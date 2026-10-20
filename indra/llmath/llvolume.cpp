@@ -2136,9 +2136,9 @@ bool LLVolume::generate()
     // edge into a parallelogram, and every face is flat or ruled straight
     // along the path: positions and UVs are affine over each quad, and the
     // split points and the rings between the ends lie on the triangles the
-    // ends make. A hole drawn in to its wall is the exception: its split
-    // points are drawn in too, where the edges they split are not, and
-    // they shape it.
+    // ends make. A hole drawn in to its wall is the exception: the wall
+    // draws in some of its points and not others, its edges no longer run
+    // straight between its corners, and its split points shape it.
     const S32 lighting_split = split;
     if (path_params.getCurveType() == LL_PCODE_PATH_LINE && !tapered && path_params.getTwistBegin() == path_params.getTwist())
     {
@@ -3004,6 +3004,10 @@ void LLVolume::createVolumeFaces()
                             {
                                 ++num_s;
                             }
+                        }
+                        if (num_s < 0)
+                        {
+                            LL_ERRS() << "Volume face corruption detected." << LL_ENDL;
                         }
                     }
                 }
@@ -5898,6 +5902,116 @@ namespace
         return outer_shorter();
     }
 
+    // A side's rows and columns that its parameters take to one point at
+    // every station: the first or last row where the path tapers to nothing
+    // at an end it reaches, and the first or last column where a half circle
+    // ends on the axis a circle path turns it about and the path keeps it
+    // there, a sphere's poles. A half circle's ends lie on that axis where
+    // no cut moves them; a circle of no radius, a hole size of 1 in y, with
+    // no skew and no taper along the axis keeps them there, and a twist
+    // keeps them only by whole half turns. An inner side runs the other way
+    // along its profile.
+    struct Collapse
+    {
+        bool first_row = false;
+        bool last_row = false;
+        bool first_column = false;
+        bool last_column = false;
+    };
+
+    Collapse collapse_of(const LLVolume* volume, bool inner)
+    {
+        Collapse collapse;
+        const LLPathParams& path = volume->getParams().getPathParams();
+        const U8 curve = path.getCurveType();
+        if (curve == LL_PCODE_PATH_LINE)
+        {
+            // A line's scale of 2 narrows its beginning to nothing, as
+            // LLPathParams::getBeginScale has it, and one of 0 its end.
+            const F32 scale_x = path.getScaleX();
+            const F32 scale_y = path.getScaleY();
+            collapse.first_row = scale_x == 2.f && scale_y == 2.f && path.getBegin() == 0.f;
+            collapse.last_row = scale_x == 0.f && scale_y == 0.f && path.getEnd() == 1.f;
+            return collapse;
+        }
+        if (curve != LL_PCODE_PATH_CIRCLE && curve != LL_PCODE_PATH_CIRCLE2)
+        {
+            return collapse;
+        }
+
+        // LLPath::genNGon tapers the end by a positive taper and the
+        // beginning by a negative one.
+        collapse.first_row = path.getTaperX() == -1.f && path.getTaperY() == -1.f && path.getBegin() == 0.f;
+        collapse.last_row = path.getTaperX() == 1.f && path.getTaperY() == 1.f && path.getEnd() == 1.f;
+
+        const LLProfileParams& profile = volume->getParams().getProfileParams();
+        const F32 half_turns = 2.f * path.getTwist();
+        if (curve == LL_PCODE_PATH_CIRCLE && (profile.getCurveType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF &&
+            path.getScaleY() == 1.f && path.getSkew() == 0.f && path.getTaperX() == 0.f && path.getTwistBegin() == path.getTwist() &&
+            half_turns == floorf(half_turns))
+        {
+            const bool begin_pole = profile.getBegin() == 0.f;
+            const bool end_pole = profile.getEnd() == 1.f;
+            collapse.first_column = inner ? end_pole : begin_pole;
+            collapse.last_column = inner ? begin_pole : end_pole;
+        }
+        return collapse;
+    }
+
+    // A side's triangles, from the quads of its grid, vertex s + num_s * t,
+    // whose left columns are listed, or from every quad: bottom left, top
+    // right, top left and bottom left, bottom right, top right, but for
+    // those whose corners a collapsed row or column puts in one place.
+    // Returns the end of what it wrote.
+    template <bool LISTED, bool COLLAPSED>
+    U16* grid_indices(U16* out, S32 num_s, S32 num_t, const S32* lefts, S32 quads, const Collapse& collapse)
+    {
+        const auto upper = [&](S32 s, S32 t)
+        {
+            *out++ = (U16)(s   + num_s*t);          //bottom left
+            *out++ = (U16)(s+1 + num_s*(t+1));      //top right
+            *out++ = (U16)(s   + num_s*(t+1));      //top left
+        };
+        const auto lower = [&](S32 s, S32 t)
+        {
+            *out++ = (U16)(s   + num_s*t);          //bottom left
+            *out++ = (U16)(s+1 + num_s*t);          //bottom right
+            *out++ = (U16)(s+1 + num_s*(t+1));      //top right
+        };
+        // The last quad's column.
+        const S32 last = num_s - 2;
+        for (S32 t = 0; t < num_t - 1; t++)
+        {
+            const bool keep_upper = !COLLAPSED || !(collapse.last_row && t + 1 == num_t - 1);
+            const bool keep_lower = !COLLAPSED || !(collapse.first_row && t == 0);
+            if (!COLLAPSED || (keep_upper && keep_lower && !collapse.first_column && !collapse.last_column))
+            {
+                for (S32 q = 0; q < quads; ++q)
+                {
+                    const S32 s = LISTED ? lefts[q] : q;
+                    upper(s, t);
+                    lower(s, t);
+                }
+                continue;
+            }
+            // A collapsed column is the first quad's left or the last
+            // quad's right.
+            for (S32 q = 0; q < quads; ++q)
+            {
+                const S32 s = LISTED ? lefts[q] : q;
+                if (keep_upper && !(s == 0 && collapse.first_column))
+                {
+                    upper(s, t);
+                }
+                if (keep_lower && !(s == last && collapse.last_column))
+                {
+                    lower(s, t);
+                }
+            }
+        }
+        return out;
+    }
+
     // The path station a cap closes: the last for a top cap, the first for a
     // bottom one.
     S32 cap_station(const LLVolume* volume, bool top)
@@ -6926,59 +7040,43 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     S32 s, t;
     F32 ss, tt;
 
-    // A flat inner side copies each of its corners, so that its normals turn
-    // there: the quad between a corner and its copy has no width, and has
-    // no triangles.
+    // A flat inner side copies each of its hole's corners, so that its
+    // normals turn there: the quad between a corner and its copy has no
+    // width, and has no triangles.
     const bool doubled = (mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2;
     const LLProfile::Face* outline = doubled ? &volume->getProfile().mFaces[mID] : nullptr;
     const S32 num_s = doubled ? outline->mCount : mNumS;
-    const S32 copies = mNumS - num_s;
 
-    num_vertices = mNumS*mNumT;
-    num_indices = (mNumS-1-copies)*(mNumT-1)*6;
-
-    // createVolumeFaces builds partially only where the layout, and so the
-    // counts, are the last build's.
-    llassert(!partial_build || (num_vertices == mNumVertices && num_indices == mNumIndices));
-    if (num_vertices != mNumVertices || num_indices != mNumIndices)
-    {
-        partial_build = false;
-    }
-
-    if (!partial_build)
-    {
-        resizeVertices(num_vertices);
-        resizeIndices(num_indices);
-    }
-
-    LLVector4a* pos = (LLVector4a*) mPositions;
-    LLVector2* tc = (LLVector2*) mTexCoords;
     F32 begin_stex = floorf(profile[mBeginS][2]);
 
-    S32 cur_vertex = 0;
-    S32 end_t = mBeginT+mNumT;
-
-    // Copy the vertices into the array. Every row takes the same columns of
-    // its mesh row with the same s texture coordinates, and the path's t for
-    // its own: the columns and their s are worked out once, so the rows are
-    // copies.
+    // Every row takes the same columns of its mesh row with the same s
+    // texture coordinates, and the path's t for its own: the columns and
+    // their s are worked out once, so the rows are copies.
     struct Column
     {
         S32 mesh;
         F32 s;
-        bool copy; // the copy of the column before it
     };
     constexpr S32 STACK_COLUMNS = 256;
     Column stack_columns[STACK_COLUMNS];
     std::vector<Column> heap_columns;
     Column* columns = stack_columns;
+    // A flat inner side's quads with area, by their left columns.
+    S32 stack_lefts[STACK_COLUMNS];
+    std::vector<S32> heap_lefts;
+    S32* lefts = stack_lefts;
     if (mNumS > STACK_COLUMNS)
     {
         heap_columns.resize(mNumS);
         columns = heap_columns.data();
+        if (doubled)
+        {
+            heap_lefts.resize(mNumS);
+            lefts = heap_lefts.data();
+        }
     }
-    { LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - copy verts");
     S32 column_count = 0;
+    S32 quads = doubled ? 0 : mNumS - 1;
     for (s = 0; s < num_s; s++)
     {
         if (mTypeMask & END_MASK)
@@ -7018,14 +7116,72 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 
         // A column past the profile's end wraps to its start.
         const S32 column = mBeginS + s >= max_s ? mBeginS + s - max_s : mBeginS + s;
-        columns[column_count++] = { column, ss, false };
+        if (doubled && s > 0)
+        {
+            lefts[quads++] = column_count - 1;
+        }
+        columns[column_count++] = { column, ss };
         if (doubled && outline->isCorner(s))
         {
-            columns[column_count++] = { column, ss, true };
+            columns[column_count++] = { column, ss };
         }
     }
     llassert(column_count == mNumS);
 
+    const S32 rows = mNumT - 1;
+
+    // On a shared volume, a row or column its parameters take to one point
+    // keeps its vertices, each with its own UV and normal, and has no
+    // triangles: those with two corners there have no area. Of a grid
+    // quad's two triangles, bottom left, top right, top left has two corners
+    // on its left column and on its top row, and bottom left, bottom right,
+    // top right on its right column and its bottom row. A face that would be
+    // left with none keeps them all.
+    Collapse collapse;
+    if (!volume->isUnique() && sculpt_stitching == LL_SCULPT_TYPE_NONE)
+    {
+        collapse = collapse_of(volume, mTypeMask & INNER_MASK);
+        if (mTypeMask & END_MASK)
+        {
+            collapse.first_column = false;
+            collapse.last_column = false;
+        }
+    }
+    const S32 upper_left_out = (collapse.first_column ? rows : 0) + (collapse.last_row ? quads : 0) - (collapse.first_column && collapse.last_row ? 1 : 0);
+    const S32 lower_left_out = (collapse.last_column ? rows : 0) + (collapse.first_row ? quads : 0) - (collapse.last_column && collapse.first_row ? 1 : 0);
+    S32 triangles = 2 * quads * rows - upper_left_out - lower_left_out;
+    if (triangles <= 0)
+    {
+        collapse = Collapse();
+        triangles = 2 * quads * rows;
+    }
+    const bool collapsed = collapse.first_row || collapse.last_row || collapse.first_column || collapse.last_column;
+
+    num_vertices = mNumS*mNumT;
+    num_indices = triangles*3;
+
+    // createVolumeFaces builds partially only where the layout, and so the
+    // counts, are the last build's.
+    llassert(!partial_build || (num_vertices == mNumVertices && num_indices == mNumIndices));
+    if (num_vertices != mNumVertices || num_indices != mNumIndices)
+    {
+        partial_build = false;
+    }
+
+    if (!partial_build)
+    {
+        resizeVertices(num_vertices);
+        resizeIndices(num_indices);
+    }
+
+    LLVector4a* pos = (LLVector4a*) mPositions;
+    LLVector2* tc = (LLVector2*) mTexCoords;
+
+    S32 cur_vertex = 0;
+    S32 end_t = mBeginT+mNumT;
+
+    // Copy the vertices into the array.
+    { LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - copy verts");
     const LLVector4a* mesh_points = mesh.data();
     for (t = mBeginT; t < end_t; t++)
     {
@@ -7086,22 +7242,18 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - generate indices");
 
         // Now we generate the indices.
-        for (t = 0; t < (mNumT-1); t++)
+        U16* end_index = mIndices;
+        if (collapsed)
         {
-            for (s = 0; s < (mNumS-1); s++)
-            {
-                if (columns[s + 1].copy)
-                {
-                    continue;
-                }
-                mIndices[cur_index++] = s   + mNumS*t;          //bottom left
-                mIndices[cur_index++] = s+1 + mNumS*(t+1);      //top right
-                mIndices[cur_index++] = s   + mNumS*(t+1);      //top left
-                mIndices[cur_index++] = s   + mNumS*t;          //bottom left
-                mIndices[cur_index++] = s+1 + mNumS*t;          //bottom right
-                mIndices[cur_index++] = s+1 + mNumS*(t+1);      //top right
-            }
+            end_index = doubled ? grid_indices<true, true>(mIndices, mNumS, mNumT, lefts, quads, collapse)
+                                : grid_indices<false, true>(mIndices, mNumS, mNumT, lefts, quads, collapse);
         }
+        else
+        {
+            end_index = doubled ? grid_indices<true, false>(mIndices, mNumS, mNumT, lefts, quads, collapse)
+                                : grid_indices<false, false>(mIndices, mNumS, mNumT, lefts, quads, collapse);
+        }
+        cur_index = (S32)(end_index - mIndices);
         llassert(cur_index == mNumIndices);
     }
 
@@ -7215,7 +7367,8 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 
     // On a sphere's side, a column that is one place in every row is a pole
     // on the axis the half circle sweeps about, and takes the axis. A cut
-    // end of a hollow sphere lies on the axis, and has no area.
+    // end of a hollow sphere lies on the axis, and has no area. A flat inner
+    // side's last point keeps the normal of the strip it ends.
     if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
         ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
     {
@@ -7227,7 +7380,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             }
         }
 
-        if (column_is_point(pos, mNumS, mNumT, mNumS - 1))
+        if (!doubled && column_is_point(pos, mNumS, mNumT, mNumS - 1))
         { //all upper S have same normal
             for (S32 i = 0; i < mNumT; i++)
             {
