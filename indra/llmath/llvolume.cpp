@@ -4543,6 +4543,7 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
     mNumT = src.mNumT;
     mJoinsS = src.mJoinsS;
     mJoinsT = src.mJoinsT;
+    mReversed = src.mReversed;
 
     mExtents[0] = src.mExtents[0];
     mExtents[1] = src.mExtents[1];
@@ -5542,6 +5543,159 @@ void LLVolumeFace::swapData(LLVolumeFace& rhs)
     llswap(rhs.mNumIndices, mNumIndices);
 }
 
+namespace
+{
+    // Points closer than this are one place: far above the rounding that a
+    // closed loop carries from its first point around to its last, far below
+    // the step between any two points the generator means to be apart.
+    constexpr F32 SAME_PLACE = 1e-5f;
+
+    bool same_place(const LLVector4a& a, const LLVector4a& b)
+    {
+        LLVector4a d;
+        d.setSub(a, b);
+        return d.dot3(d).getF32() <= SAME_PLACE * SAME_PLACE;
+    }
+
+    // Whether every row of a grid has the same place in column a as in
+    // column b.
+    bool columns_meet(const LLVector4a* pos, S32 num_s, S32 num_t, S32 a, S32 b)
+    {
+        for (S32 t = 0; t < num_t; ++t)
+        {
+            if (!same_place(pos[num_s * t + a], pos[num_s * t + b]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether every column of a grid has the same place in row a as in row b.
+    bool rows_meet(const LLVector4a* pos, S32 num_s, S32 a, S32 b)
+    {
+        for (S32 s = 0; s < num_s; ++s)
+        {
+            if (!same_place(pos[num_s * a + s], pos[num_s * b + s]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Whether a column of a grid is one place in every row: a pole.
+    bool column_is_point(const LLVector4a* pos, S32 num_s, S32 num_t, S32 s)
+    {
+        for (S32 t = 1; t < num_t; ++t)
+        {
+            if (!same_place(pos[s], pos[num_s * t + s]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // Adds a grid quad to its corners' normals. Its two triangles, (bl, br,
+    // tr) and (bl, tr, tl), share the diagonal from bl to tr: each gives its
+    // corner off the diagonal its cross product, twice its area along its
+    // normal, and each corner on the diagonal half of it. A parallelogram
+    // then gives its four corners one weight, so a vertex has as much from
+    // either side of it in every row, and no corner takes a normal from a
+    // triangle it is not in. Each cross product is taken at the corner off
+    // the diagonal: where a copied or collapsed row or column puts two of a
+    // triangle's corners in one place, an edge there has no length and the
+    // product is exactly zero, fused multiply-add or not. A quad between a
+    // copied row or column adds nothing, so the edge there stays hard.
+    void add_quad_to_normals(LLVector4a* norm, const LLVector4a* pos, S32 bl, S32 br, S32 tl, S32 tr)
+    {
+        LLVector4a bottom, right, top, left;
+        bottom.setSub(pos[br], pos[bl]);
+        right.setSub(pos[tr], pos[br]);
+        top.setSub(pos[tr], pos[tl]);
+        left.setSub(pos[tl], pos[bl]);
+
+        LLVector4a lower, upper;
+        lower.setCross3(bottom, right);
+        upper.setCross3(top, left);
+
+        LLVector4a shared;
+        shared.setAdd(lower, upper);
+        shared.mul(0.5f);
+
+        norm[bl].add(shared);
+        norm[br].add(lower);
+        norm[tr].add(shared);
+        norm[tl].add(upper);
+    }
+
+    // The path station a cap closes: the last for a top cap, the first for a
+    // bottom one.
+    S32 cap_station(const LLVolume* volume, bool top)
+    {
+        return top ? (S32)volume->getPath().mPath.size() - 1 : 0;
+    }
+
+    // A cap's normal: the normal of its station's profile plane, the third
+    // row of the station's rotation, which a taper to a point or a line
+    // cannot make degenerate as it does a cross product of the cap's own
+    // edges. A top cap's profile winds to face along that row and a bottom
+    // cap's against it. Where the ring of the station next to the cap lies
+    // on the side the winding faces, the cap faces the other way, and
+    // reversed is set: the end of a twisted sphere turns its half disc to
+    // the other side of the axis it sweeps about, and the sphere leaves the
+    // cap the other way. decide is false on a partial build, which keeps
+    // reversed as the full build left it.
+    LLVector4a cap_normal(const LLVolume* volume, bool top, bool decide, bool& reversed)
+    {
+        const LLAlignedArray<LLPath::PathPt, 64>& path = volume->getPath().mPath;
+        const S32 own = cap_station(volume, top);
+        LLVector4a normal = path[own].mRot.getRow<2>();
+        normal.normalize3();
+        if (!top)
+        {
+            normal.negate();
+        }
+
+        if (decide)
+        {
+            reversed = false;
+            const S32 count = (S32)path.size();
+            if (count > 1)
+            {
+                const S32 next = top ? own - 1 : own + 1;
+                const S32 ring = volume->getProfile().getTotal();
+                const LLAlignedArray<LLVector4a, 64>& mesh = volume->getMesh();
+                LLVector4a toward;
+                toward.clear();
+                for (S32 i = 0; i < ring; ++i)
+                {
+                    LLVector4a d;
+                    d.setSub(mesh[next * ring + i], mesh[own * ring + i]);
+                    toward.add(d);
+                }
+                reversed = toward.dot3(normal).getF32() > SAME_PLACE * ring;
+            }
+        }
+
+        if (reversed)
+        {
+            normal.negate();
+        }
+        return normal;
+    }
+
+    // Turns every triangle of an index list over.
+    void reverse_winding(U16* indices, S32 count)
+    {
+        for (S32 i = 0; i + 2 < count; i += 3)
+        {
+            std::swap(indices[i + 1], indices[i + 2]);
+        }
+    }
+}
+
 void    LerpPlanarVertex(LLVolumeFace::VertexData& v0,
                    LLVolumeFace::VertexData& v1,
                    LLVolumeFace::VertexData& v2,
@@ -5599,20 +5753,9 @@ bool LLVolumeFace::createUnCutCubeCap(LLVolume* volume, bool partial_build)
             corners[t].mTexCoord.mV[1] = 0.5f - profile[grid_size*t][1];
         }
 
-        {
-            LLVector4a lhs;
-            lhs.setSub(corners[1].getPosition(), corners[0].getPosition());
-            LLVector4a rhs;
-            rhs.setSub(corners[2].getPosition(), corners[1].getPosition());
-            baseVert.getNormal().setCross3(lhs, rhs);
-            baseVert.getNormal().normalize3fast();
-        }
+        baseVert.setNormal(cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed));
 
-        if(!(mTypeMask & TOP_MASK))
-        {
-            baseVert.getNormal().mul(-1.0f);
-        }
-        else
+        if (mTypeMask & TOP_MASK)
         {
             //Swap the UVs on the U(X) axis for top face
             LLVector2 swap;
@@ -5696,6 +5839,11 @@ bool LLVolumeFace::createUnCutCubeCap(LLVolume* volume, bool partial_build)
                 }
             }
         }
+
+        if (mReversed)
+        {
+            reverse_winding(mIndices, mNumIndices);
+        }
     }
 
     return true;
@@ -5755,9 +5903,6 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     {
         offset = mBeginS;
     }
-
-    // Figure out the normal, assume all caps are flat faces.
-    // Cross product to get normals.
 
     LLVector2 cuv;
     LLVector2 min_uv, max_uv;
@@ -5837,15 +5982,35 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     mCenter->setAdd(min, max);
     mCenter->mul(0.5f);
 
-    cuv = (min_uv + max_uv)*0.5f;
-
-
-    VertexData vd;
-    vd.setPosition(*mCenter);
-    vd.mTexCoord = cuv;
-
     if (!(mTypeMask & HOLLOW_MASK) && !(mTypeMask & OPEN_MASK))
     {
+        // The centre vertex takes the UV of its own position: the profile
+        // point its station's scale and rotation carry there. A twist turns
+        // the cap, and the middle of its positions' box is then not where
+        // the middle of its UVs' box maps. Along an axis the station scales
+        // to nothing, every point of the cap is one place, and the middle of
+        // the UVs serves.
+        cuv = (min_uv + max_uv)*0.5f;
+
+        const LLPath::PathPt& station = volume->getPath().mPath[cap_station(volume, mTypeMask & TOP_MASK)];
+        LLVector4a origin = station.mPos;
+        if (!origin.isFinite3())
+        {
+            origin.clear();
+        }
+        LLVector4a from_origin;
+        from_origin.setSub(*mCenter, origin);
+        const F32* scale = station.mScale.getF32ptr();
+        if (scale[0] > SAME_PLACE)
+        {
+            cuv.mV[0] = from_origin.dot3(station.mRot.getRow<0>()).getF32() / scale[0] + 0.5f;
+        }
+        if (scale[1] > SAME_PLACE)
+        {
+            const F32 y = from_origin.dot3(station.mRot.getRow<1>()).getF32() / scale[1];
+            cuv.mV[1] = (mTypeMask & TOP_MASK) ? y + 0.5f : 0.5f - y;
+        }
+
         *pos++ = *mCenter;
         *tc++ = cuv;
         num_vertices++;
@@ -6096,23 +6261,10 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
 
     }
 
-    LLVector4a d0,d1;
-    d0.setSub(mPositions[mIndices[1]], mPositions[mIndices[0]]);
-    d1.setSub(mPositions[mIndices[2]], mPositions[mIndices[0]]);
-
-    LLVector4a normal;
-    normal.setCross3(d0,d1);
-
-    if (normal.dot3(normal).getF32() > F_APPROXIMATELY_ZERO)
+    const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
+    if (mReversed)
     {
-        normal.normalize3fast();
-    }
-    else
-    { //degenerate, make up a value
-        if(normal.getF32ptr()[2] >= 0)
-            normal.set(0.f,0.f,1.f);
-        else
-            normal.set(0.f,0.f,-1.f);
+        reverse_winding(mIndices, mNumIndices);
     }
 
     llassert(llfinite(normal.getF32ptr()[0]));
@@ -6371,94 +6523,6 @@ size_t LLVolumeFace::weldVertices(VertexData* destination_vertices, U32* destina
     meshopt_remapIndexBuffer<unsigned int>(destination_indices, indices, index_count, &remap[0]);
 
     return unique;
-}
-
-namespace
-{
-    // Points closer than this are one place: far above the rounding that a
-    // closed loop carries from its first point around to its last, far below
-    // the step between any two points the generator means to be apart.
-    constexpr F32 SAME_PLACE = 1e-5f;
-
-    bool same_place(const LLVector4a& a, const LLVector4a& b)
-    {
-        LLVector4a d;
-        d.setSub(a, b);
-        return d.dot3(d).getF32() <= SAME_PLACE * SAME_PLACE;
-    }
-
-    // Whether every row of a grid has the same place in column a as in
-    // column b.
-    bool columns_meet(const LLVector4a* pos, S32 num_s, S32 num_t, S32 a, S32 b)
-    {
-        for (S32 t = 0; t < num_t; ++t)
-        {
-            if (!same_place(pos[num_s * t + a], pos[num_s * t + b]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Whether every column of a grid has the same place in row a as in row b.
-    bool rows_meet(const LLVector4a* pos, S32 num_s, S32 a, S32 b)
-    {
-        for (S32 s = 0; s < num_s; ++s)
-        {
-            if (!same_place(pos[num_s * a + s], pos[num_s * b + s]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Whether a column of a grid is one place in every row: a pole.
-    bool column_is_point(const LLVector4a* pos, S32 num_s, S32 num_t, S32 s)
-    {
-        for (S32 t = 1; t < num_t; ++t)
-        {
-            if (!same_place(pos[s], pos[num_s * t + s]))
-            {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // Adds a grid quad to its corners' normals. Its two triangles, (bl, br,
-    // tr) and (bl, tr, tl), share the diagonal from bl to tr: each gives its
-    // corner off the diagonal its cross product, twice its area along its
-    // normal, and each corner on the diagonal half of it. A parallelogram
-    // then gives its four corners one weight, so a vertex has as much from
-    // either side of it in every row, and no corner takes a normal from a
-    // triangle it is not in. Each cross product is taken at the corner off
-    // the diagonal: where a copied or collapsed row or column puts two of a
-    // triangle's corners in one place, an edge there has no length and the
-    // product is exactly zero, fused multiply-add or not. A quad between a
-    // copied row or column adds nothing, so the edge there stays hard.
-    void add_quad_to_normals(LLVector4a* norm, const LLVector4a* pos, S32 bl, S32 br, S32 tl, S32 tr)
-    {
-        LLVector4a bottom, right, top, left;
-        bottom.setSub(pos[br], pos[bl]);
-        right.setSub(pos[tr], pos[br]);
-        top.setSub(pos[tr], pos[tl]);
-        left.setSub(pos[tl], pos[bl]);
-
-        LLVector4a lower, upper;
-        lower.setCross3(bottom, right);
-        upper.setCross3(top, left);
-
-        LLVector4a shared;
-        shared.setAdd(lower, upper);
-        shared.mul(0.5f);
-
-        norm[bl].add(shared);
-        norm[br].add(lower);
-        norm[tr].add(shared);
-        norm[tl].add(upper);
-    }
 }
 
 bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)

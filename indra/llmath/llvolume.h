@@ -947,6 +947,12 @@ public:
     bool mJoinsS = false;
     bool mJoinsT = false;
 
+    // Whether a cap's triangles wind against the way its profile runs, so
+    // that it faces away from the wall it closes where that wall lies on the
+    // side its profile's winding faces. A full build decides it and a
+    // partial build keeps it.
+    bool mReversed = false;
+
     LLVector4a* mExtents; //minimum and maximum point of face
     LLVector4a* mCenter;
     LLVector2   mTexCoordExtents[2]; //minimum and maximum of texture coordinates of the face.

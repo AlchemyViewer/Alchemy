@@ -582,8 +582,10 @@ namespace
 
     namespace Regions
     {
-        // A cap with no area, which has no triangle to take a normal
-        // from.
+        // A cap with no area. Where its path leaves it within its plane, its
+        // normal is far from the way its wall runs; and its tangent, from
+        // triangles with no area, is the one the tangent generator makes up,
+        // whatever the normal.
         constexpr U32 CapNoArea = 1 << 2;
         // A square hole above 0.707 in a round or triangular profile,
         // whose corners go through the wall.
@@ -594,14 +596,6 @@ namespace
         // last column of a cut flat inner side, a half circle's square or
         // triangle hole on its axis, the middle of a sculpt's pinch.
         constexpr U32 ZeroNormal = 1 << 5;
-        // A cap with a centre vertex on a twisted path: the centre takes the
-        // middle of the cap's bounding box and the middle of its UVs', which
-        // a rotation makes two different points.
-        constexpr U32 TwistedCapHub = 1 << 6;
-        // A cap of a twisted sphere: the twist turns the half disc to the
-        // other side of the axis it sweeps about, which reverses the way
-        // the sphere leaves the cap, but not the cap.
-        constexpr U32 InsideOutCap = 1 << 7;
     }
 
     U32 excusedBy(U32 regions)
@@ -609,19 +603,11 @@ namespace
         U32 checks = 0;
         if (regions & Regions::CapNoArea)
         {
-            checks |= Checks::Finite | Checks::RawUnit | Checks::CapFacing | Checks::Tangents | Checks::Orthogonal;
+            checks |= Checks::CapFacing | Checks::Orthogonal;
         }
         if (regions & Regions::SquareHole)
         {
             checks |= Checks::Inversion | Checks::CapFacing | Checks::Oracle;
-        }
-        if (regions & Regions::TwistedCapHub)
-        {
-            checks |= Checks::AffineUV;
-        }
-        if (regions & Regions::InsideOutCap)
-        {
-            checks |= Checks::CapFacing;
         }
         return checks;
     }
@@ -654,25 +640,13 @@ namespace
         const LLVolumeParams& params = volume.getParams();
         const U8 profile = params.getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK;
         const U8 hole = params.getProfileParams().getCurveType() & LL_PCODE_HOLE_MASK;
-        const bool twisted = params.getPathParams().getTwistBegin() != params.getPathParams().getTwist();
         if (!isSculpt(volume) && hole == LL_PCODE_HOLE_SQUARE && params.getHollow() > 0.70711f && isRoundOrTriangle(profile))
         {
             regions |= Regions::SquareHole;
         }
-        if (isCap(face))
+        if (isCap(face) && std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
         {
-            if (std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
-            {
-                regions |= Regions::CapNoArea;
-            }
-            if (twisted && !(face.mTypeMask & (LLVolumeFace::HOLLOW_MASK | LLVolumeFace::OPEN_MASK)))
-            {
-                regions |= Regions::TwistedCapHub;
-            }
-            if (twisted && profile == LL_PCODE_PROFILE_CIRCLE_HALF && params.getPathParams().getCurveType() != LL_PCODE_PATH_LINE)
-            {
-                regions |= Regions::InsideOutCap;
-            }
+            regions |= Regions::CapNoArea;
         }
         if (std::find(lone.begin(), lone.end(), true) != lone.end())
         {
@@ -2645,9 +2619,11 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A cap's normal is the first triangle's, with +/-Z when that has
-    // no area; the uncut cube cap normalizes a zero cross product. A cap
-    // with no area, as on a pyramid or a prism, still faces along the path.
+    // A cap with no area, as on a pyramid or a prism, still faces along the
+    // path. A cap's normal is its station's plane's, which a circle2 path's
+    // alternating stations, and a half circle on a circle path tapered to a
+    // point, leave the cap at 70 to 90 degrees from: their walls run off
+    // within the plane, not along its normal.
     TEST_CASE("llvolume: a cap with no area still faces away from its wall", "[llvolume][!shouldfail]")
     {
         Inspect how;
@@ -2899,14 +2875,13 @@ namespace
     }
 
     // A general cap's centre vertex takes the middle of the cap's bounding
-    // box for its position and the middle of the UVs' box for its UV. A
-    // twist rotates the cap, and the two are no longer one point: the
-    // texture slides at the centre of every twisted cap.
-    TEST_CASE("llvolume: a twisted cap's centre vertex has the UV of its position", "[llvolume][!shouldfail]")
+    // box for its position. A twist rotates the cap, and the middle of the
+    // UVs' box is then another point: a centre that took that UV would
+    // slide the texture at the centre of every twisted cap.
+    TEST_CASE("llvolume: a twisted cap's centre vertex has the UV of its position", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::AffineUV;
-        how.only_regions = Regions::TwistedCapHub;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2916,13 +2891,12 @@ namespace
 
     // A sphere's half disc sweeps about the axis it touches. A twist turns
     // it about its own centre on that axis, to the other side of the axis,
-    // and the sphere then leaves the cap the other way; the cap's winding
-    // and normal stay, and the cap faces into the sphere.
-    TEST_CASE("llvolume: a twisted sphere's caps face out of the sphere", "[llvolume][!shouldfail]")
+    // and the sphere then leaves the cap the other way: a cap that kept the
+    // winding and normal its profile gives it would face into the sphere.
+    TEST_CASE("llvolume: a twisted sphere's caps face out of the sphere", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::CapFacing;
-        how.only_regions = Regions::InsideOutCap;
+        how.checks = Checks::CapFacing | Checks::Inversion;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
