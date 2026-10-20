@@ -1098,8 +1098,9 @@ namespace
         {
             return;
         }
-        const bool sphere = !isSculpt(volume) && (volume.getParams().getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF &&
-                            volume.getParams().getPathParams().getCurveType() == LL_PCODE_PATH_CIRCLE;
+        const LLVolumeParams& params = volume.getParams();
+        const bool sphere = !isSculpt(volume) && (params.getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF &&
+                            params.getPathParams().getCurveType() == LL_PCODE_PATH_CIRCLE;
         auto pole = [&](S32 column)
         {
             for (S32 t = 1; t < face.mNumT; ++t)
@@ -2492,7 +2493,7 @@ namespace
     }
 
     // ------------------------------------------------------------------
-    // Today's defects
+    // Defects, a case each: tagged [!shouldfail] while the generator has one
 
     // A cylinder side's quads are rectangles of one size, so a vertex has
     // as much area on either side of it, in every row: a weight that went to

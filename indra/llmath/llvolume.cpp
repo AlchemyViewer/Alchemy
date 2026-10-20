@@ -614,17 +614,20 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
         F32 nearest = 1.f;
         for (S32 k = 0; k + 1 < mTotalOut; k++)
         {
-            // Where the ray s * p crosses the line a + u * e.
+            // Where the ray s * p crosses the line a + u * e: at s = toward /
+            // across. A point well inside the line, on the origin's side,
+            // crosses it beyond itself.
             const F32 ax = mProfile[k][0];
             const F32 ay = mProfile[k][1];
             const F32 ex = mProfile[k + 1][0] - ax;
             const F32 ey = mProfile[k + 1][1] - ay;
+            const F32 toward = ax * ey - ay * ex;
             const F32 across = px * ey - py * ex;
-            if (across == 0.f)
+            if ((toward > 0.f && toward - across > 1e-6f) || across == 0.f)
             {
                 continue;
             }
-            const F32 s = (ax * ey - ay * ex) / across;
+            const F32 s = toward / across;
             if (s > 0.f)
             {
                 nearest = llmin(nearest, s);
@@ -5659,36 +5662,31 @@ namespace
         return true;
     }
 
-    // Adds a grid quad to its corners' normals. Its two triangles, (bl, br,
-    // tr) and (bl, tr, tl), share the diagonal from bl to tr: each gives its
-    // corner off the diagonal its cross product, twice its area along its
-    // normal, and each corner on the diagonal half of it. A parallelogram
-    // then gives its four corners one weight, so a vertex has as much from
-    // either side of it in every row, and no corner takes a normal from a
-    // triangle it is not in. Each cross product is taken at the corner off
-    // the diagonal: where a copied or collapsed row or column puts two of a
-    // triangle's corners in one place, an edge there has no length and the
-    // product is exactly zero, fused multiply-add or not. An edge between
-    // two points that are one place but for rounding, as a closed profile's
-    // last point and its first, counts as having none. A quad between a
-    // copied row or column adds nothing, so the edge there stays hard.
-    void add_quad_to_normals(LLVector4a* norm, const LLVector4a* pos, S32 bl, S32 br, S32 tl, S32 tr)
+    // An edge between two points that are one place but for rounding, as a
+    // closed profile's last point and its first, has no length.
+    inline void drop_rounding(LLVector4a& edge)
     {
-        LLVector4a bottom, right, top, left;
-        bottom.setSub(pos[br], pos[bl]);
-        right.setSub(pos[tr], pos[br]);
-        top.setSub(pos[tr], pos[tl]);
-        left.setSub(pos[tl], pos[bl]);
-
-        const LLVector4a zero = LLVector4a::getZero();
-        const LLVector4a same_place(SAME_PLACE * SAME_PLACE);
-        for (LLVector4a* edge : { &bottom, &right, &top, &left })
+        if (edge.equals3(LLVector4a::getZero(), SAME_PLACE))
         {
-            LLVector4a length;
-            length.setAllDot3(*edge, *edge);
-            edge->setSelectWithMask(length.lessThan(same_place), zero, *edge);
+            edge.clear();
         }
+    }
 
+    // Adds a grid quad, given by its edges, to its corners' normals. Its two
+    // triangles, (bl, br, tr) and (bl, tr, tl), share the diagonal from bl to
+    // tr: each gives its corner off the diagonal its cross product, twice its
+    // area along its normal, and each corner on the diagonal half of it. A
+    // parallelogram then gives its four corners one weight, so a vertex has
+    // as much from either side of it in every row, and no corner takes a
+    // normal from a triangle it is not in. Each cross product is taken at the
+    // corner off the diagonal: where a copied or collapsed row or column puts
+    // two of a triangle's corners in one place, an edge there has no length
+    // and the product is exactly zero, fused multiply-add or not. A quad
+    // between a copied row or column adds nothing, so the edge there stays
+    // hard.
+    inline void add_quad_to_normals(LLVector4a* norm, S32 bl, S32 br, S32 tl, S32 tr, const LLVector4a& bottom, const LLVector4a& right,
+                                    const LLVector4a& top, const LLVector4a& left)
+    {
         LLVector4a lower, upper;
         lower.setCross3(bottom, right);
         upper.setCross3(top, left);
@@ -5705,14 +5703,13 @@ namespace
 
     // Brings every normal of a grid to unit length. A vertex whose quads all
     // have no area, as a copy that closes a cut flat inner side or a row in
-    // the middle of a sculpt's pinch, has no normal of its own, and takes
-    // the nearest one up or down its column, or, where the whole column has
-    // none, along its row, or, where neither has one, as where a copied
-    // column crosses a copied row, the nearest around it: only a normal a
-    // vertex had of its own, so that what one such vertex takes does not
-    // pass on to the next. A grid with no normal at all faces +Z. While they
-    // wait, such vertices are marked with a w of 1, which every normal of
-    // its own has as 0.
+    // the middle of a sculpt's pinch, has no normal of its own. It takes the
+    // nearest one up or down its column; where its whole column has none,
+    // the nearest along its row; where its row has none either, as where a
+    // copied column crosses a copied row, the nearest around it. It takes
+    // only a normal a vertex has of its own, so that none is passed on twice.
+    // A grid with no normal at all faces +Z. Such a vertex is marked with a
+    // w of 1 until it has one; a normal of its own has a w of 0.
     void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
     {
         const S32 count = num_s * num_t;
@@ -6258,10 +6255,8 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
 
     if (mTypeMask & HOLLOW_MASK)
     {
-        // A hole that touches its wall puts inner points on outer ones, and
-        // the strip's triangles there have no area but what rounding leaves,
-        // of either sign: the signs alone can then leave the strip only
-        // triangles facing the wrong way.
+        // Where the hole touches the wall, the strip's triangles have no area
+        // but what rounding leaves, of either sign.
         const F32 zero_area = volume->getProfile().holeTouchesWall() ? CAP_ZERO_AREA : 0.f;
 
         if (mTypeMask & TOP_MASK)
@@ -6897,20 +6892,30 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     for (t = 0; t < mNumT - 1; ++t)
     {
         const S32 row = mNumS * t;
+        LLVector4a left;
+        left.setSub(pos[row + mNumS], pos[row]);
+        drop_rounding(left);
         for (s = 0; s < mNumS - 1; ++s)
         {
             const S32 bl = row + s;
             const S32 tl = bl + mNumS;
-            add_quad_to_normals(norm, pos, bl, bl + 1, tl, tl + 1);
+            LLVector4a bottom, right, top;
+            bottom.setSub(pos[bl + 1], pos[bl]);
+            right.setSub(pos[tl + 1], pos[bl + 1]);
+            top.setSub(pos[tl + 1], pos[tl]);
+            drop_rounding(bottom);
+            drop_rounding(right);
+            drop_rounding(top);
+            add_quad_to_normals(norm, bl, bl + 1, tl, tl + 1, bottom, right, top, left);
+            left = right;
         }
     }
 
-    // A side's normals join across an edge where its first and last columns
-    // are one seam, or its first and last rows: a prim's where they are one
-    // place in every row or column, which the face tells from its own
-    // positions and not from whether the profile or the path counts as
-    // closed; a sculpt's where its stitching samples them from one column
-    // or row of the map.
+    // A side's normals join across its first and last columns where they are
+    // one seam, and across its first and last rows: a prim's where they are
+    // one place in every row or column, as its own positions say; a
+    // sculpt's where its stitching samples them from one column or row of
+    // the map.
     if (!partial_build)
     {
         if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
