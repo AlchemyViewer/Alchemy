@@ -57,6 +57,7 @@ LLFetchedGLTFMaterial& LLFetchedGLTFMaterial::operator=(const LLFetchedGLTFMater
     mNormalTexture = rhs.mNormalTexture;
     mMetallicRoughnessTexture = rhs.mMetallicRoughnessTexture;
     mEmissiveTexture = rhs.mEmissiveTexture;
+    std::copy(std::begin(rhs.mBakedTextures), std::end(rhs.mBakedTextures), std::begin(mBakedTextures));
 
     return *this;
 }
@@ -95,8 +96,8 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
     // override emissive and base color textures with media tex if present
-    LLViewerTexture* baseColorTex = media_tex ? media_tex : mBaseColorTexture;
-    LLViewerTexture* emissiveTex = media_tex ? media_tex : mEmissiveTexture;
+    LLViewerTexture* baseColorTex = media_tex ? media_tex : getRenderTexture(GLTF_TEXTURE_INFO_BASE_COLOR);
+    LLViewerTexture* emissiveTex = media_tex ? media_tex : getRenderTexture(GLTF_TEXTURE_INFO_EMISSIVE);
 
     // sImpostorRender is checked alongside sShadowRender throughout this function because
     // generateImpostor sets BOTH, and only one of them means "depth-only". An impostor bake
@@ -136,18 +137,20 @@ void LLFetchedGLTFMaterial::bind(LLViewerTexture* media_tex)
 
     if (!depth_only_pass)
     {
-        if (mNormalTexture.notNull() && mNormalTexture->getDiscardLevel() <= 4)
+        LLViewerTexture* normalTex = getRenderTexture(GLTF_TEXTURE_INFO_NORMAL);
+        if (normalTex != nullptr && normalTex->getDiscardLevel() <= 4)
         {
-            shader->bindTexture(LLShaderMgr::BUMP_MAP, mNormalTexture, GLTF_DATA_SAMPLER);
+            shader->bindTexture(LLShaderMgr::BUMP_MAP, normalTex, GLTF_DATA_SAMPLER);
         }
         else
         {
             shader->bindTexture(LLShaderMgr::BUMP_MAP, LLViewerFetchedTexture::sFlatNormalImagep, GLTF_DATA_SAMPLER);
         }
 
-        if (mMetallicRoughnessTexture.notNull())
+        LLViewerTexture* metallicRoughnessTex = getRenderTexture(GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS);
+        if (metallicRoughnessTex != nullptr)
         {
-            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, mMetallicRoughnessTexture, GLTF_DATA_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
+            shader->bindTexture(LLShaderMgr::SPECULAR_MAP, metallicRoughnessTex, GLTF_DATA_SAMPLER); // PBR linear packed Occlusion, Roughness, Metal.
         }
         else
         {
@@ -269,6 +272,7 @@ void LLFetchedGLTFMaterial::clearFetchedTextures()
     mNormalTexture = nullptr;
     mMetallicRoughnessTexture = nullptr;
     mEmissiveTexture = nullptr;
+    std::fill(std::begin(mBakedTextures), std::end(mBakedTextures), nullptr);
 }
 
 void LLFetchedGLTFMaterial::materialBegin()

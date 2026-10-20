@@ -885,7 +885,7 @@ ALSelectionOutline::FaceBinding ALSelectionOutline::bindFace(LLGLSLShader& progr
         // LLFetchedGLTFMaterial::bind in its place.
         if (!face->hasMedia() || !texture || texture->getType() != LLViewerTexture::MEDIA_TEXTURE)
         {
-            texture = gltf->mBaseColorTexture.get();
+            texture = gltf->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR);
         }
         if (texture && texture_has_alpha(texture))
         {

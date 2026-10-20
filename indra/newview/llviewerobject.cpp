@@ -5477,22 +5477,18 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         getTE(te)->setGLTFMaterial(nullptr);
     }
 
-    auto fetch_texture = [this](const LLUUID& id)
+    // A slot naming a bake proxy draws what it resolves to on this object's avatar
+    // (LLFetchedGLTFMaterial::mBakedTextures), and fetches nothing; any other fetches its asset
+    auto fetch_texture = [this, mat](LLGLTFMaterial::TextureInfo slot)
     {
+        const LLUUID& id = mat->mTextureId[slot];
+        mat->mBakedTextures[slot] = getBakedTextureForMagicId(id);
+
         LLViewerFetchedTexture* img = nullptr;
-        if (id.notNull())
+        if (id.notNull() && mat->mBakedTextures[slot].isNull())
         {
-            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(id))
-            {
-                 // TODO -- fall back to LLTextureEntry::mGLTFRenderMaterial when overriding with baked texture
-                LLViewerTexture* viewerTexture = getBakedTextureForMagicId(id);
-                img = viewerTexture ? dynamic_cast<LLViewerFetchedTexture*>(viewerTexture) : nullptr;
-            }
-            else
-            {
-                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-                img->addTextureStats(64.f * 64.f, true);
-            }
+            img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+            img->addTextureStats(64.f * 64.f, true);
         }
 
         return img;
@@ -5500,10 +5496,10 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
 
     if (mat != nullptr)
     {
-        mat->mBaseColorTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
-        mat->mNormalTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
-        mat->mMetallicRoughnessTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
-        mat->mEmissiveTexture= fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
+        mat->mBaseColorTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR);
+        mat->mNormalTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL);
+        mat->mMetallicRoughnessTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS);
+        mat->mEmissiveTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE);
     }
 }
 
@@ -5512,11 +5508,32 @@ void LLViewerObject::refreshBakeTexture()
     for (int face_index = 0; face_index < getNumTEs(); face_index++)
     {
         LLTextureEntry* tex_entry = getTE(face_index);
-        if (tex_entry && LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(tex_entry->getID()))
+        if (!tex_entry)
+        {
+            continue;
+        }
+
+        if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(tex_entry->getID()))
         {
             const LLUUID& image_id = tex_entry->getID();
             LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
             changeTEImage(face_index, bakedTexture);
+        }
+
+        // A PBR face draws the bake proxies its render material names from what the material holds
+        // for them, resolved when the face was last built: resolve them again where one now resolves
+        // to another texture, whatever the face's own image names
+        const LLFetchedGLTFMaterial* mat = static_cast<const LLFetchedGLTFMaterial*>(tex_entry->getGLTFRenderMaterial());
+        if (mat != nullptr)
+        {
+            for (U32 slot = 0; slot < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++slot)
+            {
+                if (getBakedTextureForMagicId(mat->mTextureId[slot]) != mat->mBakedTextures[slot].get())
+                {
+                    changeTEMaterialTextures(face_index);
+                    break;
+                }
+            }
         }
     }
 }
@@ -5615,6 +5632,16 @@ void LLViewerObject::changeTEImage(S32 index, LLViewerTexture* new_image)
         return ;
     }
     mTEImages[index] = new_image ;
+}
+
+//virtual
+void LLViewerObject::changeTEMaterialTextures(S32 index)
+{
+    if (index < 0 || index >= getNumTEs())
+    {
+        return;
+    }
+    updateTEMaterialTextures((U8)index);
 }
 
 void LLViewerObject::changeTENormalMap(S32 index, LLViewerTexture* new_image)

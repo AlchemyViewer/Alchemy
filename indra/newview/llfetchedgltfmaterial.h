@@ -71,6 +71,30 @@ public:
     LLPointer<LLViewerFetchedTexture> mNormalTexture;
     LLPointer<LLViewerFetchedTexture> mMetallicRoughnessTexture;
     LLPointer<LLViewerFetchedTexture> mEmissiveTexture;
+
+    // What a slot naming a bake proxy (IMG_USE_BAKED_*) resolved to on the face this render
+    // material is drawn on (LLViewerObject::updateTEMaterialTextures, which fetches nothing for
+    // it): the server's bake, or the local composite while the avatar edits its appearance, which
+    // is no fetched texture and so has no place in the slots above. Null for any other slot.
+    LLPointer<LLViewerTexture> mBakedTextures[GLTF_TEXTURE_INFO_COUNT];
+
+    // The texture a pass draws a slot with: its bake, else its fetched texture
+    LLViewerTexture* getRenderTexture(TextureInfo slot) const
+    {
+        if (mBakedTextures[slot].notNull())
+        {
+            return mBakedTextures[slot];
+        }
+        switch (slot)
+        {
+        case GLTF_TEXTURE_INFO_BASE_COLOR:          return mBaseColorTexture;
+        case GLTF_TEXTURE_INFO_NORMAL:              return mNormalTexture;
+        case GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS:  return mMetallicRoughnessTexture;
+        case GLTF_TEXTURE_INFO_EMISSIVE:            return mEmissiveTexture;
+        default:                                    return nullptr;
+        }
+    }
+
     void clearFetchedTextures();
 
     std::set<LLTextureEntry*> mTextureEntires;
