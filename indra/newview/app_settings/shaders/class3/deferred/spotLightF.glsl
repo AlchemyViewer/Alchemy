@@ -81,7 +81,7 @@ float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
 vec4 getNorm(vec2 screenpos);
-vec3 getProjectedLightAmbiance(float amb_da, float attenuation, float lit, float nl, float noise, vec2 projected_uv);
+vec3 getProjectedLightAmbiance(float da, float attenuation, float lit, vec2 projected_uv);
 vec3 getProjectedLightDiffuseColor(float light_distance, vec2 projected_uv );
 vec2 getScreenCoord(vec4 clip);
 vec3 srgb_to_linear(vec3 cs);
@@ -149,6 +149,11 @@ void main()
     float nh, nl, nv, vh, lightDist;
     calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
+    // The facing test, on the raw dot product. calcHalfVectors clamps nl to a positive epsilon
+    // so the legacy terms can divide by it, which made every test against nl constant -- no
+    // facing test left at all, and no back side for the ambiance to wrap onto.
+    float da = dot(n, l);
+
     vec3 diffuse = gb.albedo.rgb;
     vec4 spec    = gb.specular;
     vec3 dlit    = vec3(0, 0, 0);
@@ -181,18 +186,11 @@ void main()
         &&  proj_tc.y > 0.0 && proj_tc.y < 1.0)
         {
             float lit = 0.0;
-            float amb_da = 0.0;
 
             lv = normalize(lv);
 
-            // Tested against the raw dot product, not against nl. calcHalfVectors clamps nl to
-            // a positive epsilon so the legacy path can divide by it, which made this condition
-            // and pointLightF's mirror image of it constant -- there was no facing test left
-            // here at all, only pbrPunctual's own internal one further down.
-            if (dot(n.xyz, lv) > 0.0)
+            if (da > 0.0)
             {
-                amb_da += (nl*0.5 + 0.5) * proj_ambiance;
-
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );
 
                 vec3 intensity = dist_atten * dlit * PUNCTUAL_LIGHT_SCALE * shadow; // see deferredUtil.glsl -- must match every other site
@@ -208,7 +206,7 @@ void main()
                 lit = clamp(nl * dist_atten, 0.0, 1.0);
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE; //magic number to balance with legacy ambiance
+            amb_rgb = getProjectedLightAmbiance( da, dist_atten, lit, proj_tc.xy ) * PUNCTUAL_LIGHT_SCALE; //magic number to balance with legacy ambiance
 
             // Ambiance is the projector's non-directional fill -- it exists to reach the
             // surfaces the cookie does not. Weighting it by the punctual lobe (a second,
@@ -230,23 +228,21 @@ void main()
             proj_tc.x > 0.0 &&
             proj_tc.y > 0.0)
         {
-            float amb_da = 0;
             float lit = 0.0;
 
-            if (nl > 0.0)
+            if (da > 0.0)
             {
                 lit = nl * dist_atten;
 
                 dlit = getProjectedLightDiffuseColor( l_dist, proj_tc.xy );
 
                 final_color = dlit*lit*diffuse*shadow;
-
-                // unshadowed for consistency between forward and deferred?
-                amb_da += (nl*0.5+0.5) /* * (1.0-shadow) */ * proj_ambiance;
             }
 
-            amb_rgb = getProjectedLightAmbiance( amb_da, dist_atten, lit, nl, 1.0, proj_tc.xy );
-            final_color += diffuse.rgb * amb_rgb * max(dot(-normalize(lv), n), 0.0);
+            // Every facing, as the PBR branch above and the pre-PBR shaders fill it. Weighted by
+            // the light's direction reversed, it lit only the faces turned away from the beam.
+            amb_rgb = getProjectedLightAmbiance( da, dist_atten, lit, proj_tc.xy );
+            final_color += diffuse.rgb * amb_rgb;
         }
 
         if (spec.a > 0.0)
@@ -262,12 +258,20 @@ void main()
             {
                 float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 vec3 speccol = dlit*scol*spec.rgb*shadow;
-                speccol = clamp(speccol, vec3(0), vec3(1));
-                final_color += speccol;
+                // Bounded as pointLightF bounds its highlight, against a runaway divide by the
+                // two cosines, not at 1. A ceiling of 1 flat-topped every glossy highlight under a
+                // projector, while the same material lit by a point light, or blended and lit
+                // forward by this light, kept its peak.
+                final_color += clampRadiance(speccol);
             }
         }
 
-        if (envIntensity > 0.0)
+        // The legacy "Environment" mirror image of the projector's own picture. It is weighted
+        // by Environment alone, as the sky's reflection is (applyLegacyEnv): the specular colour
+        // tints the Blinn-Phong highlight above, not this, and glossiness already blurs and
+        // narrows it through the lookup's LOD. A mirror image does not dim with distance either.
+        // Only a surface facing the projector can reflect it.
+        if (envIntensity > 0.0 && da > 0.0)
         {
             vec3 ref = reflect(normalize(pos), n);
 
@@ -290,7 +294,13 @@ void main()
                         stc.x > 0.0 &&
                         stc.y > 0.0)
                     {
-                        final_color += color.rgb * texture2DLodSpecular(stc.xy, (1 - spec.a) * (proj_lod * 0.6)).rgb * shadow * envIntensity;
+                        // The light is drawn out to its radius widened by half again (size, from
+                        // pipeline.cpp) and clipped there. Faded across that margin, the image
+                        // keeps its full strength out to the radius the light was given and does
+                        // not end in a hard edge where the clip falls.
+                        float edge = 1.0 - smoothstep(2.0 / 3.0, 1.0, dist);
+
+                        final_color += color.rgb * texture2DLodSpecular(stc.xy, (1 - spec.a) * (proj_lod * 0.6)).rgb * shadow * envIntensity * edge;
                     }
                 }
             }

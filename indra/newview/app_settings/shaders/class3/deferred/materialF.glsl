@@ -333,13 +333,21 @@ void main()
     }
 
     color = mix(color.rgb, diffcol.rgb, emissive);
+    // The sun's glint gives way to the fullbright colour above, so its glare goes with it. The
+    // Environment reflection and the local lights below are laid over a fullbright surface too,
+    // and keep theirs.
+    glare *= 1.0-emissive;
 
     if (env > 0.0)
     {  // add environmentmap
         applyLegacyEnv(color, legacyenv, spec, pos.xyz, norm.xyz, env);
 
-        float cur_glare = max(max(legacyenv.r, legacyenv.g), legacyenv.b);
-        cur_glare = max(cur_glare, 0.0) * env * 4.0; // WindLight's weight; glare is clamped to 1 below
+        // WindLight's weight, taken on the reflection as WindLight had it: sRGB-encoded, the
+        // environment map's own values. On linear radiance a mid-grey sky counted as 0.21
+        // rather than 0.5. glare is clamped to 1 below.
+        vec3 env_srgb = linear_to_srgb(max(legacyenv, vec3(0.0)));
+        float cur_glare = max(max(env_srgb.r, env_srgb.g), env_srgb.b);
+        cur_glare *= env * 4.0;
         glare += cur_glare;
     }
 
@@ -362,7 +370,6 @@ void main()
 
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, vec4(color, 1.0)).rgb;
 
-    glare *= 1.0-emissive;
     glare = min(glare, 1.0);
     float al = max(diffcol.a, glare) * vertex_color.a;
     float final_scale = 1;
