@@ -58,10 +58,6 @@ vec3 windlightDome(vec3 dir);
 // bound at UB_ENVIRONMENT.
 //[ENGINE_BLOCK Environment]
 
-// The dome drawn behind everything at half size, which the dome along the ray replaces where skyBehindAB is 0.
-uniform sampler2D skyBehindMap;
-uniform int skyBehindAB;
-
 // How far the water has faded into the sky behind it, seen from high above (ALFarPlane::groundFade): 1 by the height it
 // is no longer drawn from, where the sky is all there is to see.
 uniform float waterGroundFade;
@@ -120,14 +116,9 @@ void main()
         {
             vec3 dome = windlightDome(eyeToSky * normalize(pos.xyz));
 #ifdef HAZE_DOME_LDR
-            // Outside HDR with the float emissive buffer, the dome as an 8-bit target holds it.
+            // Without HDR's float emissive buffer, the dome held to the [0, 1] an 8-bit sky holds.
             dome = min(dome, vec3(1.0));
 #endif
-            if (skyBehindAB != 0)
-            {
-                // Its one level, read at it: under the test above no derivative is defined.
-                dome = textureLod(skyBehindMap, tc, 0.0).rgb;
-            }
             // atmosFragLighting doubles additive, so the sky is halved
             vec3 sky = dome * 0.5;
             additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);

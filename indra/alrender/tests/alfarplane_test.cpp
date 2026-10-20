@@ -257,15 +257,15 @@ namespace
         UNSCOPED_INFO("flare sky is the far plane, forward");
         REQUIRE(flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
         // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading, and the
-        // water surface alone converges on the sky behind it.
+        // water surface alone converges on WindLight's dome behind it, along the ray to the geometry where it is.
         UNSCOPED_INFO("the haze pass's in-scatter is alpha's");
         REQUIRE(haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
-        UNSCOPED_INFO("water converges on the sky behind");
+        UNSCOPED_INFO("water converges on the dome");
         REQUIRE(haze.find("#ifdef HAZE_ON_WATER") != std::string::npos);
-        UNSCOPED_INFO("water converges on the sky behind");
+        UNSCOPED_INFO("water converges on the dome");
         REQUIRE(haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
-        UNSCOPED_INFO("the sky behind is sampled for water");
-        REQUIRE(haze.find("texture(skyBehindMap, tc)") != std::string::npos);
+        UNSCOPED_INFO("the dome is worked out along the ray to the water");
+        REQUIRE(haze.find("windlightDome(eyeToSky * normalize(pos.xyz))") != std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);

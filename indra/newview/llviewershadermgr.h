@@ -163,7 +163,6 @@ extern LLGLSLShader         gUnderWaterOpaqueProgram;
 extern LLGLSLShader         gWaterWavesProgram;
 extern LLGLSLShader         gUnderWaterWavesProgram;
 extern LLGLSLShader         gWaterExclusionProgram;
-extern LLGLSLShader         gWaterFieldProgram;
 // One level of ALDepthPyramid; built where the session computes.
 extern LLGLSLShader         gDepthPyramidProgram;
 extern LLGLSLShader         gGlowProgram;

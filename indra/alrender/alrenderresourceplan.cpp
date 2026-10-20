@@ -66,7 +66,7 @@ namespace
 
     // Everything after the packs, in Id order.
     constexpr std::string_view OWN_NAMES[Plan::ID_COUNT - PACK_IDS] = {
-        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene", "main.light.blurred",
+        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "ssr.scene", "main.light.blurred",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
         "smaa.sample", "tone.curve",
@@ -307,13 +307,6 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                                           .depth  = main_depth };
     }
 
-    // The sky behind everything at half size, in the format the sky's colour lands in: the emissive attachment's float
-    // with HDR, 8 bits otherwise.
-    plan.at(Id::SkyBehind).mDesc = ALRenderTargetDesc{ .width  = std::max(width / 2, 1u),
-                                                       .height = std::max(height / 2, 1u),
-                                                       .color  = { hdr && in.mEmissive ? (U32)GL_R11F_G11F_B10F
-                                                                                       : (U32)GL_RGBA8 } };
-
     // The legacy glow, which HDR's bloom replaces.
     if (!hdr)
     {
@@ -427,7 +420,6 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         case Id::SpotShadow1:
         case Id::SMAAEdges:
         case Id::SMAABlend:
-        case Id::SkyBehind:
         case Id::SSRScene:
         case Id::MainLightBlurred:
             return true;
@@ -474,7 +466,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
                slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
-           id == Id::SkyBehind || id == Id::MainLightBlurred || id == Id::Preview || id == Id::Bake;
+           id == Id::MainLightBlurred || id == Id::Preview || id == Id::Bake;
 }
 
 // static

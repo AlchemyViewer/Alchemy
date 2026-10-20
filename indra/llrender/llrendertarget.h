@@ -241,7 +241,7 @@ public:
     // the next bindTarget restores the one-to-one mapping.
     //
     // How a single-attachment target hosts a pass written for a G-buffer: the sky writes its colour to the
-    // emissive output, frag_data[3], when that buffer is on, and mSkyBehind keeps only that colour.
+    // emissive output, frag_data[3], when that buffer is on, and a target of that colour alone takes only it.
     void setDrawOutput(U32 output);
 
     //get X resolution

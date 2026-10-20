@@ -119,7 +119,6 @@ LLGLSLShader        gUnderWaterOpaqueProgram;
 LLGLSLShader        gWaterWavesProgram;
 LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
-LLGLSLShader        gWaterFieldProgram;
 LLGLSLShader        gDepthPyramidProgram;
 
 //interface shaders
@@ -1084,7 +1083,6 @@ void LLViewerShaderMgr::loadShadersWater()
         gWaterWavesProgram.unload();
         gUnderWaterWavesProgram.unload();
         gWaterExclusionProgram.unload();
-        gWaterFieldProgram.unload();
         return;
     }
 
@@ -1176,19 +1174,6 @@ void LLViewerShaderMgr::loadShadersWater()
         gWaterExclusionProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterExclusionProgram.clearPermutations();
         built(gWaterExclusionProgram.createShader(), gWaterExclusionProgram);
-    }
-
-    {
-        // The field and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
-        gWaterFieldProgram.mName = "Water Field Shader";
-        gWaterFieldProgram.mFeatures.hasWaterSurface = true;
-        gWaterFieldProgram.mShaderFiles.clear();
-        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
-        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
-        gWaterFieldProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        gWaterFieldProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gWaterFieldProgram.clearPermutations();
-        built(gWaterFieldProgram.createShader(), gWaterFieldProgram);
     }
 
     /// Keep track of water shader levels

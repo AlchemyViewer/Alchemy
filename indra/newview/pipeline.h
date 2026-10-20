@@ -617,10 +617,6 @@ public:
     // and just before rendering alpha when camera is above water
     void doAtmospherics();
 
-    // Whether this frame's haze pass could converge anything on the sky behind (mSkyBehind): the main view's, with
-    // atmospherics on, the camera above the water, and water among what was sorted to draw.
-    bool skyBehindWanted() const;
-
     // Whether the haze converges the water surface on WindLight's dome (hazeF.glsl's HAZE_ON_WATER): in the main view,
     // with atmospherics on, the camera above the water, WindLight's sky drawn rather than an HDRI, and the water drawn
     // (drawsWater), which is what leaves pixels for the haze's draw over the water to shade.
@@ -1265,18 +1261,6 @@ public:
     LLRenderTarget*                   mWaterRefraction = nullptr;
     LLRenderTarget*                   mWaterDepthCopy  = nullptr;
 
-    // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
-    // haze pass converges far water on it (hazeF.glsl). The main view's alone, from the pool from the sky pool's draw
-    // (acquireSkyBehind) to the end of the deferred lighting its haze runs in (releaseSkyBehind): null outside that,
-    // and in a frame that has none to draw.
-    LLRenderTarget*             acquireSkyBehind();
-    void                        releaseSkyBehind();
-    ALTransientTargets          mSkyBehindTargets{ mTransientTargets };
-    LLRenderTarget*             mSkyBehind = nullptr;
-    // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
-    // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
-    ALQueryTicket               mSkyBehindQuery;
-    U32                         mSkyBehindQueryFrame = 0;
 
     // The attachments profileAvatar() timed, with their spans of gGL's pool, until readAttachmentTimes() has them.
     std::vector<std::pair<LLPointer<LLViewerObject>, ALQuerySpan>> mAttachmentSpans;
@@ -1294,6 +1278,12 @@ public:
     ALPrimitivePlot             mWaterPrimitives{ "water primitives", false };
     ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
     U32                         mWaterDraws = 0;
+
+    // Whether the main view's water surface, seen from above, passed the depth test anywhere: an occlusion query of
+    // gGL's over its draws (LLDrawPoolWater::renderPostDeferred), begun in mWaterSeenFrame. The haze's draw on the
+    // water's pixels runs under it (doAtmospherics), so a frame whose water land hides altogether skips it.
+    ALQueryTicket               mWaterSeen;
+    U32                         mWaterSeenFrame = 0;
 
     static constexpr U32 MAX_PREVIEW_WIDTH = ALRenderResourcePlan::PREVIEW_SIZE;
 

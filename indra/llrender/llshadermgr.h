@@ -622,7 +622,6 @@ public:
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_DOME_RADIUS,                    //  "skyDomeRadius"  the sky dome's radius, about its frame's origin
-        SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
 
         // The WindLight atmospherics' terms that only the sky settings set, Environment block members
         // (LLSettingsVOSky::applySpecial, LLEnvironment::packAtmosphericTerms)

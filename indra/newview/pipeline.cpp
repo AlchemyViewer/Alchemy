@@ -1587,7 +1587,6 @@ void LLPipeline::releaseAllGLResources()
 void LLPipeline::releaseRenderTargets()
 {
     using Plan = ALRenderResourcePlan;
-    releaseSkyBehind();
     mTransientTargets.clear();
     for (size_t i = 0; i < Plan::ID_COUNT; ++i)
     {
@@ -1608,8 +1607,8 @@ void LLPipeline::releaseRenderTargets()
         rt->bloomMipCount = 0;
     }
 
-    mSkyBehindQuery      = {};
-    mSkyBehindQueryFrame = 0;
+    mWaterSeen           = {};
+    mWaterSeenFrame      = 0;
     mLensFlareStateValid = false;
     mToneCurveLutDirty   = true;
 
@@ -11709,21 +11708,6 @@ void LLPipeline::renderDeferredLighting()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderDeferredLighting");
 
-    // The main view's sky behind is this frame's: given back once the haze that reads it has run, however the lighting
-    // ends.
-    struct SkyBehindRelease
-    {
-        LLPipeline& mPipeline;
-        bool        mMainView;
-        ~SkyBehindRelease()
-        {
-            if (mMainView)
-            {
-                mPipeline.releaseSkyBehind();
-            }
-        }
-    } sky_behind_release{ *this, !gCubeSnapshot && !sImpostorRender && mRT == &mMainRT };
-
     if (!sCull)
     {
         return;
@@ -12340,33 +12324,6 @@ void LLPipeline::renderDeferredLighting()
     gGL.setColorMask(true, true);
 }
 
-LLRenderTarget* LLPipeline::acquireSkyBehind()
-{
-    // What a frame whose lighting never ran left held goes back first.
-    releaseSkyBehind();
-    mSkyBehind = acquireResource(mSkyBehindTargets, ALRenderResourcePlan::Id::SkyBehind);
-    return mSkyBehind;
-}
-
-void LLPipeline::releaseSkyBehind()
-{
-    mSkyBehind = nullptr;
-    mSkyBehindTargets.releaseAll();
-}
-
-bool LLPipeline::skyBehindWanted() const
-{
-    // The haze pass converges only the water surface seen from above it (hazeF.glsl).
-    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender ||
-        !mResourcePlan.wants(ALRenderResourcePlan::Id::SkyBehind))
-    {
-        return false;
-    }
-    // The water's slab, rim to rim, against the frustum, from where the water is drawn. What the frustum holds but the
-    // world hides, as water under the land, the sky pool's query finds (LLDrawPoolWLSky::renderSkyHazeDeferred).
-    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.drawnFrom(*LLViewerCamera::getInstance());
-}
-
 bool LLPipeline::hazeOnWater() const
 {
     // The haze converges only the water surface seen from above it (hazeF.glsl), on the dome the sky draws. An HDRI
@@ -12431,12 +12388,6 @@ void LLPipeline::doAtmospherics()
             if (on_water)
             {
                 LLDrawPoolWLSky::bindDome(haze_shader);
-                static LLStaticHashedString sky_behind_ab("skyBehindAB");
-                haze_shader.uniform1i(sky_behind_ab, mSkyBehind ? 1 : 0);
-                if (mSkyBehind)
-                {
-                    haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, mSkyBehind, ALSamplers::BilinearClamp);
-                }
                 // From high above the water, the water fades into the sky behind it, wholly by the height it is no
                 // longer drawn from.
                 const F32 height = LLViewerCamera::getInstance()->getOrigin().mV[VZ] - environment.getWaterHeight();
@@ -12447,31 +12398,26 @@ void LLPipeline::doAtmospherics()
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            if (on_water && mSkyBehind)
-            {
-                haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
-            }
             unbindDeferredShader(haze_shader);
         };
 
-        // Far water converges on the sky drawn behind it when this view's is there: the main view's alone, once the
-        // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
-        // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
-        // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
-        static LLCachedControl<bool> sky_behind_ab(gSavedSettings, "AlchemyRenderSkyBehindAB", false);
-        const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind;
-        if (sky_behind_ab ? sky_behind : hazeOnWater())
+        // Far water converges on WindLight's dome behind it (hazeOnWater): the main view's alone, while the sky is
+        // WindLight's (HDRI skies and probe captures keep WindLight's own limit). The water marked its own pixels in the
+        // stencil, so the two draws shade each pixel once.
+        if (hazeOnWater())
         {
             {
                 ALWaterStencil::OffWater stencil;
                 apply_haze(*gHazeProgram.selectVariant(), false);
             }
             {
+                // Only where the water's own draw passed the depth test somewhere this frame (mWaterSeen): where land
+                // hides all of it, no pixel is the water's.
                 ALWaterStencil::OnWater stencil;
-                std::optional<ALConditionalRender> if_water;
-                if (mSkyBehindQueryFrame == gFrameCount)
+                std::optional<ALConditionalRender> if_seen;
+                if (mWaterSeenFrame == LLFrameTimer::getFrameCount())
                 {
-                    if_water.emplace(gGL.queries(), mSkyBehindQuery);
+                    if_seen.emplace(gGL.queries(), mWaterSeen);
                 }
                 apply_haze(*gHazeOnWaterProgram.selectVariant(), true);
             }
