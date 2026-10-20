@@ -709,6 +709,9 @@ public:
     bool generate(const LLProfileParams& params, bool path_open, F32 detail = 1.0f, S32 split = 0,
                   bool is_sculpted = false, S32 sculpt_size = 0);
     bool isConcave() const                              { return mConcave; }
+    // Whether the hole was drawn in where it would have gone through the
+    // outer wall, and so touches it there.
+    bool holeTouchesWall() const                        { return mHoleTouchesWall; }
 public:
     struct Face
     {
@@ -743,6 +746,7 @@ protected:
     bool          mOpen;
     bool          mConcave;
     bool          mDirty;
+    bool          mHoleTouchesWall = false;
 
     S32           mTotalOut;
     S32           mTotal;

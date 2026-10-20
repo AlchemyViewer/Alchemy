@@ -374,11 +374,6 @@ namespace
         return fmt::format("{} at LOD {}", s.name, lod);
     }
 
-    bool isRoundOrTriangle(U8 profile)
-    {
-        return profile != LL_PCODE_PROFILE_SQUARE;
-    }
-
     bool isTriangle(U8 profile)
     {
         return profile == LL_PCODE_PROFILE_ISOTRI || profile == LL_PCODE_PROFILE_EQUALTRI || profile == LL_PCODE_PROFILE_RIGHTTRI;
@@ -587,9 +582,6 @@ namespace
         // A cap with no area. Where its path leaves it within its plane, its
         // normal is far from the way its wall runs.
         constexpr U32 CapNoArea = 1 << 2;
-        // A square hole above 0.707 in a round or triangular profile,
-        // whose corners go through the wall.
-        constexpr U32 SquareHole = 1 << 3;
     }
 
     U32 excusedBy(U32 regions)
@@ -598,10 +590,6 @@ namespace
         if (regions & Regions::CapNoArea)
         {
             checks |= Checks::CapFacing;
-        }
-        if (regions & Regions::SquareHole)
-        {
-            checks |= Checks::Inversion | Checks::CapFacing | Checks::Oracle;
         }
         return checks;
     }
@@ -628,16 +616,9 @@ namespace
         return (volume.getParams().getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_NONE;
     }
 
-    U32 regionsOf(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles)
+    U32 regionsOf(const LLVolumeFace& face, const std::vector<Triangle>& triangles)
     {
         U32 regions = 0;
-        const LLVolumeParams& params = volume.getParams();
-        const U8 profile = params.getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK;
-        const U8 hole = params.getProfileParams().getCurveType() & LL_PCODE_HOLE_MASK;
-        if (!isSculpt(volume) && hole == LL_PCODE_HOLE_SQUARE && params.getHollow() > 0.70711f && isRoundOrTriangle(profile))
-        {
-            regions |= Regions::SquareHole;
-        }
         if (isCap(face) && std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
         {
             regions |= Regions::CapNoArea;
@@ -1217,7 +1198,7 @@ namespace
             }
             const std::vector<Triangle> triangles = trianglesOf(face);
             State& state = states[i];
-            state.regions = regionsOf(volume, face, triangles);
+            state.regions = regionsOf(face, triangles);
             if (how.only_regions && !(state.regions & how.only_regions))
             {
                 continue;
@@ -2765,9 +2746,9 @@ namespace
     }
 
     // SetHollow no longer holds a square hole in a round profile to
-    // 0.7, and the hole's corners, at 0.707 of the hollow, go through the
-    // wall above it: the hole's points must stay inside the wall.
-    TEST_CASE("llvolume: a square hole above 0.707 stays inside its wall", "[llvolume][!shouldfail]")
+    // 0.7, and the hole's corners, at 0.707 of the hollow, would go through
+    // the wall above it: the hole's points must stay inside the wall.
+    TEST_CASE("llvolume: a square hole above 0.707 stays inside its wall", "[llvolume]")
     {
         Report report;
         for (const Shape& base : { cylinder(), sphere(), prism() })
@@ -2811,11 +2792,21 @@ namespace
                 }
             }
         }
+        // The sweep's square holes above 0.707 in round and triangular
+        // profiles, cut, twisted and tapered: where hole and wall touch, the
+        // cap's strip and the inner side still have a layout.
         Inspect how;
         how.checks = Checks::Inversion | Checks::CapFacing | Checks::Oracle;
-        how.only_regions = Regions::SquareHole;
-        S32 volumes = 0;
-        inspectSweep(how, report, volumes);
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.hole == LL_PCODE_HOLE_SQUARE && s.hollow > 0.70711f && s.profile != LL_PCODE_PROFILE_SQUARE)
+            {
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    inspectPrim(s, lod, how, report);
+                }
+            }
+        }
         INFO(report.text());
         CHECK(report.failures == 0);
     }

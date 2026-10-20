@@ -601,6 +601,43 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
         pt[i].mul(box_hollow);
     }
 
+    // A hole stays inside its wall. A point that would go through it, as a
+    // square hole's corners do above 0.707 in a round profile or in a
+    // triangle, is drawn in along its own direction to where it meets the
+    // wall, which is of no thickness there. The wall is convex about the
+    // origin, so the ray from the origin through a point leaves it where it
+    // first crosses the line of any of its edges.
+    for (S32 i=mTotalOut;i<mTotal;i++)
+    {
+        const F32 px = pt[i][0];
+        const F32 py = pt[i][1];
+        F32 nearest = 1.f;
+        for (S32 k = 0; k + 1 < mTotalOut; k++)
+        {
+            // Where the ray s * p crosses the line a + u * e.
+            const F32 ax = mProfile[k][0];
+            const F32 ay = mProfile[k][1];
+            const F32 ex = mProfile[k + 1][0] - ax;
+            const F32 ey = mProfile[k + 1][1] - ay;
+            const F32 across = px * ey - py * ex;
+            if (across == 0.f)
+            {
+                continue;
+            }
+            const F32 s = (ax * ey - ay * ex) / across;
+            if (s > 0.f)
+            {
+                nearest = llmin(nearest, s);
+            }
+        }
+        if (nearest < 1.f)
+        {
+            pt[i].getF32ptr()[0] = px * nearest;
+            pt[i].getF32ptr()[1] = py * nearest;
+            mHoleTouchesWall = true;
+        }
+    }
+
     S32 j=mTotal-1;
     for (S32 i=mTotalOut;i<mTotal;i++)
     {
@@ -748,6 +785,7 @@ bool LLProfile::generate(const LLProfileParams& params, bool path_open,F32 detai
 
     mProfile.resize(0);
     mFaces.resize(0);
+    mHoleTouchesWall = false;
 
     // Generate the face data
     S32 i;
@@ -5778,6 +5816,39 @@ namespace
         }
     }
 
+    // Twice the area, in profile units, within which a hollow cap's strip
+    // takes a triangle for one of no area where its hole touches its wall.
+    constexpr F32 CAP_ZERO_AREA = 1e-6f;
+
+    // Whether a hollow cap's strip takes (1, a, 2) next, a step along its
+    // outer chain, rather than (2, 1, b), a step along its inner one. A
+    // triangle that faces the wrong way will not do, nor one that contains
+    // the other chain's next point; of two that will, the one whose new edge
+    // is shorter. Areas within the tolerance count as none, and so, with a
+    // tolerance, a triangle of no area contains nothing.
+    bool cap_strip_takes_outer(F32 area_1a2, F32 area_2ab, F32 area_21b, F32 area_1ba, bool outer_shorter, F32 tolerance)
+    {
+        bool tri_1a2 = !(area_1a2 < -tolerance);
+        bool tri_21b = !(area_21b < -tolerance);
+        if (area_2ab < -tolerance && !(tolerance > 0.f && area_1a2 <= tolerance))
+        {
+            tri_1a2 = false;
+        }
+        if (area_1ba < -tolerance && !(tolerance > 0.f && area_21b <= tolerance))
+        {
+            tri_21b = false;
+        }
+        if (!tri_1a2)
+        {
+            return false;
+        }
+        if (!tri_21b)
+        {
+            return true;
+        }
+        return outer_shorter;
+    }
+
     // The path station a cap closes: the last for a top cap, the first for a
     // bottom one.
     S32 cap_station(const LLVolume* volume, bool top)
@@ -6185,6 +6256,12 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
 
     if (mTypeMask & HOLLOW_MASK)
     {
+        // A hole that touches its wall puts inner points on outer ones, and
+        // the strip's triangles there have no area but what rounding leaves,
+        // of either sign: the signs alone can then leave the strip only
+        // triangles facing the wrong way.
+        const F32 zero_area = volume->getProfile().holeTouchesWall() ? CAP_ZERO_AREA : 0.f;
+
         if (mTypeMask & TOP_MASK)
         {
             // HOLLOW TOP
@@ -6229,54 +6306,13 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
                             (paV[0]*pbV[1] - pbV[0]*paV[1]) +
                             (pbV[0]*p2V[1] - p2V[0]*pbV[1]);
 
-                bool use_tri1a2 = true;
-                bool tri_1a2 = true;
-                bool tri_21b = true;
+                LLVector4a d1;
+                d1.setSub(p1, pa);
+                LLVector4a d2;
+                d2.setSub(p2, pb);
+                const bool outer_shorter = d1.dot3(d1) < d2.dot3(d2);
 
-                if (area_1a2 < 0)
-                {
-                    tri_1a2 = false;
-                }
-                if (area_2ab < 0)
-                {
-                    // Can't use, because it contains point b
-                    tri_1a2 = false;
-                }
-                if (area_21b < 0)
-                {
-                    tri_21b = false;
-                }
-                if (area_1ba < 0)
-                {
-                    // Can't use, because it contains point b
-                    tri_21b = false;
-                }
-
-                if (!tri_1a2)
-                {
-                    use_tri1a2 = false;
-                }
-                else if (!tri_21b)
-                {
-                    use_tri1a2 = true;
-                }
-                else
-                {
-                    LLVector4a d1;
-                    d1.setSub(p1, pa);
-
-                    LLVector4a d2;
-                    d2.setSub(p2, pb);
-
-                    if (d1.dot3(d1) < d2.dot3(d2))
-                    {
-                        use_tri1a2 = true;
-                    }
-                    else
-                    {
-                        use_tri1a2 = false;
-                    }
-                }
+                const bool use_tri1a2 = cap_strip_takes_outer(area_1a2, area_2ab, area_21b, area_1ba, outer_shorter, zero_area);
 
                 if (use_tri1a2)
                 {
@@ -6335,53 +6371,13 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
                             (paV[0]*pbV[1] - pbV[0]*paV[1]) +
                             (pbV[0]*p2V[1] - p2V[0]*pbV[1]);
 
-                bool use_tri1a2 = true;
-                bool tri_1a2 = true;
-                bool tri_21b = true;
+                LLVector4a d1;
+                d1.setSub(p1, pa);
+                LLVector4a d2;
+                d2.setSub(p2, pb);
+                const bool outer_shorter = d1.dot3(d1) < d2.dot3(d2);
 
-                if (area_1a2 < 0)
-                {
-                    tri_1a2 = false;
-                }
-                if (area_2ab < 0)
-                {
-                    // Can't use, because it contains point b
-                    tri_1a2 = false;
-                }
-                if (area_21b < 0)
-                {
-                    tri_21b = false;
-                }
-                if (area_1ba < 0)
-                {
-                    // Can't use, because it contains point b
-                    tri_21b = false;
-                }
-
-                if (!tri_1a2)
-                {
-                    use_tri1a2 = false;
-                }
-                else if (!tri_21b)
-                {
-                    use_tri1a2 = true;
-                }
-                else
-                {
-                    LLVector4a d1;
-                    d1.setSub(p1,pa);
-                    LLVector4a d2;
-                    d2.setSub(p2,pb);
-
-                    if (d1.dot3(d1) < d2.dot3(d2))
-                    {
-                        use_tri1a2 = true;
-                    }
-                    else
-                    {
-                        use_tri1a2 = false;
-                    }
-                }
+                const bool use_tri1a2 = cap_strip_takes_outer(area_1a2, area_2ab, area_21b, area_1ba, outer_shorter, zero_area);
 
                 // Flipped backfacing from top
                 if (use_tri1a2)
@@ -6984,9 +6980,10 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
     }
 
-    // On a sphere, a column that is one place in every row is a pole on the
-    // axis the half circle sweeps about, and takes the axis.
-    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
+    // On a sphere's side, a column that is one place in every row is a pole
+    // on the axis the half circle sweeps about, and takes the axis. A cut
+    // end of a hollow sphere lies on the axis, and has no area.
+    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
         ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
     {
         if (column_is_point(pos, mNumS, mNumT, 0))
