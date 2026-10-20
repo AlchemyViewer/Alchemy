@@ -1004,6 +1004,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderSunBloom", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleRenderInputChanged);

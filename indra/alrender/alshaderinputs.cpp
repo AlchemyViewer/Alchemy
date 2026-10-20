@@ -122,6 +122,7 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     l.mGlowNoise        = s.mGlowNoise;
     l.mBloomHalation    = s.mBloomHalation;
     l.mSMAAPredication  = s.mSMAAPredication;
+    l.mSunBloom         = s.mSunBloom;
     l.mTerrainPBRNormals = s.mTerrainPBRNormals;
     l.mTerrainTessPinned = !s.mDynamicLOD;
     l.mWaterWaves        = s.mWaterWaves;

@@ -1176,6 +1176,7 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mGlowNoise                = gSavedSettings.getBOOL("RenderGlowNoise");
     s.mBloomHalation            = gSavedSettings.getBOOL("RenderBloomHalation");
     s.mSMAAPredication          = gSavedSettings.getBOOL("RenderSMAAPredication");
+    s.mSunBloom                 = gSavedSettings.getBOOL("AlchemyRenderSunBloom");
     s.mLocalTerrainPaint        = gSavedSettings.getBOOL("LocalTerrainPaintEnabled");
     s.mTerrainPaintBitDepth     = gSavedSettings.getU32("TerrainPaintBitDepth");
 

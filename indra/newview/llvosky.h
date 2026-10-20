@@ -271,6 +271,7 @@ public:
     void setSunTextures(const LLUUID& sun_texture, const LLUUID& sun_texture_next);
     void setMoonTextures(const LLUUID& moon_texture, const LLUUID& moon_texture_next);
     void setCloudNoiseTextures(const LLUUID& cloud_noise_texture, const LLUUID& cloud_noise_texture_next);
+    // Only while the sun bloom is on (ALShaderInputs::Local::mSunBloom) are the textures fetched.
     void setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_texture_next);
 
     void setSunScale(F32 sun_scale);
@@ -289,6 +290,9 @@ protected:
 
     void updateDirections(LLSettingsSky::ptr_t psky);
 
+    // The bloom textures fetched, or let go, as the sun bloom is on or off.
+    void fetchBloomTextures();
+
     void initSkyTextureDirs(const S32 side, const S32 tile);
     void createSkyTexture(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const S32 side, const S32 tile);
 
@@ -296,6 +300,7 @@ protected:
     LLPointer<LLViewerFetchedTexture> mMoonTexturep[2];
     LLPointer<LLViewerFetchedTexture> mCloudNoiseTexturep[2];
     LLPointer<LLViewerFetchedTexture> mBloomTexturep[2];
+    LLUUID                            mBloomTextureId[2];
     LLPointer<LLViewerFetchedTexture> mRainbowMap;
     LLPointer<LLViewerFetchedTexture> mHaloMap;
 

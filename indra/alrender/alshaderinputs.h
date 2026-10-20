@@ -79,6 +79,7 @@ struct ALShaderSettings
     bool mGlowNoise              = true;  ///< RenderGlowNoise
     bool mBloomHalation          = false; ///< RenderBloomHalation
     bool mSMAAPredication        = true;  ///< RenderSMAAPredication
+    bool mSunBloom               = false; ///< AlchemyRenderSunBloom
     bool mLocalTerrainPaint      = false; ///< LocalTerrainPaintEnabled
     U32  mTerrainPaintBitDepth   = 8;     ///< TerrainPaintBitDepth
 };
@@ -132,6 +133,7 @@ struct ALShaderInputs
         bool mGlowNoise        = true;  ///< the glow extract's HAS_NOISE
         bool mBloomHalation    = false; ///< the bloom extract's and composites' BLOOM_HALATION
         bool mSMAAPredication  = true;  ///< the SMAA programs' predication
+        bool mSunBloom         = false; ///< the sky's sun bloom, whose textures the sky fetches only while it is on
         bool mTerrainPBRNormals = false; ///< the PBR terrain programs' TERRAIN_FLAT_NORMALS
         bool mTerrainTessPinned = false; ///< the terrain tessellation programs' TERRAIN_TESS_PINNED, without dynamic LOD
         bool mWaterWaves       = true;  ///< the water waves' programs and the three objects only they attach

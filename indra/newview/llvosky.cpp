@@ -820,16 +820,15 @@ void LLVOSky::updateTextures()
         mMoonTexturep[1]->addTextureStats( (F32)MAX_IMAGE_AREA );
 }
 
-    if (mBloomTexturep[0])
+    fetchBloomTextures();
+    for (const LLPointer<LLViewerFetchedTexture>& bloom : mBloomTexturep)
     {
-        mBloomTexturep[0]->addTextureStats( (F32)MAX_IMAGE_AREA );
-        }
-
-    if (mBloomTexturep[1])
+        if (bloom)
         {
-        mBloomTexturep[1]->addTextureStats( (F32)MAX_IMAGE_AREA );
+            bloom->addTextureStats((F32)MAX_IMAGE_AREA);
         }
     }
+}
 
 LLDrawable *LLVOSky::createDrawable(LLPipeline *pipeline)
 {
@@ -925,11 +924,28 @@ void LLVOSky::setBloomTextures(const LLUUID& bloom_texture, const LLUUID& bloom_
 {
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-    LLUUID bloom_tex = bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture;
-    LLUUID bloom_tex_next = bloom_texture_next.isNull() ? (bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture) : bloom_texture_next;
+    mBloomTextureId[0] = bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture;
+    mBloomTextureId[1] = bloom_texture_next.isNull() ? (bloom_texture.isNull() ? psky->GetDefaultBloomTextureId() : bloom_texture) : bloom_texture_next;
 
-    mBloomTexturep[0] = bloom_tex.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
-    mBloomTexturep[1] = bloom_tex_next.isNull() ? nullptr : LLViewerTextureManager::getFetchedTexture(bloom_tex_next, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+    fetchBloomTextures();
+}
+
+void LLVOSky::fetchBloomTextures()
+{
+    // The latched input, so the textures come and go with the bloom the programs draw (updateTextures asks again).
+    const bool bloom = gPipeline.shaderInputs().mLocal.mSunBloom;
+    for (S32 i = 0; i < 2; ++i)
+    {
+        const LLUUID& id = bloom ? mBloomTextureId[i] : LLUUID::null;
+        if (id.isNull())
+        {
+            mBloomTexturep[i] = nullptr;
+        }
+        else if (mBloomTexturep[i].isNull() || mBloomTexturep[i]->getID() != id)
+        {
+            mBloomTexturep[i] = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_UI);
+        }
+    }
 }
 
 bool LLVOSky::updateGeometry(LLDrawable *drawable)
