@@ -2270,6 +2270,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterWaveReach");
     mReservedUniforms.push_back("waterWaveEye");
     mReservedUniforms.push_back("waterRaise");
+    mReservedUniforms.push_back("waterGroundFade");
 
     // The depth pyramid
     mReservedUniforms.push_back("depthPyramid");

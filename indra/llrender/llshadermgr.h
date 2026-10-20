@@ -686,6 +686,7 @@ public:
         WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
         WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
         WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
+        WATER_GROUND_FADE,                  //  "waterGroundFade"  how far the water has faded into the sky behind it, seen from high above (ALFarPlane::groundFade)
 
         // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
         DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers

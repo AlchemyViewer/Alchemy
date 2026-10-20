@@ -137,10 +137,60 @@ namespace
         CHECK_FALSE(waterVisibleFrom(4096.f, 20.f, 4096.f));
         UNSCOPED_INFO("infinite: 2 km up still shows");
         CHECK(waterVisibleFrom(2000.f, 20.f, INFINITE_FAR));
-        UNSCOPED_INFO("infinite: within reach above the water");
-        CHECK(waterVisibleFrom(20.f + EDGE_WATER_STRETCH - 1.f, 20.f, INFINITE_FAR));
-        UNSCOPED_INFO("infinite: past reach above the water");
-        CHECK_FALSE(waterVisibleFrom(20.f + EDGE_WATER_STRETCH, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: up to the ground's band above the water");
+        CHECK(waterVisibleFrom(20.f + GROUND_FADE_END - 1.f, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: from the band's top above the water it stops");
+        CHECK_FALSE(waterVisibleFrom(20.f + GROUND_FADE_END, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: a skybox's height");
+        CHECK_FALSE(waterVisibleFrom(4000.f, 20.f, INFINITE_FAR));
+        UNSCOPED_INFO("infinite: measured from the water, not from zero");
+        CHECK(waterVisibleFrom(2500.f, 1000.f, INFINITE_FAR));
+        UNSCOPED_INFO("finite: a farther plane stops at the band's top too");
+        CHECK_FALSE(waterVisibleFrom(20.f + GROUND_FADE_END, 20.f, 4096.f));
+    }
+
+    // The band over which the world below leaves the view as the camera climbs: the water fades into the sky across
+    // it, and from its top neither water nor terrain is drawn.
+    TEST_CASE("alfarplane: the water fades into the sky over the ground's band and the ground goes at its top", "[alfarplane]")
+    {
+        using namespace ALFarPlane;
+        UNSCOPED_INFO("the band starts at LL's finite far plane");
+        CHECK(GROUND_FADE_START == FINITE_PROJECTION_FAR);
+        CHECK(GROUND_FADE_START < GROUND_FADE_END);
+
+        UNSCOPED_INFO("no fade on the water or below it");
+        CHECK(groundFade(0.f) == 0.f);
+        CHECK(groundFade(-500.f) == 0.f);
+        UNSCOPED_INFO("no fade up to the band");
+        CHECK(groundFade(GROUND_FADE_START) == 0.f);
+        UNSCOPED_INFO("halfway at the band's middle");
+        CHECK(groundFade(0.5f * (GROUND_FADE_START + GROUND_FADE_END)) == 0.5f);
+        UNSCOPED_INFO("whole at the band's top");
+        CHECK(groundFade(GROUND_FADE_END) == 1.f);
+        CHECK(groundFade(4096.f) == 1.f);
+
+        // Eased: no step at either end, and it only climbs.
+        F32 last = 0.f;
+        for (F32 h = GROUND_FADE_START; h <= GROUND_FADE_END; h += 16.f)
+        {
+            const F32 fade = groundFade(h);
+            INFO("height " << h);
+            CHECK(fade >= last);
+            CHECK(fade - last < 0.025f);
+            last = fade;
+        }
+        UNSCOPED_INFO("a metre into the band barely fades");
+        CHECK(groundFade(GROUND_FADE_START + 1.f) < 1e-5f);
+        UNSCOPED_INFO("a metre short of its top has all but faded");
+        CHECK(groundFade(GROUND_FADE_END - 1.f) > 1.f - 1e-5f);
+
+        UNSCOPED_INFO("drawn below the band's top");
+        CHECK(groundDrawnFrom(-10.f));
+        CHECK(groundDrawnFrom(GROUND_FADE_START));
+        CHECK(groundDrawnFrom(GROUND_FADE_END - 1.f));
+        UNSCOPED_INFO("not from its top up");
+        CHECK_FALSE(groundDrawnFrom(GROUND_FADE_END));
+        CHECK_FALSE(groundDrawnFrom(4000.f));
     }
 
     // Depth reconstruction: the far corners an infinite projection unprojects, and the floors the shaders carry.

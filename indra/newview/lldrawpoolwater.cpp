@@ -75,16 +75,9 @@ S32 LLDrawPoolWater::getNumPostDeferredPasses()
         return 0;
     }
 
-    // Not where the view misses the whole sea, as looking up: nothing would be drawn, and the screen's copy and the
-    // depth pyramid would be made for nothing.
-    LLViewerCamera* camera = LLViewerCamera::getInstance();
-    if (ALFarPlane::waterVisibleFrom(camera->getOrigin().mV[2], LLEnvironment::instance().getWaterHeight(), camera->getProjectionFar())
-        && gPipeline.mWaterSurface.inView(*camera))
-    {
-        return 1;
-    }
-
-    return 0;
+    // Not where the view misses the whole sea, as looking up, nor from so high above it that it has faded into the sky:
+    // nothing would be drawn, and the screen's copy and the depth pyramid would be made for nothing.
+    return gPipeline.mWaterSurface.drawnFrom(*LLViewerCamera::getInstance()) ? 1 : 0;
 }
 
 void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
