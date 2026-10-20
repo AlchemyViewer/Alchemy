@@ -151,8 +151,8 @@ namespace
         return face.mTypeMask & LLVolumeFace::CAP_MASK;
     }
 
-    // A flat inner side copies every profile point, so that each is a hard
-    // edge: the quad between a point and its copy has no width.
+    // A flat inner side copies each of its corners, so that each is a hard
+    // edge: the quad between a corner and its copy has no width.
     bool isDoubled(const LLVolumeFace& face)
     {
         return (face.mTypeMask & LLVolumeFace::INNER_MASK) && (face.mTypeMask & LLVolumeFace::FLAT_MASK) && face.mNumS > 2;
@@ -666,10 +666,43 @@ namespace
             if (face.mNumVertices != face.mNumS * face.mNumT)
             {
                 fail(fmt::format("{} vertices for a grid of {} by {}", face.mNumVertices, face.mNumS, face.mNumT));
+                return true;
             }
-            if (face.mNumIndices != (face.mNumS - 1) * (face.mNumT - 1) * 6)
+            // Each triangle is one of the grid's, bottom left, top right,
+            // top left or bottom left, bottom right, top right, a quad, and
+            // none twice; a triangle of the grid's left out has no area.
+            std::map<std::array<U32, 3>, bool> grid;
+            for (S32 t = 0; t + 1 < face.mNumT; ++t)
             {
-                fail(fmt::format("{} indices for a grid of {} by {}", face.mNumIndices, face.mNumS, face.mNumT));
+                for (S32 s = 0; s + 1 < face.mNumS; ++s)
+                {
+                    const U32 bl = gridIndex(face, s, t), br = bl + 1, tl = gridIndex(face, s, t + 1), tr = tl + 1;
+                    grid[{ bl, tr, tl }] = false;
+                    grid[{ bl, br, tr }] = false;
+                }
+            }
+            for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+            {
+                const auto found = grid.find({ face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2] });
+                if (found == grid.end() || found->second)
+                {
+                    fail(fmt::format("triangle {} ({}, {}, {}) is {} of the grid's", i / 3, face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2],
+                                     found == grid.end() ? "none" : "a second"));
+                    return true;
+                }
+                found->second = true;
+            }
+            for (const auto& [corners, used] : grid)
+            {
+                const LLVector3 a = v3(face.mPositions[corners[0]]);
+                const LLVector3 b = v3(face.mPositions[corners[1]]);
+                const LLVector3 c = v3(face.mPositions[corners[2]]);
+                const F32 scale = (b - a).lengthSquared() + (c - a).lengthSquared() + (c - b).lengthSquared();
+                if (!used && ((b - a) % (c - a)).length() > 1e-5f * scale)
+                {
+                    fail(fmt::format("the grid's triangle ({}, {}, {}), which has area, is left out", corners[0], corners[1], corners[2]));
+                    return true;
+                }
             }
         }
         return true;
@@ -1001,17 +1034,27 @@ namespace
         }
     }
 
-    // A flat inner side is hard at every point. Its columns run p0, then
-    // each later point twice, then p0 again (or the last point, where the
-    // profile is cut), so the quads after even columns are the real ones
-    // and the quads after odd columns have no width: a vertex takes its
-    // normal from the one strip of real quads beside it, up and down the
-    // path, and from no other strip at its point. A vertex in no triangle
-    // with area, as the copies that close the side or an apex's copies,
-    // is beside no strip.
-    S32 stripOf(S32 column)
+    // A flat inner side is hard at every corner. Its columns run along its
+    // points, each corner twice, the copy one place with the corner in every
+    // row and with its UVs: the quad between them has no width. Each run of
+    // columns between copies is a strip, a flat facet along the path, and a
+    // vertex takes its normal from the triangles of its own strip at its
+    // point, and from no other strip there. A vertex in no triangle with
+    // area, as an apex's, is in no strip.
+    std::vector<S32> stripsOf(const LLVolumeFace& face)
     {
-        return column % 2 == 0 ? column : column - 1;
+        std::vector<S32> strip(face.mNumS, 0);
+        for (S32 s = 1; s < face.mNumS; ++s)
+        {
+            bool copy = true;
+            for (S32 t = 0; t < face.mNumT && copy; ++t)
+            {
+                copy = bitsOf(face.mPositions[gridIndex(face, s, t)]) == bitsOf(face.mPositions[gridIndex(face, s - 1, t)]) &&
+                       face.mTexCoords[gridIndex(face, s, t)] == face.mTexCoords[gridIndex(face, s - 1, t)];
+            }
+            strip[s] = strip[s - 1] + (copy ? 1 : 0);
+        }
+        return strip;
     }
 
     void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
@@ -1023,6 +1066,7 @@ namespace
         }
         const std::vector<bool> lone = loneVertices(face, triangles);
         const std::vector<U32> groups = weldGroups(face);
+        const std::vector<S32> strips = stripsOf(face);
         std::map<std::pair<U32, S32>, std::vector<U32>> in_strip;
         for (size_t t = 0; t < triangles.size(); ++t)
         {
@@ -1030,14 +1074,14 @@ namespace
             {
                 continue;
             }
-            S32 strip = face.mNumS;
+            S32 column = face.mNumS;
             for (U32 v : triangles[t].v)
             {
-                strip = llmin(strip, (S32)(v % face.mNumS));
+                column = llmin(column, (S32)(v % face.mNumS));
             }
             for (U32 v : triangles[t].v)
             {
-                in_strip[{ groups[v], strip }].push_back((U32)t);
+                in_strip[{ groups[v], strips[column] }].push_back((U32)t);
             }
         }
         for (S32 v = 0; v < face.mNumVertices; ++v)
@@ -1047,7 +1091,7 @@ namespace
             {
                 continue;
             }
-            const auto found = in_strip.find({ groups[v], stripOf(column) });
+            const auto found = in_strip.find({ groups[v], strips[column] });
             if (found == in_strip.end())
             {
                 continue;
@@ -3628,5 +3672,127 @@ namespace
                 CHECK(volume->getPath().getPathLength() == 2);
             }
         }
+    }
+
+    // A flat inner side's columns, against its hole's points: each point a
+    // column, and a copy after each corner, a point where the hole turns, or
+    // after every point where the hole is drawn in to its wall; and no
+    // triangle in the quad between a corner and its copy.
+    void checkCorners(const LLVolume& volume, const std::string& name, Report& report)
+    {
+        const LLProfile& outline = volume.getProfile();
+        for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = volume.getVolumeFace(i);
+            if (!isDoubled(face) || !isGrid(face))
+            {
+                continue;
+            }
+            const std::string where = fmt::format("{}: {}", name, faceName(face));
+            const S32 points = outline.mFaces[i].mCount;
+            const std::vector<S32> strips = stripsOf(face);
+            std::vector<bool> copied(points, false);
+            S32 point = 0;
+            for (S32 s = 1; s < face.mNumS; ++s)
+            {
+                if (strips[s] != strips[s - 1])
+                {
+                    copied[point] = true;
+                }
+                else
+                {
+                    ++point;
+                }
+            }
+            if (point != points - 1)
+            {
+                report.fail(fmt::format("{}: {} columns for {} points", where, face.mNumS, points));
+                continue;
+            }
+            for (S32 k = 0; k < points; ++k)
+            {
+                bool turns = false;
+                if (k > 0 && k + 1 < points)
+                {
+                    const LLVector4a& a = outline.mProfile[face.mBeginS + k - 1];
+                    const LLVector4a& b = outline.mProfile[face.mBeginS + k];
+                    const LLVector4a& c = outline.mProfile[face.mBeginS + k + 1];
+                    const F32 e1x = b[0] - a[0], e1y = b[1] - a[1], e2x = c[0] - b[0], e2y = c[1] - b[1];
+                    const F32 turn = e1x * e2y - e1y * e2x;
+                    turns = fabsf(turn) > 1e-4f * sqrtf((e1x * e1x + e1y * e1y) * (e2x * e2x + e2y * e2y)) || outline.holeTouchesWall();
+                }
+                if (copied[k] != turns)
+                {
+                    report.fail(fmt::format("{}: point {} of {} {} but is {}", where, k, points, turns ? "turns" : "does not turn",
+                                            copied[k] ? "copied" : "not copied"));
+                    break;
+                }
+            }
+            for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+            {
+                S32 low = face.mNumS, high = 0;
+                for (S32 k = 0; k < 3; ++k)
+                {
+                    low = llmin(low, (S32)(face.mIndices[t + k] % face.mNumS));
+                    high = llmax(high, (S32)(face.mIndices[t + k] % face.mNumS));
+                }
+                if (strips[low] != strips[high])
+                {
+                    report.fail(fmt::format("{}: triangle {} spans a corner and its copy", where, t / 3));
+                    break;
+                }
+            }
+        }
+    }
+
+    // A flat inner side copies its hole's corners, where its normals turn,
+    // and no point between them: a hollow box's inner side is one quad a
+    // side of its hole, as its outer sides are.
+    TEST_CASE("llvolume: a flat inner side copies its corners and nothing else", "[llvolume]")
+    {
+        Shape hollow_box = box();
+        hollow_box.name = "hollow box";
+        hollow_box.hole = LL_PCODE_HOLE_SQUARE;
+        hollow_box.hollow = 0.5f;
+        Shape hollow_prism = prism();
+        hollow_prism.name = "hollow prism";
+        hollow_prism.hollow = 0.5f;
+        checkCounts({ hollow_box, { { 52, 32 }, { 52, 32 }, { 52, 32 }, { 52, 32 } } });
+        checkCounts({ hollow_prism, { { 40, 24 }, { 40, 24 }, { 40, 24 }, { 40, 24 } } });
+
+        Report report;
+        S32 volumes = 0;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.hole != LL_PCODE_HOLE_SQUARE && s.hole != LL_PCODE_HOLE_TRIANGLE && !(s.hole == LL_PCODE_HOLE_SAME && s.profile != LL_PCODE_PROFILE_CIRCLE &&
+                                                                                     s.profile != LL_PCODE_PROFILE_CIRCLE_HALF))
+            {
+                continue;
+            }
+            if (s.hollow <= 0.f)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                checkCorners(*volume, lodName(s, lod), report);
+                ++volumes;
+            }
+        }
+        for (S32 sections : { 4, 16 })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SQUARE, 0.5f, lod);
+                bendPath(*volume, sections, 1.1f);
+                volume->regen();
+                checkCorners(*volume, fmt::format("flexible hollow box, {} sections, LOD {}", sections, lod), report);
+            }
+        }
+        INFO(fmt::format("{} volumes", volumes));
+        INFO(report.text());
+        CHECK(volumes > 0);
+        CHECK(report.failures == 0);
     }
 }

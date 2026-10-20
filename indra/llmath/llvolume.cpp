@@ -450,7 +450,7 @@ S32 LLProfile::getNumNGonPoints(const LLProfileParams& params, S32 sides, F32 of
 // What is the bevel parameter used for? - DJS 04/05/02
 // Bevel parameter is currently unused but presumedly would support
 // filleted and chamfered corners
-void LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F32 bevel, F32 ang_scale, S32 split)
+bool LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F32 bevel, F32 ang_scale, S32 split)
 {
     // Generate an n-sided "circular" path.
     // 0 is (1,0), and we go counter-clockwise along a circular path from there.
@@ -491,7 +491,8 @@ void LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F3
     t_fraction = (begin - t_first)*sides;
 
     // Only use if it's not almost exactly on an edge.
-    if (t_fraction < 0.9999f)
+    const bool begin_point = t_fraction < 0.9999f;
+    if (begin_point)
     {
         LLVector4a new_pt;
         new_pt.setLerp(pt1, pt2, t_fraction);
@@ -575,6 +576,7 @@ void LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F3
     }
 
     mTotal = mProfile.size();
+    return begin_point;
 }
 
 // Hollow is percent of the original bounding box, not of this particular
@@ -588,7 +590,7 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
     mTotalOut = mTotal;
 
     // Why is the "bevel" parameter -1? DJS 04/05/02
-    genNGon(params, llfloor(sides),offset,-1, ang_scale, split);
+    const bool begin_point = genNGon(params, llfloor(sides),offset,-1, ang_scale, split);
 
     Face *face = addFace(mTotalOut, mTotal-mTotalOut,0,LL_FACE_INNER_SIDE, flat);
 
@@ -668,6 +670,19 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
     for (S32 i=mTotalOut;i<mTotal;i++)
     {
         mProfile[i] = pt[j--];
+    }
+
+    // A flat hole's corners. genNGon laid the points out as its begin point,
+    // where it has one, then split points and a corner by turns, split
+    // points first, to its end; they run the other way here. A hole drawn
+    // in to its wall may fold at any point.
+    if (flat)
+    {
+        const S32 count = mTotal - mTotalOut;
+        const S32 step = mHoleTouchesWall ? 1 : split + 1;
+        const S32 first_laid = (begin_point ? 1 : 0) + split;
+        face->mCornerStep = step;
+        face->mFirstCorner = ((count - 1 - first_laid) % step + step) % step;
     }
 
     for (S32 i=0;i<(S32)mFaces.size();i++)
@@ -2979,11 +2994,16 @@ void LLVolume::createVolumeFaces()
                 {
                     type_mask |= LLVolumeFace::INNER_MASK;
                     if (face.mFlat && num_s > 2)
-                    { //flat inner faces have to copy vert normals
-                        num_s = num_s*2;
-                        if (num_s < 0)
+                    {
+                        // A flat inner side has a column for each of its
+                        // points and a second for each corner, where its
+                        // normals turn.
+                        for (S32 point = 1; point + 1 < face.mCount; ++point)
                         {
-                            LL_ERRS() << "Volume face corruption detected." << LL_ENDL;
+                            if (face.isCorner(point))
+                            {
+                                ++num_s;
+                            }
                         }
                     }
                 }
@@ -6633,9 +6653,10 @@ void LLVolumeFace::createTangents()
             std::fill(mTangents, mTangents + mNumVertices, tangent);
         }
         else if (!(mTypeMask & CAP_MASK) && mNumS > 0 && mNumT > 0 && mNumS * mNumT == mNumVertices &&
-                 mNumIndices == (mNumS - 1) * (mNumT - 1) * 6)
+                 mNumIndices <= (mNumS - 1) * (mNumT - 1) * 6)
         {
-            // A side is createSide's grid.
+            // A side is createSide's grid. The quads and triangles its indices
+            // leave out have no area, and add nothing to a tangent.
             if (mFlexible)
             {
                 // Along the rows, the way u runs across the face, and w as
@@ -6905,8 +6926,16 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     S32 s, t;
     F32 ss, tt;
 
+    // A flat inner side copies each of its corners, so that its normals turn
+    // there: the quad between a corner and its copy has no width, and has
+    // no triangles.
+    const bool doubled = (mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2;
+    const LLProfile::Face* outline = doubled ? &volume->getProfile().mFaces[mID] : nullptr;
+    const S32 num_s = doubled ? outline->mCount : mNumS;
+    const S32 copies = mNumS - num_s;
+
     num_vertices = mNumS*mNumT;
-    num_indices = (mNumS-1)*(mNumT-1)*6;
+    num_indices = (mNumS-1-copies)*(mNumT-1)*6;
 
     // createVolumeFaces builds partially only where the layout, and so the
     // counts, are the last build's.
@@ -6925,21 +6954,19 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     LLVector4a* pos = (LLVector4a*) mPositions;
     LLVector2* tc = (LLVector2*) mTexCoords;
     F32 begin_stex = floorf(profile[mBeginS][2]);
-    S32 num_s = ((mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2) ? mNumS/2 : mNumS;
 
     S32 cur_vertex = 0;
     S32 end_t = mBeginT+mNumT;
-    bool test = (mTypeMask & INNER_MASK) && (mTypeMask & FLAT_MASK) && mNumS > 2;
 
     // Copy the vertices into the array. Every row takes the same columns of
     // its mesh row with the same s texture coordinates, and the path's t for
     // its own: the columns and their s are worked out once, so the rows are
     // copies.
-    { LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - copy verts");
     struct Column
     {
         S32 mesh;
         F32 s;
+        bool copy; // the copy of the column before it
     };
     constexpr S32 STACK_COLUMNS = 256;
     Column stack_columns[STACK_COLUMNS];
@@ -6950,6 +6977,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         heap_columns.resize(mNumS);
         columns = heap_columns.data();
     }
+    { LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - copy verts");
     S32 column_count = 0;
     for (s = 0; s < num_s; s++)
     {
@@ -6990,16 +7018,11 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 
         // A column past the profile's end wraps to its start.
         const S32 column = mBeginS + s >= max_s ? mBeginS + s - max_s : mBeginS + s;
-        columns[column_count++] = { column, ss };
-        if (test && s > 0)
+        columns[column_count++] = { column, ss, false };
+        if (doubled && outline->isCorner(s))
         {
-            columns[column_count++] = { column, ss };
+            columns[column_count++] = { column, ss, true };
         }
-    }
-    if (test)
-    {
-        s = (mTypeMask & OPEN_MASK) ? num_s - 1 : 0;
-        columns[column_count++] = { mBeginS + s, profile[mBeginS + s][2] - begin_stex };
     }
     llassert(column_count == mNumS);
 
@@ -7067,6 +7090,10 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         {
             for (s = 0; s < (mNumS-1); s++)
             {
+                if (columns[s + 1].copy)
+                {
+                    continue;
+                }
                 mIndices[cur_index++] = s   + mNumS*t;          //bottom left
                 mIndices[cur_index++] = s+1 + mNumS*(t+1);      //top right
                 mIndices[cur_index++] = s   + mNumS*(t+1);      //top left
@@ -7075,6 +7102,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
                 mIndices[cur_index++] = s+1 + mNumS*(t+1);      //top right
             }
         }
+        llassert(cur_index == mNumIndices);
     }
 
     // The normals come from the grid's quads, not from the triangles the
@@ -7113,12 +7141,12 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // one seam, and across its first and last rows: a prim's where they are
     // one place in every row or column, as its own positions say; a
     // sculpt's where its stitching samples them from one column or row of
-    // the map.
+    // the map. A flat inner side's seam is one of its corners.
     if (!partial_build)
     {
         if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
         {
-            mJoinsS = columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
+            mJoinsS = !doubled && columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
             mJoinsT = rows_meet(pos, mNumS, 0, mNumT - 1);
         }
         else
