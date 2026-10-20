@@ -2549,10 +2549,12 @@ namespace
     // ------------------------------------------------------------------
     // Today's defects
 
-    // The even-out switch adds each triangle's normal a second time to
-    // its top-right vertex, so a round prim's vertex normals lean around
-    // the axis, by an amount that depends on the row.
-    TEST_CASE("llvolume: a cylinder's side normals point straight out from its axis", "[llvolume][!shouldfail]")
+    // A cylinder side's quads are rectangles of one size, so a vertex has
+    // as much area on either side of it, in every row: a weight that went to
+    // some corners of a quad and not others, as the top right corner or the
+    // corners of one triangle, would lean the normals around the axis, by
+    // an amount that depends on the row.
+    TEST_CASE("llvolume: a cylinder's side normals point straight out from its axis", "[llvolume]")
     {
         for (S32 lod = 0; lod < LOD_COUNT; ++lod)
         {
@@ -2581,37 +2583,44 @@ namespace
         }
     }
 
-    // The double count goes to whichever vertex is top right in
-    // the grid, so a mirrored sculpt, whose rows run the other way, does
-    // not get the mirror image of the plain one's normals.
-    TEST_CASE("llvolume: a mirrored sculpt's normals mirror the plain one's", "[llvolume][!shouldfail]")
+    // A mirrored sculpt's rows run the other way, so a weight that went to
+    // whichever corner is top right in the grid would not give it the mirror
+    // image of the plain one's normals. The map is a cylinder's, whose quads
+    // are flat even in eight bits: a mirrored sculpt's diagonals run the
+    // other way across its surface, and where a quad is warped, as eight bits
+    // warp a torus's, its two triangles are not the mirror image of the plain
+    // one's, and neither are normals that follow them.
+    TEST_CASE("llvolume: a mirrored sculpt's normals mirror the plain one's", "[llvolume]")
     {
-        const SculptMap map = torusMap(64, 64);
-        LLPointer<LLVolume> plain = buildSculpt(LL_SCULPT_TYPE_TORUS, map, 3);
-        LLPointer<LLVolume> mirrored = buildSculpt((U8)(LL_SCULPT_TYPE_TORUS | LL_SCULPT_FLAG_MIRROR), map, 3);
-        const LLVolumeFace& a = plain->getVolumeFace(0);
-        const LLVolumeFace& b = mirrored->getVolumeFace(0);
-        REQUIRE(a.mNumS == b.mNumS);
-        F32 worst = 0.f;
-        for (S32 t = 0; t < a.mNumT; ++t)
+        const SculptMap map = cylinderMap(64, 64);
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
         {
-            for (S32 s = 0; s < a.mNumS; ++s)
+            LLPointer<LLVolume> plain = buildSculpt(LL_SCULPT_TYPE_CYLINDER, map, lod);
+            LLPointer<LLVolume> mirrored = buildSculpt((U8)(LL_SCULPT_TYPE_CYLINDER | LL_SCULPT_FLAG_MIRROR), map, lod);
+            const LLVolumeFace& a = plain->getVolumeFace(0);
+            const LLVolumeFace& b = mirrored->getVolumeFace(0);
+            REQUIRE(a.mNumS == b.mNumS);
+            REQUIRE(a.mNumT == b.mNumT);
+            F32 worst = 0.f;
+            for (S32 t = 0; t < a.mNumT; ++t)
             {
-                LLVector3 expected = v3(a.mNormals[gridIndex(a, a.mNumS - 1 - s, t)]);
-                expected.mV[0] = -expected.mV[0];
-                worst = llmax(worst, degreesBetween(v3(b.mNormals[gridIndex(b, s, t)]), expected));
+                for (S32 s = 0; s < a.mNumS; ++s)
+                {
+                    LLVector3 expected = v3(a.mNormals[gridIndex(a, a.mNumS - 1 - s, t)]);
+                    expected.mV[0] = -expected.mV[0];
+                    worst = llmax(worst, degreesBetween(v3(b.mNormals[gridIndex(b, s, t)]), expected));
+                }
             }
+            INFO(fmt::format("LOD {}: the mirrored normals are up to {:.2f} degrees from the mirror image", lod, worst));
+            CHECK(worst < 0.1f);
         }
-        INFO(fmt::format("the mirrored normals are up to {:.2f} degrees from the mirror image", worst));
-        CHECK(worst < 0.1f);
     }
 
-    // Where a smooth side creases sharply, as a flattened torus
-    // tube does at LOD 0, the double count's weights turn a normal past
-    // the triangles on the crease's light side. Equal weights cannot: a
-    // crease turns by less than 180 degrees, and its normal by half that
-    // from each side.
-    TEST_CASE("llvolume: a torus's normals face every triangle at a sharp crease", "[llvolume][!shouldfail]")
+    // Where a smooth side creases sharply, as a flattened torus tube does at
+    // LOD 0, weights that favour one side of the crease turn a normal past
+    // the triangles on its light side. Equal weights cannot: a crease turns
+    // by less than 180 degrees, and its normal by half that from each side.
+    TEST_CASE("llvolume: a torus's normals face every triangle at a sharp crease", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Inversion;

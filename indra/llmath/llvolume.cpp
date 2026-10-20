@@ -6371,6 +6371,42 @@ size_t LLVolumeFace::weldVertices(VertexData* destination_vertices, U32* destina
     return unique;
 }
 
+namespace
+{
+    // Adds a grid quad to its corners' normals. Its two triangles, (bl, br,
+    // tr) and (bl, tr, tl), share the diagonal from bl to tr: each gives its
+    // corner off the diagonal its cross product, twice its area along its
+    // normal, and each corner on the diagonal half of it. A parallelogram
+    // then gives its four corners one weight, so a vertex has as much from
+    // either side of it in every row, and no corner takes a normal from a
+    // triangle it is not in. Each cross product is taken at the corner off
+    // the diagonal: where a copied or collapsed row or column puts two of a
+    // triangle's corners in one place, an edge there has no length and the
+    // product is exactly zero, fused multiply-add or not. A quad between a
+    // copied row or column adds nothing, so the edge there stays hard.
+    void add_quad_to_normals(LLVector4a* norm, const LLVector4a* pos, S32 bl, S32 br, S32 tl, S32 tr)
+    {
+        LLVector4a bottom, right, top, left;
+        bottom.setSub(pos[br], pos[bl]);
+        right.setSub(pos[tr], pos[br]);
+        top.setSub(pos[tr], pos[tl]);
+        left.setSub(pos[tl], pos[bl]);
+
+        LLVector4a lower, upper;
+        lower.setCross3(bottom, right);
+        upper.setCross3(top, left);
+
+        LLVector4a shared;
+        shared.setAdd(lower, upper);
+        shared.mul(0.5f);
+
+        norm[bl].add(shared);
+        norm[br].add(lower);
+        norm[tr].add(shared);
+        norm[tl].add(upper);
+    }
+}
+
 bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
@@ -6581,98 +6617,25 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
     }
 
-    //clear normals
-    F32* dst = (F32*) mNormals;
-    F32* end = (F32*) (mNormals+mNumVertices);
-    LLVector4a zero = LLVector4a::getZero();
-
-    while (dst < end)
-    {
-        zero.store4a(dst);
-        dst += 4;
-    }
-
-    //generate normals
-    U32 count = mNumIndices/3;
-
+    // The normals come from the grid's quads, not from the triangles the
+    // indices make of them, so they do not depend on the diagonals or on the
+    // order of the triangles.
     LLVector4a* norm = mNormals;
 
-    static thread_local LLAlignedArray<LLVector4a, 64> triangle_normals;
-    try
+    for (S32 v = 0; v < mNumVertices; ++v)
     {
-        triangle_normals.resize(count);
-    }
-    catch (std::bad_alloc&)
-    {
-        LL_WARNS("LLVOLUME") << "Resize of triangle_normals to " << count << " failed" << LL_ENDL;
-        return false;
-    }
-    LLVector4a* output = triangle_normals.mArray;
-    LLVector4a* end_output = output+count;
-
-    U16* idx = mIndices;
-
-    while (output < end_output)
-    {
-        LLVector4a b,v1,v2;
-        b.load4a((F32*) (pos+idx[0]));
-        v1.load4a((F32*) (pos+idx[1]));
-        v2.load4a((F32*) (pos+idx[2]));
-
-        //calculate triangle normal
-        LLVector4a a;
-
-        a.setSub(b, v1);
-        b.sub(v2);
-
-        v1.setCross3(a, b);
-
-        llassert(v1.isFinite3());
-
-        v1.store4a((F32*) output);
-
-
-        output++;
-        idx += 3;
+        norm[v].clear();
     }
 
-    idx = mIndices;
-
-    LLVector4a* src = triangle_normals.mArray;
-
-    for (U32 i = 0; i < count; i++) //for each triangle
+    for (t = 0; t < mNumT - 1; ++t)
     {
-        LLVector4a c;
-        c.load4a((F32*) (src++));
-
-        LLVector4a* n0p = norm+idx[0];
-        LLVector4a* n1p = norm+idx[1];
-        LLVector4a* n2p = norm+idx[2];
-
-        idx += 3;
-
-        LLVector4a n0,n1,n2;
-        n0.load4a((F32*) n0p);
-        n1.load4a((F32*) n1p);
-        n2.load4a((F32*) n2p);
-
-        n0.add(c);
-        n1.add(c);
-        n2.add(c);
-
-        llassert(c.isFinite3());
-
-        //even out quad contributions
-        switch (i%2+1)
+        const S32 row = mNumS * t;
+        for (s = 0; s < mNumS - 1; ++s)
         {
-            case 0: n0.add(c); break;
-            case 1: n1.add(c); break;
-            case 2: n2.add(c); break;
-        };
-
-        n0.store4a((F32*) n0p);
-        n1.store4a((F32*) n1p);
-        n2.store4a((F32*) n2p);
+            const S32 bl = row + s;
+            const S32 tl = bl + mNumS;
+            add_quad_to_normals(norm, pos, bl, bl + 1, tl, tl + 1);
+        }
     }
 
     // adjust normals based on wrapping and stitching
