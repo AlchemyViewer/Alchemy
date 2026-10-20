@@ -1897,10 +1897,14 @@ if(AL_BUILD_VIEWER)
     list(APPEND viewer_HEADERS aldiscordmanager.h)
   endif()
 
-  # The version as one line, for the hosted build's metadata.
+  # The version as one line, for the hosted build's metadata and the
+  # attribution. It is written only when it changes, so its time says when
+  # the version last did.
   file(
-    WRITE "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
-    "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n"
+    CONFIGURE
+    OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
+    CONTENT "${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION}\n"
+    @ONLY
   )
 
   if(DARWIN)
@@ -2268,8 +2272,11 @@ if(AL_BUILD_VIEWER)
   )
 
   # The third-party attribution, from what vcpkg installed and the table of
-  # what it cannot know. It is regenerated when the installed set, the table
-  # or the generator changes, and the viewer's build waits for it.
+  # what it cannot know. It is regenerated when the installed set, the table,
+  # the generator or the version changes, and the viewer's build waits for
+  # it. The version is read from viewer_version.txt, not passed: the revision
+  # moves with every commit, and on the command line it would rewrite the
+  # project file of this target on each reconfigure.
   get_cmake_property(cache_variables CACHE_VARIABLES)
   set(al_enabled_options "")
   foreach(variable IN LISTS cache_variables)
@@ -2292,11 +2299,12 @@ if(AL_BUILD_VIEWER)
       -DVCPKG_SHARE=${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/share
       -DTRIPLET=${VCPKG_TARGET_TRIPLET} -DTABLE=${al_attribution_table}
       -DSOURCE_DIR=${INDRA_SOURCE_DIR} -DCHANNEL=${AL_CHANNEL}
-      -DVERSION=${VIEWER_SHORT_VERSION}.${VIEWER_VERSION_REVISION} -DENABLED=${al_enabled_options}
+      -DVERSION_FILE=${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt -DENABLED=${al_enabled_options}
       -DOUTPUT_INFO=${CMAKE_CURRENT_BINARY_DIR}/packages-info.txt
       -DOUTPUT_LICENSES=${CMAKE_CURRENT_BINARY_DIR}/licenses.txt -P ${al_attribution_script}
     DEPENDS
       "${VCPKG_INSTALLED_DIR}/vcpkg/status"
+      "${CMAKE_CURRENT_BINARY_DIR}/viewer_version.txt"
       "${al_attribution_table}"
       "${al_attribution_script}"
     COMMENT "Writing packages-info.txt and licenses.txt from the installed ports"
