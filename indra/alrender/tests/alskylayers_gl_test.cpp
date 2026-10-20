@@ -45,6 +45,7 @@ namespace
         TEST_SUN   = 1,
         TEST_MOON  = 2,
         TEST_BLOOM = 3,
+        TEST_CLOUDS = 4,
     };
 
     // The screen triangle the layers are drawn over.
@@ -75,6 +76,7 @@ uniform vec3 test_background;
 vec4 skySun(vec3 dir);
 vec4 skyMoon(vec3 dir);
 vec4 skyBloom(vec3 dir);
+vec4 skyClouds(vec3 dir);
 
 void main()
 {
@@ -94,6 +96,11 @@ void main()
     else if (test_layer == 3)
     {
         vec4 layer = skyBloom(dir);
+        color = mix(color, layer.rgb, layer.a);
+    }
+    else if (test_layer == 4)
+    {
+        vec4 layer = skyClouds(dir);
         color = mix(color, layer.rgb, layer.a);
     }
     frag_color = vec4(color, 1.0);
@@ -188,6 +195,24 @@ void main()
     // The sun's colour the bloom is tinted by, held to 1 as the fixed-function halo's vertex colour was.
     const LLVector3 BLOOM_COLOR(1.f, 0.82f, 0.6f);
 
+    // Clouds: the sky they are lit by, a view, and how far their noise has blended toward the next.
+    struct CloudCase
+    {
+        const char* mName;
+        S32  mSky;
+        View mView;
+        F32  mBlend;
+    };
+
+    // Toward the sun and overhead at midday, the horizon at sunset, where the cap meets the sky below the camera's
+    // level, and up at night; the noise blending in two.
+    const CloudCase CLOUDS[] = {
+        { "midday, toward the sun", 0, { 80.f, 30.f, 70.f }, 0.f },
+        { "midday, overhead", 0, { 200.f, 75.f, 60.f }, 0.f },
+        { "sunset, at the horizon, blending", 1, { 250.f, 3.f, 60.f }, 0.35f },
+        { "night, looking up, blending", 2, { 100.f, 40.f, 80.f }, 0.6f },
+    };
+
     // How a layer drawn two ways differs, over the colour channels: the most, the pixels past the bound compare() is
     // given, and the pixels the layer reached in either.
     struct Difference
@@ -218,6 +243,7 @@ void main()
                 mOldSun[path].unload();
                 mOldMoon[path].unload();
                 mHalo[path].unload();
+                mOldClouds[path].unload();
                 mLayers[path].unload();
                 for (LLRenderTarget& target : mGBuffer[path])
                 {
@@ -232,6 +258,10 @@ void main()
             mMoonTexture = nullptr;
             mBloomTexture = nullptr;
             mBloomTextureNext = nullptr;
+            mCloudNoise = nullptr;
+            mCloudNoiseNext = nullptr;
+            mDome = nullptr;
+            mFineDome = nullptr;
             if (mEnvironment)
             {
                 glDeleteBuffers(1, &mEnvironment);
@@ -269,10 +299,16 @@ void main()
                              { { "skytest/sunHaloV.glsl", GL_VERTEX_SHADER },
                                { "skytest/sunHaloF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
+                buildProgram(mOldClouds[path], "Deferred Windlight Cloud Program (before the composite)",
+                             { { "skyraster/deferred/cloudsV.glsl", GL_VERTEX_SHADER },
+                               { "skyraster/deferred/cloudsF.glsl", GL_FRAGMENT_SHADER } },
+                             emissive);
                 buildProgram(mLayers[path], "The sky's layers along the view ray (test)",
                              { { "skytest/skyLayerTestV.glsl", GL_VERTEX_SHADER },
                                { "skytest/skyLayerTestF.glsl", GL_FRAGMENT_SHADER },
-                               { "deferred/skyBodiesF.glsl", GL_FRAGMENT_SHADER } },
+                               { "deferred/skyBodiesF.glsl", GL_FRAGMENT_SHADER },
+                               { "deferred/skyCloudsF.glsl", GL_FRAGMENT_SHADER },
+                               { "windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER } },
                              emissive, { { "SUN_BLOOM", "1" } });
 
                 for (S32 storage = 0; storage < 2; ++storage)
@@ -293,6 +329,10 @@ void main()
             mMoonTexture    = disc(3, 0.9f);
             mBloomTexture     = disc(7, 1.f);
             mBloomTextureNext = disc(9, 0.7f);
+            mCloudNoise       = cloudNoise(11);
+            mCloudNoiseNext   = cloudNoise(13);
+            mDome             = domeMesh();
+            mFineDome         = fineSphere();
             glGenBuffers(1, &mEnvironment);
         }
 
@@ -328,12 +368,12 @@ void main()
         // A layer along each pixel's view ray over the background, for @a emissive's path, @a bind setting its
         // uniforms. Read back.
         template <typename Bind>
-        std::vector<F32> drawLayer(const View& view, bool emissive, TestLayer layer, Bind&& bind)
+        std::vector<F32> drawLayer(const View& view, bool emissive, TestLayer layer, Bind&& bind, const Sky& sky = SKIES[0])
         {
             mFloat.bindTarget();
             loadView(view, W, H);
             LLGLSLShader& program = mLayers[emissive];
-            bindEnvironment(program, mEnvironment, SKIES[0], ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix()));
+            bindEnvironment(program, mEnvironment, sky, ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix()));
             program.bind();
             glUniform1i(glGetUniformLocation(program.mProgramObject, "test_layer"), layer);
             glUniform3fv(glGetUniformLocation(program.mProgramObject, "test_background"), 1, BACKGROUND[emissive]);
@@ -464,10 +504,92 @@ void main()
             });
         }
 
+        // The dome's sphere as a far finer mesh than the dome's, with no skirt: rings every tenth of a degree from the
+        // zenith to 22.5 degrees, past where the camera's level meets it, with the dome's planar texture coordinates.
+        // Its facets are a hundredth of the dome's in depth, so the clouds drawn over it are the sphere's.
+        static LLPointer<LLVertexBuffer> fineSphere()
+        {
+            constexpr U32 RINGS  = 225;
+            constexpr U32 SLICES = 256;
+            LLPointer<LLVertexBuffer> mesh = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0);
+            REQUIRE(mesh->allocateBuffer((RINGS + 1) * SLICES, RINGS * SLICES * 6));
+            LLStrider<LLVector3> vertices;
+            LLStrider<LLVector2> tex_coords;
+            LLStrider<U16>       index;
+            REQUIRE(mesh->getVertexStrider(vertices));
+            REQUIRE(mesh->getTexCoord0Strider(tex_coords));
+            REQUIRE(mesh->getIndexStrider(index));
+            for (U32 ring = 0; ring <= RINGS; ++ring)
+            {
+                const F32 phi = (F32)ring / RINGS * (F_PI / 8.f);
+                for (U32 slice = 0; slice < SLICES; ++slice)
+                {
+                    const F32 theta = F_TWO_PI * (F32)slice / SLICES;
+                    const F32 x = sinf(phi) * cosf(theta);
+                    const F32 y = cosf(phi);
+                    const F32 z = sinf(phi) * sinf(theta);
+                    *vertices++   = LLVector3(x, y, z) * DOME_RADIUS;
+                    *tex_coords++ = LLVector2((1.f - z) / 2.f, (1.f - x) / 2.f);
+                }
+            }
+            for (U32 ring = 0; ring < RINGS; ++ring)
+            {
+                for (U32 slice = 0; slice < SLICES; ++slice)
+                {
+                    const U16 a = (U16)(ring * SLICES + slice);
+                    const U16 b = (U16)(ring * SLICES + (slice + 1) % SLICES);
+                    const U16 c = (U16)(a + SLICES);
+                    const U16 d = (U16)(b + SLICES);
+                    for (U16 i : { a, c, b, b, c, d })
+                    {
+                        *index++ = i;
+                    }
+                }
+            }
+            mesh->unmapBuffer();
+            return mesh;
+        }
+
+        // The clouds by their old program, as LLDrawPoolWLSky::renderSkyCloudsDeferred drew them: the dome's mesh,
+        // alpha blended, the next noise bound only while the sky blends toward it.
+        std::vector<F32> oldClouds(const CloudCase& clouds, bool emissive, bool stored, LLVertexBuffer* mesh)
+        {
+            const Sky& sky = SKIES[clouds.mSky];
+            return drawOld(clouds.mView, emissive, stored, [&]
+            {
+                gGL.setSceneBlendType(LLRender::BT_ALPHA);
+                LLGLSLShader& program = mOldClouds[emissive];
+                bindEnvironment(program, mEnvironment, sky, ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix()));
+                program.bind();
+                bindDome(program, sky, nullptr, nullptr);
+                bindMap(program, LLShaderMgr::CLOUD_NOISE_MAP, mCloudNoise, ALSamplers::AnisoWrap);
+                if (clouds.mBlend > 0.f)
+                {
+                    bindMap(program, LLShaderMgr::CLOUD_NOISE_MAP_NEXT, mCloudNoiseNext, ALSamplers::AnisoWrap);
+                }
+                program.uniform1f(LLShaderMgr::BLEND_FACTOR, clouds.mBlend);
+                drawDome(mesh, mesh == mFineDome ? LLRender::TRIANGLES : LLRender::TRIANGLE_STRIP);
+                program.unbind();
+            });
+        }
+
+        // The clouds along each pixel's ray.
+        std::vector<F32> rayClouds(const CloudCase& clouds, bool emissive)
+        {
+            const Sky& sky = SKIES[clouds.mSky];
+            return drawLayer(clouds.mView, emissive, TEST_CLOUDS, [&](LLGLSLShader& program)
+            {
+                bindDome(program, sky, nullptr, nullptr);
+                bindMap(program, LLShaderMgr::CLOUD_NOISE_MAP, mCloudNoise, ALSamplers::AnisoWrap);
+                bindMap(program, LLShaderMgr::CLOUD_NOISE_MAP_NEXT, mCloudNoiseNext, ALSamplers::AnisoWrap);
+                program.uniform1f(LLShaderMgr::SKY_CLOUD_BLEND, clouds.mBlend);
+            }, sky);
+        }
+
         // How pictures @a a and @a b differ where either differs from the background, each channel allowed
         // @a allowance plus @a steps of the path's storage at the larger value; pixels @a skip marks are left out.
         static Difference compare(const std::vector<F32>& a, const std::vector<F32>& b, bool emissive, F32 allowance,
-                                  F32 steps, const std::vector<bool>& skip = {})
+                                  F32 steps, const std::vector<bool>& skip = {}, F32 dithered = 0.f)
         {
             Difference d;
             for (size_t px = 0; px < size_t(W) * H; ++px)
@@ -485,7 +607,9 @@ void main()
                     const F32 diff = fabsf(pa[c] - pb[c]);
                     d.mMost = llmax(d.mMost, diff);
                     lit = lit || fabsf(pa[c] - BACKGROUND[emissive][c]) > 1e-6f || fabsf(pb[c] - BACKGROUND[emissive][c]) > 1e-6f;
-                    beyond = beyond || diff > allowance + steps * storageStep(llmax(pa[c], pb[c]), emissive, c);
+                    const F32 larger = llmax(pa[c], pb[c]);
+                    beyond = beyond ||
+                             diff > allowance + steps * storageStep(larger, emissive, c) + dithered * ditherReach(c) * larger;
                 }
                 d.mLit += lit;
                 d.mBeyond += beyond;
@@ -541,6 +665,7 @@ void main()
         LLGLSLShader           mOldSun[2];
         LLGLSLShader           mOldMoon[2];
         LLGLSLShader           mHalo[2];
+        LLGLSLShader           mOldClouds[2];
         LLGLSLShader           mLayers[2];
         LLRenderTarget         mGBuffer[2][2];
         LLRenderTarget         mFloat;
@@ -550,8 +675,19 @@ void main()
         LLPointer<LLImageGL>   mMoonTexture;
         LLPointer<LLImageGL>   mBloomTexture;
         LLPointer<LLImageGL>   mBloomTextureNext;
+        LLPointer<LLImageGL>   mCloudNoise;
+        LLPointer<LLImageGL>   mCloudNoiseNext;
+        LLPointer<LLVertexBuffer> mDome;
+        LLPointer<LLVertexBuffer> mFineDome;
         GLuint                 mEnvironment = 0;
     };
+
+    // How far the per-ray clouds may lie from the old program's over the sphere, display encoded: the filter's
+    // rounding (1.7/255 at most). How far that lies from the old program's over the dome's mesh above the camera's
+    // level, its facets (30/255 at most, at cloud edges near the horizon); and below it, its skirt (3.2/255).
+    constexpr F32 CLOUD_MATHS  = 2.f / 255.f;
+    constexpr F32 CLOUD_FACETS = 40.f / 255.f;
+    constexpr F32 CLOUD_SKIRT  = 4.f / 255.f;
 
     // How far the per-ray sun and moon may lie from their raster quads with nothing stored between: what the filter
     // makes of derivatives taken from the ray's coordinates rather than interpolated across the quad's two triangles.
@@ -626,4 +762,68 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the bloom along the view 
                   BODY_MATHS, clamped_pixels);
         }
     }
+}
+
+TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the clouds along the view ray are the clouds on the dome",
+                 "[alskylayers_gl]")
+{
+    // The clouds' texture coordinates are linear in the point on the dome, and so are the haze terms of the point, so
+    // the clouds along the ray are the clouds the old program drew over the sphere itself: over a mesh fine enough,
+    // the same up to the filter. Over the dome's own mesh they differ by its facets, which near the horizon move the
+    // point a ray meets by tens of metres and the detail noise, sixteen times as fine, by texels (accepted, plan §4),
+    // and below the camera's level, where the mesh's skirt bends toward the axis and the ray continues the sphere
+    // (D7), over the sliver the 50 m raise lifts above the horizon. The 8-bit albedo then clamps the clouds' colour,
+    // up to 2 (D6). With the emissive buffer the old program dithered what it wrote (ditherEmissive).
+    setUp();
+    S32 clamped_pixels = 0;
+    for (const CloudCase& clouds : CLOUDS)
+    {
+        for (S32 path = 0; path < 2; ++path)
+        {
+            const bool emissive = path == 1;
+            CAPTURE(clouds.mName, emissive);
+            const std::vector<F32> ray          = rayClouds(clouds, emissive);
+            const std::vector<F32> sphere       = oldClouds(clouds, emissive, false, mFineDome);
+            const std::vector<F32> dome_float   = oldClouds(clouds, emissive, false, mDome);
+            const std::vector<F32> dome_stored  = oldClouds(clouds, emissive, true, mDome);
+
+            // The pixels above and below the camera's level, by their ray in the dome's frame.
+            loadView(clouds.mView, W, H);
+            const std::array<F32, 9> eye_to_sky = ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix());
+            std::vector<bool> below(size_t(W) * H);
+            std::vector<bool> cap(size_t(W) * H);
+            for (S32 y = 0; y < H; ++y)
+            {
+                for (S32 x = 0; x < W; ++x)
+                {
+                    const bool under = domeRay(clouds.mView, eye_to_sky, W, H, x, y).mV[VY] < 0.f;
+                    below[size_t(y) * W + x] = under;
+                    cap[size_t(y) * W + x] = !under;
+                }
+            }
+
+            const F32 dithered = emissive ? 1.f : 0.f;
+            const std::vector<bool> clamps = emissive ? std::vector<bool>() : clamped(dome_stored, dome_float);
+            const S32 clamp_count = (S32)std::count(clamps.begin(), clamps.end(), true);
+
+            const Difference maths  = compare(ray, sphere, emissive, CLOUD_MATHS, 0.f, {}, dithered);
+            const Difference facets = compare(dome_float, sphere, emissive, CLOUD_FACETS, 0.f, below, 2.f * dithered);
+            const Difference skirt  = compare(dome_float, sphere, emissive, 0.f, 0.f, cap, 2.f * dithered);
+            const Difference stored = compare(dome_stored, dome_float, emissive, 1e-5f, 1.f, clamps, 2.f * dithered);
+            const std::string maths_summary  = maths.summary();
+            const std::string facets_summary = facets.summary();
+            const std::string skirt_summary  = skirt.summary();
+            const std::string stored_summary = stored.summary();
+            CAPTURE(maths_summary, facets_summary, skirt_summary, stored_summary, clamp_count);
+            UNSCOPED_INFO("the clouds are in view");
+            CHECK(maths.mLit > 1000);
+            CHECK(maths.mBeyond == 0);
+            CHECK(facets.mBeyond == 0);
+            CHECK(skirt.mMost < CLOUD_SKIRT);
+            CHECK(stored.mBeyond == 0);
+            clamped_pixels += clamp_count;
+        }
+    }
+    UNSCOPED_INFO("the 8-bit albedo clamped bright clouds");
+    CHECK(clamped_pixels > 0);
 }

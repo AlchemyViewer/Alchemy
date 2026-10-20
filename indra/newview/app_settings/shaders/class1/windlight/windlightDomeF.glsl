@@ -175,13 +175,26 @@ vec3 windlightDomeAt(vec3 rel_pos)
     return clamp(color.rgb, vec3(0), vec3(5));
 }
 
-// The dome's colour along dir, a unit vector in the dome's frame: where the ray from the camera meets the sphere.
-// Below the camera's level this continues the sphere, where the raster dome's skirt bends down to the axis instead.
-vec3 windlightDome(vec3 dir)
+// Where the ray from the camera along dir, a unit vector in the dome's frame, meets the dome's sphere, less the camera's
+// position. Below the camera's level this continues the sphere, where the raster dome's skirt bent down to the axis.
+vec3 windlightDomeHit(vec3 dir)
 {
     // camPosLocal + t * dir on the sphere: the far root, the camera lying inside it.
     float b = dot(camPosLocal, dir);
     float c = dot(camPosLocal, camPosLocal) - skyDomeRadius * skyDomeRadius;
     float t = sqrt(max(b * b - c, 0.0)) - b;
-    return windlightDomeAt(t * dir + vec3(0.0, 50.0, 0.0));
+    return t * dir;
+}
+
+// The point the dome is shaded at for a ray that meets it at hit (windlightDomeHit's), less the camera's position: hit
+// raised 50 m, so that the horizon's colour, where the raised point comes level, lies a little below the camera's level.
+vec3 windlightDomeRaise(vec3 hit)
+{
+    return hit + vec3(0.0, 50.0, 0.0);
+}
+
+// The dome's colour along dir, a unit vector in the dome's frame: where the ray from the camera meets the sphere.
+vec3 windlightDome(vec3 dir)
+{
+    return windlightDomeAt(windlightDomeRaise(windlightDomeHit(dir)));
 }

@@ -27,6 +27,7 @@
 #pragma once
 
 #include "alfarplane.h"
+#include "alskydome.h"
 #include "alskylayers.h"
 
 #include "llgl.h"
@@ -176,6 +177,25 @@ namespace al_sky_test
         gGL.translatef(-CAMERA.mV[VX], -CAMERA.mV[VY], -CAMERA.mV[VZ]);
     }
 
+    // Pixel (x, y)'s view ray in the dome's frame, through @a eye_to_sky, for a @a view on a @a width by @a height
+    // viewport.
+    inline LLVector3 domeRay(const View& view, const std::array<F32, 9>& eye_to_sky, S32 width, S32 height, S32 x,
+                             S32 y)
+    {
+        const F32 tan_half = tanf(view.mFov * 0.5f * DEG_TO_RAD);
+        const F32 nx = ((F32)x + 0.5f) / (F32)width * 2.f - 1.f;
+        const F32 ny = ((F32)y + 0.5f) / (F32)height * 2.f - 1.f;
+        LLVector3 eye(nx * tan_half * (F32)width / (F32)height, ny * tan_half, -1.f);
+        eye.normVec();
+        LLVector3 dir;
+        for (S32 r = 0; r < 3; ++r)
+        {
+            dir.mV[r] = eye_to_sky[0 * 3 + r] * eye.mV[0] + eye_to_sky[1 * 3 + r] * eye.mV[1] +
+                        eye_to_sky[2 * 3 + r] * eye.mV[2];
+        }
+        return dir;
+    }
+
     // A step of an attachment's storage at @a value: a step of 8 bits, or of R11G11B10F's mantissa, six bits for red
     // and green and five for blue, at value's exponent (its least, 2^-14, below it).
     inline F32 storageStep(F32 value, bool emissive, S32 channel)
@@ -188,6 +208,12 @@ namespace al_sky_test
         S32 exponent = 0;
         std::frexp(llmax(fabsf(value), 0x1p-14f), &exponent);
         return std::ldexp(1.f, exponent - 1 - mantissa);
+    }
+
+    // globalF.glsl's ditherEmissive: how far it moves a value written to the emissive buffer, relative to the value.
+    inline F32 ditherReach(S32 channel)
+    {
+        return channel == 2 ? 0.5f / 32.f : 0.5f / 64.f;
     }
 
     // The shader tree the tests build from: every file of the viewer's class1 tree, and the sky as it was drawn before
@@ -368,14 +394,58 @@ namespace al_sky_test
         glBindBufferBase(GL_UNIFORM_BUFFER, LLGLSLShader::UB_ENVIRONMENT, buffer);
     }
 
-    // Bind @a texture to @a program's sampler @a uniform through @a sampler, where the program reads it.
+    // Bind @a texture to @a program's sampler @a uniform through @a sampler, where the program reads it and there is
+    // one.
     inline void bindMap(LLGLSLShader& program, U32 uniform, LLImageGL* texture, ALSampler sampler)
     {
+        if (!texture)
+        {
+            return;
+        }
         const S32 channel = program.enableTexture(uniform);
         if (channel > -1)
         {
             gGL.getTextureSlot(channel)->bindSampled(texture, sampler);
         }
+    }
+
+    // The dome's loose uniforms and maps, as LLDrawPoolWLSky::bindDome binds them, on the bound @a program.
+    inline void bindDome(LLGLSLShader& program, const Sky& sky, LLImageGL* rainbow, LLImageGL* halo)
+    {
+        const LLVector3 light = lightNorm(sky);
+        program.uniform3fv(LLShaderMgr::LIGHTNORM, 1, light.mV);
+        program.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, sky.mDensityMultiplier);
+        program.uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, sky.mGlowFactor);
+        program.uniform1f(LLShaderMgr::MOISTURE_LEVEL, sky.mMoisture);
+        program.uniform1f(LLShaderMgr::DROPLET_RADIUS, sky.mDroplet);
+        program.uniform1f(LLShaderMgr::ICE_LEVEL, sky.mIce);
+        program.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, CAMERA_HEIGHT, 0.f);
+        program.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, DOME_RADIUS);
+        program.uniform1f(LLShaderMgr::CLOUD_VARIANCE, sky.mCloudVariance);
+        bindMap(program, LLShaderMgr::RAINBOW_MAP, rainbow, ALSamplers::AnisoWrap);
+        bindMap(program, LLShaderMgr::HALO_MAP, halo, ALSamplers::AnisoWrap);
+    }
+
+    // A smooth texture, so a lookup's place shows in what it reads: opaque, @a mips or not.
+    inline LLPointer<LLImageGL> gradient(U32 seed, bool mips = false)
+    {
+        constexpr S32 SIZE = 64;
+        LLPointer<LLImageRaw> raw = new LLImageRaw(SIZE, SIZE, 4);
+        U8* data = raw->getData();
+        for (S32 y = 0; y < SIZE; ++y)
+        {
+            for (S32 x = 0; x < SIZE; ++x)
+            {
+                const F32 u = (F32)x / (SIZE - 1);
+                const F32 v = (F32)y / (SIZE - 1);
+                U8* px = data + (y * SIZE + x) * 4;
+                px[0] = (U8)std::lround(255.f * (0.5f + 0.5f * sinf(6.f * v + (F32)seed)));
+                px[1] = (U8)std::lround(255.f * (0.5f + 0.5f * cosf(5.f * v + 2.f * u)));
+                px[2] = (U8)std::lround(255.f * v);
+                px[3] = 255;
+            }
+        }
+        return new LLImageGL(raw, mips);
     }
 
     // A disc that fades out at its rim through every alpha, its colour turning across it so a lookup's place shows:
@@ -401,6 +471,76 @@ namespace al_sky_test
             }
         }
         return new LLImageGL(raw, true);
+    }
+
+    // Tiling value noise in red, as the clouds read their noise: mipmapped and wrapped.
+    inline LLPointer<LLImageGL> cloudNoise(U32 seed)
+    {
+        constexpr S32 SIZE = 128;
+        constexpr S32 CELLS = 8;
+        std::vector<F32> lattice(CELLS * CELLS);
+        U32 state = seed * 2654435761u + 1u;
+        for (F32& value : lattice)
+        {
+            state = state * 1664525u + 1013904223u;
+            value = (F32)(state >> 8) / (F32)(1u << 24);
+        }
+        LLPointer<LLImageRaw> raw = new LLImageRaw(SIZE, SIZE, 4);
+        U8* data = raw->getData();
+        for (S32 y = 0; y < SIZE; ++y)
+        {
+            for (S32 x = 0; x < SIZE; ++x)
+            {
+                const F32 fx = (F32)x / SIZE * CELLS;
+                const F32 fy = (F32)y / SIZE * CELLS;
+                const S32 x0 = (S32)fx;
+                const S32 y0 = (S32)fy;
+                F32 tx = fx - x0;
+                F32 ty = fy - y0;
+                tx = tx * tx * (3.f - 2.f * tx);
+                ty = ty * ty * (3.f - 2.f * ty);
+                const auto at = [&](S32 i, S32 j) { return lattice[(j % CELLS) * CELLS + (i % CELLS)]; };
+                const auto mix = [](F32 a, F32 b, F32 t) { return a + (b - a) * t; };
+                const F32 n = mix(mix(at(x0, y0), at(x0 + 1, y0), tx), mix(at(x0, y0 + 1), at(x0 + 1, y0 + 1), tx), ty);
+                U8* px = data + (y * SIZE + x) * 4;
+                px[0] = px[1] = px[2] = (U8)std::lround(255.f * n);
+                px[3] = 255;
+            }
+        }
+        return new LLImageGL(raw, true);
+    }
+
+    // The dome's mesh, as LLVOWLSky filled it.
+    inline LLPointer<LLVertexBuffer> domeMesh()
+    {
+        const U32 verts   = ALSkyDome::vertexCount(ALSkyDome::STACKS);
+        const U32 indices = ALSkyDome::indexCount(ALSkyDome::STACKS);
+        LLPointer<LLVertexBuffer> dome = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0);
+        REQUIRE(dome->allocateBuffer(verts, indices));
+        LLStrider<LLVector3> vertices;
+        LLStrider<LLVector2> tex_coords;
+        LLStrider<U16>       index;
+        REQUIRE(dome->getVertexStrider(vertices));
+        REQUIRE(dome->getTexCoord0Strider(tex_coords));
+        REQUIRE(dome->getIndexStrider(index));
+        ALSkyDome::buildStrips(0, ALSkyDome::STACKS, DOME_RADIUS, vertices, tex_coords, index);
+        dome->unmapBuffer();
+        return dome;
+    }
+
+    // Draw @a dome, a mesh in the dome's frame of @a mode's primitives, with the bound program as
+    // LLDrawPoolWLSky::renderDome drew it: taken to the camera, turned from its frame to the agent's and lowered by the
+    // camera's height.
+    inline void drawDome(LLVertexBuffer* dome, LLRender::eGeomModes mode = LLRender::TRIANGLE_STRIP)
+    {
+        gGL.pushMatrix();
+        gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
+        gGL.rotatef(120.f, 1.f / F_SQRT3, 1.f / F_SQRT3, 1.f / F_SQRT3);
+        gGL.scalef(0.333f, 0.333f, 0.333f);
+        gGL.translatef(0.f, -CAMERA_HEIGHT, 0.f);
+        dome->setBuffer();
+        dome->drawRange(mode, 0, dome->getNumVerts() - 1, dome->getNumIndices(), 0);
+        gGL.popMatrix();
     }
 
     // A sun's or moon's quad as LLVOSky filled its face: the corners about the camera, their texture coordinates, and

@@ -2221,6 +2221,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skyBloomBlend");
     mReservedUniforms.push_back("skyBloomQuad");
     mReservedUniforms.push_back("skyBloomColor");
+    mReservedUniforms.push_back("skyCloudBlend");
 
     // Selection outlines, hover glow and wireframe (ALSelectionOutline)
     mReservedUniforms.push_back("selection_id");
