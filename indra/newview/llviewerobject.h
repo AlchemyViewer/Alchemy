@@ -695,6 +695,8 @@ public:
 public:
     LLViewerTexture* getBakedTextureForMagicId(const LLUUID& id);
     void updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& old_id);
+    // As above, for a face's PBR material: old_material is the render material it had before
+    void updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old_material);
     void refreshBakeTexture();
 public:
     static void unpackVector3(LLDataPackerBinaryBuffer* dp, LLVector3& value, std::string name);

@@ -5417,6 +5417,22 @@ void LLViewerObject::updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& 
     }
 }
 
+void LLViewerObject::updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old_material)
+{
+    const LLTextureEntry* tep = getTE(te);
+    const LLGLTFMaterial* material = tep ? tep->getGLTFRenderMaterial() : nullptr;
+    if (material == old_material)
+    {
+        return;
+    }
+
+    LLVOAvatar* avatar = getAvatar();
+    if (avatar && LLVOAvatar::getBakesNamedBy(material) != LLVOAvatar::getBakesNamedBy(old_material))
+    {
+        avatar->updateMeshVisibility();
+    }
+}
+
 
 void LLViewerObject::setTE(const U8 te, const LLTextureEntry& texture_entry)
 {
@@ -5919,7 +5935,12 @@ S32 LLViewerObject::initRenderMaterial(U8 te)
         if (override_material) { render_material->applyOverride(*override_material); }
         render_material->clearFetchedTextures();
     }
-    return tep->setGLTFRenderMaterial(render_material);
+
+    // held, as setting the new one may release it
+    const LLPointer<LLGLTFMaterial> old_material = tep->getGLTFRenderMaterial();
+    const S32 changed = tep->setGLTFRenderMaterial(render_material);
+    updateAvatarMeshVisibility(te, old_material);
+    return changed;
 }
 
 S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
@@ -7820,6 +7841,8 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     for (S32 te = start_idx; te < end_idx; ++te)
     {
         LLTextureEntry* tep = getTE(te);
+        // held, as clearing the render material may release it
+        const LLPointer<LLGLTFMaterial> old_material = tep->getGLTFRenderMaterial();
 
         // If local_origin=false (i.e. it's from the server), we know the
         // material has updated or been created, because extra params are
@@ -7849,6 +7872,8 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             tep->setGLTFMaterial(new_material, !update_server);
         }
 
+        updateAvatarMeshVisibility((U8)te, old_material);
+
         if (material_changed && new_material)
         {
             // Sometimes, the material may change out from underneath the overrides.
@@ -7859,11 +7884,17 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             // Also, sometimes, the material has baked textures, which requires
             // a copy unique to this object.
             // Currently, we do not deduplicate render materials.
-            new_material->onMaterialComplete([obj_id = getID(), te]()
+            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching()]()
             {
                 LLViewerObject* obj = gObjectList.findObject(obj_id);
                 if (!obj) { return; }
                 obj->initRenderMaterial(te);
+                if (fetching)
+                {
+                    // the material named no bake when the face took it, above, and has filled in
+                    // its textures since, so initRenderMaterial sees none of them change
+                    obj->updateAvatarMeshVisibility((U8)te, nullptr);
+                }
             });
         }
     }

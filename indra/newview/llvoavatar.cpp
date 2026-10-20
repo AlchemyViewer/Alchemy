@@ -9492,6 +9492,37 @@ void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
     }
 }
 
+// Add the bake a texture ID names, where it is a bake proxy (IMG_USE_BAKED_*)
+static void add_named_bake(LLVOAvatar::bake_set_t& bakes, const LLUUID& id)
+{
+    const EBakedTextureIndex index = LLAvatarAppearanceDictionary::assetIdToBakedTextureIndex(id);
+    if (index != BAKED_NUM_INDICES)
+    {
+        bakes.set(index);
+    }
+}
+
+// static
+LLVOAvatar::bake_set_t LLVOAvatar::getBakesNamedBy(const LLGLTFMaterial* material)
+{
+    bake_set_t bakes;
+    if (material)
+    {
+        for (const LLUUID& id : material->mTextureId)
+        {
+            add_named_bake(bakes, id);
+        }
+    }
+    return bakes;
+}
+
+// static
+LLVOAvatar::bake_set_t LLVOAvatar::getBakesDrawnBy(const LLTextureEntry& te)
+{
+    bake_set_t bakes = getBakesNamedBy(te.getGLTFRenderMaterial());
+    add_named_bake(bakes, te.getID());
+    return bakes;
+}
 
 //-----------------------------------------------------------------------------
 // updateMeshVisibility()
@@ -9499,8 +9530,7 @@ void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateMeshVisibility()
 {
-    bool bake_flag[BAKED_NUM_INDICES];
-    memset(bake_flag, 0, BAKED_NUM_INDICES*sizeof(bool));
+    bake_set_t bake_flag;
 
     if (getOverallAppearance() == AOA_NORMAL)
     {
@@ -9516,19 +9546,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                 for (int face_index = 0; face_index < objectp->getNumTEs(); face_index++)
                 {
-                    LLTextureEntry* tex_entry = objectp->getTE(face_index);
-                    const auto& tex_id = tex_entry->getID();
-                    bake_flag[BAKED_HEAD] |= (tex_id == IMG_USE_BAKED_HEAD);
-                    bake_flag[BAKED_EYES] |= (tex_id == IMG_USE_BAKED_EYES);
-                    bake_flag[BAKED_HAIR] |= (tex_id == IMG_USE_BAKED_HAIR);
-                    bake_flag[BAKED_LOWER] |= (tex_id == IMG_USE_BAKED_LOWER);
-                    bake_flag[BAKED_UPPER] |= (tex_id == IMG_USE_BAKED_UPPER);
-                    bake_flag[BAKED_SKIRT] |= (tex_id == IMG_USE_BAKED_SKIRT);
-                    bake_flag[BAKED_LEFT_ARM] |= (tex_id == IMG_USE_BAKED_LEFTARM);
-                    bake_flag[BAKED_LEFT_LEG] |= (tex_id == IMG_USE_BAKED_LEFTLEG);
-                    bake_flag[BAKED_AUX1] |= (tex_id == IMG_USE_BAKED_AUX1);
-                    bake_flag[BAKED_AUX2] |= (tex_id == IMG_USE_BAKED_AUX2);
-                    bake_flag[BAKED_AUX3] |= (tex_id == IMG_USE_BAKED_AUX3);
+                    bake_flag |= getBakesDrawnBy(*objectp->getTE(face_index));
                 }
 
                 for (const auto& objectchild : objectp->getChildren())
@@ -9538,19 +9556,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                     for (int face_index = 0; face_index < objectchild->getNumTEs(); face_index++)
                     {
-                        LLTextureEntry* tex_entry = objectchild->getTE(face_index);
-                        const auto& tex_id = tex_entry->getID();
-                        bake_flag[BAKED_HEAD] |= (tex_id == IMG_USE_BAKED_HEAD);
-                        bake_flag[BAKED_EYES] |= (tex_id == IMG_USE_BAKED_EYES);
-                        bake_flag[BAKED_HAIR] |= (tex_id == IMG_USE_BAKED_HAIR);
-                        bake_flag[BAKED_LOWER] |= (tex_id == IMG_USE_BAKED_LOWER);
-                        bake_flag[BAKED_UPPER] |= (tex_id == IMG_USE_BAKED_UPPER);
-                        bake_flag[BAKED_SKIRT] |= (tex_id == IMG_USE_BAKED_SKIRT);
-                        bake_flag[BAKED_LEFT_ARM] |= (tex_id == IMG_USE_BAKED_LEFTARM);
-                        bake_flag[BAKED_LEFT_LEG] |= (tex_id == IMG_USE_BAKED_LEFTLEG);
-                        bake_flag[BAKED_AUX1] |= (tex_id == IMG_USE_BAKED_AUX1);
-                        bake_flag[BAKED_AUX2] |= (tex_id == IMG_USE_BAKED_AUX2);
-                        bake_flag[BAKED_AUX3] |= (tex_id == IMG_USE_BAKED_AUX3);
+                        bake_flag |= getBakesDrawnBy(*objectchild->getTE(face_index));
                     }
                 }
             }
