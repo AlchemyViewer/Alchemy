@@ -211,6 +211,27 @@ static void ll_adjust_window_rect_dpi(HWND hwnd, LPRECT rect, DWORD dw_style, DW
     AdjustWindowRectEx(rect, dw_style, FALSE, dw_ex_style);
 }
 
+// Fits a window's frame into the work area of the monitor nearest it, so a
+// frame saved on a monitor since moved, rescaled or unplugged opens whole on
+// a screen and clear of the taskbar. The top edge is placed last, so the
+// title bar is always on the screen.
+static void ll_fit_window_to_work_area(S32& x, S32& y, S32& width, S32& height)
+{
+    RECT frame = { x, y, x + width, y + height };
+    MONITORINFO monitor_info{};
+    monitor_info.cbSize = sizeof(monitor_info);
+    if (!GetMonitorInfo(MonitorFromRect(&frame, MONITOR_DEFAULTTONEAREST), &monitor_info))
+    {
+        return;
+    }
+
+    const RECT& work = monitor_info.rcWork;
+    width = llmin(width, S32(work.right - work.left));
+    height = llmin(height, S32(work.bottom - work.top));
+    x = llmax(llmin(x, S32(work.right) - width), S32(work.left));
+    y = llmax(llmin(y, S32(work.bottom) - height), S32(work.top));
+}
+
 //static
 bool LLWindowWin32::sIsClassRegistered = false;
 
@@ -617,7 +638,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     allowLanguageTextInput(mPreeditor, false);
 
     WNDCLASS        wc;
-    RECT            window_rect;
 
     // Set the window title
     if (title.empty())
@@ -671,25 +691,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 
     // No WPARAM yet.
     mLastSizeWParam = 0;
-
-    // Windows GDI rects don't include rightmost pixel
-    window_rect.left = (long) 0;
-    window_rect.right = (long) width;
-    window_rect.top = (long) 0;
-    window_rect.bottom = (long) height;
-
-    // Grab screen size to sanitize the window
-    S32 window_border_y = GetSystemMetrics(SM_CYBORDER);
-    S32 virtual_screen_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
-    S32 virtual_screen_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    S32 virtual_screen_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-    S32 virtual_screen_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-
-    if (x < virtual_screen_x) x = virtual_screen_x;
-    if (y < virtual_screen_y - window_border_y) y = virtual_screen_y - window_border_y;
-
-    if (x + width > virtual_screen_x + virtual_screen_width) x = virtual_screen_x + virtual_screen_width - width;
-    if (y + height > virtual_screen_y + virtual_screen_height) y = virtual_screen_y + virtual_screen_height - height;
 
     if (!sIsClassRegistered)
     {
@@ -803,8 +804,8 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
                 if (dev_mode.dmBitsPerPel == BITS_PER_PIXEL)
                 {
                     LL_WARNS("Window") << "Current BBP is OK falling back to that" << LL_ENDL;
-                    window_rect.right=width=dev_mode.dmPelsWidth;
-                    window_rect.bottom=height=dev_mode.dmPelsHeight;
+                    width = dev_mode.dmPelsWidth;
+                    height = dev_mode.dmPelsHeight;
                     success = true;
                 }
                 else
@@ -900,9 +901,13 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     //-----------------------------------------------------------------------
     // Create GL drawing context
     //-----------------------------------------------------------------------
+    if (!mFullscreen)
+    {
+        ll_fit_window_to_work_area(x, y, width, height);
+    }
+
     LLCoordScreen windowPos(x,y);
-    LLCoordScreen windowSize(window_rect.right - window_rect.left,
-                             window_rect.bottom - window_rect.top);
+    LLCoordScreen windowSize(width, height);
     if (!switchContext(mFullscreen, windowSize, enable_vsync, &windowPos))
     {
         return;
@@ -1378,6 +1383,8 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
     }
     else
     {
+        // The size and position are the window's frame, as getSize(LLCoordScreen)
+        // and getPosition report it, so they are not adjusted for the borders.
         mFullscreen = false;
         window_rect.left = (long)(posp ? posp->mX : 0);
         window_rect.right = (long)width + window_rect.left;         // Windows GDI rects don't include rightmost pixel
@@ -1386,10 +1393,6 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         // Window with an edge
         dw_ex_style = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
         dw_style = WS_OVERLAPPEDWINDOW;
-
-        // Caller passes the desired client size; expand to include
-        // borders/title bar so CreateWindowEx gets a window rect.
-        ll_adjust_window_rect_dpi(mWindowHandle, &window_rect, dw_style, dw_ex_style);
     }
 
 
