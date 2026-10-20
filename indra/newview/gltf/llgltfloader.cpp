@@ -1080,26 +1080,13 @@ bool LLGLTFLoader::populateModelFromMesh(LLModel* pModel, const std::string& bas
                 }
             }
 
-            // Generates a vertex remap table with no gaps in the resulting
-            // sequence; vertices equal in position, normal and texture
-            // coordinate map to one
-            std::vector<U32> remap(faceVertices.size());
-            const meshopt_Stream streams[] = {
-                { faceVertices[0].getPosition().getF32ptr(), 3 * sizeof(F32), sizeof(LLVolumeFace::VertexData) },
-                { faceVertices[0].getNormal().getF32ptr(), 3 * sizeof(F32), sizeof(LLVolumeFace::VertexData) },
-                { faceVertices[0].mTexCoord.mV, sizeof(LLVector2), sizeof(LLVolumeFace::VertexData) },
-            };
-            size_t vertex_count = meshopt_generateVertexRemapMulti(&remap[0], &indices_32[0], indices_32.size(), faceVertices.size(), streams, 3);
-
-            // Manually remap vertices
-            std::vector<LLVolumeFace::VertexData> optimized_vertices(vertex_count);
-            for (size_t i = 0; i < vertex_count; ++i)
-            {
-                optimized_vertices[i] = faceVertices[remap[i]];
-            }
-
+            // Vertices equal in position, normal and texture coordinate map
+            // to one, and vertices no index uses are dropped
+            std::vector<LLVolumeFace::VertexData> optimized_vertices(faceVertices.size());
             std::vector<U32> optimized_indices(indices_32.size());
-            meshopt_remapIndexBuffer(&optimized_indices[0], &indices_32[0], indices_32.size(), &remap[0]);
+            size_t vertex_count = LLVolumeFace::weldVertices(&optimized_vertices[0], &optimized_indices[0],
+                &faceVertices[0], faceVertices.size(), &indices_32[0], indices_32.size());
+            optimized_vertices.resize(vertex_count);
 
             // Sort indices to improve mesh splits (reducing amount of duplicated indices)
             meshopt_optimizeVertexCache(&optimized_indices[0], &optimized_indices[0], indices_32.size(), vertex_count);

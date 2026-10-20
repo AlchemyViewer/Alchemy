@@ -854,6 +854,14 @@ public:
         LLVector4a mNormal;
     };
 
+    // Welds vertices equal in position, normal and texture coordinate and
+    // drops the ones no index uses. destination_vertices needs room for
+    // vertex_count vertices and destination_indices for index_count indices.
+    // Returns the number of vertices written.
+    static size_t weldVertices(VertexData* destination_vertices, U32* destination_indices,
+                               const VertexData* vertices, size_t vertex_count,
+                               const U32* indices, size_t index_count);
+
     LLVolumeFace();
     LLVolumeFace(const LLVolumeFace& src);
     LLVolumeFace& operator=(const LLVolumeFace& rhs);
