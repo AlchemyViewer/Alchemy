@@ -158,7 +158,9 @@ public:
 
     // set the color by linear color value
     //  color - linear color value (value as it appears in shaders)
-    void setLinearColor(const LLColor4& color)  { mColor = color; mColor.clamp(); }
+    // The color is held as pack() sends it, each channel and the intensity in steps of 1/255, so the light
+    // renders here as it does once the region sends it back, and as it does for everyone else.
+    void setLinearColor(const LLColor4& color);
     void setRadius(F32 radius)              { mRadius = llclamp(radius, LIGHT_MIN_RADIUS, LIGHT_MAX_RADIUS); }
     void setFalloff(F32 falloff)            { mFalloff = llclamp(falloff, LIGHT_MIN_FALLOFF, LIGHT_MAX_FALLOFF); }
     void setCutoff(F32 cutoff)              { mCutoff = llclamp(cutoff, LIGHT_MIN_CUTOFF, LIGHT_MAX_CUTOFF); }
