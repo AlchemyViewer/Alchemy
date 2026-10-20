@@ -32,6 +32,8 @@
 
 #include "llviewerobject.h"
 
+#include "alstarfield.h"
+
 #include <boost/signals2/connection.hpp>
 
 class LLVOWLSky : public LLStaticViewerObject {
@@ -73,9 +75,8 @@ private:
     LLPointer<LLVertexBuffer>                   mStarsVerts;
     LLPointer<LLVertexBuffer>                   mMeteorVerts;
 
-    // Per-star data. All three vectors stay in lock-step.
-    std::vector<LLVector3>  mStarPositions;    // Star centers (world-space, relative to camera)
-    std::vector<LLColor4>   mStarColors;       // RGB = black-body color (sRGB 0..1), A = intrinsic intensity (0..1)
+    // The star field RenderStarCount asked for, in the order the buffer takes it.
+    std::vector<ALStarField::Star> mStars;
 
     struct MeteorState
     {

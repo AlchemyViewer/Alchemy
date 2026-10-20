@@ -23,6 +23,7 @@ set(
   alshaderinputs.cpp
   alskydome.cpp
   alspotshadowcache.cpp
+  alstarfield.cpp
   altransienttargetpool.cpp
   altransienttargets.cpp
   alwaterfield.cpp
@@ -46,6 +47,8 @@ set(
   alshaderinputs.h
   alskydome.h
   alspotshadowcache.h
+  alstarfield.h
+  alstarfieldgenerate.h
   altransienttargetpool.h
   altransienttargets.h
   alwaterfield.h
@@ -76,7 +79,7 @@ if(AL_BUILD_TESTS)
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
   # heights a normal map's slopes integrate to, snapshot cutouts, the spot
-  # shadows' cache, and how a display pass ends its frame.
+  # shadows' cache, how a display pass ends its frame, and the star field.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
@@ -89,6 +92,7 @@ if(AL_BUILD_TESTS)
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
       tests/alspotshadowcache_test.cpp
+      tests/alstarfield_test.cpp
       tests/altransienttargetpool_test.cpp
       tests/alwaterfield_test.cpp
       tests/alwaterheightbake_test.cpp
@@ -102,11 +106,12 @@ if(AL_BUILD_TESTS)
   # and the waves displaced by heights the bake integrates from a normal map,
   # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
-  # WindLight's dome along the view ray against the dome's mesh,
-  # FXAA on an RGB10_A2 source, the reflection probes' taps in one pass over
-  # them against their list, the transient target pool's GL objects,
-  # shared depth and poison, and the previews' and bakes' targets taken from
-  # it only when one draws, on llrender's shared hidden window.
+  # WindLight's dome along the view ray against the dome's mesh, the stars
+  # against the picture they left before their rework, FXAA on an RGB10_A2
+  # source, the reflection probes' taps in one pass over them against their
+  # list, the transient target pool's GL objects, shared depth and poison,
+  # and the previews' and bakes' targets taken from it only when one draws,
+  # on llrender's shared hidden window.
   al_add_test_binary(
     alrender_gl_tests
     PROJECT alrender
@@ -116,6 +121,7 @@ if(AL_BUILD_TESTS)
       tests/alondemandtarget_gl_test.cpp
       tests/alskydome_gl_test.cpp
       tests/alspotshadowcache_gl_test.cpp
+      tests/alstarfield_gl_test.cpp
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
