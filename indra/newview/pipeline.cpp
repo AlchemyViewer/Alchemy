@@ -85,6 +85,7 @@
 #include "lldrawpoolbump.h"
 #include "lldrawpooltree.h"
 #include "lldrawpoolwater.h"
+#include "lldrawpoolwlsky.h"
 #include "llface.h"
 #include "llfeaturemanager.h"
 #include "llfetchedgltfmaterial.h"
@@ -12366,6 +12367,26 @@ bool LLPipeline::skyBehindWanted() const
     return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.drawnFrom(*LLViewerCamera::getInstance());
 }
 
+bool LLPipeline::hazeOnWater() const
+{
+    // The haze converges only the water surface seen from above it (hazeF.glsl), on the dome the sky draws. An HDRI
+    // sky is colour already shaded, which the haze cannot take the same way.
+    if (gCubeSnapshot || sImpostorRender || mRT != &mMainRT || !RenderDeferredAtmospheric || sUnderWaterRender ||
+        !canUseWindLightShaders() || !hasRenderType(RENDER_TYPE_SKY) || !hasRenderType(RENDER_TYPE_WL_SKY) ||
+        gSky.mVOSkyp.isNull() || LLDrawPoolWLSky::useHDRISky())
+    {
+        return false;
+    }
+    // Only where the water pool draws: elsewhere no pixel is the water's, and from higher than the water is drawn from
+    // the haze would fog the sky as void water.
+    return drawsWater();
+}
+
+bool LLPipeline::drawsWater() const
+{
+    return mWaterPool && hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterPool->getNumPostDeferredPasses() > 0;
+}
+
 void LLPipeline::doAtmospherics()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -12409,7 +12430,13 @@ void LLPipeline::doAtmospherics()
 
             if (on_water)
             {
-                haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, mSkyBehind, ALSamplers::BilinearClamp);
+                LLDrawPoolWLSky::bindDome(haze_shader);
+                static LLStaticHashedString sky_behind_ab("skyBehindAB");
+                haze_shader.uniform1i(sky_behind_ab, mSkyBehind ? 1 : 0);
+                if (mSkyBehind)
+                {
+                    haze_shader.bindTexture(LLShaderMgr::SKY_BEHIND_MAP, mSkyBehind, ALSamplers::BilinearClamp);
+                }
                 // From high above the water, the water fades into the sky behind it, wholly by the height it is no
                 // longer drawn from.
                 const F32 height = LLViewerCamera::getInstance()->getOrigin().mV[VZ] - environment.getWaterHeight();
@@ -12420,7 +12447,7 @@ void LLPipeline::doAtmospherics()
             mScreenTriangleVB->setBuffer();
             mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
-            if (on_water)
+            if (on_water && mSkyBehind)
             {
                 haze_shader.disableTexture(LLShaderMgr::SKY_BEHIND_MAP);
             }
@@ -12431,8 +12458,9 @@ void LLPipeline::doAtmospherics()
         // sky pool has drawn it this frame (HDRI skies and probe captures keep WindLight's own limit). The water
         // marked its own pixels in the stencil, so the two draws shade each pixel once. The water's draw runs only if
         // the sky pool's query saw water: its field covers every pixel the water marked, and inland none is.
+        static LLCachedControl<bool> sky_behind_ab(gSavedSettings, "AlchemyRenderSkyBehindAB", false);
         const bool sky_behind = !gCubeSnapshot && mRT == &mMainRT && mSkyBehind;
-        if (sky_behind)
+        if (sky_behind_ab ? sky_behind : hazeOnWater())
         {
             {
                 ALWaterStencil::OffWater stencil;

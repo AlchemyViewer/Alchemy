@@ -126,7 +126,8 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
 
 extern LLPointer<LLImageGL> gEXRImage;
 
-static bool use_hdri_sky()
+// static
+bool LLDrawPoolWLSky::useHDRISky()
 {
     static LLCachedControl<F32> hdri_split(gSavedSettings, "RenderHDRISplitScreen", 1.f);
     static LLCachedControl<bool> irradiance_only(gSavedSettings, "RenderHDRIIrradianceOnly", false);
@@ -221,8 +222,10 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         // The sky again, behind everything, for the haze pass to converge far water on (hazeF.glsl): the main view's
         // only, and only when water is in it; an HDRI sky is colour already shaded, which the haze cannot take the
         // same way. Whether any water shows is asked first, before the sky binds its textures.
-        // From the pool until the haze has read it, acquired before the sky binds its textures.
-        LLRenderTarget* const behind = !use_hdri_sky() && gPipeline.skyBehindWanted() ? gPipeline.acquireSkyBehind() : nullptr;
+        // From the pool until the haze has read it, acquired before the sky binds its textures. Drawn only for the
+        // A/B against windlightDome along the ray, which the haze takes otherwise.
+        static LLCachedControl<bool> sky_behind_ab(gSavedSettings, "AlchemyRenderSkyBehindAB", false);
+        LLRenderTarget* const behind = sky_behind_ab && !useHDRISky() && gPipeline.skyBehindWanted() ? gPipeline.acquireSkyBehind() : nullptr;
         const bool            sky_behind = behind != nullptr;
         if (!gCubeSnapshot && gPipeline.mRT == &gPipeline.mMainRT)
         {
@@ -230,7 +233,7 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         }
         const bool queried = sky_behind && query_water_in_view();
 
-        if (use_hdri_sky())
+        if (useHDRISky())
         {
             sky_shader = &gEnvironmentMapProgram;
             sky_shader->bind();
@@ -297,7 +300,7 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
 
 void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 {
-    if (!gSky.mVOSkyp || use_hdri_sky())
+    if (!gSky.mVOSkyp || useHDRISky())
     {
         return;
     }
@@ -402,7 +405,7 @@ void LLDrawPoolWLSky::renderStarsDeferred(const LLVector3& camPosLocal) const
 
 void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
 {
-    if (!gSky.mVOSkyp || use_hdri_sky() || !gSky.mVOWLSkyp) return;
+    if (!gSky.mVOSkyp || useHDRISky() || !gSky.mVOWLSkyp) return;
 
     static LLCachedControl<bool> meteors_enabled(gSavedSettings, "RenderMeteorsEnabled", true);
     if (!meteors_enabled) return;
@@ -446,7 +449,7 @@ void LLDrawPoolWLSky::renderMeteorsDeferred(const LLVector3& camPosLocal) const
 
 void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
 {
-    if (!gSky.mVOSkyp || use_hdri_sky() || !gSky.mVOWLSkyp) return;
+    if (!gSky.mVOSkyp || useHDRISky() || !gSky.mVOWLSkyp) return;
 
     static LLCachedControl<F32> aurora_intensity(gSavedSettings, "RenderAuroraIntensity", 0.6f);
     if (aurora_intensity <= 0.0f) return;
@@ -490,7 +493,7 @@ void LLDrawPoolWLSky::renderAuroraDeferred(const LLVector3& camPosLocal, F32 cam
 
 void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const
 {
-    if (use_hdri_sky())
+    if (useHDRISky())
     {
         return;
     }
@@ -557,7 +560,7 @@ void LLDrawPoolWLSky::renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 
 
 void LLDrawPoolWLSky::renderHeavenlyBodies()
 {
-    if (!gSky.mVOSkyp || use_hdri_sky()) return;
+    if (!gSky.mVOSkyp || useHDRISky()) return;
 
     LLGLEnable blend(GL_BLEND);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);

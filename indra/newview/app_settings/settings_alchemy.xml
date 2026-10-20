@@ -2443,6 +2443,17 @@
             <key>Value</key>
             <real>200.0</real>
         </map>
+        <key>AlchemyRenderSkyBehindAB</key>
+        <map>
+            <key>Comment</key>
+            <string>A/B for the sky modernization: the haze converges far water on the sky dome drawn behind everything at half size, as it did, rather than on WindLight's dome worked out along each pixel's ray.</string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderSpotShadowCache</key>
         <map>
             <key>Comment</key>

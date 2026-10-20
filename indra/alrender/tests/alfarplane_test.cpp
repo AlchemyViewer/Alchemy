@@ -436,7 +436,13 @@ namespace
         const std::string haze = shader_source("class3/deferred/hazeF.glsl");
         UNSCOPED_INFO("the haze pass hands over eye space");
         REQUIRE(haze.find("calcAtmosphericVarsLinear(pos.xyz,") != std::string::npos);
-        UNSCOPED_INFO("and does not turn it itself");
-        REQUIRE(haze.find("eyeToSky") == std::string::npos);
+        // The one turn it makes is the water's view ray, for the dome it converges on (windlightDomeF.glsl).
+        const std::string dome_call = "windlightDome(eyeToSky * normalize(pos.xyz))";
+        const size_t      dome      = haze.find(dome_call);
+        UNSCOPED_INFO("the dome along the water's ray");
+        REQUIRE(dome != std::string::npos);
+        UNSCOPED_INFO("and nothing else turned");
+        REQUIRE(haze.find("eyeToSky *") == dome + dome_call.find("eyeToSky *"));
+        REQUIRE(haze.find("eyeToSky *", dome + dome_call.size()) == std::string::npos);
     }
 }

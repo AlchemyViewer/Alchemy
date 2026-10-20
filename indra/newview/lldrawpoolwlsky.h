@@ -71,6 +71,10 @@ public:
     /// What windlight/windlightDomeF.glsl reads besides the Environment block, on the bound @a shader: the rainbow
     /// and halo maps and their levels, the glow, density and light, and the dome's geometry.
     static void bindDome(LLGLSLShader& shader);
+
+    /// Whether the sky this view draws is the HDRI rather than WindLight's: always in a capture that has one (unless
+    /// only the irradiance takes it), and in the main view while its split screen shows any of it.
+    static bool useHDRISky();
 private:
     void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 

@@ -2508,7 +2508,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        // The haze pass, and its variant for the water's pixels, which converges on the sky behind the water.
+        // The haze pass, and its variant for the water's pixels, which converges on WindLight's dome behind the water.
         const auto load_haze = [&](LLGLSLShader& program, const char* name, bool on_water)
         {
             program.mName = name;
@@ -2528,7 +2528,12 @@ void LLViewerShaderMgr::loadShadersDeferred()
             add_common_permutations(&program);
             if (on_water)
             {
+                program.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
                 program.addPermutation("HAZE_ON_WATER", "1");
+                if (!(mInputs.mLocal.mHDR && mInputs.mGlobal.mEmissive))
+                {
+                    program.addPermutation("HAZE_DOME_LDR", "1");
+                }
             }
 
             program.mShaderLevel = mShaderLevel[SHADER_DEFERRED];

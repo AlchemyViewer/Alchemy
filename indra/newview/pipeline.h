@@ -621,6 +621,11 @@ public:
     // atmospherics on, the camera above the water, and water among what was sorted to draw.
     bool skyBehindWanted() const;
 
+    // Whether the haze converges the water surface on WindLight's dome (hazeF.glsl's HAZE_ON_WATER): in the main view,
+    // with atmospherics on, the camera above the water, WindLight's sky drawn rather than an HDRI, and the water drawn
+    // (drawsWater), which is what leaves pixels for the haze's draw over the water to shade.
+    bool hazeOnWater() const;
+
     // apply water haze based on contents of color and depth buffer
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();
@@ -628,6 +633,11 @@ public:
     // Mark where the PASS_INVISIBLE prims remove the water in the bound screen target's stencil
     // (ALWaterStencil::EXCLUDE_BIT), against the scene's depth, before the water draws.
     void doWaterExclusion();
+
+    // Whether this view draws the water, as the water pool decides it: the Water render type on, and the pool's pass
+    // run (LLDrawPoolWater::getNumPostDeferredPasses: a field to draw, a view that takes some of it in, and no
+    // snapshot cutout's frame). Only then does any pixel carry the water's stencil (ALWaterStencil::SURFACE_BIT).
+    bool drawsWater() const;
 
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
