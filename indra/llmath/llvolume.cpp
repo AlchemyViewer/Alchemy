@@ -3092,7 +3092,9 @@ void LLVolume::sculptGenerateEmptyPlaceholder()
     }
 }
 
-// create sphere placeholder shape
+// create sphere placeholder shape, laid out as a sphere sculpt's map is
+// sampled: the profile runs around each row, and the path from pole to pole,
+// so that the sphere stitching's pole and seam normals land on it
 void LLVolume::sculptGenerateSpherePlaceholder()
 {
     S32 sizeS = mPathp->mPath.size();
@@ -3108,15 +3110,15 @@ void LLVolume::sculptGenerateSpherePlaceholder()
             LLVector4a& pt = mMesh[i];
 
 
-            F32 u = (F32)s / (sizeS - 1);
-            F32 v = (F32)t / (sizeT - 1);
+            F32 u = (F32)t / (sizeT - 1);
+            F32 v = (F32)s / (sizeS - 1);
 
             const F32 RADIUS = (F32) 0.3;
 
             F32* p = pt.getF32ptr();
 
             p[0] = (F32)(sin(F_PI * v) * cos(2.0 * F_PI * u) * RADIUS);
-            p[1] = (F32)(sin(F_PI * v) * sin(2.0 * F_PI * u) * RADIUS);
+            p[1] = (F32)(-sin(F_PI * v) * sin(2.0 * F_PI * u) * RADIUS);
             p[2] = (F32)(cos(F_PI * v) * RADIUS);
 
             llassert(pt.isFinite3());

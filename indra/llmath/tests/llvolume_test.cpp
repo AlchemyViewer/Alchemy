@@ -2932,11 +2932,12 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // The sphere placeholder runs u around along the path and v pole to
-    // pole along the profile, the other way round from a sculpt map, but
-    // gets a sphere sculpt's normal stitching: the poles' average lands on
-    // one meridian, and the S wrap sums the north pole with the south.
-    TEST_CASE("llvolume: the sphere placeholder's normals follow its surface", "[llvolume][!shouldfail]")
+    // The sphere placeholder gets a sphere sculpt's normal stitching, so it
+    // must run as a sphere sculpt's map does, around along the profile and
+    // pole to pole along the path. The other way round, the poles' average
+    // would land on one meridian, and the S wrap would sum the north pole
+    // with the south.
+    TEST_CASE("llvolume: the sphere placeholder's normals follow its surface", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Inversion | Checks::Oracle;
