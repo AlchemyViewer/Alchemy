@@ -1224,7 +1224,7 @@ void LLPanelVolume::onCopyLight()
         clipboard["light"]["intensity"] = volobjp->getLightIntensity();
         clipboard["light"]["radius"] = volobjp->getLightRadius();
         clipboard["light"]["falloff"] = volobjp->getLightFalloff();
-        LLColor3 color = volobjp->getLightSRGBColor();
+        LLColor3 color = volobjp->getLightSRGBBaseColor();
         clipboard["light"]["r"] = color.mV[0];
         clipboard["light"]["g"] = color.mV[1];
         clipboard["light"]["b"] = color.mV[2];
@@ -1412,7 +1412,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
                 volobjp->setLightIntensity(hit_volobjp->getLightIntensity());
                 volobjp->setLightRadius(hit_volobjp->getLightRadius());
                 volobjp->setLightFalloff(hit_volobjp->getLightFalloff());
-                volobjp->setLightSRGBColor(hit_volobjp->getLightSRGBColor());
+                volobjp->setLightLinearColor(hit_volobjp->getLightLinearBaseColor());
 
                 // Spotlight
                 if (hit_volobjp->isLightSpotlight())
