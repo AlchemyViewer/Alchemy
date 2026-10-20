@@ -44,6 +44,7 @@
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <fmt/format.h>
 
 #include <algorithm>
 #include <cmath>
@@ -306,14 +307,38 @@ void main()
         const F32* pixel(S32 attachment, S32 x, S32 y) const { return &mAttachments[attachment][(size_t(y) * W + x) * 4]; }
     };
 
+    // A step of the attachment's storage at @a value: a step of 8 bits, or of R11G11B10F's mantissa, six bits for red
+    // and green and five for blue, at value's exponent (its least, 2^-14, below it).
+    F32 storageStep(F32 value, bool emissive, S32 channel)
+    {
+        if (!emissive)
+        {
+            return 1.f / 255.f;
+        }
+        const S32 mantissa = channel == 2 ? 5 : 6;
+        S32 exponent = 0;
+        std::frexp(llmax(fabsf(value), 0x1p-14f), &exponent);
+        return std::ldexp(1.f, exponent - 1 - mantissa);
+    }
+
     // How two pictures' star attachment differ, over the colour channels: the most, the pixels where it differs at
-    // all and where by half a step of 8 bits or more, and the pixels a star lit in either.
+    // all, by half a step of 8 bits or more, and by more than a step of the storage and half a step of 8 bits (a
+    // rounding the order of the maths may flip, and what the brightness cull may leave out), and the pixels a star lit
+    // in either.
     struct Difference
     {
         F32 mMost = 0.f;
         S32 mDiffer = 0;
         S32 mPastHalfQuantum = 0;
+        S32 mBeyond = 0;
         S32 mLit = 0;
+
+        std::string summary() const
+        {
+            return fmt::format("most {:.6f} ({:.2f}/255), {} of {} lit pixels differ, {} by half a step of 8 bits or "
+                               "more, {} past the bound",
+                               mMost, mMost * 255.f, mDiffer, mLit, mPastHalfQuantum, mBeyond);
+        }
     };
 
     struct alstarfield_gl_data
@@ -638,6 +663,7 @@ void main()
         // @a blank.
         static Difference compare(const Picture& a, const Picture& b, const Picture& blank, S32 attachment)
         {
+            const bool emissive = attachment == 3;
             Difference d;
             for (S32 y = 0; y < H; ++y)
             {
@@ -648,14 +674,18 @@ void main()
                     const F32* pn = blank.pixel(attachment, x, y);
                     F32 most = 0.f;
                     bool lit = false;
+                    bool beyond = false;
                     for (S32 c = 0; c < 3; ++c)
                     {
-                        most = llmax(most, fabsf(pa[c] - pb[c]));
+                        const F32 diff = fabsf(pa[c] - pb[c]);
+                        most = llmax(most, diff);
                         lit = lit || pa[c] != pn[c] || pb[c] != pn[c];
+                        beyond = beyond || diff > storageStep(llmax(pa[c], pb[c]), emissive, c) + HALF_QUANTUM;
                     }
                     d.mMost = llmax(d.mMost, most);
                     d.mDiffer += most > 0.f;
                     d.mPastHalfQuantum += most >= HALF_QUANTUM;
+                    d.mBeyond += beyond;
                     d.mLit += lit;
                 }
             }
@@ -689,10 +719,11 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
             const Picture before = drawOld(scene, emissive);
             const Picture after  = drawStars(scene, emissive);
             const Difference d = compare(before, after, blank, attachment);
-            CAPTURE(d.mMost, d.mDiffer, d.mPastHalfQuantum, d.mLit);
+            const std::string summary = d.summary();
+            CAPTURE(summary);
             UNSCOPED_INFO("the scene shows stars");
             CHECK(d.mLit > 100);
-            CHECK(d.mMost < HALF_QUANTUM);
+            CHECK(d.mBeyond == 0);
             if (scene.mMoonBrightness > 0.f)
             {
                 const Difference moon = compare(before, drawOld(scene, emissive, false), blank, attachment);

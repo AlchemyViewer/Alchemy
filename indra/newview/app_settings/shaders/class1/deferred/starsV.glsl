@@ -35,11 +35,21 @@ in vec3 position;       // star center world position (shared by all 6 verts of 
 in vec4 diffuse_color;  // RGB = sRGB black-body color, A = intrinsic intensity (0..1)
 in vec2 texcoord0;      // corner offset in [-1, 1] for GPU-side billboarding
 
-out vec3 vary_world_dir;     // direction from camera to star in the stars' frame, before their slow rotation about z
-out vec2 vary_corner;        // corner offset, pass-through for fragment shape
-out vec4 vary_color;         // rgb = linear BB color, a = intensity
-out float vary_intensity;
-out float vary_subpixel_fade; // energy attenuation from sub-pixel widening (1.0 = no widening)
+out vec2 vary_corner;          // corner offset, pass-through for fragment shape
+flat out vec3 vary_star_color; // what the star adds where its shape is 1: every per-star term but the shape
+flat out float vary_spike;     // the diffraction spikes' strength
+
+uniform float custom_alpha;    // star_brightness slider output (0..2 range in practice)
+uniform float time;            // seconds, wrapped to avoid precision drift
+uniform vec3  moon_dir;        // moon direction in the stars' frame (z up)
+uniform float moon_brightness; // moon illumination 0..1 (from LLSettingsSky)
+
+// The moon's quad in the stars' frame, on the plane a unit away along moonQuadCenter (zero when no moon is drawn), and
+// its texture (LLDrawPoolWLSky::renderStarsDeferred).
+uniform vec3 moonQuadCenter;
+uniform vec3 moonQuadU;
+uniform vec3 moonQuadV;
+uniform sampler2D diffuseMap;
 
 // sRGB -> linear approximation; good enough for stars since BB color is smooth.
 vec3 srgb_to_linear(vec3 c)
@@ -47,8 +57,77 @@ vec3 srgb_to_linear(vec3 c)
     return pow(max(c, vec3(0.0)), vec3(2.2));
 }
 
+// 3D value noise
+// -------------------------------------------------------------------
+float hash31(vec3 p)
+{
+    p  = fract(p * vec3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yzx + 33.33);
+    return fract((p.x + p.y) * p.z);
+}
+
+float valueNoise3D(vec3 p)
+{
+    vec3 i = floor(p);
+    vec3 f = fract(p);
+    vec3 u = f * f * (3.0 - 2.0 * f);
+
+    float n000 = hash31(i + vec3(0.0, 0.0, 0.0));
+    float n100 = hash31(i + vec3(1.0, 0.0, 0.0));
+    float n010 = hash31(i + vec3(0.0, 1.0, 0.0));
+    float n110 = hash31(i + vec3(1.0, 1.0, 0.0));
+    float n001 = hash31(i + vec3(0.0, 0.0, 1.0));
+    float n101 = hash31(i + vec3(1.0, 0.0, 1.0));
+    float n011 = hash31(i + vec3(0.0, 1.0, 1.0));
+    float n111 = hash31(i + vec3(1.0, 1.0, 1.0));
+
+    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
+               mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
+               u.z);
+}
+
+// Kasten-Young airmass. cos_zenith is the cosine of the zenith angle (z
+// component of the world-up aligned direction). Clamped to avoid the
+// horizon singularity.
+float airmassKastenYoung(float cos_zenith)
+{
+    float cz = clamp(cos_zenith, 0.02, 1.0);
+    // Kasten & Young (1989): X = 1 / (cos(z) + 0.50572 * (96.07995 - z_deg)^-1.6364)
+    // Rewritten using the elevation angle in degrees.
+    float elev_deg = degrees(asin(cz));
+    return 1.0 / (cz + 0.50572 * pow(max(6.07995 + elev_deg, 1.0), -1.6364));
+}
+
+// SL-14113: no star behind the moon. The moon draws after the stars and fades low in the sky, which would let them
+// through its disc, so a star whose direction falls on a texel moonF.glsl draws, taken from the moon's own quad and
+// texture, is left out whole.
+bool behindMoon(vec3 dir)
+{
+    float moon_facing = dot(dir, moonQuadCenter);
+    if (moon_facing > 0.0)
+    {
+        vec3 on_quad = dir / moon_facing - moonQuadCenter;
+        vec2 quad = vec2(dot(on_quad, moonQuadU), dot(on_quad, moonQuadV));
+        return all(lessThan(abs(quad), vec2(1.0))) && textureLod(diffuseMap, quad * 0.5 + 0.5, 0.0).a > 2./255.;
+    }
+    return false;
+}
+
 void main()
 {
+    // Every term but the shape depends only on the star, so it is worked here, once a vertex, rather than once a
+    // fragment, and the fragment stage multiplies the shape by it.
+    vec3 dir = normalize(position);
+    if (behindMoon(dir))
+    {
+        // Outside the clip volume: nothing of the star is drawn.
+        gl_Position     = vec4(2.0, 2.0, 2.0, 1.0);
+        vary_corner     = vec2(0.0);
+        vary_star_color = vec3(0.0);
+        vary_spike      = 0.0;
+        return;
+    }
+
     // Transform the star center to clip space. All 6 verts of a star share
     // the same input position, so the center projects identically; the only
     // per-vertex change is the screen-space corner offset we add below.
@@ -70,9 +149,9 @@ void main()
     // and compensate by scaling output energy by the area ratio — integrated
     // brightness stays the same, but the distribution is smooth enough for
     // the pixel grid to resolve stably.
-    const float min_px    = 2.6;
-    float quad_pixels     = max(ideal_px, min_px);
-    vary_subpixel_fade    = (ideal_px * ideal_px) / (quad_pixels * quad_pixels);
+    const float min_px     = 2.6;
+    float quad_pixels      = max(ideal_px, min_px);
+    float subpixel_fade    = (ideal_px * ideal_px) / (quad_pixels * quad_pixels);
 
     vec2 pixel_offset = texcoord0 * (quad_pixels * 0.5);
 
@@ -91,15 +170,90 @@ void main()
 #endif
 
     gl_Position = clip_center;
+    vary_corner = texcoord0;
 
-    vary_corner    = texcoord0;
-    vary_world_dir = normalize(position);
     // NB: this linearises the sRGB black-body colour, and softenLight's SKIP_ATMOS branch
     // then srgb_to_linear's it a SECOND time and multiplies by sky_hdr_scale (the sky dome's
     // fake-HDR boost, ~2x with HDR on -- stars inherit it via the shared SKIP_ATMOS flag).
     // Long-standing upstream behaviour. Net star brightness balances that double-decode
     // against the gains here (bloom_boost, the (1 + intensity) gain) and sky_hdr_scale -- if
     // star brightness is ever retuned, this whole chain is the place to look, not one line.
-    vary_color     = vec4(srgb_to_linear(diffuse_color.rgb), intensity);
-    vary_intensity = intensity;
+    vec3 color = srgb_to_linear(diffuse_color.rgb);
+
+    // --- Atmospheric extinction ----------------------------------------------
+    // Airmass grows sharply near the horizon. The wavelength-dependent
+    // extinction (Rayleigh-dominated) reddens low stars, matching the familiar
+    // deep-orange appearance of rising/setting bright stars.
+    float cos_zenith = dir.z; // +Z is up in sky local space
+    float airmass    = airmassKastenYoung(cos_zenith);
+
+    // Extinction coefficients tuned for a clear night (blue scatters ~5x more
+    // than red). Multiplied by a small overall factor so the zenith is nearly
+    // transparent while the horizon meaningfully dims.
+    const vec3 k_ext = vec3(0.05, 0.13, 0.30);
+    vec3 extinction  = exp(-airmass * k_ext);
+
+    // --- Scintillation -------------------------------------------------------
+    // Per-star seed via the full 3D direction so nearby stars with similar xy
+    // but different elevations don't share the same twinkle pattern. Two
+    // noise samples at different frequencies give an organic beat instead of
+    // a periodic pulse.
+    vec3 seed = dir * 120.0;
+
+    float n_fast = valueNoise3D(seed + vec3(0.0, 0.0, time * 2.3));
+    float n_slow = valueNoise3D(seed * 0.37 + vec3(0.0, 0.0, time * 0.7));
+    float twinkle_base = mix(n_fast, n_slow, 0.35);
+
+    // Scintillation is much stronger near the horizon (airmass) and for the
+    // brighter stars our eye actually resolves flickering on.
+    float twinkle_amount = clamp(0.18 + 0.14 * (airmass - 1.0), 0.0, 0.65) * intensity;
+    float twinkle = 1.0 + (twinkle_base - 0.5) * 2.0 * twinkle_amount;
+
+    // Subtle color scintillation: each channel samples its own noise with a
+    // phase shift, so the twinkle occasionally tints the star.
+    vec3 chroma_noise = vec3(
+        valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 1.7 +  0.0)),
+        valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 1.3 +  5.7)),
+        valueNoise3D(seed * 0.55 + vec3(0.0, 0.0, time * 2.1 + 13.1)));
+    float chroma_amt = 0.18 * twinkle_amount;
+    vec3  color_jitter = 1.0 + (chroma_noise - 0.5) * 2.0 * chroma_amt;
+
+    // --- Moon glare ----------------------------------------------------------
+    // Two contributions: a broad "sky wash" that dims faint stars when a bright
+    // moon is up (scattered moonlight raising the night-sky floor), and a
+    // narrow direct glare around the moon itself that kills anything nearby.
+    // Bright stars are almost immune to sky wash (they still outshine the
+    // scattered background), but nothing survives direct glare at a full moon.
+    float moon_up    = max(0.0, moon_dir.z);                  // horizon clip
+    float moon_power = moon_brightness * moon_up;             // 0..~1
+    float sky_wash   = moon_power * (1.0 - intensity) * 0.55;
+    float moon_cos   = max(0.0, dot(dir, moon_dir));
+    float direct_glare = pow(moon_cos, 10.0) * moon_power * 0.85;
+    float moon_fade  = clamp(sky_wash + direct_glare, 0.0, 0.95);
+
+    // --- Composition ---------------------------------------------------------
+    vec3 star_color = color * color_jitter * extinction * twinkle;
+    star_color *= intensity;
+    star_color *= custom_alpha;
+    star_color *= (1.0 - moon_fade);
+    star_color *= subpixel_fade;
+
+#if defined(HAS_EMISSIVE)
+    // HDR boost for the emissive/bloom buffer: bright stars should feed the
+    // bloom pyramid with a larger signal than their on-screen dot suggests.
+    // Kept modest so the bloom pass doesn't smear every mid-tier star into a
+    // halo blob.
+    star_color *= 1.0 + intensity * intensity * 1.2;
+#else
+    // No emissive buffer - the stars go to diffuse. The glow extraction still catches
+    // the bright peaks via thresholding, so scale slightly up to compensate.
+    star_color *= 1.0 + intensity;
+#endif
+
+    vary_star_color = star_color;
+
+    // Diffraction spikes on the brightest tail only. Gated tight (0.90..1.0)
+    // so only real stand-out stars get crosses — the quad expands above for
+    // those stars, so the spike has room to render.
+    vary_spike = smoothstep(0.90, 1.0, intensity);
 }
