@@ -54,9 +54,12 @@ void main()
         discard;
     }
 
-    if (shadow_stipple > 0.0 && alpha < 0.88) // treat as semi-transparent
+    // Semi-transparent: a half-density shadow, every other texel of the shadow map in a
+    // checkerboard. The shadow filter all but averages a checkerboard flat, where a pattern
+    // of columns leaves lines along them.
+    if (shadow_stipple > 0.0 && alpha < 0.88)
     {
-        if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
+        if (((int(gl_FragCoord.x) + int(gl_FragCoord.y)) & 1) == 0)
         {
             discard;
         }

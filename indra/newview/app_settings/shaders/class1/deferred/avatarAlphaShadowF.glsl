@@ -43,9 +43,9 @@ void main()
         discard;
     }
 
-    // Semi-transparent: a half-density shadow, every other column of the shadow map, as
-    // shadowAlphaMaskF has it for prims.
-    if (alpha < 0.88 && (int(gl_FragCoord.x) & 1) == 0)
+    // Semi-transparent: a half-density shadow, in the checkerboard shadowAlphaMaskF stipples
+    // prims with.
+    if (alpha < 0.88 && ((int(gl_FragCoord.x) + int(gl_FragCoord.y)) & 1) == 0)
     {
         discard;
     }
