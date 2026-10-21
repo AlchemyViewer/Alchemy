@@ -2898,6 +2898,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
 
     {
         gLuminanceProgram.mName = "Exposure Meter Grid";
+        gLuminanceProgram.mFeatures.isDeferred = true;
         gLuminanceProgram.mShaderFiles.clear();
         gLuminanceProgram.clearPermutations();
         gLuminanceProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));

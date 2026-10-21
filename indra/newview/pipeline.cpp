@@ -8482,6 +8482,37 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     // buffer the exposure already shaped would feed the exposure back into itself.
     LL_PROFILE_GPU_ZONE("exposure meter grid");
 
+    // Where the water lies over the sky, which the meter takes as sky (luminanceF.glsl): the G-buffer's normals copied
+    // under the water's stencil (ALWaterStencil::SURFACE_BIT), and nothing elsewhere. The target shares the G-buffer's
+    // depth and stencil, and is the light map's description, whose storage the lighting has let go of by now. The
+    // water is the main view's alone, and only where it was drawn (drawsWater) does any pixel carry its stencil.
+    LLRenderTarget& gbuffer = mRT->deferredScreen;
+    ALTransientTargets water_scope(mTransientTargets);
+    LLRenderTarget* water = water_scope.acquire(
+        ALRenderTargetDesc{ .width = gbuffer.getWidth(), .height = gbuffer.getHeight(), .color = { GL_RGBA8 } }, gbuffer,
+        "exposure.meter.water");
+    if (water)
+    {
+        water->bindTarget();
+        const LLColor4 clear_color = gGL.getClearColor();
+        gGL.setClearColor(LLColor4::transparent);
+        water->clear(GL_COLOR_BUFFER_BIT);
+        gGL.setClearColor(clear_color);
+        if (mRT == &mMainRT && drawsWater() && gCopyProgram.isComplete())
+        {
+            LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+            LLGLDisable   no_blend(GL_BLEND);
+            ALWaterStencil::OnWater on_water;
+            gCopyProgram.bind();
+            gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &gbuffer, ALSamplers::PointClamp, 2);
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            gCopyProgram.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+            gCopyProgram.unbind();
+        }
+        water->flush();
+    }
+
     dst->bindTarget();
 
     LLGLDepthTest depth(GL_FALSE, GL_FALSE);
@@ -8494,11 +8525,20 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         src->bindTexture(0, channel, ALSamplers::BilinearClamp);
     }
 
-    channel = gLuminanceProgram.enableTexture(LLShaderMgr::NORMAL_MAP);
-    if (channel > -1)
+    // The sky is what the world leaves at the far plane, and the water over it. Without the water's map the unit holds
+    // nothing, which the meter reads as no water.
+    const S32 depth_channel = gLuminanceProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &gbuffer);
+    const S32 water_channel = gLuminanceProgram.enableTexture(LLShaderMgr::METER_WATER_MAP);
+    if (water_channel > -1)
     {
-        // the G-buffer normals carry the flags that mark the sky
-        mRT->deferredScreen.bindTexture(2, channel, ALSamplers::PointClamp);
+        if (water)
+        {
+            water->bindTexture(0, water_channel, ALSamplers::PointClamp);
+        }
+        else
+        {
+            gGL.getTextureSlot(water_channel)->unbind();
+        }
     }
 
     // A bilinear tap averages a 2x2 block, so taps two texels apart cover a patch.
@@ -8510,6 +8550,14 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     mScreenTriangleVB->setBuffer();
     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
 
+    if (depth_channel > -1)
+    {
+        gGL.getTextureSlot(depth_channel)->unbind();
+    }
+    if (water_channel > -1)
+    {
+        gGL.getTextureSlot(water_channel)->unbind();
+    }
     gLuminanceProgram.unbind();
     dst->flush();
 }

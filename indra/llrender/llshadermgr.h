@@ -429,6 +429,7 @@ public:
         HDRI_SPLIT_SCREEN,                  //  "hdri_split_screen"
         METER_PARAMS,                       //  "meter_params"          the exposure meter's per-pass parameters
         METER_MAP,                          //  "meterMap"              the exposure meter's grid
+        METER_WATER_MAP,                    //  "meterWaterMap"         the G-buffer's normals under the water, for the meter
         EXPOSURE_HISTOGRAM,                 //  "exposureHistogram"     64x1, per bin (weight, weight * log2 luminance)
 
         // Alchemy-specific uniforms for Sky
