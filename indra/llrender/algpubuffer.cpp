@@ -40,7 +40,7 @@ U64 ALGPUBuffer::sBytesAllocated = 0;
 namespace
 {
     // The named forms of everything below but the clear, which has its own check. mHasDirectStateAccess vouches for
-    // the creation and upload calls; the copy and the read are resolved beside them but not checked with them.
+    // the creation, upload and flush calls; the copy and the read are resolved beside them but not checked with them.
     bool use_dsa()
     {
         return gGLManager.mHasDirectStateAccess && glCopyNamedBufferSubData && glGetNamedBufferSubData;
@@ -177,6 +177,13 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
         return false;
     }
 
+    // A flushed write map needs a write map, and a map that reads what the GPU wrote stays coherent.
+    llassert(!(flags & FLUSH_EXPLICIT) || ((flags & STREAM) && !(flags & READBACK)));
+    if (!(flags & STREAM) || (flags & READBACK))
+    {
+        flags &= ~FLUSH_EXPLICIT;
+    }
+
     // Immutable where it resolved: the driver knows the store never moves, and a store only allocate() replaces is
     // all this class offers anyway. A STREAM store that is not mapped is uploaded to, as a DYNAMIC one is. The mutable
     // fallback's hint says who reads it: the CPU for READBACK, the GPU, from the CPU's writes or its own, otherwise.
@@ -192,10 +199,14 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
     if ((readback || stream) && can_map_persistent(dsa))
     {
         // Coherent both ways, so neither side flushes ranges or issues client barriers: the fences the rings place are
-        // all the ordering they need. A readback store asks for memory the CPU reads quickly.
-        const GLbitfield map_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+        // all the ordering they need. FLUSH_EXPLICIT gives that up on the write side, where flushMapped() publishes
+        // instead; the storage takes no flush bit, only the map. A readback store asks for memory the CPU reads
+        // quickly.
+        const GLbitfield coherency = (flags & FLUSH_EXPLICIT) ? GL_MAP_FLUSH_EXPLICIT_BIT : GL_MAP_COHERENT_BIT;
+        const GLbitfield map_flags = GL_MAP_PERSISTENT_BIT | coherency
                                    | (readback ? GL_MAP_READ_BIT : 0) | (stream ? GL_MAP_WRITE_BIT : 0);
-        const GLbitfield storage_flags = map_flags | dynamic | (readback ? GL_CLIENT_STORAGE_BIT : 0);
+        const GLbitfield storage_flags = (map_flags & ~GL_MAP_FLUSH_EXPLICIT_BIT) | dynamic
+                                       | (readback ? GL_CLIENT_STORAGE_BIT : 0);
         mapped = make_store(name, dsa, size, data, storage_flags, map_flags, usage);
         if (!mapped)
         {
@@ -275,6 +286,7 @@ void ALGPUBuffer::upload(size_t offset, const void* data, size_t bytes)
     if (mMapped && (mFlags & STREAM))
     {
         memcpy(mMapped + offset, data, bytes);
+        flushMapped(offset, bytes);
     }
     else if (use_dsa())
     {
@@ -284,6 +296,31 @@ void ALGPUBuffer::upload(size_t offset, const void* data, size_t bytes)
     {
         glBindBuffer(GL_COPY_WRITE_BUFFER, mName);
         glBufferSubData(GL_COPY_WRITE_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes, data);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    }
+}
+
+void ALGPUBuffer::flushMapped(size_t offset, size_t bytes)
+{
+    if (!mMapped || !(mFlags & FLUSH_EXPLICIT) || bytes == 0)
+    {
+        return;
+    }
+    if (!in_range(offset, bytes, mSize))
+    {
+        llassert(false);
+        return;
+    }
+
+    // The flush is the mapping's, however the map was made.
+    if (use_dsa())
+    {
+        glFlushMappedNamedBufferRange(mName, (GLintptr)offset, (GLsizeiptr)bytes);
+    }
+    else
+    {
+        glBindBuffer(GL_COPY_WRITE_BUFFER, mName);
+        glFlushMappedBufferRange(GL_COPY_WRITE_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes);
         glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
     }
 }

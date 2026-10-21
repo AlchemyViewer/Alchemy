@@ -26,6 +26,7 @@
 
 #include "aluniformbuffer.h"
 
+#include "algpubuffer.h"
 #include "llgl.h"          // gGLManager (context-alive guard)
 #include "llglheaders.h"
 
@@ -76,7 +77,8 @@ namespace
     // wrap -- a cached offset must never survive into a recreated buffer.
     //
     // Preferred backing is a persistently-mapped COHERENT ring with fenced segments
-    // (the same scheme as sPersistRing below): a write is then a plain memcpy. The
+    // (the same scheme as sPersistRing below) in an ALGPUBuffer STREAM store: a write
+    // is then a plain memcpy. The
     // map/unmap-per-write idiom this replaced (GL_STREAM_DRAW + unsynchronized map,
     // whole-store orphan on wrap) was measured stalling for MILLISECONDS on a single
     // palette write inside LLDrawPoolAlpha::renderPostDeferred -- rigged alpha-only
@@ -103,8 +105,8 @@ namespace
     static_assert(SCRATCH_MAX_PAYLOAD <= SCRATCH_BYTES, "payload must fit the orphan fallback ring");
     static_assert(SCRATCH_MIN_BYTES <= SCRATCH_MAX_BYTES, "scratch ring floor must not exceed the cap");
 
-    GLuint sScratch             = 0;
-    U8*    sScratchPtr          = nullptr; // live persistent mapping (null == fallback path)
+    ALGPUBuffer sScratchRing;              // the persistent ring, always mapped (unallocated == fallback path)
+    GLuint sScratchOrphan       = 0;       // the orphan fallback ring's store
     size_t sScratchHead         = 0;
     U32    sScratchGeneration   = 1;
     GLint  sScratchAlign        = 256; // GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, queried on creation
@@ -126,14 +128,20 @@ namespace
     size_t sScratchBoundBytes   = 0;
     U32    sScratchBoundGen     = 0;
 
+    // The scratch ring's live store, whichever backing it has (0 == none yet).
+    GLuint scratch_name()
+    {
+        return sScratchRing.isAllocated() ? sScratchRing.getGLName() : sScratchOrphan;
+    }
+
     // --- UPDATE_PERSISTENT / _FLUSH: persistently-mapped ring ------------------
-    // One immutable (glBufferStorage) buffer, mapped once for the process lifetime. Each dirty
+    // One immutable ALGPUBuffer STREAM store, mapped for as long as it lives. Each dirty
     // block memcpys its slice straight into the mapping (no map/unmap, no orphan, no
     // glBufferSubData) and binds the slice. The ring is split into PERSIST_SEGMENTS; a GLsync
     // fenced when we leave a segment is waited on before that segment is reused a lap later, so
     // the CPU never overwrites bytes the GPU may still be reading. sPersistCoherent records
-    // whether the live mapping is COHERENT (mode 3) or non-coherent + explicit-flush (mode 4);
-    // switching between the two recreates the ring.
+    // whether the live mapping is COHERENT (mode 3) or non-coherent + explicit-flush (mode 4,
+    // ALGPUBuffer::FLUSH_EXPLICIT); switching between the two recreates the ring.
     //
     // Sized adaptively from measured traffic (endFrame), the same scheme as the scratch ring: a
     // small floor grown toward the cap (and shrunk back as traffic falls), so a light scene costs
@@ -154,8 +162,7 @@ namespace
     constexpr int    PERSIST_SLACK_FRAMES = 4;                // keep >= this many frames of head slack
     static_assert(PERSIST_MIN_BYTES <= PERSIST_MAX_BYTES, "persistent ring floor must not exceed the cap");
 
-    GLuint sPersistRing       = 0;
-    U8*    sPersistPtr        = nullptr; // the live persistent mapping (== whole ring)
+    ALGPUBuffer sPersistRing;            // allocated only while mapped (== whole ring)
     size_t sPersistHead       = 0;
     U32    sPersistGeneration = 1;       // bumped on full wrap; invalidates outstanding slices
     GLint  sPersistAlign      = 256;
@@ -219,21 +226,6 @@ namespace
         }
     }
 
-    // Publish a non-coherent persistent mapping range (mode 4), DSA-aware.
-    void flush_mapped(GLuint name, GLintptr offset, GLsizeiptr size)
-    {
-        if (dsa_ok())
-        {
-            glFlushMappedNamedBufferRange(name, offset, size);
-        }
-        else
-        {
-            glBindBuffer(GL_UNIFORM_BUFFER, name);
-            glFlushMappedBufferRange(GL_UNIFORM_BUFFER, offset, size);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        }
-    }
-
     // Round `v` up to a multiple of `align` (a power of two, as GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT
     // always is).
     inline size_t align_up(size_t v, size_t align)
@@ -251,21 +243,6 @@ namespace
         else
         {
             glGenBuffers(1, &name);
-        }
-    }
-
-    // Unmap a buffer's persistent/mapped range, DSA-aware.
-    void buffer_unmap(GLuint name)
-    {
-        if (dsa_ok())
-        {
-            glUnmapNamedBuffer(name);
-        }
-        else
-        {
-            glBindBuffer(GL_UNIFORM_BUFFER, name);
-            glUnmapBuffer(GL_UNIFORM_BUFFER);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
         }
     }
 
@@ -305,28 +282,6 @@ namespace
         {
             buffer_subdata(name, offset, size, src);
         }
-    }
-
-    // Create an immutable (glBufferStorage) buffer and persistently map its whole range. Returns
-    // the mapping (null on failure), DSA-aware. Shared by the two persistent rings.
-    U8* create_mapped_ring(GLuint& name, GLsizeiptr size, GLbitfield stor_flags, GLbitfield map_flags)
-    {
-        void* ptr = nullptr;
-        if (dsa_ok())
-        {
-            glCreateBuffers(1, &name);
-            glNamedBufferStorage(name, size, nullptr, stor_flags);
-            ptr = glMapNamedBufferRange(name, 0, size, map_flags);
-        }
-        else
-        {
-            glGenBuffers(1, &name);
-            glBindBuffer(GL_UNIFORM_BUFFER, name);
-            glBufferStorage(GL_UNIFORM_BUFFER, size, nullptr, stor_flags);
-            ptr = glMapBufferRange(GL_UNIFORM_BUFFER, 0, size, map_flags);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-        }
-        return static_cast<U8*>(ptr);
     }
 
     // Advance a fenced, segmented ring so a slice of `aligned` bytes fits within one segment.
@@ -392,7 +347,7 @@ namespace
     // outstanding slice re-flushes on its next bindCurrent.
     void teardown_persist_ring()
     {
-        if (sPersistRing != 0)
+        if (sPersistRing.isAllocated())
         {
             if (gGLManager.mInited)
             {
@@ -400,10 +355,9 @@ namespace
                 {
                     if (f) { glDeleteSync(f); }
                 }
-                buffer_unmap(sPersistRing);
-                glDeleteBuffers(1, &sPersistRing);
             }
-            sPersistRing = 0;
+            // Deleting the store unmaps it, and release() issues no GL once the context is gone.
+            sPersistRing.release();
         }
         // Clear the fence handles unconditionally: on a context-lost teardown the syncs are already
         // gone and cannot be deleted, but their handles must not survive into a recreated ring --
@@ -413,7 +367,6 @@ namespace
         {
             f = 0;
         }
-        sPersistPtr       = nullptr;
         sPersistHead      = 0;
         sPersistSeg       = 0;
         sPersistOK        = false;
@@ -551,21 +504,17 @@ namespace
         glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &sPersistAlign);
         sPersistAlign = llmax(sPersistAlign, 1);
 
-        const GLbitfield stor_flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | (coherent ? GL_MAP_COHERENT_BIT : 0);
-        const GLbitfield map_flags  = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT |
-                                      (coherent ? GL_MAP_COHERENT_BIT : GL_MAP_FLUSH_EXPLICIT_BIT);
-        U8* ptr = create_mapped_ring(sPersistRing, (GLsizeiptr)sPersistBytes, stor_flags, map_flags);
-
-        if (!ptr)
+        // WRITE + PERSISTENT, and COHERENT (mode 3) or FLUSH_EXPLICIT (mode 4). A store ALGPUBuffer could only make
+        // unmapped is no ring.
+        const U32 flags = ALGPUBuffer::STREAM | (coherent ? 0 : ALGPUBuffer::FLUSH_EXPLICIT);
+        if (!sPersistRing.allocate(sPersistBytes, flags, nullptr, "UBO persistent ring") || !sPersistRing.getMapped())
         {
             LL_WARNS("ShaderUniform") << "Persistent UBO: glBufferStorage/glMapBufferRange failed; "
                                          "falling back to ORPHAN." << LL_ENDL;
-            glDeleteBuffers(1, &sPersistRing);
-            sPersistRing = 0;
+            sPersistRing.release();
             return false;
         }
 
-        sPersistPtr      = ptr;
         sPersistHead     = 0;
         sPersistSeg      = 0;
         sPersistCoherent = coherent;
@@ -579,7 +528,7 @@ namespace
     // creation itself fails.
     bool ensure_scratch_ring()
     {
-        if (sScratch != 0)
+        if (scratch_name() != 0)
         {
             return true;
         }
@@ -592,32 +541,26 @@ namespace
             sScratchPersistTried = true;
             if (glBufferStorage)
             {
-                // Storage and map flags are identical: WRITE + PERSISTENT + COHERENT.
-                const GLbitfield flags = GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-                U8* ptr = create_mapped_ring(sScratch, (GLsizeiptr)sScratchPersistBytes, flags, flags);
-                if (ptr)
+                // WRITE + PERSISTENT + COHERENT. A store ALGPUBuffer could only make unmapped is no ring.
+                if (sScratchRing.allocate(sScratchPersistBytes, ALGPUBuffer::STREAM, nullptr, "UBO scratch ring")
+                    && sScratchRing.getMapped())
                 {
-                    sScratchPtr  = ptr;
                     sScratchHead = 0;
                     sScratchSeg  = 0;
                     return true;
                 }
                 LL_WARNS("ShaderUniform") << "Scratch UBO ring: persistent mapping failed; "
                                              "falling back to the orphan ring." << LL_ENDL;
-                if (sScratch != 0)
-                {
-                    glDeleteBuffers(1, &sScratch);
-                    sScratch = 0;
-                }
+                sScratchRing.release();
             }
         }
 
-        create_buffer(sScratch);
-        if (sScratch == 0)
+        create_buffer(sScratchOrphan);
+        if (sScratchOrphan == 0)
         {
             return false;
         }
-        buffer_data(sScratch, (GLsizeiptr)SCRATCH_BYTES, nullptr, GL_STREAM_DRAW);
+        buffer_data(sScratchOrphan, (GLsizeiptr)SCRATCH_BYTES, nullptr, GL_STREAM_DRAW);
         sScratchHead = 0;
         return true;
     }
@@ -627,7 +570,7 @@ namespace
     // grow path. Leaves sScratchPersistBytes alone -- the caller owns the target size.
     void teardown_scratch_ring()
     {
-        if (sScratch != 0)
+        if (scratch_name() != 0)
         {
             if (gGLManager.mInited)
             {
@@ -635,13 +578,14 @@ namespace
                 {
                     if (f) { glDeleteSync(f); }
                 }
-                if (sScratchPtr)
+                if (sScratchOrphan != 0)
                 {
-                    buffer_unmap(sScratch);
+                    glDeleteBuffers(1, &sScratchOrphan);
                 }
-                glDeleteBuffers(1, &sScratch);
             }
-            sScratch = 0;
+            // Deleting the store unmaps it, and release() issues no GL once the context is gone.
+            sScratchRing.release();
+            sScratchOrphan = 0;
         }
         // Zero the fence handles unconditionally: a context-lost teardown can't delete the syncs,
         // but their handles must not survive into a recreated ring.
@@ -649,7 +593,6 @@ namespace
         {
             f = 0;
         }
-        sScratchPtr          = nullptr;
         sScratchHead         = 0;
         sScratchSeg          = 0;
         sScratchPersistTried = false;        // let the recreated ring attempt the persistent mapping again
@@ -767,7 +710,7 @@ void ALUniformBuffer::update(const void* data, size_t bytes, EUsage usage)
 // points, never at the scratch client's.
 static void scratch_note_foreign_bind(U32 binding, GLuint name)
 {
-    if (binding == sScratchBoundBinding && name != sScratch)
+    if (binding == sScratchBoundBinding && name != scratch_name())
     {
         sScratchBoundBinding = 0xFFFFFFFFu;
         sScratchBoundOffset  = -1;
@@ -891,19 +834,20 @@ void ALUniformBuffer::flushPersistent(U32 binding)
                         sPersistGeneration, sPersistStats, "Persistent");
 
     // Write the slice. Coherent mappings need no explicit publish; non-coherent (mode 4) does.
-    memcpy(sPersistPtr + sPersistHead, mShadow.data(), len);
+    memcpy(sPersistRing.getMapped() + sPersistHead, mShadow.data(), len);
     if (!sPersistCoherent)
     {
-        flush_mapped(sPersistRing, (GLintptr)sPersistHead, (GLsizeiptr)len);
+        sPersistRing.flushMapped(sPersistHead, len);
     }
 
     // Bind the slice. The segment fences guarantee this region is not being read by any
     // in-flight draw.
-    glBindBufferRange(GL_UNIFORM_BUFFER, binding, sPersistRing, (GLintptr)sPersistHead, (GLsizeiptr)len);
+    const GLuint ring = sPersistRing.getGLName();
+    glBindBufferRange(GL_UNIFORM_BUFFER, binding, ring, (GLintptr)sPersistHead, (GLsizeiptr)len);
 
     mRingOffset     = sPersistHead;
     mRingGeneration = sPersistGeneration;
-    mSliceRing      = sPersistRing;
+    mSliceRing      = ring;
     sPersistHead   += aligned;
 
     ++sPersistStats.mSlices;
@@ -977,7 +921,7 @@ void ALUniformBuffer::bindCurrent(U32 binding)
     // belongs to the other ring). Force a re-upload so we never bind old bytes or a foreign
     // offset. (mRingGeneration alone can't catch this: RING and the persistent ring keep
     // independent counters that routinely collide at small values.)
-    const GLuint target = streaming ? (persistent ? sPersistRing : sRing) : mName;
+    const GLuint target = streaming ? (persistent ? sPersistRing.getGLName() : sRing) : mName;
     if (mSliceRing != target)
     {
         mDirty = true;
@@ -999,7 +943,7 @@ void ALUniformBuffer::bindCurrent(U32 binding)
         {
             const bool slice_live =
                 !mDirty
-                && mSliceRing == sPersistRing
+                && mSliceRing == sPersistRing.getGLName()
                 && mRingGeneration == sPersistGeneration
                 && (size_t)(mRingOffset / (sPersistBytes / PERSIST_SEGMENTS)) == (size_t)sPersistSeg;
 
@@ -1021,7 +965,8 @@ void ALUniformBuffer::bindCurrent(U32 binding)
             else
             {
                 ++sPersistStats.mLiveRebinds;
-                glBindBufferRange(GL_UNIFORM_BUFFER, binding, sPersistRing, (GLintptr)mRingOffset, (GLsizeiptr)mShadow.size());
+                glBindBufferRange(GL_UNIFORM_BUFFER, binding, sPersistRing.getGLName(), (GLintptr)mRingOffset,
+                                  (GLsizeiptr)mShadow.size());
             }
             return;
         }
@@ -1075,7 +1020,7 @@ void ALUniformBuffer::ensureCurrent(U32 binding)
     // Same staleness rules as bindCurrent(), which see. mSliceRing == 0 (never flushed
     // in any mode -- possible only while the shadow is still all zeros) also lands in
     // the re-flush branch rather than aliasing a never-created ring's name.
-    const GLuint target = persistent ? sPersistRing : sRing;
+    const GLuint target = persistent ? sPersistRing.getGLName() : sRing;
     bool live = (mSliceRing == target) && (mSliceRing != 0);
     if (live)
     {
@@ -1178,10 +1123,10 @@ void ALUniformBuffer::endFrame()
     // the segment was LEFT, does not gate a draw issued after that, so no stall is registered.
     // Below the cap this self-heals -- the adaptive sizing below grows the ring next frame -- so
     // only warn once the ring is already at SCRATCH_MAX_BYTES and STILL laps: then the CAP is too
-    // small for this scene, which growth can't fix. (The orphan fallback -- sScratchPtr == null --
+    // small for this scene, which growth can't fix. (The orphan fallback -- sScratchRing unmapped --
     // is exempt: it keeps the old store alive for in-flight draws on wrap.)
     static bool s_warned_scratch_lap = false;
-    if (!s_warned_scratch_lap && sScratchPtr && sScratchPersistBytes >= SCRATCH_MAX_BYTES
+    if (!s_warned_scratch_lap && sScratchRing.getMapped() && sScratchPersistBytes >= SCRATCH_MAX_BYTES
         && sScratchLastFrame.mBytes >= sScratchPersistBytes)
     {
         s_warned_scratch_lap = true;
@@ -1213,7 +1158,7 @@ void ALUniformBuffer::endFrame()
                          << sScratchLastFrame.mStalls << " stall ("
                          << sScratchLastFrame.mStallTimeouts << " timeout), "
                          << sScratchLastFrame.mLiveRebinds << " bind-dedup"
-                         << (sScratchPtr ? "" : " [orphan fallback]")
+                         << (sScratchRing.getMapped() ? "" : " [orphan fallback]")
                          << LL_ENDL;
 
     sPersistStats = RingStats();
@@ -1234,7 +1179,7 @@ void ALUniformBuffer::endFrame()
     // before it's reused a lap later, and segments stay near one frame of slices so clean-block
     // churn stays low. UPDATE_RING orphans on wrap (correct even tiny), but each wrap orphans a
     // whole store kept a lap, so ~SLACK frames keeps wraps to about one every few frames.
-    if (sScratchPtr)
+    if (sScratchRing.getMapped())
     {
         const size_t next = next_ring_size(sScratchPersistBytes, sScratchLastFrame.mBytes,
                                            SCRATCH_MIN_BYTES, SCRATCH_MAX_BYTES, SCRATCH_SLACK_FRAMES,
@@ -1292,7 +1237,7 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
 
     const size_t aligned = align_up(bytes, (size_t)sScratchAlign);
 
-    if (sScratchPtr)
+    if (U8* const ring = sScratchRing.getMapped())
     {
         // Persistent ring: advance segments exactly as flushPersistent does -- fence the segment
         // being left; before reusing the next one, wait out any draws that read it a lap ago. A
@@ -1303,7 +1248,7 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
                             sScratchGeneration, sScratchStats, "Scratch");
 
         // COHERENT mapping: the memcpy is the whole publish.
-        memcpy(sScratchPtr + sScratchHead, data, bytes);
+        memcpy(ring + sScratchHead, data, bytes);
 
         const S64 offset = (S64)sScratchHead;
         sScratchHead += aligned;
@@ -1317,14 +1262,14 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
         // Wrapped: orphan the ring (in-flight draws keep reading the old store) and
         // invalidate every cached offset via the generation bump -- owners re-write
         // on their next use.
-        buffer_data(sScratch, (GLsizeiptr)SCRATCH_BYTES, nullptr, GL_STREAM_DRAW);
+        buffer_data(sScratchOrphan, (GLsizeiptr)SCRATCH_BYTES, nullptr, GL_STREAM_DRAW);
         sScratchHead = 0;
         ++sScratchGeneration;
         ++sScratchStats.mWraps;
     }
 
     // Fresh, never-in-flight region: unsynchronized map skips the GPU sync.
-    buffer_write_unsync(sScratch, (GLintptr)sScratchHead, (GLsizeiptr)bytes, data);
+    buffer_write_unsync(sScratchOrphan, (GLintptr)sScratchHead, (GLsizeiptr)bytes, data);
 
     const S64 offset = (S64)sScratchHead;
     sScratchHead += aligned;
@@ -1336,7 +1281,8 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
 // static
 void ALUniformBuffer::scratchBindRange(U32 binding, S64 offset, size_t bytes)
 {
-    if (sScratch == 0 || offset < 0 || bytes == 0)
+    const GLuint name = scratch_name();
+    if (name == 0 || offset < 0 || bytes == 0)
     {
         return;
     }
@@ -1348,7 +1294,7 @@ void ALUniformBuffer::scratchBindRange(U32 binding, S64 offset, size_t bytes)
         ++sScratchStats.mLiveRebinds;
         return;
     }
-    glBindBufferRange(GL_UNIFORM_BUFFER, binding, sScratch, (GLintptr)offset, (GLsizeiptr)bytes);
+    glBindBufferRange(GL_UNIFORM_BUFFER, binding, name, (GLintptr)offset, (GLsizeiptr)bytes);
     sScratchBoundBinding = binding;
     sScratchBoundOffset  = offset;
     sScratchBoundBytes   = bytes;
