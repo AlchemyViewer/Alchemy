@@ -536,11 +536,14 @@ void LLRender::shutdown()
 
     // Its queries and fences, which it deletes only while the context is up.
     mQueries.release();
+    mFrameFences.release();
 }
 
 void LLRender::endFrame()
 {
+    // The batch's results are written ahead of the fence that follows them.
     mQueries.endFrame();
+    mFrameFences.endFrame();
     ALUniformBuffer::endFrame();
 }
 

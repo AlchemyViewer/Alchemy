@@ -2,8 +2,8 @@
  * @file algpubuffer_gl_test.cpp
  * @brief ALGPUBuffer on the hidden window: what its store holds after each way of writing it, what it accounts, how
  *        a move leaves it, which stores are mapped; LLRender's indirect draw binding over a buffer's life; and the
- *        rings, ALGPUReadback's results in order, its reads of the framebuffer, and ALGPUStream's regions round the
- *        ring.
+ *        rings, ALGPUReadback's results in order and only once their frame has finished, its reads of the framebuffer,
+ *        and ALGPUStream's regions round the ring, reused by the frames they were read in.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,6 +27,7 @@
 
 #include "linden_common.h"
 
+#include "../alframefences.h"
 #include "../algpubuffer.h"
 #include "../llgl.h"
 #include "../llglheaders.h"
@@ -93,7 +94,8 @@ namespace
             return glClearBufferSubData || (gGLManager.mHasDirectStateAccess && glClearNamedBufferSubData);
         }
 
-    // The program the tests bind, and compute's switch, go back with mGL.
+    // The program the tests bind, and compute's switch, go back with mGL. The rings keep their frames by the case's own
+    // frame fences.
     struct algpubuffer_data
     {
         algpubuffer_data()
@@ -105,6 +107,7 @@ namespace
         {
             LLGLSLShader::unbind();
             mProgram.unload();
+            mFrames.release();
         }
 
         // A program that draws a point and declares no inputs, bound, for the indirect draws.
@@ -132,6 +135,7 @@ namespace
         ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mProgram;
+        ALFrameFences mFrames;
     };
 
 
@@ -370,14 +374,16 @@ namespace
     }
 
     // ALGPUReadback: each request copies what its source held then; a request with every slot pending is refused; the
-    // results come back oldest first; and with none pending collect has nothing to give.
+    // results come back oldest first; with none pending collect has nothing to give; and a result is collected without
+    // waiting once a later frame's end has seen its frame finished, and not before, the readback laying no fence and
+    // polling none of its own.
     TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: ALGPUReadback gives back each request's copy oldest first", "[algpubuffer_gl]")
     {
         constexpr U32 SLOTS = 3;
         constexpr U32 COUNT = 16;
         ALGPUBuffer source;
         REQUIRE(source.allocate(WORDS * sizeof(U32), ALGPUBuffer::DYNAMIC, nullptr, "source (test)"));
-        ALGPUReadback readback;
+        ALGPUReadback readback(&mFrames);
         REQUIRE(readback.allocate(COUNT * sizeof(U32), SLOTS, "readback (test)"));
         CHECK(readback.getSlotSize() == size_t(COUNT * sizeof(U32)));
 
@@ -407,12 +413,23 @@ namespace
         UNSCOPED_INFO("nothing more to collect");
         REQUIRE_FALSE(readback.collect(result.data(), result.size() * sizeof(U32), true));
 
-        // A request made, its copy finished: collect gives it without waiting.
+        // A request made, its copy finished: collect gives it without waiting once its frame has ended.
         const std::vector<U32> last = pattern(WORDS, 7u);
         source.upload(0, last.data(), last.size() * sizeof(U32));
+        const U32 calls = mFrames.getCalls();
         CHECK(readback.request(source, 0, COUNT * sizeof(U32)));
+        UNSCOPED_INFO("the request lays no fence");
+        CHECK(mFrames.getCalls() == calls);
         glFinish();
-        UNSCOPED_INFO("a finished copy is collected without waiting");
+        UNSCOPED_INFO("not collected while its frame is open, however long the GPU has had, and no poll");
+        CHECK_FALSE(readback.collect(result.data(), result.size() * sizeof(U32)));
+        CHECK(mFrames.getCalls() == calls);
+        mFrames.endFrame();
+        glFinish();
+        UNSCOPED_INFO("nor at its frame's end");
+        CHECK_FALSE(readback.collect(result.data(), result.size() * sizeof(U32)));
+        mFrames.endFrame();
+        UNSCOPED_INFO("collected without waiting once the next frame's end has seen its frame finished");
         REQUIRE(readback.collect(result.data(), result.size() * sizeof(U32)));
         UNSCOPED_INFO("and holds the source");
         CHECK(result == std::vector<U32>(last.begin(), last.begin() + COUNT));
@@ -467,7 +484,7 @@ namespace
         constexpr S32    WIDTH = 4;
         constexpr S32    HEIGHT = 2;
         constexpr size_t BYTES = WIDTH * HEIGHT * 4;
-        ALGPUReadback readback;
+        ALGPUReadback readback(&mFrames);
         REQUIRE(readback.allocate(BYTES, 2, "pixels (test)"));
 
         fill(51, 102);
@@ -482,9 +499,12 @@ namespace
         UNSCOPED_INFO("the pack binding left at none");
         CHECK(pack == 0);
 
+        mFrames.endFrame();
         glFinish();
+        // The next frame's end shows it finished.
+        mFrames.endFrame();
         std::vector<U8> result(BYTES, 0);
-        UNSCOPED_INFO("the first, finished, collected without waiting");
+        UNSCOPED_INFO("the first, its frame finished, collected without waiting");
         REQUIRE(readback.collect(result.data(), result.size()));
         UNSCOPED_INFO("the rectangle as the framebuffer held it at the first request");
         CHECK(reds(result) == expected(51, 102));
@@ -505,7 +525,7 @@ namespace
     {
         constexpr U32 REGIONS = 3;
         constexpr U32 COUNT = 10;
-        ALGPUStream stream;
+        ALGPUStream stream(&mFrames);
         REQUIRE(stream.allocate(COUNT * sizeof(U32), REGIONS, "stream (test)"));
         CHECK(stream.getRegionSize() == size_t(COUNT * sizeof(U32)));
         ALGPUBuffer check;
@@ -528,6 +548,7 @@ namespace
 
             check.copyFrom(stream.getBuffer(), offset, 0, COUNT * sizeof(U32));
             REQUIRE(readAll(check) == words);
+            mFrames.endFrame();
         }
         for (U32 frame = 0; frame < REGIONS; ++frame)
         {
@@ -539,6 +560,42 @@ namespace
             UNSCOPED_INFO("the ring wraps to the same region");
             REQUIRE(offsets[frame + REGIONS] == offsets[frame]);
         }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // ALGPUStream: a region is mapped again with no GL call once the frame its reads were issued in has finished; one
+    // read in the open frame waits for what has been issued, with a fence of its own.
+    TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: ALGPUStream reuses a region once the frame it was read in has finished", "[algpubuffer_gl]")
+    {
+        constexpr U32 REGIONS = 2;
+        constexpr U32 COUNT = 10;
+        ALGPUStream stream(&mFrames);
+        REQUIRE(stream.allocate(COUNT * sizeof(U32), REGIONS, "stream (test)"));
+
+        // Both regions mapped and published in one frame: the second map notes the first region read in it.
+        for (U32 i = 0; i < REGIONS; ++i)
+        {
+            REQUIRE(stream.map() != nullptr);
+            stream.publish(COUNT * sizeof(U32));
+        }
+        mFrames.endFrame();
+        glFinish();
+        // The next frame's end shows it finished.
+        mFrames.endFrame();
+
+        const U32 calls = mFrames.getCalls();
+        // Back to the first region, read in the frame that has finished. The second is noted read in this one: its
+        // reads could be issued up to this map.
+        REQUIRE(stream.map() != nullptr);
+        stream.publish(COUNT * sizeof(U32));
+        UNSCOPED_INFO("no GL call for a region whose frame has finished");
+        CHECK(mFrames.getCalls() == calls);
+
+        // The second, read in this open frame.
+        REQUIRE(stream.map() != nullptr);
+        stream.publish(COUNT * sizeof(U32));
+        UNSCOPED_INFO("a region read in the open frame waits for what has been issued");
+        CHECK(mFrames.getCalls() >= calls + 2);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

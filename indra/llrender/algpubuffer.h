@@ -30,6 +30,8 @@
 #include <cstddef>
 #include <vector>
 
+class ALFrameFences;
+
 // GL 4.3's minimum GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, so every point here exists on every context that has
 // compute. LLRender keeps what each holds; the reserved storage blocks' fixed points all fall below it.
 constexpr U32 AL_NUM_STORAGE_BINDINGS = 8;
@@ -155,17 +157,18 @@ private:
 };
 
 // Results the GPU wrote, read back without waiting on it. request() copies a range of a buffer, and requestPixels() a
-// rectangle of the framebuffer, into the next of a few slots, GPU-side, and fences it; collect() hands back the oldest
-// result once its fence has signalled, which is a frame or two later. A request that finds every slot holding a result
-// not yet collected is refused rather than stalling on the oldest. Slots are mapped for reading where persistent maps
-// resolved, and read by glGetBufferSubData elsewhere -- after the fence, so neither waits on the GPU, and a mapped
-// slot asks GL for nothing, so nothing waits on a threaded driver's own thread either.
+// rectangle of the framebuffer, into the next of a few slots, GPU-side, noting the frame it is issued in; collect()
+// hands back the oldest result once the frame fences show that frame finished (ALFrameFences), which is a frame or two
+// later. A request that finds every slot holding a result not yet collected is refused rather than stalling on the
+// oldest. Slots are mapped for reading where persistent maps resolved, and read by glGetBufferSubData elsewhere --
+// once the frame has finished, so neither waits on the GPU. Neither a request nor a mapped slot's collect lays or polls
+// a fence of its own, so nothing waits on a threaded driver's own thread either.
 //
-// All operations require a current GL context. Non-copyable.
+// All operations require the GL context of the frame fences to be current: gGL's, unless others are given. Non-copyable.
 class ALGPUReadback
 {
 public:
-    ALGPUReadback() = default;
+    explicit ALGPUReadback(ALFrameFences* frames = nullptr) : mFrameFences(frames) {}
     ~ALGPUReadback();
 
     ALGPUReadback(const ALGPUReadback&) = delete;
@@ -180,30 +183,32 @@ public:
     // Requests made and not yet collected.
     U32    getPending() const { return mPending; }
 
-    // Copy [src_offset, src_offset + bytes) of `src` into the next slot and fence the copy. A shader's writes to `src`
-    // are ordered before the copy here. False, and nothing copied, while every slot is pending.
+    // Copy [src_offset, src_offset + bytes) of `src` into the next slot. A shader's writes to `src` are ordered before
+    // the copy here. False, and nothing copied, while every slot is pending.
     bool request(const ALGPUBuffer& src, size_t src_offset, size_t bytes);
 
     // Read the `width` x `height` rectangle at (x, y) of the framebuffer bound for reading into the next slot, as
-    // glReadPixels reads it in `format` and `type` under LLRender's pack alignment of 1, and fence the read. `bytes` is
-    // what the read writes. False, and nothing read, while every slot is pending.
+    // glReadPixels reads it in `format` and `type` under LLRender's pack alignment of 1. `bytes` is what the read
+    // writes. False, and nothing read, while every slot is pending.
     bool requestPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, size_t bytes);
 
-    // The oldest pending result into `out`, the `bytes` its request copied, once the GPU has finished it: false while
-    // it is still in flight, or when nothing is pending. `wait` waits for it instead, for a teardown or a test.
+    // The oldest pending result into `out`, the `bytes` its request copied, once the frame fences have shown the frame
+    // it was issued in finished, which is at a later frame's end: false before, or when nothing is pending. No GL call
+    // for a mapped slot. `wait` waits for it instead, for a teardown or a test.
     bool collect(void* out, size_t bytes, bool wait = false);
 
 private:
     struct Slot
     {
-        void*  mFence   = nullptr;  // the GLsync after the slot's copy
-        size_t mBytes   = 0;
-        bool   mFlushed = false;    // the fence has been flushed toward the GPU
+        U32    mFrame = 0;  // the frame the slot's copy was issued in
+        size_t mBytes = 0;
     };
 
-    // Fences the `bytes` just written into the next slot, and moves on to the one after.
-    void fenceNext(size_t bytes);
+    ALFrameFences& frames() const;
+    // Notes the `bytes` just written into the next slot, and moves on to the one after.
+    void issueNext(size_t bytes);
 
+    ALFrameFences*    mFrameFences = nullptr;  // gGL's where null
     ALGPUBuffer       mStore;
     std::vector<Slot> mSlots;
     size_t            mSlotBytes  = 0;  // what a slot holds
@@ -214,16 +219,18 @@ private:
 
 // Data the CPU writes for the GPU every frame, without waiting on an upload or on the GPU: a ring of regions in one
 // STREAM buffer. map() gives the next region to write, publish() hands it to the GPU, and the GPU has it until the ring
-// comes round to it again, `regions` publishes later; only a GPU that many frames behind makes map() wait. Where
+// comes round to it again, `regions` publishes later, and until the frame its reads were issued in has finished
+// (ALFrameFences); only a GPU that many frames behind, or a ring mapped round within one frame, makes map() wait. Where
 // persistent maps did not resolve, map() gives memory of its own and publish() uploads it.
 //
-// A published region's reads -- binds, draws, dispatches -- are all issued before the next map(), which fences them.
+// A published region's reads -- binds, draws, dispatches -- are all issued before the next map(), which notes the frame
+// they were issued in. Neither call lays or polls a fence while the GPU keeps up.
 //
-// All operations require a current GL context. Non-copyable.
+// All operations require the GL context of the frame fences to be current: gGL's, unless others are given. Non-copyable.
 class ALGPUStream
 {
 public:
-    ALGPUStream() = default;
+    explicit ALGPUStream(ALFrameFences* frames = nullptr) : mFrameFences(frames) {}
     ~ALGPUStream();
 
     ALGPUStream(const ALGPUStream&) = delete;
@@ -238,7 +245,7 @@ public:
     // The buffer a published region lies in, for LLRender::bindStorageBuffer and the indirect calls.
     const ALGPUBuffer& getBuffer() const { return mStore; }
 
-    // Where the next region's bytes go, getRegionSize() of them. Fences the region published last.
+    // Where the next region's bytes go, getRegionSize() of them. Notes the frame the region published last was read in.
     U8* map();
 
     // Hand the GPU the `bytes` written since map(). Returns where they start in getBuffer(): a multiple of
@@ -249,12 +256,15 @@ public:
     U32 getStalls() const { return mStalls; }
 
 private:
+    ALFrameFences& frames() const;
+
+    ALFrameFences*     mFrameFences  = nullptr; // gGL's where null
     ALGPUBuffer        mStore;
-    std::vector<void*> mFences;            // per region, the GLsync after the last reads of it
+    std::vector<U32>   mReadIn;            // per region, the frame its last reads were issued in, 0 for none
     std::vector<U8>    mStaging;           // what map() gives where mStore is not mapped
     size_t             mRegionBytes  = 0;
     size_t             mRegionStride = 0;
-    S32                mPublished    = -1; // the region published last, not yet fenced
+    S32                mPublished    = -1; // the region published last, its frame not yet noted
     S32                mWriting      = -1; // the region map() gave, not yet published
     U32                mNext         = 0;  // the region the next map() gives
     U32                mStalls       = 0;

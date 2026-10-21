@@ -44,6 +44,7 @@
 #include "llmatrix4a.h"
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
 #include "algpubuffer.h"     // AL_NUM_STORAGE_BINDINGS -- the storage binding points this context keeps
+#include "alframefences.h"
 #include "alimageslot.h"
 #include "alquerypool.h"
 #include "altextureslot.h"
@@ -465,8 +466,13 @@ public:
     // context in shutdown().
     ALQueryPool& queries() { return mQueries; }
 
-    // Ends the frame for what is kept a frame at a time: the query pool's batch is fenced, and the uniform buffer rings
-    // close their counters and resize. Once a frame, past the swap; the main context's only.
+    // The frames of this context the GPU has finished, from the one fence endFrame() lays a frame. Released with the
+    // context in shutdown().
+    ALFrameFences& frameFences() { return mFrameFences; }
+
+    // Ends the frame for what is kept a frame at a time: the query pool's batch closes, the frame's fence is laid, and
+    // the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
+    // context's only.
     void endFrame();
 
     // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
@@ -618,7 +624,8 @@ private:
     U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
     bool            mMatricesUBOBound = false;
 
-    ALQueryPool mQueries;
+    ALFrameFences mFrameFences;
+    ALQueryPool   mQueries{ mFrameFences };
 
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to

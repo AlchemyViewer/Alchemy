@@ -25,6 +25,7 @@
 
 #include "linden_common.h"
 
+#include "../alframefences.h"
 #include "../algputimer.h"
 #include "../alquerypool.h"
 #include "../llgl.h"
@@ -87,10 +88,28 @@ namespace
                 glEndQuery(GL_TIME_ELAPSED);
             }
             mPool.release();
+            mFrames.release();
+        }
+
+        // The frame ended as LLRender ends it: the pool's batch closed, then the frame's fence laid.
+        void endFrame()
+        {
+            mPool.endFrame();
+            mFrames.endFrame();
+        }
+
+        // The frame ended, finished on the GPU and shown finished, as the next frame's end shows it, then read.
+        void finishFrame()
+        {
+            endFrame();
+            glFinish();
+            REQUIRE(mFrames.wait(mFrames.frame() - 1, 1000000000ull));
+            mPool.retire();
         }
 
         ll_test::SharedGLScope mGL;
-        ALQueryPool mPool;
+        ALFrameFences mFrames;
+        ALQueryPool mPool{ mFrames };
     };
 
 
@@ -183,9 +202,7 @@ namespace
         U64 ns = 0;
         REQUIRE(timer.begin());
         timer.end();
-        mPool.endFrame();
-        glFinish();
-        mPool.retire();
+        finishFrame();
         {
             INFO("read without waiting once its frame has been");
             CHECK(timer.poll(ns));
@@ -200,9 +217,7 @@ namespace
         {
             ALQuerySpan other = mPool.beginSpan();
             mPool.endSpan(other);
-            mPool.endFrame();
-            glFinish();
-            mPool.retire();
+            finishFrame();
         }
         {
             INFO("expired once its frame's results were dropped, and the timer free again");

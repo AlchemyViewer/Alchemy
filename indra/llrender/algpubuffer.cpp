@@ -27,6 +27,7 @@
 
 #include "algpubuffer.h"
 
+#include "alframefences.h"
 #include "llgl.h"
 #include "llglheaders.h"
 #include "llrender.h"
@@ -198,10 +199,10 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
     U8* mapped = nullptr;
     if ((readback || stream) && can_map_persistent(dsa))
     {
-        // Coherent both ways, so neither side flushes ranges or issues client barriers: the fences the rings place are
-        // all the ordering they need. FLUSH_EXPLICIT gives that up on the write side, where flushMapped() publishes
-        // instead; the storage takes no flush bit, only the map. A readback store asks for memory the CPU reads
-        // quickly.
+        // Coherent both ways, so neither side flushes ranges or issues client barriers: the frame fences the rings wait
+        // on are all the ordering they need. FLUSH_EXPLICIT gives that up on the write side, where flushMapped()
+        // publishes instead; the storage takes no flush bit, only the map. A readback store asks for memory the CPU
+        // reads quickly.
         const GLbitfield coherency = (flags & FLUSH_EXPLICIT) ? GL_MAP_FLUSH_EXPLICIT_BIT : GL_MAP_COHERENT_BIT;
         const GLbitfield map_flags = GL_MAP_PERSISTENT_BIT | coherency
                                    | (readback ? GL_MAP_READ_BIT : 0) | (stream ? GL_MAP_WRITE_BIT : 0);
@@ -456,15 +457,13 @@ bool ALGPUReadback::allocate(size_t bytes, U32 slots, const char* label)
     return true;
 }
 
+ALFrameFences& ALGPUReadback::frames() const
+{
+    return mFrameFences ? *mFrameFences : gGL.frameFences();
+}
+
 void ALGPUReadback::release()
 {
-    for (Slot& slot : mSlots)
-    {
-        if (slot.mFence && gGLManager.mInited)
-        {
-            glDeleteSync(static_cast<GLsync>(slot.mFence));
-        }
-    }
     mSlots.clear();
     mStore.release();
     mSlotBytes  = 0;
@@ -493,7 +492,7 @@ bool ALGPUReadback::request(const ALGPUBuffer& src, size_t src_offset, size_t by
     }
 
     mStore.copyFrom(src, src_offset, (size_t)mNext * mSlotStride, bytes);
-    fenceNext(bytes);
+    issueNext(bytes);
     return true;
 }
 
@@ -515,16 +514,15 @@ bool ALGPUReadback::requestPixels(S32 x, S32 y, S32 width, S32 height, U32 forma
     glBindBuffer(GL_PIXEL_PACK_BUFFER, mStore.getGLName());
     glReadPixels(x, y, width, height, format, type, reinterpret_cast<void*>(offset));
     glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-    fenceNext(bytes);
+    issueNext(bytes);
     return true;
 }
 
-void ALGPUReadback::fenceNext(size_t bytes)
+void ALGPUReadback::issueNext(size_t bytes)
 {
     Slot& slot = mSlots[mNext];
-    slot.mFence   = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-    slot.mBytes   = bytes;
-    slot.mFlushed = false;
+    slot.mFrame = frames().frame();
+    slot.mBytes = bytes;
 
     mNext = (mNext + 1) % (U32)mSlots.size();
     ++mPending;
@@ -542,34 +540,22 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
     Slot& slot = mSlots[oldest];
     llassert(bytes <= slot.mBytes);
 
-    bool waited = false;
-    if (GLsync fence = static_cast<GLsync>(slot.mFence))
+    ALFrameFences& fences = frames();
+    if (!fences.isComplete(slot.mFrame))
     {
-        // The first look flushes the fence toward the GPU, so that a later one can find it signalled.
-        GLenum result = glClientWaitSync(fence, slot.mFlushed ? 0 : GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-        slot.mFlushed = true;
-        while (wait && result == GL_TIMEOUT_EXPIRED)
-        {
-            result = glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull /* 1s */);
-        }
-        if (result == GL_TIMEOUT_EXPIRED)
+        if (!wait)
         {
             return false;
         }
-        glDeleteSync(fence);
-        slot.mFence = nullptr;
-        // A wait that failed has said nothing about the copy, so the read below is one that waits for it.
-        if (result == GL_WAIT_FAILED)
+        // For the open frame this waits for every command issued so far, the copy among them.
+        while (!fences.wait(slot.mFrame, 1000000000ull /* 1s */))
         {
-            LL_WARNS_ONCE("GPUBuffer") << "A readback fence could not be waited on; reading back synchronously"
-                                       << LL_ENDL;
-            waited = true;
         }
     }
 
     const size_t offset = (size_t)oldest * mSlotStride;
     const size_t copied = llmin(bytes, slot.mBytes);
-    if (mStore.getMapped() && !waited)
+    if (mStore.getMapped())
     {
         memcpy(out, mStore.getMapped() + offset, copied);
     }
@@ -609,7 +595,7 @@ bool ALGPUStream::allocate(size_t bytes, U32 regions, const char* label)
     {
         return false;
     }
-    mFences.assign(regions, nullptr);
+    mReadIn.assign(regions, 0);
     if (!mStore.getMapped())
     {
         mStaging.resize(bytes);
@@ -619,16 +605,14 @@ bool ALGPUStream::allocate(size_t bytes, U32 regions, const char* label)
     return true;
 }
 
+ALFrameFences& ALGPUStream::frames() const
+{
+    return mFrameFences ? *mFrameFences : gGL.frameFences();
+}
+
 void ALGPUStream::release()
 {
-    for (void* fence : mFences)
-    {
-        if (fence && gGLManager.mInited)
-        {
-            glDeleteSync(static_cast<GLsync>(fence));
-        }
-    }
-    mFences.clear();
+    mReadIn.clear();
     mStaging.clear();
     mStore.release();
     mRegionBytes  = 0;
@@ -650,31 +634,32 @@ U8* ALGPUStream::map()
     // A region mapped and not yet published is the one to write still.
     if (mWriting < 0)
     {
-        // Every read of the region published last was issued before this call, so a fence here follows them all.
+        // Every read of the region published last was issued before this call, in this frame or an earlier one.
+        ALFrameFences& fences = frames();
         if (mPublished >= 0)
         {
-            mFences[mPublished] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            mReadIn[mPublished] = fences.frame();
             mPublished = -1;
         }
 
         const U32 region = mNext;
-        mNext = (mNext + 1) % (U32)mFences.size();
-        if (GLsync fence = static_cast<GLsync>(mFences[region]))
+        mNext = (mNext + 1) % (U32)mReadIn.size();
+        // Finished already, unless the GPU is as many frames behind as there are regions, or the ring came round
+        // within the frame: then the wait, which polls first, waits for every command of that frame.
+        if (!fences.isComplete(mReadIn[region]))
         {
-            // Signalled already, unless the GPU is as many frames behind as there are regions.
-            if (glClientWaitSync(fence, 0, 0) == GL_TIMEOUT_EXPIRED)
+            bool stalled = false;
+            if (!fences.wait(mReadIn[region], 1000000000ull /* 1s */, &stalled))
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("GPU stream stall");
-                ++mStalls;
-                if (glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull /* 1s */) == GL_TIMEOUT_EXPIRED)
-                {
-                    LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
-                                               << LL_ENDL;
-                }
+                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
+                                           << LL_ENDL;
             }
-            glDeleteSync(fence);
-            mFences[region] = nullptr;
+            if (stalled)
+            {
+                ++mStalls;
+            }
         }
+        mReadIn[region] = 0;
         mWriting = (S32)region;
     }
 
