@@ -91,7 +91,7 @@ def strip_if_zero(text):
         match = DIRECTIVE.match(line)
         if match:
             kind, rest = match.group(1), match.group(2).strip()
-            zero = re.match(r"^0\b", rest) is not None
+            zero = rest == "0"
             if kind in ("if", "ifdef", "ifndef"):
                 stack.append(kind == "if" and zero)
             elif kind == "elif" and stack:

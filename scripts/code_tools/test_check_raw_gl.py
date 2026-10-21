@@ -64,6 +64,17 @@ class RawCallTests(unittest.TestCase):
                 "#endif\n")
         self.assertEqual(check.raw_calls(text), [(6, "glFinish"), (9, "glViewport"), (13, "glCullFace")])
 
+    def test_a_condition_that_only_starts_with_zero_is_counted(self):
+        text = ("#if 0 || LL_WINDOWS\n"
+                "glClear(0);\n"
+                "#elif 0 && LL_DARWIN\n"
+                "glFlush();\n"
+                "#endif\n"
+                "#if 0 // DEPRECATED\n"
+                "glFinish();\n"
+                "#endif\n")
+        self.assertEqual(check.raw_calls(text), [(2, "glClear"), (4, "glFlush")])
+
     def test_a_call_whose_parenthesis_is_on_a_later_line_is_counted_on_its_name_line(self):
         text = "void f()\n{\n    glClear\n        (GL_COLOR_BUFFER_BIT);\n    glFlush();\n}\n"
         self.assertEqual(check.raw_calls(text), [(3, "glClear"), (5, "glFlush")])
