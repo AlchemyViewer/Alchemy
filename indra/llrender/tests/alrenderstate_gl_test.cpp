@@ -121,7 +121,8 @@ namespace
         }
 
         // GL's stencil state, both faces, against what is given. The masks are held to the 8 bits a stencil buffer has:
-        // past them, what glGetIntegerv answers for an unsigned mask is the driver's choice.
+        // past them, what glGetIntegerv answers for an unsigned mask is the driver's choice. GL answers the reference
+        // held to the stencil bits of the draw framebuffer, so a check of one above 0 binds a target with stencil.
         void checkStencil(GLenum func, GLint ref, GLuint read_mask, GLenum fail, GLenum depth_fail, GLenum pass,
                           GLuint write_mask)
         {
@@ -170,9 +171,10 @@ namespace
             mTarget.release();
         }
 
-        void setUp()
+        // The target, with depth and stencil where `stencil`.
+        void setUp(bool stencil = false)
         {
-            REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8));
+            REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8, stencil, stencil));
         }
 
         ll_test::SharedGLScope mGL;
@@ -334,6 +336,8 @@ namespace
             CHECK((U32)glInteger(GL_BLEND_EQUATION_ALPHA) == (U32)GL_MAX);
         };
 
+        setUp(true);
+        mTarget.bindTarget();
         set();
         {
             INFO("what gGL is given, GL holds");
@@ -371,6 +375,7 @@ namespace
             INFO("refreshState puts back what gGL holds");
             check_set();
         }
+        mTarget.flush();
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -432,6 +437,8 @@ namespace
     // defaults.
     TEST_CASE_METHOD(alrenderstate_data, "alrenderstate_gl: ALGLStencil sets its state through gGL and leaves GL's defaults", "[alrenderstate_gl]")
     {
+        setUp(true);
+        mTarget.bindTarget();
         {
             ALGLStencil stencil(GL_EQUAL, 3, 0x0F, GL_KEEP, GL_INCR, GL_REPLACE, 0xF0);
             UNSCOPED_INFO("the test is on in the scope");
@@ -443,6 +450,7 @@ namespace
         CHECK(glIsEnabled(GL_STENCIL_TEST) == GL_FALSE);
         checkCachedStencil(GL_ALWAYS, 0, ~0u, GL_KEEP, GL_KEEP, GL_KEEP, ~0u);
         checkStencil(GL_ALWAYS, 0, ~0u, GL_KEEP, GL_KEEP, GL_KEEP, ~0u);
+        mTarget.flush();
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
