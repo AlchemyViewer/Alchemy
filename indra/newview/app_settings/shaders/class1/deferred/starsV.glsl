@@ -76,34 +76,8 @@ vec3 srgb_to_linear(vec3 c)
     return pow(max(c, vec3(0.0)), vec3(2.2));
 }
 
-// 3D value noise
-// -------------------------------------------------------------------
-float hash31(vec3 p)
-{
-    p  = fract(p * vec3(0.1031, 0.1030, 0.0973));
-    p += dot(p, p.yzx + 33.33);
-    return fract((p.x + p.y) * p.z);
-}
-
-float valueNoise3D(vec3 p)
-{
-    vec3 i = floor(p);
-    vec3 f = fract(p);
-    vec3 u = f * f * (3.0 - 2.0 * f);
-
-    float n000 = hash31(i + vec3(0.0, 0.0, 0.0));
-    float n100 = hash31(i + vec3(1.0, 0.0, 0.0));
-    float n010 = hash31(i + vec3(0.0, 1.0, 0.0));
-    float n110 = hash31(i + vec3(1.0, 1.0, 0.0));
-    float n001 = hash31(i + vec3(0.0, 0.0, 1.0));
-    float n101 = hash31(i + vec3(1.0, 0.0, 1.0));
-    float n011 = hash31(i + vec3(0.0, 1.0, 1.0));
-    float n111 = hash31(i + vec3(1.0, 1.0, 1.0));
-
-    return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
-               mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y),
-               u.z);
-}
+// deferred/valueNoiseUtil.glsl
+float valueNoise3D(vec3 p);
 
 // Kasten-Young airmass. cos_zenith is the cosine of the zenith angle (z
 // component of the world-up aligned direction). Clamped to avoid the

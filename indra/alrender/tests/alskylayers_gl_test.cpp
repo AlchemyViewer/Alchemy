@@ -46,6 +46,7 @@ namespace
         TEST_MOON  = 2,
         TEST_BLOOM = 3,
         TEST_CLOUDS = 4,
+        TEST_AURORA = 5,
     };
 
     // The screen triangle the layers are drawn over.
@@ -77,6 +78,7 @@ vec4 skySun(vec3 dir);
 vec4 skyMoon(vec3 dir);
 vec4 skyBloom(vec3 dir);
 vec4 skyClouds(vec3 dir);
+vec3 skyAurora(vec3 dir);
 
 void main()
 {
@@ -102,6 +104,10 @@ void main()
     {
         vec4 layer = skyClouds(dir);
         color = mix(color, layer.rgb, layer.a);
+    }
+    else if (test_layer == 5)
+    {
+        color += skyAurora(dir);
     }
     frag_color = vec4(color, 1.0);
 }
@@ -213,6 +219,23 @@ void main()
         { "night, looking up, blending", 2, { 100.f, 40.f, 80.f }, 0.6f },
     };
 
+    // The aurora: a view, its intensity and its time.
+    struct AuroraCase
+    {
+        const char* mName;
+        View mView;
+        F32  mIntensity;
+        F32  mTime;
+    };
+
+    // Low toward the horizon, where it is brightest, up where it fades toward the zenith, and wide, bright enough that
+    // its folds pass 1.
+    const AuroraCase AURORAS[] = {
+        { "aurora at the horizon", { 20.f, 12.f, 60.f }, 0.6f, 1234.5f },
+        { "aurora overhead", { 250.f, 55.f, 70.f }, 0.6f, 40000.25f },
+        { "aurora, wide and bright", { 130.f, 20.f, 100.f }, 1.4f, 777.f },
+    };
+
     // How a layer drawn two ways differs, over the colour channels: the most, the pixels past the bound compare() is
     // given, and the pixels the layer reached in either.
     struct Difference
@@ -244,6 +267,7 @@ void main()
                 mOldMoon[path].unload();
                 mHalo[path].unload();
                 mOldClouds[path].unload();
+                mOldAurora[path].unload();
                 mLayers[path].unload();
                 for (LLRenderTarget& target : mGBuffer[path])
                 {
@@ -303,11 +327,17 @@ void main()
                              { { "skyraster/deferred/cloudsV.glsl", GL_VERTEX_SHADER },
                                { "skyraster/deferred/cloudsF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
+                buildProgram(mOldAurora[path], "Deferred Aurora Program (before the composite)",
+                             { { "skyraster/deferred/auroraV.glsl", GL_VERTEX_SHADER },
+                               { "skyraster/deferred/auroraF.glsl", GL_FRAGMENT_SHADER } },
+                             emissive);
                 buildProgram(mLayers[path], "The sky's layers along the view ray (test)",
                              { { "skytest/skyLayerTestV.glsl", GL_VERTEX_SHADER },
                                { "skytest/skyLayerTestF.glsl", GL_FRAGMENT_SHADER },
                                { "deferred/skyBodiesF.glsl", GL_FRAGMENT_SHADER },
                                { "deferred/skyCloudsF.glsl", GL_FRAGMENT_SHADER },
+                               { "deferred/valueNoiseUtil.glsl", GL_FRAGMENT_SHADER },
+                               { "deferred/skyAuroraF.glsl", GL_FRAGMENT_SHADER },
                                { "windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER } },
                              emissive, { { "SUN_BLOOM", "1" } });
 
@@ -504,6 +534,33 @@ void main()
             });
         }
 
+        // The aurora by its old program, as LLDrawPoolWLSky::renderAuroraDeferred drew it: over the dome's mesh, added.
+        std::vector<F32> oldAurora(const AuroraCase& aurora, bool emissive, bool stored)
+        {
+            const Sky& sky = SKIES[2];
+            return drawOld(aurora.mView, emissive, stored, [&]
+            {
+                gGL.setSceneBlendType(LLRender::BT_ADD);
+                LLGLSLShader& program = mOldAurora[emissive];
+                program.bind();
+                bindDome(program, sky, nullptr, nullptr);
+                program.uniform1f(LLShaderMgr::AURORA_INTENSITY, aurora.mIntensity);
+                program.uniform1f(LLShaderMgr::AURORA_TIME, aurora.mTime);
+                drawDome(mDome);
+                program.unbind();
+            });
+        }
+
+        // The aurora along each pixel's ray.
+        std::vector<F32> rayAurora(const AuroraCase& aurora, bool emissive)
+        {
+            return drawLayer(aurora.mView, emissive, TEST_AURORA, [&](LLGLSLShader& program)
+            {
+                program.uniform1f(LLShaderMgr::AURORA_INTENSITY, aurora.mIntensity);
+                program.uniform1f(LLShaderMgr::AURORA_TIME, aurora.mTime);
+            }, SKIES[2]);
+        }
+
         // The dome's sphere as a far finer mesh than the dome's, with no skirt: rings every tenth of a degree from the
         // zenith to 22.5 degrees, past where the camera's level meets it, with the dome's planar texture coordinates.
         // Its facets are a hundredth of the dome's in depth, so the clouds drawn over it are the sphere's.
@@ -636,18 +693,20 @@ void main()
         // against its stored one within a step of the storage besides, where the blend rounded: GL leaves the
         // precision of a blend into an 8-bit attachment, and the rounding of a conversion to R11G11B10F, to the
         // implementation. Where the layer @a can_clamp, writing past 1, the 8-bit albedo also clamped it (D6), and
-        // those pixels are counted into @a clamped_pixels and left out; R11G11B10F holds the layer's whole range.
+        // those pixels are counted into @a clamped_pixels and left out; R11G11B10F holds the layer's whole range. A
+        // layer the old program @a dithered into the emissive buffer is allowed the dither.
         static void check(const std::vector<F32>& ray, const std::vector<F32>& old_float,
                           const std::vector<F32>& old_stored, bool emissive, F32 maths, S32& clamped_pixels,
-                          bool can_clamp = false)
+                          bool can_clamp = false, bool dithered = false)
         {
+            const F32 dither = dithered && emissive ? 1.f : 0.f;
             const std::vector<bool> clamps =
                 emissive || !can_clamp ? std::vector<bool>() : clamped(old_stored, old_float);
             const S32 clamp_count = (S32)std::count(clamps.begin(), clamps.end(), true);
             const F32 rounding = 1.f;
-            const Difference d_maths = compare(ray, old_float, emissive, maths, 0.f);
-            const Difference d_storage = compare(ray, old_stored, emissive, maths, rounding, clamps);
-            const Difference d_stored = compare(old_stored, old_float, emissive, maths, rounding, clamps);
+            const Difference d_maths = compare(ray, old_float, emissive, maths, 0.f, {}, dither);
+            const Difference d_storage = compare(ray, old_stored, emissive, maths, rounding, clamps, 2.f * dither);
+            const Difference d_stored = compare(old_stored, old_float, emissive, maths, rounding, clamps, 2.f * dither);
             const std::string maths_summary = d_maths.summary();
             const std::string storage_summary = d_storage.summary();
             CAPTURE(maths_summary, storage_summary, clamp_count);
@@ -666,6 +725,7 @@ void main()
         LLGLSLShader           mOldMoon[2];
         LLGLSLShader           mHalo[2];
         LLGLSLShader           mOldClouds[2];
+        LLGLSLShader           mOldAurora[2];
         LLGLSLShader           mLayers[2];
         LLRenderTarget         mGBuffer[2][2];
         LLRenderTarget         mFloat;
@@ -688,6 +748,11 @@ void main()
     constexpr F32 CLOUD_MATHS  = 2.f / 255.f;
     constexpr F32 CLOUD_FACETS = 40.f / 255.f;
     constexpr F32 CLOUD_SKIRT  = 4.f / 255.f;
+
+    // How far the per-ray aurora may lie from the old program's, display encoded: next to nothing, but at a pixel
+    // whose strength lies on the 0.003 the aurora is cut at, which the two rays' last bits can put either side of it
+    // (1.7/255 at an intensity of 1.4).
+    constexpr F32 AURORA_MATHS = 2.5f / 255.f;
 
     // How far the per-ray sun and moon may lie from their raster quads with nothing stored between: what the filter
     // makes of derivatives taken from the ray's coordinates rather than interpolated across the quad's two triangles.
@@ -825,5 +890,27 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the clouds along the view
         }
     }
     UNSCOPED_INFO("the 8-bit albedo clamped bright clouds");
+    CHECK(clamped_pixels > 0);
+}
+
+TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the aurora along the view ray is the aurora on the dome",
+                 "[alskylayers_gl]")
+{
+    // The old program took its direction from the dome's point under the pixel less the camera's place, which is the
+    // view ray whatever the facets, so the two differ by the arithmetic alone. Its folds pass 1 where it is bright,
+    // which the 8-bit albedo clamped (D6).
+    setUp();
+    S32 clamped_pixels = 0;
+    for (const AuroraCase& aurora : AURORAS)
+    {
+        for (S32 path = 0; path < 2; ++path)
+        {
+            const bool emissive = path == 1;
+            CAPTURE(aurora.mName, emissive);
+            check(rayAurora(aurora, emissive), oldAurora(aurora, emissive, false), oldAurora(aurora, emissive, true),
+                  emissive, AURORA_MATHS, clamped_pixels, true, true);
+        }
+    }
+    UNSCOPED_INFO("the 8-bit albedo clamped the bright aurora");
     CHECK(clamped_pixels > 0);
 }

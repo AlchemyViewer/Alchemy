@@ -3240,6 +3240,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredStarProgram.mName = "Deferred Star Program";
         gDeferredStarProgram.mShaderFiles.clear();
         gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+        gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER));
         gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
         gDeferredStarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredStarProgram.mShaderGroup = LLGLSLShader::SG_SKY;
@@ -3255,6 +3256,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredStarQuadProgram.mName = "Deferred Star Quad Program";
         gDeferredStarQuadProgram.mShaderFiles.clear();
         gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER));
         gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
         gDeferredStarQuadProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredStarQuadProgram.mShaderGroup = LLGLSLShader::SG_SKY;

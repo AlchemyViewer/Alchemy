@@ -404,6 +404,7 @@ void main()
             program.mName = quads ? "Deferred Star Quad Program" : "Deferred Star Program";
             program.mShaderFiles.clear();
             program.mShaderFiles.push_back(std::make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+            program.mShaderFiles.push_back(std::make_pair("deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER));
             program.mShaderFiles.push_back(std::make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
             program.mShaderGroup = LLGLSLShader::SG_SKY;
