@@ -4289,6 +4289,22 @@ void LLPipeline::stateSort(LLSpatialBridge* bridge, LLCamera& camera, bool fov_c
     }
 }
 
+// The test a terrain patch's octree group passed (LLSpatialPartition::cull), put to the patch. A group holds up to
+// OctreeMaxNodeCapacity patches, a quarter of its region or more, and every patch drawn is tessellated whole, so a
+// camera that sees a corner of the group would draw all of it: a shadow cascade a few metres across would tessellate
+// the near field at its highest levels. The main view's reach is left to the group's test.
+static bool terrain_patch_in_frustum(const LLDrawable* drawablep, LLCamera& camera)
+{
+    const LLVector4a* extents = drawablep->getSpatialExtents();
+    LLVector4a center;
+    center.setAdd(extents[0], extents[1]);
+    center.mul(0.5f);
+    LLVector4a radius;
+    radius.setSub(extents[1], extents[0]);
+    radius.mul(0.5f);
+    return (LLPipeline::sShadowRender ? camera.AABBInFrustum(center, radius) : camera.AABBInFrustumNoFarClip(center, radius)) != 0;
+}
+
 void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -4370,6 +4386,11 @@ void LLPipeline::stateSort(LLDrawable* drawablep, LLCamera& camera)
                 drawablep->updateDistance(camera, force_update); // calls vobj->updateLOD() which calls LLVOAvatar::updateVisibility()
             }
         }
+    }
+
+    if (drawablep->getRenderType() == RENDER_TYPE_TERRAIN && !terrain_patch_in_frustum(drawablep, camera))
+    {
+        return;
     }
 
     if (!drawablep->getVOVolume())
