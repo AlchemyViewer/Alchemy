@@ -144,10 +144,14 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
 
     // A shadow map or a capture also holds each edge to the segments its own raster resolves (terrainTC.glsl), from
     // the pass's projection and view, taken from the origin, and half its target's size over the texels or pixels a
-    // segment spans. The main view's levels are the distance's alone, and so are pinned ones.
+    // segment spans. The main view's levels are the distance's alone, and so are pinned ones, and so are those of the
+    // main view's nearest sun cascade: the terrain it casts lies under the camera, where a caster that strays from the
+    // lit surface shows most, and only a small shadow map would give the cap anything to cut there. A capture's nearest
+    // cascade keeps the cap, or it would tessellate around the probe finer than the capture itself.
     static LLCachedControl<F32> raster_segment(gSavedSettings, "AlchemyRenderTerrainTessRasterSegment", 8.f);
     const F32 segment = raster_segment;
-    if ((LLPipeline::sShadowRender || gCubeSnapshot) && segment > 0.f && density > 0.f)
+    const bool near_cascade = !gCubeSnapshot && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_SUN_SHADOW0;
+    if ((LLPipeline::sShadowRender || gCubeSnapshot) && !near_cascade && segment > 0.f && density > 0.f)
     {
         const LLCamera& pass = LLViewerCamera::getCurrent();
         LLMatrix4a clip;
