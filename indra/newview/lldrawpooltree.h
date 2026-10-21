@@ -54,6 +54,7 @@ public:
     /*virtual*/ void beginShadowPass(S32 pass);
     /*virtual*/ void endShadowPass(S32 pass);
     /*virtual*/ void renderShadow(S32 pass);
+    /*virtual*/ void addShadowCasters(ALSpotShadowCache::Casters& casters);
 
     /*virtual*/ bool verify() const;
     /*virtual*/ LLViewerTexture *getTexture();

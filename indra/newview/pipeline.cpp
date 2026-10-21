@@ -86,6 +86,7 @@
 #include "lldrawpoolwater.h"
 #include "llface.h"
 #include "llfeaturemanager.h"
+#include "llfetchedgltfmaterial.h"
 #include "llfloatertelehub.h"
 #include "llgltfmaterialpreviewmgr.h"
 #include "llfloaterreg.h"
@@ -1672,6 +1673,15 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
     const ResourceChanges changes = reconcileResources(requested);
     mGLResourcesLive   = true;
     mResourcesFullSize = changes.mFullSize;
+
+    // A spot map built again, or not there, holds nothing its last draw left in it.
+    ALRenderResourcePlan::IdSet spot_maps;
+    spot_maps.set((size_t)ALRenderResourcePlan::Id::SpotShadow0).set((size_t)ALRenderResourcePlan::Id::SpotShadow1);
+    const bool spot_maps_lost = new_context || ((changes.mBuilt | changes.mFreed | changes.mFailed) & spot_maps).any();
+    if (spot_maps_lost)
+    {
+        mSpotShadowCache.invalidate();
+    }
     // Which resource each pooled target serves over the next whole frame, for the log; not for a resize that built what
     // it asked, which is logged at debug level alone and comes every frame of a window's drag.
     if (!resized_as_asked(cause, changes))
@@ -1746,6 +1756,11 @@ bool LLPipeline::rebuildGLBuffers(const ALRenderResourceInputs& requested, Rebui
         {
             releaseDepthDependents();
             add(invalidated, "depth pyramid, water surface maps, selection outline, far-plane overlay");
+        }
+
+        if (spot_maps_lost)
+        {
+            add(invalidated, "spot shadows");
         }
 
         // An impostor is G-buffer channels and depth in the main G-buffer's formats (generateImpostor), so those
@@ -12784,41 +12799,54 @@ inline float sgn(float a)
     return (0.0F);
 }
 
+// The render pass types drawShadow draws as the prim volume alone, ignoring textures. Each has its rigged twin at the
+// next type.
+static constexpr U32 SHADOW_GEOMETRY_PASSES[] = {
+    LLRenderPass::PASS_SIMPLE,
+    LLRenderPass::PASS_FULLBRIGHT,
+    LLRenderPass::PASS_SHINY,
+    LLRenderPass::PASS_BUMP,
+    LLRenderPass::PASS_FULLBRIGHT_SHINY,
+    LLRenderPass::PASS_MATERIAL,
+    LLRenderPass::PASS_MATERIAL_ALPHA_EMISSIVE,
+    LLRenderPass::PASS_SPECMAP,
+    LLRenderPass::PASS_SPECMAP_EMISSIVE,
+    LLRenderPass::PASS_NORMMAP,
+    LLRenderPass::PASS_NORMMAP_EMISSIVE,
+    LLRenderPass::PASS_NORMSPEC,
+    LLRenderPass::PASS_NORMSPEC_EMISSIVE
+};
+
+// Those it alpha tests by their textures, each with its rigged twin at the next type. The blended casters and the
+// grass it draws besides, from PASS_ALPHA and PASS_GRASS.
+static constexpr U32 SHADOW_MASKED_PASSES[] = {
+    LLRenderPass::PASS_ALPHA_MASK,
+    LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK,
+    LLRenderPass::PASS_NORMSPEC_MASK,
+    LLRenderPass::PASS_MATERIAL_ALPHA_MASK,
+    LLRenderPass::PASS_SPECMAP_MASK,
+    LLRenderPass::PASS_NORMMAP_MASK,
+    LLRenderPass::PASS_GLTF_PBR_ALPHA_MASK
+};
+
 void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, LLCullResult& result, bool depth_clamp, bool do_cull, S32 occlusion)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     LL_PROFILE_GPU_ZONE("renderShadow");
+
+    sortShadow(shadow_cam, result, do_cull, occlusion);
+    drawShadow(view, proj, shadow_cam, depth_clamp, occlusion);
+}
+
+void LLPipeline::sortShadow(LLCamera& shadow_cam, LLCullResult& result, bool do_cull, S32 occlusion)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
     LLPipeline::sShadowRender = true;
 
     // Occlusion culling as the caller asks, by the shadow camera's own queries: none unless it does.
     U32 saved_occlusion = sUseOcclusion;
     sUseOcclusion = occlusion;
-
-    // List of render pass types that use the prim volume as the shadow,
-    // ignoring textures.
-    static const U32 types[] = {
-        LLRenderPass::PASS_SIMPLE,
-        LLRenderPass::PASS_FULLBRIGHT,
-        LLRenderPass::PASS_SHINY,
-        LLRenderPass::PASS_BUMP,
-        LLRenderPass::PASS_FULLBRIGHT_SHINY,
-        LLRenderPass::PASS_MATERIAL,
-        LLRenderPass::PASS_MATERIAL_ALPHA_EMISSIVE,
-        LLRenderPass::PASS_SPECMAP,
-        LLRenderPass::PASS_SPECMAP_EMISSIVE,
-        LLRenderPass::PASS_NORMMAP,
-        LLRenderPass::PASS_NORMMAP_EMISSIVE,
-        LLRenderPass::PASS_NORMSPEC,
-        LLRenderPass::PASS_NORMSPEC_EMISSIVE
-    };
-
-    LLGLEnable cull(GL_CULL_FACE);
-
-    //enable depth clamping if available
-    LLGLEnable clamp_depth(depth_clamp ? GL_DEPTH_CLAMP : 0);
-
-    LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_LESS);
 
     // In RenderShadowCullMode 1, do_cull is false: generateSunShadow did the single union
     // octree cull and pre-filtered `result` to this cascade's frustum (bucketShadowCull),
@@ -12829,6 +12857,26 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
     }
 
     stateSort(shadow_cam, result);
+
+    sUseOcclusion = saved_occlusion;
+    LLPipeline::sShadowRender = false;
+}
+
+void LLPipeline::drawShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& shadow_cam, bool depth_clamp, S32 occlusion)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    LLPipeline::sShadowRender = true;
+
+    U32 saved_occlusion = sUseOcclusion;
+    sUseOcclusion = occlusion;
+
+    LLGLEnable cull(GL_CULL_FACE);
+
+    //enable depth clamping if available
+    LLGLEnable clamp_depth(depth_clamp ? GL_DEPTH_CLAMP : 0);
+
+    LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_LESS);
 
     //generate shadow map
     gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -12874,7 +12922,7 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
         LL_PROFILE_GPU_ZONE("shadow simple");
         gGL.getTextureSlot(0)->unbind();
 
-        for (U32 type : types)
+        for (U32 type : SHADOW_GEOMETRY_PASSES)
         {
             renderObjects(type, false, false, rigged);
         }
@@ -13037,6 +13085,158 @@ void LLPipeline::renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LL
     // reset occlusion culling flag
     sUseOcclusion = saved_occlusion;
     LLPipeline::sShadowRender = false;
+}
+
+namespace
+{
+    using ShadowHash = ALSpotShadowCache::Hash;
+
+    // What of its buffer a draw draws, and where it is placed.
+    void add_shadow_geometry(ShadowHash& draw, const LLDrawInfo& info)
+    {
+        const LLVertexBuffer* buffer = info.mVertexBuffer.get();
+        draw.add(buffer).add(buffer ? buffer->getContentStamp() : 0);
+        draw.add((U64)info.mStart).add((U64)info.mEnd).add((U64)info.mCount).add((U64)info.mOffset);
+        if (info.mModelMatrix)
+        {
+            draw.add(*info.mModelMatrix);
+        }
+        else
+        {
+            draw.add((U64)0);
+        }
+    }
+
+    // A draw's texture animation, which moves what it alpha tests by.
+    void add_texture_matrix(ShadowHash& draw, const LLMatrix4* matrix)
+    {
+        if (matrix)
+        {
+            draw.add(matrix->mMatrix, sizeof(matrix->mMatrix));
+        }
+        else
+        {
+            draw.add((U64)0);
+        }
+    }
+
+    // A GLTF material as the shadow programs draw by it: whether it culls back faces and, where it is alpha tested or
+    // stippled, by what of its base colour.
+    void add_shadow_material(ALSpotShadowCache::Casters& casters, ShadowHash& draw, const LLFetchedGLTFMaterial* material,
+                             bool textured)
+    {
+        draw.add(material);
+        if (!material)
+        {
+            return;
+        }
+        draw.add((U64)material->mDoubleSided);
+        if (textured)
+        {
+            add_shadow_texture(casters, draw, material->mBaseColorTexture.get());
+            draw.add((U64)material->mAlphaMode).add(material->mAlphaCutoff).add(material->mBaseColor.mV[VALPHA]);
+            LLGLTFMaterial::TextureTransform::Pack packed;
+            material->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);
+            draw.add(packed, sizeof(packed));
+        }
+    }
+}
+
+void LLPipeline::addShadowCasters(ALSpotShadowCache::Casters& casters)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    // A rigged caster is skinned to its avatar's pose, which moves every frame.
+    const auto rigged = [&](U32 type)
+    {
+        if (beginRenderMap(type) != endRenderMap(type))
+        {
+            casters.markChanging();
+        }
+    };
+
+    // Those drawn as geometry alone, a GLTF material's by whether it culls back faces.
+    const auto geometry = [&](U32 type, bool gltf)
+    {
+        for (LLCullResult::drawinfo_iterator i = beginRenderMap(type), end = endRenderMap(type); i != end && !casters.changing(); ++i)
+        {
+            const LLDrawInfo& info = **i;
+            ShadowHash draw;
+            add_shadow_geometry(draw, info);
+            if (gltf)
+            {
+                add_shadow_material(casters, draw, info.mGLTFMaterial.get(), false);
+            }
+            casters.add(draw);
+        }
+    };
+
+    // Those alpha tested or stippled by their textures, whichever of them the draw binds.
+    const auto textured = [&](U32 type)
+    {
+        for (LLCullResult::drawinfo_iterator i = beginRenderMap(type), end = endRenderMap(type); i != end && !casters.changing(); ++i)
+        {
+            const LLDrawInfo& info = **i;
+            if (info.mAvatar.notNull())
+            {
+                casters.markChanging();
+                continue;
+            }
+            ShadowHash draw;
+            add_shadow_geometry(draw, info);
+            draw.add(info.mAlphaMaskCutoff);
+            add_shadow_texture(casters, draw, info.mTexture.get());
+            add_texture_matrix(draw, info.mTextureMatrix);
+            for (const LLPointer<LLViewerTexture>& texture : info.mTextureList)
+            {
+                add_shadow_texture(casters, draw, texture.get());
+            }
+            for (const LLDrawInfo::MaterialSlot& slot : info.mMaterialSlotList)
+            {
+                add_shadow_texture(casters, draw, slot.mDiffuse.get());
+                draw.add(slot.mAlphaMaskCutoff);
+            }
+            add_shadow_material(casters, draw, info.mGLTFMaterial.get(), true);
+            for (const LLPointer<LLFetchedGLTFMaterial>& material : info.mGLTFMaterialList)
+            {
+                add_shadow_material(casters, draw, material.get(), true);
+            }
+            casters.add(draw);
+        }
+    };
+
+    // What changes every frame first, the skinned casters and the pools' (an avatar's among them): a pass that draws
+    // any is drawn whatever its map holds, and the rest of what it draws is not folded.
+    for (U32 type : SHADOW_GEOMETRY_PASSES)
+    {
+        rigged(type + 1);
+    }
+    rigged(LLRenderPass::PASS_GLTF_PBR_RIGGED);
+    for (U32 type : SHADOW_MASKED_PASSES)
+    {
+        rigged(type + 1);
+    }
+    // What the pools draw in their own shadow passes, picked as renderGeomShadow picks them.
+    for (LLDrawPool* pool : mPools)
+    {
+        if (!casters.changing() && hasRenderType(pool->getType()) && pool->getNumShadowPasses() > 0)
+        {
+            pool->addShadowCasters(casters);
+        }
+    }
+
+    for (U32 type : SHADOW_GEOMETRY_PASSES)
+    {
+        geometry(type, false);
+    }
+    geometry(LLRenderPass::PASS_GLTF_PBR, true);
+    for (U32 type : SHADOW_MASKED_PASSES)
+    {
+        textured(type);
+    }
+    // The blended casters, rigged and not in one map, and the grass, which has no rigged twin.
+    textured(LLRenderPass::PASS_ALPHA);
+    textured(LLRenderPass::PASS_GRASS);
 }
 
 bool LLPipeline::getVisiblePointCloud(LLCamera& camera, LLVector3& min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir)
@@ -14138,6 +14338,16 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         // this should never happen
         llassert(mShadowSpotLight[0] != mShadowSpotLight[1] || mShadowSpotLight[0].isNull());
 
+        // What the spot maps' casters are drawn with besides themselves: the programs as loaded, and the settings and
+        // state drawShadow reads.
+        const U64 spot_state = ALSpotShadowCache::Hash()
+                                   .add((U64)LLGLSLShader::sLoadGeneration)
+                                   .add((U64)mResourceInputs.mShadowDetail)
+                                   .add((U64)LLEnvironment::instance().getIsSunUp())
+                                   .add((U64)sRenderTextures)
+                                   .value();
+        U32 spot_draws = 0;
+
         for (S32 i = 0; i < 2; i++)
         {
             LLViewerCamera::setCurrent(saved_camera);
@@ -14217,24 +14427,46 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 LLViewerCamera::updateFrustumPlanes(shadow_cam, false, false, true);
                 LLViewerCamera::setCurrent(shadow_cam);
 
-                //
-
-                mSpotShadow[i].bindTarget();
-                mSpotShadow[i].getViewport(gGLViewport);
-                mSpotShadow[i].clear();
-
                 static LLCullResult result[2];
 
                 LLViewerCamera::sCurCameraID = (LLViewerCamera::eCameraID)(LLViewerCamera::CAMERA_SPOT_SHADOW0 + i);
 
                 RenderSpotLight = drawable;
 
-                renderShadow(view[i + 4], proj[i + 4], shadow_cam, result[i], false);
+                // Culled and sorted every frame, which keeps what the light sees built, and drawn only when the map
+                // holds something other than what the light and its casters draw now.
+                sortShadow(shadow_cam, result[i], true, 0);
+
+                ALSpotShadowCache::Key key;
+                key.mView       = view[i + 4];
+                key.mProjection = proj[i + 4];
+                key.mLight      = (U64)(uintptr_t)drawable;
+                key.mState      = spot_state;
+                addShadowCasters(key.mCasters);
+
+                if (mSpotShadowCache.needsDraw(i, key))
+                {
+                    LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("spot shadow");
+                    LL_PROFILE_GPU_ZONE("spot shadow");
+
+                    mSpotShadow[i].bindTarget();
+                    mSpotShadow[i].getViewport(gGLViewport);
+                    mSpotShadow[i].clear();
+
+                    drawShadow(view[i + 4], proj[i + 4], shadow_cam, false, 0);
+
+                    mSpotShadow[i].flush();
+                    mSpotShadowCache.drawn(i, key);
+                    ++spot_draws;
+                }
 
                 RenderSpotLight = nullptr;
-
-                mSpotShadow[i].flush();
             }
+        }
+
+        if (!gCubeSnapshot)
+        {
+            LL_PROFILE_PLOT("spot shadow draws", (int64_t)spot_draws);
         }
     }
     else

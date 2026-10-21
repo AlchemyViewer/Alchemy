@@ -3,10 +3,10 @@
 # Render infrastructure over llrender that holds no viewer state: what the
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
-# the depth pyramid, the light map's blur, the depth under the HUD and
-# snapshot cutouts; and the pool that lends the frame's short-lived render
-# targets by description. Whatever reads settings or the scene hands these
-# their inputs as values.
+# the depth pyramid, the light map's blur, the depth under the HUD,
+# snapshot cutouts and whether a spot light's shadow map is drawn again; and
+# the pool that lends the frame's short-lived render targets by description.
+# Whatever reads settings or the scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
@@ -18,6 +18,7 @@ set(
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
+  alspotshadowcache.cpp
   altransienttargetpool.cpp
   altransienttargets.cpp
   alwaterfield.cpp
@@ -37,6 +38,7 @@ set(
   alrenderresourceinputs.h
   alrenderresourceplan.h
   alshaderinputs.h
+  alspotshadowcache.h
   altransienttargetpool.h
   altransienttargets.h
   alwaterfield.h
@@ -66,7 +68,8 @@ if(AL_BUILD_TESTS)
   # The suites that need no GL: the render resources' plan and the changes
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
-  # heights a normal map's slopes integrate to, and snapshot cutouts.
+  # heights a normal map's slopes integrate to, snapshot cutouts and the spot
+  # shadows' cache.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
@@ -76,6 +79,7 @@ if(AL_BUILD_TESTS)
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
+      tests/alspotshadowcache_test.cpp
       tests/altransienttargetpool_test.cpp
       tests/alwaterfield_test.cpp
       tests/alwaterheightbake_test.cpp
@@ -101,7 +105,10 @@ if(AL_BUILD_TESTS)
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
-    BENCH_SOURCES tests/alcompute_gl_bench.cpp tests/alondemandtarget_bench.cpp tests/alwatertargets_bench.cpp
+    BENCH_SOURCES
+      tests/alcompute_gl_bench.cpp
+      tests/alondemandtarget_bench.cpp
+      tests/alwatertargets_bench.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${alrender_shader_dir}
