@@ -153,6 +153,9 @@ public:
     bool mHasTimestampQuery = false;
     // GL_ARB_pipeline_statistics_query's counters, such as GL_FRAGMENT_SHADER_INVOCATIONS: core in 4.6.
     bool mHasPipelineStatistics = false;
+    // GL_QUERY_BUFFER: glGetQueryObject writes a result into the buffer bound there, by the GPU, rather than returning
+    // it to the CPU. Core in 4.4, also GL_ARB_query_buffer_object.
+    bool mHasQueryBufferObject = false;
     // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
     // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
     // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,
