@@ -107,7 +107,10 @@ U32 LLRender::sDrawCalls = 0;
 U64 LLRender::sDrawElements = 0;
 std::atomic<U32> ALTextureSlot::sWhiteTexture = 0;
 F32 LLRender::sAnisotropicFilteringLevel = 0.f;
-bool LLRender::sGLCoreProfile = false;
+// Read by the native Win32 window alone, which makes a compatibility context when it is false
+// (RenderGLContextCoreProfile, which Intel's Windows driver is recommended off). Every other window,
+// and anything that never sets it, as the appearance utility does not, is core.
+bool LLRender::sGLCoreProfile = true;
 bool LLRender::sNsightDebugSupport = false;
 LLVector2 LLRender::sUIGLScaleFactor = LLVector2(1.f, 1.f);
 bool LLRender::sClassicMode = false;
@@ -457,13 +460,6 @@ bool LLRender::init(bool needs_vertex_buffer)
         LLGLState::seedState(GL_TEXTURE_CUBE_MAP_SEAMLESS, GL_TRUE);
     }
 
-#if LL_WINDOWS
-    if (glGenVertexArrays == nullptr)
-    {
-        return false;
-    }
-#endif
-
     { //bind a dummy vertex array object so we're core profile compliant
         glGenVertexArrays(1, &mDummyVAO);
         glBindVertexArray(mDummyVAO);
@@ -540,11 +536,14 @@ void LLRender::shutdown()
 
     // Its queries and fences, which it deletes only while the context is up.
     mQueries.release();
+    mFrameFences.release();
 }
 
 void LLRender::endFrame()
 {
+    // The batch's results are written ahead of the fence that follows them.
     mQueries.endFrame();
+    mFrameFences.endFrame();
     ALUniformBuffer::endFrame();
 }
 
@@ -614,11 +613,7 @@ void LLRender::refreshState(void)
 
     glLineWidth(mLineWidth);
 
-    // Loaded only on a context with tessellation, the one that has a patch size.
-    if (glPatchParameteri)
-    {
-        glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
-    }
+    glPatchParameteri(GL_PATCH_VERTICES, mPatchVertices);
 
     rebasePolygonOffset();
 
@@ -699,10 +694,10 @@ void LLRender::syncLightState()
     }
 
     // Everything below is still a LOOSE per-program uniform, so it keeps the per-shader hash
-    // gate. These names have writers outside LLRender (LLPipeline::bindDeferredShader pushes
-    // an auto-adjusted sunlight_color; sun_up_factor is written from the pipeline, the draw
-    // pools and LLSettingsVO), so folding them into the shared block would let one writer
-    // stomp another.
+    // gate. sun_up_factor has writers outside LLRender (the pipeline, the draw pools and
+    // LLSettingsVO), so folding it into the shared block would let one writer stomp another.
+    // The sun's, moon's and ambient light the atmospherics read are the Environment block's,
+    // classic sky or not: the sky settings set them there, in one place for every program.
     LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
 
     if (!shader || shader->mLightHash == mLightHash)
@@ -713,16 +708,6 @@ void LLRender::syncLightState()
     shader->mLightHash = mLightHash;
 
     shader->uniform1i(LLShaderMgr::SUN_UP_FACTOR, mLightState[0].mSunIsPrimary ? 1 : 0);
-
-    if (sClassicMode)
-    {
-        LLVector3 diffuse(mLightState[0].mDiffuse.mV);
-        LLVector3 diffuse_b(mLightState[0].mDiffuseB.mV);
-
-        shader->uniform3fv(LLShaderMgr::AMBIENT, 1, mAmbientLightColor.mV);
-        shader->uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, diffuse.mV);
-        shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, diffuse_b.mV);
-    }
 }
 
 void LLRender::packMatricesUBO()

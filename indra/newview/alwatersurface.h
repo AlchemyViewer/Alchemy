@@ -41,6 +41,7 @@ class LLGLSLShader;
 class LLImageGL;
 class LLImageRaw;
 class LLVector3;
+class LLViewerCamera;
 class LLViewerTexture;
 
 /// The water's field for the frame: ALWaterField's layout around the main camera, and the cell map the water's shaders
@@ -107,6 +108,10 @@ public:
     /// highest, and A past each for the waves. False only where the view misses the whole sea, as looking up.
     bool inView(LLCamera& camera) const;
 
+    /// Whether the water is drawn from `camera` at all: from a height above the agent region's water that
+    /// ALFarPlane::waterVisibleFrom allows for its projection, and where its frustum meets the field (inView).
+    bool drawnFrom(LLViewerCamera& camera) const;
+
     /// Grows `min` and `max` (agent space) to hold the field: its rim, and its lowest and highest water, A past each.
     void addExtents(LLVector3& min, LLVector3& max) const;
 
@@ -137,8 +142,8 @@ public:
     };
     static WaveSettings waveSettings();
 
-    /// Whether the waves are wanted this session: AlchemyRenderWaterWaves, where tessellation is (GL 4.0). The waves'
-    /// programs, and the heights they read, exist only then.
+    /// Whether the programs were loaded for the waves (AlchemyRenderWaterWaves). The waves' programs, and the heights
+    /// they read, exist only then.
     static bool wavesWanted();
 
     const ALWaterField::Layout& getLayout() const { return mLayout; }

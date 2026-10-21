@@ -152,7 +152,7 @@ void LLAppearanceListener::getOutfitItems(LLSD const &data)
                 it->getUUID().asString(),
                 llsd::map(
                     "name", it->getName(),
-                    "wearable_type", LLWearableType::getInstance()->getTypeName(it->isWearableType() ? it->getWearableType() : LLWearableType::WT_NONE),
+                    "wearable_type", LLWearableType::getTypeName(it->isWearableType() ? it->getWearableType() : LLWearableType::WT_NONE),
                     "is_worn", get_is_item_worn(it)));
         });
 }

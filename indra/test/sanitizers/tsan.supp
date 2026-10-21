@@ -24,6 +24,28 @@
 # bug to report: Mesa is not built for TSan.
 race:libgallium
 
+# The rest of the GPU's own driver, on a viewer run that draws with it:
+# radeonsi's threads map buffers through libdrm's amdgpu, which makes a
+# buffer's mutex on one thread and locks it on another, publishing it in
+# ways TSan cannot see. The distribution's, uninstrumented, as above.
+race:libdrm_amdgpu.so
+
+# The GTK SDL brings into a Wayland viewer through libdecor's GTK plugin,
+# which draws the window's frame where the compositor leaves it to the
+# client, as GNOME's does: GLib and GIO's own threads (gdbus, dconf, a
+# pool), glycin's, which loads gdk-pixbuf's images on threads of its own,
+# and Pango's fontconfig thread with the system's fontconfig. All the
+# distribution's and uninstrumented; GLib's mutexes and conditions are
+# futexes TSan cannot see, so their threads' frees and copies read as
+# racing whatever the main thread was doing inside SDL: about 200 reports
+# in one run, every one with these libraries on a side. Not ours to fix,
+# and SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR=0 leaves them out of a run.
+race:libglycin-2.so
+race:libglib-2.0.so
+race:libgio-2.0.so
+race:libpangoft2-1.0.so
+race:libfontconfig.so.1
+
 # SDL's PipeWire audio backend, from the Alchemy registry's sdl3: a
 # lock-order inversion between a device's lock and its stream's PipeWire
 # loop lock, which cannot deadlock. OpenPhysicalAudioDevice holds the

@@ -224,7 +224,7 @@ void LLFloaterBuyContents::inventoryChanged(LLViewerObject* obj,
             item_is_multi = true;
         }
 
-        std::string icon_name = LLInventoryIcon::getIconName(inv_item->getType(),
+        std::string_view icon_name = LLInventoryIcon::getIconName(inv_item->getType(),
                                  inv_item->getInventoryType(),
                                  inv_item->getFlags(),
                                  item_is_multi);

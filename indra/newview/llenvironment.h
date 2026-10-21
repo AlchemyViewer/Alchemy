@@ -144,6 +144,11 @@ public:
     // context -- call from the render loop, alongside the reflection-probe UBO bind.
     void                        bindEnvironmentUBO();
 
+    // Bind a copy of the Environment block whose lit terms take `sunlit` in place of the sky's
+    // sun or moon on its way down, for a pass that lights an object under a light of its own
+    // (the GLTF material preview). The next bindEnvironmentUBO() binds the shared block again.
+    void                        bindEnvironmentUBOLitBy(const LLColor3& sunlit);
+
     // Release the Environment UBO's GL object on a context teardown (re-created lazily on the
     // next bindEnvironmentUBO). Must be paired with the pipeline's GL-buffer teardown, mirroring
     // the reflection-probe UBO: without it a GL destroy/restore cycle leaves a stale (or
@@ -264,20 +269,27 @@ public:
     // std140-packed sky/water constants uploaded ONCE per frame and bound at a fixed engine
     // binding point, replacing the per-shader re-upload of these values on every bind. Holds
     // ONLY the constants that are (a) written exclusively by the settings path and (b) uniform
-    // across every shader in a frame. Per-pass / light-state uniforms (ambient/sunlight/
-    // moonlight, lightnorm, camPosLocal, water/clip plane, mirror flag, sky_hdr_scale,
-    // sun_up_factor, moisture/droplet/ice/moon_brightness/cloud_variance/sun_moon_glow_factor,
+    // across every shader in a frame. Per-pass / light-state uniforms (lightnorm, camPosLocal,
+    // water/clip plane, mirror flag, sky_hdr_scale, sun_up_factor,
+    // moisture/droplet/ice/moon_brightness/cloud_variance/sun_moon_glow_factor,
     // density_multiplier) are deliberately re-pushed per context and STAY on the loose apply()
     // path. (classic_mode is a compile-time program variant -- see CLASSIC_MODE.) One member
     // is the camera's rather than the settings': eyeToSky, the rotation from the view's eye
     // space to the sky dome's frame, taken from the camera update() is given -- the main view,
     // or each probe face -- so every shader that hazes geometry works in the sky's frame.
     //
+    // The sun's, moon's and ambient light the atmospherics read are here and nowhere else, as
+    // the terms worked from them: the light lit geometry takes (LLSettingsSky::getLitLightColors,
+    // the same LLPipeline's light 0 is), the sky dome's, and the ambient applySpecial decides,
+    // worked into calcAtmosphericVars' per-sky terms by packAtmosphericTerms. A pass that lights
+    // an object under a light of its own binds a copy (bindEnvironmentUBOLitBy).
+    //
     // Field order/types/padding MUST byte-match the GLSL block. Each vec3 is paired with a
     // trailing scalar so that scalar fills the vec3's std140 tail (the next member lands at
     // offset+12) -- which is exactly how float[3]+float pack in C++, so this struct mirrors
     // std140 with no manual inter-member padding among them. Only the round to a 16-byte
     // multiple before eyeToSky needs explicit padding: a mat3 is three vec4-aligned columns.
+    // The atmospheric terms after it are vec3s with no scalar to pair, so each carries a pad.
     // See packEnvironmentUBO() and the sEnvBlockFields table in llenvironment.cpp.
     struct alignas(16) EnvironmentUBOData
     {
@@ -297,13 +309,39 @@ public:
         F32 waterFogDensity;
         F32 _pad0[2];
         F32 eyeToSky[12];              // mat3: three columns, each padded to a vec4
+        // calcAtmosphericVars' terms of blue_density and haze_density alone (applySpecial)
+        F32 haze_extinction[3];        F32 _pad1;
+        F32 blue_weight[3];            F32 _pad2;
+        F32 haze_weight[3];            F32 _pad3;
+        // The light lit geometry takes, and the sky dome's and the clouds' (applySpecial)
+        F32 atmos_sunlit[3];           F32 _pad4;
+        F32 atmos_ambient[3];          F32 _pad5;
+        F32 sky_sunlight[3];           F32 _pad6;
+        F32 sky_light[3];              F32 _pad7;
+        F32 sky_ambient[3];            F32 _pad8;
+        // calcAtmosphericVars' terms of atmos_sunlit and atmos_ambient (packAtmosphericTerms)
+        F32 atmos_sunlit_linear[3];    F32 _pad9;
+        F32 atmos_amblit[3];           F32 _pad10;
+        F32 haze_additive[3];          F32 _pad11;
+        F32 haze_additive_glow[3];     F32 _pad12;
+        // skyF's and cloudsF's terms of the sky's light and densities (applySpecial)
+        F32 sky_light_atten[3];        F32 _pad13;
+        F32 cloud_sunlight[3];         F32 _pad14;
+        F32 sky_ambient_below[3];      F32 _pad15;
     };
 
     // Pack mSky/mWaterUniforms into the CPU-side block and mark it for upload (no GL calls).
     void                        packEnvironmentUBO();
 
+    // calcAtmosphericVars' per-sky terms of atmos_sunlit and atmos_ambient, worked into d from
+    // them and from the block's haze members: atmos_sunlit_linear, atmos_amblit, haze_additive
+    // and haze_additive_glow. The one place these are worked, in the arithmetic the shader did
+    // them in.
+    static void                 packAtmosphericTerms(EnvironmentUBOData& d);
+
     EnvironmentUBOData          mEnvUBOData{};
     ALUniformBuffer             mEnvUBO;
+    ALUniformBuffer             mEnvLitByUBO;
     bool                        mEnvUBODirty{ true };
     // eyeToSky as ALFarPlane::eyeToSkyFrame gives it, for the camera of the last update()
     std::array<F32, 9>          mEyeToSky{ 1.f, 0.f, 0.f, 0.f, 1.f, 0.f, 0.f, 0.f, 1.f };

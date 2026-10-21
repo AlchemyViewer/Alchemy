@@ -313,6 +313,9 @@ public:
     bool preCreateTexture(S32 usename = 0);
      // ONLY call from LLViewerTextureList or ImageGL background thread
     bool createTexture(S32 usename = 0);
+    // With the category taken on the main thread, as an upload posted to LLImageGLThread
+    // must: the boost level it is is the main thread's, and changes while the upload runs.
+    bool createTexture(S32 usename, S32 category);
     void postCreateTexture();
     void scheduleCreateTexture();
 

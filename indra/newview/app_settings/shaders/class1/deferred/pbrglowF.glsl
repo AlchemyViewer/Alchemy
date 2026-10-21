@@ -47,13 +47,17 @@ in vec2 emissive_texcoord;
 
 uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
 
+// x: baseColorFactor's alpha, which the emissive stream displaces from vertex_color
+// y: 1 where coverage weights the glow (BLEND), 0 where it only cuts (OPAQUE, MASK)
+uniform vec2 baseColorAlpha;
+
 vec3 linear_to_srgb(vec3 c);
 
 void main()
 {
-    vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
+    float coverage = texture(diffuseMap, base_color_texcoord.xy).a * baseColorAlpha.x;
 
-    if (basecolor.a < minimum_alpha)
+    if (coverage < minimum_alpha)
     {
         discard;
     }
@@ -62,7 +66,7 @@ void main()
     emissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
 
     float lum = max(max(emissive.r, emissive.g), emissive.b);
-    lum *= vertex_emissive.a;
+    lum *= vertex_emissive.a * mix(1.0, coverage, baseColorAlpha.y);
 
     // HUDs are rendered after gamma correction, output in sRGB space
     frag_color.rgb = vec3(0);

@@ -422,7 +422,7 @@ void LLPanelVolume::getState( )
 
     bool probe_enabled = is_probe && editable && single_volume;
 
-    bool mirrors_enabled = LLPipeline::RenderMirrors;
+    bool mirrors_enabled = gPipeline.resourceInputs().mMirrors;
 
     getChildView("Probe Update Type")->setVisible(mirrors_enabled);
     getChildView("Probe Update Label")->setVisible(mirrors_enabled);
@@ -1030,10 +1030,18 @@ void LLPanelVolume::onLightSelectColor(const LLSD& data)
     }
     LLVOVolume *volobjp = (LLVOVolume *)objectp;
 
-    LLColor4    clr = mLightColorSwatch->get();
-    LLColor3    clr3( clr );
-    volobjp->setLightSRGBColor(clr3);
-    mLightSavedColor = clr;
+    applyLightSwatchColor(volobjp);
+    mLightSavedColor = mLightColorSwatch->get();
+}
+
+void LLPanelVolume::applyLightSwatchColor(LLVOVolume* volobjp)
+{
+    volobjp->setLightSRGBColor(LLColor3(mLightColorSwatch->get()));
+    if (volobjp->getIsLight())
+    {
+        // Leaves an open picker where it is, so a drag through colors the wire cannot tell apart stays smooth.
+        mLightColorSwatch->set(volobjp->getLightSRGBBaseColor());
+    }
 }
 
 void LLPanelVolume::onLightSelectTexture(const LLSD& data)
@@ -1224,7 +1232,7 @@ void LLPanelVolume::onCopyLight()
         clipboard["light"]["intensity"] = volobjp->getLightIntensity();
         clipboard["light"]["radius"] = volobjp->getLightRadius();
         clipboard["light"]["falloff"] = volobjp->getLightFalloff();
-        LLColor3 color = volobjp->getLightSRGBColor();
+        LLColor3 color = volobjp->getLightSRGBBaseColor();
         clipboard["light"]["r"] = color.mV[0];
         clipboard["light"]["g"] = color.mV[1];
         clipboard["light"]["b"] = color.mV[2];
@@ -1412,7 +1420,7 @@ void LLPanelVolume::onLightSelect(bool success, LLViewerObject* obj, const LLTex
                 volobjp->setLightIntensity(hit_volobjp->getLightIntensity());
                 volobjp->setLightRadius(hit_volobjp->getLightRadius());
                 volobjp->setLightFalloff(hit_volobjp->getLightFalloff());
-                volobjp->setLightSRGBColor(hit_volobjp->getLightSRGBColor());
+                volobjp->setLightLinearColor(hit_volobjp->getLightLinearBaseColor());
 
                 // Spotlight
                 if (hit_volobjp->isLightSpotlight())
@@ -1616,8 +1624,7 @@ void LLPanelVolume::onCommitLight( LLUICtrl* ctrl, void* userdata )
     volobjp->setLightRadius((F32)self->mLightRadius->getValue().asReal());
     volobjp->setLightFalloff((F32)self->mLightFalloff->getValue().asReal());
 
-    LLColor4    clr = self->mLightColorSwatch->get();
-    volobjp->setLightSRGBColor(LLColor3(clr));
+    self->applyLightSwatchColor(volobjp);
 
     {
         LLUUID id = self->mLightTextureCtrl->getImageAssetID();
@@ -1672,7 +1679,7 @@ void LLPanelVolume::onCommitProbe(LLUICtrl* ctrl, void* userdata)
     volobjp->setReflectionProbeAmbiance((F32)self->getChild<LLUICtrl>("Probe Ambiance")->getValue().asReal());
     volobjp->setReflectionProbeNearClip((F32)self->getChild<LLUICtrl>("Probe Near Clip")->getValue().asReal());
 
-    bool mirrors_enabled = LLPipeline::RenderMirrors;
+    bool mirrors_enabled = gPipeline.resourceInputs().mMirrors;
     bool is_mirror = false;
 
     if (mirrors_enabled)

@@ -30,6 +30,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <fmt/format.h>
+
 #include "llassetstorage.h"
 
 // linden library includes
@@ -1405,7 +1407,7 @@ void LLAssetStorage::legacyGetDataCallback(const LLUUID &uuid,
         std::string uuid_str;
 
         uuid.toString(uuid_str);
-        filename = llformat("%s.%s",gDirUtilp->getExpandedFilename(LL_PATH_CACHE,uuid_str).c_str(),LLAssetType::lookup(type));
+        filename = fmt::format("{}.{}", gDirUtilp->getExpandedFilename(LL_PATH_CACHE, uuid_str), LLAssetType::lookup(type));
 
         LLFILE* fp = LLFile::fopen(filename, LLFILE_MODE("wb")); /* Flawfinder: ignore */
         if (fp)

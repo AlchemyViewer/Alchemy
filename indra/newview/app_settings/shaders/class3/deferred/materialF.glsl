@@ -69,7 +69,7 @@ float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 out vec4 frag_color;
 
 #ifdef HAS_SUN_SHADOW
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 #endif
 
 void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
@@ -126,7 +126,8 @@ in vec2 vary_texcoord2;
 uniform float env_intensity;
 uniform vec4 specular_color;  // specular color RGB and specular exponent (glossiness) in alpha
 
-#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK)
+// The mask cutoff, or for BLEND the alpha pool's coverage cutoff (prepare_alpha_shader).
+#if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_MASK) || (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
 uniform float minimum_alpha;
 #endif
 
@@ -204,11 +205,12 @@ float getEmissive(vec4 diffcol)
 #endif
 }
 
-float getShadow(vec3 pos, vec3 norm)
+// dpos_dx and dpos_dy are pos's, taken before the discards main may take.
+float getShadow(vec3 pos, vec3 norm, vec3 dpos_dx, vec3 dpos_dy)
 {
 #ifdef HAS_SUN_SHADOW
     #if (DIFFUSE_ALPHA_MODE == DIFFUSE_ALPHA_MODE_BLEND)
-        return sampleDirectionalShadow(pos, norm, gl_FragCoord.xy / screen_res); // screen position, as alphaF passes: it seeds the PCSS rotation
+        return sampleDirectionalShadowGrad(pos, norm, gl_FragCoord.xy / screen_res, dpos_dx, dpos_dy); // screen position, as alphaF passes: it seeds the PCSS rotation
     #else
         return 1.0;
     #endif
@@ -219,6 +221,10 @@ float getShadow(vec3 pos, vec3 norm)
 
 void main()
 {
+    // Before every discard below, for the shadow's receiver-plane bias (getShadow).
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+
     mirrorClip(vary_position);
     applyWaterClip();
 
@@ -253,9 +259,20 @@ void main()
     // encoded, matching the deferred writer.
     spec.a = glossiness; // pack glossiness into spec alpha for lighting functions
 
+    // A texel the output alpha below would leave under minimum_alpha is not drawn: it would
+    // neither show nor be kept out of the depth a depth-writing alpha pass lays down. That
+    // alpha is max(diffcol.a, glare) * vertex_color.a with glare at most 1, and glare stays 0
+    // unless the surface is glossy or carries an environment, so both tests are exact here,
+    // before the lighting is paid for. The rest is caught once glare is known.
+    if (vertex_color.a < minimum_alpha ||
+        (diffcol.a * vertex_color.a < minimum_alpha && glossiness <= 0.0 && env <= 0.0))
+    {
+        discard;
+    }
+
     vec3 pos = vary_position;
 
-    float shadow = getShadow(pos, norm);
+    float shadow = getShadow(pos, norm, dpos_dx, dpos_dy);
 
     vec4 diffuse = diffcol;
 
@@ -311,7 +328,9 @@ void main()
         vec3 n = norm.xyz;
         calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
-        if (nl > 0.0 && nh > 0.0)
+        // The raw dot products: calcHalfVectors floors nl and nh at a positive epsilon so the
+        // lobe can divide by them, which would leave this test always true.
+        if (dot(n, l) > 0.0 && dot(n, h) > 0.0)
         {
             float lit = min(nl*6.0, 1.0);
 
@@ -343,6 +362,14 @@ void main()
         glare += cur_glare;
     }
 
+    // A classic sky's 1.1 is on the sun, ambient and environment term alone, as softenLightF's
+    // writeColor puts it on an opaque material: the local lights below carry their own 0.9,
+    // and the fog adds what it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color *= 1.1;
+    }
+
     vec3 npos = normalize(-pos.xyz);
     vec3 light = vec3(0, 0, 0);
 
@@ -365,10 +392,11 @@ void main()
     glare *= 1.0-emissive;
     glare = min(glare, 1.0);
     float al = max(diffcol.a, glare) * vertex_color.a;
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
-    frag_color = max(vec4(color * final_scale, al), vec4(0));
+    if (al < minimum_alpha)
+    {
+        discard;
+    }
+    frag_color = max(vec4(color, al), vec4(0));
 
 #else // mode is not DIFFUSE_ALPHA_MODE_BLEND, encode to gbuffer
     // deferred path               // See: C++: addDeferredAttachment(), shader: softenLightF.glsl

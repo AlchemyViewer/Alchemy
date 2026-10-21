@@ -51,17 +51,6 @@ uniform float uCrossFalloff;      // per-step attenuation; > 1 decays faster
 uniform float uCrossChromatic;    // 0 = white streaks, 1 = full dispersion
 uniform float uCrossPassScale;    // 1, TAPS, TAPS^2 across the three iterations
 
-// The source need not be a texture of its own. From the second pass on it is
-// a quadrant of a larger borrowed target (see generateBloomHDR), so a
-// region-relative coordinate is mapped into the texture through uCrossRegion
-// (xy origin, zw scale) -- and clamped first to the region's texel-centre
-// range, which is exactly what CLAMP_TO_EDGE did at the edge of a dedicated
-// target and what stops a tap near the edge reading the neighbouring
-// quadrant. A whole texture is region (0,0,1,1) with a clamp of 0, where the
-// sampler's own edge clamp still applies.
-uniform vec4  uCrossRegion;
-uniform vec2  uCrossClamp;
-
 in vec2 vary_texcoord0;
 
 // Four taps per pass with the stride quadrupling to match is not a tuning
@@ -97,24 +86,42 @@ in vec2 vary_texcoord0;
 // strides and the falloff remap from, so the three moving parts of the
 // tiling can no longer disagree.
 const int   TAPS        = CROSS_TAPS;
-const float CHAIN_REACH = float(TAPS * TAPS * TAPS - 1);
 
-// Cheap spectrum for the dispersion. A real star filter is a diffraction
-// grating, and a grating separates wavelengths by angle -- which is why the
-// tips of the streaks go rainbow while the core stays white. Three overlapping
-// triangular lobes are enough to read as that without a LUT.
-vec3 spectrum(float t)
+// Dispersion is a stride per channel. A real star filter is a diffraction
+// grating, which deviates long wavelengths most, so at full uCrossChromatic
+// red's taps reach 30% further along the arm and blue's 30% less.
+//
+// It has to be a stride, not a tint. A stride composes across the passes as
+// the offsets do -- channel c's chain reaches every s_c * (i + 4j + 16k) --
+// so each channel is the same exponential line the tiling makes, only longer
+// or shorter, and keeps its energy, since the weights do not depend on it. A
+// tint chosen per tap does not compose: the chain would multiply three
+// passes' tints, tint(i) * tint(4j) * tint(16k), which is not tint(i + 4j +
+// 16k), and the hue would jump at every multiple of 4 and 16. Offset 0 is
+// common to all three channels, so the core stays white, blue gathers nearest
+// the source and red reaches the tips.
+//
+// The line is exact only where a channel's pitch, uCrossLength times its
+// stride, is a whole number of texels; elsewhere the bilinear taps add a
+// texel-scale ripple along it, as they do to white at a fractional length,
+// so red and blue carry a slight one at the default length. Past a pitch of
+// 2 texels the taps stop overlapping and an arm breaks into a lattice, which
+// is where RenderCrossFilterLength's range stops, so no channel's stride is
+// let take its pitch past 2 either.
+const vec3 CROSS_DISPERSION = vec3(0.3, 0.0, -0.3);
+
+vec3 crossSample(vec2 offset)
 {
-    float s = clamp(t, 0.0, 1.0) * 3.0;
-    return clamp(vec3(1.5 - abs(s - 0.5),
-                      1.5 - abs(s - 1.5),
-                      1.5 - abs(s - 2.5)), 0.0, 1.0);
+    return texture(diffuseMap, vary_texcoord0 + offset).rgb;
 }
 
 void main()
 {
     vec3  accum   = vec3(0.0);
     float total_w = 0.0;
+
+    vec3 stride = vec3(1.0) + clamp(uCrossChromatic, 0.0, 1.0) * CROSS_DISPERSION;
+    stride = min(stride, vec3(2.0 / max(uCrossLength, 1e-4)));
 
     for (int i = 0; i < TAPS; ++i)
     {
@@ -126,29 +133,19 @@ void main()
         // ones: weight(a) * weight(b) == weight(a + b).
         float weight = pow(uCrossFalloff, -step_index);
 
-        vec3 tint = vec3(1.0);
+        vec3 c;
         if (uCrossChromatic > 0.0)
         {
-            // Normalised against the chain's full reach so the hue sweep spans
-            // the whole arm.
-            float t = clamp(step_index / CHAIN_REACH, 0.0, 1.0);
-
-            // Normalised so the three lobes always average to white.
-            // Dispersion redistributes a tap's energy across the channels; it
-            // must not add or remove any, or the dispersion slider doubles as a
-            // brightness slider.
-            vec3 sp = spectrum(t);
-            sp *= 3.0 / max(sp.r + sp.g + sp.b, 1e-4);
-
-            // The ramp by t keeps the core white, and it is not cosmetic. A
-            // grating deviates by wavelength, so at zero deviation every
-            // wavelength lands in the same place: the centre of a streak is
-            // white by construction and only the tips separate into colour.
-            tint = mix(vec3(1.0), sp, uCrossChromatic * t);
+            c.r = crossSample(offset * stride.r).r;
+            c.g = crossSample(offset * stride.g).g;
+            c.b = crossSample(offset * stride.b).b;
+        }
+        else
+        {
+            c = crossSample(offset);
         }
 
-        vec2 tc  = clamp(vary_texcoord0 + offset, uCrossClamp, vec2(1.0) - uCrossClamp);
-        accum   += texture(diffuseMap, uCrossRegion.xy + tc * uCrossRegion.zw).rgb * weight * tint;
+        accum   += c * weight;
         total_w += weight;
     }
 

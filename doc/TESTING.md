@@ -158,7 +158,7 @@ ctest --test-dir build-Linux-ninja-os-asan -C RelWithDebInfo -LE benchmark --out
 - **Left out:** the SIMD assembly probe (`alsimd_asm_probe`), whose listing the sanitizers' checks fill past every ceiling. The harness's own entries whose case crashes on purpose (`CRASHES` in [`indra/test/CMakeLists.txt`](../indra/test/CMakeLists.txt)) leave the crash to Catch2's handler, whose replay they check: there the sanitizers do not take `SIGSEGV`, and ThreadSanitizer does not report the handler's allocations. Those options come after the shell's.
 - **Turned off:** Tracy, which replaces `operator new` and `delete`, Sentry, whose handler takes the signals a sanitizer reports through, WebRTC, and the CEF plugin: CEF's prebuilt Chromium frees through glibc's own `__libc_free` what glibc allocated through the sanitizer's `malloc`, and its process falls over at start.
 - **Suppressions** are in [`indra/test/sanitizers/`](../indra/test/sanitizers/), for code that is not ours: a port's headers, the system's GL driver. Each says what it hides and why it cannot be fixed here. A report in our own code is fixed, not suppressed, and one in a port the Alchemy registry carries is patched there, unless it is no fault, as SDL's PipeWire lock order is not. LL's LSL compiler in `indra/lscript` is the exception: it is a reference, never shipped, and may be suppressed where a fix would change what it does.
-- **The viewer** starts to the login screen and shuts down with no report under either. A sanitized tree builds it with `-DAL_BUILD_VIEWER=ON`, and it runs headless from the staged tree, in a profile of its own, quitting itself after a time (`QuitAfterSeconds`); give it the options and suppressions the tests have:
+- **The viewer** goes from start to a world, logs out and shuts down with no report under either, headless on software GL and in a window on the GPU's own driver. A sanitized tree builds it with `-DAL_BUILD_VIEWER=ON`, and it runs from the staged tree, in a profile of its own, quitting itself after a time (`QuitAfterSeconds`); give it the options and suppressions the tests have:
 
   ```
   cd build-Linux-ninja-os-asan/newview/RelWithDebInfo
@@ -170,7 +170,22 @@ ctest --test-dir build-Linux-ninja-os-asan -C RelWithDebInfo -LE benchmark --out
       bin/alchemy-bin --quitafter 30
   ```
 
-  It reaches the login screen in seconds under ASan, a minute or two under ThreadSanitizer, whose run wants `TSAN_OPTIONS=suppressions=...tsan.supp` and a longer `--quitafter`. Like the gl fixture, a viewer LeakSanitizer checks keeps its libraries loaded once its window is made.
+  It reaches the login screen in seconds under ASan, a minute or two under ThreadSanitizer, whose run wants `TSAN_OPTIONS=suppressions=...tsan.supp` and a longer `--quitafter`. Like the gl fixture, a viewer LeakSanitizer checks keeps its libraries loaded once its window is made. UBSan shares ASan's runtime, and a `log_path` in `UBSAN_OPTIONS` takes ASan's and LeakSanitizer's reports too.
+
+  - **Into a world:** the run logs in with the login a profile remembers. Copy `bin_conf.dat` into the run's `user_settings` from a profile that logged in with its password and its multi-factor token remembered; its key is the machine's, so the copy opens on that machine only. `--autologin` alone stops at the login screen, which RLVa always shows, so a LEAP plugin presses Log In through the panel's event API, given as `--leap "bash click-login.sh $ALCHEMYNEXT_USER_DIR/logs/Alchemy.log"`:
+
+    ```
+    # click-login.sh <Alchemy.log>: drain what the viewer sends, wait for the login
+    # panel, post LLPanelLogin's onClickConnect, and live until the viewer goes.
+    cat > /dev/null &
+    until grep -aq STATE_LOGIN_WAIT "$1"; do sleep 1; done
+    msg="{'pump':'LLPanelLogin','data':{'op':'onClickConnect'}}"
+    printf '%d:%s' "${#msg}" "$msg"
+    wait
+    ```
+
+    `--quitafter` counts from the start until the world is reached, and from there again; in world it quits as File > Quit does, logging out first. The logout waits on any modal dialog and on a floater asking to save, so a run whose logout has not finished a minute later quits without it.
+  - **On the GPU:** keep `WAYLAND_DISPLAY` and give `SDL_VIDEO_DRIVER=wayland` for the offscreen driver and `LIBGL_ALWAYS_SOFTWARE`. The window is drawn by the system's Mesa driver, which the sanitizers do not see into. Where the compositor leaves a window's frame to the client, as GNOME's does, SDL draws it through libdecor's GTK plugin, which brings GTK, Pango and the system's fontconfig into the process; `SDL_VIDEO_WAYLAND_ALLOW_LIBDECOR=0` leaves them out.
 
 ## Fuzzing
 

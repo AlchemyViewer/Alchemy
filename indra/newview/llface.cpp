@@ -1287,7 +1287,9 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
         if (tep->getGLTFRenderMaterial())
         {
-            color = tep->getGLTFRenderMaterial()->mBaseColor;
+            // baseColorFactor is linear; the PBR vertex stages linearise the attribute as
+            // they do a prim tint, so it keeps sRGB's 8-bit steps near black
+            color = srgbColor4(tep->getGLTFRenderMaterial()->mBaseColor);
         }
     }
 
@@ -1879,8 +1881,10 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
             mVObjp->getVolume()->genTangents(face_index);
 
-            // the handedness rides in w and is not rotated
-            alsimd::transform_directions_keep_w(mat_normal, vf.mTangents, (LLVector4a*) tangent.get(), num_vertices);
+            // A tangent lies in the surface, so it goes through the vertex matrix as the surface does; the
+            // normal's inverse transpose would turn it off the surface under a non-uniform scale. The
+            // handedness rides in w and is not transformed.
+            alsimd::transform_directions_keep_w(mat_vert, vf.mTangents, (LLVector4a*) tangent.get(), num_vertices);
         }
 
         if (rebuild_weights && vf.mWeights)

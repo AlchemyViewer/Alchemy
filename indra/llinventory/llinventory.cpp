@@ -833,7 +833,7 @@ bool LLInventoryItem::importLegacyStream(std::istream& input_stream)
         }
         else if(0 == strcmp("inv_type", keyword))
         {
-            mInventoryType = LLInventoryType::lookup(std::string(valuestr));
+            mInventoryType = LLInventoryType::lookup(valuestr);
         }
         else if(0 == strcmp("flags", keyword))
         {
@@ -994,7 +994,7 @@ bool LLInventoryItem::exportLegacyStream(std::ostream& output_stream, bool inclu
         output_stream << "\t\tasset_id\t" << uuid_str << "\n";
     }
     output_stream << "\t\ttype\t" << LLAssetType::lookup(mType) << "\n";
-    const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
+    const std::string_view inv_type_str = LLInventoryType::lookup(mInventoryType);
     if(!inv_type_str.empty())
         output_stream << "\t\tinv_type\t" << inv_type_str << "\n";
     std::string buffer;
@@ -1058,7 +1058,7 @@ void LLInventoryItem::asLLSD( LLSD& sd ) const
         sd[INV_SHADOW_ID_LABEL] = shadow_id;
     }
     sd[INV_ASSET_TYPE_LABEL] = LLAssetType::lookup(mType);
-    const std::string inv_type_str = LLInventoryType::lookup(mInventoryType);
+    const std::string_view inv_type_str = LLInventoryType::lookup(mInventoryType);
     if(!inv_type_str.empty())
     {
         sd[INV_INVENTORY_TYPE_LABEL] = inv_type_str;
@@ -1790,7 +1790,7 @@ LLSD ll_create_sd_from_inventory_category(LLPointer<LLInventoryCategory> cat)
     if(LLFolderType::lookupIsProtectedType(cat->getPreferredType()))
     {
         rv[INV_PREFERRED_TYPE_LABEL] =
-            LLFolderType::lookup(cat->getPreferredType()).c_str();
+            LLFolderType::lookup(cat->getPreferredType());
     }
     return rv;
 }

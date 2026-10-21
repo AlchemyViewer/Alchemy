@@ -15,12 +15,10 @@ on:
         - "Project"
         - "Beta"
         - "Release"
-        - "Release edu"
       project:
         description: "Project Name (used for channel name in Project builds)"
-        required: true
+        required: false
         type: string
-        default: "hippo"
   pull_request:
     # Everything but documentation and the GitHub files no build reads;
     # later patterns win.
@@ -35,6 +33,10 @@ on:
   push:
     branches: ["main", "release/*", "beta/*", "project/*"]
     tags: ["Alchemy*"]
+  # A weekly Develop build of the default branch, untagged, so it posts no
+  # release: its installers are the run's artifacts.
+  schedule:
+    - cron: "21 2 * * 6" # 2:21am UTC Saturday
 
 # Every job reads the repository and nothing more, unless it says otherwise.
 permissions:
@@ -123,7 +125,6 @@ jobs:
           # never pasted into it, so no input can become a command.
           INPUT_CHANNEL: ${{ inputs.channel }}
           INPUT_PROJECT: ${{ inputs.project }}
-          IS_EDU_TAG: ${{ github.ref_type == 'tag' && contains(github.ref_name, 'edu') }}
           R2_ENABLED: ${{ vars.VCPKG_R2_ENABLED }}
           # FMOD Studio and the Discord Social SDK come from the private vcpkg
           # registry, which a proprietary build cannot fetch without it.
@@ -189,22 +190,38 @@ jobs:
           fi
           echo "r2_cache_mode=$r2_cache_mode" >> "$GITHUB_OUTPUT"
 
-          # determine the viewer channel from the branch or tag name
-          # trigger an EDU build by including "edu" in the tag
-          edu=$IS_EDU_TAG
-          echo "ref_type=$GITHUB_REF_TYPE, ref_name=$GITHUB_REF_NAME, edu='$edu'"
+          # determine the viewer channel: from the dispatch's inputs (tag-release
+          # passes its own), else from the tag name, else from the branch
+          echo "ref_type=$GITHUB_REF_TYPE, ref_name=$GITHUB_REF_NAME"
           branch=$BUILD_VCS_BRANCH
+          # A tag as tag-release names it: Alchemy_<Channel>#<sha>-<suffix>,
+          # where a Project tag's suffix is the project, underscores for spaces.
+          tag_re='^Alchemy_(Test|Develop|Project|Beta|Release)#[0-9a-fA-F]+(-(.+))?$'
           if [[ "$INPUT_CHANNEL" != "" && "$INPUT_CHANNEL" != "Auto" ]];
           then
               if [[ "$INPUT_CHANNEL" == "Project" ]];
               then
+                  if [[ -z "$INPUT_PROJECT" ]]; then
+                      echo "::error::A Project build needs a project name"
+                      exit 1
+                  fi
                   export viewer_channel="$VIEWER_CHANNEL_BASE Project $INPUT_PROJECT"
               else
                   export viewer_channel="$VIEWER_CHANNEL_BASE $INPUT_CHANNEL"
               fi
-          elif [[ "$edu" == "true" ]];
+          elif [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" =~ $tag_re ]];
           then
-              export viewer_channel="$VIEWER_CHANNEL_BASE Release edu"
+              if [[ "${BASH_REMATCH[1]}" == "Project" ]];
+              then
+                  project="${BASH_REMATCH[3]//_/ }"
+                  if [[ -z "$project" ]]; then
+                      echo "::error::Project tag $GITHUB_REF_NAME names no project"
+                      exit 1
+                  fi
+                  export viewer_channel="$VIEWER_CHANNEL_BASE Project $project"
+              else
+                  export viewer_channel="$VIEWER_CHANNEL_BASE ${BASH_REMATCH[1]}"
+              fi
           elif  [[ "$branch" == "develop" ]];
           then
               export viewer_channel="$VIEWER_CHANNEL_BASE Develop"
@@ -603,6 +620,7 @@ jobs:
       # made from the staged tree, after the package is.
       - name: Upload debug files to Sentry
         if: matrix.configuration == 'release' && matrix.build_variant == 'Viewer' && needs.setup.outputs.sentry_dsn != ''
+        timeout-minutes: 30
         shell: bash
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
@@ -619,7 +637,27 @@ jobs:
 
           # sentry-cli is one of the setup's Python tools.
           cmake --build "$BUILD_DIRECTORY" --config Release --target symbols
-          sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release"
+
+          # sentry-cli tries a request again on a 5xx for only a few seconds,
+          # which an outage of Sentry's API outlasts, so the upload is run
+          # again over several minutes; a run sends only what Sentry does not
+          # have yet. A client error, short of a timeout or a rate limit,
+          # would come back the same and ends the step.
+          log="$RUNNER_TEMP/sentry-upload.log"
+          attempts=5
+          attempt=1
+          delay=30
+          until sentry-cli debug-files upload --include-sources --wait "$BUILD_DIRECTORY/symbols/Release" 2>&1 | tee "$log"; do
+            status=$(sed -nE 's/.*http status: ([0-9]+).*/\1/p' "$log" | tail -n 1)
+            if [[ $status == 4?? && $status != 408 && $status != 429 ]] || (( attempt == attempts )); then
+              echo "::error::Sentry did not take the debug files${status:+ (HTTP $status)}; crash reports from this build would go unsymbolicated"
+              exit 1
+            fi
+            echo "::warning::Upload $attempt of $attempts to Sentry failed${status:+ (HTTP $status)}; trying again in $delay s"
+            sleep "$delay"
+            attempt=$((attempt + 1))
+            delay=$((delay * 2))
+          done
 
       # The headroom the row finished with, failed or not.
       - name: Report disk space
@@ -746,10 +784,11 @@ jobs:
       - name: Rename Velopack outputs
         shell: bash
         run: |
-          # The installer and the portable archive take the package's name.
+          # The installer and the portable archive take the package's name and
+          # leave the update feed, which is all Releases then holds.
           mkdir .installer
           mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Setup.exe" ".installer/${IMAGENAME}_Setup.exe"
-          mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip" "Releases/${IMAGENAME}_Portable.zip"
+          mv "Releases/${VELOPACK_PACK_ID}-${VELOPACK_CHANNEL}-Portable.zip" ".installer/${IMAGENAME}_Portable.zip"
 
       # .installer is itself hidden, and upload-artifact leaves out what is
       # hidden unless told otherwise, the directory it was given included.
@@ -1175,25 +1214,136 @@ jobs:
       # Creates the release, generates its notes and uploads its assets.
       contents: write
     steps:
+      # The commits and tags without their files, for the tag before this one.
+      - name: Checkout history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          filter: tree:0
+          sparse-checkout: .github
+          persist-credentials: false
+
+      # The release holds what a user downloads: the installers, the Windows
+      # portable archive, and the Linux packages and archive. The update feed
+      # (the *-releases artifacts) is served from our own infrastructure.
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-installer"
-
-      - uses: actions/download-artifact@v8
-        with:
-          pattern: "*-releases"
+          path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v8
         with:
           pattern: "*-packages"
+          path: dist
+          merge-multiple: true
 
       - uses: actions/download-artifact@v8
         with:
           name: "Linux${{ needs.setup.outputs.build_suffix }}-x64-app"
+          path: dist
 
       - uses: actions/download-artifact@v8
         with:
           name: "Linux${{ needs.setup.outputs.build_suffix }}-arm64-app"
+          path: dist
+
+      # The notes open with a table of the downloads, a row a kind and a
+      # column an architecture, then the tag's pull request notes after
+      # "relnotes:", if any, then the generated notes of the pull requests
+      # since the release before this one.
+      - name: Write the release notes
+        id: notes
+        shell: bash
+        env:
+          RELNOTES: ${{ needs.setup.outputs.relnotes }}
+          VIEWER_CHANNEL: ${{ needs.setup.outputs.viewer_channel }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          # The release before this one is the nearest below this commit on
+          # the same channel, so each Beta, Release or Project Quantum build
+          # lists what is new since the last; a channel's first build takes
+          # the nearest release of any channel. Only a tag with a release
+          # counts, so a failed build's tag is passed over, and the search
+          # starts at the parent, so no tag on this commit is its own base.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '.[] | select(.draft | not) | [.tag_name, .name // ""] | @tsv' > "$RUNNER_TEMP/releases.tsv"
+          same=() any=()
+          while IFS=$'\t' read -r tag name; do
+            any+=(--match "$tag")
+            # A release is named for its channel and version.
+            version="${name#"$VIEWER_CHANNEL "}"
+            if [[ "$version" != "$name" && "$version" =~ ^[0-9][0-9.]*$ ]]; then
+              same+=(--match "$tag")
+            fi
+          done < "$RUNNER_TEMP/releases.tsv"
+          nearest() { (( $# )) && git describe --tags --abbrev=0 "$@" HEAD^ 2>/dev/null; }
+          if previous="$(nearest "${same[@]}")"; then
+            echo "Notes from $previous, the last $VIEWER_CHANNEL release"
+          elif previous="$(nearest "${any[@]}")"; then
+            echo "Notes from $previous, the nearest release, as there is none on $VIEWER_CHANNEL"
+          else
+            echo "::notice::No release below $GITHUB_SHA, so the notes cover the whole history"
+          fi
+          echo "previous_tag=$previous" >> "$GITHUB_OUTPUT"
+
+          # Whatever an artifact kept in a directory comes up beside the rest.
+          find dist -mindepth 2 -type f -exec mv -t dist -- {} +
+          find dist -mindepth 1 -type d -empty -delete
+
+          uri() { jq -rn --arg s "$1" '$s | @uri'; }
+          base="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/download/$(uri "$GITHUB_REF_NAME")"
+          cell() {
+            local size
+            size="$(stat -c %s "dist/$1")"
+            printf '[%s](%s/%s) (%d MB)' "$2" "$base" "$(uri "$1")" $(( (size + 524288) / 1048576 ))
+          }
+
+          # platform|kind|file name ending|link text
+          rows=(
+            "Windows|installer|_Setup.exe|Setup.exe"
+            "Windows|portable|_Portable.zip|.zip"
+            "macOS|disk image|.dmg|.dmg"
+            "Linux|AppImage|.AppImage|.AppImage"
+            "Linux|Debian, Ubuntu|.deb|.deb"
+            "Linux|Fedora, openSUSE|.rpm|.rpm"
+            "Linux|archive|.tar.xz|.tar.xz"
+          )
+          declare -A listed=()
+          {
+            echo "## Downloads"
+            echo
+            echo "| | x64 | Arm64 |"
+            echo "| :-- | :-- | :-- |"
+            for row in "${rows[@]}"; do
+              IFS='|' read -r platform kind ending text <<< "$row"
+              x64="" arm64=""
+              for path in dist/*"$ending"; do
+                file="${path#dist/}"
+                case "$file" in
+                  *arm64*|*aarch64*) arm64="$(cell "$file" "$text")" ;;
+                  *x86_64*|*x64*|*amd64*) x64="$(cell "$file" "$text")" ;;
+                  *) continue ;;
+                esac
+                listed["$file"]=1
+              done
+              if [[ -n "$x64$arm64" ]]; then
+                echo "| **$platform** $kind | ${x64:-—} | ${arm64:-—} |"
+              fi
+            done
+            if [[ -n "$RELNOTES" ]]; then
+              echo
+              printf '%s\n' "$RELNOTES"
+            fi
+          } > release-notes.md
+
+          for path in dist/*; do
+            if [[ -z "${listed[${path#dist/}]:-}" ]]; then
+              echo "::warning::$path is attached to the release but not in its downloads table"
+            fi
+          done
+          cat release-notes.md
 
       # forked from softprops/action-gh-release
       - name: Create GitHub release
@@ -1202,19 +1352,14 @@ jobs:
         with:
           # name the release page for the branch. We want channel and version.
           name: "${{ needs.setup.outputs.viewer_channel }} ${{ needs.build.outputs.viewer_version }}"
-          # The tag's pull request notes after "relnotes:", if any, ahead of
-          # the generated notes.
-          body: ${{ needs.setup.outputs.relnotes }}
+          # A rerun writes the notes again rather than adding a second copy.
+          body_path: release-notes.md
           prerelease: true
           generate_release_notes: true
+          previous_tag: ${{ steps.notes.outputs.previous_tag }}
           target_commitish: ${{ github.sha }}
-          append_body: true
           fail_on_unmatched_files: true
-          files: |
-            *-installer/*
-            *-releases/*
-            *-packages/*
-            *.tar.xz
+          files: dist/*
 
       - name: post release URL
         env:

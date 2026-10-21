@@ -64,7 +64,7 @@ namespace
     public:
         std::string iconOf(const LLInventoryItem& item) const override
         {
-            return LLInventoryIcon::getIconName(item.getType(), item.getInventoryType(), item.getFlags());
+            return std::string(LLInventoryIcon::getIconName(item.getType(), item.getInventoryType(), item.getFlags()));
         }
 
         bool draggedFromNotecard() const override

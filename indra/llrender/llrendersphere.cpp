@@ -53,6 +53,12 @@ inline LLVector3 polar_to_cart(F32 latitude, F32 longitude)
 }
 
 
+void LLRenderSphere::cleanupGL()
+{
+    mVertexBuffer = nullptr;
+    mSpherePoints.clear();
+}
+
 void LLRenderSphere::renderGGL()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -106,7 +112,7 @@ void LLRenderSphere::renderGGL()
     if (LLGLSLShader::sCurBoundShaderPtr->mAttributeMask == LLVertexBuffer::MAP_VERTEX)
     { // shader expects only vertex positions in vertex buffer, use fast path
         mVertexBuffer->setBuffer();
-        mVertexBuffer->drawRange(LLRender::TRIANGLES, 0, mVertexBuffer->getNumVerts(), mVertexBuffer->getNumIndices(), 0);
+        mVertexBuffer->draw(LLRender::TRIANGLES, mVertexBuffer->getNumIndices(), 0);
     }
     else
     { //shader wants colors in the vertex stream, use slow path

@@ -564,7 +564,10 @@ bool LLSurface::idleUpdate(F32 max_update_time)
     {
         std::set<LLSurfacePatch *>::iterator curiter = iter++;
         LLSurfacePatch *patchp = *curiter;
-        patchp->updateNorthEastCorner();
+        if (patchp->updateNorthEastCorner())
+        {
+            dirtySurfaceMaps(*patchp);
+        }
         patchp->updateVerticalStats();
         if (max_update_time == 0.f || update_timer.getElapsedTimeF32() < max_update_time)
         {
@@ -573,18 +576,14 @@ bool LLSurface::idleUpdate(F32 max_update_time)
                 did_update = true;
                 patchp->clearDirty();
                 mDirtyPatchList.erase(curiter);
+                // The patch's composition regenerated; the neighbours' border column reads it.
+                dirtySurfaceMaps(*patchp);
             }
         }
     }
 
     // some patches changed, update region reflection probes
     mRegionp->updateReflectionProbes(did_update);
-
-    // A patch's composition regenerated; the neighbours' border column reads it.
-    if (did_update)
-    {
-        dirtySurfaceMaps();
-    }
 
     return did_update;
 }
@@ -653,7 +652,7 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
         // Dirty patch statistics, and flag that the patch has data.
         patchp->dirtyZ();
         patchp->setHasReceivedData();
-        dirtySurfaceMaps();
+        dirtySurfaceMaps(*patchp);
     }
 }
 
@@ -1135,6 +1134,35 @@ void LLSurface::dirtySurfaceMaps()
             neighbor->mSurfaceMaps->markDirty();
         }
     }
+}
+
+void LLSurface::dirtySurfaceMaps(S32 gx0, S32 gy0, S32 gx1, S32 gy1)
+{
+    const ALTerrainSurfaceMaps::Rect rect{ gx0, gy0, gx1, gy1 };
+    if (mSurfaceMaps)
+    {
+        mSurfaceMaps->markDirty(rect);
+    }
+    // A neighbour's apron holds a strip of ours at most; the rest of the rectangle lies off its maps.
+    for (U32 dir = 0; dir < 8; ++dir)
+    {
+        LLSurface* neighbor = mNeighbors[dir];
+        if (neighbor && neighbor->mSurfaceMaps)
+        {
+            neighbor->mSurfaceMaps->markDirty(ALTerrainSurfaceMaps::toNeighbor(rect, dir, mGridsPerEdge));
+        }
+    }
+}
+
+void LLSurface::dirtySurfaceMaps(const LLSurfacePatch& patch)
+{
+    // The patch's samples, the edge and corner it shares with the patches north and east of it included, and
+    // the composition, which is read between samples, so a grid of it either side changes what a texel holds.
+    constexpr S32 MARGIN = 2;
+    const S32 gx = ll_round(patch.getOriginRegion().mV[VX] / mMetersPerGrid);
+    const S32 gy = ll_round(patch.getOriginRegion().mV[VY] / mMetersPerGrid);
+    const S32 edge = (S32)mGridsPerPatchEdge;
+    dirtySurfaceMaps(gx - MARGIN, gy - MARGIN, gx + edge + MARGIN, gy + edge + MARGIN);
 }
 
 

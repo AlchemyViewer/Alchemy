@@ -43,6 +43,8 @@
 #include "pipeline.h"
 #include "llglslshader.h"
 
+#include "alondemandtarget.h"
+
 // static
 LLViewerDynamicTexture::instance_list_t LLViewerDynamicTexture::sInstances[ LLViewerDynamicTexture::ORDER_COUNT ];
 S32 LLViewerDynamicTexture::sNumRenders = 0;
@@ -189,76 +191,68 @@ bool LLViewerDynamicTexture::updateAllInstances()
         return true;
     }
 
-    LLRenderTarget& preview_target = gPipeline.mPreviewMap;
-    LLRenderTarget& bake_target = gPipeline.mBakeMap;
-    if (!preview_target.isComplete() || !bake_target.isComplete())
-    {
-        llassert(false);
-        return false;
-    }
-    llassert(preview_target.getWidth() >= LLPipeline::MAX_PREVIEW_WIDTH);
-    llassert(preview_target.getHeight() >= LLPipeline::MAX_PREVIEW_WIDTH);
-    llassert(bake_target.getWidth() >= (U32) LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH);
-    llassert(bake_target.getHeight() >= (U32) LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT);
-
-    preview_target.bindTarget();
-    preview_target.clear();
-
     LLGLSLShader::unbind();
     LLVertexBuffer::unbind();
 
     bool result = false;
     bool ret = false ;
-    auto update_func = [&](LLViewerDynamicTexture* dynamicTexture, LLRenderTarget& renderTarget, S32 width, S32 height)
+    auto update_func = [&](LLViewerDynamicTexture* dynamicTexture, LLRenderTarget& renderTarget)
         {
-            if (dynamicTexture->needsRender())
+            llassert(dynamicTexture->getFullWidth() <= (S32)renderTarget.getWidth());
+            llassert(dynamicTexture->getFullHeight() <= (S32)renderTarget.getHeight());
+
+            glClear(GL_DEPTH_BUFFER_BIT);
+
+            gGL.color4f(1.f, 1.f, 1.f, 1.f);
+            dynamicTexture->setBoundTarget(&renderTarget);
+            dynamicTexture->preRender();    // Must be called outside of startRender()
+            result = false;
+            if (dynamicTexture->render())
             {
-                llassert(dynamicTexture->getFullWidth() <= width);
-                llassert(dynamicTexture->getFullHeight() <= height);
+                ret = true;
+                result = true;
+                sNumRenders++;
+            }
+            gGL.flush();
+            LLVertexBuffer::unbind();
+            dynamicTexture->setBoundTarget(nullptr);
+            dynamicTexture->postRender(result);
+        };
+    const auto needs_render = [](LLViewerDynamicTexture* dynamicTexture) { return dynamicTexture->needsRender(); };
 
-                glClear(GL_DEPTH_BUFFER_BIT);
-
-                gGL.color4f(1.f, 1.f, 1.f, 1.f);
-                dynamicTexture->setBoundTarget(&renderTarget);
-                dynamicTexture->preRender();    // Must be called outside of startRender()
-                result = false;
-                if (dynamicTexture->render())
-                {
-                    ret = true;
-                    result = true;
-                    sNumRenders++;
-                }
-                gGL.flush();
-                LLVertexBuffer::unbind();
-                dynamicTexture->setBoundTarget(nullptr);
-                dynamicTexture->postRender(result);
+    // Each range of orders draws into a target of its own from the pool, acquired, bound and cleared for the first of
+    // its instances that needs a render, and given back once they are drawn: a frame with nothing to draw takes, binds
+    // and clears neither. Where one cannot be had, the range's instances wait for a later frame. A preview or a bake
+    // can go seconds between draws, as a slider waits on the hand dragging it, and building its target again costs
+    // the frame that draws next around half a millisecond of CPU and more of the GPU's: the pool keeps each through
+    // 1800 frames unacquired, 30 seconds at 60 fps, and with it whatever a draw takes for itself, as a GLTF material
+    // preview takes the probe pack's post target and bloom.
+    using Plan = ALRenderResourcePlan;
+    constexpr U32 KEEP_FRAMES = 1800;
+    const auto update_orders = [&](S32 first, S32 last, Plan::Id id)
+        {
+            const ALTransientTargetPool::Keep keep(gPipeline.mTransientTargets, KEEP_FRAMES);
+            ALOnDemandTarget target(gPipeline.mTransientTargets, gPipeline.resourcePlan().desc(id), Plan::name(id),
+                                    KEEP_FRAMES);
+            bool drawn = true;
+            for (S32 order = first; drawn && order < last; ++order)
+            {
+                drawn = target.drawEach(LLViewerDynamicTexture::sInstances[order], needs_render, update_func);
+            }
+            if (!drawn)
+            {
+                LL_WARNS_ONCE("RenderResources") << "No " << Plan::name(id)
+                                                 << " target to draw dynamic textures into; they wait for one" << LL_ENDL;
             }
         };
 
     // ORDER_FIRST is unused, ORDER_MIDDLE is various ui preview
-    for(S32 order = 0; order < ORDER_LAST; ++order)
-    {
-        for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
-        {
-            update_func(dynamicTexture, preview_target, preview_target.getWidth(), preview_target.getHeight());
-        }
-    }
-    preview_target.flush();
+    update_orders(0, ORDER_LAST, Plan::Id::Preview);
 
     // ORDER_LAST is baked skin preview, ORDER_RESET resets appearance parameters and does not render.
-    bake_target.bindTarget();
-    bake_target.clear();
-
     result = false;
     ret = false;
-    for (S32 order = ORDER_LAST; order < ORDER_COUNT; ++order)
-    {
-        for (LLViewerDynamicTexture* dynamicTexture : LLViewerDynamicTexture::sInstances[order])
-        {
-            update_func(dynamicTexture, bake_target, LLAvatarAppearanceDefines::SCRATCH_TEX_WIDTH, LLAvatarAppearanceDefines::SCRATCH_TEX_HEIGHT);
-        }
-    }
-    bake_target.flush();
+    update_orders(ORDER_LAST, ORDER_COUNT, Plan::Id::Bake);
 
     gGL.flush();
 

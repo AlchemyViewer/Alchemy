@@ -52,6 +52,10 @@ uniform int cube_snapshot;
 // no sunlight to the sun's glow), and a mountain took the glow of a sun behind it. This variant draws only where the
 // water marked its pixels in the stencil (ALWaterStencil::SURFACE_BIT), seen from above.
 uniform sampler2D skyBehindMap;
+
+// How far the water has faded into the sky behind it, seen from high above (ALFarPlane::groundFade): 1 by the height it
+// is no longer drawn from, where the sky is all there is to see.
+uniform float waterGroundFade;
 #endif
 
 void main()
@@ -92,6 +96,7 @@ void main()
     if (do_atmospherics)
     {
 #ifdef HAZE_ON_WATER
+        atten *= 1.0 - waterGroundFade;
         // atmosFragLighting doubles additive, so the sky is halved
         vec3 sky = texture(skyBehindMap, tc).rgb * 0.5;
         additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);

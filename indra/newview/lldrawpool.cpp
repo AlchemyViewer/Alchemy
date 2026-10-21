@@ -1072,6 +1072,7 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
     F32 roughness[kSlots] = { 0.f };
     F32 metallic[kSlots]  = { 0.f };
     F32 min_alpha[kSlots] = { 0.f };
+    F32 base_alpha[kSlots] = { 0.f };
     F32 emissive[3 * kSlots] = { 0.f };
     F32 bc_xform[kSlots * kXf] = { 0.f }; // kXf floats (2 vec4) per slot
     F32 nm_xform[kSlots * kXf] = { 0.f };
@@ -1118,6 +1119,9 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
         emissive[3 * s + 1] = mat->mEmissiveColor.mV[1];
         emissive[3 * s + 2] = mat->mEmissiveColor.mV[2];
 
+        // the glow program reads the emissive stream where the base colour's alpha would be
+        base_alpha[s] = mat->getStreamedBaseAlpha();
+
         mat->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].getPacked(packed);
         memcpy(&em_xform[kXf * s], packed, sizeof(packed));
 
@@ -1148,6 +1152,11 @@ void LLRenderPass::pushGLTFBatchIndexed(LLDrawInfo& params, eGLTFIndexedMaps map
     {
         shader->uniform3fv(LLShaderMgr::GLTF_EMISSIVE_COLOR, n, emissive);
         shader->uniform4fv(LLShaderMgr::GLTF_EMISSIVE_TRANSFORM, 2 * n, em_xform);
+    }
+
+    if (maps == GLTF_MAPS_GLOW)
+    {
+        shader->uniform1fv(LLShaderMgr::GLTF_BASE_COLOR_ALPHA, n, base_alpha);
     }
 
     if (want_full)

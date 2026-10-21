@@ -31,11 +31,16 @@
 #define CAS_BETTER_DIAGONALS
 #define CAS_SLOW
 
+// CAS_LIBRARY links the filter into another program, the final blit, which sharpens as it samples: no main, and the
+// caller's own output.
+#ifndef CAS_LIBRARY
 out vec4 frag_color;
 in vec2 vary_fragcoord;
 
-uniform sampler2D diffuseRect;
 uniform vec2 out_screen_res;
+#endif
+
+uniform sampler2D diffuseRect;
 uniform uvec4 cas_param_0;
 uniform uvec4 cas_param_1;
 
@@ -2064,7 +2069,9 @@ A_STATIC void CasSetup(
 //                                                     NON-PACKED VERSION
 //==============================================================================================================================
 #ifdef A_GPU
- AF3 CasLoad(ASU2 p) { return texelFetch(diffuseRect, p, 0).rgb; }
+ // Clamped to the image, as the reference's SampleLevel with a clamp sampler is: the 3x3
+ // neighbourhood of an edge pixel reaches one texel outside it, and texelFetch there is undefined.
+ AF3 CasLoad(ASU2 p) { return texelFetch(diffuseRect, clamp(p, ASU2(0), textureSize(diffuseRect, 0) - ASU2(1)), 0).rgb; }
  void CasInput(inout AF1 r,inout AF1 g,inout AF1 b)
  {
  }
@@ -2545,6 +2552,15 @@ A_STATIC void CasSetup(
 #endif
 
 #ifdef A_GPU
+#ifdef CAS_LIBRARY
+// The sharpened texel at p, as this file's own pass writes it at p.
+vec3 casSharpenedTexel(ivec2 p)
+{
+    vec3 c;
+    CasFilter(c.r, c.g, c.b, uvec2(p), cas_param_0, cas_param_1, true);
+    return c;
+}
+#else
 void main()
 {
     vec4 diff = vec4(0.f);
@@ -2552,4 +2568,5 @@ void main()
     CasFilter(diff.r, diff.g, diff.b, point, cas_param_0, cas_param_1, true);
     frag_color = diff;
 }
+#endif
 #endif

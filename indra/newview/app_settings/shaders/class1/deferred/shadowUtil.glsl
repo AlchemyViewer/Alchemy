@@ -34,8 +34,7 @@
  *     a true separable Gaussian, not a box.
  *   - Fallback path: the "optimized PCF" of Castano/MJP -- fixed depth-compare taps whose
  *     bilinear footprints synthesise the same window with 4 (3x3) or 9 (5x5) fetches. Used
- *     wherever a gather-compare is unavailable or undesirable, including any context that
- *     compiles below #version 400 (see the __VERSION__ guard below).
+ *     where SHADOW_PCF_GATHER is defined 0.
  *   - SHADOW_PCSS: contact-hardening soft shadows. A blocker search sizes the penumbra per
  *     pixel, so a shadow is sharp where its caster meets the receiver and softens with the
  *     gap. Sampled on rotated Vogel discs. Needs raw depth, so it swaps the sampler type.
@@ -93,25 +92,11 @@
 #ifndef SHADOW_PCSS
 #define SHADOW_PCSS 0
 #endif
-#ifndef SHADOW_PCSS_SCALE
-#define SHADOW_PCSS_SCALE 200.0 // receiver-blocker depth delta -> penumbra radius, in texels
-#endif
 #ifndef SHADOW_PCSS_MAX_RADIUS
 #define SHADOW_PCSS_MAX_RADIUS 12.0 // penumbra clamp, texels (bounds the sparse-tap spread)
 #endif
 #ifndef SHADOW_PCSS_SEARCH
 #define SHADOW_PCSS_SEARCH 6.0  // blocker-search radius, texels
-#endif
-
-// textureGather on a shadow sampler is core in GLSL 4.00. The viewer's floor is GL 4.1, but
-// llshadermgr still emits #version 330/150 for a 3.x context, and a gather there would fail
-// to compile rather than fall back -- so pin both gather paths to 400+. PCSS has no
-// non-gather implementation, so below 400 it degrades to the fixed-kernel filter entirely.
-#if __VERSION__ < 400
-#undef SHADOW_PCF_GATHER
-#define SHADOW_PCF_GATHER 0
-#undef SHADOW_PCSS
-#define SHADOW_PCSS 0
 #endif
 
 #if SHADOW_PCSS
@@ -137,6 +122,13 @@ uniform AL_SHADOW_SAMPLER shadowMap5;
 // Set by bindDeferredShader and bindDeferredShaderFast. Unset defaults to 0, which is the
 // full-quality path -- the safe way round for a program that never gets it written.
 uniform int cube_snapshot;
+// The sun cascades the pass rendered, set beside cube_snapshot: four in the main view, two in a capture unless
+// AlchemyRenderProbeAllShadowCascades gives a reflection probe's four. Unset reads 0, which takes the four's path.
+uniform int sun_shadow_cascades;
+// The maps the pass has none of, a bit each: sun cascades 0 to 3, then the spot pair (LLPipeline::unbuiltShadowMaps).
+// Their shadows read lit without a sample, as a map cleared for want of casters reads, and their units hold another map.
+// Unset it reads 0, and every map is read.
+uniform int unbuilt_shadow_maps;
 
 uniform vec3 sun_dir;
 uniform vec3 moon_dir;
@@ -150,6 +142,11 @@ uniform vec2 screen_res;
 uniform int sun_up_factor;
 
 #if defined(SUN_SHADOW) || defined(SPOT_SHADOW)
+
+bool shadowMapBuilt(int map)
+{
+    return (unbuilt_shadow_maps & (1 << map)) == 0;
+}
 
 // Solve the shadow-space depth gradient from the receiver's screen-space derivatives and
 // return it as a per-texel (du,dv) depth step, clamped so a runaway gradient at a depth
@@ -285,9 +282,9 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     // depth forward and the smaller one under reverse-Z -- swap the operands so the gap stays
     // positive (a negative gap would clamp to the 1-texel floor and kill contact hardening).
 #ifdef REVERSE_Z
-    float radius = clamp((blocker - uvz.z) * SHADOW_PCSS_SCALE, 1.0, SHADOW_PCSS_MAX_RADIUS);
+    float radius = clamp((blocker - uvz.z) * shadow_pcss_scale, 1.0, SHADOW_PCSS_MAX_RADIUS);
 #else
-    float radius = clamp((uvz.z - blocker) * SHADOW_PCSS_SCALE, 1.0, SHADOW_PCSS_MAX_RADIUS);
+    float radius = clamp((uvz.z - blocker) * shadow_pcss_scale, 1.0, SHADOW_PCSS_MAX_RADIUS);
 #endif
 
     float shadow = 0.0;
@@ -491,14 +488,12 @@ float filterShadow(AL_SHADOW_SAMPLER shadowMap, vec4 lpos, vec4 dLdx, vec4 dLdy,
 
 #endif // SUN_SHADOW || SPOT_SHADOW
 
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
-{
 #if defined(SUN_SHADOW)
-    // Receiver derivatives, taken here in uniform control flow (before the cascade branches
-    // below diverge) so the per-cascade receiver-plane bias is well-defined.
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
-
+// The sun's cascades for a receiver whose screen-space derivatives the caller took in uniform
+// control flow, before anything it branches on, so the per-cascade receiver-plane bias is
+// well-defined.
+float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy)
+{
     float shadow = 0.0;
     vec3 light_dir = normalize((sun_up_factor == 1) ? sun_dir : moon_dir);
 
@@ -522,7 +517,17 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
         vec4 transition_domain = near_split - far_split;
         float weight = 0.0;
 
-        if (spos.z < near_split.z)
+        // Toward the far split the last cascade fades to lit, where the shadows end. A blend: added on top, it
+        // lifted a lit receiver up to twice its light there and dropped it back at the split, which sunLightF's
+        // clamp hides on opaque surfaces and the water and alpha, reading this raw, showed as a line.
+        float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
+
+        // A pass that rendered cascades 0 and 1 alone (a capture, generateSunShadow) has 1 as its last cascade and the
+        // one that fades; maps 2 and 3 hold nothing of it. Its clip planes put cascade 1's split at the last one and the
+        // fade past it, inside what cascade 1's map covers.
+        bool two_cascades = sun_shadow_cascades == 2;
+
+        if (!two_cascades && spos.z < near_split.z)
         {
             lpos = shadow_matrix[3] * spos;
             vec4 dLdx = shadow_matrix[3] * ddx4;
@@ -530,15 +535,12 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 
             float w = 1.0;
             w -= max(spos.z - far_split.z, 0.0) / transition_domain.z;
-            // Toward the far split the last cascade fades to lit, where the shadows end. A blend: added on top, it
-            // lifted a lit receiver up to twice its light there and dropped it back at the split, which sunLightF's
-            // clamp hides on opaque surfaces and the water and alpha, reading this raw, showed as a line.
-            float to_lit = clamp((pos.z + shadow_clip.z) / (shadow_clip.z - shadow_clip.w) * 2.0 - 1.0, 0.0, 1.0);
-            shadow += mix(filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen), 1.0, to_lit) * w;
+            float filtered = shadowMapBuilt(3) ? filterShadow(shadowMap3, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0;
+            shadow += mix(filtered, 1.0, to_lit) * w;
             weight += w;
         }
 
-        if (spos.z < near_split.y && spos.z > far_split.z)
+        if (!two_cascades && spos.z < near_split.y && spos.z > far_split.z)
         {
             lpos = shadow_matrix[2] * spos;
             vec4 dLdx = shadow_matrix[2] * ddx4;
@@ -547,7 +549,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             float w = 1.0;
             w -= max(spos.z - far_split.y, 0.0) / transition_domain.y;
             w -= max(near_split.z - spos.z, 0.0) / transition_domain.z;
-            shadow += filterShadow(shadowMap2, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            shadow += (shadowMapBuilt(2) ? filterShadow(shadowMap2, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0) * w;
             weight += w;
         }
 
@@ -560,7 +562,8 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
             float w = 1.0;
             w -= max(spos.z - far_split.x, 0.0) / transition_domain.x;
             w -= max(near_split.y - spos.z, 0.0) / transition_domain.y;
-            shadow += filterShadow(shadowMap1, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            float filtered = shadowMapBuilt(1) ? filterShadow(shadowMap1, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0;
+            shadow += (two_cascades ? mix(filtered, 1.0, to_lit) : filtered) * w;
             weight += w;
         }
 
@@ -572,7 +575,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
 
             float w = 1.0;
             w -= max(near_split.x - spos.z, 0.0) / transition_domain.x;
-            shadow += filterShadow(shadowMap0, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) * w;
+            shadow += (shadowMapBuilt(0) ? filterShadow(shadowMap0, lpos, dLdx, dLdy, shadow_res, const_bias, pos_screen) : 1.0) * w;
             weight += w;
         }
 
@@ -583,16 +586,52 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
         return 1.0; // lit beyond the far split...
     }
     return shadow;
+}
+#endif
+
+float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen)
+{
+#if defined(SUN_SHADOW)
+    return directionalShadow(pos, norm, pos_screen, dFdx(pos), dFdy(pos));
 #else
     return 1.0;
 #endif
 }
 
-float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+// sampleDirectionalShadow for a caller that took pos's derivatives itself, before a discard only
+// some of its quad's pixels take: after one, GLSL leaves the derivatives the shadow would take
+// undefined for the pixels that survive it.
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy)
 {
+#if defined(SUN_SHADOW)
+    return directionalShadow(pos, norm, pos_screen, dpos_dx, dpos_dy);
+#else
+    return 1.0;
+#endif
+}
+
 #if defined(SPOT_SHADOW)
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
+// Spot map `index` for a receiver whose derivatives the caller took in uniform control flow.
+// With frustum_lit, a receiver the map's frustum does not hold (outside its unit square, or
+// behind the light) takes 1 without the filter: the receiver itself, as spotLightF tests the
+// cookie on it, not the point the normal offset moves it to, which the narrowing cone can put
+// outside while the receiver is still lit.
+float spotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy, bool frustum_lit)
+{
+    if (!shadowMapBuilt(4 + index))
+    {
+        return 1.0;
+    }
+
+    if (frustum_lit)
+    {
+        // The map's texture space: in its frustum where 0 <= xy <= w and w > 0.
+        vec4 rpos = shadow_matrix[4 + index] * vec4(pos, 1.0);
+        if (rpos.w <= 0.0 || any(lessThan(rpos.xy, vec2(0.0))) || any(greaterThan(rpos.xy, rpos.ww)))
+        {
+            return 1.0;
+        }
+    }
 
     float shadow = 0.0;
     pos += norm * spot_shadow_offset;
@@ -604,23 +643,19 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 
     if (spos.z > -shadow_clip.w)
     {
-        vec4 lpos;
+        vec4 lpos = shadow_matrix[4 + index] * spos;
+        vec4 dLdx = shadow_matrix[4 + index] * ddx4;
+        vec4 dLdy = shadow_matrix[4 + index] * ddy4;
 
         // A sampler2DShadow cannot live in a local or a ternary (GLSL opaque type), so pick
         // the map by branch and pass it straight in.
         float filtered;
         if (index == 0)
         {
-            lpos = shadow_matrix[4] * spos;
-            vec4 dLdx = shadow_matrix[4] * ddx4;
-            vec4 dLdy = shadow_matrix[4] * ddy4;
             filtered = filterShadow(shadowMap4, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
         }
         else
         {
-            lpos = shadow_matrix[5] * spos;
-            vec4 dLdx = shadow_matrix[5] * ddx4;
-            vec4 dLdy = shadow_matrix[5] * ddy4;
             filtered = filterShadow(shadowMap5, lpos, dLdx, dLdy, proj_shadow_res, const_bias, pos_screen);
         }
 
@@ -635,6 +670,59 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
         shadow = 1.0;
     }
     return shadow;
+}
+#endif
+
+float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+{
+#if defined(SPOT_SHADOW)
+    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), false);
+#else
+    return 1.0;
+#endif
+}
+
+// The sun pass's (sunLightF, sunLightSSAOF), which fills the light map the deferred lights read:
+// each takes its derivatives as the shared samplers do, then leaves out the filter where no
+// reader of the map uses what it would give. The forward passes read the directional shadow's
+// raw value (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no
+// pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
+
+// Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
+// No spot light reads the other's channel.
+uniform vec2 spot_shadow_live;
+
+// A surface turned from the light (by the shading normal softenLightF lights it with) receives
+// none of it there whatever its shadow, so it takes 0 unfiltered.
+float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
+{
+#if defined(SUN_SHADOW)
+    vec3 dpos_dx = dFdx(pos);
+    vec3 dpos_dy = dFdy(pos);
+
+    vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
+    if (dot(norm, light_dir) <= 0.0)
+    {
+        return 0.0;
+    }
+    return directionalShadow(pos, norm, pos_screen, dpos_dx, dpos_dy);
+#else
+    return 1.0;
+#endif
+}
+
+// A map no spot light owns, or a receiver outside its frustum, takes 1 unfiltered. The frustum is
+// the cookie's (setupSpotLight builds both from one origin, field of view and aspect), outside
+// which spotLightF lights nothing but a legacy surface's reflection of the projector; that is left
+// unshadowed there, where the map holds nothing for it and the filter read its clamped edge.
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+{
+#if defined(SPOT_SHADOW)
+    if (spot_shadow_live[index] <= 0.0)
+    {
+        return 1.0;
+    }
+    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), true);
 #else
     return 1.0;
 #endif

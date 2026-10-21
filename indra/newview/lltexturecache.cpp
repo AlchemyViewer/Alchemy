@@ -812,6 +812,18 @@ LLTextureCache::LLTextureCache(bool threaded)
 
 LLTextureCache::~LLTextureCache()
 {
+    // Reads and writes nobody completed: the fetch workers that would have go after the
+    // cache, which they find gone (LLTextureFetch::shutDownTextureCacheThread).
+    for (const auto& [handle, worker] : mReaders)
+    {
+        worker->scheduleDelete();
+    }
+    for (const auto& [handle, worker] : mWriters)
+    {
+        worker->scheduleDelete();
+    }
+    mReaders.clear();
+    mWriters.clear();
     clearDeleteList() ;
     writeUpdatedEntries() ;
     delete mFastCachep;

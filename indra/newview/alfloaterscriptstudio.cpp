@@ -356,6 +356,15 @@ LLFloater* ALScriptStudio::build(const LLSD& key)
 
 void ALScriptStudio::open(const ALScriptRef& ref, const std::string& name, bool take_focus)
 {
+    // The studio is a window of tabs itself, never a tab of another's: it
+    // opens with no floater host, though one is set -- as the inventory
+    // sets its Preview while several items open at once.
+    struct Unhosted
+    {
+        LLMultiFloater* const host = LLFloater::getFloaterHost();
+        Unhosted() { LLFloater::setFloaterHost(nullptr); }
+        ~Unhosted() { LLFloater::setFloaterHost(host); }
+    } unhosted;
     // Open somewhere already: that window, brought forward -- if a
     // window may be shown at all, which a restriction on viewing
     // scripts decides the same way for every window. Else the window last

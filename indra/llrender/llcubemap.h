@@ -66,9 +66,6 @@ public:
 
     void destroyGL();
 
-public:
-    static bool sUseCubeMaps;
-
 protected:
     friend class ALTextureSlot;
     ~LLCubeMap();

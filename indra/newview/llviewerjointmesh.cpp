@@ -259,24 +259,28 @@ U32 LLViewerJointMesh::drawShape( F32 pixelArea, bool first_pass, bool is_dummy)
             gGL.diffuseColor4f(0.7f, 0.6f, 0.3f, 1.f);
         }
     }
-    else if( !is_dummy && layerset )
-    {
-        if( layerset->hasComposite() )
-        {
-            gGL.getTextureSlot(diffuse_channel)->bindSampled(layerset->getViewerComposite(), skin_key);
-        }
-        else
-        {
-            gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
-        }
-    }
-    else if ( !is_dummy && mTexture.notNull() )
-    {
-        gGL.getTextureSlot(diffuse_channel)->bindSampled(mTexture, skin_key);
-    }
     else
     {
-        gGL.getTextureSlot(diffuse_channel)->bindSampled(LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT), skin_key);
+        LLGLTexture* diffuse = nullptr;
+        if (!is_dummy && layerset)
+        {
+            diffuse = layerset->hasComposite() ? layerset->getViewerComposite() : nullptr;
+        }
+        else if (!is_dummy)
+        {
+            diffuse = mTexture.get();
+        }
+        if (!diffuse)
+        {
+            diffuse = LLViewerTextureManager::getFetchedTexture(IMG_DEFAULT);
+        }
+
+        if (!LLDrawPoolAvatar::shadowDrawsBake(diffuse))
+        {
+            return 0;
+        }
+
+        gGL.getTextureSlot(diffuse_channel)->bindSampled(diffuse, skin_key);
     }
 
     U32 start = mMesh->mFaceVertexOffset;

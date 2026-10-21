@@ -110,7 +110,7 @@ void RlvOverlayEffect::setImage(const LLUUID& idTexture)
     m_pImage->forceToSaveRawImage(0);
 }
 
-void RlvOverlayEffect::run(const LLVisualEffectParams*)
+void RlvOverlayEffect::run(LLVisualEffectParams*)
 {
     if (m_pImage)
     {
@@ -371,7 +371,7 @@ void RlvSphereEffect::renderPass(LLGLSLShader* pShader, const LLShaderEffectPara
     }
 }
 
-void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
+void RlvSphereEffect::run(LLVisualEffectParams* pParams)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     if (gRlvSphereProgram.isComplete())
@@ -381,7 +381,7 @@ void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
         gRlvSphereProgram.bind();
         setShaderUniforms(&gRlvSphereProgram);
 
-        const LLShaderEffectParams* pShaderParams = static_cast<const LLShaderEffectParams*>(pParams);
+        LLShaderEffectParams* pShaderParams = static_cast<LLShaderEffectParams*>(pParams);
         switch (m_eMode)
         {
             case ESphereMode::Blend:
@@ -391,8 +391,17 @@ void RlvSphereEffect::run(const LLVisualEffectParams* pParams)
                 break;
             case ESphereMode::Blur:
             case ESphereMode::BlurVariable:
-                gRlvSphereProgram.uniform2f(LLShaderMgr::RLV_EFFECT_PARAM5, 1.f, 0.f);
-                renderPass(&gRlvSphereProgram, pShaderParams);
+                // Separable: the vertical pass reads what the horizontal one wrote, so the
+                // buffers swap between them and the result ends in the destination the
+                // params are left with. The horizontal pass needs a buffer to land in: as the
+                // last effect drawn straight into what is bound (m_fBindLast) there is none, and
+                // only the vertical pass draws.
+                if (pShaderParams->m_pDstBuffer)
+                {
+                    gRlvSphereProgram.uniform2f(LLShaderMgr::RLV_EFFECT_PARAM5, 1.f, 0.f);
+                    renderPass(&gRlvSphereProgram, pShaderParams);
+                    pShaderParams->step(false);
+                }
                 gRlvSphereProgram.uniform2f(LLShaderMgr::RLV_EFFECT_PARAM5, 0.f, 1.f);
                 renderPass(&gRlvSphereProgram, pShaderParams);
                 break;

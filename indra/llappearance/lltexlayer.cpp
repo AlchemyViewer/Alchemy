@@ -39,6 +39,7 @@
 #include "../llui/llui.h"
 #include "llwearable.h"
 #include "llwearabledata.h"
+#include "llrendertarget.h"
 #include "llvertexbuffer.h"
 #include "llviewervisualparam.h"
 
@@ -670,12 +671,12 @@ bool LLTexLayerInfo::parseXml(LLXmlTreeNode* node)
             /* if ("upper_shirt" == local_texture_name)
                 mLocalTexture = TEX_UPPER_SHIRT; */
             mLocalTexture = TEX_NUM_INDICES;
-            for (const LLAvatarAppearanceDictionary::Textures::value_type& dict_pair : LLAvatarAppearance::getDictionary()->getTextures())
+            for (const LLAvatarAppearanceDictionary::TextureEntry& dict_entry : LLAvatarAppearance::getDictionary()->getTextures())
             {
-                const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = dict_pair.second;
+                const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = &dict_entry;
                 if (local_texture_name == texture_dict->mName)
             {
-                    mLocalTexture = dict_pair.first;
+                    mLocalTexture = dict_entry.mIndex;
                     break;
             }
             }
@@ -1445,13 +1446,8 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
                 mAlphaCache.erase(iter2);
             }
 
-            // GPUs tend to be very uptight about memory alignment as the DMA used to convey
-            // said data to the card works better when well-aligned so plain old default-aligned heap mem is a no-no
-            //new U8[width * height];
-            size_t bytes_per_pixel = 1; // unsigned byte alpha channel only...
-            size_t row_size        = (width + 3) & ~0x3; // OpenGL 4-byte row align (even for things < 4 bpp...)
-            size_t pixels          = (row_size * height);
-            size_t mem_size        = pixels * bytes_per_pixel;
+            // One byte of alpha a pixel, its rows as wide as the layer.
+            const size_t mem_size = (size_t)width * height;
 
             alpha_data = (U8*)ll_aligned_malloc_32(mem_size);
             if (!alpha_data)
@@ -1465,66 +1461,26 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
 
             if (!skip_readback)
             {
-                if (gGLManager.mIsIntel)
-                { // work-around for broken intel drivers which cannot do glReadPixels on an RGBA FBO
-                  // returning only the alpha portion without locking up downstream
-                    U8* temp = (U8*)ll_aligned_malloc_32(mem_size << 2); // allocate same size, but RGBA
-                    if (!temp)
-                    {
-                        ll_aligned_free_32(alpha_data);
-                        LLError::LLUserWarningMsg::showOutOfMemory();
-                        LL_ERRS() << "Failed to allocate temporary memory for morph texture readback: " << (S32)(mem_size << 2) << LL_ENDL;
-                        return;
-                    }
-
-                    if (bound_target)
-                    {
-                        gGL.getTextureSlot(0)->bind(bound_target);
-                    }
-                    else
-                    {
-                        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, 0);
-                    }
-
-                    glGetTexImage(ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE), 0, GL_RGBA, GL_UNSIGNED_BYTE, temp);
-                    GLenum error = glGetError();
-                    if (error != GL_NO_ERROR)
-                    {
-                        LL_INFOS("Morph") << "GL Error while reading back morph texture. Error code: " << error << LL_ENDL;
-                    }
-                    else
-                    {
-                        U8* alpha_cursor = alpha_data;
-                        U8* pixel = temp;
-                        for (int i = 0; i < pixels; i++)
-                        {
-                            *alpha_cursor++ = pixel[3];
-                            pixel += 4;
-                        }
-                    }
-
-                    gGL.getTextureSlot(0)->unbind();
-
-                    ll_aligned_free_32(temp);
+                // Intel's drivers locked up reading the alpha alone out of an RGBA framebuffer with glReadPixels,
+                // so they read the target's texture instead.
+                const bool from_texture = gGLManager.mIsIntel && bound_target;
+                const size_t scratch_bytes = alphaReadbackScratchBytes(bound_target, width, height, from_texture);
+                U8* scratch = (U8*)ll_aligned_malloc_32(scratch_bytes);
+                if (!scratch)
+                {
+                    ll_aligned_free_32(alpha_data);
+                    LLError::LLUserWarningMsg::showOutOfMemory();
+                    LL_ERRS() << "Failed to allocate temporary memory for morph texture readback: " << scratch_bytes << LL_ENDL;
+                    return;
                 }
-                else
-                { // platforms with working drivers...
-                    // We just want GL_ALPHA, but that isn't supported in OGL core profile 4.
-                    static const size_t TEMP_BYTES_PER_PIXEL = 4;
-                    U8* temp_data = (U8*)ll_aligned_malloc_32(mem_size * TEMP_BYTES_PER_PIXEL);
-                    if (!temp_data)
-                    {
-                        ll_aligned_free_32(alpha_data);
-                        LLError::LLUserWarningMsg::showOutOfMemory();
-                        LL_ERRS() << "Failed to allocate temporary memory for morph texture: " << (S32)(mem_size * TEMP_BYTES_PER_PIXEL) << LL_ENDL;
-                        return;
-                    }
-                    glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, temp_data);
-                    for (size_t pixel = 0; pixel < pixels; pixel++) {
-                        alpha_data[pixel] = temp_data[(pixel * TEMP_BYTES_PER_PIXEL) + 3];
-                    }
-                    ll_aligned_free_32(temp_data);
+
+                const GLenum error = readBackAlpha(bound_target, x, y, width, height, from_texture, scratch, scratch_bytes, alpha_data);
+                if (error != GL_NO_ERROR)
+                {
+                    LL_INFOS("Morph") << "GL Error while reading back morph texture. Error code: " << error << LL_ENDL;
                 }
+
+                ll_aligned_free_32(scratch);
             }
             else
             {
@@ -1540,6 +1496,79 @@ void LLTexLayer::renderMorphMasks(S32 x, S32 y, S32 width, S32 height, const LLC
         mMorphMasksValid = true;
         getTexLayerSet()->applyMorphMask(alpha_data, width, height, 1);
     }
+}
+
+// static
+size_t LLTexLayer::alphaReadbackScratchBytes(const LLRenderTarget* bound_target, S32 width, S32 height, bool from_texture)
+{
+    if (from_texture && bound_target)
+    {
+        return (size_t)bound_target->getWidth() * bound_target->getHeight() * 4;
+    }
+    return (size_t)llmax(width, 0) * llmax(height, 0) * 4;
+}
+
+// static
+GLenum LLTexLayer::readBackAlpha(LLRenderTarget* bound_target, S32 x, S32 y, S32 width, S32 height, bool from_texture,
+                                 U8* scratch, size_t scratch_bytes, U8* alpha)
+{
+    // Rows of RGBA8 are whole words, so they read back tight under any pack alignment up to 4 (LLRender keeps 1).
+    constexpr size_t RGBA = 4;
+
+    if (width <= 0 || height <= 0 || (from_texture && !bound_target))
+    {
+        return GL_INVALID_VALUE;
+    }
+    const size_t pixels = (size_t)width * height;
+
+    if (!from_texture)
+    {
+        // GL_ALPHA is no format to read in a core profile: the RGBA, and the alpha out of it.
+        if (scratch_bytes < pixels * RGBA)
+        {
+            return GL_INVALID_VALUE;
+        }
+        glReadPixels(x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, scratch);
+        for (size_t pixel = 0; pixel < pixels; ++pixel)
+        {
+            alpha[pixel] = scratch[pixel * RGBA + 3];
+        }
+        return GL_NO_ERROR;
+    }
+
+    // glGetTexImage writes the whole level, however little of it the layer drew, so scratch takes all of it: the
+    // level's size as GL has it, not as the target was asked for.
+    const GLenum texture_type = ALTextureSlot::getInternalType(ALTextureSlot::TT_TEXTURE);
+    gGL.getTextureSlot(0)->bind(bound_target);
+    GLint level_width = 0;
+    GLint level_height = 0;
+    glGetTexLevelParameteriv(texture_type, 0, GL_TEXTURE_WIDTH, &level_width);
+    glGetTexLevelParameteriv(texture_type, 0, GL_TEXTURE_HEIGHT, &level_height);
+    GLenum error = GL_INVALID_VALUE;
+    if (level_width > 0 && level_height > 0 && (size_t)level_width * level_height * RGBA <= scratch_bytes)
+    {
+        glGetTexImage(texture_type, 0, GL_RGBA, GL_UNSIGNED_BYTE, scratch);
+        error = glGetError();
+    }
+    gGL.getTextureSlot(0)->unbind();
+    if (error != GL_NO_ERROR)
+    {
+        return error;
+    }
+
+    // The rectangle's rows out of the level's; what of the rectangle lies outside the level reads as 0.
+    for (S32 row = 0; row < height; ++row)
+    {
+        U8* out = alpha + (size_t)row * width;
+        const S32 level_y = y + row;
+        for (S32 col = 0; col < width; ++col)
+        {
+            const S32 level_x = x + col;
+            const bool inside = level_x >= 0 && level_x < level_width && level_y >= 0 && level_y < level_height;
+            out[col] = inside ? scratch[((size_t)level_y * level_width + level_x) * RGBA + 3] : 0;
+        }
+    }
+    return GL_NO_ERROR;
 }
 
 void LLTexLayer::addAlphaMask(U8 *data, S32 originX, S32 originY, S32 width, S32 height, LLRenderTarget* bound_target)

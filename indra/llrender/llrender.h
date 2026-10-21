@@ -44,6 +44,7 @@
 #include "llmatrix4a.h"
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
 #include "algpubuffer.h"     // AL_NUM_STORAGE_BINDINGS -- the storage binding points this context keeps
+#include "alframefences.h"
 #include "alimageslot.h"
 #include "alquerypool.h"
 #include "altextureslot.h"
@@ -283,11 +284,10 @@ public:
     // the same ~672 bytes re-derived and re-written once per program. Packed once and bound at
     // a fixed engine point instead, so a light-state change costs one upload total.
     //
-    // Holds ONLY what LLRender owns exclusively. sun_up_factor and the sClassicMode
-    // ambient/sunlight/moonlight overrides stay LOOSE: those names have other writers
-    // (LLPipeline::bindDeferredShader pushes an auto-adjusted sunlight_color, and
-    // sun_up_factor is written from many sites across the pipeline, draw pools and
-    // LLSettingsVO), and a shared block would let one writer silently stomp another's value.
+    // Holds ONLY what LLRender owns exclusively. sun_up_factor stays LOOSE: it is written from
+    // many sites across the pipeline, draw pools and LLSettingsVO, and a shared block would let
+    // one writer silently stomp another's value. The sun's, moon's and ambient light the
+    // atmospherics read are the Environment block's (LLSettingsVOSky::applySpecial).
     //
     // std140 pads every array element to 16 bytes regardless of the element type, hence the
     // float[4] rows for the vec3/vec2 arrays -- the C++ mirror carries that padding explicitly
@@ -392,6 +392,8 @@ public:
     void setAmbientLightColor(const LLColor4& color);
 
     void setLineWidth(F32 width);
+    // The width setLineWidth() left GL with, which only it sets.
+    F32  getLineWidth() const { return mLineWidth; }
 
     // Depth offset applied to polygons while GL_POLYGON_OFFSET_FILL/LINE is enabled.
     // Stated in the forward/semantic convention: a negative factor/units pulls a fragment
@@ -464,8 +466,13 @@ public:
     // context in shutdown().
     ALQueryPool& queries() { return mQueries; }
 
-    // Ends the frame for what is kept a frame at a time: the query pool's batch is fenced, and the uniform buffer rings
-    // close their counters and resize. Once a frame, past the swap; the main context's only.
+    // The frames of this context the GPU has finished, from the one fence endFrame() lays a frame. Released with the
+    // context in shutdown().
+    ALFrameFences& frameFences() { return mFrameFences; }
+
+    // Ends the frame for what is kept a frame at a time: the query pool's batch closes, the frame's fence is laid, and
+    // the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
+    // context's only.
     void endFrame();
 
     // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
@@ -575,9 +582,9 @@ public:
 
     // The GBuffer normal attachment is GL_RGBA16 when the deferred targets are HDR and
     // GL_RGB10_A2 when they are not, which changes how many bits its blue channel has to spend
-    // on the packed geometric normal -- 16 versus 10. Latched by addDeferredAttachments from the
-    // same decision that picks the format, because llrender cannot read settings and a shader
-    // compiled against the wrong assumption unpacks noise.
+    // on the packed geometric normal -- 16 versus 10. Latched by newview at shader load, before
+    // anything compiles (llrender cannot read settings), and the attachment's format is then picked
+    // from it, because a shader compiled against the wrong assumption unpacks noise.
     static bool sGBufferNormHDR;
 
 private:
@@ -617,7 +624,8 @@ private:
     U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
     bool            mMatricesUBOBound = false;
 
-    ALQueryPool mQueries;
+    ALFrameFences mFrameFences;
+    ALQueryPool   mQueries{ mFrameFences };
 
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to

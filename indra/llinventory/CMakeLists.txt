@@ -67,6 +67,8 @@ if(AL_BUILD_TESTS)
       tests/llsaleinfo_test.cpp
       tests/llsettingssky_test.cpp
       tests/lluserrelations_test.cpp
+    # The asset type table's lookups, and the inventory reader that makes them.
+    BENCH_SOURCES tests/typenames_bench.cpp
     LIBRARIES llinventory llmath llcorehttp llfilesystem
   )
 endif()

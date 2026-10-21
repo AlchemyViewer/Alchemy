@@ -107,6 +107,9 @@ public:
 protected:
     void            getState();
     void            refreshCost();
+    // Gives the light the swatch's color and shows in the swatch the color the light holds, which the wire can
+    // carry, rather than the one picked.
+    void            applyLightSwatchColor(LLVOVolume* volobjp);
 
 protected:
     void            sendPhysicsShapeType(LLUICtrl* ctrl, void* userdata);

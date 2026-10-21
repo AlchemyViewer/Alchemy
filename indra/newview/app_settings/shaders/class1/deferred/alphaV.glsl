@@ -47,11 +47,12 @@ in vec2 texcoord0;
 
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
-vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #ifdef IS_AVATAR_SKIN
 mat4 getSkinnedTransform();
+vec3 getSkinnedNormal(mat4 trans, vec3 normal);
 #endif
 #endif
 
@@ -64,8 +65,6 @@ out vec4 vertex_color;
 
 out vec2 vary_texcoord0;
 out vec3 vary_norm;
-
-uniform float near_clip;
 
 // Linearises an sRGB prim tint for a pass that shades in linear. Defined in
 // deferred/textureUtilV.glsl, which every vertex stage attaches.
@@ -82,7 +81,7 @@ void main()
 
     pos = skinTransformH(skin, position.xyz, modelview_matrix);
 
-    norm = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    norm = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;
 #else
@@ -95,10 +94,7 @@ void main()
     pos.z = dot(trans[2], pos_in);
     pos.w = 1.0;
 
-    norm.x = dot(trans[0].xyz, normal);
-    norm.y = dot(trans[1].xyz, normal);
-    norm.z = dot(trans[2].xyz, normal);
-    norm = normalize(norm);
+    norm = normalize(getSkinnedNormal(trans, normal));
 
     vec4 frag_pos = projection_matrix * pos;
     gl_Position = frag_pos;
@@ -134,32 +130,13 @@ void main()
 #endif
 #endif
 
-// The FS derives a screen UV as vary_fragcoord.xy / vary_fragcoord.z. Forward-Z abuses the
-// view-space z plus near_clip as a stand-in for clip w; under reverse-Z that pseudo-w is
-// meaningless (and clip.z tends to 0 at the far plane), so carry the true clip w instead.
-#ifdef HAS_SKIN
-#ifdef REVERSE_Z
+// The FS derives a screen UV as vary_fragcoord.xy / vary_fragcoord.z, so z carries clip w:
+// clip.xy / clip.w is the NDC position under either depth convention.
+#if defined(HAS_SKIN) || defined(IS_AVATAR_SKIN)
     vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
-#else
-    vary_fragcoord.xyz = frag_pos.xyz + vec3(0,0,near_clip);
-#endif
-#else
-
-#ifdef IS_AVATAR_SKIN
-#ifdef REVERSE_Z
-    vary_fragcoord.xyz = vec3(frag_pos.xy, frag_pos.w);
-#else
-    vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
-#endif
 #else
     pos = modelview_projection_matrix * vert;
-#ifdef REVERSE_Z
     vary_fragcoord.xyz = vec3(pos.xy, pos.w);
-#else
-    vary_fragcoord.xyz = pos.xyz + vec3(0,0,near_clip);
-#endif
-#endif
-
 #endif
 
 }

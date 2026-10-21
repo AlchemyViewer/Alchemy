@@ -67,6 +67,12 @@ namespace LLSkinningUtil
     }
 
     void initJointNums(LLMeshSkinInfo* skin, LLVOAvatar *avatar);
+    // The numbers joint names resolve to are the skeleton's, the same on every avatar. The
+    // agent's are published once its skeleton is built (main thread), and a skin resolved
+    // from them on any thread: the mesh thread has no business reading an avatar, which
+    // the main thread owns, rebuilds and caches lookups in. False until published.
+    void publishJointNums(LLVOAvatar* avatar);
+    bool initJointNumsFromPublished(LLMeshSkinInfo* skin);
     void updateRiggingInfo(const LLMeshSkinInfo* skin, LLVOAvatar *avatar, LLVolumeFace& vol_face);
     LLQuaternion getUnscaledQuaternion(const LLMatrix4& mat4);
 };

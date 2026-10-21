@@ -93,11 +93,19 @@ namespace LL
          * post work, unless the queue is closed before we can post
          */
         virtual bool post(const Work&) = 0;
+        /**
+         * the same, moving the work in. Copied, what it captures would have
+         * a second owner on this thread, going as this thread lets go of it
+         * while the queue's thread runs the work: an LLSD's count of its
+         * owners is no atomic.
+         */
+        virtual bool post(Work&&) = 0;
 
         /**
          * post work, unless the queue is full
          */
         virtual bool tryPost(const Work&) = 0;
+        virtual bool tryPost(Work&&) = 0;
 
         /**
          * Post work to another WorkQueue, which may or may not still exist
@@ -259,12 +267,14 @@ namespace LL
          * post work, unless the queue is closed before we can post
          */
         bool post(const Work&) override;
+        bool post(Work&&) override;
 
         /**
          * post work, unless the queue is full -- or its lock is held at
          * that moment, by a consumer popping as likely as not
          */
         bool tryPost(const Work&) override;
+        bool tryPost(Work&&) override;
 
         /**
          * post work, waiting no longer than timeout for the queue's lock
@@ -341,22 +351,26 @@ namespace LL
          * post work, unless the queue is closed before we can post
          */
         bool post(const Work& callable) override;
+        bool post(Work&& callable) override;
 
         /**
          * post work for a particular time, unless the queue is closed before
          * we can post
          */
         bool post(const Work& callable, const TimePoint& time);
+        bool post(Work&& callable, const TimePoint& time);
 
         /**
          * post work, unless the queue is full
          */
         bool tryPost(const Work& callable) override;
+        bool tryPost(Work&& callable) override;
 
         /**
          * post work for a particular time, unless the queue is full
          */
         bool tryPost(const Work& callable, const TimePoint& time);
+        bool tryPost(Work&& callable, const TimePoint& time);
 
         /**
          * Launch a callable returning bool that will trigger repeatedly at

@@ -25,14 +25,13 @@
 
 out vec4 frag_color;
 
-uniform sampler2D diffuseMap;
+// Each hull's colour (LLModelPreview). The hulls are drawn from positions alone, with no
+// texture bound for them.
 uniform vec4 color;
-
-in vec2 vary_texcoord0;
 
 //====================================================================================================
 
 void main()
 {
-    frag_color = max(texture(diffuseMap,vary_texcoord0.xy) * color, vec4(0));
+    frag_color = max(color, vec4(0));
 }

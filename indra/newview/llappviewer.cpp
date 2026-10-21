@@ -570,11 +570,13 @@ static void settings_to_globals()
     LLSurface::setTextureSize(gSavedSettings.getU32("RegionTextureSize"));
 
 #if LL_DARWIN
-    LLRender::sGLCoreProfile = true;
     LLRender::s10bitBackBuffer = false;
 #else
-    LLRender::sGLCoreProfile = gSavedSettings.getBOOL("RenderGLContextCoreProfile");
     LLRender::s10bitBackBuffer = gSavedSettings.getBOOL("RenderGLContext10bitSDR");
+#endif
+#if LL_WINDOWS && !LL_SDL_WINDOW
+    // Only the native Win32 window can make a compatibility context; every other one is core.
+    LLRender::sGLCoreProfile = gSavedSettings.getBOOL("RenderGLContextCoreProfile");
 #endif
     LLRender::sNsightDebugSupport = gSavedSettings.getBOOL("RenderNsightDebugSupport");
     LLRender::sAnisotropicFilteringLevel = static_cast<F32>(gSavedSettings.getU32("RenderAnisotropicLevel"));
@@ -613,7 +615,6 @@ static void settings_modify()
 {
     LLPipeline::sRenderTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
     LLPipeline::sRenderDeferred = true; // false is deprecated
-    LLRenderTarget::sUseFBO = LLPipeline::sRenderDeferred;
     LLDrawPoolTerrain::sLODFactor = gSavedSettings.getF32("RenderTerrainLODFactor");
     LLDrawPoolTerrain::sLODFactor *= LLDrawPoolTerrain::sLODFactor; //square lod factor to get exponential range of [1,4]
     gDebugGL       = gDebugGLSession || gDebugSession;
@@ -803,9 +804,8 @@ bool LLAppViewer::init()
     // Start of the application
     //
 
-    // initialize the LLSettingsType translation bridge.
+    // the translation bridge LLWearableType reads its labels through
     LLTranslationBridge::ptr_t trans = std::make_shared<LLUITranslationBridge>();
-    LLSettingsType::initParamSingleton(trans);
 
     // initialize SSE options
     LLVector4a::initClass();
@@ -1093,9 +1093,6 @@ bool LLAppViewer::init()
     // writeSystemInfo can be called after window is initialized (gViewerWindow non-null)
     writeSystemInfo();
 
-    // initWindow also initializes the Feature List, so now we can initialize this global.
-    LLCubeMap::sUseCubeMaps = LLFeatureManager::getInstance()->isFeatureAvailable("RenderCubeMap");
-
     // call all self-registered classes
     LLInitClassList::instance().fireCallbacks();
 
@@ -1127,11 +1124,11 @@ bool LLAppViewer::init()
     ALCrashReporter::setTag("gpu_driver", gGLManager.mDriverVersionVendorString);
     ALCrashReporter::setTag("vram_mb", std::to_string(gGLManager.mVRAM));
 
-    // If we don't have the right GL requirements, exit.
-    // ? AG: It seems we never set mHasRequirements to false
+    // If we don't have the right GL requirements, exit. LLGLManager::initGL clears it when it refuses a
+    // context below the floor, and the window has failed to open by then.
     if (!gGLManager.mHasRequirements)
     {
-        // Already handled with a MBVideoDrvErr
+        // Already told to the user by the window, with MBGLVersionErr
         LL_WARNS("InitInfo") << "gGLManager.mHasRequirements is false." << LL_ENDL;
         // quit immediately
         LL_PROFILER_FRAME_END;
@@ -1169,13 +1166,6 @@ bool LLAppViewer::init()
         std::stringstream minRAMString(LLNotifications::instance().getGlobalString("UnsupportedRAMAmount"));
         U64Bytes minRAM;
         minRAMString >> minRAM;
-
-        if (!LLFeatureManager::getInstance()->isGPUSupported() && LLFeatureManager::getInstance()->getGPUClass() != GPU_CLASS_UNKNOWN)
-        {
-            minSpecs += LLNotifications::instance().getGlobalString("UnsupportedGPU");
-            minSpecs += "\n";
-            unsupported = true;
-        }
 
         // A clock the system would not report is unknown, not slow.
         if (gSysCPU.getMHz() > 0 && gSysCPU.getMHz() < minCPU)
@@ -1216,32 +1206,6 @@ bool LLAppViewer::init()
         LLNotificationsUtil::add("SoftwareRenderer", LLSD().with("RENDERER", gGLManager.getRawGLString()));
     }
 #endif
-
-    // Obsolete? mExpectedGLVersion is always zero
-#if LL_WINDOWS
-    if (gGLManager.mGLVersion < LLFeatureManager::getInstance()->getExpectedGLVersion())
-    {
-        std::string url;
-        if (gGLManager.mIsIntel)
-        {
-            url = LLTrans::getString("IntelDriverPage");
-        }
-        else if (gGLManager.mIsNVIDIA)
-        {
-            url = LLTrans::getString("NvidiaDriverPage");
-        }
-        else if (gGLManager.mIsAMD)
-        {
-            url = LLTrans::getString("AMDDriverPage");
-        }
-
-        if (!url.empty())
-        {
-            LLNotificationsUtil::add("OldGPUDriver", LLSD().with("URL", url));
-        }
-    }
-#endif
-
 
     // save the graphics card
     gDebugInfo["GraphicsCard"] = LLFeatureManager::getInstance()->getGPUString();
@@ -1843,6 +1807,24 @@ bool LLAppViewer::cleanup()
     velopack_cleanup();
 #endif
 
+    // Finish what the workers have in flight before anything they finish with is torn down.
+    // The General pool and the LLImageGL thread drain as they close, replying to the main
+    // loop's queue, which no frame services any more, and the uploads then publish once the
+    // GPU has done with them: one last frame's worth. Left unrun, the references those
+    // replies hold -- on a texture being uploaded or having its alpha analysed, a material's
+    // asset, an HTTP response -- are never let go.
+    if (mGeneralThreadPool)
+    {
+        mGeneralThreadPool->close();
+    }
+    if (LLImageGLThread::instanceExists())
+    {
+        LLImageGLThread::instance().close();
+    }
+    gMainloopWork.runPending();
+    LLImageGL::finishUploads();
+    gMainloopWork.runPending();
+
     //ditch LLVOAvatarSelf instance
     gAgentAvatarp = NULL;
 
@@ -1894,6 +1876,10 @@ bool LLAppViewer::cleanup()
     LLViewerCamera::deleteSingleton();
 
     LL_INFOS() << "Viewer disconnected" << LL_ENDL;
+
+    // No idle runs from here on. What waited for the next one goes now, while what its
+    // callable holds can still reach the singletons it was made beside.
+    gIdleCallbacks.deleteAllFunctions();
 
     if (gKeyboard)
     {
@@ -5594,10 +5580,21 @@ void LLAppViewer::idle()
     F32 qas = gSavedSettings.getF32("QuitAfterSeconds");
     if (qas > 0.f)
     {
-        if (gRenderStartTime.getElapsedTimeF32() > qas)
+        // The logout waits on any modal dialog and on each floater that asks before it closes,
+        // which a run quitting itself has nobody to answer: past this, it quits without one.
+        constexpr F32 QUIT_AFTER_LOGOUT_SECONDS = 60.f;
+        const F32 elapsed = gRenderStartTime.getElapsedTimeF32();
+        if (elapsed > qas && !mQuitRequested)
         {
             LL_INFOS() << "Quitting after " << qas << " seconds. See setting \"QuitAfterSeconds\"." << LL_ENDL;
-            LLAppViewer::instance()->forceQuit();
+            // As File > Quit does: in world, this logs out first.
+            requestQuit();
+        }
+        else if (elapsed > qas + QUIT_AFTER_LOGOUT_SECONDS && mQuitRequested && !isQuitting())
+        {
+            LL_WARNS() << "The logout \"QuitAfterSeconds\" asked for has not finished in "
+                       << QUIT_AFTER_LOGOUT_SECONDS << " seconds; quitting without it." << LL_ENDL;
+            forceQuit();
         }
     }
 

@@ -664,13 +664,25 @@ void LLGLTFMaterial::getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& d
 
     // make every effort to shave bytes here
 
+    // "tex" and "ti" are indexed by texture slot: a slot with no override
+    // before one that has one is Undefined
+    auto slot = [&data](const char* key, U32 i) -> LLSD&
+    {
+        LLSD& slots = data[key];
+        if (slots.size() <= i)
+        {
+            slots.resize(i + 1);
+        }
+        return slots[i];
+    };
+
     for (U32 i = 0; i < GLTF_TEXTURE_INFO_COUNT; ++i)
     {
         const LLUUID& texture_id = mTextureId[i];
         const LLUUID& override_texture_id = override_mat.mTextureId[i];
         if (override_texture_id.notNull() && override_texture_id != texture_id)
         {
-            data["tex"][i] = LLSD::UUID(override_texture_id);
+            slot("tex", i) = LLSD::UUID(override_texture_id);
         }
     }
 
@@ -713,17 +725,17 @@ void LLGLTFMaterial::getOverrideLLSD(const LLGLTFMaterial& override_mat, LLSD& d
     {
         if (override_mat.mTextureTransform[i].mOffset != getDefaultTextureOffset())
         {
-            data["ti"][i]["o"] = override_mat.mTextureTransform[i].mOffset.getValue();
+            slot("ti", i)["o"] = override_mat.mTextureTransform[i].mOffset.getValue();
         }
 
         if (override_mat.mTextureTransform[i].mScale != getDefaultTextureScale())
         {
-            data["ti"][i]["s"] = override_mat.mTextureTransform[i].mScale.getValue();
+            slot("ti", i)["s"] = override_mat.mTextureTransform[i].mScale.getValue();
         }
 
         if (override_mat.mTextureTransform[i].mRotation != getDefaultTextureRotation())
         {
-            data["ti"][i]["r"] = override_mat.mTextureTransform[i].mRotation;
+            slot("ti", i)["r"] = override_mat.mTextureTransform[i].mRotation;
         }
     }
 }

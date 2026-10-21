@@ -42,8 +42,11 @@
 #include <cmath>
 #include <limits>
 
+#include <fmt/format.h>
+
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
 U32 LLRenderTarget::sBytesAllocated = 0;
+U64 LLRenderTarget::sLastDepthSerial = 0;
 
 namespace
 {
@@ -154,6 +157,121 @@ namespace
         return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
     }
 
+    LLRenderTarget::eMipGeneration mip_generation(ALRenderTargetDesc::Mips mips)
+    {
+        switch (mips)
+        {
+            case ALRenderTargetDesc::Mips::Auto: return LLRenderTarget::MIPS_AUTO;
+            case ALRenderTargetDesc::Mips::Manual: return LLRenderTarget::MIPS_MANUAL;
+            case ALRenderTargetDesc::Mips::None: break;
+        }
+        return LLRenderTarget::MIPS_NONE;
+    }
+
+    ALRenderTargetDesc::Mips desc_mips(LLRenderTarget::eMipGeneration mips)
+    {
+        switch (mips)
+        {
+            case LLRenderTarget::MIPS_AUTO: return ALRenderTargetDesc::Mips::Auto;
+            case LLRenderTarget::MIPS_MANUAL: return ALRenderTargetDesc::Mips::Manual;
+            case LLRenderTarget::MIPS_NONE: break;
+        }
+        return ALRenderTargetDesc::Mips::None;
+    }
+
+    // `desc` as allocate builds it, its size held to the context's largest texture.
+    ALRenderTargetDesc held_to_context(ALRenderTargetDesc desc)
+    {
+        const U32 max_size = (U32)gGLManager.mGLMaxTextureSize;
+        desc.width         = llmin(desc.width, max_size);
+        desc.height        = llmin(desc.height, max_size);
+        return desc;
+    }
+
+    // Why no target can be built from `desc`, or null when one can. A target whose depth is shared needs no attachment
+    // of its own.
+    const char* unbuildable(const ALRenderTargetDesc& desc, bool depth_shared)
+    {
+        if (desc.width == 0 || desc.height == 0)
+        {
+            return "it has no size";
+        }
+        const U32 colors = desc.colorCount();
+        for (U32 attachment = colors; attachment < ALRenderTargetDesc::MAX_COLOR; ++attachment)
+        {
+            if (desc.color[attachment] != 0)
+            {
+                return "a colour format follows a 0 in its colour list";
+            }
+        }
+        if (colors == 0 && desc.depth == ALRenderTargetDesc::Depth::None && !depth_shared)
+        {
+            return "it has no attachment";
+        }
+        if (desc.stencil && desc.depth == ALRenderTargetDesc::Depth::None)
+        {
+            return "it has stencil without depth";
+        }
+        if (desc.mips == ALRenderTargetDesc::Mips::Auto && colors == 0)
+        {
+            return "flush generates its first attachment's mips, and it has no colour attachment";
+        }
+        if (desc.mips == ALRenderTargetDesc::Mips::Auto && LLImageGL::isIntegerFormat(desc.color[0]))
+        {
+            return "flush generates its first attachment's mips, and GL generates none of an integer texture's";
+        }
+        return nullptr;
+    }
+
+    // Why `sharer` cannot be what `desc` describes with `owner`'s depth, or null when it can.
+    const char* unshareable(const ALRenderTargetDesc& desc, const LLRenderTarget& sharer, const LLRenderTarget& owner)
+    {
+        if (&sharer == &owner)
+        {
+            return "it would share its own depth";
+        }
+        if (!owner.getDepth())
+        {
+            return "the target it shares depth from has none of its own";
+        }
+        if (desc.depth != ALRenderTargetDesc::Depth::None || desc.stencil)
+        {
+            return "it describes depth of its own";
+        }
+        if (desc.width != owner.getWidth() || desc.height != owner.getHeight())
+        {
+            return "its size is not the size of the depth it shares";
+        }
+        return nullptr;
+    }
+
+    // Whether GL objects are labelled: under debug GL alone, where the context keeps labels. A label is a driver call
+    // that copies the string, and only a debugger reads it.
+    bool labels_objects()
+    {
+        return gDebugGL && gGLManager.mHasDebugOutput && glObjectLabel;
+    }
+
+    // Label the GL object `name` `label` followed by `suffix` and, where it is not negative, `index`; an empty `label`
+    // takes the object's label away. Nothing where objects are not labelled (labels_objects).
+    void label_object(GLenum identifier, U32 name, std::string_view label, std::string_view suffix, S32 index = -1)
+    {
+        if (!name || !labels_objects())
+        {
+            return;
+        }
+        if (label.empty())
+        {
+            glObjectLabel(identifier, name, 0, nullptr);
+            return;
+        }
+        // GL refuses a label as long as GL_MAX_LABEL_LENGTH, which is at least 256.
+        char text[255];
+        const auto result = index < 0 ? fmt::format_to_n(text, sizeof(text), "{}{}", label, suffix)
+                                      : fmt::format_to_n(text, sizeof(text), "{}{}{}", label, suffix, index);
+        glObjectLabel(identifier, name, (GLsizei)(result.out - text), text);
+    }
+
     void check_framebuffer_status()
     {
         if (gDebugGL)
@@ -172,7 +290,6 @@ namespace
     }
 }
 
-bool LLRenderTarget::sUseFBO = false;
 U32 LLRenderTarget::sCurFBO = 0;
 
 
@@ -298,20 +415,146 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
 
     glGenFramebuffers(1, (GLuint *) &mFBO);
 
+    // Bound once whatever it holds: a name is a framebuffer only from its first bind, and only a framebuffer takes a
+    // label.
+    glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
     if (mDepth)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
-
         GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
         glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
 
     if (!addColorAttachment(color_fmt))
     {
         release();
         return false;
+    }
+
+    if (!mLabel.empty())
+    {
+        labelFramebuffer();
+    }
+    return true;
+}
+
+// static
+U64 LLRenderTarget::bytesFor(const ALRenderTargetDesc& desc)
+{
+    U64 per_pixel = 0;
+    for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
+    {
+        per_pixel += get_color_format_bytes_per_pixel(desc.color[attachment]);
+    }
+    if (desc.depth != ALRenderTargetDesc::Depth::None)
+    {
+        const eDepthFormat format = desc.depth == ALRenderTargetDesc::Depth::D32F ? DEPTH_FMT_32F : DEPTH_FMT_24;
+        per_pixel += get_depth_format_info(format, desc.stencil).bytes_per_pixel;
+    }
+    return (U64)desc.width * desc.height * per_pixel;
+}
+
+ALRenderTargetDesc LLRenderTarget::desc() const
+{
+    if (!mFBO)
+    {
+        return {};
+    }
+
+    ALRenderTargetDesc desc{ .width = mResX, .height = mResY, .mips = desc_mips(mGenerateMipMaps) };
+    for (size_t attachment = 0; attachment < mInternalFormat.size() && attachment < ALRenderTargetDesc::MAX_COLOR;
+         ++attachment)
+    {
+        desc.color[attachment] = mInternalFormat[attachment];
+    }
+    if (mDepth)
+    {
+        desc.depth   = mDepthFormat == DEPTH_FMT_32F ? ALRenderTargetDesc::Depth::D32F : ALRenderTargetDesc::Depth::D24;
+        desc.stencil = mStencil;
+    }
+    return desc;
+}
+
+LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wanted)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!isBoundInStack());
+
+    const ALRenderTargetDesc held = held_to_context(wanted);
+    if (const char* reason = unbuildable(held, /*depth_shared=*/false))
+    {
+        LL_WARNS("RenderTarget") << "Render target '" << mLabel << "' cannot be built as described: " << reason
+                                 << LL_ENDL;
+        release();
+        return EnsureResult::Failed;
+    }
+
+    // A depth attachment shared from another target, and a lent colour texture, are storage the description says
+    // nothing of, so a target holding either is built again.
+    const bool holds_only_its_own = !sharesDepth() && mTex.size() == mInternalFormat.size();
+    if (holds_only_its_own && held == desc())
+    {
+        return EnsureResult::Kept;
+    }
+
+    return build(held) ? EnsureResult::Built : EnsureResult::Failed;
+}
+
+LLRenderTarget::EnsureResult LLRenderTarget::ensure(const ALRenderTargetDesc& wanted, const LLRenderTarget& depth_from)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!isBoundInStack());
+
+    const ALRenderTargetDesc held = held_to_context(wanted);
+    const char*              reason = unbuildable(held, /*depth_shared=*/true);
+    if (!reason)
+    {
+        reason = unshareable(held, *this, depth_from);
+    }
+    if (reason)
+    {
+        LL_WARNS("RenderTarget") << "Render target '" << mLabel << "' cannot be built as described: " << reason
+                                 << LL_ENDL;
+        release();
+        return EnsureResult::Failed;
+    }
+
+    bool built = false;
+    if (mTex.size() != mInternalFormat.size() || held != desc())
+    {
+        if (!build(held))
+        {
+            return EnsureResult::Failed;
+        }
+        built = true;
+    }
+
+    if (!built && mSharedDepthSerial == depth_from.mDepthSerial)
+    {
+        return EnsureResult::Kept;
+    }
+
+    attachSharedDepth(depth_from);
+    return EnsureResult::Built;
+}
+
+bool LLRenderTarget::build(const ALRenderTargetDesc& desc)
+{
+    const bool         depth     = desc.depth != ALRenderTargetDesc::Depth::None;
+    const eDepthFormat depth_fmt = desc.depth == ALRenderTargetDesc::Depth::D32F ? DEPTH_FMT_32F : DEPTH_FMT_24;
+    if (!allocate(desc.width, desc.height, desc.color[0], depth, desc.stencil, ALTextureSlot::TT_TEXTURE,
+                  mip_generation(desc.mips), depth_fmt))
+    {
+        return false;
+    }
+
+    for (U32 attachment = 1; attachment < desc.colorCount(); ++attachment)
+    {
+        if (!addColorAttachment(desc.color[attachment]))
+        {
+            release();
+            return false;
+        }
     }
     return true;
 }
@@ -320,7 +563,6 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
 {
     LL_PROFILE_ZONE_SCOPED;
     llassert(img != nullptr); // img must not be null
-    llassert(sUseFBO); // FBO support must be enabled
     llassert(mDepth == 0); // depth buffers not supported with this mode
     llassert(mTex.empty()); // mTex must be empty with this mode (binding target should be done via LLImageGL)
     llassert(!isBoundInStack());
@@ -350,6 +592,12 @@ void LLRenderTarget::setColorAttachment(LLImageGL* img, LLGLuint use_name)
     check_framebuffer_status();
 
     glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
+
+    // The lent texture keeps the name its owner gave it.
+    if (!mLabel.empty())
+    {
+        labelFramebuffer();
+    }
 }
 
 void LLRenderTarget::releaseColorAttachment()
@@ -447,6 +695,11 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
     mTex.push_back(tex);
     mInternalFormat.push_back(color_fmt);
 
+    if (!mLabel.empty())
+    {
+        labelColor(offset);
+    }
+
     if (gDebugGL)
     { //bind and unbind to validate target
         bindTarget();
@@ -461,6 +714,7 @@ bool LLRenderTarget::allocateDepth()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     LLImageGL::generateTextures(1, &mDepth);
+    mDepthSerial = ++sLastDepthSerial;
     gGL.getTextureSlot(0)->bindManual(mUsage, mDepth);
 
     U32 internal_type = ALTextureSlot::getInternalType(mUsage);
@@ -502,19 +756,57 @@ void LLRenderTarget::shareDepthBuffer(LLRenderTarget& target)
 
     if (mDepth)
     {
-        glBindFramebuffer(GL_FRAMEBUFFER, target.mFBO);
-
-        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
-        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), mDepth, 0);
-
-        check_framebuffer_status();
-
-        glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
-
-        target.mUseDepth = true;
-        target.mStencil = mStencil;
-        target.mDepthFormat = mDepthFormat;
+        target.attachSharedDepth(*this);
     }
+}
+
+void LLRenderTarget::setLabel(std::string_view label)
+{
+    mLabel = label;
+    labelFramebuffer();
+    for (U32 attachment = 0; attachment < mInternalFormat.size(); ++attachment)
+    {
+        labelColor(attachment);
+    }
+}
+
+void LLRenderTarget::labelFramebuffer() const
+{
+    label_object(GL_FRAMEBUFFER, mFBO, mLabel, "");
+    label_object(GL_TEXTURE, mDepth, mLabel, ".depth");
+}
+
+void LLRenderTarget::labelColor(U32 attachment) const
+{
+    if (attachment < mInternalFormat.size())
+    {
+        label_object(GL_TEXTURE, mTex[attachment], mLabel, ".color", (S32)attachment);
+    }
+}
+
+void LLRenderTarget::attachSharedDepth(const LLRenderTarget& owner)
+{
+    glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
+
+    if (mUseDepth)
+    {
+        // From the point it was attached at: a depth-stencil texture fills the depth and the stencil point, a depth
+        // texture the depth point alone, so attaching at the other point would leave it on one of them.
+        GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+        glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), 0, 0);
+    }
+
+    GLenum attachment = owner.mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
+    glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(owner.mUsage), owner.mDepth, 0);
+
+    check_framebuffer_status();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
+
+    mUseDepth          = true;
+    mStencil           = owner.mStencil;
+    mDepthFormat       = owner.mDepthFormat;
+    mSharedDepthSerial = owner.mDepthSerial;
 }
 
 void LLRenderTarget::release()
@@ -530,8 +822,7 @@ void LLRenderTarget::release()
         sBytesAllocated -= mResX * mResY * info.bytes_per_pixel;
 
         mDepth = 0;
-        mStencil = false;
-        mDepthFormat = DEPTH_FMT_24;
+        mDepthSerial = 0;
     }
     else if (mFBO)
     {
@@ -541,13 +832,14 @@ void LLRenderTarget::release()
         { //detach shared depth buffer
             GLenum attachment = mStencil ? GL_DEPTH_STENCIL_ATTACHMENT : GL_DEPTH_ATTACHMENT;
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, ALTextureSlot::getInternalType(mUsage), 0, 0);
-            mUseDepth = false;
-            mStencil = false;
-            mDepthFormat = DEPTH_FMT_24;
         }
 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
     }
+    mUseDepth = false;
+    mStencil = false;
+    mDepthFormat = DEPTH_FMT_24;
+    mSharedDepthSerial = 0;
 
     // Detach any extra color buffers (e.g. SRGB spec buffers)
     //
@@ -939,7 +1231,8 @@ void LLRenderTarget::copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S
 
 bool LLRenderTarget::isComplete() const
 {
-    return !mTex.empty() || mDepth;
+    // A sharer with no colour of its own renders into its owner's depth.
+    return !mTex.empty() || mDepth || sharesDepth();
 }
 
 void LLRenderTarget::getViewport(S32* viewport)
@@ -1021,7 +1314,6 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
     llassert(!other.isBoundInStack());
 
     // Must be same type
-    llassert(sUseFBO == other.sUseFBO);
     llassert(mResX == other.mResX);
     llassert(mResY == other.mResY);
     llassert(mInternalFormat == other.mInternalFormat);
@@ -1036,4 +1328,19 @@ void LLRenderTarget::swapFBORefs(LLRenderTarget& other)
 
     std::swap(mFBO, other.mFBO);
     std::swap(mTex, other.mTex);
+    // A sharer's depth is attached to its framebuffer, so which build of it is attached goes with the framebuffer.
+    std::swap(mSharedDepthSerial, other.mSharedDepthSerial);
+
+    // A label names the target, and the objects each holds now were named for the other.
+    if (labels_objects() && mLabel != other.mLabel)
+    {
+        for (const LLRenderTarget* target : { this, &other })
+        {
+            target->labelFramebuffer();
+            for (U32 attachment = 0; attachment < target->mInternalFormat.size(); ++attachment)
+            {
+                target->labelColor(attachment);
+            }
+        }
+    }
 }

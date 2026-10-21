@@ -209,10 +209,14 @@ void HttpOperation::addAsReply()
                            << LL_ENDL;
     }
 
-    if (mReplyQueue)
+    // An op replies once, and lets go of the queue as it does: the queue holds the op
+    // until it is fetched, and the two holding each other would outlive a request that
+    // went with a reply still on its way.
+    HttpReplyQueuePtr_t reply_queue = std::move(mReplyQueue);
+    if (reply_queue)
     {
         HttpOperation::ptr_t op = shared_from_this();
-        mReplyQueue->addOp(op);
+        reply_queue->addOp(op);
     }
 }
 

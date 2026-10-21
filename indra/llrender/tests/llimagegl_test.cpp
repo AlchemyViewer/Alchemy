@@ -189,12 +189,6 @@ namespace
     // resolveDeprecatedFormat rewrites them at format-set time.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: setExplicitFormat rewrites deprecated formats and keeps modern ones", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
-            return;
-        }
-
         LLPointer<LLImageGL> la = new LLImageGL(/*usemipmaps=*/false);
         la->setExplicitFormat(GL_LUMINANCE_ALPHA, GL_LUMINANCE_ALPHA, GL_UNSIGNED_BYTE);
         CHECK((S32)la->getPrimaryFormat() == (S32)GL_RG);
@@ -265,12 +259,6 @@ namespace
     // means: 1 -> GL_RED, 2 -> GL_RG, 3 -> GL_RGB, 4 -> GL_RGBA.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture picks the primary format from the component count", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("resolveDeprecatedFormat is gated on GL >= 3.3");
-            return;
-        }
-
         // 2-component raw — exercises the LUMINANCE_ALPHA -> GL_RG
         // rewrite path. This is the format the greyscale font atlas
         // uses (see commit c99dcaa7d3 — "Restore greyscale font atlas
@@ -322,12 +310,6 @@ namespace
     // mask matches applySwizzleForDeprecatedFormat's table.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: createGLTexture sets the RRRA swizzle for luminance-alpha", "[LLImageGL]")
     {
-        if (gGLManager.mGLVersion < 3.29f)
-        {
-            SKIP("swizzle apply is gated on GL >= 3.3");
-            return;
-        }
-
         // 2-component raw goes through LUMINANCE_ALPHA -> GL_RG
         // rewrite, which sets mDeprecatedSourceFormat=LUMINANCE_ALPHA.
         // createGLTexture then applies the matching swizzle.
@@ -540,6 +522,25 @@ namespace
         CHECK(std::memcmp(dst->getData(), sd, (size_t)W * H * 4) == 0);
     }
 
+    // An upload of another component count works its format out on the main thread as it
+    // begins, and the image goes on answering for the texture on screen until the new one
+    // publishes: its format, and the alpha a format without one clears.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload in flight answers with the format on screen", "[LLImageGL]")
+    {
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x00).get()));
+        REQUIRE(img->getPrimaryFormat() == (LLGLenum)GL_RGBA);
+        REQUIRE(img->getMaxAlpha() == 0);
+
+        img->beginUpload(3);
+        UNSCOPED_INFO("the RGBA texture on screen, not the RGB one being built");
+        CHECK(img->getPrimaryFormat() == (LLGLenum)GL_RGBA);
+        CHECK(img->getMaxAlpha() == 0);
+        img->endUpload();
+        UNSCOPED_INFO("an upload that never published leaves the alpha alone");
+        CHECK(img->getMaxAlpha() == 0);
+    }
+
     // The pick mask of a texture still being uploaded waits for that texture:
     // getMask answers for the one on screen, and off the main thread building the
     // mask in place freed the buffer getMask was reading. It publishes with the
@@ -605,6 +606,71 @@ namespace
         REQUIRE(rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x00).get()));
         UNSCOPED_INFO("no alpha channel reads as opaque");
         CHECK(rgb->getMaxAlpha() == 255);
+    }
+
+    // And the lowest, which the avatar shadow asks to tell a bake that cuts out from one that does not: the odd
+    // row and column counted again, 255 where there is no alpha channel, and 0 where nothing was analysed.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the alpha analysis reports the lowest alpha, odd edges included", "[LLImageGL]")
+    {
+        // An opaque w x h RGBA image with alpha `alpha` at (x, y).
+        auto analysed = [](U16 w, U16 h, S32 x, S32 y, U8 alpha)
+        {
+            LLPointer<LLImageRaw> raw = makeRaw(w, h, 4, 0xFF);
+            if (x >= 0)
+            {
+                raw->getData()[((size_t)y * w + x) * 4 + 3] = alpha;
+            }
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+            REQUIRE(img->createGLTexture(0, raw.get()));
+            return img->getMinAlpha();
+        };
+
+        UNSCOPED_INFO("an opaque texture");
+        CHECK(analysed(16, 16, -1, -1, 0) == 255);
+        UNSCOPED_INFO("one texel inside");
+        CHECK(analysed(16, 16, 5, 7, 40) == 40);
+        UNSCOPED_INFO("a texel in the odd column");
+        CHECK(analysed(15, 15, 14, 3, 90) == 90);
+        UNSCOPED_INFO("a texel in the odd row");
+        CHECK(analysed(15, 15, 6, 14, 60) == 60);
+        UNSCOPED_INFO("the odd corner");
+        CHECK(analysed(15, 15, 14, 14, 30) == 30);
+        UNSCOPED_INFO("a single row");
+        CHECK(analysed(9, 1, 8, 0, 120) == 120);
+
+        LLPointer<LLImageGL> rgb = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(rgb->createGLTexture(0, makeRaw(16, 16, 3, 0x00).get()));
+        UNSCOPED_INFO("no alpha channel reads as opaque");
+        CHECK(rgb->getMinAlpha() == 255);
+
+        LLPointer<LLImageGL> unread = new LLImageGL(/*usemipmaps=*/false);
+        unread->setNeedsAlphaAndPickMask(false);
+        REQUIRE(unread->createGLTexture(0, makeRaw(16, 16, 4, 0xFF).get()));
+        UNSCOPED_INFO("an alpha not analysed may be anything");
+        CHECK(unread->getMinAlpha() == 0);
+    }
+
+    // The alpha layout is worked out with the format, once for a component count. An image
+    // that comes to want its mask after an upload works both out again on the next, and
+    // reads alpha from the fourth channel rather than the first.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a mask wanted after an upload reads alpha from the alpha channel", "[LLImageGL]")
+    {
+        constexpr U16 W = 16, H = 16;
+        // Red full and alpha clear: read from the first channel, it would look opaque.
+        LLPointer<LLImageRaw> raw = makeRaw(W, H, 4, 0x00);
+        for (size_t i = 0; i < (size_t)W * H; ++i)
+        {
+            raw->getData()[i * 4] = 0xFF;
+        }
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        img->setNeedsAlphaAndPickMask(false);
+        REQUIRE(img->createGLTexture(0, raw.get()));
+        UNSCOPED_INFO("no mask wanted reads as opaque");
+        CHECK(img->getMaxAlpha() == 255);
+
+        img->setNeedsAlphaAndPickMask(true);
+        REQUIRE(img->createGLTexture(0, raw.get()));
+        CHECK(img->getMaxAlpha() == 0);
     }
 
     // An edit writes through the ACTIVE unit, and a bind that finds the texture

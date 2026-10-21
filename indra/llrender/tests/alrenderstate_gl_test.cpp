@@ -191,14 +191,9 @@ namespace
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
-    // refreshState puts back the patch size too, on a context with tessellation to have one.
+    // refreshState puts back the patch size too.
     TEST_CASE_METHOD(alrenderstate_data, "alrenderstate_gl: refreshState puts back the patch size gGL holds", "[alrenderstate_gl]")
     {
-        if (!glPatchParameteri)
-        {
-            SKIP("this context has no tessellation");
-        }
-
         // Handed back however the test ends: the shared context outlives it, and its scope does not keep this.
         struct PatchSizeRestore
         {

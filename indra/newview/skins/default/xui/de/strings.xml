@@ -2802,15 +2802,6 @@ Gültige Formate: .wav, .tga, .bmp, .jpg, .jpeg oder .bvh
 	<string name="Play Media">
 		Medien Abspielen/Pausieren
 	</string>
-	<string name="IntelDriverPage">
-		http://www.intel.com/p/en_US/support/detect/graphics
-	</string>
-	<string name="NvidiaDriverPage">
-		http://www.nvidia.com/Download/index.aspx?lang=de-de
-	</string>
-	<string name="AMDDriverPage">
-		http://support.amd.com/de/Pages/AMDSupportHub.aspx
-	</string>
 	<string name="MBCmdLineError">
 		Beim Parsen der Befehlszeile wurde ein Fehler festgestellt.
 Weitere Informationen: http://wiki.secondlife.com/wiki/Client_parameters (EN)

@@ -30,7 +30,12 @@
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
 
+// The spacing terrainTE.glsl takes, for the same reason.
+#ifdef TERRAIN_TESS_PINNED
+layout(quads, equal_spacing, ccw) in;
+#else
 layout(quads, fractional_odd_spacing, ccw) in;
+#endif
 
 // terrainSurface.glsl
 vec2 terrain_patch_xy();

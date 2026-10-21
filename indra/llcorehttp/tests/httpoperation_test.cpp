@@ -28,6 +28,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "_httpoperation.h"
+#include "_httpreplyqueue.h"
 #include "httphandler.h"
 
 #include <iostream>
@@ -86,6 +87,26 @@ namespace
 
         // release the handlers
         h1.reset();
+    }
+
+    TEST_CASE("HttpOperation Tests: a reply lets go of the reply queue", "[HttpOperation_Tests]")
+    {
+        // The queue holds a reply until it is fetched. Were the op to keep holding the
+        // queue, the two would keep each other alive once the request that made the
+        // queue went with the reply unfetched, as an event poll's last cancel does.
+        auto queue = std::make_shared<HttpReplyQueue>();
+        std::weak_ptr<HttpReplyQueue> watch(queue);
+        HttpOperation::ptr_t op(new HttpOpNull());
+        op->setReplyPath(queue, LLCore::HttpHandler::ptr_t());
+        CHECK(queue.use_count() == 2);
+
+        op->stageFromRequest(nullptr);  // HttpOpNull bounces straight to its reply
+        CHECK(queue.use_count() == 1);
+        CHECK(op.use_count() == 2);     // its own and the queue's
+
+        op.reset();
+        queue.reset();
+        CHECK(watch.expired());
     }
 
 }

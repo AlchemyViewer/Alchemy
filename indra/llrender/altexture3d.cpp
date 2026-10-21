@@ -72,20 +72,13 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
 
     gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE_3D, texname);
 
-    if (gGLManager.mHasTextureStorage)
+    // Immutable: one call covers the whole volume, and it may only be made once for
+    // the object, so a later resize has to build a new texture.
+    glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, width, height, depth);
+    mImage->markStorageAllocated();
+    if (data != nullptr)
     {
-        // Immutable: one call covers the whole volume, and it may only be made once for
-        // the object, so a later resize has to build a new texture.
-        glTexStorage3D(GL_TEXTURE_3D, 1, internal_format, width, height, depth);
-        mImage->markStorageAllocated();
-        if (data != nullptr)
-        {
-            glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, width, height, depth, primary_format, type, data);
-        }
-    }
-    else
-    {
-        glTexImage3D(GL_TEXTURE_3D, 0, internal_format, width, height, depth, 0, primary_format, type, data);
+        glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, width, height, depth, primary_format, type, data);
     }
 
     // Accounted as depth slices of a width*height surface, matching how the cube map

@@ -712,11 +712,6 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		<url name="url">https://secondlife.com/system-requirements?lang=ja</url>
 		<usetemplate ignoretext="使用中のコンピューターのハードウェアがサポートされていないとき" name="okcancelignore" notext="いいえ" yestext="はい"/>
 	</notification>
-	<notification name="OldGPUDriver">グラフィックスチップに最新のドライバがある可能性があります。グラフィックドライバを更新することにより、大幅にパフォーマンスが向上します。
-ドライバの更新を確認するために[URL] にアクセスしますか？
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="使用中のグラフィックドライバが古くなっています" name="okcancelignore" notext="いいえ" yestext="はい"/>
-	</notification>
 	<notification name="UnknownGPU">
 		お使いのシステムには、[APP_NAME]が認識できないグラフィックカードが搭載されています。[APP_NAME]でまだテストされていない最新ハードウェアのためだと考えられます。
 問題ないとは思いますが、グラフィックの設定を調整する必要があるかもしれません。
@@ -4002,9 +3997,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</global>
 	<global name="UnsupportedRAMAmount">
 		510
-	</global>
-	<global name="UnsupportedGPU">
-		－あなたのグラフィックカードは、必須動作環境の条件を満たしていません。
 	</global>
 	<global name="UnsupportedRAM">
 		－あなたのシステムメモリは、必須動作環境の条件を満たしていません。

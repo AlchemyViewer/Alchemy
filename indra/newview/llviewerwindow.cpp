@@ -214,6 +214,7 @@
 #include "llviewerwindowlistener.h"
 #include "alcutoutimage.h"
 #include "alrenderisolation.h"
+#include "alrendersizeoverride.h"
 #include "alsnapshotcutout.h"
 #include "llstatslistener.h"
 #include "llcleanup.h"
@@ -238,7 +239,6 @@ void swap();
 extern bool gDebugClicks;
 extern bool gDisplaySwapBuffers;
 extern bool gDepthDirty;
-extern bool gResizeScreenTexture;
 extern bool gCubeSnapshot;
 extern bool gSnapshotNoPost;
 
@@ -2149,7 +2149,6 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     mHideCursorPermanent( false ),
     mCursorHidden(false),
     mResDirty(false),
-    mStatesDirty(false),
     mProgressView(NULL)
 {
     // gKeyboard is still NULL, so it doesn't do LLWindowListener any good to
@@ -2214,9 +2213,8 @@ LLViewerWindow::LLViewerWindow(const Params& p)
     }
     else if (!LLViewerShaderMgr::sInitialized)
     {
-        //immediately initialize shaders
+        // The programs are built by the pipeline's first load (LLPipeline::init), once it has a window to build them in.
         LLViewerShaderMgr::sInitialized = true;
-        LLViewerShaderMgr::instance()->setShaders();
     }
 
     if (!LLAppViewer::instance()->restoreErrorTrap())
@@ -2751,8 +2749,10 @@ void LLViewerWindow::shutdownGL()
 
     // The UI images' recorded draws hold vertex buffers, which go back to the pool while
     // there is still one, and a context to delete their names in. LLUIImageList's own
-    // cleanUp comes after the window is gone.
+    // cleanUp comes after the window is gone. The sphere is a global, so its buffer would
+    // otherwise go at exit, after the pool.
     LLUIImage::cleanupClass();
+    gSphere.cleanupGL();
 
     LL_INFOS() << "All textures and llimagegl images are destroyed!" << LL_ENDL ;
 
@@ -2833,7 +2833,7 @@ void LLViewerWindow::reshape(S32 width, S32 height, bool force_reshape)
     // may have been destructed.
     if (!LLApp::isExiting())
     {
-        gWindowResized = true;
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Window);
 
         // update our window rectangle
         mWindowRectRaw.mRight = mWindowRectRaw.mLeft + width;
@@ -4464,7 +4464,7 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
     if (mWorldViewRectRaw != new_world_rect)
     {
         mWorldViewRectRaw = new_world_rect;
-        gResizeScreenTexture = true;
+        gPipeline.markRenderInputsDirty();
         LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
         LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
 
@@ -5591,9 +5591,9 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     }
 
     // What the single-pass path below changes, recorded so the restore can undo it.
+    std::optional<ALRenderSizeOverride> render_size;
     LLRenderTarget scratch_space;
-    S32 original_width = 0;
-    S32 original_height = 0;
+    scratch_space.setLabel("snapshot.scratch");
     bool reset_deferred = false;
     LLRect window_rect;
 
@@ -5649,10 +5649,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
             scratch_space.flush();
             scratch_space.release();
-            gPipeline.allocateScreenBuffer(original_width, original_height);
-            // Reallocated, the SSR source holds whatever was in that memory,
-            // and the next live frame's reflections would trace it.
-            gPipeline.clearSceneMap();
+            render_size.reset();
         }
 
         setBalanceVisible(true);
@@ -5704,24 +5701,10 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
             // This is the colour attachment, and it needs a colour format whatever the layer is.
             if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
             {
-                // mRT->width/height, not the attachment's dimensions. allocateScreenBuffer
-                // takes a LOGICAL size, records it in mRT->width/height, and only then applies
-                // RenderResolutionDivisor / RenderResolutionMultiplier to arrive at the texture
-                // size. Reading the texture size back and handing it in as a logical size
-                // therefore applies the scale a second time, squaring it: at multiplier 2.0 the
-                // viewer comes back from a snapshot rendering four times the pixels, sixteen
-                // after the second, and at divisor 2 it halves away instead.
-                //
-                // Nothing corrects it afterwards either. resizeScreenTexture() would notice,
-                // but it is gated on gResizeScreenTexture, and the restore below assigns
-                // mWorldViewRectRaw directly rather than going through updateWorldViewRect(),
-                // which is what sets that flag. The wrong size survives until a window resize.
-                //
-                // resizeShadowTexture() already reads these two for the same reason.
-                original_width = (S32)gPipeline.mRT->width;
-                original_height = (S32)gPipeline.mRT->height;
-
-                if (gPipeline.allocateScreenBuffer(image_width, image_height))
+                // The main view at the snapshot's size, before the resolution scale, until the
+                // restore ends the override and the world view's size is back.
+                render_size.emplace(image_width, image_height);
+                if (render_size->applied())
                 {
                     window_width = image_width;
                     window_height = image_height;
@@ -5736,7 +5719,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                 else
                 {
                     scratch_space.release();
-                    gPipeline.allocateScreenBuffer(original_width, original_height);
+                    render_size.reset();
                 }
             }
         }
@@ -6055,19 +6038,17 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
 
     LLRect window_rect = getWorldViewRectRaw();
 
-    // The logical size, not the attachment's -- see rawSnapshot for why handing a scaled
-    // texture size back to allocateScreenBuffer squares the resolution scale.
-    S32 original_width = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->width : gViewerWindow->getWorldViewWidthRaw();
-    S32 original_height = LLPipeline::sRenderDeferred ? (S32)gPipeline.mRT->height : gViewerWindow->getWorldViewHeightRaw();
-
+    std::optional<ALRenderSizeOverride> render_size;
     LLRenderTarget scratch_space;
+    scratch_space.setLabel("snapshot.simple");
     // Sized format, for the reason spelled out in rawSnapshot: immutable storage means
     // glTexStorage2D sees this, and it rejects unsized formats. There is no tiled fallback on
     // this path -- a failure here means the screen buffers are never resized and the readback
     // below pulls image_width x image_height out of window-sized ones.
     if (scratch_space.allocate(image_width, image_height, GL_RGBA8, true))
     {
-        if (gPipeline.allocateScreenBuffer(image_width, image_height))
+        render_size.emplace(image_width, image_height);
+        if (render_size->applied())
         {
             mWorldViewRectRaw.set(0, image_height, image_width, 0);
 
@@ -6076,7 +6057,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
         else
         {
             scratch_space.release();
-            gPipeline.allocateScreenBuffer(original_width, original_height);
+            render_size.reset();
         }
     }
 
@@ -6140,7 +6121,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     mWorldViewRectRaw = window_rect;
     scratch_space.flush();
     scratch_space.release();
-    gPipeline.allocateScreenBuffer(original_width, original_height);
+    render_size.reset();
 
     return true;
 }
@@ -6661,8 +6642,7 @@ void LLViewerWindow::restoreGL(const std::string& progress_message)
         LLVOAvatar::restoreGL();
         LLVOPartGroup::restoreGL();
 
-        gResizeScreenTexture = true;
-        gWindowResized = true;
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Window);
 
         if (isAgentAvatarValid() && gAgentAvatarp->isEditingAppearance())
         {
@@ -6718,13 +6698,6 @@ void LLViewerWindow::requestResolutionUpdate()
 void LLViewerWindow::checkSettings()
 {
     LL_PROFILE_ZONE_SCOPED;
-    if (mStatesDirty)
-    {
-        gGL.refreshState();
-        LLViewerShaderMgr::instance()->setShaders();
-        mStatesDirty = false;
-    }
-
     // Drain any pending font reload before doing anything else this frame.
     // The setting listener for AlchemyUIFontOverrides defers the reload
     // here so we never tear down LLFontFreetype state mid-render. Routes

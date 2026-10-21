@@ -28,6 +28,7 @@
 #define LL_LLFOLDERTYPE_H
 
 #include <string>
+#include <string_view>
 #include "llassettype.h"
 
 // This class handles folder types (similar to assettype, except for folders)
@@ -105,8 +106,11 @@ public:
         // When adding, see note at bottom of LLAssetType::Etype
     };
 
-    static EType                lookup(const std::string& type_name);
-    static const std::string&   lookup(EType folder_type);
+    static EType                lookup(std::string_view type_name); // FT_NONE when no type has the name
+    static std::string_view     lookup(EType folder_type);          // badLookup() when the type has no entry
+
+    // the type has an entry; the ensembles and FT_NONE have one
+    static bool                 isKnown(EType folder_type);
 
     static bool                 lookupIsProtectedType(EType folder_type);
     static bool                 lookupIsAutomaticType(EType folder_type);
@@ -116,7 +120,7 @@ public:
     static LLAssetType::EType   folderTypeToAssetType(LLFolderType::EType folder_type);
     static LLFolderType::EType  assetTypeToFolderType(LLAssetType::EType asset_type);
 
-    static const std::string&   badLookup(); // error string when a lookup fails
+    static std::string_view     badLookup(); // error string when a lookup fails
 
     static LLSD getTypeNames();
 

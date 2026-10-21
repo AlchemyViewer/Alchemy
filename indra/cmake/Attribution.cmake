@@ -6,9 +6,11 @@
 #
 #   cmake -DVCPKG_STATUS=<vcpkg/status> -DVCPKG_SHARE=<triplet share dir>
 #         -DTRIPLET=<triplet> -DTABLE=<attribution.json> -DSOURCE_DIR=<indra>
-#         -DCHANNEL=<channel> -DVERSION=<version> -DENABLED=<opt,opt,...>
-#         -DOUTPUT_INFO=<packages-info.txt> -DOUTPUT_LICENSES=<licenses.txt>
-#         -P Attribution.cmake
+#         -DCHANNEL=<channel> -DVERSION_FILE=<viewer_version.txt>
+#         -DENABLED=<opt,opt,...> -DOUTPUT_INFO=<packages-info.txt>
+#         -DOUTPUT_LICENSES=<licenses.txt> -P Attribution.cmake
+#
+# The version is the first line of VERSION_FILE.
 #
 # Each installed port's share/<port>/vcpkg.spdx.json gives its name, version,
 # licence expression and homepage; share/<port>/copyright is the licence
@@ -31,7 +33,7 @@ foreach(
   TABLE
   SOURCE_DIR
   CHANNEL
-  VERSION
+  VERSION_FILE
   OUTPUT_INFO
   OUTPUT_LICENSES
 )
@@ -40,6 +42,11 @@ foreach(
   endif()
 endforeach()
 string(REPLACE "," ";" ENABLED "${ENABLED}")
+
+file(STRINGS "${VERSION_FILE}" VERSION LIMIT_COUNT 1)
+if(NOT VERSION)
+  message(FATAL_ERROR "Attribution.cmake: no version in ${VERSION_FILE}")
+endif()
 
 file(READ "${TABLE}" table)
 

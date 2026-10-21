@@ -188,7 +188,7 @@ public:
 
 protected:
     LLViewerPartGroup *createViewerPartGroup(const LLVector3 &pos_agent, const F32 desired_size, bool hud);
-    LLViewerPartGroup *put(LLViewerPart* part);
+    LLViewerPartGroup *put(LLViewerPart* part, F32 desired_size, const LLViewerPartGroup* leaving = nullptr);
 
     group_list_t mViewerPartGroups;
     source_list_t mViewerPartSources;

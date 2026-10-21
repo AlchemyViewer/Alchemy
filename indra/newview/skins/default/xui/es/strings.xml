@@ -2737,15 +2737,6 @@ Se esperaba .wav, .tga, .bmp, .jpg, .jpeg, o .bvh
 	<string name="Play Media">
 		Play/Pausa los media
 	</string>
-	<string name="IntelDriverPage">
-		http://www.intel.com/p/en_US/support/detect/graphics
-	</string>
-	<string name="NvidiaDriverPage">
-		http://www.nvidia.com/Download/index.aspx?lang=es
-	</string>
-	<string name="AMDDriverPage">
-		http://support.amd.com/us/Pages/AMDSupportHub.aspx
-	</string>
 	<string name="MBCmdLineError">
 		Ha habido un error analizando la línea de comando.
 Por favor, consulta: http://wiki.secondlife.com/wiki/Client_parameters

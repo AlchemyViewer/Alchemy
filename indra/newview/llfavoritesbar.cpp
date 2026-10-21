@@ -464,6 +464,12 @@ LLFavoritesBarCtrl::~LLFavoritesBarCtrl()
         mOverflowMenuHandle.get()->die();
     if (mContextMenuHandle.get())
         mContextMenuHandle.get()->die();
+
+    // The chevron is a child only while favorites overflow; out of the bar, it is ours.
+    if (mMoreTextBox && mMoreTextBox->getParent() != this)
+    {
+        delete mMoreTextBox;
+    }
 }
 
 bool LLFavoritesBarCtrl::handleDragAndDrop(S32 x, S32 y, MASK mask, bool drop,

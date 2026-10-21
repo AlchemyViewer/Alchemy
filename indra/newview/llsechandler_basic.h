@@ -34,6 +34,7 @@
 #endif // LL_WINDOWS
 
 #include "llsecapi.h"
+#include <boost/signals2/connection.hpp>
 #include <vector>
 #include <openssl/x509.h>
 
@@ -347,6 +348,7 @@ protected:
     LLPointer<LLBasicCertificateStore> mStore;
 
     std::string mLegacyPasswordPath;
+    boost::signals2::scoped_connection mNoVerifySSLCertConnection;
 };
 
 bool valueCompareLLSD(const LLSD& lhs, const LLSD& rhs);

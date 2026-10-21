@@ -45,7 +45,10 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     // that channel is the subject's coverage, and the coverage seeded after
     // the opaque pools (LLPipeline::seedCutoutCoverageFromDepth) writes over
     // whatever this put there, so it would be work for nothing.
-    if (LLPipeline::cullingToCutoutSubject())
+    //
+    // RenderGlow off is decided here rather than at registration, so the faces stay registered and
+    // a toggle takes effect on the next frame.
+    if (!LLPipeline::sRenderGlow || LLPipeline::cullingToCutoutSubject())
     {
         return;
     }
@@ -82,7 +85,7 @@ void LLDrawPoolGlow::renderPostDeferred(S32 pass)
     }
 
     // second pass -- rigged objects
-    shader = shader->mRiggedVariant;
+    shader = shader->riggedVariant();
     shader->bind();
     if (glow_indexed)
     {
@@ -239,14 +242,19 @@ void LLDrawPoolFullbrightAlphaMask::renderPostDeferred(S32 pass)
 
     LLGLDisable blend(GL_BLEND);
 
+    // Outside the alpha pool LLFace stores shininess in the vertex alpha, which the mask must not
+    // test (fullbrightF.glsl); the alpha pool, drawing with the same program, sets it back.
+
     // render static
     shader->bind();
+    shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 0.f);
     pushMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK, true, true);
 
     if (!LLPipeline::sRenderingHUDs)
     {
         // render rigged
         shader->bind(true);
+        LLGLSLShader::sCurBoundShaderPtr->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 0.f);
         pushRiggedMaskBatches(LLRenderPass::PASS_FULLBRIGHT_ALPHA_MASK_RIGGED, true, true);
     }
 }

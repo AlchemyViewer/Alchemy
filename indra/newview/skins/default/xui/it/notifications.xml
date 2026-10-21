@@ -576,13 +576,6 @@ Visitare [_URL] per ulteriori informazioni?
 		<usetemplate ignoretext="L'hardware di questo computer non è compatibile" name="okcancelignore" notext="No" yestext="Si"/>
 	</notification>
 	<notification name="RunLauncher">Non avviare direttamente il viewer eseguibile. Aggiorna le scorciatoie attuali per avviare invece il Launcher_SL.</notification>
-	<notification name="OldGPUDriver">
-		È probabile che ci sia un driver aggiornato per il processore grafico. L'aggiornamento dei driver della grafica può migliorare le prestazioni in maniera significativa.
-
-    Visitare [URL] per cercare un aggiornamento del driver?
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="Driver grafica obsoleto" name="okcancelignore" notext="No" yestext="Sì"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Il tuo sistema utilizza una scheda grafica che [APP_NAME] non riconosce.
 Questo succede spesso con un nuovo hardware che non è stato ancora testato con [APP_NAME].  Probabilmente tutto andrà bene, ma devi riconfigurare le tue impostazioni grafiche.
@@ -2792,7 +2785,6 @@ Vuoi continuare?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- La tua scheda grafica non soddisfa i requisiti minimi.</global>
 	<global name="UnsupportedRAM">- La memoria del tuo sistema non soddisfa i requisiti minimi.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Se sei proprietario di un appezzamento di terreno, puoi definirlo come la tua posizione iniziale.
 In alternativa, puoi guardare sulla mappa e trovare luoghi segnalati come &quot;Infohub&quot;.</global>

@@ -408,6 +408,9 @@ void LLExperienceCache::idleCoro()
     const F32 ERASE_EXPIRED_TIMEOUT = 60.f; // seconds
 
     LL_INFOS("ExperienceCache") << "Launching Experience cache idle coro." << LL_ENDL;
+    // Launched from initSingleton(), and so entered while getInstance() still holds the
+    // singleton's lock on the fiber that called it: let that call finish first.
+    llcoro::suspend();
     do
     {
         LLExperienceCache* self = LLExperienceCache::getInstance();

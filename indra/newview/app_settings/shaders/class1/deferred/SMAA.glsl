@@ -23,9 +23,6 @@
  * $/LicenseInfo$
  */
 
-#extension GL_ARB_texture_rectangle : enable
-#extension GL_ARB_shader_texture_lod : enable
-
 /*[EXTRA_CODE_HERE]*/
 
 #ifdef VERTEX_SHADER
@@ -461,6 +458,19 @@ uniform vec4 SMAA_RT_METRICS;
  */
 #ifndef SMAA_PREDICATION
 #define SMAA_PREDICATION 0
+#endif
+
+/**
+ * With predication, the three settings below are uniforms, set from RenderSMAAPredicationThreshold, Scale and
+ * Strength on the edge detection program, the one that reads them (LLPipeline::generateSMAABuffers).
+ */
+#if SMAA_PREDICATION
+uniform float smaaPredicationThreshold;
+uniform float smaaPredicationScale;
+uniform float smaaPredicationStrength;
+#define SMAA_PREDICATION_THRESHOLD smaaPredicationThreshold
+#define SMAA_PREDICATION_SCALE smaaPredicationScale
+#define SMAA_PREDICATION_STRENGTH smaaPredicationStrength
 #endif
 
 /**

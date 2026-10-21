@@ -28,10 +28,13 @@
 #define LL_LLWEARABLETYPE_H
 
 #include "llassettype.h"
-#include "lldictionary.h"
 #include "llinventorytype.h"
 #include "llsingleton.h"
 #include "llinvtranslationbrdg.h"
+
+#include <array>
+#include <string>
+#include <string_view>
 
 class LLWearableType : public LLParamSingleton<LLWearableType>
 {
@@ -64,61 +67,26 @@ public:
         WT_NONE       = -1,
     };
 
-    // Most methods are wrappers for dictionary, but if LLWearableType is not initialized,
-    // they will crash. Whole LLWearableType is just wrapper for convinient calls.
-    const std::string&                  getTypeName(EType type);
-    const std::string&                  getTypeDefaultNewName(EType type);
+    // A type with no entry reads as WT_INVALID. These read a constant table
+    // and need no instance.
+    static std::string_view             getTypeName(EType type);
+    static std::string_view             getTypeDefaultNewName(EType type);
+    static LLAssetType::EType           getAssetType(EType type);
+    static EType                        typeNameToType(std::string_view type_name); // WT_INVALID when no type has the name
+    static LLInventoryType::EIconName   getIconName(EType type);
+    static bool                         getDisableCameraSwitch(EType type);
+    static bool                         getAllowMultiwear(EType type);
+
+    // The label is translated through the bridge the singleton was made with,
+    // so LLWearableType must be initialized to read one.
     const std::string&                  getTypeLabel(EType type);
-    LLAssetType::EType                  getAssetType(EType type);
-    EType                               typeNameToType(const std::string& type_name);
-    LLInventoryType::EIconName          getIconName(EType type);
-    bool                                getDisableCameraSwitch(EType type);
-    bool                                getAllowMultiwear(EType type);
 
     static EType                        inventoryFlagsToWearableType(U32 flags);
 
 private:
-    struct WearableEntry : public LLDictionaryEntry
-    {
-        WearableEntry(LLTranslationBridge::ptr_t& trans,
-            const std::string &name,
-            const std::string& default_new_name,
-            LLAssetType::EType assetType,
-            LLInventoryType::EIconName iconName,
-            bool disable_camera_switch = false,
-            bool allow_multiwear = true) :
-            LLDictionaryEntry(name),
-            mAssetType(assetType),
-            mDefaultNewName(default_new_name),
-            mLabel(trans->getString(name)),
-            mIconName(iconName),
-            mDisableCameraSwitch(disable_camera_switch),
-            mAllowMultiwear(allow_multiwear)
-        {
-
-        }
-        const LLAssetType::EType mAssetType;
-        const std::string mLabel;
-        const std::string mDefaultNewName;
-        LLInventoryType::EIconName mIconName;
-        bool mDisableCameraSwitch;
-        bool mAllowMultiwear;
-    };
-
-    class LLWearableDictionary : public LLDictionary<LLWearableType::EType, WearableEntry>
-    {
-    public:
-        LLWearableDictionary(LLTranslationBridge::ptr_t& trans);
-        ~LLWearableDictionary() {}
-
-// [RLVa:KB] - Checked: 2010-03-03 (RLVa-1.2.0a) | Added: RLVa-1.2.0a
-    protected:
-        // The default implementation asserts on 'notFound()' and returns -1 which isn't a valid EWearableType
-        LLWearableType::EType notFound() const override { return LLWearableType::WT_INVALID; }
-// [/RLVa:KB]
-    };
-
-    LLWearableDictionary mDictionary;
+    // One label for each entry: every type below WT_COUNT, WT_INVALID and WT_NONE.
+    static constexpr std::size_t ENTRY_COUNT = WT_COUNT + 2;
+    std::array<std::string, ENTRY_COUNT> mLabels;
 };
 
 #endif  // LL_LLWEARABLETYPE_H

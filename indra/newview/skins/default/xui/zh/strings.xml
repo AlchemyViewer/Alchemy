@@ -2793,15 +2793,6 @@ http://secondlife.com/support 求助解決問題。
 	<string name="Play Media">
 		播放/暫停媒體
 	</string>
-	<string name="IntelDriverPage">
-		http://www.intel.com/p/en_US/support/detect/graphics
-	</string>
-	<string name="NvidiaDriverPage">
-		http://www.nvidia.com/Download/index.aspx?lang=tw
-	</string>
-	<string name="AMDDriverPage">
-		http://support.amd.com/us/Pages/AMDSupportHub.aspx
-	</string>
 	<string name="MBCmdLineError">
 		解析命令列時發現錯誤。
 請參閱： http://wiki.secondlife.com/wiki/Client_parameters

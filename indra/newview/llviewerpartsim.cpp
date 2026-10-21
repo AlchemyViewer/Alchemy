@@ -409,7 +409,7 @@ void LLViewerPartGroup::updateParticles(const F32 lastdt)
             if (!posInGroup(part->mPosAgent, desired_size))
             {
                 // Transfer particles between groups
-                LLViewerPartSim::getInstance()->put(part) ;
+                LLViewerPartSim::getInstance()->put(part, desired_size, this) ;
                 mParticles[i] = mParticles.back() ;
                 mParticles.pop_back() ;
             }
@@ -558,7 +558,7 @@ void LLViewerPartSim::addPart(LLViewerPart* part)
 {
     if (sParticleCount < MAX_PART_COUNT)
     {
-        put(part);
+        put(part, calc_desired_size(LLViewerCamera::getInstance(), part->mPosAgent, part->mScale));
     }
     else
     {
@@ -569,7 +569,7 @@ void LLViewerPartSim::addPart(LLViewerPart* part)
 }
 
 
-LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part)
+LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part, F32 desired_size, const LLViewerPartGroup* leaving)
 {
     const F32 MAX_MAG = 1000000.f*1000000.f; // 1 million
     LLViewerPartGroup *return_group = NULL ;
@@ -582,13 +582,12 @@ LLViewerPartGroup *LLViewerPartSim::put(LLViewerPart* part)
     }
     else
     {
-        LLViewerCamera* camera = LLViewerCamera::getInstance();
-        F32 desired_size = calc_desired_size(camera, part->mPosAgent, part->mScale);
-
         S32 count = (S32) mViewerPartGroups.size();
         for (S32 i = 0; i < count; i++)
         {
-            if (mViewerPartGroups[i]->addPart(part, desired_size))
+            // The group the particle is leaving has already found it out of bounds. Asking it again
+            // could round the other way and take the particle back without counting it out.
+            if (mViewerPartGroups[i] != leaving && mViewerPartGroups[i]->addPart(part, desired_size))
             {
                 // We found a spatial group that we fit into, add us and exit
                 return_group = mViewerPartGroups[i];

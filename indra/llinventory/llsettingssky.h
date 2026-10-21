@@ -325,6 +325,11 @@ public:
     LLColor3 getSunlightColorClamped() const;
     LLColor3 getAmbientColorClamped() const;
 
+    // The sun's and moon's light as lit geometry takes it, LLPipeline's light 0 and the
+    // Environment block's atmospheric terms alike: each held to 1 by its brightest channel and
+    // clamped to [0, 1], and both black while neither is up.
+    void getLitLightColors(LLColor3& sun, LLColor3& moon) const;
+
     virtual LLSettingsBase::ptr_t buildDerivedClone() SETTINGS_OVERRIDE { return buildClone(); }
 
     static LLUUID GetDefaultAssetId();

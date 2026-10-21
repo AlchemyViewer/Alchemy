@@ -27,10 +27,12 @@
 
 #include "algpubuffer.h"
 
+#include "alframefences.h"
 #include "llgl.h"
 #include "llglheaders.h"
 #include "llrender.h"
 
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -39,7 +41,7 @@ U64 ALGPUBuffer::sBytesAllocated = 0;
 namespace
 {
     // The named forms of everything below but the clear, which has its own check. mHasDirectStateAccess vouches for
-    // the creation and upload calls; the copy and the read are resolved beside them but not checked with them.
+    // the creation, upload and flush calls; the copy and the read are resolved beside them but not checked with them.
     bool use_dsa()
     {
         return gGLManager.mHasDirectStateAccess && glCopyNamedBufferSubData && glGetNamedBufferSubData;
@@ -56,10 +58,10 @@ namespace
         return (value + multiple - 1) / multiple * multiple;
     }
 
-    // A store that stays mapped: GL 4.4's immutable storage, and a map of it.
+    // A store that stays mapped: GL 4.4's immutable storage, and a map of it, by name where DSA makes the store.
     bool can_map_persistent(bool dsa)
     {
-        return glBufferStorage && (dsa ? glNamedBufferStorage && glMapNamedBufferRange : glMapBufferRange != nullptr);
+        return glBufferStorage && (!dsa || (glNamedBufferStorage && glMapNamedBufferRange));
     }
 
     // Make a store of `size` bytes in buffer `name`, mapped persistently with `map_flags` unless they are 0. Returns the
@@ -176,6 +178,13 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
         return false;
     }
 
+    // A flushed write map needs a write map, and a map that reads what the GPU wrote stays coherent.
+    llassert(!(flags & FLUSH_EXPLICIT) || ((flags & STREAM) && !(flags & READBACK)));
+    if (!(flags & STREAM) || (flags & READBACK))
+    {
+        flags &= ~FLUSH_EXPLICIT;
+    }
+
     // Immutable where it resolved: the driver knows the store never moves, and a store only allocate() replaces is
     // all this class offers anyway. A STREAM store that is not mapped is uploaded to, as a DYNAMIC one is. The mutable
     // fallback's hint says who reads it: the CPU for READBACK, the GPU, from the CPU's writes or its own, otherwise.
@@ -190,11 +199,15 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
     U8* mapped = nullptr;
     if ((readback || stream) && can_map_persistent(dsa))
     {
-        // Coherent both ways, so neither side flushes ranges or issues client barriers: the fences the rings place are
-        // all the ordering they need. A readback store asks for memory the CPU reads quickly.
-        const GLbitfield map_flags = GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT
+        // Coherent both ways, so neither side flushes ranges or issues client barriers: the frame fences the rings wait
+        // on are all the ordering they need. FLUSH_EXPLICIT gives that up on the write side, where flushMapped()
+        // publishes instead; the storage takes no flush bit, only the map. A readback store asks for memory the CPU
+        // reads quickly.
+        const GLbitfield coherency = (flags & FLUSH_EXPLICIT) ? GL_MAP_FLUSH_EXPLICIT_BIT : GL_MAP_COHERENT_BIT;
+        const GLbitfield map_flags = GL_MAP_PERSISTENT_BIT | coherency
                                    | (readback ? GL_MAP_READ_BIT : 0) | (stream ? GL_MAP_WRITE_BIT : 0);
-        const GLbitfield storage_flags = map_flags | dynamic | (readback ? GL_CLIENT_STORAGE_BIT : 0);
+        const GLbitfield storage_flags = (map_flags & ~GL_MAP_FLUSH_EXPLICIT_BIT) | dynamic
+                                       | (readback ? GL_CLIENT_STORAGE_BIT : 0);
         mapped = make_store(name, dsa, size, data, storage_flags, map_flags, usage);
         if (!mapped)
         {
@@ -223,7 +236,7 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
         return false;
     }
 
-    if (label && gGLManager.mHasDebugOutput && glObjectLabel)
+    if (label && gDebugGL && gGLManager.mHasDebugOutput && glObjectLabel)
     {
         glObjectLabel(GL_BUFFER, name, -1, label);
     }
@@ -274,6 +287,7 @@ void ALGPUBuffer::upload(size_t offset, const void* data, size_t bytes)
     if (mMapped && (mFlags & STREAM))
     {
         memcpy(mMapped + offset, data, bytes);
+        flushMapped(offset, bytes);
     }
     else if (use_dsa())
     {
@@ -283,6 +297,31 @@ void ALGPUBuffer::upload(size_t offset, const void* data, size_t bytes)
     {
         glBindBuffer(GL_COPY_WRITE_BUFFER, mName);
         glBufferSubData(GL_COPY_WRITE_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes, data);
+        glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    }
+}
+
+void ALGPUBuffer::flushMapped(size_t offset, size_t bytes)
+{
+    if (!mMapped || !(mFlags & FLUSH_EXPLICIT) || bytes == 0)
+    {
+        return;
+    }
+    if (!in_range(offset, bytes, mSize))
+    {
+        llassert(false);
+        return;
+    }
+
+    // The flush is the mapping's, however the map was made.
+    if (use_dsa())
+    {
+        glFlushMappedNamedBufferRange(mName, (GLintptr)offset, (GLsizeiptr)bytes);
+    }
+    else
+    {
+        glBindBuffer(GL_COPY_WRITE_BUFFER, mName);
+        glFlushMappedBufferRange(GL_COPY_WRITE_BUFFER, (GLintptr)offset, (GLsizeiptr)bytes);
         glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
     }
 }
@@ -418,15 +457,13 @@ bool ALGPUReadback::allocate(size_t bytes, U32 slots, const char* label)
     return true;
 }
 
+ALFrameFences& ALGPUReadback::frames() const
+{
+    return mFrameFences ? *mFrameFences : gGL.frameFences();
+}
+
 void ALGPUReadback::release()
 {
-    for (Slot& slot : mSlots)
-    {
-        if (slot.mFence && gGLManager.mInited)
-        {
-            glDeleteSync(static_cast<GLsync>(slot.mFence));
-        }
-    }
     mSlots.clear();
     mStore.release();
     mSlotBytes  = 0;
@@ -454,15 +491,41 @@ bool ALGPUReadback::request(const ALGPUBuffer& src, size_t src_offset, size_t by
         gGL.memoryBarrier(LLRender::BARRIER_BUFFER_UPDATE);
     }
 
-    Slot& slot = mSlots[mNext];
     mStore.copyFrom(src, src_offset, (size_t)mNext * mSlotStride, bytes);
-    slot.mFence   = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-    slot.mBytes   = bytes;
-    slot.mFlushed = false;
+    issueNext(bytes);
+    return true;
+}
+
+bool ALGPUReadback::requestPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, size_t bytes)
+{
+    if (!mStore.isAllocated() || width <= 0 || height <= 0 || bytes == 0 || bytes > mSlotBytes)
+    {
+        llassert(false);
+        return false;
+    }
+    if (mPending == (U32)mSlots.size())
+    {
+        return false;
+    }
+
+    // Through the pack buffer binding, which nothing else in the renderer caches, and back to none after: while a
+    // buffer is bound there, a read writes into it at the offset it is given in place of a pointer.
+    const uintptr_t offset = (uintptr_t)mNext * mSlotStride;
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, mStore.getGLName());
+    glReadPixels(x, y, width, height, format, type, reinterpret_cast<void*>(offset));
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    issueNext(bytes);
+    return true;
+}
+
+void ALGPUReadback::issueNext(size_t bytes)
+{
+    Slot& slot = mSlots[mNext];
+    slot.mFrame = frames().frame();
+    slot.mBytes = bytes;
 
     mNext = (mNext + 1) % (U32)mSlots.size();
     ++mPending;
-    return true;
 }
 
 bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
@@ -477,34 +540,22 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
     Slot& slot = mSlots[oldest];
     llassert(bytes <= slot.mBytes);
 
-    bool waited = false;
-    if (GLsync fence = static_cast<GLsync>(slot.mFence))
+    ALFrameFences& fences = frames();
+    if (!fences.isComplete(slot.mFrame))
     {
-        // The first look flushes the fence toward the GPU, so that a later one can find it signalled.
-        GLenum result = glClientWaitSync(fence, slot.mFlushed ? 0 : GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-        slot.mFlushed = true;
-        while (wait && result == GL_TIMEOUT_EXPIRED)
-        {
-            result = glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull /* 1s */);
-        }
-        if (result == GL_TIMEOUT_EXPIRED)
+        if (!wait)
         {
             return false;
         }
-        glDeleteSync(fence);
-        slot.mFence = nullptr;
-        // A wait that failed has said nothing about the copy, so the read below is one that waits for it.
-        if (result == GL_WAIT_FAILED)
+        // For the open frame this waits for every command issued so far, the copy among them.
+        while (!fences.wait(slot.mFrame, 1000000000ull /* 1s */))
         {
-            LL_WARNS_ONCE("GPUBuffer") << "A readback fence could not be waited on; reading back synchronously"
-                                       << LL_ENDL;
-            waited = true;
         }
     }
 
     const size_t offset = (size_t)oldest * mSlotStride;
     const size_t copied = llmin(bytes, slot.mBytes);
-    if (mStore.getMapped() && !waited)
+    if (mStore.getMapped())
     {
         memcpy(out, mStore.getMapped() + offset, copied);
     }
@@ -544,7 +595,7 @@ bool ALGPUStream::allocate(size_t bytes, U32 regions, const char* label)
     {
         return false;
     }
-    mFences.assign(regions, nullptr);
+    mReadIn.assign(regions, 0);
     if (!mStore.getMapped())
     {
         mStaging.resize(bytes);
@@ -554,16 +605,14 @@ bool ALGPUStream::allocate(size_t bytes, U32 regions, const char* label)
     return true;
 }
 
+ALFrameFences& ALGPUStream::frames() const
+{
+    return mFrameFences ? *mFrameFences : gGL.frameFences();
+}
+
 void ALGPUStream::release()
 {
-    for (void* fence : mFences)
-    {
-        if (fence && gGLManager.mInited)
-        {
-            glDeleteSync(static_cast<GLsync>(fence));
-        }
-    }
-    mFences.clear();
+    mReadIn.clear();
     mStaging.clear();
     mStore.release();
     mRegionBytes  = 0;
@@ -585,31 +634,32 @@ U8* ALGPUStream::map()
     // A region mapped and not yet published is the one to write still.
     if (mWriting < 0)
     {
-        // Every read of the region published last was issued before this call, so a fence here follows them all.
+        // Every read of the region published last was issued before this call, in this frame or an earlier one.
+        ALFrameFences& fences = frames();
         if (mPublished >= 0)
         {
-            mFences[mPublished] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+            mReadIn[mPublished] = fences.frame();
             mPublished = -1;
         }
 
         const U32 region = mNext;
-        mNext = (mNext + 1) % (U32)mFences.size();
-        if (GLsync fence = static_cast<GLsync>(mFences[region]))
+        mNext = (mNext + 1) % (U32)mReadIn.size();
+        // Finished already, unless the GPU is as many frames behind as there are regions, or the ring came round
+        // within the frame: then the wait, which polls first, waits for every command of that frame.
+        if (!fences.isComplete(mReadIn[region]))
         {
-            // Signalled already, unless the GPU is as many frames behind as there are regions.
-            if (glClientWaitSync(fence, 0, 0) == GL_TIMEOUT_EXPIRED)
+            bool stalled = false;
+            if (!fences.wait(mReadIn[region], 1000000000ull /* 1s */, &stalled))
             {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("GPU stream stall");
-                ++mStalls;
-                if (glClientWaitSync(fence, GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull /* 1s */) == GL_TIMEOUT_EXPIRED)
-                {
-                    LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
-                                               << LL_ENDL;
-                }
+                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
+                                           << LL_ENDL;
             }
-            glDeleteSync(fence);
-            mFences[region] = nullptr;
+            if (stalled)
+            {
+                ++mStalls;
+            }
         }
+        mReadIn[region] = 0;
         mWriting = (S32)region;
     }
 

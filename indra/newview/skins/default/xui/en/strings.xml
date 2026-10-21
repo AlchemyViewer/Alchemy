@@ -3943,9 +3943,6 @@ Expected .wav, .tga, .bmp, .jpg, .jpeg, or .anim
 	<string name="Play Media">Play/Pause Media</string>
 
 	<!-- Drivers support/update pages -->
-	<string name="IntelDriverPage">http://www.intel.com/p/en_US/support/detect/graphics</string>
-	<string name="NvidiaDriverPage">http://www.nvidia.com/Download/index.aspx?lang=en-us</string>
-	<string name="AMDDriverPage">http://support.amd.com/us/Pages/AMDSupportHub.aspx</string>
 
 
 	<!-- OSMessageBox messages -->
@@ -4006,6 +4003,13 @@ Running in window.
 		[APP_NAME] is unable to run because your video card drivers did not install properly, are out of date, or are for unsupported hardware. Please make sure you have the latest video card drivers and even if you do have the latest, try reinstalling them.
 
 If you continue to receive this message, contact the [SUPPORT_SITE].
+	</string>
+	<string name="MBGLVersionErr">
+		[APP_NAME] needs [MISSING], which this graphics driver does not provide:
+
+[RENDERER], OpenGL [VERSION]
+
+Installing the latest driver for this graphics card may provide it. If the latest driver does not, [APP_NAME] cannot run on this graphics card.
 	</string>
     <string name="MBOutOfMemoryTitle">Out Of Memory</string>
     <string name="MBOutOfMemoryErr">
@@ -4911,6 +4915,7 @@ Abuse Report</string>
   <string name="New Daycycle">New Daycycle</string>
   <string name="New Water">New Water</string>
   <string name="New Sky">New Sky</string>
+  <string name="New Settings">New Settings</string>
   
 
   <string name="/bow">/bow</string>

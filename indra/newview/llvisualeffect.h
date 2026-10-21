@@ -89,7 +89,9 @@ public:
     EVisualEffectType getType() const     { return m_eType;}
     void              setEnabled(bool enable) { m_fEnabled = enable; }
 
-    virtual void      run(const LLVisualEffectParams* pParams) = 0;
+    // An effect that draws in more than one pass steps pParams between them itself, so
+    // what it leaves as the destination is where its result is.
+    virtual void      run(LLVisualEffectParams* pParams) = 0;
 
 protected:
     void              setPriority(U32 priority) { m_nPriority = priority; }

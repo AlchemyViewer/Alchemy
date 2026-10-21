@@ -726,6 +726,8 @@ public:
     void handleLateArrivals();
     void resetTime(F32 timeout);
     static S32 countActive() { return static_cast<S32>(sActiveHoldingPatterns.size()); }
+    // The idle polls that finish an attempt, deleting it, go unrun as the viewer quits.
+    static void deleteAll();
     S32 index() { return mIndex; }
 
 private:
@@ -774,6 +776,16 @@ LLWearableHoldingPattern::LLWearableHoldingPattern():
     sActiveHoldingPatterns.insert(this);
     LL_DEBUGS("Avatar") << "HP " << index() << " created" << LL_ENDL;
     selfStartPhase("holding_pattern");
+}
+
+// static
+void LLWearableHoldingPattern::deleteAll()
+{
+    const type_set_hp active = sActiveHoldingPatterns; // each one erases itself
+    for (LLWearableHoldingPattern* holder : active)
+    {
+        delete holder;
+    }
 }
 
 LLWearableHoldingPattern::~LLWearableHoldingPattern()
@@ -1055,7 +1067,7 @@ void LLWearableHoldingPattern::recoverMissingWearable(LLWearableType::EType type
 
         // Try to recover by replacing missing wearable with a new one.
     LLNotificationsUtil::add("ReplacedMissingWearable");
-    LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getInstance()->getTypeName(type)
+    LL_DEBUGS("Avatar") << "Wearable of type '" << LLWearableType::getTypeName(type)
                 << "' could not be downloaded.  Replaced inventory item with default wearable." << LL_ENDL;
     LLViewerWearable* wearable = LLWearableList::instance().createNewWearable(type, gAgentAvatarp);
 
@@ -2175,7 +2187,7 @@ void LLAppearanceMgr::filterWearableItems(
                 continue;
 //            S32 start_index = llmax(0,size-max_per_type);
 // [SL:KB] - Patch: Appearance-Misc | Checked: 2010-05-11 (Catznip-2.0)
-            S32 start_index = llmax(0, size - ((LLWearableType::instance().getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
+            S32 start_index = llmax(0, size - ((LLWearableType::getAllowMultiwear((LLWearableType::EType)i)) ? max_per_type : 1));
 // [/SL:KB[
             for (S32 j = start_index; j<size; j++)
             {
@@ -4713,6 +4725,7 @@ LLAppearanceMgr::LLAppearanceMgr():
 LLAppearanceMgr::~LLAppearanceMgr()
 {
     mActive = false;
+    LLWearableHoldingPattern::deleteAll();
 }
 
 void LLAppearanceMgr::setAttachmentInvLinkEnable(bool val)

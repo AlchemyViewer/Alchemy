@@ -120,7 +120,7 @@
 #include "lltoolpie.h"
 #include "lltoolselectland.h"
 #include "lltrans.h"
-#include "llviewerdisplay.h" //for gWindowResized
+#include "llviewerdisplay.h"
 #include "llviewergenericmessage.h"
 #include "llviewerhelp.h"
 #include "llviewermenufile.h"   // init_menu_file()
@@ -2426,8 +2426,9 @@ class LLAdvancedPurgeShaderCache : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
+        // Every program is built again with the frame's other changes, from source now that its binary is gone.
         LLViewerShaderMgr::instance()->clearShaderCache();
-        LLViewerShaderMgr::instance()->setShaders();
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         return true;
     }
 };
@@ -8883,7 +8884,8 @@ class LLToggleShaderControl : public view_listener_t
         bool checked = gSavedSettings.getBOOL( control_name );
         gSavedSettings.setBOOL( control_name, !checked );
         LLPipeline::refreshCachedSettings();
-        LLViewerShaderMgr::instance()->setShaders();
+        // The programs are built from the binary cache, or not, as the setting now says.
+        gPipeline.markRenderInputsDirty(ALRenderInputRequests::Change::Programs);
         return !checked;
     }
 };
@@ -9436,8 +9438,18 @@ void handle_grab_baked_texture(EBakedTextureIndex baked_tex_index)
     const LLUUID folder_id = gInventory.findCategoryUUIDForType(LLFolderType::assetTypeToFolderType(asset_type));
     if(folder_id.notNull())
     {
-        std::string name;
-        name = "Baked " + LLAvatarAppearance::getDictionary()->getBakedTexture(baked_tex_index)->mNameCapitalized + " Texture";
+        // The bake's name as capitalized words: "upper_body" is "Upper Body".
+        std::string words(LLAvatarAppearance::getDictionary()->getBakedTexture(baked_tex_index)->mName);
+        LLStringUtil::replaceChar(words, '-', ' ');
+        LLStringUtil::replaceChar(words, '_', ' ');
+        for (size_t i = 0; i < words.size(); i++)
+        {
+            if (i == 0 || words[i - 1] == ' ')
+            {
+                words[i] = (char)toupper((unsigned char)words[i]);
+            }
+        }
+        std::string name = "Baked " + words + " Texture";
 
         LLUUID item_id;
         item_id.generate();
@@ -10094,7 +10106,7 @@ class LLEditEnableTakeOff : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         std::string clothing = userdata.asString();
-        LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(clothing);
+        LLWearableType::EType type = LLWearableType::typeNameToType(clothing);
 //      if (type >= LLWearableType::WT_SHAPE && type < LLWearableType::WT_COUNT)
 // [RLVa:KB] - Checked: 2010-03-20 (RLVa-1.2.0c) | Modified: RLVa-1.2.0a
         // NOTE: see below - enable if there is at least one wearable on this type that can be removed
@@ -10117,7 +10129,7 @@ class LLEditTakeOff : public view_listener_t
             LLAppearanceMgr::instance().removeAllClothesFromAvatar();
         else
         {
-            LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(clothing);
+            LLWearableType::EType type = LLWearableType::typeNameToType(clothing);
             if (type >= LLWearableType::WT_SHAPE
                 && type < LLWearableType::WT_COUNT
                 && (gAgentWearables.getWearableCount(type) > 0))

@@ -33,4 +33,6 @@ layout (std140) uniform Deferred
     float ssao_max_radius;
     float ssao_factor;
     float ssao_factor_inv;
+    float shadow_pcss_scale;   // receiver-blocker depth gap to penumbra radius, in texels
+    float specular_exponent;   // the Blinn-Phong exponent at full glossiness
 };

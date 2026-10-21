@@ -511,7 +511,9 @@ void LLStatBar::draw()
     if (mCachedShowsCurrent)
     {
         mLastDisplayValue = current;
-        if (is_approx_equal((F32)(S32)display_value, display_value))
+        // Whole without a cast to S32, which a stat with nothing recorded yet (NaN) or
+        // one past an S32's range could not take.
+        if (llfinite(display_value) && is_approx_equal(std::trunc(display_value), display_value))
         {
             decimal_digits = 0;
         }

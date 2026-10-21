@@ -54,8 +54,11 @@ class LLUICtrl;
 // (ALFarPlane::drawDistanceCeiling): range takes the ceiling as its maximum, and bound, the
 // control bound to RenderFarClip, shows the setting held to it. The setting itself is left
 // alone, so switching back to reverse-Z gives back what was chosen. A control capped once is
-// capped again whenever AlchemyRenderReverseZ changes, while it lives.
+// capped again whenever the depth convention changes, while it lives.
 void cap_draw_distance_control(LLF32UICtrl* range, LLUICtrl* bound);
+// Caps again every draw distance control still alive, for the depth convention now in force
+// (LLPipeline::updateReverseZ).
+void recap_draw_distance_controls();
 
 // saved at end of session
 extern LLControlGroup gSavedSettings;

@@ -85,6 +85,15 @@ void main()
     vec3 final_color = vec3(0);
     vec2 tc          = getScreenCoord(vary_fragcoord);
     vec3 pos         = getPosition(tc).xyz;
+
+    // Outside the light's sphere from the position alone, before the G-buffer is read, as
+    // spotLightF and multiPointLightF test it.
+    vec3  lv = trans_center.xyz-pos;
+    if (length(lv) >= size)
+    {
+        discard;
+    }
+
     GBufferInfo gb = getGBuffer(tc);
 
     vec3 n = gb.normal;
@@ -93,15 +102,10 @@ void main()
     vec4 spec    = gb.specular;
 
     // Common half vectors calcs
-    vec3  lv = trans_center.xyz-pos;
     vec3  h, l, v = -normalize(pos);
     float nh, nl, nv, vh, lightDist;
     calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
-    if (lightDist >= size)
-    {
-        discard;
-    }
     float dist = lightDist / size;
     float dist_atten = calcLegacyDistanceAttenuation(dist, falloff);
 
@@ -159,7 +163,7 @@ void main()
             float gtdenom = 2 * nh;
             float gt = max(0,(min(gtdenom * nv / vh, gtdenom * nl / vh)));
 
-            if (nh > 0.0)
+            if (dot(n, h) > 0.0) // raw: calcHalfVectors floors nh above 0
             {
                 float scol = fres*blinnPhongLobe(nh, spec.a)*gt/(nh*nl);
                 final_color += lit*scol*color.rgb*spec.rgb;

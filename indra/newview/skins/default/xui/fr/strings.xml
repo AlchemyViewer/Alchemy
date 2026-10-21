@@ -2803,15 +2803,6 @@ Si vous continuez de recevoir ce message, contactez l’assistance Second Life �
 	<string name="Play Media">
 		Lire/pauser le média
 	</string>
-	<string name="IntelDriverPage">
-		http://www.intel.com/p/fr_FR/support/detect/graphics
-	</string>
-	<string name="NvidiaDriverPage">
-		http://www.nvidia.com/Download/index.aspx?lang=fr
-	</string>
-	<string name="AMDDriverPage">
-		http://support.amd.com/us/Pages/AMDSupportHub.aspx
-	</string>
 	<string name="MBCmdLineError">
 		Une erreur est survenue lors de la lecture de la ligne de commande.
 Merci de consulter : http://wiki.secondlife.com/wiki/Client_parameters

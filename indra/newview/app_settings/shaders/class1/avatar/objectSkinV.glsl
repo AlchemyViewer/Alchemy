@@ -90,11 +90,20 @@ mat3x4 getSkinBlend()
     return b;
 }
 
-// Skinned direction (normals, tangents): rotation and scale only, translation-free.
+// Skinned direction in the surface (tangents): rotation and scale only, translation-free.
 // Exactly what mat*(p+d) - mat*p computed, without the catastrophic cancellation.
 vec3 skinDirection(mat3x4 b, vec3 dir)
 {
     return mat3(b) * dir;
+}
+
+// Skinned normal: through the cofactor of the blend's rotation and scale, its inverse transpose
+// times its determinant, so a joint scaled unevenly tilts the normal as it tilts the surface.
+// Not unit length.
+vec3 skinNormal(mat3x4 b, vec3 n)
+{
+    mat3 m = mat3(b);
+    return mat3(cross(m[1], m[2]), cross(m[2], m[0]), cross(m[0], m[1])) * n;
 }
 
 // Skinned position, AVATAR-LOCAL -- the rebase origin is NOT applied here.

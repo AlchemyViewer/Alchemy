@@ -82,9 +82,18 @@ LLUICtrlFactory::LLUICtrlFactory()
 
 LLUICtrlFactory::~LLUICtrlFactory()
 {
-    // go ahead and leak mDummyPanel since this is static destructor time
-    //delete mDummyPanel;
-    //mDummyPanel = NULL;
+    if (mDummyPanel)
+    {
+        // What was built on it is given a parent of its own by whoever asked for it, and goes
+        // with that parent. One still here never was, and goes with the panel; were its maker
+        // to delete it later as well, it would go twice, so it is named.
+        for (LLView* child : *mDummyPanel->getChildList())
+        {
+            LL_WARNS() << "\"" << child->getName() << "\" was built with no parent and never given one" << LL_ENDL;
+        }
+        delete mDummyPanel;
+        mDummyPanel = NULL;
+    }
 }
 
 void LLUICtrlFactory::loadWidgetTemplate(const std::string& widget_tag, LLInitParam::BaseBlock& block)

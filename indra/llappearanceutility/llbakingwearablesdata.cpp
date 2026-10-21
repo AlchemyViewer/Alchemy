@@ -123,7 +123,7 @@ void LLBakingWearablesData::asLLSD(LLSD& sd) const
             wearable->asLLSD(wearable_sd);
             wearable_type_sd.append(wearable_sd);
         }
-        sd[LLWearableType::getInstance()->getTypeName(wearable_type)] = wearable_type_sd;
+        sd[LLWearableType::getTypeName(wearable_type)] = wearable_type_sd;
     }
 }
 

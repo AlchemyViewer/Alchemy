@@ -33,7 +33,6 @@ RenderAvatarPhysicsLODFactor 1	1.0
 RenderAvatarMaxNonImpostors 1   16
 RenderAvatarMaxComplexity          1	350000
 RenderAutoMuteSurfaceAreaLimit     1	1000.0
-RenderCubeMap				1	1
 RenderFarClip				1	256
 RenderFlexTimeFactor		1	1.0
 RenderFogRatio				1	4.0
@@ -86,7 +85,6 @@ RenderDisableVintageMode           1   1
 RenderMaxTextureResolution         1   2048
 RenderReflectionProbeCount  1   256
 AlchemyRenderWaterWaves    1   1
-RenderReflectionProbeIrradianceResolution 1 16
 AlchemyRenderUBOUpdateMode 1 4
 
 //
@@ -429,7 +427,11 @@ RenderGLMultiThreadedTextures       1   1
 list NVIDIA
 RenderGLMultiThreadedTextures      1   0
 
-list GL3
+// Intel's drivers short of OpenGL 4.6 (LLGLManager::isIntelLegacy):
+// chiefly Haswell and Broadwell, which report 4.3 or 4.4. Every entry is
+// held at each start, not only when a level is applied (holdUnavailable).
+// The viewer also keeps them from compute and the shader cache.
+list IntelLegacy
 RenderFSAAType  			0	0
 RenderFSAASamples           0   0
 RenderReflectionsEnabled    0   0
@@ -437,8 +439,9 @@ RenderReflectionProbeDetail	0	0
 RenderMirrors				0	0
 RenderGLMultiThreadedTextures 0 0
 RenderGLMultiThreadedMedia 0 0
-RenderDisableVintageMode           1   0
+RenderDisableVintageMode           0   0
 RenderReflectionProbeCount  0   0
+AlchemyRenderWaterWaves     0   0
 
 list TexUnit16orLess
 RenderTerrainPBRDetail      1   -1

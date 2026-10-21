@@ -60,6 +60,12 @@ LLVector4 LLDrawPoolAlpha::sWaterPlane;
 // minimum alpha before discarding a fragment
 static const F32 MINIMUM_ALPHA = 0.004f; // ~ 1/255
 
+// static
+void LLDrawPoolAlpha::setCoverageCutoff(LLGLSLShader* shader)
+{
+    shader->setMinimumAlpha(MINIMUM_ALPHA);
+}
+
 LLDrawPoolAlpha::LLDrawPoolAlpha(U32 type) :
         LLRenderPass(type), target_shader(NULL),
         mColorSFactor(LLRender::BF_UNDEF), mColorDFactor(LLRender::BF_UNDEF),
@@ -129,6 +135,10 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
     // correctly -- and the threshold is just a rule that deletes faint glass, veils and gauze
     // the moment an avatar impostors, then restores them when it stops.
     shader->setMinimumAlpha(MINIMUM_ALPHA);
+
+    // The alpha pool's faces carry coverage in their vertex alpha, which the masked fullbright
+    // program tests with the texture's when the pool draws with it (fullbrightF.glsl).
+    shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 1.f);
 
     //also prepare rigged variant
     if (shader->mRiggedVariant && shader->mRiggedVariant != shader)
@@ -225,6 +235,7 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 
         simple_shader->bind();
         simple_shader->setMinimumAlpha(0.33f);
+        simple_shader->uniform1f(LLShaderMgr::VERTEX_ALPHA_COVERAGE, 1.f);
 
         // mask off color buffer writes as we're only writing to depth buffer
         gGL.setColorMask(false, false);
@@ -319,7 +330,7 @@ void LLDrawPoolAlpha::renderDebugAlpha()
         gGL.diffuseColor4f(0, 1, 0, 1);
         pushUntexturedBatches(LLRenderPass::PASS_INVISIBLE);
 
-        gHighlightProgram.mRiggedVariant->bind();
+        gHighlightProgram.riggedVariant()->bind();
         gGL.diffuseColor4f(1, 0, 0, 1);
 
         pushRiggedBatches(LLRenderPass::PASS_ALPHA_MASK_RIGGED, false);
@@ -544,15 +555,17 @@ void LLDrawPoolAlpha::renderPbrEmissives(std::vector<LLDrawInfo*>& emissives)
         llassert(draw->mGLTFMaterial);
         LLGLDisable cull_face(draw->mGLTFMaterial->mDoubleSided ? GL_CULL_FACE : 0);
         draw->mGLTFMaterial->bind(draw->mTexture);
+        setup_texture_matrix(*draw);
         draw->mVertexBuffer->setBuffer();
         draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
+        teardown_texture_matrix(*draw);
     }
 }
 
 void LLDrawPoolAlpha::renderRiggedEmissives(std::vector<LLDrawInfo*>& emissives)
 {
     LLGLDepthTest depth(GL_TRUE, GL_FALSE); //disable depth writes since "emissive" is additive so sorting doesn't matter
-    LLGLSLShader* shader = emissive_shader->mRiggedVariant;
+    LLGLSLShader* shader = emissive_shader->riggedVariant();
     shader->bind();
     shader->uniform1f(LLShaderMgr::EMISSIVE_BRIGHTNESS, 1.f);
 
@@ -591,8 +604,10 @@ void LLDrawPoolAlpha::renderRiggedPbrEmissives(std::vector<LLDrawInfo*>& emissiv
 
         LLGLDisable cull_face(draw->mGLTFMaterial->mDoubleSided ? GL_CULL_FACE : 0);
         draw->mGLTFMaterial->bind(draw->mTexture);
+        setup_texture_matrix(*draw);
         draw->mVertexBuffer->setBuffer();
         draw->mVertexBuffer->drawRange(LLRender::TRIANGLES, draw->mStart, draw->mEnd, draw->mCount, draw->mOffset);
+        teardown_texture_matrix(*draw);
     }
 }
 
@@ -708,7 +723,7 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
                     target_shader = pbr_shader;
                     if (params.mAvatar != nullptr)
                     {
-                        target_shader = target_shader->mRiggedVariant;
+                        target_shader = target_shader->riggedVariant();
                     }
 
                     // shader must be bound before LLGLTFMaterial::bind
@@ -786,8 +801,8 @@ void LLDrawPoolAlpha::renderAlpha(U32 mask, bool depth_only, bool rigged)
 
                     if (params.mAvatar != nullptr)
                     {
-                        llassert(target_shader->mRiggedVariant != nullptr);
-                        target_shader = target_shader->mRiggedVariant;
+                        llassert(target_shader->mRiggedVariant || !target_shader->isComplete());
+                        target_shader = target_shader->riggedVariant();
                     }
 
                     if (current_shader != target_shader)

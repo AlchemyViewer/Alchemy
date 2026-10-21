@@ -124,6 +124,7 @@ if(AL_BUILD_TESTS)
       tests/llrect_test.cpp
       tests/llsdutil_math_test.cpp
       tests/llvector4a_test.cpp
+      tests/llvolume_test.cpp
       tests/m3math_test.cpp
       tests/mathmisc_test.cpp
       tests/v2math_test.cpp
@@ -135,8 +136,10 @@ if(AL_BUILD_TESTS)
       tests/v4math_test.cpp
       tests/xform_test.cpp
     # Nanoseconds per element for the SIMD math the geometry rebuild spends
-    # its time in, and for the choices the SIMD series makes by a number.
-    BENCH_SOURCES tests/llsimd_bench.cpp
+    # its time in, and for the choices the SIMD series makes by a number;
+    # what generating prims, sculpts and their tangents, a flexible frame,
+    # a mesh LOD's cacheOptimize and each index order cost.
+    BENCH_SOURCES tests/llsimd_bench.cpp tests/llvolume_bench.cpp
     LIBRARIES llmath llcommon
   )
 

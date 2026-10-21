@@ -68,6 +68,11 @@ U32 LLGLSLShader::sMaxGLTFMaterials = 0;
 U32 LLGLSLShader::sMaxGLTFNodes = 0;
 bool LLGLSLShader::sProfileEnabled = false;
 std::set<LLGLSLShader*>& LLGLSLShader::sInstances = *(new std::set<LLGLSLShader*>());
+std::set<LLGLSLShader*>& LLGLSLShader::sConfigured = *(new std::set<LLGLSLShader*>());
+U32 LLGLSLShader::sLoadGeneration = 0;
+U32 LLGLSLShader::sLinked = 0;
+U32 LLGLSLShader::sKept = 0;
+LLUUID LLGLSLShader::sSharedObjectsKey;
 LLGLSLShader::defines_map_t LLGLSLShader::sGlobalDefines;
 // Starts at 1, and a default-constructed program starts level with it (see the member's
 // initialiser) rather than behind: a program must not apply the environment uniform set before
@@ -184,6 +189,13 @@ namespace
     inline U32 uniform_bits(GLint v)   { return std::bit_cast<U32>(v); }
     inline U32 uniform_bits(GLuint v)  { return v; }
     inline U32 uniform_bits(GLfloat v) { return std::bit_cast<U32>(v); }
+
+#if LL_WINDOWS
+    // A value as GL takes it for a bool: false at zero, -0 included, and true anywhere else, NaN included. A float is
+    // tested by its bits, since /fp:fast leaves a NaN's comparison with zero to the compiler.
+    inline GLint bool_value(GLfloat v) { return (std::bit_cast<U32>(v) & 0x7fffffffu) != 0; }
+    inline GLint bool_value(GLuint v)  { return v != 0u; }
+#endif
 
     // Every sampler type GL has: the float ones, shadow included, and the int and unsigned forms of each dimension.
     bool is_sampler_type(GLenum type)
@@ -672,6 +684,7 @@ LLGLSLShader::~LLGLSLShader()
     // dangle. It is walked for name uniqueness, so a stale entry is a use-after-free rather
     // than a leak. Recursion covers the subtree: each child erases itself on the way out.
     sInstances.erase(this);
+    sConfigured.erase(this);
     forget_profile_records(this);
 
     // Nor may the bound-program statics name this object. They are cleared without a GL call,
@@ -741,6 +754,7 @@ void LLGLSLShader::configureVariantClone(LLGLSLShader& dst, const std::string& n
     dst.mShaderFiles = mShaderFiles;
     dst.mShaderLevel = mShaderLevel;
     dst.mShaderGroup = mShaderGroup;
+    dst.mOnLink      = mOnLink;
 }
 
 // Build one corner: this program's config plus the requested defines, compiled. Deriving every
@@ -848,10 +862,16 @@ void LLGLSLShader::unload()
 
     // After unloadInternal: unbinding a bound program ends its profile queries by the
     // features they were begun with.
+    clearConfiguration();
+}
+
+void LLGLSLShader::clearConfiguration()
+{
     mShaderFiles.clear();
     mDefines.clear();
     mPermutationsAdded = false;
     mFeatures = LLShaderFeatures();
+    mOnLink = nullptr;
 }
 
 void LLGLSLShader::unloadInternal()
@@ -879,6 +899,9 @@ void LLGLSLShader::unloadInternal()
         size = 0;
     }
     mUniform.clear();
+#if LL_WINDOWS
+    mBoolLocations.clear();
+#endif
     // program state is going away with the program
     mUniformCache.clear();
     mMinimumAlpha = MINIMUM_ALPHA_UNSET;
@@ -897,6 +920,8 @@ void LLGLSLShader::unloadInternal()
 
         mProgramObject = 0;
     }
+    mLinkedHash.setNull();
+    mLinkedVariants = 0;
 
     stop_glerror();
 }
@@ -927,15 +952,33 @@ bool LLGLSLShader::createShader(U32 variants)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    sConfigured.insert(this);
+    mLoadGeneration = sLoadGeneration;
+
+    // Linked as configured, its variants with it: nothing to build. The level is the one it linked at, which a
+    // fallback may have taken below the one asked for.
+    const LLUUID configured = hash();
+    if (mProgramObject != 0 && configured == mLinkedHash && variants == mLinkedVariants)
+    {
+        mShaderLevel       = mLinkedLevel;
+        mPermutationsAdded = false;
+        forEachVariant([](LLGLSLShader&) { ++sKept; });
+        return true;
+    }
+
+    if (!linkProgram(variants))
+    {
+        return false;
+    }
+    mLinkedHash     = configured;
+    mLinkedVariants = variants;
+    return true;
+}
+
+bool LLGLSLShader::linkProgram(U32 variants)
+{
     // Recreating the program invalidates any variants built from the previous configuration.
     freeOwnedVariants();
-
-    // Start level with the current generation rather than behind it: a program must not apply
-    // the environment uniform set before there IS an environment. gpu_benchmark() builds and
-    // binds a program during feature detection, which runs from LLViewerWindow's constructor,
-    // long before LLEnvironment exists. Nothing is lost by waiting -- LLEnvironment::update()
-    // bumps the generation every frame, so a program built mid-session applies on the next one.
-    mEnvUniformsGeneration = sEnvironmentGeneration;
 
     unloadInternal();
 
@@ -1031,7 +1074,7 @@ bool LLGLSLShader::createShader(U32 variants)
         {
             LL_SHADER_LOADING_WARNS() << "Failed to link using shader level " << mShaderLevel << " trying again using shader level " << (mShaderLevel - 1) << LL_ENDL;
             mShaderLevel--;
-            return createShader(variants);
+            return linkProgram(variants);
         }
         else
         {
@@ -1066,12 +1109,40 @@ bool LLGLSLShader::createShader(U32 variants)
         mRiggedVariant = this;
     }
 
+    if (success)
+    {
+        mLinkedLevel   = mShaderLevel;
+        mStandInWarned = false;
+        ++mLinkCount;
+        ++sLinked;
+        // Behind the current generation once every uniform is mapped, so the program's next bind applies the
+        // environment's uniform set: mapUniforms binds the program before it knows a location, and a set applied
+        // there would reach none of them. A program built during a frame is bound in it before the frame's
+        // environment update, the mirrors' pass among the first, and would otherwise draw with them unset. The
+        // viewer applies no environment before there is one (LLViewerShaderMgr::updateShaderUniforms):
+        // gpu_benchmark() builds and binds a program during feature detection, long before LLEnvironment exists.
+        mEnvUniformsGeneration = sEnvironmentGeneration - 1;
+        if (mOnLink)
+        {
+            mOnLink(*this);
+        }
+    }
+
     for (EVariant axis : { VARIANT_RIGGED, VARIANT_CLASSIC, VARIANT_MIRROR })
     {
         if (success && (variants & axis))
         {
             success = createVariant(axis);
         }
+    }
+
+    // A variant it was asked for that did not build fails the program with it. The passes bind the variants they draw
+    // with and set their uniforms through this program, so a base left built without one would draw skinned geometry
+    // unskinned, or set its uniforms on the stand-in bind(true) binds in the variant's place.
+    if (!success && mProgramObject != 0)
+    {
+        freeOwnedVariants();
+        unloadInternal();
     }
 
     return success;
@@ -1281,6 +1352,12 @@ void LLGLSLShader::mapUniform(const gl_uniform_data_t& gl_uniform)
 
         LLStaticHashedString hashedName(name);
         mUniformMap[hashedName] = location;
+#if LL_WINDOWS
+        if (type == GL_BOOL && gGLManager.mIsAMD)
+        {
+            mBoolLocations.push_back(location);
+        }
+#endif
 
         LL_DEBUGS("ShaderUniform") << "Uniform " << name << " is at location " << location << LL_ENDL;
 
@@ -1489,6 +1566,9 @@ bool LLGLSLShader::mapUniforms()
     mActiveImageUnits = 0;
     mUniform.clear();
     mUniformMap.clear();
+#if LL_WINDOWS
+    mBoolLocations.clear();
+#endif
     mTexture.clear();
     mImage.clear();
     mStorage.clear();
@@ -1713,11 +1793,99 @@ void LLGLSLShader::releaseCompareSamplerUnits()
     ALTextureSlot::sSamplerBindsShadowCycle += ALTextureSlot::sSamplerBinds - binds_before;
 }
 
+namespace
+{
+    // The program a program that did not build binds in its place. It reads no attribute and places every vertex at
+    // one point, so its draws cover nothing, and discards whatever might be left: a failed program draws nothing rather
+    // than taking the viewer down. Built on first need in each context (LLGLSLShader::releaseStandIn).
+    GLuint sStandIn = 0;
+
+    GLuint stand_in_stage(GLenum type, const char* source)
+    {
+        const GLuint stage = glCreateShader(type);
+        glShaderSource(stage, 1, &source, nullptr);
+        glCompileShader(stage);
+        return stage;
+    }
+
+    GLuint stand_in()
+    {
+        if (sStandIn == 0)
+        {
+            const GLuint vertex =
+                stand_in_stage(GL_VERTEX_SHADER, "#version 400\nvoid main() { gl_Position = vec4(0.0, 0.0, 0.0, 1.0); }\n");
+            const GLuint fragment = stand_in_stage(GL_FRAGMENT_SHADER, "#version 400\nvoid main() { discard; }\n");
+            const GLuint program  = glCreateProgram();
+            glAttachShader(program, vertex);
+            glAttachShader(program, fragment);
+            glLinkProgram(program);
+            glDetachShader(program, vertex);
+            glDetachShader(program, fragment);
+            glDeleteShader(vertex);
+            glDeleteShader(fragment);
+
+            GLint linked = GL_FALSE;
+            glGetProgramiv(program, GL_LINK_STATUS, &linked);
+            if (linked == GL_TRUE)
+            {
+                sStandIn = program;
+            }
+            else
+            {
+                LL_WARNS("Shader") << "The stand-in for programs that did not build did not link either" << LL_ENDL;
+                glDeleteProgram(program);
+            }
+        }
+        return sStandIn;
+    }
+}
+
+// static
+void LLGLSLShader::releaseStandIn()
+{
+    if (sStandIn != 0)
+    {
+        if (sCurBoundShader == sStandIn)
+        {
+            unbind();
+        }
+        glDeleteProgram(sStandIn);
+        sStandIn = 0;
+    }
+}
+
+void LLGLSLShader::bindStandIn()
+{
+    gGL.flush();
+
+    const GLuint program = stand_in();
+    if (sCurBoundShader != program || sCurBoundShaderPtr != this)
+    {
+        endProfileQuery();
+        LLVertexBuffer::unbind();
+        glUseProgram(program);
+        sCurBoundShader    = program;
+        sCurBoundShaderPtr = this;
+        LLVertexBuffer::setupClientArrays(0);
+    }
+
+    if (!mStandInWarned)
+    {
+        LL_WARNS("Shader") << mName << " did not build: what it draws is not drawn" << LL_ENDL;
+        mStandInWarned = true;
+    }
+}
+
 void LLGLSLShader::bind()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
-    llassert_always(mProgramObject != 0);
+    // A program that did not build draws nothing, and its uniform and texture calls set nothing.
+    if (mProgramObject == 0)
+    {
+        bindStandIn();
+        return;
+    }
 
     gGL.flush();
 
@@ -1787,9 +1955,13 @@ void LLGLSLShader::warnIfVariantMissed() const
 
 void LLGLSLShader::bind(bool rigged)
 {
-    if (rigged)
+    if (rigged && !mRiggedVariant)
     {
-        llassert_always(mRiggedVariant);
+        // This program did not build, or the skinned variant asked of it did not: a skinned draw draws nothing.
+        bindStandIn();
+    }
+    else if (rigged)
+    {
         // Checked on THIS program, not on the corner about to be bound. A rigged corner carries
         // no per-pass variants of its own, so the check inside its bind() can never fire -- which
         // would let base.bind(true) skip a classic or mirror corner silently, the one route the
@@ -1820,6 +1992,10 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLTexture* texture, ALSampler key)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1841,6 +2017,10 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler ke
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1862,6 +2042,10 @@ S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampl
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1888,6 +2072,10 @@ S32 LLGLSLShader::unbindTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -1907,7 +2095,7 @@ S32 LLGLSLShader::unbindTexture(S32 uniform)
 
 S32 LLGLSLShader::getTextureChannel(S32 uniform) const
 {
-    return mTexture[uniform];
+    return uniform >= 0 && uniform < (S32)mTexture.size() ? mTexture[uniform] : -1;
 }
 
 S32 LLGLSLShader::getImageUnit(S32 uniform, U32 element) const
@@ -1994,12 +2182,20 @@ void LLGLSLShader::bindStorageBuffer(S32 block, const ALGPUBuffer& buffer, size_
 
 void LLGLSLShader::dispatch(U32 groups_x, U32 groups_y, U32 groups_z)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(sCurBoundShaderPtr == this && mIsCompute);
     gGL.dispatchCompute(groups_x, groups_y, groups_z);
 }
 
 void LLGLSLShader::dispatchThreads(U32 x, U32 y, U32 z)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(mComputeLocalSize[0] > 0 && mComputeLocalSize[1] > 0 && mComputeLocalSize[2] > 0);
     if (mComputeLocalSize[0] == 0 || mComputeLocalSize[1] == 0 || mComputeLocalSize[2] == 0)
     {
@@ -2012,6 +2208,10 @@ void LLGLSLShader::dispatchThreads(U32 x, U32 y, U32 z)
 
 void LLGLSLShader::dispatchIndirect(const ALGPUBuffer& buffer, size_t offset)
 {
+    if (mProgramObject == 0)
+    {
+        return;
+    }
     llassert(sCurBoundShaderPtr == this && mIsCompute);
     gGL.dispatchComputeIndirect(buffer, offset);
 }
@@ -2028,6 +2228,10 @@ S32 LLGLSLShader::enableTexture(S32 uniform)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -2042,6 +2246,10 @@ S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
 
+    if (mTexture.empty())
+    {
+        return -1;
+    }
     if (uniform < 0 || uniform >= (S32)mTexture.size())
     {
         LL_WARNS_ONCE("Shader") << "Uniform index out of bounds. Size: " << (S32)mUniform.size() << " index: " << uniform << LL_ENDL;
@@ -2089,6 +2297,68 @@ S32 LLGLSLShader::disableTexture(S32 uniform, ALTextureSlot::eTextureType mode)
     return index;
 }
 
+#if LL_WINDOWS
+// A plain loop: MSVC's std::find over ints calls its vectorized search out of line, an empty range included, and a
+// program has few bools.
+bool LLGLSLShader::isBoolLocation(GLint location) const
+{
+    for (GLint bool_location : mBoolLocations)
+    {
+        if (bool_location == location)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+#endif
+
+void LLGLSLShader::uploadFloat(GLint location, GLfloat x) const
+{
+#if LL_WINDOWS
+    if (isBoolLocation(location))
+    {
+        glUniform1i(location, bool_value(x));
+        return;
+    }
+#endif
+    glUniform1f(location, x);
+}
+
+void LLGLSLShader::uploadFloats(GLint location, U32 count, const GLfloat* v) const
+{
+#if LL_WINDOWS
+    if (isBoolLocation(location))
+    {
+        // Converted on the stack, the heap only for an array longer than a bool array is in practice.
+        GLint stack_bools[16];
+        std::vector<GLint> heap_bools;
+        GLint* bools = stack_bools;
+        if (count > std::size(stack_bools))
+        {
+            heap_bools.resize(count);
+            bools = heap_bools.data();
+        }
+        std::transform(v, v + count, bools, [](GLfloat x) { return bool_value(x); });
+        glUniform1iv(location, count, bools);
+        return;
+    }
+#endif
+    glUniform1fv(location, count, v);
+}
+
+void LLGLSLShader::uploadUInt(GLint location, GLuint x) const
+{
+#if LL_WINDOWS
+    if (isBoolLocation(location))
+    {
+        glUniform1i(location, bool_value(x));
+        return;
+    }
+#endif
+    glUniform1ui(location, x);
+}
+
 void LLGLSLShader::uniform1i(U32 index, GLint x)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
@@ -2127,7 +2397,7 @@ void LLGLSLShader::uniform1f(U32 index, GLfloat x)
         const GLint location = mUniform[index];
         if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(x)))
         {
-            glUniform1f(location, x);
+            uploadFloat(location, x);
         }
     }
 }
@@ -2142,7 +2412,7 @@ void LLGLSLShader::fastUniform1f(U32 index, GLfloat x)
     llassert(index < mUniform.size());
     llassert(mUniform[index] >= 0);
     const GLint location = mUniform[index];
-    glUniform1f(location, x);
+    uploadFloat(location, x);
     mUniformCache.uploaded(location, UniformCache::Kind::Float, uniform_bits(x));
 }
 
@@ -2162,7 +2432,7 @@ void LLGLSLShader::uniform1ui(U32 index, GLuint x)
         const GLint location = mUniform[index];
         if (location >= 0 && mUniformCache.changed(location, UniformCache::Kind::UInt, uniform_bits(x)))
         {
-            glUniform1ui(location, x);
+            uploadUInt(location, x);
         }
     }
 }
@@ -2322,11 +2592,11 @@ void LLGLSLShader::uniform1fv(U32 index, U32 count, const GLfloat* v)
         if (count != 1)
         {
             mUniformCache.forget(location);
-            glUniform1fv(location, count, v);
+            uploadFloats(location, count, v);
         }
         else if (mUniformCache.changed(location, UniformCache::Kind::Float, uniform_bits(v[0])))
         {
-            glUniform1fv(location, 1, v);
+            uploadFloats(location, 1, v);
         }
     }
 }
@@ -2656,7 +2926,7 @@ void LLGLSLShader::uniform1i(const LLStaticHashedString& uniform, GLint v)
 }
 void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GLfloat w)
 {
-    if (mAttribute[index] > 0)
+    if (index < mAttribute.size() && mAttribute[index] > 0)
     {
         glVertexAttrib4f(mAttribute[index], x, y, z, w);
     }
@@ -2664,7 +2934,7 @@ void LLGLSLShader::vertexAttrib4f(U32 index, GLfloat x, GLfloat y, GLfloat z, GL
 
 void LLGLSLShader::vertexAttrib4fv(U32 index, GLfloat* v)
 {
-    if (mAttribute[index] > 0)
+    if (index < mAttribute.size() && mAttribute[index] > 0)
     {
         glVertexAttrib4fv(mAttribute[index], v);
     }
@@ -2733,10 +3003,14 @@ LLUUID LLGLSLShader::hash()
         hash_obj.update(define_pair.second);
 
     }
-    // Injected by loadShaderFile() rather than carried in either defines map, so it has to be
-    // folded in by hand -- otherwise a reverse-Z toggle would hand back binaries compiled under
-    // the other depth convention.
+    // Injected by loadShaderFile() rather than carried in either defines map, so they have to be
+    // folded in by hand -- otherwise a reverse-Z or HDR toggle would hand back binaries compiled
+    // under the other depth convention, or unpacking the other normal attachment layout
+    // (GBUFFER_NORM_HDR).
     hash_obj.update(&LLRender::sReverseZ, sizeof(LLRender::sReverseZ));
+    hash_obj.update(&LLRender::sGBufferNormHDR, sizeof(LLRender::sGBufferNormHDR));
+    // The shared objects every program links against, which sGlobalDefines alone need not describe.
+    hash_obj.update(sSharedObjectsKey.mData, UUID_BYTES);
     hash_obj.update(&mFeatures, sizeof(LLShaderFeatures));
     // Not the raw renderer: radeonsi's carries the kernel release, and a kernel update would
     // orphan every binary.

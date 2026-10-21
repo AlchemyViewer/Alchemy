@@ -48,6 +48,7 @@ public:
 
     S32 getNumPostDeferredPasses() override;
     void beginPostDeferredPass(S32 pass) override;
+    void endPostDeferredPass(S32 pass) override;
     void renderPostDeferred(S32 pass) override;
 
     void prerender() override;

@@ -802,9 +802,6 @@ bool LLFeatureManager::loadGPUClass()
     if (extractGLDeviceModel(mGPUString)) {
         LL_INFOS("RenderInit") << "GPU String has been stripped of driver identification" << LL_ENDL;
     }
-    // defaults
-    mGPUSupported = true;
-
     return true; // indicates that a gpu value was established
 }
 
@@ -851,6 +848,39 @@ void LLFeatureManager::applyRecommendedSettings()
     }
 }
 
+// Sets the control a feature names to a value, in the control's own type.
+static void set_feature_control(const std::string& name, F32 value)
+{
+    LLControlVariable* ctrl = gSavedSettings.getControl(name);
+    if(ctrl == NULL)
+    {
+        LL_WARNS("RenderInit") << "AHHH! Control setting " << name << " does not exist!" << LL_ENDL;
+        return;
+    }
+
+    // handle all the different types
+    if(ctrl->isType(TYPE_BOOLEAN))
+    {
+        gSavedSettings.setBOOL(name, (bool)value);
+    }
+    else if (ctrl->isType(TYPE_S32))
+    {
+        gSavedSettings.setS32(name, (S32)value);
+    }
+    else if (ctrl->isType(TYPE_U32))
+    {
+        gSavedSettings.setU32(name, (U32)value);
+    }
+    else if (ctrl->isType(TYPE_F32))
+    {
+        gSavedSettings.setF32(name, value);
+    }
+    else
+    {
+        LL_WARNS("RenderInit") << "AHHH! Control variable is not a numeric type!" << LL_ENDL;
+    }
+}
+
 void LLFeatureManager::applyFeatures(bool skipFeatures)
 {
     // see featuretable.txt / featuretable_linux.txt / featuretable_mac.txt
@@ -874,41 +904,28 @@ void LLFeatureManager::applyFeatures(bool skipFeatures)
             }
         }
 
-        // get the control setting
-        LLControlVariable* ctrl = gSavedSettings.getControl(mIt->first);
-        if(ctrl == NULL)
-        {
-            LL_WARNS("RenderInit") << "AHHH! Control setting " << mIt->first << " does not exist!" << LL_ENDL;
-            continue;
-        }
+        set_feature_control(mIt->first, getRecommendedValue(mIt->first));
+    }
+}
 
-        // handle all the different types
-        if(ctrl->isType(TYPE_BOOLEAN))
+void LLFeatureManager::holdUnavailable(const std::string& name)
+{
+    LLFeatureList* maskp = findMask(name);
+    if (!maskp)
+    {
+        return;
+    }
+    for (const auto& [feature, info] : maskp->getFeatures())
+    {
+        if (!info.mAvailable)
         {
-            gSavedSettings.setBOOL(mIt->first, (bool)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_S32))
-        {
-            gSavedSettings.setS32(mIt->first, (S32)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_U32))
-        {
-            gSavedSettings.setU32(mIt->first, (U32)getRecommendedValue(mIt->first));
-        }
-        else if (ctrl->isType(TYPE_F32))
-        {
-            gSavedSettings.setF32(mIt->first, (F32)getRecommendedValue(mIt->first));
-        }
-        else
-        {
-            LL_WARNS("RenderInit") << "AHHH! Control variable is not a numeric type!" << LL_ENDL;
+            set_feature_control(feature, info.mRecommendedLevel);
         }
     }
 }
 
 void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 {
-    LLViewerShaderMgr::sSkipReload = true;
     flush_glerror(); // Whatever may have already happened (e.g., to cause us to change), don't let confuse it with new initializations.
     applyBaseMasks();
 
@@ -917,10 +934,11 @@ void LLFeatureManager::setGraphicsLevel(U32 level, bool skipFeatures)
 
     maskFeatures(features);
 
+    // Each feature's setting marks what it changes as it is set; the frame applies them all with one reload, and the
+    // reload asked for here as well covers what changed without a listener.
     applyFeatures(skipFeatures);
 
-    LLViewerShaderMgr::sSkipReload = false;
-    LLViewerShaderMgr::instance()->setShaders();
+    gPipeline.markRenderInputsDirty();
     gPipeline.refreshCachedSettings();
 }
 
@@ -938,21 +956,10 @@ void LLFeatureManager::applyBaseMasks()
 
     mFeatures = maskp->getFeatures();
 
-    // mask class
+    // The class has no list of its own: it picks the graphics level (applyRecommendedSettings).
     if (mGPUClass >= 0 && mGPUClass < 6)
     {
-        const char* class_table[] =
-        {
-            "Class0",
-            "Class1",
-            "Class2",
-            "Class3",
-            "Class4",
-            "Class5",
-        };
-
-        LL_INFOS("RenderInit") << "Setting GPU Class to " << class_table[mGPUClass] << LL_ENDL;
-        maskFeatures(class_table[mGPUClass]);
+        LL_INFOS("RenderInit") << "Setting GPU Class to Class" << (S32)mGPUClass << LL_ENDL;
     }
     else
     {
@@ -972,32 +979,6 @@ void LLFeatureManager::applyBaseMasks()
     if (gGLManager.mIsIntel)
     {
         maskFeatures("Intel");
-
-        static constexpr F32 TARGET_GL_VERSION =
-#if LL_DARWIN
-            4.09f;
-#else
-            4.59f;
-#endif
-
-        // check against 3.33 to avoid applying this fallback twice
-        if (gGLManager.mGLVersion < TARGET_GL_VERSION && gGLManager.mGLVersion > 3.33f)
-        {
-            // if we don't have OpenGL 4.6 on intel, set it to OpenGL 3.3
-            // we also want to trigger the GL3 fallbacks on these chipsets
-            // this is expected to be mainly pre-Haswell Intel HD Graphics 4X00 and 5X00.
-            // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
-            // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
-            // https://docs.blender.org/manual/en/latest/troubleshooting/gpu/windows/intel.html#legacy-intel-hd-4000-5000
-            // https://www.intel.com/content/www/us/en/support/articles/000005524/graphics.html
-            // this will disable things like reflection probes, HDR, FXAA and SMAA
-            LL_INFOS("RenderInit") << "Applying Intel integrated pre-Haswell fallback.  Downgrading feature usage to OpenGL 3.3" << LL_ENDL;
-            gGLManager.mGLVersion = llmin(gGLManager.mGLVersion, 3.33f);
-            gGLManager.mGLVersionString += " 3.3 fallback";  // for ViewerStats reporting
-            // and select GLSL version for OpenGL 3.2
-            gGLManager.mGLSLVersionMajor = 3;
-            gGLManager.mGLSLVersionMinor = 20;
-        }
     }
     if (gGLManager.mIsApple)
     {
@@ -1007,36 +988,32 @@ void LLFeatureManager::applyBaseMasks()
     {
         maskFeatures("NonAppleGPU");
     }
-    if (gGLManager.mGLVersion < 3.f)
-    {
-        maskFeatures("OpenGLPre30");
-    }
-    if (gGLManager.mNumTextureImageUnits <= 8)
-    {
-        maskFeatures("TexUnit8orLess");
-    }
+    // GL 4.1 has at least 16 texture units, so this is the fewest a context past initGL has.
     if (gGLManager.mNumTextureImageUnits <= 16)
     {
         maskFeatures("TexUnit16orLess");
-    }
-    if (gGLManager.mVRAM < 2048)
-    {
-        maskFeatures("VRAMLT2GB");
     }
     if (!gGLManager.mHasAnisotropic || 2.f > gGLManager.mMaxAnisotropy)
     {
         maskFeatures("AnisotropicMissing");
     }
-    if (gGLManager.mGLVersion < 3.99f)
+    if (gGLManager.isIntelLegacy())
     {
-        maskFeatures("GL3");
+        // A lot of these chips claim 4.3 or 4.4 support, but don't seem to work.
+        // https://code.blender.org/2019/04/supported-gpus-in-blender-2-80/
+        // https://docs.blender.org/manual/en/latest/troubleshooting/gpu/windows/intel.html#legacy-intel-hd-4000-5000
+        // https://www.intel.com/content/www/us/en/support/articles/000005524/graphics.html
+        LL_INFOS("RenderInit") << "Intel driver below OpenGL 4.6: holding to the IntelLegacy list" << LL_ENDL;
+        maskFeatures("IntelLegacy");
 
-        // make sure to disable background context activity in GL3 mode
-        LLImageGLThread::sEnabledMedia = false;
-        LLImageGLThread::sEnabledTextures = false;
+        // At every start, before anything reads the settings, and not only when a graphics level is
+        // applied: what the list holds is held for a user who already had it on, as the false GL
+        // version once held it whatever the settings said. The upload threads, vintage mode, the
+        // probes and the waves are all on the list.
+        holdUnavailable("IntelLegacy");
 
-        // Make extra sure that vintage mode also gets enabled.
-        gSavedSettings.setBOOL("RenderDisableVintageMode", false);
+        // HDR is on no list: vintage mode switches it, and only when vintage mode changes.
+        gSavedSettings.setBOOL("RenderHDREnabled", false);
     }
     if (gGLManager.mMaxVaryingVectors <= 16)
     {

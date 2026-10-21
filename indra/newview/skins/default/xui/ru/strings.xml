@@ -2800,15 +2800,6 @@ support@secondlife.com.
 	<string name="Play Media">
 		Мультимедиа – воспроизведение/пауза
 	</string>
-	<string name="IntelDriverPage">
-		http://www.intel.com/p/en_US/support/detect/graphics
-	</string>
-	<string name="NvidiaDriverPage">
-		http://www.nvidia.com/Download/index.aspx?lang=ru-ru
-	</string>
-	<string name="AMDDriverPage">
-		http://support.amd.com/us/Pages/AMDSupportHub.aspx
-	</string>
 	<string name="MBCmdLineError">
 		Ошибка при анализе командной строки.
 См.: http://wiki.secondlife.com/wiki/Client_parameters
