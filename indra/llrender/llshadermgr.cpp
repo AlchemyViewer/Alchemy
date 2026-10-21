@@ -2228,6 +2228,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skyHdriMap");
     mReservedUniforms.push_back("skyHdriRotation");
     mReservedUniforms.push_back("skyHdriScale");
+    mReservedUniforms.push_back("skyCubeFace");
 
     // Selection outlines, hover glow and wireframe (ALSelectionOutline)
     mReservedUniforms.push_back("selection_id");

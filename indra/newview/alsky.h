@@ -36,6 +36,7 @@
 
 #include "llpointer.h"
 #include "llquaternion.h"
+#include "llrendertarget.h"
 #include "lluuid.h"
 #include "llvertexbuffer.h"
 #include "v3color.h"
@@ -47,27 +48,19 @@
 #include <array>
 #include <vector>
 
-class LLCubeMap;
 class LLGLSLShader;
-class LLImageRaw;
 class LLViewerFetchedTexture;
 class LLViewerTexture;
 
 /// How far from the camera the sun's and the moon's quads lie.
 const F32 HEAVENLY_BODY_DIST = HORIZON_DIST - 20.f;
 
-/// The sun or the moon as the sky draws it: its direction and turn as the sky sets them, its disk, and its quad about
-/// the camera (ALSkyLayers::bodyCorners) as the frame draws it. Its colour and whether it is up are the current sky's
-/// (LLSettingsSky).
+/// The sun or the moon as the sky draws it: its disk, and its quad about the camera (ALSkyLayers::bodyCorners) as the
+/// frame draws it. Its direction, its turn, its colour and whether it is up are the current sky's (LLSettingsSky).
 class LLHeavenBody
 {
 public:
     explicit LLHeavenBody(F32 disk_radius) : mDiskRadius(disk_radius) {}
-
-    void setDirection(const LLVector3& direction) { mDirection = direction; }
-
-    const LLQuaternion& getRotation() const { return mRotation; }
-    void setRotation(const LLQuaternion& rotation) { mRotation = rotation; }
 
     F32 getDiskRadius() const { return mDiskRadius; }
 
@@ -75,16 +68,14 @@ public:
     void setCorners(const ALSkyLayers::Corners& corners) { mCorners = corners; }
 
 private:
-    LLVector3            mDirection;
-    LLQuaternion         mRotation;
     F32                  mDiskRadius;
     ALSkyLayers::Corners mCorners{};
 };
 
 /// The sky, drawn by no object and no pool: the sun and the moon, the sky's textures and their fetch, the star field's
-/// buffer and the meteors, the fog colour the tracker's beacons take, and the legacy environment cube the shiny and
-/// probe-less reflections read where reflection probes are off. Its pure parts are alrender's (ALStarField, ALSkyDome,
-/// ALSkyLayers).
+/// buffer and the meteors, the fog colour the tracker's beacons take, and the environment cube the shiny and probe-less
+/// reflections read where reflection probes are off. Its pure parts are alrender's (ALStarField, ALSkyLayers,
+/// ALSkyCube).
 ///
 /// Owned by LLPipeline, as the water's surface is. It runs at three fixed points, the same in every view: the stars
 /// after renderGeomDeferred's pool loop (renderStars), the composite at the sky's pass (bindComposite), and the
@@ -102,9 +93,9 @@ public:
     ALSky(const ALSky&) = delete;
     ALSky& operator=(const ALSky&) = delete;
 
-    /// Takes the frame's sky: the bodies' directions, colour and quads and whether each is up, the textures the current
-    /// sky names fetched at the priority they are drawn at, and the environment cube where it is wanted. Once a main
-    /// frame, before anything draws; the first lays the star field out.
+    /// Takes the frame's sky: the bodies' quads, and the textures the current sky names fetched at the priority they are
+    /// drawn at. Once a main frame, with the context current, before anything draws; the first asks for the star field,
+    /// which is laid out off the main thread, and the stars draw once it lands.
     void update();
 
     /// Whether an update has run, so there is a sky to draw.
@@ -112,22 +103,31 @@ public:
 
     /// The bodies and the textures taken again once the frame's environment update (LLEnvironment::update) has moved
     /// the sky on, before the main view draws them. The views drawn before it, the mirrors, draw the sky as the frame
-    /// began with it, as they take its environment: their faces' environment updates do not move the sky on. Nothing
-    /// before the first update.
+    /// began with it, as they take its environment: their faces' environment updates do not move the sky on. And where
+    /// the sky has changed, the fog colour and the environment cube, from the Environment block as the main view takes
+    /// it rather than as the last capture left it, which an irradiance pass greys. Nothing before the first update.
     void followEnvironment();
 
     /// Lets go of everything at shutdown, ahead of the texture list.
     void cleanup();
 
-    /// The GL objects of its own, released with the context (destroyGL): the stars' buffer and the cube's, made again
-    /// when next drawn.
+    /// The GL objects of its own, released with the context (destroyGL): the stars' buffer and the cube's strip, made
+    /// again when next drawn. The cube is the pipeline's to release (ALRenderResourcePlan::Id::EnvironmentCube).
     void releaseGL();
 
-    /// After the context returns: the cube is built again on the next update.
+    /// After the context returns: the cube is baked again when the environment is next taken (followEnvironment).
     void restoreGL();
 
-    /// The environment cube built again on the next update, whatever has changed: after its programs are loaded.
+    /// The environment cube baked again when the environment is next taken (followEnvironment), whatever has changed:
+    /// after its program is loaded.
     void forceSkyUpdate();
+
+    /// The environment cube's GL name, which the pipeline's reconcile makes (allocateEnvironmentCube) and frees as its
+    /// plan says (ALRenderResourcePlan::Id::EnvironmentCube): only where reflection probes are off.
+    U32* environmentCubeTexture() { return &mCube; }
+
+    /// A new environment cube (ALSkyCube::allocate), baked when the environment is next taken (followEnvironment).
+    void allocateEnvironmentCube();
 
     /// The sun's direction, CFR (+x at, +z up, +y right), as LLSettingsVOSky::updateSettings and the mouselook tool set
     /// it: the sun bump maps are lit by (getBumpSunDir). The bodies take the current sky's own directions.
@@ -187,19 +187,18 @@ public:
     /// only the irradiance takes it), and in the main view while its split screen shows any of it.
     static bool useHDRISky();
 
-    /// The legacy environment cube, bound on texture @a channel for a program's environmentMap, where reflection probes
-    /// are off and there is one. False, with nothing bound, otherwise.
+    /// The environment cube, bound on texture @a channel for a program's environmentMap, where the plan wants one
+    /// (reflection probes off): neutral until it is first baked (ALSkyCube::NEUTRAL). False otherwise, with the unit let
+    /// go, so the reader's disable finds nothing there.
     bool bindEnvironmentCube(S32 channel) const;
 
     /// The debug beacons toward the sun and the moon from the agent, as the menu shows them.
     void addSunMoonBeacons();
 
 private:
-    // The bodies' directions and turns as the current sky has them.
-    void updateDirections();
     // The textures the sky names, fetched where they changed; the bloom's only while the sun bloom is drawn.
     void fetchTextures();
-    // The bodies' directions, turns and quads, and the textures, from the current sky.
+    // The bodies' quads and the textures, from the current sky.
     void takeSky();
 
     // A star field as the General queue lays it out for the buffer: plain data, handed over whole.
@@ -227,12 +226,40 @@ private:
     // as its envelope has carried it this far, its colour times that envelope, and its width class.
     void meteors(std::vector<ALSkyLayers::Meteor>& out) const;
 
-    // The legacy environment cube: built on the CPU a face a frame, through LLAtmospherics, where probes are off.
-    void initCubeMap();
-    void updateCubeMap();
-    void cacheEnvironment(AtmosphericsVars& vars) const;
-    void initSkyTextureDirs(S32 side, S32 tile);
-    void createSkyTexture(AtmosphericsVars& vars, S32 side, S32 tile);
+    // windlight/windlightDomeF.glsl's loose uniforms, as bindDome sets them: the rainbow's and the halo's levels, which
+    // a sky with neither the sun nor the moon up has none of, the glow, the density and the light, and the camera's
+    // place in the dome's frame and the dome's radius.
+    struct DomeUniforms
+    {
+        F32       mMoisture   = 0.f;
+        F32       mDroplet    = 0.f;
+        F32       mIce        = 0.f;
+        F32       mGlowFactor = 0.f;
+        F32       mDensity    = 0.f;
+        LLVector4 mLightNorm;
+        F32       mCamHeight  = 0.f;
+        F32       mDomeRadius = 0.f;
+    };
+    DomeUniforms domeUniforms() const;
+
+    // What the environment cube and the fog colour are worked from: windlightDome's terms of the Environment block, its
+    // loose uniforms, and the rainbow and halo maps as far as they have loaded.
+    struct EnvironmentKey
+    {
+        std::array<F32, 40> mTerms{};
+        std::array<S32, 4>  mMaps{};
+
+        // Whether the two bake alike: the same maps, as far loaded, and terms within ALSkyCube::TERM_TOLERANCE of each
+        // other (ALSkyCube::termsAlike).
+        bool alike(const EnvironmentKey& other) const;
+    };
+    EnvironmentKey environmentKey() const;
+
+    // Where the sky has changed since it was last taken, at most every so often, or where something asked: the fog
+    // colour, and the environment cube baked where there is one. The sky is taken only once the cube holds it.
+    void updateEnvironment();
+    // False where the cube could not be baked: its program did not build, or its strip could not be made.
+    bool bakeEnvironmentCube();
 
     static void renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& direction, LLColor4 color);
 
@@ -295,18 +322,13 @@ private:
 
     LLAtmospherics mAtmospherics;
 
-    // The legacy environment cube, and the shiny faces it is made from.
-    struct ShinyFace
-    {
-        LLPointer<LLImageRaw> mImage;
-        std::vector<LLColor4> mColours;
-        std::vector<LLVector3> mDirs;
-    };
-    std::array<ShinyFace, 6> mShiny;
-    LLPointer<LLCubeMap>     mCubeMap;
-    AtmosphericsVars         mAtmosphericsVars;
-    AtmosphericsVars         mLastAtmosphericsVars;
-    S32                      mCubeMapUpdateStage = -1; // -1 idle; 0-5 a face a frame; 6 finalizing
-    bool                     mForceUpdate = true;
-    F64                      mCubeMapUpdated = 0.0; // LLFrameTimer::getTotalSeconds() at the last finished cube
+    // The environment cube and the strip its faces are drawn into; and the sky it was last taken from, when it was last
+    // tried, whether it must be taken again whatever has changed, and whether that is because the last bake did not
+    // happen, which is tried again when next due rather than at once.
+    U32            mCube = 0;
+    LLRenderTarget mCubeStrip;
+    EnvironmentKey mEnvironmentKey;
+    F64            mEnvironmentUpdated = 0.0; // LLFrameTimer::getTotalSeconds()
+    bool           mEnvironmentDirty = true;
+    bool           mEnvironmentRetry = false;
 };

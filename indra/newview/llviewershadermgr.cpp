@@ -223,6 +223,7 @@ LLGLSLShader            gCASProgram;
 LLGLSLShader            gDeferredPostNoDoFProgram;
 LLGLSLShader            gDeferredStarProgram;
 LLGLSLShader            gDeferredStarQuadProgram;
+LLGLSLShader            gDeferredSkyCubeProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
 LLGLSLShader            gHUDFullbrightShinyProgram;
 LLGLSLShader            gNormalMapGenProgram;
@@ -1382,6 +1383,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gCASProgram.unload();
         gDeferredStarProgram.unload();
         gDeferredStarQuadProgram.unload();
+        gDeferredSkyCubeProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
 
@@ -3167,6 +3169,21 @@ void LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredStarQuadProgram);
 
         built(gDeferredStarQuadProgram.createShader(), gDeferredStarQuadProgram);
+    }
+
+    if (!mInputs.mGlobal.mProbes)
+    {
+        // WindLight's dome baked into the environment cube the shiny and probe-less reflections read (ALSkyCube), where
+        // reflection probes are off.
+        gDeferredSkyCubeProgram.mName = "Sky Environment Cube Program";
+        gDeferredSkyCubeProgram.mShaderFiles.clear();
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("deferred/skyCubeF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredSkyCubeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredSkyCubeProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+
+        built(gDeferredSkyCubeProgram.createShader(), gDeferredSkyCubeProgram);
     }
 
     {

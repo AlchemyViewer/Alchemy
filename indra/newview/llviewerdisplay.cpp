@@ -780,8 +780,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLVOAvatar::allocateImpostors();
     }
 
-    // The sky as the frame begins with it, before anything draws: the mirrors below draw it, and the previews and
-    // impostor bakes read its environment cube.
+    // The sky as the frame begins with it, before anything draws: the mirrors below draw it.
     if (!gDisconnected && !LLApp::isExiting())
     {
         LLAppViewer::instance()->pingMainloopTimeout("Display:Sky");
@@ -843,7 +842,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Env Update");
             // update all the sky/atmospheric/water settings
             LLEnvironment::instance().update(LLViewerCamera::getInstance());
-            // The sky's bodies and textures as the update has moved it on, for the main view.
+            // The sky's bodies and textures as the update has moved it on, for the main view, and its fog colour and
+            // environment cube from the Environment block the main view takes.
             gPipeline.mSky.followEnvironment();
         }
 

@@ -129,6 +129,7 @@ public:
         SMAASearch,
         SMAASample,
         ToneCurve,
+        EnvironmentCube, ///< the sky's cube for the shiny and probe-less reflections, without probes (ALSkyCube)
 
         COUNT
     };

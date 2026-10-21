@@ -32,9 +32,10 @@
 
 #include "alsky.h"
 
+#include "alskycube.h"
+
 #include "llagent.h"
 #include "llappviewer.h" // gFrameIntervalSeconds
-#include "llcubemap.h"
 #include "llenvironment.h"
 #include "llglslshader.h"
 #include "llglstates.h"
@@ -59,12 +60,8 @@ namespace
     constexpr F32 SUN_DISK_RADIUS  = 0.5f;
     constexpr F32 MOON_DISK_RADIUS = SUN_DISK_RADIUS * 0.9f;
 
-    // The legacy environment cube: a face's edge, how long a finished cube holds before the next may start, and how
-    // far the sky must move to start one.
-    constexpr S32 CUBE_RESOLUTION             = 64;
-    constexpr S32 CUBE_FACES                  = 6;
-    constexpr F64 CUBE_UPDATE_SECONDS         = 0.25;
-    constexpr F32 UPDATE_MIN_DELTA_THRESHOLD  = 0.0005f;
+    // How long the fog colour and the environment cube hold before a changed sky is taken again.
+    constexpr F64 ENVIRONMENT_UPDATE_SECONDS = 0.25;
 
     // The global generator, for the meteors.
     F32 globalRandom() { return ll_frand(); }
@@ -145,12 +142,12 @@ void ALSky::takeSky()
         return;
     }
 
-    updateDirections();
-
-    // The bodies' quads about the camera: the stars' moon mask and the composite read them.
-    mSun.setCorners(ALSkyLayers::bodyCorners(mSun.getRotation(), HEAVENLY_BODY_DIST, mSunScale, mSun.getDiskRadius()));
+    // The bodies' quads about the camera, turned as the sky turns them: the stars' moon mask and the composite read
+    // them.
+    mSun.setCorners(
+        ALSkyLayers::bodyCorners(psky->getSunRotation(), HEAVENLY_BODY_DIST, mSunScale, mSun.getDiskRadius()));
     mMoon.setCorners(
-        ALSkyLayers::bodyCorners(mMoon.getRotation(), HEAVENLY_BODY_DIST, mMoonScale, mMoon.getDiskRadius()));
+        ALSkyLayers::bodyCorners(psky->getMoonRotation(), HEAVENLY_BODY_DIST, mMoonScale, mMoon.getDiskRadius()));
 
     fetchTextures();
 }
@@ -181,11 +178,6 @@ void ALSky::update()
     }
 
     takeSky();
-
-    if (gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_SKY) && !gGLManager.mIsDisabled)
-    {
-        updateCubeMap();
-    }
 }
 
 void ALSky::followEnvironment()
@@ -197,6 +189,12 @@ void ALSky::followEnvironment()
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_ENVIRONMENT;
     takeSky();
+
+    // Whether or not the sky is drawn: the cube lights the reflections, and the fog colour the beacons.
+    if (!gGLManager.mIsDisabled)
+    {
+        updateEnvironment();
+    }
 }
 
 void ALSky::cleanup()
@@ -208,7 +206,7 @@ void ALSky::cleanup()
     mStarLayout = {};
     mStarsBuildFailed = false;
     mStarsVerts = nullptr;
-    mCubeMap    = nullptr;
+    mCubeStrip.release();
     for (auto* textures : { &mSunTexture, &mMoonTexture, &mCloudNoiseTexture, &mBloomTexture })
     {
         textures->fill(nullptr);
@@ -224,28 +222,18 @@ void ALSky::releaseGL()
     // The next context may make the buffer this one could not.
     mStarsBuildFailed = false;
     mStarsVerts = nullptr;
-    if (mCubeMap)
-    {
-        mCubeMap->destroyGL();
-    }
+    mCubeStrip.release();
 }
 
 void ALSky::restoreGL()
 {
-    if (!mShiny[0].mDirs.empty())
-    {
-        initCubeMap();
-    }
     forceSkyUpdate();
 }
 
-void ALSky::updateDirections()
+void ALSky::forceSkyUpdate()
 {
-    const LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    mSun.setDirection(psky->getSunDirection());
-    mMoon.setDirection(psky->getMoonDirection());
-    mSun.setRotation(psky->getSunRotation());
-    mMoon.setRotation(psky->getMoonRotation());
+    mEnvironmentDirty = true;
+    mEnvironmentRetry = false;
 }
 
 void ALSky::setSunDirectionCFR(const LLVector3& sun_dir_cfr)
@@ -833,36 +821,48 @@ bool ALSky::useHDRISky()
         false; // no HDRI available, always use EEP sky
 }
 
-void ALSky::bindDome(LLGLSLShader& shader) const
+ALSky::DomeUniforms ALSky::domeUniforms() const
 {
     LLEnvironment&             environment = LLEnvironment::instance();
     const LLSettingsSky::ptr_t psky        = environment.getCurrentSky();
 
-    shader.bindTexture(LLShaderMgr::RAINBOW_MAP, mRainbowMap.get(), ALSamplers::AnisoWrap);
-    shader.bindTexture(LLShaderMgr::HALO_MAP, mHaloMap.get(), ALSamplers::AnisoWrap);
-
-    F32 moisture_level  = (float)psky->getSkyMoistureLevel();
-    F32 droplet_radius  = (float)psky->getSkyDropletRadius();
-    F32 ice_level       = (float)psky->getSkyIceLevel();
+    DomeUniforms dome;
+    dome.mMoisture = (F32)psky->getSkyMoistureLevel();
+    dome.mDroplet  = (F32)psky->getSkyDropletRadius();
+    dome.mIce      = (F32)psky->getSkyIceLevel();
 
     // hobble halos and rainbows when there's no light source to generate them
     if (!psky->getIsSunUp() && !psky->getIsMoonUp())
     {
-        moisture_level = 0.0f;
-        ice_level      = 0.0f;
+        dome.mMoisture = 0.0f;
+        dome.mIce      = 0.0f;
     }
 
-    shader.uniform1f(LLShaderMgr::MOISTURE_LEVEL, moisture_level);
-    shader.uniform1f(LLShaderMgr::DROPLET_RADIUS, droplet_radius);
-    shader.uniform1f(LLShaderMgr::ICE_LEVEL, ice_level);
+    dome.mGlowFactor = psky->getSunMoonGlowFactor();
+    dome.mDensity    = psky->getDensityMultiplier();
+    dome.mLightNorm  = environment.getClampedLightNorm();
+    dome.mCamHeight  = environment.getCamHeight();
+    dome.mDomeRadius = psky->getDomeRadius();
+    return dome;
+}
 
-    shader.uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, psky->getSunMoonGlowFactor());
-    shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, psky->getDensityMultiplier());
-    shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, environment.getClampedLightNorm().mV);
+void ALSky::bindDome(LLGLSLShader& shader) const
+{
+    shader.bindTexture(LLShaderMgr::RAINBOW_MAP, mRainbowMap.get(), ALSamplers::AnisoWrap);
+    shader.bindTexture(LLShaderMgr::HALO_MAP, mHaloMap.get(), ALSamplers::AnisoWrap);
+
+    const DomeUniforms dome = domeUniforms();
+    shader.uniform1f(LLShaderMgr::MOISTURE_LEVEL, dome.mMoisture);
+    shader.uniform1f(LLShaderMgr::DROPLET_RADIUS, dome.mDroplet);
+    shader.uniform1f(LLShaderMgr::ICE_LEVEL, dome.mIce);
+
+    shader.uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, dome.mGlowFactor);
+    shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, dome.mDensity);
+    shader.uniform3fv(LLShaderMgr::LIGHTNORM, 1, dome.mLightNorm.mV);
 
     // The dome's geometry: the camera's place in its frame, and the radius of the sphere the dome lies on.
-    shader.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, environment.getCamHeight(), 0.f);
-    shader.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, psky->getDomeRadius());
+    shader.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, dome.mCamHeight, 0.f);
+    shader.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, dome.mDomeRadius);
 }
 
 void ALSky::bindComposite(LLGLSLShader& shader)
@@ -1044,177 +1044,142 @@ void ALSky::unbindComposite(LLGLSLShader& shader)
 }
 
 //
-// The legacy environment cube
+// The environment cube
 //
+
+void ALSky::allocateEnvironmentCube()
+{
+    // Neutral until the bake (ALSkyCube::allocate), so it is bound from the frame it is made in.
+    mCube = ALSkyCube::allocate();
+    forceSkyUpdate();
+}
 
 bool ALSky::bindEnvironmentCube(S32 channel) const
 {
-    if (LLPipeline::sReflectionProbesEnabled || channel < 0 || mCubeMap.isNull())
+    if (channel < 0)
     {
         return false;
     }
-    mCubeMap->enable(channel);
-    mCubeMap->bind();
+    ALTextureSlot* slot = gGL.getTextureSlot(channel);
+    if (!mCube || !gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::EnvironmentCube))
+    {
+        // The unit holds nothing, which the reader's disable then finds and leaves.
+        slot->unbind();
+        return false;
+    }
+    slot->bindManual(ALTextureSlot::TT_CUBE_MAP, mCube, gGL.getSampler(ALSamplers::AnisoClamp));
     return true;
 }
 
-void ALSky::cacheEnvironment(AtmosphericsVars& vars) const
+bool ALSky::EnvironmentKey::alike(const EnvironmentKey& other) const
 {
-    const LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    // NOTE: Also see: LLAtmospherics::updateFog()
-    // invariants across whole sky tex process...
-    vars.blue_density = psky->getBlueDensity();
-    vars.blue_horizon = psky->getBlueHorizon();
-    vars.haze_density = psky->getHazeDensity();
-    vars.haze_horizon = psky->getHazeHorizon();
-    vars.density_multiplier = psky->getDensityMultiplier();
-    vars.distance_multiplier = psky->getDistanceMultiplier();
-    vars.max_y = psky->getMaxY();
-    vars.sun_norm = LLEnvironment::instance().getClampedSunNorm();
-    vars.sunlight = psky->getIsSunUp() ? psky->getSunlightColor() : psky->getMoonlightColor();
-    vars.ambient = psky->getAmbientColor();
-    vars.glow = psky->getGlow();
-    vars.cloud_shadow = psky->getCloudShadow();
-    vars.dome_radius = psky->getDomeRadius();
-    vars.dome_offset = psky->getDomeOffset();
-    vars.light_atten = psky->getLightAttenuation(vars.max_y);
-    vars.light_transmittance = psky->getLightTransmittance(vars.max_y);
-    vars.total_density = psky->getTotalDensity();
-    vars.gamma = psky->getGamma();
+    return mMaps == other.mMaps && ALSkyCube::termsAlike(mTerms, other.mTerms);
 }
 
-void ALSky::initSkyTextureDirs(S32 side, S32 tile)
+ALSky::EnvironmentKey ALSky::environmentKey() const
 {
-    ShinyFace& face = mShiny[side];
-    if (face.mDirs.empty())
+    // The members windlightDome reads of the Environment block (LLSettingsVOSky::applySpecial and
+    // LLEnvironment::packAtmosphericTerms work them from the sky), and of its loose uniforms.
+    const LLEnvironment::EnvironmentUBOData& block = LLEnvironment::instance().mEnvUBOData;
+    const DomeUniforms dome = domeUniforms();
+
+    EnvironmentKey key;
+    size_t next = 0;
+    const auto take = [&](const F32* values, size_t count)
     {
-        face.mDirs.resize(CUBE_RESOLUTION * CUBE_RESOLUTION);
-        face.mColours.resize(CUBE_RESOLUTION * CUBE_RESOLUTION);
-        face.mImage = new LLImageRaw(CUBE_RESOLUTION, CUBE_RESOLUTION, 4);
-    }
-
-    F32 coeff[3] = {0, 0, 0};
-    const S32 curr_coef = side >> 1; // 0/1 = X axis, 2/3 = Y, 4/5 = Z
-    const S32 side_dir = (((side & 1) << 1) - 1);  // even = -1, odd = 1
-    const S32 x_coef = (curr_coef + 1) % 3;
-    const S32 y_coef = (x_coef + 1) % 3;
-
-    coeff[curr_coef] = (F32)side_dir;
-
-    const F32 inv_res = 1.f / CUBE_RESOLUTION;
-    for (S32 y = 0; y < CUBE_RESOLUTION; ++y)
-    {
-        for (S32 x = 0; x < CUBE_RESOLUTION; ++x)
+        for (size_t i = 0; i < count; ++i)
         {
-            coeff[x_coef] = F32((x<<1) + 1) * inv_res - 1.f;
-            coeff[y_coef] = F32((y<<1) + 1) * inv_res - 1.f;
-            LLVector3 dir(coeff[0], coeff[1], coeff[2]);
-            dir.normalize();
-            face.mDirs[x * CUBE_RESOLUTION + y] = dir;
+            key.mTerms[next++] = values[i];
         }
+    };
+    take(block.blue_horizon, 3);
+    take(&block.haze_horizon, 1);
+    take(block.glow, 3);
+    take(&block.max_y, 1);
+    take(&block.cloud_shadow, 1);
+    take(block.haze_extinction, 3);
+    take(block.blue_weight, 3);
+    take(block.haze_weight, 3);
+    take(block.sky_light, 3);
+    take(block.sky_ambient, 3);
+    take(block.sky_light_atten, 3);
+    take(block.sky_ambient_below, 3);
+    take(&dome.mMoisture, 1);
+    take(&dome.mDroplet, 1);
+    take(&dome.mIce, 1);
+    take(&dome.mGlowFactor, 1);
+    take(&dome.mDensity, 1);
+    take(dome.mLightNorm.mV, 3);
+    take(&dome.mCamHeight, 1);
+    take(&dome.mDomeRadius, 1);
+    llassert(next == key.mTerms.size());
+
+    // A map still loading is baked as far as it has come, and again as it comes in.
+    for (const auto& [slot, map] : { std::pair{ 0, mRainbowMap.get() }, std::pair{ 2, mHaloMap.get() } })
+    {
+        key.mMaps[slot]     = map ? (S32)map->getTexName() : 0;
+        key.mMaps[slot + 1] = map ? map->getDiscardLevel() : -1;
     }
+    return key;
 }
 
-void ALSky::createSkyTexture(AtmosphericsVars& vars, S32 side, S32 tile)
+void ALSky::updateEnvironment()
 {
-    const LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
-    ShinyFace& face = mShiny[side];
-    for (size_t i = 0; i < face.mDirs.size(); ++i)
+    if (!mCube)
     {
-        face.mColours[i] = mAtmospherics.calcSkyColorInDir(psky, vars, face.mDirs[i], true, false);
-    }
-}
-
-void ALSky::initCubeMap()
-{
-    std::vector<LLPointer<LLImageRaw>> images;
-    for (ShinyFace& face : mShiny)
-    {
-        {
-            LLImageDataLock lock(face.mImage);
-            U32* pixels = (U32*)face.mImage->getData();
-            for (size_t i = 0; i < face.mColours.size(); ++i)
-            {
-                pixels[i] = LLColor4U(face.mColours[i]).asRGBA();
-            }
-        }
-        images.push_back(face.mImage);
+        // The plan has none, with reflection probes on.
+        mCubeStrip.release();
     }
 
-    if (!mCubeMap && gSavedSettings.getBOOL("RenderWater"))
+    // At once where something asked, and otherwise where the sky has moved, at most every so often; a bake that did not
+    // happen is tried again as often, until one does.
+    const EnvironmentKey key = environmentKey();
+    const F64  now = LLFrameTimer::getTotalSeconds();
+    const bool due = now - mEnvironmentUpdated >= ENVIRONMENT_UPDATE_SECONDS;
+    if (mEnvironmentDirty ? (mEnvironmentRetry && !due) : (key.alike(mEnvironmentKey) || !due))
     {
-        mCubeMap = new LLCubeMap();
-    }
-
-    if (mCubeMap)
-    {
-        mCubeMap->init(images);
-    }
-
-    gGL.getTextureSlot(0)->unbind();
-}
-
-void ALSky::forceSkyUpdate()
-{
-    mForceUpdate = true;
-    mLastAtmosphericsVars = {};
-    mCubeMapUpdateStage = -1;
-}
-
-void ALSky::updateCubeMap()
-{
-    if (mShiny[0].mDirs.empty())
-    {
-        // Every face at once, the first time.
-        cacheEnvironment(mAtmosphericsVars);
-        for (S32 side = 0; side < CUBE_FACES; ++side)
-        {
-            initSkyTextureDirs(side, 0);
-            createSkyTexture(mAtmosphericsVars, side, 0);
-        }
-        initCubeMap();
-    }
-
-    if (!mCubeMap || LLPipeline::sReflectionProbesEnabled)
-    {
-        mCubeMapUpdateStage = CUBE_FACES;
-        mForceUpdate = false;
         return;
     }
 
-    if (mCubeMapUpdateStage < 0)
-    {
-        cacheEnvironment(mAtmosphericsVars);
+    LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("sky environment");
 
-        const bool same_atmospherics =
-            approximatelyEqual(mLastAtmosphericsVars, mAtmosphericsVars, UPDATE_MIN_DELTA_THRESHOLD);
-        const bool need_update = mForceUpdate || !same_atmospherics;
-        if (need_update &&
-            (mForceUpdate || LLFrameTimer::getTotalSeconds() - mCubeMapUpdated >= CUBE_UPDATE_SECONDS))
-        {
-            // start updating cube map sides
-            mAtmospherics.updateFog(LLViewerCamera::getInstance()->getFar(),
-                                    LLEnvironment::instance().getClampedLightDirection());
-            mCubeMapUpdateStage = 0;
-            mForceUpdate = false;
-        }
-    }
-    else if (mCubeMapUpdateStage == CUBE_FACES)
+    // The fog colour the tracker's beacons fade into.
+    mAtmospherics.updateFog(LLViewerCamera::getInstance()->getFar(), LLEnvironment::instance().getClampedLightDirection());
+
+    // The sky is taken once the cube holds it, or where there is no cube to bake.
+    mEnvironmentUpdated = now;
+    mEnvironmentRetry   = mCube && !bakeEnvironmentCube();
+    if (!mEnvironmentRetry)
     {
-        LL_PROFILE_ZONE_NAMED("updateSky - forced");
-        initCubeMap();
-        mLastAtmosphericsVars = mAtmosphericsVars;
-        mForceUpdate = false;
-        mCubeMapUpdated = LLFrameTimer::getTotalSeconds();
-        mCubeMapUpdateStage = -1;
+        mEnvironmentKey   = key;
+        mEnvironmentDirty = false;
     }
-    else
+}
+
+bool ALSky::bakeEnvironmentCube()
+{
+    LLGLSLShader& program = gDeferredSkyCubeProgram;
+    if (!program.isComplete())
     {
-        // CPU hungry part, createSkyTexture() is math heavy: a face a frame.
-        LL_PROFILE_ZONE_NAMED("updateSky - create");
-        createSkyTexture(mAtmosphericsVars, mCubeMapUpdateStage, 0);
-        mCubeMapUpdateStage++;
+        LL_WARNS_ONCE("Sky") << "The environment cube's program did not build: reflections without probes read it "
+                                "neutral grey" << LL_ENDL;
+        return false;
     }
+
+    const ALRenderTargetDesc strip{ .width = ALSkyCube::STRIP_WIDTH, .height = ALSkyCube::SIZE, .color = { GL_RGBA8 } };
+    if (gPipeline.mScreenTriangleVB.isNull() || mCubeStrip.ensure(strip) == LLRenderTarget::EnsureResult::Failed)
+    {
+        return false;
+    }
+
+    program.bind();
+    LLEnvironment::instance().bindEnvironmentUBO();
+    bindDome(program);
+    ALSkyCube::bake(program, mCube, mCubeStrip, *gPipeline.mScreenTriangleVB);
+    program.disableTexture(LLShaderMgr::RAINBOW_MAP);
+    program.disableTexture(LLShaderMgr::HALO_MAP);
+    program.unbind();
+    return true;
 }
 
 //

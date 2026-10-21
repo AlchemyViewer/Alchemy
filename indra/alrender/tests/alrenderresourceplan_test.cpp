@@ -298,7 +298,8 @@ namespace
             { "RenderReflectionProbeResolution", no_change, [](Inputs& in) { in.mProbeResolution = 256; },
               [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe)); } },
             { "RenderReflectionsEnabled", no_change, [](Inputs& in) { in.mProbes = false; },
-              [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)); } },
+              [](const Plan& before)
+              { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)) | of({ Id::EnvironmentCube }); } },
             { "RenderScreenSpaceReflections", no_change, [](Inputs& in) { in.mSSR = true; },
               [](const Plan&) { return of({ Id::SSRScene }); } },
             { "RenderScreenSpaceReflections without probes", [](Inputs& in) { in.mProbes = false; },
@@ -1442,6 +1443,7 @@ namespace
         CHECK(Plan::name(Id::SMAAEdges) == "smaa.edges");
         CHECK(Plan::name(Id::LensFlareB) == "lens.flare.b");
         CHECK(Plan::name(Id::ToneCurve) == "tone.curve");
+        CHECK(Plan::name(Id::EnvironmentCube) == "sky.cube");
 
         std::set<std::string_view> seen;
         for (size_t i = 0; i < Plan::ID_COUNT; ++i)
@@ -1451,5 +1453,28 @@ namespace
             CHECK(!name.empty());
             CHECK(seen.insert(name).second);
         }
+    }
+
+    TEST_CASE("alrenderresourceplan: the sky's environment cube is wanted only without probes", "[alrenderresourceplan]")
+    {
+        CHECK_FALSE(Plan::make(defaults()).wants(Id::EnvironmentCube));
+
+        // Probes off, whatever else the inputs say: the low feature class, every Intel legacy session and the setting.
+        for (const bool hdr : { true, false })
+        {
+            INFO("HDR " << hdr);
+            Inputs in = defaults();
+            in.mProbes = false;
+            in.mHDR    = hdr;
+            const Plan plan = Plan::make(in);
+            REQUIRE(plan.wants(Id::EnvironmentCube));
+            CHECK(plan.desc(Id::EnvironmentCube)->color[0] == GL_RGBA8);
+            CHECK(plan.desc(Id::EnvironmentCube)->mips == ALRenderTargetDesc::Mips::Manual);
+        }
+
+        // A texture of the pipeline's own, which the reconcile keeps rather than the transient pool lending it.
+        CHECK(Plan::isTexture(Id::EnvironmentCube));
+        CHECK_FALSE(Plan::isTransient(Id::EnvironmentCube));
+        CHECK_FALSE(Plan::followsRenderSize(Id::EnvironmentCube));
     }
 }

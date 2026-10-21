@@ -286,6 +286,7 @@ extern LLGLSLShader         gDeferredEmissiveIndexedProgram; // multi-material i
 extern LLGLSLShader         gDeferredAvatarAlphaProgram;
 extern LLGLSLShader         gDeferredStarProgram;
 extern LLGLSLShader         gDeferredStarQuadProgram;
+extern LLGLSLShader         gDeferredSkyCubeProgram;
 extern LLGLSLShader         gDeferredFullbrightShinyProgram;
 extern LLGLSLShader         gHUDFullbrightShinyProgram;
 extern LLGLSLShader         gNormalMapGenProgram;

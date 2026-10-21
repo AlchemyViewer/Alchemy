@@ -5,10 +5,11 @@
 # change, the far plane, the water's field, wave heights and stencil bits,
 # the depth pyramid, the light map's blur, the depth under the HUD,
 # which placed reflection probes swallow automatic ones, snapshot cutouts,
-# whether a spot light's shadow map is drawn again, the sky dome's mesh and
-# what the sky's other layers are worked out from along the view ray; and
-# the pool that lends the frame's short-lived render targets by description.
-# Whatever reads settings or the scene hands these their inputs as values.
+# whether a spot light's shadow map is drawn again, what the sky's layers
+# are worked out from along the view ray and the environment cube baked
+# from the dome; and the pool that lends the frame's
+# short-lived render targets by description. Whatever reads settings or the
+# scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
@@ -21,7 +22,7 @@ set(
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
-  alskydome.cpp
+  alskycube.cpp
   alskylayers.cpp
   alspotshadowcache.cpp
   alstarfield.cpp
@@ -46,7 +47,7 @@ set(
   alrenderresourceinputs.h
   alrenderresourceplan.h
   alshaderinputs.h
-  alskydome.h
+  alskycube.h
   alskylayers.h
   alspotshadowcache.h
   alstarfield.h
@@ -85,8 +86,8 @@ if(AL_BUILD_TESTS)
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
   # heights a normal map's slopes integrate to, snapshot cutouts, the spot
-  # shadows' cache, how a display pass ends its frame, the star field and the
-  # sky's layers.
+  # shadows' cache, how a display pass ends its frame, the star field, the
+  # sky's layers and the environment cube's directions.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
@@ -98,6 +99,7 @@ if(AL_BUILD_TESTS)
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
+      tests/alskycube_test.cpp
       tests/alskylayers_test.cpp
       tests/alspotshadowcache_test.cpp
       tests/alstarfield_test.cpp
@@ -117,7 +119,8 @@ if(AL_BUILD_TESTS)
   # the light map's blur by one dispatch against its two fragment passes,
   # WindLight's dome along the view ray against the dome's mesh, the sky's
   # other layers along it against the programs that drew them and the whole
-  # sky's composite against the sky they drew, the stars
+  # sky's composite against the sky they drew, the environment cube against
+  # the dome it is baked from and the cube the CPU built, the stars
   # against the picture they left before their rework, FXAA on an RGB10_A2
   # source, the reflection probes' taps in one pass over them against their
   # list, the transient target pool's GL objects, shared depth and poison,
@@ -131,6 +134,7 @@ if(AL_BUILD_TESTS)
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp
       tests/alskycomposite_gl_test.cpp
+      tests/alskycube_gl_test.cpp
       tests/alskydome_gl_test.cpp
       tests/alskylayers_gl_test.cpp
       tests/alspotshadowcache_gl_test.cpp

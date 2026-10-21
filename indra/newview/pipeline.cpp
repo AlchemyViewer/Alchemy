@@ -959,6 +959,7 @@ U32* LLPipeline::resourceTexture(ALRenderResourcePlan::Id id)
         case Id::SMAASearch: return &mSMAASearchMap;
         case Id::SMAASample: return &mSMAASampleMap;
         case Id::ToneCurve:  return &mToneCurveLut;
+        case Id::EnvironmentCube: return mSky.environmentCubeTexture();
         default:
             return nullptr;
     }
@@ -1868,6 +1869,11 @@ void LLPipeline::createResourceTexture(ALRenderResourcePlan::Id id)
 
     switch (id)
     {
+        case Id::EnvironmentCube:
+            // Allocated neutral, and baked when the sky next takes the frame's environment.
+            mSky.allocateEnvironmentCube();
+            break;
+
         case Id::Noise:
         {
             std::vector<LLVector3> noise(noise_res * noise_res);

@@ -27,7 +27,6 @@
 #pragma once
 
 #include "alfarplane.h"
-#include "alskydome.h"
 #include "alskylayers.h"
 
 #include "llgl.h"
@@ -36,6 +35,7 @@
 #include "llglstates.h"
 #include "llimage.h"
 #include "llimagegl.h"
+#include "llmath.h"
 #include "llmatrix4a.h"
 #include "llquaternion.h"
 #include "llrender.h"
@@ -536,6 +536,106 @@ namespace al_sky_test
         }
         return new LLImageGL(raw, true);
     }
+
+    // WindLight's sky dome as a mesh, in the dome's frame (north, up, east), which the old sky program shaded from the
+    // camera's point inside the sphere (windlight/windlightDomeF.glsl's windlightDomeAt): rings of a sphere about the
+    // origin, from the zenith down past the camera's level. The last rings are a skirt: the third from last lowered
+    // 2048 m, the next collapsed onto the axis below it, and the last two back out on the sphere, so the strips overlap
+    // below the camera's level and the later band drawn covers the earlier. Triangle strips of SLICES vertices a ring.
+    namespace ALSkyDome
+    {
+        // The stacks the dome has, and the vertices a ring has. Any fewer and the facets show.
+        constexpr U32 STACKS = 18;
+        constexpr U32 SLICES = 2 * STACKS;
+
+        // The vertices and indices buildStrips writes for @a stacks stacks.
+        constexpr U32 vertexCount(U32 stacks) { return SLICES * (stacks + 1); }
+        constexpr U32 indexCount(U32 stacks) { return 1 + stacks * (2 + 2 * SLICES); }
+
+        // The polar angle of ring @a ring, from the zenith: PI/8 (1 - (1 - t^4)^2) at t = ring / STACKS, which gathers
+        // the rings toward the horizon.
+        inline F32 ringAngle(U32 ring)
+        {
+            F32 t = float(ring) * (1.f / STACKS);
+
+            // ^4 the parameter of the tesselation to bias things toward 0 (the dome's apex)
+            t *= t;
+            t *= t;
+
+            // invert and square the parameter of the tesselation to bias things toward 1 (the horizon)
+            t = 1.f - t;
+            t = t * t;
+            t = 1.f - t;
+
+            return (F_PI / 8.f) * t;
+        }
+
+        // Stacks [@a begin_stack, @a end_stack) of a dome of @a radius: rings begin_stack + 1 to end_stack + 1, their
+        // positions, their planar texture coordinates ((1 - east) / 2, (1 - north) / 2) and one triangle strip over
+        // them.
+        inline void buildStrips(U32 begin_stack, U32 end_stack, F32 radius, LLStrider<LLVector3>& vertices,
+                                LLStrider<LLVector2>& tex_coords, LLStrider<U16>& indices)
+        {
+            llassert(end_stack <= STACKS);
+
+            for (U32 i = begin_stack + 1; i <= end_stack + 1; ++i)
+            {
+                const F32 phi0 = ringAngle(i);
+
+                for (U32 j = 0; j < SLICES; ++j)
+                {
+                    const F32 theta = F_TWO_PI * (float(j) / float(SLICES));
+
+                    // standard transformation from spherical to rectangular coordinates
+                    const F32 x0 = sin(phi0) * cos(theta);
+                    const F32 y0 = cos(phi0);
+                    const F32 z0 = sin(phi0) * sin(theta);
+
+                    if (i == STACKS - 2)
+                    {
+                        *vertices++ = LLVector3(x0 * radius, y0 * radius - 1024.f * 2.f, z0 * radius);
+                    }
+                    else if (i == STACKS - 1)
+                    {
+                        *vertices++ = LLVector3(0, y0 * radius - 1024.f * 2.f, 0);
+                    }
+                    else
+                    {
+                        *vertices++ = LLVector3(x0 * radius, y0 * radius, z0 * radius);
+                    }
+
+                    // planar uv coordinates, x and z transposed so that they animate in the global frame, where +x is
+                    // east and +y north
+                    *tex_coords++ = LLVector2((-z0 + 1.f) / 2.f, (-x0 + 1.f) / 2.f);
+                }
+            }
+
+            // the triangle strip
+            *indices++ = 0;
+
+            S32 k = 0;
+            for (U32 i = 1; i <= end_stack - begin_stack; ++i)
+            {
+                *indices++ = (U16)(i * SLICES + (U32)k);
+
+                k = (k + 1) % (S32)SLICES;
+                for (U32 j = 0; j < SLICES; ++j)
+                {
+                    *indices++ = (U16)((i - 1) * SLICES + (U32)k);
+                    *indices++ = (U16)(i * SLICES + (U32)k);
+
+                    k = (k + 1) % (S32)SLICES;
+                }
+
+                if ((--k) < 0)
+                {
+                    k = (S32)SLICES - 1;
+                }
+
+                *indices++ = (U16)(i * SLICES + (U32)k);
+            }
+        }
+    } // namespace ALSkyDome
 
     // The dome's mesh, as LLVOWLSky filled it.
     inline LLPointer<LLVertexBuffer> domeMesh()

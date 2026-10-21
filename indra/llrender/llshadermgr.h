@@ -665,6 +665,7 @@ public:
         SKY_HDRI_MAP,                       //  "skyHdriMap"  the HDRI sky, wrapped about the dome's sphere
         SKY_HDRI_ROTATION,                  //  "skyHdriRotation"  the HDRI's turn about the vertical (RenderHDRIRotation)
         SKY_HDRI_SCALE,                     //  "skyHdriScale"  the HDRI's exposure (RenderHDRIExposure)
+        SKY_CUBE_FACE,                      //  "skyCubeFace"  vec3[18], each environment cube face's forward, right and up (ALSkyCube::bake)
 
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535

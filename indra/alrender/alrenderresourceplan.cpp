@@ -69,10 +69,10 @@ namespace
         "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "ssr.scene", "main.light.blurred",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
-        "smaa.sample", "tone.curve",
+        "smaa.sample", "tone.curve", "sky.cube",
     };
 
-    static_assert(OWN_NAMES[(size_t)Id::ToneCurve - PACK_IDS] == "tone.curve", "a name for every id after the packs");
+    static_assert(OWN_NAMES[(size_t)Id::EnvironmentCube - PACK_IDS] == "sky.cube", "a name for every id after the packs");
 }
 
 // static
@@ -344,6 +344,14 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     plan.at(Id::Noise).mDesc     = ALRenderTargetDesc{ .color = { GL_RGB16F } };
     plan.at(Id::TrueNoise).mDesc = ALRenderTargetDesc{ .color = { GL_RGB16F } };
     plan.at(Id::ToneCurve).mDesc = ALRenderTargetDesc{ .color = { GL_RGBA16 } };
+
+    // Where there are no reflection probes, the shiny and probe-less reflections read the sky from a small cube the
+    // sky bakes, with every level.
+    if (!in.mProbes)
+    {
+        plan.at(Id::EnvironmentCube).mDesc =
+            ALRenderTargetDesc{ .color = { GL_RGBA8 }, .mips = ALRenderTargetDesc::Mips::Manual };
+    }
 
     // SMAA's area and search tables, and the debug image it can blend, for as long as SMAA is what antialiases, as its
     // edges and blend weights are.
