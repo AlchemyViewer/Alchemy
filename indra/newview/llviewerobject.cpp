@@ -5473,11 +5473,12 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(gGLTFMaterialList.getMaterial(mat_id)) != nullptr);
         if (mat->isFetching())
         { // material is not loaded yet, rebuild draw info when the object finishes loading
-            mat->onMaterialComplete([id=getID()]
+            mat->onMaterialComplete([id=getID(), te]
                 {
                     LLViewerObject* obj = gObjectList.findObject(id);
                     if (obj)
                     {
+                        obj->onRenderMaterialFetched(te);
                         obj->markForUpdate();
                     }
                 });
@@ -5941,6 +5942,20 @@ S32 LLViewerObject::initRenderMaterial(U8 te)
     const S32 changed = tep->setGLTFRenderMaterial(render_material);
     updateAvatarMeshVisibility(te, old_material);
     return changed;
+}
+
+void LLViewerObject::onRenderMaterialFetched(U8 te)
+{
+    const LLTextureEntry* tep = getTE(te);
+    if (!tep || !tep->getGLTFMaterial())
+    { // the face lost its material while it fetched
+        return;
+    }
+
+    initRenderMaterial(te);
+    // The material named no bake when the face took it and has filled in its textures since, so
+    // initRenderMaterial saw none of them change: look from nothing
+    updateAvatarMeshVisibility(te, nullptr);
 }
 
 S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
@@ -7888,12 +7903,13 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             {
                 LLViewerObject* obj = gObjectList.findObject(obj_id);
                 if (!obj) { return; }
-                obj->initRenderMaterial(te);
                 if (fetching)
                 {
-                    // the material named no bake when the face took it, above, and has filled in
-                    // its textures since, so initRenderMaterial sees none of them change
-                    obj->updateAvatarMeshVisibility((U8)te, nullptr);
+                    obj->onRenderMaterialFetched((U8)te);
+                }
+                else
+                {
+                    obj->initRenderMaterial(te);
                 }
             });
         }

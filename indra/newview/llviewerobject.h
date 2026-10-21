@@ -387,6 +387,10 @@ public:
     /*virtual*/ S32     setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID);
     /*virtual*/ S32     setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams);
     S32 initRenderMaterial(const U8 te);
+    // The material face te took while it was still fetching has completed: give the face its own
+    // copy where it needs one (initRenderMaterial), so the bakes it names are resolved for this
+    // object's avatar and not into the material every object using it shares
+    void onRenderMaterialFetched(const U8 te);
     virtual     S32     setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* mat);
 
     // Used by Materials update functions to properly kick off rebuilds
