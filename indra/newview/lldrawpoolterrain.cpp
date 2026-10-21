@@ -52,6 +52,8 @@
 #include "llsettingsvo.h"
 #include "llappviewer.h"
 
+extern bool gCubeSnapshot;
+
 const F32 DETAIL_SCALE = 1.f/16.f;
 int DebugDetailMap = 0;
 
@@ -124,11 +126,12 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     maps.bind(shader->enableTexture(LLShaderMgr::TERRAIN_HEIGHT_MAP),
               shader->enableTexture(LLShaderMgr::TERRAIN_COMPOSITION_MAP));
 
-    // Levels come from the distance to this camera in every pass, so the
-    // shadow pass places the same vertices the lit pass does. During a cube
-    // snapshot the singleton is the probe; that tessellates around the probe,
-    // which is what a probe wants.
-    const LLVector3 origin = LLViewerCamera::getInstance()->getOrigin() - regionp->getOriginAgent();
+    // Levels come from the distance to this camera in every pass, so where
+    // nothing else holds them the shadow pass places the same vertices the lit
+    // pass does. During a cube snapshot the singleton is the probe; that
+    // tessellates around the probe, which is what a probe wants.
+    const LLVector3& camera_origin = LLViewerCamera::getInstance()->getOrigin();
+    const LLVector3 origin = camera_origin - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
     // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
     // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
@@ -138,6 +141,28 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
         ? 0.f
         : llmax(llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor, F_APPROXIMATELY_ZERO);
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
+
+    // A shadow map or a capture also holds each edge to the segments its own raster resolves (terrainTC.glsl), from
+    // the pass's projection and view, taken from the origin, and half its target's size over the texels or pixels a
+    // segment spans. The main view's levels are the distance's alone, and so are pinned ones.
+    static LLCachedControl<F32> raster_segment(gSavedSettings, "AlchemyRenderTerrainTessRasterSegment", 8.f);
+    const F32 segment = raster_segment;
+    if ((LLPipeline::sShadowRender || gCubeSnapshot) && segment > 0.f && density > 0.f)
+    {
+        const LLCamera& pass = LLViewerCamera::getCurrent();
+        LLMatrix4a clip;
+        clip.setMul(pass.getModelview(), pass.getProjection());
+        LLVector4a clip_origin;
+        clip.transform4(LLVector4a(camera_origin.mV[VX], camera_origin.mV[VY], camera_origin.mV[VZ], 1.f), clip_origin);
+        shader->uniformMatrix4fv(LLShaderMgr::TERRAIN_TESS_CLIP, 1, GL_FALSE, clip.getF32ptr());
+        shader->uniform4fv(LLShaderMgr::TERRAIN_TESS_CLIP_ORIGIN, 1, clip_origin.getF32ptr());
+        shader->uniform2f(LLShaderMgr::TERRAIN_TESS_RASTER, 0.5f * (F32)LLRenderTarget::sCurResX / segment,
+                          0.5f * (F32)LLRenderTarget::sCurResY / segment);
+    }
+    else
+    {
+        shader->uniform2f(LLShaderMgr::TERRAIN_TESS_RASTER, 0.f, 0.f);
+    }
     shader->uniform1f(LLShaderMgr::TERRAIN_GRID_SCALE, land.getMetersPerGrid());
     shader->uniform1i(LLShaderMgr::TERRAIN_SMOOTHING, LLSurface::isSmoothing() ? 1 : 0);
     shader->uniform1f(LLShaderMgr::REGION_SCALE, regionp->getWidth());

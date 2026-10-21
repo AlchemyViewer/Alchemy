@@ -1888,6 +1888,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("terrain_composition_map");
     mReservedUniforms.push_back("terrain_tess_origin");
     mReservedUniforms.push_back("terrain_tess_density");
+    mReservedUniforms.push_back("terrain_tess_clip");
+    mReservedUniforms.push_back("terrain_tess_clip_origin");
+    mReservedUniforms.push_back("terrain_tess_raster");
     mReservedUniforms.push_back("terrain_grid_scale");
     mReservedUniforms.push_back("terrain_smoothing");
     mReservedUniforms.push_back("parcel_overlay");

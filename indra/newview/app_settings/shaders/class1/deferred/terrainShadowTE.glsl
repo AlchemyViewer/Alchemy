@@ -4,7 +4,8 @@
  * The terrain's evaluation stage for the shadow pass: the same surface the
  * lit stages place, from the same terrainSurface body, and nothing else.
  * With the same control stage and the same origin, the depth the shadow
- * map holds is the surface the lit pass shades.
+ * map holds is the surface the lit pass shades, cut no finer than the map
+ * resolves (terrainTC.glsl).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
