@@ -122,7 +122,8 @@ namespace
 
         // GL's stencil state, both faces, against what is given. The masks are held to the 8 bits a stencil buffer has:
         // past them, what glGetIntegerv answers for an unsigned mask is the driver's choice. GL answers the reference
-        // held to the stencil bits of the draw framebuffer, so a check of one above 0 binds a target with stencil.
+        // held to the stencil bits of the draw framebuffer, which Mesa takes as of the last draw or clear into it, not
+        // its bind: a check of one above 0 binds a target with stencil and clears it first.
         void checkStencil(GLenum func, GLint ref, GLuint read_mask, GLenum fail, GLenum depth_fail, GLenum pass,
                           GLuint write_mask)
         {
@@ -338,6 +339,7 @@ namespace
 
         setUp(true);
         mTarget.bindTarget();
+        mTarget.clear();
         set();
         {
             INFO("what gGL is given, GL holds");
@@ -439,6 +441,7 @@ namespace
     {
         setUp(true);
         mTarget.bindTarget();
+        mTarget.clear();
         {
             ALGLStencil stencil(GL_EQUAL, 3, 0x0F, GL_KEEP, GL_INCR, GL_REPLACE, 0xF0);
             UNSCOPED_INFO("the test is on in the scope");
