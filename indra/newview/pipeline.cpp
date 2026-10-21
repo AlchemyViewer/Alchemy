@@ -1208,6 +1208,7 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings(const ALShaderInpu
 
     in.mShadowDetail     = gSavedSettings.getS32("RenderShadowDetail");
     in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
+    in.mSpotShadowMaxResolution = gSavedSettings.getU32("AlchemyRenderSpotShadowMaxResolution");
     in.mShadowDepth32F   = gSavedSettings.getBOOL("AlchemyRenderShadowDepth32F");
     in.mSSAO             = gSavedSettings.getBOOL("RenderDeferredSSAO");
     in.mSSR              = gSavedSettings.getBOOL("RenderScreenSpaceReflections");

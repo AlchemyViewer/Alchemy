@@ -2377,6 +2377,17 @@
             <key>Value</key>
             <real>200.0</real>
         </map>
+        <key>AlchemyRenderSpotShadowMaxResolution</key>
+        <map>
+            <key>Comment</key>
+            <string>Largest edge of the two projector (spot light) shadow maps, in texels. They are square at the render width times RenderShadowResolutionScale up to this edge. 0 takes the render width alone. Reallocates the spot shadow maps.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2048</integer>
+        </map>
         <key>AlchemyRenderTerrainHexTiling</key>
         <map>
             <key>Comment</key>
