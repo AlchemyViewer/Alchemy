@@ -476,7 +476,7 @@ void LLHeroProbeManager::generateRadiance(LLReflectionMap* probe)
                 if (i != mMipChain.size() - 1)
                 {
                     res /= 2;
-                    glViewport(0, 0, res, res);
+                    gGL.setViewport(0, 0, res, res);
                 }
             }
 

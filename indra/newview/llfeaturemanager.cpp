@@ -552,7 +552,7 @@ bool checkRDNA35()
  */
 bool extractGLDeviceModel(std::string& device_name)
 {
-    const std::string gl_string = ll_safe_string((const char*)(glGetString(GL_RENDERER)));
+    const std::string gl_string = gGLManager.mGLRendererString;
 #if LL_LINUX
     // The kernel release, 'uname -r'. The OS string leads with the
     // distribution's name.
