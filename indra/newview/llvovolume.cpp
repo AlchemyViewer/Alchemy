@@ -112,6 +112,15 @@ LLPointer<LLObjectMediaNavigateClient> LLVOVolume::sObjectMediaNavigateClient = 
 
 extern bool gCubeSnapshot;
 
+namespace
+{
+    // A frame's volumes whose LOD moved, those of them marked for a volume
+    // rebuild, and volume spatial groups whose geometry was rebuilt.
+    S32 sNumLODMoves = 0;
+    S32 sNumLODRebuilds = 0;
+    S32 sNumGroupRebuilds = 0;
+}
+
 // Implementation class of LLMediaDataClientObject.  See llmediadataclient.h
 class LLMediaDataClientObjectImpl : public LLMediaDataClientObject
 {
@@ -1718,10 +1727,12 @@ bool LLVOVolume::updateLOD()
 
     // An LOD-invariant volume is the same at the new LOD, so its faces and
     // its spatial group's buffers stay as they are.
+    sNumLODMoves += lod_changed ? 1 : 0;
     if (lod_changed && !getVolume()->isLODInvariant())
     {
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
         mLODChanged = true;
+        ++sNumLODRebuilds;
     }
     else
     {
@@ -4511,6 +4522,14 @@ U32 LLVOVolume::getHighLODTriangleCount()
 //static
 void LLVOVolume::preUpdateGeom()
 {
+    // Counted since the previous frame's call.
+    LL_PROFILE_PLOT("volume LOD moves", (int64_t)sNumLODMoves);
+    LL_PROFILE_PLOT("volume LOD rebuilds", (int64_t)sNumLODRebuilds);
+    LL_PROFILE_PLOT("volume LOD change faces", (int64_t)sNumLODChanges);
+    LL_PROFILE_PLOT("volume group rebuilds", (int64_t)sNumGroupRebuilds);
+    sNumLODMoves = 0;
+    sNumLODRebuilds = 0;
+    sNumGroupRebuilds = 0;
     sNumLODChanges = 0;
 }
 
@@ -5937,6 +5956,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         return;
     }
 
+    ++sNumGroupRebuilds;
     group->mBuilt = 1.f;
 
     LLSpatialBridge* bridge = group->getSpatialPartition()->asBridge();
