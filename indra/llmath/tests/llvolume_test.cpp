@@ -42,6 +42,7 @@
 #include "linden_common.h"
 
 #include "llvolume.h"
+#include "llvolumemgr.h"
 #include "llmath.h"
 #include "llquaternion.h"
 #include "m3math.h"
@@ -3996,4 +3997,211 @@ namespace
         CHECK(left_out > 0);
         CHECK(report.failures == 0);
     }
+
+
+    // What first differs between two volumes, or nothing where they are the
+    // same bytes: the profile's faces and points, the path's length, the
+    // mesh, and each face's layout, bounds, positions, normals, UVs,
+    // tangents and indices.
+    std::string differenceBetween(LLVolume& a, LLVolume& b)
+    {
+        auto same = [](const void* x, const void* y, size_t bytes) { return bytes == 0 || std::memcmp(x, y, bytes) == 0; };
+        const LLProfile& pa = a.getProfile();
+        const LLProfile& pb = b.getProfile();
+        if (pa.mFaces.size() != pb.mFaces.size())
+        {
+            return fmt::format("{} profile faces against {}", pa.mFaces.size(), pb.mFaces.size());
+        }
+        for (size_t i = 0; i < pa.mFaces.size(); ++i)
+        {
+            const LLProfile::Face& fa = pa.mFaces[i];
+            const LLProfile::Face& fb = pb.mFaces[i];
+            if (fa.mIndex != fb.mIndex || fa.mCount != fb.mCount || fa.mScaleU != fb.mScaleU || fa.mCap != fb.mCap || fa.mFlat != fb.mFlat ||
+                fa.mFaceID != fb.mFaceID || fa.mFirstCorner != fb.mFirstCorner || fa.mCornerStep != fb.mCornerStep)
+            {
+                return fmt::format("profile face {}", i);
+            }
+        }
+        if (pa.mProfile.size() != pb.mProfile.size() || !same(pa.mProfile.data(), pb.mProfile.data(), sizeof(LLVector4a) * pa.mProfile.size()))
+        {
+            return "the profile's points";
+        }
+        if (a.getPath().getPathLength() != b.getPath().getPathLength())
+        {
+            return fmt::format("{} path points against {}", a.getPath().getPathLength(), b.getPath().getPathLength());
+        }
+        if (a.getMesh().size() != b.getMesh().size() || !same(a.getMesh().data(), b.getMesh().data(), sizeof(LLVector4a) * a.getMesh().size()))
+        {
+            return "the mesh";
+        }
+        if (a.getNumVolumeFaces() != b.getNumVolumeFaces())
+        {
+            return fmt::format("{} faces against {}", a.getNumVolumeFaces(), b.getNumVolumeFaces());
+        }
+        for (S32 i = 0; i < a.getNumVolumeFaces(); ++i)
+        {
+            a.genTangents(i);
+            b.genTangents(i);
+            const LLVolumeFace& fa = a.getVolumeFace(i);
+            const LLVolumeFace& fb = b.getVolumeFace(i);
+            const std::string name = faceName(fa);
+            if (fa.mID != fb.mID || fa.mTypeMask != fb.mTypeMask || fa.mBeginS != fb.mBeginS || fa.mBeginT != fb.mBeginT || fa.mNumS != fb.mNumS ||
+                fa.mNumT != fb.mNumT || fa.mJoinsS != fb.mJoinsS || fa.mJoinsT != fb.mJoinsT || fa.mReversed != fb.mReversed ||
+                fa.mNumVertices != fb.mNumVertices || fa.mNumIndices != fb.mNumIndices)
+            {
+                return fmt::format("{}: its layout", name);
+            }
+            if (!same(fa.mExtents, fb.mExtents, 2 * sizeof(LLVector4a)) || !same(fa.mCenter, fb.mCenter, sizeof(LLVector4a)) ||
+                !same(fa.mTexCoordExtents, fb.mTexCoordExtents, sizeof(fa.mTexCoordExtents)))
+            {
+                return fmt::format("{}: its bounds", name);
+            }
+            const size_t vertices = fa.mNumVertices;
+            if (!same(fa.mPositions, fb.mPositions, sizeof(LLVector4a) * vertices))
+            {
+                return fmt::format("{}: its positions", name);
+            }
+            if (!same(fa.mNormals, fb.mNormals, sizeof(LLVector4a) * vertices))
+            {
+                return fmt::format("{}: its normals", name);
+            }
+            if (!same(fa.mTexCoords, fb.mTexCoords, sizeof(LLVector2) * vertices))
+            {
+                return fmt::format("{}: its UVs", name);
+            }
+            if ((fa.mTangents == nullptr) != (fb.mTangents == nullptr) || (fa.mTangents && !same(fa.mTangents, fb.mTangents, sizeof(LLVector4a) * vertices)))
+            {
+                return fmt::format("{}: its tangents", name);
+            }
+            if (!same(fa.mIndices, fb.mIndices, sizeof(U16) * fa.mNumIndices))
+            {
+                return fmt::format("{}: its indices", name);
+            }
+        }
+        return {};
+    }
+
+    // A prim is LOD-invariant where its parameters build it the same at
+    // every detail: a sculpt, a mesh and a flexible prim are not; nor is a
+    // prim whose path is round, twists, or tapers a profile whose hole type
+    // is not the default, nor one whose profile or hole is round, nor one
+    // whose hole is drawn in to its wall. Every prim of the sweep the parameters
+    // call invariant is the same bytes at every LOD, and every other one
+    // differs at some LOD.
+    TEST_CASE("llvolume: a prim LOD-invariant by its parameters is the same bytes at every LOD", "[llvolume]")
+    {
+        Shape hollow_box = box();
+        hollow_box.name = "hollow box";
+        hollow_box.hollow = 0.5f;
+        Shape tapered = box();
+        tapered.name = "tapered box";
+        tapered.scale_x = 0.4f;
+        Shape tapered_hole = tapered;
+        tapered_hole.name = "tapered box with a square hole";
+        tapered_hole.hole = LL_PCODE_HOLE_SQUARE;
+        tapered_hole.hollow = 0.5f;
+        Shape twisted = box();
+        twisted.name = "twisted box";
+        twisted.twist_end = 0.5f;
+        Shape turned = box();
+        turned.name = "box turned a quarter turn";
+        turned.twist_begin = turned.twist_end = 0.25f;
+        Shape circle_hole = box();
+        circle_hole.name = "box with a circle hole";
+        circle_hole.hole = LL_PCODE_HOLE_CIRCLE;
+        circle_hole.hollow = 0.5f;
+        Shape solid_circle_hole = circle_hole;
+        solid_circle_hole.name = "box with a circle hole of no size";
+        solid_circle_hole.hollow = 0.f;
+        Shape drawn_in = prism();
+        drawn_in.name = "prism with a square hole drawn in to its wall";
+        drawn_in.hole = LL_PCODE_HOLE_SQUARE;
+        drawn_in.hollow = 0.85f;
+        Shape clear = drawn_in;
+        clear.name = "prism with a square hole clear of its wall";
+        clear.hollow = 0.5f;
+        Report report;
+        std::vector<std::string> rejected_but_same;
+        // A shape at each LOD against its LOD 0: every LOD is the same bytes
+        // where its parameters call it invariant, and it is listed where they
+        // do not and no LOD differs. Returns what they call it.
+        auto check = [&](const Shape& s)
+        {
+            const bool invariant = LLVolume::isLODInvariant(s.params());
+            LLPointer<LLVolume> lowest = build(s, 0);
+            if (lowest->isLODInvariant() != invariant)
+            {
+                report.fail(fmt::format("{}: the volume and its parameters disagree", s.name));
+            }
+            for (S32 lod = 1; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> other = build(s, lod);
+                const std::string difference = differenceBetween(*lowest, *other);
+                if (!difference.empty())
+                {
+                    if (invariant)
+                    {
+                        report.fail(fmt::format("{}: LOD 0 and {} differ in {}", s.name, lod, difference));
+                    }
+                    return invariant;
+                }
+            }
+            if (!invariant)
+            {
+                rejected_but_same.push_back(s.name);
+            }
+            return invariant;
+        };
+
+        struct Expected
+        {
+            Shape shape;
+            bool invariant;
+        };
+        for (const Expected& expected : { Expected{ box(), true }, Expected{ hollow_box, true }, Expected{ prism(), true }, Expected{ tapered, true },
+                                          Expected{ turned, true }, Expected{ solid_circle_hole, true }, Expected{ clear, true },
+                                          Expected{ tapered_hole, false }, Expected{ twisted, false }, Expected{ circle_hole, false },
+                                          Expected{ drawn_in, false }, Expected{ cylinder(), false }, Expected{ sphere(), false },
+                                          Expected{ tube(), false } })
+        {
+            if (check(expected.shape) != expected.invariant)
+            {
+                report.fail(fmt::format("{}: {} invariant", expected.shape.name, expected.invariant ? "not" : "called"));
+            }
+        }
+        const LLUUID asset("6d3b2a1e-4c5f-4e8a-9b7d-0f1e2d3c4b5a");
+        LLVolumeParams sculpt = box().params();
+        sculpt.setSculptID(asset, LL_SCULPT_TYPE_SPHERE);
+        CHECK_FALSE(LLVolume::isLODInvariant(sculpt));
+        LLVolumeParams mesh = box().params();
+        mesh.setSculptID(asset, LL_SCULPT_TYPE_MESH);
+        CHECK_FALSE(LLVolume::isLODInvariant(mesh));
+        LLVolumeParams flexible = box().params();
+        flexible.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_FLEXIBLE);
+        CHECK_FALSE(LLVolume::isLODInvariant(flexible));
+
+        // A volume says so only where it is shared.
+        CHECK(build(box(), 0)->isLODInvariant());
+        CHECK_FALSE(build(box(), 0, true)->isLODInvariant());
+        CHECK_FALSE(build(cylinder(), 0)->isLODInvariant());
+
+        // The sweep's invariant prims: its straight untwisted squares and
+        // triangles, plain, cut and sheared, with no hole or one of straight
+        // sides clear of the wall, and tapered with no hole or one of the
+        // default type.
+        S32 accepted = 0;
+        S32 rejected = 0;
+        for (const Shape& s : sweepShapes())
+        {
+            ++(check(s) ? accepted : rejected);
+        }
+        INFO(fmt::format("{} prims of the sweep invariant and {} not", accepted, rejected));
+        INFO(fmt::format("{} not invariant but the same at every LOD{}{}", rejected_but_same.size(), rejected_but_same.empty() ? "" : ", the first ",
+                         rejected_but_same.empty() ? "" : rejected_but_same.front()));
+        INFO(report.text());
+        CHECK(report.failures == 0);
+        CHECK(rejected_but_same.empty());
+        CHECK(accepted == 84);
+    }
+
 }

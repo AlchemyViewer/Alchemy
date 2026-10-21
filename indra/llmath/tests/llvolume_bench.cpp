@@ -588,6 +588,19 @@ namespace
         }
     }
 
+    TEST_CASE("llvolume_bench: whether a prim of each class is LOD-invariant", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        for (const Prim& prim : primClasses())
+        {
+            const LLVolumeParams params = prim.params;
+            BENCHMARK(fmt::format("{}, {}", prim.name, LLVolume::isLODInvariant(params) ? "invariant" : "not invariant"))
+            {
+                return LLVolume::isLODInvariant(params);
+            };
+        }
+    }
+
     TEST_CASE("llvolume_bench: a sculpt of each stitching built from its map", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
