@@ -2208,23 +2208,20 @@ U32 LLImageGL::publishUploads()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(on_main_thread());
 
-    // Fences of one context signal in the order they were issued, so walking oldest first
-    // publishes an image's uploads in order. The ready ones are taken out before any is
-    // published: publishing runs the callers' callbacks, which must find the list settled.
+    // Fences of one context signal in the order they were issued, and every one here is the
+    // LLImageGL thread's, queued in the order it laid them: walking oldest first publishes an
+    // image's uploads in order, and the first still pending leaves every later one pending
+    // too, so the walk stops there. Each poll is a call that returns a value, which a threaded
+    // driver such as Mesa's glthread answers only once its own thread has caught up. The ready
+    // ones are taken out before any is published: publishing runs the callers' callbacks,
+    // which must find the list settled.
     std::vector<PendingPublish> ready;
-    size_t kept = 0;
-    for (size_t i = 0; i < sPendingPublishes.size(); ++i)
+    for (PendingPublish& pending : sPendingPublishes)
     {
-        PendingPublish& pending = sPendingPublishes[i];
         const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
         if (res == GL_TIMEOUT_EXPIRED)
         {
-            if (kept != i)
-            {
-                sPendingPublishes[kept] = std::move(pending);
-            }
-            ++kept;
-            continue;
+            break;
         }
         if (res == GL_WAIT_FAILED)
         {
@@ -2235,7 +2232,7 @@ U32 LLImageGL::publishUploads()
         glDeleteSync(pending.mFence);
         ready.push_back(std::move(pending));
     }
-    sPendingPublishes.erase(sPendingPublishes.begin() + kept, sPendingPublishes.end());
+    sPendingPublishes.erase(sPendingPublishes.begin(), sPendingPublishes.begin() + ready.size());
 
     for (PendingPublish& pending : ready)
     {
