@@ -41,6 +41,9 @@ class LLViewerObject;
 // Second-order SH: one DC term, three linear, five quadratic.
 #define LL_SH_COEFF_COUNT 9
 
+// RGBA32UI texels a probe's coefficients pack into: 27 halves, eight to a texel (shPackUtilF.glsl).
+#define LL_SH_PACKED_TEXELS 4
+
 // reflection probe mininum scale
 #define LL_REFLECTION_PROBE_MINIMUM_SCALE 1.f;
 
@@ -77,7 +80,8 @@ public:
         //  x - irradiance scale
         //  y - radiance scale
         //  z - fade in
-        //  w - unused (std140 keeps this a vec4)
+        //  w - nearest view depth of the probe's bounding sphere (mMinDepth), which the list is
+        //      sorted on: the shader's scan stops at the first probe beyond the pixel
         LLVector4 refParams[LL_MAX_REFLECTION_PROBE_COUNT];
 
         LLVector4 heroSphere;
@@ -97,7 +101,7 @@ public:
         GLint refmapCount;
 
         GLint heroShape;
-        GLint heroMipCount;
+        GLfloat heroMaxLod;
         GLint heroProbeCount;
 
         // Screen-space reflection march parameters. Frame-constant, and every SSR consumer is
@@ -162,6 +166,11 @@ public:
     // call once at startup to allocate cubemap arrays
     void initReflectionMaps();
 
+    // The GL resources initReflectionMaps and update build: the cube array, the SH coefficients, the scratch target,
+    // the mip chain, the UBO and the vertex buffer. The probes stay, holding nothing, and start over once
+    // initReflectionMaps builds the resources again. Whether there was anything to free.
+    bool freeResources();
+
     // True if currently updating a radiance map, false if currently updating an irradiance map
     bool isRadiancePass() { return mRadiancePass; }
 
@@ -218,8 +227,9 @@ private:
     LLPointer<LLVertexBuffer> mVertexBuffer;
 
     // storage for reflection probe irradiance maps
-    // Nine RGB SH coefficients per probe, laid out 9 wide with one row per cubemap layer.
-    // Signed, so RGBA16F rather than the unsigned float the radiance chain uses.
+    // Nine RGB SH coefficients per probe as signed halves, packed into LL_SH_PACKED_TEXELS
+    // RGBA32UI texels with one row per cubemap layer, so a pixel reads a probe's set in four
+    // fetches (shPackUtilF.glsl).
     LLRenderTarget mSHCoeffs;
 
     // Scratch for the row-parallel form of the SH projection: the same nine columns, one row of
@@ -285,11 +295,15 @@ private:
     // resolution of reflection probes
     U32 mProbeResolution = 128;
 
-    // Linear supersample factor of a capture: faces render at mProbeResolution times this,
-    // are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, applied by
-    // initReflectionMaps like the resolution (the aux render target pack follows it).
+    // Linear supersample factor of a capture: faces render at mProbeResolution times this and,
+    // above 1, are Gaussian blurred and downsampled to the probe. ALProbeSuperSample, which
+    // initReflectionMaps takes from the plan with the resolution, as the probe pack is sized.
     U32 mSuperSample = 4;
     U32 superSample() const { return mSuperSample; }
+
+    // RenderHDREnabled as the cube array, the scratch target and the mip chain were allocated
+    // under: float colour or 8-bit. initReflectionMaps rebuilds all three when it changes.
+    bool mHDR = true;
 
     // maximum LoD of reflection probes (mip levels - 1)
     F32 mMaxProbeLOD = 6.f;

@@ -33,6 +33,7 @@
 #include "llappviewer.h"
 #include "llcamera.h"
 #include "lldrawpoolwater.h"
+#include "llenvironment.h"
 #include "llglslshader.h"
 #include "llimage.h"
 #include "llimagegl.h"
@@ -63,8 +64,7 @@ ALWaterSurface::WaveSettings ALWaterSurface::waveSettings()
 
 bool ALWaterSurface::wavesWanted()
 {
-    static LLCachedControl<bool> waves(gSavedSettings, "AlchemyRenderWaterWaves", true);
-    return waves && water_waves_supported();
+    return gPipeline.shaderInputs().mLocal.mWaterWaves;
 }
 
 void ALWaterSurface::update()
@@ -104,7 +104,7 @@ void ALWaterSurface::update()
 
     // The maps the pool binds this frame, followed before anything is drawn, so the waves' bound is the bound maps'.
     // Their means are read only by the tiled reads.
-    static LLCachedControl<U32> hextile(gSavedSettings, "AlchemyRenderWaterHextile", 1);
+    const S32 hextile = gPipeline.shaderInputs().mGlobal.mWaterHextile;
     const bool waves = wavesWanted() && gWaterWavesProgram.mProgramObject != 0;
     if (LLDrawPoolWater* pool = static_cast<LLDrawPoolWater*>(gPipeline.findPool(LLDrawPool::POOL_WATER)))
     {
@@ -282,6 +282,13 @@ bool ALWaterSurface::inView(LLCamera& camera) const
     const LLVector4a centre(mCentre.mV[VX], mCentre.mV[VY], 0.5f * (mLowest + mHighest));
     const LLVector4a radius(rim, rim, 0.5f * (mHighest - mLowest) + maxDisplacement() + 0.01f);
     return camera.AABBInFrustumNoFarClip(centre, radius) != 0;
+}
+
+bool ALWaterSurface::drawnFrom(LLViewerCamera& camera) const
+{
+    return exists() &&
+           ALFarPlane::waterVisibleFrom(camera.getOrigin().mV[VZ], LLEnvironment::instance().getWaterHeight(), camera.getProjectionFar()) &&
+           inView(camera);
 }
 
 bool ALWaterSurface::patchesInView(LLCamera& camera) const

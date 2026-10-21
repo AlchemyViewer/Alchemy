@@ -562,10 +562,16 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
         LL::WorkQueue::ptr_t main_queue = LL::WorkQueue::getInstance("mainloop");
         LL::WorkQueue::ptr_t general_queue = LL::WorkQueue::getInstance("General");
 
+        // Owned by both halves of the work, so it goes with the last of them to go, run or
+        // not: queues closed at shutdown drop the work they still hold unrun. The work lets
+        // its share go before the reply can run, so the material it holds, whose count is
+        // the main thread's, is never let go of on the general queue's thread.
+        std::shared_ptr<AssetLoadUserData> owned_data(asset_data);
         main_queue->postTo(
             general_queue,
-            [id, asset_type, asset_data]() // Work done on general queue
+            [id, asset_type, owned = owned_data]() mutable // Work done on general queue
         {
+            const std::shared_ptr<AssetLoadUserData> asset_data = std::move(owned);
             std::vector<char> buffer;
             {
                 LL_PROFILE_ZONE_NAMED("gltf read asset");
@@ -625,7 +631,7 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
 
             return false;
         },
-            [id, asset_data](bool result) // Callback to main thread
+            [id, asset_data = owned_data](bool result) // Callback to main thread
             {
 
             if (result)
@@ -638,8 +644,6 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
             }
 
             asset_data->mMaterial->materialComplete(true);
-
-            delete asset_data;
         });
     }
 }

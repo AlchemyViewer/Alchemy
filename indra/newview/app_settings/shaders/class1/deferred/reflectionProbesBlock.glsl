@@ -32,7 +32,7 @@ layout (std140) uniform ReflectionProbes
     //  x - irradiance scale
     //  y - radiance scale
     //  z - fade in
-    //  w - unused (std140 keeps this a vec4)
+    //  w - nearest view depth of the probe's bounding sphere, which the list is sorted on
     vec4 refParams[MAX_REFMAP_COUNT];
     vec4 heroSphere;
     // index  of cube map in reflectionProbes for a corresponding reflection probe
@@ -52,8 +52,8 @@ layout (std140) uniform ReflectionProbes
     int refmapCount;
 
     int heroShape;
-    int heroMipCount;
-    int heroProbeCount;
+    float heroMaxLod;   // the hero chain's LOD for roughness 1, as its radiance was generated
+    int heroProbeCount; // 1 while there is a mirror to reflect, else 0
 
     // Screen-space reflection march parameters (see ReflectionProbeData). noiseSine is NOT
     // here -- it advances per bind and stays a loose uniform.

@@ -32,6 +32,7 @@
 #include <time.h>
 #include <locale.h>
 #include <chrono>
+#include <cmath>
 #include <string>
 #include <iomanip>
 #include <sstream>
@@ -44,6 +45,21 @@
 
 namespace
 {
+    // A date's seconds as a time_t, or false when they are not a number or
+    // lie past what a time_t holds. Converting such a double is undefined,
+    // and a binary LLSD date carries whatever eight bytes it was sent.
+    bool seconds_to_time_t(F64 seconds, time_t& out)
+    {
+        // 2^63, exactly representable; any double below it fits an S64
+        constexpr F64 LIMIT = 9223372036854775808.0;
+        if (!std::isfinite(seconds) || seconds < -LIMIT || seconds >= LIMIT)
+        {
+            return false;
+        }
+        out = (time_t)seconds;
+        return true;
+    }
+
     bool gmtime_utc(time_t secs, struct tm& out)
     {
 #if LL_WINDOWS
@@ -133,9 +149,18 @@ namespace
             s.setstate(std::ios::failbit);
             return false;
         }
+        // A field past nine digits' worth is no date, and is turned down before
+        // the digits or the "- 1900" a year takes can overflow. timegm() would
+        // carry it into the fields above rather than refuse it.
+        constexpr S32 FIELD_MAX = 999999999;
         S32 value = 0;
         while (c >= '0' && c <= '9')
         {
+            if (value > (FIELD_MAX - (c - '0')) / 10)
+            {
+                s.setstate(std::ios::failbit);
+                return false;
+            }
             value = value * 10 + (c - '0');
             s.rdbuf()->sbumpc();
             c = date_peek(s);
@@ -155,6 +180,13 @@ namespace
     // buf must hold at least 32 chars.
     size_t format_iso8601(F64 seconds_since_epoch, char* buf, size_t cap)
     {
+        // The microseconds must fit an S64 for the cast below to be defined:
+        // about 292,000 years either side of the epoch, and never NaN.
+        constexpr F64 MAX_SECONDS = 9.2e12;
+        if (!std::isfinite(seconds_since_epoch) || std::fabs(seconds_since_epoch) >= MAX_SECONDS)
+        {
+            return snprintf(buf, cap, "1970-01-01T00:00:00Z");
+        }
         S64 total_usec = (S64)(seconds_since_epoch * (F64)USEC_PER_SEC);
         time_t secs = (time_t)(total_usec / 1000000);
         int usec = (int)(total_usec % 1000000);
@@ -245,9 +277,9 @@ std::string LLDate::toLocalDateString (std::string fmt) const
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    time_t locSeconds = (time_t) mSecondsSinceEpoch;
+    time_t locSeconds;
     struct tm lt = {};
-    if (!localtime_utc(locSeconds, lt)) return std::string();
+    if (!seconds_to_time_t(mSecondsSinceEpoch, locSeconds) || !localtime_utc(locSeconds, lt)) return std::string();
     return toHTTPDateString(&lt, fmt);
 }
 
@@ -255,9 +287,9 @@ std::string LLDate::toHTTPDateString (std::string fmt) const
 {
     LL_PROFILE_ZONE_SCOPED;
 
-    time_t locSeconds = (time_t) mSecondsSinceEpoch;
+    time_t locSeconds;
     struct tm gmt = {};
-    if (!gmtime_utc(locSeconds, gmt)) return std::string();
+    if (!seconds_to_time_t(mSecondsSinceEpoch, locSeconds) || !gmtime_utc(locSeconds, gmt)) return std::string();
     return toHTTPDateString(&gmt, fmt);
 }
 
@@ -274,10 +306,11 @@ std::string LLDate::toHTTPDateString (tm * gmt, std::string fmt)
         prev_locale = this_locale;
     }
 
-    // use strftime() as it appears to be faster than std::time_put
+    // use strftime() as it appears to be faster than std::time_put. It returns
+    // 0 and leaves the buffer indeterminate when the result does not fit.
     char buffer[128];
-    strftime(buffer, 128, fmt.c_str(), gmt);
-    std::string res(buffer);
+    const size_t len = strftime(buffer, sizeof(buffer), fmt.c_str(), gmt);
+    std::string res(buffer, len);
 #if LL_WINDOWS
     // Convert from locale-dependant charset to UTF-8 (EXT-8524).
     res = ll_convert_string_to_utf8_string(res);
@@ -293,10 +326,9 @@ void LLDate::toStream(std::ostream& s) const
 
 bool LLDate::split(S32 *year, S32 *month, S32 *day, S32 *hour, S32 *min, S32 *sec) const
 {
-    time_t secs = (time_t)mSecondsSinceEpoch;
-
+    time_t secs;
     struct tm exp_time;
-    if (!gmtime_utc(secs, exp_time))
+    if (!seconds_to_time_t(mSecondsSinceEpoch, secs) || !gmtime_utc(secs, exp_time))
     {
         return false;
     }
@@ -383,7 +415,6 @@ bool LLDate::fromStream(std::istream& s)
         S32 offset_sign = (c == '+') ? 1 : -1;
         S32 offset_hours = 0;
         S32 offset_minutes = 0;
-        S32 offset_in_seconds = 0;
 
         s >> offset_hours;
 
@@ -393,8 +424,9 @@ bool LLDate::fromStream(std::istream& s)
             s >> offset_minutes;
         }
 
-        offset_in_seconds =  (offset_hours * 60 + offset_sign * offset_minutes) * 60;
-        seconds_since_epoch -= offset_in_seconds;
+        // in F64: an extracted S32 may be anything up to its limits, and
+        // scaling it to seconds in S32 would overflow
+        seconds_since_epoch -= ((F64)offset_hours * 60.0 + offset_sign * (F64)offset_minutes) * 60.0;
     }
     else if (c != 'Z') { return false; } // skip the Z
 

@@ -678,15 +678,6 @@
 	<notification name="RunLauncher">
 		請勿直接執行該瀏覽器可執行程式。 如果有SL_Launcher（SL啓動器）的捷徑，請更新，以便正常使用。
 	</notification>
-	<notification name="OldGPUDriver">
-		你的顯示卡很可能有新版的驅動程式。  更新顯示驅動程式會大幅改善性能。
-
-    前往[URL]察看是否有新版驅動程式？
-		<url name="url">
-			[URL]
-		</url>
-		<usetemplate ignoretext="我的顯示驅動程式太老舊" name="okcancelignore" notext="取消" yestext="是"/>
-	</notification>
 	<notification name="UnknownGPU">
 		你的系統含有一個 [APP_NAME] 無法辨認的顯像卡。
 原因很可能是 [APP_NAME] 尚未針對新硬體完成測試。  這大概不會出問題，但你可能需要調整顯像設定。
@@ -3638,9 +3629,6 @@ SHA1 指紋：[MD5_DIGEST]
 	</global>
 	<global name="UnsupportedRAMAmount">
 		510
-	</global>
-	<global name="UnsupportedGPU">
-		- 你的顯示卡未達系統最低配備要求。
 	</global>
 	<global name="UnsupportedRAM">
 		- 你的系統記憶體卡未達系統最低配備要求。

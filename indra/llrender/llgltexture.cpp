@@ -283,7 +283,7 @@ S32Bytes LLGLTexture::getTextureMemory() const
 {
     llassert(mGLTexturep.notNull()) ;
 
-    return mGLTexturep->mTextureMemory ;
+    return mGLTexturep->getTextureMemory();
 }
 
 LLGLenum LLGLTexture::getPrimaryFormat() const

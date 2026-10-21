@@ -2332,25 +2332,6 @@ Visit [_URL] for more information?
 
   <notification
    icon="alertmodal.tga"
-   name="OldGPUDriver"
-   type="alertmodal">
-     There is likely a newer driver for your graphics chip.  Updating graphics drivers can substantially improve performance.
-
-    Visit [URL] to check for driver updates?
-    <tag>confirm</tag>
-    <url option="0" name="url">
-    [URL]
-    </url>
-    <usetemplate
-     ignoretext="My graphics driver is out of date"
-     name="okcancelignore"
-     notext="No"
-     yestext="Yes"/>
-    <tag>fail</tag>
-  </notification>
-
-  <notification
-   icon="alertmodal.tga"
    name="UnknownGPU"
    type="alertmodal">
 Your system contains a graphics card that [APP_NAME] doesn't recognize.
@@ -10974,10 +10955,6 @@ Do you wish to continue?
 
   <global name="UnsupportedRAMAmount">
 510
-  </global>
-
-  <global name="UnsupportedGPU">
-- Your graphics card does not meet the minimum requirements.
   </global>
 
   <global name="UnsupportedRAM">

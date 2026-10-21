@@ -1698,11 +1698,17 @@ namespace
     // The CPU block must exactly match the std140 layout the shaders declare. Each vec3 is
     // paired with a trailing scalar (fills the vec3's std140 tail), so the C++ float[3]+float
     // packing reproduces std140 with no manual padding; only the round to 16 bytes before
-    // eyeToSky needs it, a mat3's columns being vec4-aligned.
-    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 208,
-                  "Environment UBO layout must match std140 (208 bytes)");
+    // eyeToSky needs it, a mat3's columns being vec4-aligned, and the unpaired vec3s after it.
+    static_assert(sizeof(LLEnvironment::EnvironmentUBOData) == 448,
+                  "Environment UBO layout must match std140 (448 bytes)");
     static_assert(offsetof(LLEnvironment::EnvironmentUBOData, eyeToSky) == 160,
                   "eyeToSky must start on a 16-byte boundary, as a std140 mat3 does");
+    static_assert(offsetof(LLEnvironment::EnvironmentUBOData, haze_extinction) == 208 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, atmos_sunlit) == 256 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, sky_ambient) == 320 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, haze_additive_glow) == 384 &&
+                  offsetof(LLEnvironment::EnvironmentUBOData, sky_ambient_below) == 432,
+                  "the atmospheric terms are vec3s after the mat3, each on a 16-byte boundary, as std140 lays them");
 
     // LLShaderMgr uniform enum -> (byte offset in the block, float component count). The pack
     // walks the per-frame LLShaderUniforms buckets and writes any setting whose enum appears
@@ -1735,6 +1741,21 @@ namespace
         LL_ENV_FIELD(GAMMA,                     gamma),
         LL_ENV_FIELD(WATER_FOGKS,               waterFogKS),
         LL_ENV_FIELD(WATER_FOGDENSITY,          waterFogDensity),
+        LL_ENV_FIELD(HAZE_EXTINCTION,           haze_extinction),
+        LL_ENV_FIELD(BLUE_WEIGHT,               blue_weight),
+        LL_ENV_FIELD(HAZE_WEIGHT,               haze_weight),
+        LL_ENV_FIELD(ATMOS_SUNLIT,              atmos_sunlit),
+        LL_ENV_FIELD(ATMOS_AMBIENT,             atmos_ambient),
+        LL_ENV_FIELD(SKY_SUNLIGHT,              sky_sunlight),
+        LL_ENV_FIELD(SKY_LIGHT,                 sky_light),
+        LL_ENV_FIELD(SKY_AMBIENT,               sky_ambient),
+        LL_ENV_FIELD(ATMOS_SUNLIT_LINEAR,       atmos_sunlit_linear),
+        LL_ENV_FIELD(ATMOS_AMBLIT,              atmos_amblit),
+        LL_ENV_FIELD(HAZE_ADDITIVE,             haze_additive),
+        LL_ENV_FIELD(HAZE_ADDITIVE_GLOW,        haze_additive_glow),
+        LL_ENV_FIELD(SKY_LIGHT_ATTEN,           sky_light_atten),
+        LL_ENV_FIELD(CLOUD_SUNLIGHT,            cloud_sunlight),
+        LL_ENV_FIELD(SKY_AMBIENT_BELOW,         sky_ambient_below),
     };
 #undef LL_ENV_FIELD
 
@@ -1911,7 +1932,30 @@ void LLEnvironment::packEnvironmentUBO()
         memcpy(&d.eyeToSky[column * 4], &mEyeToSky[column * 3], 3 * sizeof(F32));
     }
 
+    packAtmosphericTerms(d);
+
     mEnvUBODirty = true;
+}
+
+// static
+void LLEnvironment::packAtmosphericTerms(EnvironmentUBOData& d)
+{
+    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), per channel: cs is the light under
+    // cloud; the haze's colour is the blue share lit by it and the ambient, plus the haze share
+    // lit by the ambient and by the light times the per-pixel glow toward it.
+    for (U32 c = 0; c < 3; ++c)
+    {
+        const F32 sunlit  = d.atmos_sunlit[c];
+        const F32 ambient = d.atmos_ambient[c];
+        const F32 cs      = sunlit * (1.f - d.cloud_shadow);
+        const F32 blue    = d.blue_horizon[c] * d.blue_weight[c];
+        const F32 haze    = d.haze_horizon * d.haze_weight[c];
+
+        d.atmos_sunlit_linear[c] = sRGBtoLinear(sunlit);
+        d.atmos_amblit[c]        = powf(ambient, 0.9f) * 0.57f;
+        d.haze_additive[c]       = blue * (cs + ambient) + haze * ambient;
+        d.haze_additive_glow[c]  = haze * cs;
+    }
 }
 
 void LLEnvironment::bindEnvironmentUBO()
@@ -1927,9 +1971,22 @@ void LLEnvironment::bindEnvironmentUBO()
     mEnvUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
 }
 
+void LLEnvironment::bindEnvironmentUBOLitBy(const LLColor3& sunlit)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_SHADER;
+
+    EnvironmentUBOData d = mEnvUBOData;
+    memcpy(d.atmos_sunlit, sunlit.mV, sizeof(d.atmos_sunlit));
+    packAtmosphericTerms(d);
+
+    mEnvLitByUBO.update(&d, sizeof(EnvironmentUBOData));
+    mEnvLitByUBO.bind(LLGLSLShader::UB_ENVIRONMENT);
+}
+
 void LLEnvironment::releaseGLBuffers()
 {
     mEnvUBO.release();
+    mEnvLitByUBO.release();
     mEnvUBODirty = true; // force a re-upload before the next bind
 }
 

@@ -2645,35 +2645,6 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
                 gSavedSettings.setBOOL("RenderTerrainPBREnabled", false);
             }
 
-            if (features.has("PBRMaterialSwatchEnabled"))
-            {
-                bool enabled = features["PBRMaterialSwatchEnabled"];
-                gSavedSettings.setBOOL("UIPreviewMaterial", enabled);
-            }
-            else
-            {
-                gSavedSettings.setBOOL("UIPreviewMaterial", false);
-            }
-
-            if (features.has("GLTFEnabled"))
-            {
-                bool enabled = features["GLTFEnabled"];
-
-                // call setShaders the first time GLTFEnabled is received as true (causes GLTF specific shaders to be loaded)
-                if (enabled != gSavedSettings.getBOOL("GLTFEnabled"))
-                {
-                    gSavedSettings.setBOOL("GLTFEnabled", enabled);
-                    if (enabled)
-                    {
-                        LLViewerShaderMgr::instance()->setShaders();
-                    }
-                }
-            }
-            else
-            {
-                gSavedSettings.setBOOL("GLTFEnabled", false);
-            }
-
             if (features.has("PBRTerrainTransformsEnabled"))
             {
                 bool enabled = features["PBRTerrainTransformsEnabled"];

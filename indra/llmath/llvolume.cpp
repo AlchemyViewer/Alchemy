@@ -1950,7 +1950,6 @@ LLProfile::~LLProfile()
 }
 
 
-S32 LLVolume::sNumMeshPoints = 0;
 
 LLVolume::LLVolume(const LLVolumeParams &params, const F32 detail, const bool generate_single_face, const bool is_unique)
     : mParams(params)
@@ -2011,7 +2010,6 @@ void LLVolume::genTangents(S32 face)
 
 LLVolume::~LLVolume()
 {
-    sNumMeshPoints -= mMesh.size();
     delete mPathp;
 
     delete mProfilep;
@@ -2077,9 +2075,7 @@ bool LLVolume::generate()
         S32 sizeS = mPathp->mPath.size();
         S32 sizeT = mProfilep->mProfile.size();
 
-        sNumMeshPoints -= mMesh.size();
         mMesh.resize(sizeT * sizeS);
-        sNumMeshPoints += mMesh.size();
 
         //generate vertex positions
 
@@ -3265,9 +3261,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
         LL_WARNS() << "sculpt bad mesh size " << sizeS << " " << sizeT << LL_ENDL;
     }
 
-    sNumMeshPoints -= mMesh.size();
     mMesh.resize(sizeS * sizeT);
-    sNumMeshPoints += mMesh.size();
 
     //generate vertex positions
     if (!data_is_empty)
@@ -5402,7 +5396,8 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 }
             }
 
-            // put back in normalized coordinate frame
+            // put back in normalized coordinate frame: tangents lie in the surface and scale as positions do,
+            // normals take the inverse transpose
             LLVector4a inv_scale(1.f/mNormalizedScale.mV[0], 1.f / mNormalizedScale.mV[1], 1.f / mNormalizedScale.mV[2]);
             LLVector4a scale;
             scale.load3(mNormalizedScale.mV);
@@ -5414,7 +5409,7 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 mNormals[i].mul(scale);
                 mNormals[i].normalize3();
                 F32 w = mTangents[i].getF32ptr()[3];
-                mTangents[i].mul(scale);
+                mTangents[i].mul(inv_scale);
                 mTangents[i].normalize3();
                 mTangents[i].getF32ptr()[3] = w;
             }
@@ -6351,6 +6346,29 @@ void LLVolumeFace::fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, 
     {
         mIndices[i] = idx[i];
     }
+}
+
+//static
+size_t LLVolumeFace::weldVertices(VertexData* destination_vertices, U32* destination_indices,
+                                  const VertexData* vertices, size_t vertex_count,
+                                  const U32* indices, size_t index_count)
+{
+    static_assert(std::is_trivially_copyable_v<VertexData>, "meshopt_remapVertexBuffer copies vertices byte for byte");
+
+    const meshopt_Stream streams[] = {
+        { vertices[0].getPosition().getF32ptr(), sizeof(F32) * 3, sizeof(VertexData) },
+        { vertices[0].getNormal().getF32ptr(), sizeof(F32) * 3, sizeof(VertexData) },
+        { vertices[0].mTexCoord.mV, sizeof(F32) * 2, sizeof(VertexData) },
+    };
+
+    // remap[old] is the vertex's new index, or ~0u where no index uses it
+    std::vector<unsigned int> remap(vertex_count);
+    size_t unique = meshopt_generateVertexRemapMulti(&remap[0], indices, index_count, vertex_count, streams, sizeof(streams) / sizeof(streams[0]));
+
+    meshopt_remapVertexBuffer(destination_vertices, vertices, vertex_count, sizeof(VertexData), &remap[0]);
+    meshopt_remapIndexBuffer<unsigned int>(destination_indices, indices, index_count, &remap[0]);
+
+    return unique;
 }
 
 bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)

@@ -41,6 +41,8 @@
 #include "llviewercontrol.h"
 #include "llviewerregion.h"
 
+#include <fmt/format.h>
+
 using namespace LLAvatarAppearanceDefines;
 
 // support class - remove for 2.1 (hackity hack hack)
@@ -301,7 +303,7 @@ void LLViewerWearable::setTexturesToDefaults()
 LLUUID LLViewerWearable::getDefaultTextureImageID(ETextureIndex index) const
 {
     const LLAvatarAppearanceDictionary::TextureEntry *texture_dict = LLAvatarAppearance::getDictionary()->getTexture(index);
-    const std::string &default_image_name = texture_dict ? texture_dict->mDefaultImageName : "";
+    const std::string_view default_image_name = texture_dict ? texture_dict->mDefaultImageName : std::string_view();
     if (default_image_name == "")
     {
         return IMG_DEFAULT_AVATAR;
@@ -573,7 +575,7 @@ void LLViewerWearable::saveNewAsset() const
 void LLViewerWearable::onSaveNewAssetComplete(const LLUUID& new_asset_id, void* userdata, S32 status, LLExtStat ext_status) // StoreAssetData callback (fixed)
 {
     LLWearableSaveData* data = (LLWearableSaveData*)userdata;
-    const std::string& type_name = LLWearableType::getInstance()->getTypeName(data->mType);
+    const std::string_view type_name = LLWearableType::getTypeName(data->mType);
     if(0 == status)
     {
         // Success
@@ -581,7 +583,7 @@ void LLViewerWearable::onSaveNewAssetComplete(const LLUUID& new_asset_id, void* 
     }
     else
     {
-        std::string buffer = llformat("Unable to save %s to central asset store.", type_name.c_str());
+        std::string buffer = fmt::format("Unable to save {} to central asset store.", type_name);
         LL_WARNS() << buffer << " Status: " << status << LL_ENDL;
         LLSD args;
         args["NAME"] = type_name;
@@ -599,7 +601,7 @@ void LLViewerWearable::onSaveNewAssetComplete(const LLUUID& new_asset_id, void* 
 
 std::ostream& operator<<(std::ostream &s, const LLViewerWearable &w)
 {
-    s << "wearable " << LLWearableType::getInstance()->getTypeName(w.mType) << "\n";
+    s << "wearable " << LLWearableType::getTypeName(w.mType) << "\n";
     s << "    Name: " << w.mName << "\n";
     s << "    Desc: " << w.mDescription << "\n";
     //w.mPermissions

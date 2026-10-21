@@ -35,6 +35,7 @@
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #endif
@@ -94,7 +95,7 @@ void main()
 #endif
 
 #ifdef HAS_SKIN
-    vec3 n = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    vec3 n = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
 #ifdef HAS_NORMAL_MAP
     vec3 t = normalize(mat3(modelview_matrix) * skinDirection(skin, tangent.xyz));
     vary_tangent = t;

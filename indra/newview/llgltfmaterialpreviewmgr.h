@@ -35,10 +35,15 @@ class LLGLTFPreviewTexture : public LLViewerDynamicTexture
 {
 protected:
     LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width);
+    ~LLGLTFPreviewTexture() override;
 
 public:
     // Width scales with size of material's textures
     static LLPointer<LLGLTFPreviewTexture> create(LLPointer<LLFetchedGLTFMaterial> material);
+
+    // How many previews are alive: each renders through the probe pack, which is kept for them while reflection probes
+    // are off (ALRenderResourceInputs::mMaterialPreview).
+    static U32 liveCount() { return sLiveCount; }
 
     bool needsRender() override;
     void preRender(bool clear_depth = true) override;
@@ -62,9 +67,14 @@ public:
     };
 
 private:
+    static U32 sLiveCount;
+
     LLPointer<LLFetchedGLTFMaterial> mGLTFMaterial;
     bool mShouldRender = true;
+    // The material's load levels the preview was last drawn at, and those the render asked for draws at: a render that
+    // finds no target to draw into leaves the first as it was, so the next frame asks again.
     MaterialLoadLevels mBestLoad;
+    MaterialLoadLevels mPendingLoad;
 };
 
 class LLGLTFMaterialPreviewMgr

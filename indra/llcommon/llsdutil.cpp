@@ -160,14 +160,14 @@ LLSD ll_binary_from_string(const LLSD& sd)
 char* ll_print_sd(const LLSD& sd)
 {
     const U32 bufferSize = 10 * 1024;
-    static char buffer[bufferSize];
+    thread_local auto buffer = std::make_unique<char[]>(bufferSize);
     std::ostringstream stream;
     //stream.rdbuf()->pubsetbuf(buffer, bufferSize);
     stream << LLSDOStreamer<LLSDXMLFormatter>(sd);
     stream << std::ends;
-    strncpy(buffer, stream.str().c_str(), bufferSize);
+    strncpy(buffer.get(), stream.str().c_str(), bufferSize);
     buffer[bufferSize - 1] = '\0';
-    return buffer;
+    return buffer.get();
 }
 
 char* ll_pretty_print_sd_ptr(const LLSD* sd)
@@ -182,14 +182,14 @@ char* ll_pretty_print_sd_ptr(const LLSD* sd)
 char* ll_pretty_print_sd(const LLSD& sd)
 {
     const U32 bufferSize = 100 * 1024;
-    static char buffer[bufferSize];
+    thread_local auto buffer = std::make_unique<char[]>(bufferSize);
     std::ostringstream stream;
     //stream.rdbuf()->pubsetbuf(buffer, bufferSize);
     stream << LLSDOStreamer<LLSDXMLFormatter>(sd, LLSDFormatter::OPTIONS_PRETTY);
     stream << std::ends;
-    strncpy(buffer, stream.str().c_str(), bufferSize);
+    strncpy(buffer.get(), stream.str().c_str(), bufferSize);
     buffer[bufferSize - 1] = '\0';
-    return buffer;
+    return buffer.get();
 }
 
 std::string ll_stream_notation_sd(const LLSD& sd)
@@ -872,13 +872,15 @@ bool llsd_equals(const LLSD& lhs, const LLSD& rhs, int bits)
 /*****************************************************************************
 *   llsd::drill()
 *****************************************************************************/
-namespace llsd
+namespace
 {
 
-LLSD& drill_ref(LLSD& blob, const LLSD& rawPath)
+// SD is LLSD or const LLSD. Through a non-const blob, operator[] creates what
+// the path names; through a const one it only looks, and a missing step
+// yields Undefined.
+template <typename SD>
+SD& drill_walk(SD& blob, const LLSD& rawPath)
 {
-    LL_PROFILE_ZONE_SCOPED;
-
     // Treat rawPath uniformly as an array. If it's not already an array,
     // store it as the only entry in one. (But let's say Undefined means an
     // empty array.)
@@ -897,15 +899,13 @@ LLSD& drill_ref(LLSD& blob, const LLSD& rawPath)
     // an LLSD& to capture a subscripted LLSD lvalue, this time we must
     // instead use a pointer -- since it must be reassigned.
     // Start by pointing to the input blob exactly as is.
-    LLSD* located{&blob};
+    SD* located{&blob};
 
     // Extract the element of interest by walking path. Use an explicit index
     // so that, in case of a bogus type in path, we can identify the specific
     // path entry that's bad.
     for (LLSD::Integer i = 0; i < path.size(); ++i)
     {
-        LL_PROFILE_ZONE_NUM(i);
-
         const LLSD& key{path[i]};
         if (key.isString())
         {
@@ -932,13 +932,23 @@ LLSD& drill_ref(LLSD& blob, const LLSD& rawPath)
     return *located;
 }
 
+} // anonymous namespace
+
+namespace llsd
+{
+
+LLSD& drill_ref(LLSD& blob, const LLSD& rawPath)
+{
+    LL_PROFILE_ZONE_SCOPED;
+    return drill_walk(blob, rawPath);
+}
+
 LLSD drill(const LLSD& blob, const LLSD& path)
 {
     LL_PROFILE_ZONE_SCOPED;
-
-    // drill_ref() does exactly what we want. Temporarily cast away
-    // const-ness and use that.
-    return drill_ref(const_cast<LLSD&>(blob), path);
+    // Only looks: blob may be the shared Undefined a missing key returns,
+    // which a non-const walk would turn into a map for every caller.
+    return drill_walk(blob, path);
 }
 
 } // namespace llsd

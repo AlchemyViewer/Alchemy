@@ -45,7 +45,7 @@ in vec2 vary_region_uv;
 in vec4 vary_texcoord_side;
 #endif
 
-void mirrorClip(vec3 position);
+bool mirrorClipped(vec3 position);
 vec4 encodeNormal(vec3 n, float env, float gbuffer_flag);
 vec3 srgb_to_linear(vec3 cs);
 
@@ -81,25 +81,34 @@ vec3 terrain_facet(vec2 p_region);
 #endif
 
 #ifdef TERRAIN_HEX_TILING
+struct HexPlace
+{
+    vec2 frac;
+    ivec2 base;
+};
 struct HexTile
 {
     ivec2 corner[3];
+    ivec2 base;
+    vec2 q;
     vec3 weight;
     int type;
 };
-HexTile hex_tile(vec2 uv);
-mat2 hex_cell(ivec2 corner, vec2 uv, out vec2 st);
+HexPlace terrain_hex_place(int m, int p, float side);
+HexTile hex_tile(vec2 uv, HexPlace place);
+mat2 hex_cell(HexTile ht, int i, out vec2 st);
 float hex_luma(vec3 rgb);
 vec3 hex_weights(HexTile ht, vec3 luma);
 #endif
 
 // One detail texture at one uv. Gradients arrive as parameters: every call sits inside a
 // branch on which textures and which projections cover the fragment, where an implicit-LOD
-// fetch has no derivative to take. See fetch_pbr() in pbrterrainUtilF.glsl.
-vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy)
+// fetch has no derivative to take. See fetch_pbr() in pbrterrainUtilF.glsl. Under hex tiling,
+// p and side name the projection, whose place on the lattice the four textures share.
+vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy, int p, float side)
 {
 #ifdef TERRAIN_HEX_TILING
-    HexTile ht = hex_tile(uv);
+    HexTile ht = hex_tile(uv, terrain_hex_place(0, p, side));
     vec4 cell[3];
     vec3 luma = vec3(0.0);
     for (int i = 0; i < 3; ++i)
@@ -108,7 +117,7 @@ vec4 detail_fetch(sampler2D tex, vec2 uv, vec2 uv_ddx, vec2 uv_ddy)
         if ((ht.type & (1 << i)) != 0)
         {
             vec2 st;
-            mat2 rot = hex_cell(ht.corner[i], uv, st);
+            mat2 rot = hex_cell(ht, i, st);
             cell[i] = textureGrad(tex, st, rot * uv_ddx, rot * uv_ddy);
             luma[i] = hex_luma(cell[i].rgb);
         }
@@ -132,28 +141,29 @@ vec4 detail_sample(sampler2D tex, TerrainTriplanar tw, float sx, float sy
     if ((tw.type & SAMPLE_X) != 0)
     {
         vec2 flip = vec2(sx, 1.0);
-        c += detail_fetch(tex, flip * side.xy, flip * side_ddx.xy, flip * side_ddy.xy) * tw.weight.x;
+        c += detail_fetch(tex, flip * side.xy, flip * side_ddx.xy, flip * side_ddy.xy, 1, sx) * tw.weight.x;
     }
     if ((tw.type & SAMPLE_Y) != 0)
     {
         vec2 flip = vec2(-sy, 1.0);
-        c += detail_fetch(tex, flip * side.zw, flip * side_ddx.zw, flip * side_ddy.zw) * tw.weight.y;
+        c += detail_fetch(tex, flip * side.zw, flip * side_ddx.zw, flip * side_ddy.zw, 2, -sy) * tw.weight.y;
     }
     if ((tw.type & SAMPLE_Z) != 0)
     {
-        c += detail_fetch(tex, uv, uv_ddx, uv_ddy) * tw.weight.z;
+        c += detail_fetch(tex, uv, uv_ddx, uv_ddy, 0, 1.0) * tw.weight.z;
     }
     return c;
 }
 #define TERRAIN_DETAIL(tex) detail_sample(tex, tw, sx, sy, vary_texcoord0.xy, uv_ddx, uv_ddy, vary_texcoord_side, side_ddx, side_ddy)
 #else
-#define TERRAIN_DETAIL(tex) detail_fetch(tex, vary_texcoord0.xy, uv_ddx, uv_ddy)
+#define TERRAIN_DETAIL(tex) detail_fetch(tex, vary_texcoord0.xy, uv_ddx, uv_ddy, 0, 1.0)
 #endif
 
 void main()
 {
-    // Every derivative this shader takes, taken here in uniform control flow and ahead of
-    // mirrorClip's discard, which can cost the quad the lanes a derivative needs.
+    // The detail fetches' derivatives, taken here in uniform control flow. The mirror clip's
+    // discard waits for the end of main: it can cost the quad the lanes a derivative needs, and
+    // the alpha ramp is sampled with implicit LOD after it.
     vec2 uv_ddx = dFdx(vary_texcoord0.xy);
     vec2 uv_ddy = dFdy(vary_texcoord0.xy);
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
@@ -161,11 +171,19 @@ void main()
     vec4 side_ddy = dFdy(vary_texcoord_side);
 #endif
 
-    mirrorClip(pos);
+    bool clipped = mirrorClipped(pos);
 
     // The ramp's four-way mix, as weights, with the ones under the threshold dropped and the
     // rest renormalised, so a texture that would barely show is not fetched at all.
     TerrainMix tm = terrain_ramp_mix(alpha_ramp, vary_composition);
+#ifdef MIRROR_CLIP
+    // A fragment the mirror clips fetches no detail. The fetches are textureGrad from the
+    // derivatives taken above, so its lanes may skip them without costing the quad's others.
+    if (clipped)
+    {
+        tm.type = 0;
+    }
+#endif
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     // By the surface's normal under the fragment, in region space where the projection planes
     // are the axes; see terrain_facet.
@@ -202,6 +220,15 @@ void main()
     }
 
     outColor.a = 0.0; // yes, downstream atmospherics
+
+    // Only the mirror variant can clip; see pbrterrainF for why the discard is compiled out
+    // elsewhere rather than left to a test that is false.
+#if defined(MIRROR_CLIP)
+    if (clipped)
+    {
+        discard;
+    }
+#endif
 
     frag_data[0] = max(outColor, vec4(0));
     frag_data[1] = vec4(0.0,0.0,0.0,-1.0);

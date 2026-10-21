@@ -1,8 +1,8 @@
 /**
  * @file alterrainsurfacemaps_test.cpp
  * @brief The terrain map layout: the apron offset, the row order, channel
- *        interleaving, and which neighbour a grid coordinate beyond the
- *        region resolves to.
+ *        interleaving, which neighbour a grid coordinate beyond the region
+ *        resolves to, and which texels a change marks dirty.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -328,6 +328,117 @@ namespace
                                - ALTerrainSurfaceMaps::smoothHeight(x, y - eps, field, nullptr, nullptr)) / (2.f * eps);
                 REQUIRE_THAT(dzdx, ll_test::WithinBits(fdx, 8));
                 REQUIRE_THAT(dzdy, ll_test::WithinBits(fdy, 8));
+            }
+        }
+    }
+
+    // fillRect rewrites the texels of its rectangle, cut to the map, and leaves every other texel as it was.
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: fillRect rewrites its rectangle and nothing else", "[ALTerrainSurfaceMaps]")
+    {
+        std::vector<F32> out;
+        ALTerrainSurfaceMaps::fill(out, GPE, 2, [](S32, S32, F32* t) { t[0] = -1.f; t[1] = -2.f; });
+
+        // Reaches past the map's west and north edges.
+        const ALTerrainSurfaceMaps::Rect rect{ -APRON - 3, 4, 1, GPE + APRON + 5 };
+        S32 visits = 0;
+        ALTerrainSurfaceMaps::fillRect(out, GPE, 2, rect, [&visits](S32 gx, S32 gy, F32* t) {
+            ++visits;
+            t[0] = (F32)(gx * 100 + gy);
+        });
+        UNSCOPED_INFO("the rectangle less what lies off the map: x -APRON..1, y 4..GPE+APRON-1");
+        CHECK(visits == (1 + APRON + 1) * (GPE + APRON - 4));
+        for (S32 gy = -APRON; gy < GPE + APRON; ++gy)
+        {
+            for (S32 gx = -APRON; gx < GPE + APRON; ++gx)
+            {
+                CAPTURE(gx, gy);
+                const bool inside = gx <= 1 && gy >= 4;
+                CHECK(out[texel(gx, gy, 2)] == (inside ? (F32)(gx * 100 + gy) : -1.f));
+                UNSCOPED_INFO("the channel the sampler leaves alone");
+                CHECK(out[texel(gx, gy, 2) + 1] == -2.f);
+            }
+        }
+
+        S32 none = 0;
+        ALTerrainSurfaceMaps::fillRect(out, GPE, 2, ALTerrainSurfaceMaps::Rect{ GPE + APRON, 0, GPE + APRON + 4, 3 },
+                                       [&none](S32, S32, F32*) { ++none; });
+        UNSCOPED_INFO("a rectangle wholly off the map visits nothing");
+        CHECK(none == 0);
+    }
+
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: merge and intersect, with the empty rectangle", "[ALTerrainSurfaceMaps]")
+    {
+        using Rect = ALTerrainSurfaceMaps::Rect;
+        const Rect a{ 0, 1, 4, 5 };
+        const Rect b{ 3, -2, 7, 2 };
+        const Rect m = ALTerrainSurfaceMaps::merge(a, b);
+        CHECK((m.x0 == 0 && m.y0 == -2 && m.x1 == 7 && m.y1 == 5));
+        const Rect i = ALTerrainSurfaceMaps::intersect(a, b);
+        CHECK((i.x0 == 3 && i.y0 == 1 && i.x1 == 4 && i.y1 == 2));
+        UNSCOPED_INFO("the default rectangle is empty");
+        CHECK(Rect().empty());
+        UNSCOPED_INFO("merging the empty rectangle changes nothing, either side");
+        const Rect ma = ALTerrainSurfaceMaps::merge(Rect(), a);
+        const Rect am = ALTerrainSurfaceMaps::merge(a, Rect());
+        CHECK((ma.x0 == a.x0 && ma.y0 == a.y0 && ma.x1 == a.x1 && ma.y1 == a.y1));
+        CHECK((am.x0 == a.x0 && am.y0 == a.y0 && am.x1 == a.x1 && am.y1 == a.y1));
+        UNSCOPED_INFO("disjoint rectangles intersect to nothing");
+        CHECK(ALTerrainSurfaceMaps::intersect(a, Rect{ 5, 0, 6, 9 }).empty());
+        const Rect w = ALTerrainSurfaceMaps::wholeMap(GPE);
+        CHECK((w.x0 == -APRON && w.y0 == -APRON && w.x1 == GPE + APRON - 1 && w.y1 == GPE + APRON - 1));
+    }
+
+    // toNeighbor undoes resolve: wherever a neighbour's map reads one of our grid points, that point moved into the
+    // neighbour's grid is exactly the texel that reads it, and a point no texel of the neighbour reads lands on
+    // nothing of its map.
+    TEST_CASE_METHOD(alterrainsurfacemaps_data, "ALTerrainSurfaceMaps: toNeighbor lands each of our grid points on the neighbour texel that reads it", "[ALTerrainSurfaceMaps]")
+    {
+        bool has[8];
+        allSet(true, has);
+        for (U32 dir = 0; dir < 8; ++dir)
+        {
+            // Which of the neighbour's texels read each of our grid points (by our coordinate), from its resolve.
+            std::vector<S32> readers(static_cast<size_t>(SIZE) * SIZE, 0);
+            for (S32 hy = -APRON; hy < GPE + APRON; ++hy)
+            {
+                for (S32 hx = -APRON; hx < GPE + APRON; ++hx)
+                {
+                    S32 gx = hx, gy = hy;
+                    if (ALTerrainSurfaceMaps::resolve(gx, gy, GPE, has) != gDirOpposite[dir])
+                    {
+                        continue;
+                    }
+                    CAPTURE(dir, hx, hy, gx, gy);
+                    REQUIRE((gx >= -APRON && gx < GPE + APRON && gy >= -APRON && gy < GPE + APRON));
+                    ++readers[texel(gx, gy)];
+                    const ALTerrainSurfaceMaps::Rect t =
+                        ALTerrainSurfaceMaps::toNeighbor(ALTerrainSurfaceMaps::Rect{ gx, gy, gx, gy }, dir, GPE);
+                    CHECK((t.x0 == hx && t.y0 == hy && t.x1 == hx && t.y1 == hy));
+                }
+            }
+            // Our grid points no texel of the neighbour reads: inside the region and over two grids from the shared
+            // border, they land off the neighbour's map.
+            for (S32 gy = 0; gy < GPE; ++gy)
+            {
+                for (S32 gx = 0; gx < GPE; ++gx)
+                {
+                    if (readers[texel(gx, gy)] != 0)
+                    {
+                        continue;
+                    }
+                    const ALTerrainSurfaceMaps::Rect t =
+                        ALTerrainSurfaceMaps::toNeighbor(ALTerrainSurfaceMaps::Rect{ gx, gy, gx, gy }, dir, GPE);
+                    if (!t.empty())
+                    {
+                        // On the neighbour's map but read through us by none of its texels: a point of a border we
+                        // share with it, whose texel reads the same sample from the neighbour's own grid or from
+                        // the surface beside us both.
+                        CAPTURE(dir, gx, gy, t.x0, t.y0);
+                        const bool on_x = gDirAxes[dir][0] != 0 && gx == (gDirAxes[dir][0] > 0 ? GPE - 1 : 0);
+                        const bool on_y = gDirAxes[dir][1] != 0 && gy == (gDirAxes[dir][1] > 0 ? GPE - 1 : 0);
+                        CHECK((on_x || on_y));
+                    }
+                }
             }
         }
     }

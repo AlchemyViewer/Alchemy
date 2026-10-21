@@ -45,23 +45,49 @@ class LLSurface;
 // neighbouring surfaces where they are connected and repeats the nearest own
 // sample where they are not -- the reach and the clamp of
 // LLSurfacePatch::calcNormal, whose two-grid stencil is why the apron is two
-// texels. The maps are rebuilt whole and re-uploaded at most once per frame,
-// when anything marked them dirty.
+// texels. The maps are built whole once; after that, at most once per frame,
+// only the rectangle covering everything marked dirty since the last upload
+// is rebuilt and uploaded.
 class ALTerrainSurfaceMaps
 {
 public:
     static constexpr S32 APRON = 2;
 
+    // Grid coordinates of one surface, inclusive at both ends.
+    struct Rect
+    {
+        S32 x0 = 0;
+        S32 y0 = 0;
+        S32 x1 = -1;
+        S32 y1 = -1;
+
+        bool empty() const { return x1 < x0 || y1 < y0; }
+    };
+
     explicit ALTerrainSurfaceMaps(LLSurface& surface);
     ~ALTerrainSurfaceMaps();
 
-    void markDirty() { mDirty = true; }
-    // Rebuild and upload both maps if anything marked them dirty since the
-    // last call. Needs the GL context; the terrain pool calls it before its
-    // first draw of the frame.
+    // Mark the whole of both maps, or the texels of the grid coordinates in
+    // `rect` that lie on them, to be rebuilt.
+    void markDirty();
+    void markDirty(const Rect& rect);
+    // Rebuild and upload what was marked dirty since the last call. Needs the
+    // GL context; the terrain pool calls it before its first draw of the frame.
     void ensureUploaded();
     void bind(S32 height_slot, S32 composition_slot);
     S32  getSize() const { return mSize; }
+
+    // Every grid coordinate a map holds: [-APRON, grids_per_edge + APRON).
+    static Rect wholeMap(S32 grids_per_edge);
+    // The smallest rectangle holding both.
+    static Rect merge(const Rect& a, const Rect& b);
+    // Both at once.
+    static Rect intersect(const Rect& a, const Rect& b);
+    // `rect`, in this surface's grid, in the grid of the neighbour lying in
+    // direction `dir`, cut to the part that neighbour's maps hold: the
+    // opposite of resolve's rewrite, so our -1 is a west neighbour's
+    // grids_per_edge - 2.
+    static Rect toNeighbor(const Rect& rect, U32 dir, S32 grids_per_edge);
 
     // Texel writer for fill(); grid coordinates run [-APRON, grids_per_edge + APRON).
     using Sampler = std::function<void(S32 gx, S32 gy, F32* texel)>;
@@ -70,6 +96,8 @@ public:
     // A buffer already the right size keeps whatever channels the sampler
     // leaves alone.
     static void fill(std::vector<F32>& out, S32 grids_per_edge, U32 channels, const Sampler& sample);
+    // Rewrite only the texels of `rect` in a buffer fill() already sized.
+    static void fillRect(std::vector<F32>& out, S32 grids_per_edge, U32 channels, const Rect& rect, const Sampler& sample);
 
     // Which surface a grid coordinate that may lie outside [0, grids_per_edge)
     // is read from: MIDDLE for this one, else the neighbour's direction, with
@@ -154,7 +182,7 @@ private:
     void refresh();
     F32  compositionAt(S32 gx, S32 gy) const;
     F32  noiseAt(S32 gx, S32 gy) const;
-    void upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data);
+    void upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data, const Rect& rect, bool whole);
 
     LLSurface&           mSurface;
     LLPointer<LLImageGL> mHeight;
@@ -163,17 +191,63 @@ private:
     std::vector<F32>     mCompositionStaging;
     S32                  mSize = 0;
     bool                 mNoiseReady = false;
-    bool                 mDirty = true;
+    // What the next upload rebuilds: the whole of both maps, which the first
+    // upload always is, or the texels of mDirtyRect, none when it is empty.
+    bool                 mDirtyWhole = true;
+    Rect                 mDirtyRect;
 };
+
+inline ALTerrainSurfaceMaps::Rect ALTerrainSurfaceMaps::wholeMap(S32 grids_per_edge)
+{
+    return { -APRON, -APRON, grids_per_edge + APRON - 1, grids_per_edge + APRON - 1 };
+}
+
+inline ALTerrainSurfaceMaps::Rect ALTerrainSurfaceMaps::merge(const Rect& a, const Rect& b)
+{
+    if (a.empty())
+    {
+        return b;
+    }
+    if (b.empty())
+    {
+        return a;
+    }
+    return { llmin(a.x0, b.x0), llmin(a.y0, b.y0), llmax(a.x1, b.x1), llmax(a.y1, b.y1) };
+}
+
+inline ALTerrainSurfaceMaps::Rect ALTerrainSurfaceMaps::intersect(const Rect& a, const Rect& b)
+{
+    return { llmax(a.x0, b.x0), llmax(a.y0, b.y0), llmin(a.x1, b.x1), llmin(a.y1, b.y1) };
+}
+
+inline ALTerrainSurfaceMaps::Rect ALTerrainSurfaceMaps::toNeighbor(const Rect& rect, U32 dir, S32 grids_per_edge)
+{
+    // A neighbour's grid 0 is our last column, as in resolve.
+    const S32 span = grids_per_edge - 1;
+    const S32 dx = gDirAxes[dir][0] * span;
+    const S32 dy = gDirAxes[dir][1] * span;
+    return intersect({ rect.x0 - dx, rect.y0 - dy, rect.x1 - dx, rect.y1 - dy }, wholeMap(grids_per_edge));
+}
 
 inline void ALTerrainSurfaceMaps::fill(std::vector<F32>& out, S32 grids_per_edge, U32 channels, const Sampler& sample)
 {
     const S32 size = grids_per_edge + 2 * APRON;
     out.resize(static_cast<size_t>(size) * size * channels);
-    F32* texel = out.data();
-    for (S32 gy = -APRON; gy < grids_per_edge + APRON; ++gy)
+    fillRect(out, grids_per_edge, channels, wholeMap(grids_per_edge), sample);
+}
+
+inline void ALTerrainSurfaceMaps::fillRect(std::vector<F32>& out, S32 grids_per_edge, U32 channels, const Rect& rect, const Sampler& sample)
+{
+    const Rect r = intersect(rect, wholeMap(grids_per_edge));
+    if (r.empty())
     {
-        for (S32 gx = -APRON; gx < grids_per_edge + APRON; ++gx, texel += channels)
+        return;
+    }
+    const S32 size = grids_per_edge + 2 * APRON;
+    for (S32 gy = r.y0; gy <= r.y1; ++gy)
+    {
+        F32* texel = out.data() + (static_cast<size_t>(gy + APRON) * size + (r.x0 + APRON)) * channels;
+        for (S32 gx = r.x0; gx <= r.x1; ++gx, texel += channels)
         {
             sample(gx, gy, texel);
         }

@@ -40,6 +40,9 @@ vec3 linear_to_srgb(vec3 cl);
 
 #ifdef HAS_ALPHA_MASK
 uniform float minimum_alpha;
+#ifndef IS_ALPHA
+uniform float vertex_alpha_coverage; // 1 where the alpha pool draws with this program
+#endif
 #endif
 
 #ifdef IS_ALPHA
@@ -71,7 +74,16 @@ void main()
     float final_alpha = color.a * vertex_color.a;
 
 #ifdef HAS_ALPHA_MASK
-    if (color.a < minimum_alpha)
+    // On the alpha the pass writes, as alphaF tests it, wherever the vertex alpha is coverage: in
+    // the alpha pool's programs, and in this one where the alpha pool draws with it (an impostor
+    // bake, the depth of field's depth pass). Outside the alpha pool LLFace stores shininess
+    // there, so the opaque mask pool tests the texture's alpha alone.
+#ifdef IS_ALPHA
+    float mask_alpha = final_alpha;
+#else
+    float mask_alpha = (vertex_alpha_coverage > 0.0) ? final_alpha : color.a;
+#endif
+    if (mask_alpha < minimum_alpha)
     {
         discard;
     }

@@ -35,6 +35,10 @@ uniform vec3 eyeVec;
 out vec3 view;
 out vec3 vary_position;
 
+// atmosphericsVarsV.glsl, which calculatesAtmospherics attaches to this stage, and the waves' features to theirs.
+void setAtmosAttenuation(vec3 v);
+void setAdditiveColor(vec3 v);
+
 // The varyings and clip position of a point of the surface, in agent space. The surface's own normal is the plane's,
 // the same at every point, as is the light: the fragment stages take both from the view's normal matrix. The waves'
 // shading comes from the normal maps, the displacement only moves the point. Where a fragment lies on the screen,
@@ -47,6 +51,12 @@ vec4 water_varyings(vec3 position)
 
     // Relative to the camera: the fragment stages work the wave coordinates from it (water_wave_normals).
     view = position - eyeVec;
+
+    // The atmospherics' varyings, which their fragment side (atmosphericsVarsF) reads: the water hazes per fragment,
+    // so they are the full-screen passes' neutral values. Written, not only declared, since Apple's linker refuses a
+    // fragment input the stage before it never writes.
+    setAtmosAttenuation(vec3(1.0));
+    setAdditiveColor(vec3(0.0));
 
     return modelview_projection_matrix * pos;
 }

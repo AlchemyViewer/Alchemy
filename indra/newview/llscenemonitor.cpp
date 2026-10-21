@@ -172,6 +172,7 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
     if(!mFrames[0])
     {
         mFrames[0] = new LLRenderTarget();
+        mFrames[0]->setLabel("scenemonitor.frame.a");
         mFrames[0]->allocate(width, height, GL_RGB8);
 
         cur_target = mFrames[0];
@@ -179,6 +180,7 @@ LLRenderTarget& LLSceneMonitor::getCaptureTarget()
     else if(!mFrames[1])
     {
         mFrames[1] = new LLRenderTarget();
+        mFrames[1]->setLabel("scenemonitor.frame.b");
         mFrames[1]->allocate(width, height, GL_RGB8);
 
         cur_target = mFrames[1];
@@ -347,6 +349,7 @@ void LLSceneMonitor::compare()
     if(!mDiff)
     {
         mDiff = new LLRenderTarget();
+        mDiff->setLabel("scenemonitor.diff");
         mDiff->allocate(width, height, GL_RGBA8);
 
         generateDitheringTexture(width, height);

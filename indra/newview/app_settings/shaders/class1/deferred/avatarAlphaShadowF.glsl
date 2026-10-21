@@ -25,12 +25,12 @@
 
 out vec4 frag_color;
 
+// The deferred avatar alpha pass's cutoff (LLDrawPoolAvatar::sMinimumAlpha): what it does
+// not draw casts nothing.
 uniform float minimum_alpha;
 
 uniform sampler2D diffuseMap;
 
-in float pos_w;
-in float target_pos_x;
 in vec2 vary_texcoord0;
 uniform vec4 color;
 
@@ -38,17 +38,16 @@ void main()
 {
     float alpha = texture(diffuseMap, vary_texcoord0.xy).a * color.a;
 
-    if (alpha < 0.05) // treat as totally transparent
+    if (alpha < minimum_alpha)
     {
         discard;
     }
 
-    if (alpha < minimum_alpha) // treat as semi-transparent
+    // Semi-transparent: a half-density shadow, in the checkerboard shadowAlphaMaskF stipples
+    // prims with.
+    if (alpha < 0.88 && ((int(gl_FragCoord.x) + int(gl_FragCoord.y)) & 1) == 0)
     {
-      if (fract(0.5*floor(target_pos_x / pos_w )) < 0.25)
-      {
         discard;
-      }
     }
 
     frag_color = vec4(1,1,1,1);

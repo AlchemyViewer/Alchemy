@@ -115,8 +115,6 @@ public:
     // get the measured GPU memory bandwidth in GB/sec
     // may return 0 of benchmark has not been run or failed to run
     F32 getGPUMemoryBandwidth() { return mGPUMemoryBandwidth; }
-    bool isGPUSupported()               { return mGPUSupported; }
-    F32 getExpectedGLVersion()          { return mExpectedGLVersion; }
 
     void cleanupFeatureTables();
 
@@ -161,6 +159,11 @@ protected:
 
     void initBaseMask();
 
+    // Sets each feature the named list makes unavailable to the value it recommends, as applyFeatures
+    // does, so the list holds a setting a user already has on rather than only the next graphics level
+    // applied.
+    void holdUnavailable(const std::string& name);
+
     std::map<std::string, LLFeatureList *> mMaskList;
     std::set<std::string> mSkippedFeatures;
     bool        mInited;
@@ -168,9 +171,7 @@ protected:
     bool        mSafe;                  // Reinitialize everything to the "safe" mask
     EGPUClass   mGPUClass;
     F32         mGPUMemoryBandwidth = 0.f;  // measured memory bandwidth of GPU in GB/second
-    F32         mExpectedGLVersion;     //expected GL version according to gpu table
     std::string mGPUString;
-    bool        mGPUSupported;
     bool        mSkipProfiling = false;
 };
 
@@ -181,9 +182,7 @@ LLFeatureManager::LLFeatureManager()
     mInited(false),
     mTableVersion(0),
     mSafe(false),
-    mGPUClass(GPU_CLASS_UNKNOWN),
-    mExpectedGLVersion(0.f),
-    mGPUSupported(false)
+    mGPUClass(GPU_CLASS_UNKNOWN)
 {
 }
 

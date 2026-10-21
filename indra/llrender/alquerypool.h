@@ -24,7 +24,10 @@
 
 #pragma once
 
+#include "algpubuffer.h"
 #include "stdtypes.h"
+
+class ALFrameFences;
 
 #include <vector>
 
@@ -91,19 +94,28 @@ private:
 };
 
 /// The queries a context issues, from one pool. Every query begun in a frame belongs to that frame's batch; endFrame()
-/// fences the batch, and retire() reads every result of a batch at once when its fence has signalled, so that reading a
-/// result never waits on the GPU and never polls one query. FRAMES batches of names are in flight, and a batch's names
-/// are begun again only once it has been read, so none is begun while its last result is pending. The results are kept
-/// apart from the names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames,
-/// as the object cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a
-/// ticket has expired.
+/// closes the batch, and retire() reads every result of a batch at once when the frame fences show its frame finished
+/// (ALFrameFences), so that reading a result never waits on the GPU, never polls one query and lays no fence of its own.
+/// FRAMES batches of names are in flight, and a batch's names are begun again only once it has been read, so none is
+/// begun while its last result is pending. The results are kept apart from the names, for RESULT_FRAMES frames after
+/// their own: a user that reads its queries only every few frames, as the object cache's cull does while the camera
+/// rests (LLVOCachePartition::cull), still finds them. Past that a ticket has expired.
+///
+/// Where the context has query buffers (gGLManager.mHasQueryBufferObject), endFrame() has the GPU write the batch's
+/// results into a mapped buffer of the batch's own, ahead of the frame's fence, and reading the batch copies them out
+/// of the map: no GL call. The writes are queued as any draw is where the context has direct state access; through the
+/// buffer binding they are calls Mesa's glthread runs only once it has caught up, each one. Asking GL for a result
+/// instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as NVIDIA's with threaded
+/// optimization, answers it only once its own thread has caught up on every command issued before it, which at the end
+/// of a frame is the whole frame.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is
 /// held -- by another query open on it, or by reserve() -- and the draws run uncounted. Its user takes the missing
 /// result as it would an expired one. A query is begun and ended within one render pass (checkPassBoundary()).
 ///
-/// All operations require the GL context the pool's queries were made in to be current. Non-copyable.
+/// All operations require the GL context the pool's queries were made in to be current, and `frames` to be ended after
+/// the pool each frame. Non-copyable.
 class ALQueryPool
 {
 public:
@@ -117,7 +129,7 @@ public:
         Expired, ///< no query, or one whose results have been dropped, RESULT_FRAMES frames on, or released
     };
 
-    ALQueryPool() = default;
+    explicit ALQueryPool(ALFrameFences& frames) : mFrames(frames) {}
     ALQueryPool(const ALQueryPool&) = delete;
     ALQueryPool& operator=(const ALQueryPool&) = delete;
 
@@ -168,19 +180,21 @@ public:
     /// the elapsed query of a span, which is GL's alone, may cross. Checked where asserts are.
     void checkPassBoundary() const;
 
-    /// Reads every closed batch whose fence has signalled, oldest first, without waiting. Once a frame, before the
-    /// results are wanted.
+    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first: no GL call, the fences
+    /// being polled only at the frame's end. Once a frame, before the results are wanted.
     void retire();
 
-    /// Closes the frame's batch with a fence, and opens the next in the oldest one's place, reading that first: waiting
-    /// for it only when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame().
+    /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only
+    /// when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame(), before the frame fences end it.
     void endFrame();
 
-    /// Deletes every query and fence, while the context is current. Every ticket expires.
+    /// Deletes every query, while the context is current. Every ticket expires.
     void release();
 
     /// The frames whose batch endFrame() had to wait for.
     U32 getStalls() const { return mStalls; }
+    /// The batches read by asking GL for each result, where the GPU wrote none into a buffer.
+    U32 getAskedReads() const { return mAskedReads; }
     /// The GL query objects the pool holds, in use or not.
     U32 getNameCount() const;
 
@@ -195,12 +209,14 @@ private:
     struct Batch
     {
         U32              mSerial  = 0;       // the frame it holds, 0 for none
-        void*            mFence   = nullptr; // the GLsync after its last command, while closed and not read
+        U32              mFrame   = 0;       // the frame fences' frame its last command was issued in, once closed
         bool             mClosed  = false;
         bool             mRead    = false;
-        bool             mFlushed = false;   // the fence has been flushed toward the GPU
+        bool             mWritten = false;   // its results are written into mResults, ahead of the frame's fence
         std::vector<U32> mNames[KINDS];      // namesPer(kind) a slot, kept from frame to frame
         U32              mUsed[KINDS] = {};  // slots
+        ALGPUBuffer      mResults;           // a U64 a used name, kind after kind, kept from frame to frame
+        U32              mFirst[KINDS] = {}; // where each kind's names start in mResults, in names
     };
 
     // A read frame's results, by kind and slot, namesPer(kind) a slot.
@@ -235,9 +251,13 @@ private:
     Status        results(const ALQueryTicket& ticket, U64* values, U32 count) const;
     bool          waitFor(const ALQueryTicket& ticket, U64* values, U32 count);
     bool          isOpenIn(U32 serial) const;
+    // Has the GPU write the closing batch's results into its buffer, all but those of a query still open.
+    void          write(Batch& batch);
+    // Has the GPU write the results of the query `ticket` began, which ended after its batch was written.
+    void          writeLate(Batch& batch, const ALQueryTicket& ticket);
     void          read(Batch& batch);
-    void          fence(Batch& batch);
 
+    ALFrameFences& mFrames;
     Batch         mBatches[FRAMES];
     Results       mResults[RESULT_FRAMES];
     U32           mSerial = 1;      // the open batch's frame
@@ -245,7 +265,10 @@ private:
     ALQueryTicket mOpen[TARGETS];
     bool          mReserved[TARGETS] = {};
     bool          mConditional = false;
+    // A batch's results buffer could not be made: every batch asks GL, until release().
+    bool          mWriteFailed = false;
     U32           mStalls = 0;
+    U32           mAskedReads = 0;
 };
 
 /// begin() for the scope, end() as it goes. ticket() is what began: no query where the pool refused.

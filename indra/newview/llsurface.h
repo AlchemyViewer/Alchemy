@@ -195,7 +195,13 @@ private:
     // The GPU's copy of this surface. Its apron reads the neighbours, so a
     // change here stales theirs too: see dirtySurfaceMaps.
     std::unique_ptr<ALTerrainSurfaceMaps> mSurfaceMaps;
+    // Mark the surface maps here and in every neighbour to be rebuilt: whole,
+    // or only the texels that read grid [gx0, gx1] x [gy0, gy1] of this
+    // surface, or those that read a patch's samples and the composition
+    // around them.
     void dirtySurfaceMaps();
+    void dirtySurfaceMaps(S32 gx0, S32 gy0, S32 gx1, S32 gy1);
+    void dirtySurfaceMaps(const LLSurfacePatch& patch);
 
 
     // The textures should never be directly initialized - use the setter methods!

@@ -80,9 +80,9 @@ in vec3 vary_tangent;
 flat in float vary_sign;
 
 
-#ifdef HAS_ALPHA_MASK
-uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
-#endif
+// The alpha pool's coverage cutoff (prepare_alpha_shader): a texel covering less is not
+// drawn, so it neither pays for the lighting below nor writes depth in a pass that does.
+uniform float minimum_alpha;
 
 // Lights
 // See: LLRender::syncLightState()
@@ -97,7 +97,7 @@ vec4 applySkyAndWaterFog(vec3 pos, vec3 additive, vec3 atten, vec4 color);
 
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
-float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
+float sampleDirectionalShadowGrad(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy);
 void sampleReflectionProbes(inout vec3 ambenv, inout vec3 glossenv,
         vec2 tc, vec3 pos, vec3 norm, float glossiness, bool transparent, vec3 amblit_linear);
 
@@ -140,6 +140,12 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
 
 void main()
 {
+#ifdef HAS_SUN_SHADOW
+    // Before every discard below, for the shadow's receiver-plane bias.
+    vec3 dpos_dx = dFdx(vary_position);
+    vec3 dpos_dy = dFdy(vary_position);
+#endif
+
     mirrorClip(vary_position);
 
     vec3 color = vec3(0,0,0);
@@ -150,16 +156,16 @@ void main()
     waterClip(pos);
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
-#ifdef HAS_ALPHA_MASK
-    if (basecolor.a < minimum_alpha)
-    {
-        discard;
-    }
-#endif
+    float coverage = basecolor.a * vertex_color.a;
 
     vec3 col = vertex_color.rgb * basecolor.rgb;
 
 #ifdef FOR_IMPOSTOR
+    if (coverage < minimum_alpha)
+    {
+        discard;
+    }
+
     // Flat, unlit base colour -- the impostor bake wants ALBEDO, not a shaded result.
     //
     // An impostor is a G-buffer capture that gets replayed into the scene G-buffer and lit
@@ -173,9 +179,12 @@ void main()
     // The material response is genuinely lost for blended surfaces in an impostor. It cannot
     // be kept: a G-buffer has one normal and one ORM per texel and blended layers have no
     // single value for either, which is why the flat path is the convention here.
-    frag_color = max(vec4(col, basecolor.a * vertex_color.a), vec4(0));
+    frag_color = max(vec4(col, coverage), vec4(0));
 #else
 
+    // The material's maps and the roughness filter's derivatives are read before the coverage
+    // discard below: after a discard that only some of a quad's pixels take, GLSL leaves implicit
+    // LODs and derivatives undefined for the rest. What the discard saves is the lighting.
     vec3 vNt = texture(bumpMap, normal_texcoord.xy).xyz*2.0-1.0;
     float sign = vary_sign;
     vec3 vN = vary_normal;
@@ -193,22 +202,6 @@ void main()
     float facing = gl_FrontFacing ? 1.0 : -1.0;
     norm *= facing;
 
-    float scol = 1.0;
-    vec3 sunlit;
-    vec3 amblit;
-    vec3 additive;
-    vec3 atten;
-    calcAtmosphericVarsLinear(pos.xyz, norm, light_dir, sunlit, amblit, additive, atten);
-    if (classic_mode > 0)
-        sunlit *= 1.35;
-    vec3 sunlit_linear = sunlit;
-
-    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
-
-#ifdef HAS_SUN_SHADOW
-    scol = sampleDirectionalShadow(pos.xyz, norm.xyz, frag);
-#endif
-
     vec3 orm = texture(specularMap, metallic_roughness_texcoord.xy).rgb; //orm is packed into "emissiveRect" to keep the data in linear color space
 
     float perceptualRoughness = orm.g * roughnessFactor;
@@ -223,6 +216,27 @@ void main()
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
     colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
+
+    if (coverage < minimum_alpha)
+    {
+        discard;
+    }
+
+    float scol = 1.0;
+    vec3 sunlit;
+    vec3 amblit;
+    vec3 additive;
+    vec3 atten;
+    calcAtmosphericVarsLinear(pos.xyz, norm, light_dir, sunlit, amblit, additive, atten);
+    if (classic_mode > 0)
+        sunlit *= 1.35;
+    vec3 sunlit_linear = sunlit;
+
+    vec2 frag = vary_fragcoord.xy/vary_fragcoord.z*0.5+0.5;
+
+#ifdef HAS_SUN_SHADOW
+    scol = sampleDirectionalShadowGrad(pos.xyz, norm.xyz, frag, dpos_dx, dpos_dy);
+#endif
 
     // PBR IBL
     float gloss      = 1.0 - perceptualRoughness;
@@ -250,6 +264,14 @@ void main()
     // describes the surface behind this one, not this one.
     color = pbrBaseLight(diffuseColor, specularColor, metallic, v, norm.xyz, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, ao, additive, atten);
 
+    // A classic sky's 1.1 is on this term alone, as softenLightF's writeColor puts it on the
+    // opaque surface behind: the local lights below carry their own 0.9, and the fog adds what
+    // it adds unscaled, as the deferred light and haze passes do.
+    if (classic_mode > 0)
+    {
+        color *= 1.1;
+    }
+
     vec3 light = vec3(0);
 
     // Punctual lights
@@ -268,14 +290,11 @@ void main()
     color.rgb = applySkyAndWaterFog(pos.xyz, additive, atten, vec4(color, 1.0)).rgb;
 
     float a = basecolor.a*vertex_color.a;
-    float final_scale = 1;
-    if (classic_mode > 0)
-        final_scale = 1.1;
     // Scrubbed the same way softenLightF scrubs the opaque result. max() alone does not do it:
     // it passes an infinity through unchanged, and its answer for a NaN is undefined. This path
     // runs the same unbounded punctual lobe the opaque one does, so it can produce the same
     // values -- and whatever it writes goes on to the bloom pyramid.
-    frag_color = max(vec4(clampHDRRange(color.rgb * final_scale), a), vec4(0));
+    frag_color = max(vec4(clampHDRRange(color.rgb), a), vec4(0));
 #endif // FOR_IMPOSTOR
 }
 
@@ -295,9 +314,8 @@ in vec2 emissive_texcoord;
 
 in vec4 vertex_color;
 
-#ifdef HAS_ALPHA_MASK
-uniform float minimum_alpha; // PBR alphaMode: MASK, See: mAlphaCutoff, setAlphaCutoff()
-#endif
+// The alpha pool's coverage cutoff, as in the lit branch above.
+uniform float minimum_alpha;
 
 vec3 linear_to_srgb(vec3 c);
 
@@ -309,20 +327,19 @@ void main()
     vec3  pos         = vary_position;
 
     vec4 basecolor = texture(diffuseMap, base_color_texcoord.xy).rgba;
-#ifdef HAS_ALPHA_MASK
-    if (basecolor.a < minimum_alpha)
-    {
-        discard;
-    }
-#endif
-
-    color = vertex_color.rgb * basecolor.rgb;
 
     // emissiveColor is the emissive color factor from GLTF and is already in linear space
     vec3 colorEmissive = emissiveColor;
     // emissiveMap here is a vanilla RGB texture encoded as sRGB, manually convert to linear
+    // (read before the discard, as in the lit branch)
     colorEmissive *= texture(emissiveMap, emissive_texcoord.xy).rgb;
 
+    if (basecolor.a * vertex_color.a < minimum_alpha)
+    {
+        discard;
+    }
+
+    color = vertex_color.rgb * basecolor.rgb;
 
     float a = basecolor.a*vertex_color.a;
     color += colorEmissive;

@@ -63,7 +63,7 @@ public:
     const LLSaleInfo&           getSaleInfo() const { return mSaleInfo; }
     void                        setSaleInfo(const LLSaleInfo& info) { mSaleInfo = info; }
     const std::string&          getTypeLabel() const;
-    const std::string&          getTypeName() const;
+    std::string_view            getTypeName() const;
     LLAssetType::EType          getAssetType() const;
     S32                         getDefinitionVersion() const { return mDefinitionVersion; }
     void                        setDefinitionVersion( S32 new_version ) { mDefinitionVersion = new_version; }

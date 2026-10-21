@@ -40,6 +40,7 @@
 #include "threadpool.h"
 #include "workqueue.h"
 #include <boost/unordered_set.hpp>
+#include <atomic>
 #include <functional>
 #include <vector>
 
@@ -80,6 +81,11 @@ public:
     // then its afterPublish callbacks). Returns how many are still waiting on the GPU.
     // updateClass does this; a loop waiting on texture creation can call it too.
     static U32 publishUploads();
+
+    // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
+    // second at most in all, and publish them, since nothing will poll again. What has not
+    // signalled by then goes unpublished with the rest in cleanupClass.
+    static void finishUploads();
 
     // Get an estimate of how many bytes have been allocated in vram for
     // textures. Allocations recorded via alloc_tex_image with has_mips=true
@@ -166,12 +172,16 @@ public:
         bool mIsMask = false;
         // The highest alpha of any texel.
         U8 mMaxAlpha = 255;
+        // The lowest alpha of any texel. With mMaxAlpha's default, an analysis that read nothing bounds every alpha.
+        U8 mMinAlpha = 0;
     };
 
 protected:
     virtual ~LLImageGL();
 
     static AlphaAnalysis analyzeAlphaData(const void* data_in, U32 w, U32 h, S8 alpha_offset, S8 alpha_stride);
+    // What a texture with no alpha channel analyses as: every texel opaque.
+    static AlphaAnalysis opaqueAlphaAnalysis() { AlphaAnalysis analysis; analysis.mMinAlpha = 255; return analysis; }
     void analyzeAlpha(const void* data_in, U32 w, U32 h);
     void calcAlphaChannelOffsetAndStride();
 
@@ -279,16 +289,17 @@ public:
     S32  getWidth(S32 discard_level = -1) const;
     S32  getHeight(S32 discard_level = -1) const;
     U8   getComponents() const { return (U8)(mUploadInFlight ? mPublished.mComponents : mComponents); }
+    S64Bytes getTextureMemory() const { return mUploadInFlight ? mPublished.mTextureMemory : mTextureMemory; }
     S64  getBytes(S32 discard_level = -1) const;
     S64  getMipBytes(S32 discard_level = -1) const;
     bool getBoundRecently() const;
     bool isJustBound() const;
     bool getHasExplicitFormat() const { return mHasExplicitFormat; }
-    LLGLenum getPrimaryFormat() const { return mFormatPrimary; }
+    LLGLenum getPrimaryFormat() const { return mUploadInFlight ? mPublished.mFormatPrimary : mFormatPrimary; }
     // The source was alpha only (GL_ALPHA). It is held as R8 under a {0,0,0,R}
     // swizzle, so getPrimaryFormat() cannot tell it from a luminance source;
     // the format it was asked for can.
-    bool isAlphaOnly() const { return mDeprecatedSourceFormat == GL_ALPHA; }
+    bool isAlphaOnly() const { return (mUploadInFlight ? mPublished.mDeprecatedSourceFormat : mDeprecatedSourceFormat) == GL_ALPHA; }
     LLGLenum getFormatType() const { return mFormatType; }
 
     // Internal format to hand glTexStorage*. Block-compressed textures keep their sized
@@ -302,14 +313,17 @@ public:
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
     // alpha channel, an alpha it cannot read, or an analysis not yet back.
     U8 getMaxAlpha() const { return mMaxAlpha; }
+    // The lowest alpha of that level, 255 where there is no alpha channel, or 0 where it was not analysed: an alpha
+    // it cannot read, or an analysis not yet back.
+    U8 getMinAlpha() const { return mMinAlpha; }
 
     bool getIsResident(bool test_now = false); // not const
 
     void setTarget(const LLGLenum target, const ALTextureSlot::eTextureType bind_target);
 
     ALTextureSlot::eTextureType getTarget(void) const { return mBindTarget; }
-    bool isGLTextureCreated(void) const { return mGLTextureCreated ; }
-    void setGLTextureCreated (bool initialized) { mGLTextureCreated = initialized; }
+    bool isGLTextureCreated(void) const { return mGLTextureCreated.load(std::memory_order_relaxed); }
+    void setGLTextureCreated (bool initialized) { mGLTextureCreated.store(initialized, std::memory_order_relaxed); }
 
     bool getUseMipMaps() const { return mUseMipMaps; }
     void setUseMipMaps(bool usemips) { mUseMipMaps = usemips; }
@@ -406,10 +420,13 @@ private:
     U16 mPickMaskHeight;
     S8 mUseMipMaps;
     bool mHasExplicitFormat; // If false (default), GL format is f(mComponents)
+    S8   mFormatComponents = -1; // the component count the format was worked out for, or -1
+    void resolveComponentFormat(S8 components);
     bool mAutoGenMips = false;
 
     bool mIsMask;
     U8   mMaxAlpha;
+    U8   mMinAlpha;
     bool mNeedsAlphaAndPickMask;
     LLAtomicU32 mAlphaAnalysisSerial; // for request tracking.
     S8   mAlphaStride ;
@@ -456,6 +473,11 @@ private:
         S8  mComponents = 0;
         S8  mCurrentDiscardLevel = -1;
         S8  mMaxDiscardLevel = 0;
+        // The format, which createGLTexture works out again from mComponents for every
+        // upload of an image without an explicit one.
+        LLGLenum mFormatPrimary = 0;
+        LLGLenum mDeprecatedSourceFormat = 0;
+        S64Bytes mTextureMemory = S64Bytes(0);
     };
     PublishedGeom mPublished;
     bool     mUploadInFlight = false;
@@ -473,7 +495,8 @@ private:
         return llmax(mHeight >> llmax(discard_level, 0), 1);
     }
 
-    bool     mGLTextureCreated ;
+    // Written by the upload on LLImageGLThread and by the main thread that asks for the texture.
+    std::atomic<bool> mGLTextureCreated;
     LLGLuint mTexName;
     // Whether mTexName has had its storage allocated yet. Storage is always immutable
     // (glTexStorage2D), so it can be allocated exactly once: every upload afterwards is a
@@ -590,6 +613,9 @@ public:
     // (syncTexName has already ended it if the texture published). In between, the
     // geometry getters answer for the texture mTexName still names.
     void beginUpload();
+    // The same, first working out here the format an image without an explicit one takes
+    // from the components it is about to upload: see resolveComponentFormat.
+    void beginUpload(S8 components);
     void endUpload();
 
     //for debug use: show texture size distribution
@@ -618,6 +644,9 @@ public:
     // Joins the thread first: run() uses the window and context after the
     // queue closes.
     ~LLImageGLThread() override;
+
+    // Finish the uploads posted and stop the thread, as the destructor does.
+    using LL::ThreadPool::close;
 
     // post a function to be executed on the LLImageGL background thread
     template <typename CALLABLE>

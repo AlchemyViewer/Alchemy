@@ -27,6 +27,9 @@
 #include "linden_common.h"
 
 #include "llxfer_vfile.h"
+
+#include <fmt/format.h>
+
 #include "lluuid.h"
 #include "llerror.h"
 #include "llmath.h"
@@ -69,7 +72,7 @@ void LLXfer_VFile::init (const LLUUID &local_id, LLAssetType::EType type)
     std::string id_string;
     mLocalID.toString(id_string);
 
-    mName = llformat("VFile %s:%s", id_string.c_str(), LLAssetType::lookup(mType));
+    mName = fmt::format("VFile {}:{}", id_string, LLAssetType::lookup(mType));
 }
 
 ///////////////////////////////////////////////////////////
@@ -123,7 +126,7 @@ S32 LLXfer_VFile::initializeRequest(U64 xfer_id,
     std::string id_string;
     mLocalID.toString(id_string);
 
-    mName = llformat("VFile %s:%s", id_string.c_str(), LLAssetType::lookup(mType));
+    mName = fmt::format("VFile {}:{}", id_string, LLAssetType::lookup(mType));
 
     LL_INFOS("Xfer") << "Requesting " << mName << LL_ENDL;
 

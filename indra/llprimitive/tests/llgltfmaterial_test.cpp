@@ -196,6 +196,32 @@ namespace
         require_json_round_trip("material with transform", material);
     }
 
+    // The override LLSD names textures and transforms by slot, so an override
+    // of one slot past the first leaves the slots before it Undefined
+    TEST_CASE("llgltfmaterial: an override of one texture slot keeps its slot in the override LLSD", "[llgltfmaterial]")
+    {
+        LLGLTFMaterial override_material;
+        const LLUUID normal_id = LLUUID::generateNewID();
+        override_material.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL] = normal_id;
+        override_material.mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].mRotation = 1.f;
+
+        LLSD data;
+        LLGLTFMaterial::sDefault.getOverrideLLSD(override_material, data);
+        const LLSD& tex = data["tex"];
+        REQUIRE(tex.size() == LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL + 1);
+        CHECK(tex[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].isUndefined());
+        CHECK(tex[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL].asUUID() == normal_id);
+        const LLSD& ti = data["ti"];
+        REQUIRE(ti.size() == LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE + 1);
+        CHECK(ti[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].isUndefined());
+        CHECK(ti[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]["r"].asReal() == 1.0);
+
+        LLGLTFMaterial applied;
+        applied.applyOverrideLLSD(data);
+        CHECK(applied.mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL] == normal_id);
+        CHECK(applied.mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE].mRotation == 1.f);
+    }
+
     // Test that a GLTF material avoids serializing a material unnecessarily
     TEST_CASE("llgltfmaterial: asJSON leaves out default properties and unset textures", "[llgltfmaterial]")
     {

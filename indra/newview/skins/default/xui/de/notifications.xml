@@ -584,13 +584,6 @@ Weitere Informationen finden Sie auf [_URL].
 		<usetemplate ignoretext="Meine Hardware wird nicht unterstützt" name="okcancelignore" notext="Nein" yestext="Ja"/>
 	</notification>
 	<notification name="RunLauncher">Bitte starten Sie die ausführbare Viewer-Datei nicht direkt. Aktualisieren Sie alle bestehenden Verknüpfungen, um stattdessen den LS_Launcher zu starten.</notification>
-	<notification name="OldGPUDriver">
-		Wahrscheinlich gibt es einen neueren Treiber für Ihren Grafikchip.  Durch Aktualisieren der Grafiktreiber lässt sich die Leistung u. U. beträchtlich verbessern.
-
-    Unter [URL] nach aktualisierten Treibern suchen?
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="Mein Grafiktreiber ist veraltet" name="okcancelignore" notext="Nein" yestext="Ja"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Ihr System verwendet eine Grafikkarte, die [APP_NAME] nicht erkennt.
 Dies passiert dann, wenn die neue Hardware noch nicht mit [APP_NAME] getestet wurde.  Wahrscheinlich wird das Programm richtig ausgeführt, aber Sie müssen eventuell ein paar Grafikeinstellungen vornehmen.
@@ -2802,7 +2795,6 @@ Möchten Sie fortfahren?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- Ihre Grafikkarte entspricht nicht den Mindestanforderungen.</global>
 	<global name="UnsupportedRAM">- Ihr Arbeitsspeicher entspricht nicht den Mindestanforderungen.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Wenn Sie ein Stück Land besitzen, können Sie dies als Ihr Zuhause festlegen.
 Ansonsten können Sie auf der Karte nachsehen und dort Ort suchen, die als „Infohub“ gekennzeichnet sind.</global>

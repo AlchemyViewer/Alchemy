@@ -4,7 +4,8 @@
  * The terrain's evaluation stage for the shadow pass: the same surface the
  * lit stages place, from the same terrainSurface body, and nothing else.
  * With the same control stage and the same origin, the depth the shadow
- * map holds is the surface the lit pass shades.
+ * map holds is the surface the lit pass shades, cut no finer than the map
+ * resolves (terrainTC.glsl).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -30,7 +31,12 @@
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
 
+// The spacing terrainTE.glsl takes, so the shadow caster's vertices are the lit pass's.
+#ifdef TERRAIN_TESS_PINNED
+layout(quads, equal_spacing, ccw) in;
+#else
 layout(quads, fractional_odd_spacing, ccw) in;
+#endif
 
 // terrainSurface.glsl
 vec2  terrain_patch_xy();

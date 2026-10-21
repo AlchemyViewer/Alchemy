@@ -373,4 +373,29 @@ namespace
         }
     }
 
+    TEST_CASE("llsdutil: drill on a const blob only looks", "[llsdutil]")
+    {
+        const LLSD blob = LLSDMap("a", llsd::array(1, 2));
+        CHECK(llsd::drill(blob, llsd::array("a", 1)).asInteger() == 2);
+        CHECK(llsd::drill(blob, llsd::array("missing", 3)).isUndefined());
+        CHECK(llsd::drill(blob, llsd::array("a", 7)).isUndefined());
+        CHECK(blob.size() == 1);
+        CHECK(blob["a"].size() == 2);
+
+        // What a missing key returns is one Undefined that every lookup
+        // shares; drilling into it must not turn it into a map for them all.
+        const LLSD& missing = blob["absent"];
+        CHECK(llsd::drill(missing, "x").isUndefined());
+        CHECK(missing.isUndefined());
+        CHECK(blob["also absent"].isUndefined());
+
+        // drill_ref() on a mutable blob still makes the path it names, an
+        // array index as far as the array's end
+        LLSD target;
+        llsd::drill_ref(target, llsd::array("made", 0)) = 5;
+        CHECK(target["made"][0].asInteger() == 5);
+        llsd::drill_ref(target, llsd::array("made", 2)) = 6;
+        CHECK(target["made"].size() == 1);
+    }
+
 }

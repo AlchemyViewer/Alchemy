@@ -697,8 +697,6 @@
   <string>Proporção de tela da exibição em tela cheia (largura / altura).</string>
   <key>FullScreenAutoDetectAspectRatio</key>
   <string>Detectar automaticamente a proporção de tela correta para exibição em tela cheia.</string>
-  <key>GLTFEnabled</key>
-  <string>Ativar suporte a GLTF. Definido como verdadeiro pelo simulador se o simulador ao qual você está conectado suportar upload de assets GLTF. AVISO: definir manualmente como verdadeiro ativará botões que podem esgotar seu saldo de L$ ao fazer upload implícito de texturas sem perguntar.</string>
   <key>GenericErrorPageURL</key>
   <string>URL a definir como propriedade no LLMediaControl para navegar caso a página finalize com um status HTTP 400-499.</string>
   <key>GesturesEveryoneCopy</key>
@@ -1805,8 +1803,6 @@
   <string>Configuração obsoleta não utilizada.</string>
   <key>RenderCompressTextures</key>
   <string>Ativar compressão de texturas em implementações OpenGL 3.0 e posteriores (EXPERIMENTAL, requer reinício).</string>
-  <key>RenderCubeMap</key>
-  <string>Se podemos ou não renderizar o cube map.</string>
   <key>RenderDebugAlphaMask</key>
   <string>Testar os cortes de máscara alpha.</string>
   <key>RenderDebugGLSession</key>
@@ -1862,7 +1858,7 @@
   <key>RenderEdgeNormCutoff</key>
   <string>Corte para a diferença de normal que constitui uma borda.</string>
   <key>RenderEnableEmissiveBuffer</key>
-  <string>Ativar o buffer emissivo no gbuffer. Só deve ser desativado no modo GL3.</string>
+  <string>Ativar o buffer emissivo no gbuffer. Só deve ser desativado no modo vintage.</string>
   <key>RenderExposure</key>
   <string>Valor de exposição a enviar ao mapeador de tons.</string>
   <key>RenderFSAASamples</key>
@@ -1876,7 +1872,7 @@
   <key>RenderFogRatio</key>
   <string>OBSOLETO - Distância da câmera onde a névoa atinge densidade máxima (fração ou múltiplo da distância de far clip).</string>
   <key>RenderGLContextCoreProfile</key>
-  <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício.</string>
+  <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício. Apenas Windows.</string>
   <key>RenderGLMultiThreadedMedia</key>
   <string>Permitir que o OpenGL use múltiplos contextos de renderização para reproduzir mídia (pode reduzir engasgos de quadros, não funciona bem com drivers Intel).</string>
   <key>RenderGLMultiThreadedTextures</key>
@@ -1972,7 +1968,7 @@
   <key>RenderMaxNodeSize</key>
   <string>Tamanho máximo dos dados de vértice de um único nó (em KB).</string>
   <key>RenderMaxOpenGLVersion</key>
-  <string>Versão máxima do OpenGL a tentar usar (mínimo 3.1, máximo 4.6). Requer reinício. Apenas Windows.</string>
+  <string>Versão máxima do OpenGL a tentar usar (mínimo 4.1, máximo 4.6). Requer reinício. Apenas Windows.</string>
   <key>RenderMaxPartCount</key>
   <string>Número máximo de partículas a exibir na tela.</string>
   <key>RenderMaxTextureIndex</key>
@@ -2683,8 +2679,6 @@
   <string>Posição do destaque de pré-edição da interface.</string>
   <key>UIPreeditStandoutThickness</key>
   <string>Espessura do destaque de pré-edição da interface.</string>
-  <key>UIPreviewMaterial</key>
-  <string>Se a amostra de material PBR está ou não ativada.</string>
   <key>UIResizeBarHeight</key>
   <string>Tamanho da altura da barra de redimensionamento da interface.</string>
   <key>UIScaleFactor</key>

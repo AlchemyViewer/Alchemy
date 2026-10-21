@@ -576,13 +576,6 @@ Consulter [_URL] pour en savoir plus ?
 		<usetemplate ignoretext="Mon matériel n'est pas pris en charge" name="okcancelignore" notext="Non" yestext="Oui"/>
 	</notification>
 	<notification name="RunLauncher">Veuillez ne pas exécuter la visionneuse directement. Actualiser tout raccourci existant pour lancer SL_Launcher</notification>
-	<notification name="OldGPUDriver">
-		Il existe probablement un pilote plus récent pour votre puce graphique.  La mise à jour des pilotes graphiques est susceptible d’améliorer considérablement les performances.
-
-    Visiter la page [URL] pour rechercher d’éventuelles mises à jour de pilotes ?
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="Mon pilote graphique est obsolète." name="okcancelignore" notext="Non" yestext="Oui"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Votre système contient une carte graphique que [APP_NAME] ne reconnaît pas.
 Cela est souvent le cas avec le nouveau matériel qui n'a pas encore été testé avec [APP_NAME].  Cela ne posera probablement pas de problème, mais vous devrez peut-être ajuster vos paramètres graphiques.
@@ -2790,7 +2783,6 @@ Voulez-vous continuer ?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- Votre carte graphique ne remplit pas les conditions minimum requises.</global>
 	<global name="UnsupportedRAM">- Votre mémoire système ne remplit pas les conditions minimum requises.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Si vous possédez un terrain, vous pouvez le définir comme domicile.
 Sinon, consultez la carte et trouvez les &quot; infohubs &quot;.</global>

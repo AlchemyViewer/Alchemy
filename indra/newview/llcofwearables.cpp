@@ -44,6 +44,8 @@
 #include "lltrans.h"
 #include "llvoavatarself.h"
 
+#include <fmt/format.h>
+
 static LLPanelInjector<LLCOFWearables> t_cof_wearables("cof_wearables");
 
 const LLSD REARRANGE = LLSD().with("rearrange", LLSD());
@@ -74,7 +76,7 @@ protected:
         }
 
         // Set proper label for the "Create new <WEARABLE_TYPE>" menu item.
-        std::string new_label = LLTrans::getString("create_new_" + LLWearableType::getInstance()->getTypeName(w_type));
+        std::string new_label = LLTrans::getString(fmt::format("create_new_{}", LLWearableType::getTypeName(w_type)));
         menu_item->setLabel(new_label);
     }
 

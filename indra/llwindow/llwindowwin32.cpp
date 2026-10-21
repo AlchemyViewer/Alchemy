@@ -211,6 +211,27 @@ static void ll_adjust_window_rect_dpi(HWND hwnd, LPRECT rect, DWORD dw_style, DW
     AdjustWindowRectEx(rect, dw_style, FALSE, dw_ex_style);
 }
 
+// Fits a window's frame into the work area of the monitor nearest it, so a
+// frame saved on a monitor since moved, rescaled or unplugged opens whole on
+// a screen and clear of the taskbar. The top edge is placed last, so the
+// title bar is always on the screen.
+static void ll_fit_window_to_work_area(S32& x, S32& y, S32& width, S32& height)
+{
+    RECT frame = { x, y, x + width, y + height };
+    MONITORINFO monitor_info{};
+    monitor_info.cbSize = sizeof(monitor_info);
+    if (!GetMonitorInfo(MonitorFromRect(&frame, MONITOR_DEFAULTTONEAREST), &monitor_info))
+    {
+        return;
+    }
+
+    const RECT& work = monitor_info.rcWork;
+    width = llmin(width, S32(work.right - work.left));
+    height = llmin(height, S32(work.bottom - work.top));
+    x = llmax(llmin(x, S32(work.right) - width), S32(work.left));
+    y = llmax(llmin(y, S32(work.bottom) - height), S32(work.top));
+}
+
 //static
 bool LLWindowWin32::sIsClassRegistered = false;
 
@@ -617,7 +638,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     allowLanguageTextInput(mPreeditor, false);
 
     WNDCLASS        wc;
-    RECT            window_rect;
 
     // Set the window title
     if (title.empty())
@@ -671,25 +691,6 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
 
     // No WPARAM yet.
     mLastSizeWParam = 0;
-
-    // Windows GDI rects don't include rightmost pixel
-    window_rect.left = (long) 0;
-    window_rect.right = (long) width;
-    window_rect.top = (long) 0;
-    window_rect.bottom = (long) height;
-
-    // Grab screen size to sanitize the window
-    S32 window_border_y = GetSystemMetrics(SM_CYBORDER);
-    S32 virtual_screen_x = GetSystemMetrics(SM_XVIRTUALSCREEN);
-    S32 virtual_screen_y = GetSystemMetrics(SM_YVIRTUALSCREEN);
-    S32 virtual_screen_width = GetSystemMetrics(SM_CXVIRTUALSCREEN);
-    S32 virtual_screen_height = GetSystemMetrics(SM_CYVIRTUALSCREEN);
-
-    if (x < virtual_screen_x) x = virtual_screen_x;
-    if (y < virtual_screen_y - window_border_y) y = virtual_screen_y - window_border_y;
-
-    if (x + width > virtual_screen_x + virtual_screen_width) x = virtual_screen_x + virtual_screen_width - width;
-    if (y + height > virtual_screen_y + virtual_screen_height) y = virtual_screen_y + virtual_screen_height - height;
 
     if (!sIsClassRegistered)
     {
@@ -803,8 +804,8 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
                 if (dev_mode.dmBitsPerPel == BITS_PER_PIXEL)
                 {
                     LL_WARNS("Window") << "Current BBP is OK falling back to that" << LL_ENDL;
-                    window_rect.right=width=dev_mode.dmPelsWidth;
-                    window_rect.bottom=height=dev_mode.dmPelsHeight;
+                    width = dev_mode.dmPelsWidth;
+                    height = dev_mode.dmPelsHeight;
                     success = true;
                 }
                 else
@@ -900,9 +901,13 @@ LLWindowWin32::LLWindowWin32(LLWindowCallbacks* callbacks,
     //-----------------------------------------------------------------------
     // Create GL drawing context
     //-----------------------------------------------------------------------
+    if (!mFullscreen)
+    {
+        ll_fit_window_to_work_area(x, y, width, height);
+    }
+
     LLCoordScreen windowPos(x,y);
-    LLCoordScreen windowSize(window_rect.right - window_rect.left,
-                             window_rect.bottom - window_rect.top);
+    LLCoordScreen windowSize(width, height);
     if (!switchContext(mFullscreen, windowSize, enable_vsync, &windowPos))
     {
         return;
@@ -1378,6 +1383,8 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
     }
     else
     {
+        // The size and position are the window's frame, as getSize(LLCoordScreen)
+        // and getPosition report it, so they are not adjusted for the borders.
         mFullscreen = false;
         window_rect.left = (long)(posp ? posp->mX : 0);
         window_rect.right = (long)width + window_rect.left;         // Windows GDI rects don't include rightmost pixel
@@ -1386,10 +1393,6 @@ bool LLWindowWin32::switchContext(bool fullscreen, const LLCoordScreen& size, bo
         // Window with an edge
         dw_ex_style = WS_EX_APPWINDOW | WS_EX_WINDOWEDGE;
         dw_style = WS_OVERLAPPEDWINDOW;
-
-        // Caller passes the desired client size; expand to include
-        // borders/title bar so CreateWindowEx gets a window rect.
-        ll_adjust_window_rect_dpi(mWindowHandle, &window_rect, dw_style, dw_ex_style);
     }
 
 
@@ -1762,14 +1765,20 @@ const   S32   max_format  = (S32)num_formats - 1;
         << " Depth Bits " << S32(pfd.cDepthBits)
         << LL_ENDL;
 
-    mhRC = 0;
-    if (wglCreateContextAttribsARB)
-    { //attempt to create a specific versioned context
-        mhRC = (HGLRC) createSharedContext();
-        if (!mhRC)
-        {
-            return false;
-        }
+    // Only WGL_ARB_create_context asks for a version and a profile. Without it there is no context to
+    // make that can meet the floor, the same as without wgl_ARB_pixel_format above.
+    if (!wglCreateContextAttribsARB)
+    {
+        LL_WARNS("Window") << "No WGL_ARB_create_context extension!" << LL_ENDL;
+        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        close();
+        return false;
+    }
+
+    mhRC = (HGLRC) createSharedContext();
+    if (!mhRC)
+    {
+        return false;
     }
 
     if (!wglMakeCurrent(mhDC, mhRC))
@@ -1783,7 +1792,7 @@ const   S32   max_format  = (S32)num_formats - 1;
 
     if (!gGLManager.initGL())
     {
-        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBVideoDrvErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        LLError::LLUserWarningMsg::show(glInitFailureMessage(), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
         close();
         return false;
     }
@@ -1950,7 +1959,9 @@ void LLWindowWin32::recreateWindow(RECT window_rect, DWORD dw_ex_style, DWORD dw
 
 void* LLWindowWin32::createSharedContext()
 {
-    mMaxGLVersion = llclamp(mMaxGLVersion, 3.f, 4.6f);
+    // From what RenderMaxOpenGLVersion allows down to the floor, 4.1 (GL_MINIMUM_VERSION): initGL
+    // refuses anything less, so no version below it is asked for.
+    mMaxGLVersion = llclamp(mMaxGLVersion, 4.1f, 4.6f);
 
     S32 version_major = llfloor(mMaxGLVersion);
     S32 version_minor = (S32)ll_round((mMaxGLVersion-version_major)*10);
@@ -1965,40 +1976,38 @@ void* LLWindowWin32::createSharedContext()
     };
 
     HGLRC rc = 0;
-
-    bool done = false;
-    while (!done)
+    for (;;)
     {
         rc = wglCreateContextAttribsARB(mhDC, mhRC, attribs);
-
-        if (!rc)
+        if (rc || attribs[3] <= 1)
         {
-            if (attribs[3] > 0)
-            { //decrement minor version
-                attribs[3]--;
-            }
-            else if (attribs[1] > 3)
-            { //decrement major version and start minor version over at 3
-                attribs[1]--;
-                attribs[3] = 3;
-            }
-            else
-            { //we reached 3.0 and still failed, bail out
-                done = true;
-            }
+            break;
         }
-        else
-        {
-            LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
-                (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
-            done = true;
-        }
+        attribs[3]--;
     }
 
-    if (!rc && !(rc = wglCreateContext(mhDC)))
+    if (rc)
     {
-        close();
-        LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        LL_INFOS() << "Created OpenGL " << llformat("%d.%d", attribs[1], attribs[3]) <<
+            (LLRender::sGLCoreProfile ? " core" : " compatibility") << " context." << LL_ENDL;
+    }
+    else if (!mhRC)
+    {
+        // The window's own context, on a driver that offers no 4.1. The context it makes by default is
+        // what tells the user which version they have: initGL refuses it, naming the floor and the
+        // version (MBGLVersionErr), where failing here could only say no context was made.
+        LL_WARNS("Window") << "No OpenGL 4.1 context; making the driver's default one for initGL to judge" << LL_ENDL;
+        rc = wglCreateContext(mhDC);
+        if (!rc)
+        {
+            close();
+            LLError::LLUserWarningMsg::show(mCallbacks->translateString("MBGLContextErr"), LLError::LLUserWarningMsg::ERROR_INIT_FAILED);
+        }
+    }
+    else
+    {
+        // A worker's, shared with the window's: its owner does without it.
+        LL_WARNS("Window") << "No OpenGL 4.1 context to share with the window's" << LL_ENDL;
     }
 
     return rc;

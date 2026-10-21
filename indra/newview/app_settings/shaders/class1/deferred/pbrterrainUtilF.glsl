@@ -59,7 +59,7 @@
 // making PBR terrain blending more performant. Should be greater than 0 to work.
 #define TERRAIN_RAMP_MIX_THRESHOLD 0.1
 // A small threshold for triplanar mapping sampling cutoff. This and
-// TERRAIN_TRIPLANAR_BLEND_FACTOR together ensures that only one or two samples
+// terrainTriplanarBlend together ensures that only one or two samples
 // per texture are used in most places, making triplanar mapping more
 // performant. Should be greater than 0 to work.
 // There's also an artistic design choice in the use of these factors, and the
@@ -205,11 +205,47 @@ PBRMix fetch_pbr(
 // A cell whose weight falls under this is not fetched. As TERRAIN_TRIPLANAR_MIX_THRESHOLD.
 #define TERRAIN_HEX_MIX_THRESHOLD 0.01
 
+// Where a projection's uv origin lies on the world's lattice, placed in double by
+// LLDrawPoolTerrain (ALHexLattice::place): the fraction of its skewed coordinates, and the low
+// 32 bits of their floor. A region's uv starts at its own corner, so a lattice in the uv alone
+// moved at every region border, and every cell's look with it.
+struct HexPlace
+{
+    vec2 frac;
+    ivec2 base;
+};
+
+// Material m's places, two elements to a material: its top projection's, then its x slice's,
+// then its y slice's, each slice's for the side of its axis that does not turn it. The
+// four-texture terrain's detail textures share material 0's.
+uniform vec4 terrain_hex_frac[8];
+uniform ivec4 terrain_hex_base[8];
+
+// Projection p of material m (0 the top, 1 the x slice, 2 the y slice), from the side of the
+// slice's axis `side` gives: a slice turned about its axis negates its uv, and so its origin's
+// place, -(base + frac), which is one floor lower and the fraction from the other end.
+HexPlace terrain_hex_place(int m, int p, float side)
+{
+    int e = 2 * m + (p >> 1);
+    bool upper = (p & 1) != 0;
+    HexPlace place;
+    place.frac = upper ? terrain_hex_frac[e].zw : terrain_hex_frac[e].xy;
+    place.base = upper ? terrain_hex_base[e].zw : terrain_hex_base[e].xy;
+    if (side < 0.0)
+    {
+        place.base = -place.base - 1;
+        place.frac = 1.0 - place.frac;
+    }
+    return place;
+}
+
 struct HexTile
 {
-    ivec2 corner[3];
-    vec3 weight;    // Sums to 1
-    int type;       // Bit i: corner i's weight survived the threshold
+    ivec2 corner[3]; // Lattice points, from the place's floor
+    ivec2 base;      // The place's floor, the low 32 bits
+    vec2 q;          // The fragment's skewed coordinates, from the place's floor
+    vec3 weight;     // Sums to 1
+    int type;        // Bit i: corner i's weight survived the threshold
 };
 
 vec2 hex_skew(vec2 p);
@@ -217,46 +253,46 @@ void hex_triangle(vec2 f, out ivec2 corner0, out ivec2 corner1, out ivec2 corner
 int hex_sharpen(vec3 bary, float contrast, float threshold, out vec3 weight);
 uint hex_hash(uvec2 id);
 
-uint _hex_hash(ivec2 corner)
+HexTile hex_tile(vec2 uv, HexPlace place)
 {
-    // Ids run a few thousand either side of zero; the bias keeps the conversion in range.
-    return hex_hash(uvec2(corner + ivec2(1 << 20)));
-}
-
-HexTile hex_tile(vec2 uv)
-{
-    // The fragment's barycentrics come from its position in the skewed lattice's unit square,
-    // and its three corners from which half of the square it is in.
-    vec2 skewed = hex_skew(uv * TERRAIN_HEX_GRID_SCALE);
-    ivec2 base = ivec2(floor(skewed));
+    // The fragment's place on the lattice is the uv origin's plus its own skewed uv. Its
+    // barycentrics come from its position in the skewed lattice's unit square, and its three
+    // corners from which half of the square it is in.
+    vec2 q = place.frac + hex_skew(uv * TERRAIN_HEX_GRID_SCALE);
+    vec2 cell = floor(q);
 
     HexTile ht;
     ivec2 corner0;
     ivec2 corner1;
     ivec2 corner2;
     vec3 w;
-    hex_triangle(fract(skewed), corner0, corner1, corner2, w);
-    ht.corner[0] = base + corner0;
-    ht.corner[1] = base + corner1;
-    ht.corner[2] = base + corner2;
+    hex_triangle(q - cell, corner0, corner1, corner2, w);
+    ht.corner[0] = ivec2(cell) + corner0;
+    ht.corner[1] = ivec2(cell) + corner1;
+    ht.corner[2] = ivec2(cell) + corner2;
+    ht.base = place.base;
+    ht.q = q;
     ht.type = hex_sharpen(w, TERRAIN_HEX_EXPONENT, TERRAIN_HEX_MIX_THRESHOLD, ht.weight);
     return ht;
 }
 
-// Where a cell samples: the texture turned about the cell's centre and shifted, both by the
-// cell's hash. Returns the rotation so the caller can take the gradients and the normal
-// through it.
-mat2 hex_cell(ivec2 corner, vec2 uv, out vec2 st)
+// Where corner i's cell samples: the fragment from the cell's centre, turned and shifted, both
+// by the hash of the cell's world id, so a cell shows the same from either region it is drawn
+// in. The centre's own place in the texture is left out of the shift, which is a whole repeat's
+// worth of choice already. Returns the rotation so the caller can take the gradients and the
+// normal through it.
+mat2 hex_cell(HexTile ht, int i, out vec2 st)
 {
-    uint h = _hex_hash(corner);
+    // Through ivec2: a negative int keeps its bits.
+    uint h = hex_hash(uvec2(ht.base) + uvec2(ht.corner[i]));
     vec2 offset = vec2(h & 0x7ffu, (h >> 11) & 0x7ffu) * (1.0 / 2048.0);
     float angle = (float(h >> 22) * (1.0 / 512.0) - 1.0) * radians(180.0) * TERRAIN_HEX_ROTATION;
     float c = cos(angle);
     float s = sin(angle);
     mat2 rot = mat2(c, s, -s, c);
-    // The lattice id back to the plane, in uv units.
-    vec2 centre = mat2(1.0, 0.0, 0.5, 0.8660254) * vec2(corner) * (1.0 / TERRAIN_HEX_GRID_SCALE);
-    st = rot * (uv - centre) + centre + offset;
+    // From the centre to the fragment, unskewed back to the plane, in uv units.
+    vec2 from_centre = mat2(1.0, 0.0, 0.5, 0.8660254) * (ht.q - vec2(ht.corner[i])) * (1.0 / TERRAIN_HEX_GRID_SCALE);
+    st = rot * from_centre + offset;
     return rot;
 }
 
@@ -280,6 +316,7 @@ PBRMix sample_pbr(
     vec2 uv
     , vec2 uv_ddx
     , vec2 uv_ddy
+    , HexPlace place
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
     , sampler2D tex_orm
@@ -292,7 +329,7 @@ PBRMix sample_pbr(
 #endif
     )
 {
-    HexTile ht = hex_tile(uv);
+    HexTile ht = hex_tile(uv, place);
 
     // One fetch per cell that survived the threshold; the others stay zero and weigh nothing.
     // The gradients go through the cell's rotation with the uv, so the mip is the one the
@@ -312,7 +349,7 @@ PBRMix sample_pbr(
         if ((ht.type & (1 << i)) != 0)
         {
             vec2 st;
-            mat2 rot = hex_cell(ht.corner[i], uv, st);
+            mat2 rot = hex_cell(ht, i, st);
             cell[i] = fetch_pbr(
                 st
                 , rot * uv_ddx
@@ -353,8 +390,11 @@ PBRMix sample_pbr(
 #endif
     return mix;
 }
+// The projection's place on the lattice, as the hex sample_pbr() takes it after the gradients.
+#define TERRAIN_HEX_PLACE(m, p, side) , terrain_hex_place(m, p, side)
 #else
 #define sample_pbr fetch_pbr
+#define TERRAIN_HEX_PLACE(m, p, side)
 #endif
 
 // The fragment's region-local position and its screen derivatives. Every projection's uv is
@@ -468,9 +508,12 @@ vec3 get_weight3_from_terrain_weight(vec4 weight)
 // that straddles a crease, and on the far side of a cliff top that hands a vertical face the
 // top's slice, or the level ground beside it the face's -- a smear one triangle wide along
 // every crease.
+// The weights' sharpness, RenderTerrainPBRTriplanarBlendFactor.
+uniform float terrainTriplanarBlend;
+
 TerrainTriplanar terrain_triplanar_weights(vec3 facet_region)
 {
-    float sharpness = TERRAIN_TRIPLANAR_BLEND_FACTOR;
+    float sharpness = terrainTriplanarBlend;
     float threshold = TERRAIN_TRIPLANAR_MIX_THRESHOLD;
     vec3 weight_signed = pow(abs(facet_region), vec3(sharpness));
     weight_signed /= (weight_signed.x + weight_signed.y + weight_signed.z);
@@ -528,6 +571,7 @@ PBRMix terrain_sample_pbr(
     TerrainPoint pt
     , mat2 uv_transform
     , vec2 uv_offset
+    , int material
     , TerrainTriplanar tw
     , sampler2D tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
@@ -560,6 +604,7 @@ PBRMix terrain_sample_pbr(
             uv_transform * vec2(sx * pt.p.y, pt.p.z) + uv_offset
             , uv_transform * vec2(sx * pt.ddx.y, pt.ddx.z)
             , uv_transform * vec2(sx * pt.ddy.y, pt.ddy.z)
+            TERRAIN_HEX_PLACE(material, 1, sx)
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -592,6 +637,7 @@ PBRMix terrain_sample_pbr(
             uv_transform * vec2(-sy * pt.p.x, pt.p.z) + uv_offset
             , uv_transform * vec2(-sy * pt.ddx.x, pt.ddx.z)
             , uv_transform * vec2(-sy * pt.ddy.x, pt.ddy.z)
+            TERRAIN_HEX_PLACE(material, 2, -sy)
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -624,6 +670,7 @@ PBRMix terrain_sample_pbr(
             uv_transform * pt.p.xy + uv_offset
             , uv_transform * pt.ddx.xy
             , uv_transform * pt.ddy.xy
+            TERRAIN_HEX_PLACE(material, 0, 1.0)
             , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
             , tex_orm
@@ -685,6 +732,7 @@ PBRMix terrain_sample_and_multiply_pbr(
     TerrainPoint pt
     , mat2 uv_transform
     , vec2 uv_offset
+    , int material
 #if TERRAIN_PLANAR_TEXTURE_SAMPLE_COUNT == 3
     , TerrainTriplanar tw
 #endif
@@ -716,6 +764,7 @@ PBRMix terrain_sample_and_multiply_pbr(
         pt
         , uv_transform
         , uv_offset
+        , material
         , tw
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
@@ -735,6 +784,7 @@ PBRMix terrain_sample_and_multiply_pbr(
         uv_transform * pt.p.xy + uv_offset
         , uv_transform * pt.ddx.xy
         , uv_transform * pt.ddy.xy
+        TERRAIN_HEX_PLACE(material, 0, 1.0)
         , tex_col
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS)
         , tex_orm

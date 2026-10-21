@@ -157,8 +157,13 @@ vec3 skyColor(GBufferInfo gb)
 {
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
     {
-        // actual HDRI sky, just copy color value
+        // actual HDRI sky, just copy color value -- from the albedo target when there is no
+        // emissive one, where skyF encodes it and the read decodes it back to linear
+#if defined(HAS_EMISSIVE)
         return gb.emissive.rgb;
+#else
+        return gb.albedo.rgb;
+#endif
     }
 
     //should only be true of WL sky, port over base color value and scale for fake HDR
@@ -332,7 +337,9 @@ void main()
             vec3 n = gb.normal;
             calcHalfVectors(lv, n, v, h, l, nh, nl, nv, vh, lightDist);
 
-            if (nl > 0.0 && nh > 0.0)
+            // The raw dot products: calcHalfVectors floors nl and nh at a positive epsilon so
+            // the lobe can divide by them, which would leave this test always true.
+            if (dot(n, l) > 0.0 && dot(n, h) > 0.0)
             {
                 float lit = min(nl*6.0, 1.0);
 

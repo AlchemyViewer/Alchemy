@@ -42,7 +42,13 @@
 #include "lldrawable.h"
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
+#include "algpubuffer.h"
 #include "alquerypool.h"
+#include "alrenderinputrequests.h"
+#include "alrenderresourceplan.h"
+#include "alshaderinputs.h"
+#include "altransienttargetpool.h"
+#include "altransienttargets.h"
 #include "alwatersurface.h"
 #include "altexture3d.h"
 #include "aluniformbuffer.h"
@@ -79,26 +85,89 @@ bool setup_hud_matrices(const LLRect& screen_region); // specify portion of scre
 class LLPipeline
 {
 public:
-    static constexpr U32 BLOOM_MAX_MIPS = 7;
+    static constexpr U32 BLOOM_MAX_MIPS = ALRenderResourcePlan::BLOOM_MAX_MIPS;
 
     LLPipeline();
     ~LLPipeline();
 
     void destroyGL();
     void restoreGL();
-    void requestResizeScreenTexture(); // set flag only, no work, safer for callbacks...
-    void requestResizeShadowTexture(); // set flag only, no work, safer for callbacks...
 
-    void resizeScreenTexture();
-    void resizeShadowTexture();
+    /// Marks a change to the render inputs for the next application (applyRenderInputs), and does nothing else.
+    void markRenderInputsDirty(ALRenderInputRequests::Change change = ALRenderInputRequests::Change::Inputs);
+    /// Whether the window has been resized since the inputs were last applied: display() draws nothing that frame.
+    bool windowResizePending() const { return mRenderInputRequests.windowResized(); }
+    /// Applies every change marked since the last application, once, at the top of each frame, through the one path
+    /// into a reload or a reconcile: the inputs latched (latchRenderInputs), the programs loaded for the shader inputs
+    /// where they moved (LLViewerShaderMgr::setShaders), the resources reconciled where theirs moved
+    /// (rebuildGLBuffers), and what derives from either invalidated. Nothing while a snapshot holds the render size.
+    void applyRenderInputs();
+    /// The same application for the pipeline's first load and a restored context: every program built and every
+    /// resource reconciled, with whatever was marked until then.
+    void loadRenderInputs();
 
-    void releaseGLBuffers();
-    void releaseLUTBuffers();
-    void releaseScreenBuffers();
-    void releaseShadowBuffers();
+    /// A snapshot's render size, before the resolution scale, until endSizeOverride (ALRenderSizeOverride): the
+    /// resources reconciled to the latched inputs at that size, which rebuilds only what the size sizes, and no
+    /// application runs meanwhile. Whether the size was built in full rather than halved for want of memory.
+    bool beginSizeOverride(U32 width, U32 height);
+    /// The snapshot ends: the next application reconciles to the inputs as the settings say, the window's size among
+    /// them, so snapshots taken back to back at one size build that size once.
+    void endSizeOverride();
 
-    void createGLBuffers();
-    void createLUTBuffers();
+    /// The inputs as they were last latched: the resources' and the programs'.
+    const ALRenderResourceInputs& latchedInputs() const { return mLatchedInputs; }
+    const ALShaderInputs&         latchedShaderInputs() const { return mLatchedShaderInputs; }
+    /// The inputs the programs were last loaded for (LLViewerShaderMgr::setShaders), which a pass drawing with them
+    /// reads rather than the settings.
+    const ALShaderInputs& shaderInputs() const;
+
+    /// Every GL resource the pipeline holds, and the state derived from them: on context teardown and at shutdown.
+    void releaseAllGLResources();
+
+    /// What a rebuildGLBuffers runs for, as its log line says.
+    enum class RebuildCause : U8
+    {
+        Setting,
+        ShaderReload, ///< the programs were reloaded just before
+        Resize,
+        Snapshot, ///< an ALRenderSizeOverride began
+    };
+
+
+    /// What reconcileResources did, and what it changed that state derived from the resources depends on.
+    struct ResourceChanges
+    {
+        ALRenderResourcePlan::IdSet mBuilt;
+        ALRenderResourcePlan::IdSet mKept;
+        ALRenderResourcePlan::IdSet mFreed;
+        ALRenderResourcePlan::IdSet mFailed;
+        /// The transient resources the pool holds one of, or built one of, for the frames to acquire.
+        ALRenderResourcePlan::IdSet mPooled;
+        bool mMainSize       = false; ///< the main G-buffer's size
+        bool mGBufferFormats = false; ///< the main G-buffer's colour formats
+        bool mDepthFormat    = false; ///< the main G-buffer's depth format
+        bool mHDR            = false; ///< RenderHDREnabled
+        bool mProbePack      = false; ///< a target the reflection probes' captures render through
+        bool mHeroPack       = false; ///< a target the mirrors' captures render through
+        bool mReflectionProbesFreed = false; ///< the reflection probe manager's own resources were freed
+        bool mHeroProbesFreed       = false; ///< the hero probe manager's
+        bool mFullSize       = true;  ///< the render size was built in full, not halved for want of memory
+    };
+
+    /// Plans the render resources from @a requested (ALRenderResourcePlan::make) and makes each what the plan says:
+    /// built where it differs from its description, kept without a GL call where it matches, freed where the plan no
+    /// longer wants it. Depth owners are built before the targets sharing their depth. Where a target the render size
+    /// sizes cannot be built, the size is halved and those targets planned again.
+    ResourceChanges reconcileResources(const ALRenderResourceInputs& requested);
+
+    /// The inputs and the plan the resources were last reconciled to.
+    const ALRenderResourceInputs& resourceInputs() const { return mResourceInputs; }
+    const ALRenderResourcePlan& resourcePlan() const { return mResourcePlan; }
+
+    /// Draws the BRDF LUT with gDeferredGenBrdfLutProgram into its target.
+    void createBrdfLut();
+    /// The auto-exposure's adapted state and the lens flare's history, as a first frame finds them.
+    void resetExposureHistory();
     void setupGradingLUT();
     void generateLensDirt();
     /// Re-bake the tone curve lookup row from the four RenderColorGradeCurve*
@@ -106,30 +175,76 @@ public:
     /// per change, never per frame.
     void bakeToneCurveLut();
 
-    //allocate the largest screen buffer possible up to resX, resY
-    //returns true if full size buffer allocated, false if some other size is allocated
-    bool allocateScreenBuffer(U32 resX, U32 resY);
-
-    /// The size of the screen targets allocateScreenBuffer() makes for a view of
-    /// @a resX by @a resY: RenderResolutionDivisor applied, or else
-    /// RenderResolutionMultiplier.
+    /// The size the main view renders a view of @a resX by @a resY at: RenderResolutionDivisor applied, or else
+    /// RenderResolutionMultiplier, as the inputs were last latched.
     static void scaleToRenderResolution(U32& resX, U32& resY);
 
-    typedef enum {
-        FBO_SUCCESS_FULLRES = 0,
-        FBO_SUCCESS_LOWRES,
-        FBO_FAILURE
-    } eFBOStatus;
-
 private:
-    //implementation of above, wrapped for easy error handling
-    eFBOStatus doAllocateScreenBuffer(U32 resX, U32 resY);
-public:
+    // The one application, which applyRenderInputs and loadRenderInputs run.
+    void applyRenderInputs(const ALRenderInputRequests::Application& taken);
 
-    //attempt to allocate screen buffers at resX, resY
-    //returns true if allocation successful, false otherwise
-    bool allocateScreenBufferInternal(U32 resX, U32 resY);
-    bool allocateShadowBuffer(U32 resX, U32 resY);
+    // Reads the render inputs from the settings, once for everything an application applies: the programs a reload
+    // builds, the resources' plan and the passes, which read the latched statics set here.
+    void latchRenderInputs();
+
+    // Makes the render resources what @a requested describes (reconcileResources). State derived from them, or from
+    // the programs where @a cause says they were reloaded, is dropped only where what it derives from changed, and one
+    // log line names both. Whether the render size was built in full rather than halved for want of memory.
+    bool rebuildGLBuffers(const ALRenderResourceInputs& requested, RebuildCause cause);
+    // What the programs' reload alone invalidates, where no reconcile follows it, and its log line.
+    void programsReloaded();
+    // Whether the BRDF LUT was drawn with a gDeferredGenBrdfLutProgram that has since linked again.
+    bool brdfLutStale() const;
+
+    // What the settings say the programs' and the resources' inputs are now, read by latchRenderInputs alone, so every
+    // program, resource and pass is planned from the same reading of the settings. The resources take the G-buffer's
+    // normal layout and the depth convention from the programs' inputs, which compile for them.
+    static ALShaderInputs         shaderInputsFromSettings();
+    static ALRenderResourceInputs resourceInputsFromSettings(const ALShaderInputs& shaders);
+
+    // The render target, or the GL texture name, that each of the plan's resources is.
+    LLRenderTarget* resourceTarget(ALRenderResourcePlan::Id id);
+    U32*            resourceTexture(ALRenderResourcePlan::Id id);
+
+    // Builds, keeps or frees each of @a ids as @a plan says, depth owners first, and records which in @a changes. The
+    // transient resources are the pool's, which prewarmTransients readies.
+    void ensureResources(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
+                         ResourceChanges& changes);
+    // Readies the pool for @a plan's transient resources among @a ids that it prewarms (isPrewarmed): everything it
+    // holds dropped where the main size changed, and what shares a depth built again since, and one of each
+    // description built where it holds none, so that a description that cannot be built drives the render size down
+    // as a persistent target's does and the next frame finds them. Records which in @a changes.
+    void prewarmTransients(const ALRenderResourcePlan& plan, const ALRenderResourcePlan::IdSet& ids,
+                           ResourceChanges& changes);
+    // One of the pipeline's own GL textures, with its contents.
+    void createResourceTexture(ALRenderResourcePlan::Id id);
+    // Every resource the plan names, and what the pipeline keeps about them.
+    void releaseRenderTargets();
+
+    // What is built against the main depth format and rebuilt where it is next used: the depth pyramid, the water
+    // surface's maps, the selection outline and the far-plane overlay.
+    void releaseDepthDependents();
+
+    // What the resources were last reconciled to, and whether they have been since releaseAllGLResources last ran.
+    ALRenderResourceInputs mResourceInputs;
+    ALRenderResourcePlan   mResourcePlan;
+    bool                   mGLResourcesLive = false;
+    // What the settings asked of that reconcile: mResourceInputs at a lower size where it was halved for want of
+    // memory. A change is applied only where the settings move from this, so a halved size is not retried in full for
+    // every change that leaves the inputs as they were.
+    ALRenderResourceInputs mRequestedInputs;
+    // The inputs as the last latch read them, which the next reconcile and reload are asked for.
+    ALRenderResourceInputs mLatchedInputs;
+    ALShaderInputs         mLatchedShaderInputs;
+    // Whether the last reconcile built the render size in full, which a snapshot at the size it was built for finds.
+    bool                   mResourcesFullSize = true;
+    // The link of gDeferredGenBrdfLutProgram (LLGLSLShader::linkCount) the BRDF LUT was last drawn with.
+    U32                    mBrdfLutLinks = 0;
+
+    // The changes marked since the last application, and how many the one running applies, for the log line.
+    ALRenderInputRequests mRenderInputRequests;
+    U32                   mApplyingChanges = 0;
+public:
 
     // rebuild all LLVOVolume render batches
     void rebuildDrawInfo();
@@ -177,32 +292,54 @@ public:
     void renderFinalize();
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
-    // stretched as a nearest blit would, through gCopyDepthProgram: mWaterDis and mSceneMap keep depth without the
-    // screen's stencil, which a blit's matching formats would make them carry.
+    // stretched as a nearest blit would, through gCopyDepthProgram: the water's depth copy and mSceneMap keep depth
+    // without the screen's stencil, which a blit's matching formats would make them carry.
     void copySceneDepth(LLRenderTarget& dst);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);
     void clearLensFlareState();
-    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade);
-    void generateGlow(LLRenderTarget* src);
-    // Whether generateBloomHDR will run this frame: the pyramid is deep
-    // enough and every shader it needs built. renderDoF asks before it
-    // borrows bloomMip[0], because a blur left in there would be composited
-    // as bloom if the extract never overwrote it.
+    // What generateBloomHDR makes for colorCorrect to composite, each held by the scope it was given until that ends.
+    struct Bloom
+    {
+        // The HDR pyramid (RGB = bloom, A = halation intensity): mMips[0] the
+        // extract at its base, each level after it half the one before, and
+        // mMips[0] the bloom once the upsample is done. None where none was made.
+        std::array<LLRenderTarget*, ALRenderResourcePlan::BLOOM_MAX_MIPS> mMips{};
+        U32                                                         mMipCount = 0;
+        // The cross-screen filter's arms summed, where they were drawn this frame.
+        LLRenderTarget* mStreaks = nullptr;
+    };
+    void colorCorrect(LLRenderTarget* src, LLRenderTarget* dst, bool tonemap, bool colorgrade,
+                      const Bloom* bloom = nullptr);
+    // The legacy glow extracted from @a src and blurred, held by @a scope until combineGlow has added it; null where
+    // there is none to draw, glow being off or its blur running no iterations, or none could be had.
+    LLRenderTarget* generateGlow(LLRenderTarget* src, ALTransientTargets& scope);
+    // Whether generateBloomHDR can run: the pyramid is deep enough and every
+    // shader it needs built. It makes none at zero bloom and halation strength.
     bool bloomHDRReady() const;
-    void generateBloomHDR(LLRenderTarget* src);
-    void compositeBloomHDR(LLRenderTarget* scene);
-    void applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
-    void applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
-    void generateSMAABuffers(LLRenderTarget* src);
-    void applySMAA(LLRenderTarget* src, LLRenderTarget* dst);
-    // Operates in place on mRT->screen: the combine writes colour back under a
-    // mask that leaves the prim-glow alpha untouched, so callers neither pass
-    // buffers nor swap afterwards.
-    void renderDoF();
-    void copyRenderTarget(LLRenderTarget* src, LLRenderTarget* dst);
-    void combineGlow(LLRenderTarget* src, LLRenderTarget* dst);
+    Bloom generateBloomHDR(LLRenderTarget* src, ALTransientTargets& scope);
+    void compositeBloomHDR(LLRenderTarget* scene, const Bloom& bloom);
+    // The post chain's passes after colorCorrect: each draws @a src into @a dst and returns true, or draws nothing and
+    // returns false where it has nothing to draw with, so the caller goes on reading @a src.
+    bool applyCAS(LLRenderTarget* src, LLRenderTarget* dst);
+    bool applyFXAA(LLRenderTarget* src, LLRenderTarget* dst);
+    // SMAA's edges and blend weights for one frame, held by the scope generateSMAABuffers was given; neither where it
+    // drew none.
+    struct SMAATargets
+    {
+        LLRenderTarget* mEdges = nullptr;
+        LLRenderTarget* mBlend = nullptr;
+    };
+    SMAATargets generateSMAABuffers(LLRenderTarget* src, ALTransientTargets& scope);
+    bool applySMAA(LLRenderTarget* src, LLRenderTarget* dst, const SMAATargets& smaa);
+    // Depth of field from mRT->screen into a target of the screen's description
+    // from @a scope, which the post chain reads in the screen's place; null where
+    // it does not run. The screen keeps the sharp scene.
+    LLRenderTarget* renderDoF(ALTransientTargets& scope);
+    // The description depth of field's blur was last taken at, freed from the pool when its scale moves on.
+    std::optional<ALRenderTargetDesc> mDoFBlurDesc;
+    void combineGlow(LLRenderTarget* src, LLRenderTarget* dst, LLRenderTarget* glow);
     void visualizeBuffers(LLRenderTarget* src, LLRenderTarget* dst, U32 bufferIndex);
 
     /// Take a point-sampled copy of the presented frame for the scopes floater
@@ -348,9 +485,6 @@ public:
     U32         addObject(LLViewerObject *obj);
 
     void        enableShadows(const bool enable_shadows);
-    void        releaseSpotShadowTargets();
-    void        releaseSunShadowTargets();
-    void        releaseSunShadowTarget(U32 index);
 
     bool        shadersLoaded();
     bool        canUseWindLightShaders() const;
@@ -470,6 +604,14 @@ public:
     void postDeferredGammaCorrect(LLRenderTarget* screen_target);
 
     void generateSunShadow(LLCamera& camera);
+    // The pack being rendered through (mRT).
+    ALRenderResourcePlan::Pack renderPack() const;
+    // The sun cascades the pack being rendered through renders and has maps for (ALRenderResourcePlan::sunCascades).
+    U32 sunCascades() const;
+    // The shadow maps the pass being rendered has none of, a bit each: sun cascades 0 to 3, then the spot pair. A cascade
+    // past those its pack renders, or a map that could not be built, which reconcileResources leaves unbuilt: no pass
+    // draws into it, and the shader reads its shadows lit (unbuilt_shadow_maps).
+    U32 unbuiltShadowMaps() const;
     LLRenderTarget* getSunShadowTarget(U32 i);
     LLRenderTarget* getSpotShadowTarget(U32 i);
 
@@ -532,11 +674,15 @@ public:
     // (same 4 bytes/px as DEPTH24 on desktop GPUs), fixed 24-bit otherwise.
     static LLRenderTarget::eDepthFormat mainDepthFormat();
 
-    // Latch reverse-Z on/off to match (setting && clip-control cap): flips LLRender::sReverseZ,
-    // sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
-    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole
-    // convention flip (clip control, clear depth, RT formats, shader define) is atomic.
-    static void updateReverseZ();
+    // Latch reverse-Z on/off as the shader inputs say (the setting where the context has clip control): flips
+    // LLRender::sReverseZ, sets glClipControl + clear depth, re-bases the ambient depth func, and clears the sampler
+    // cache. Idempotent; requires a current GL context. Called from setShaders() so the whole convention flip (clip
+    // control, clear depth, RT formats, shader define) is atomic.
+    static void updateReverseZ(bool reverse_z);
+
+    /// RenderHDREnabled as the inputs were last latched: what every HDR-dependent target and pass decides by. The
+    /// G-buffer's normal layout follows LLRender::sGBufferNormHDR, which setShaders latches from the same inputs.
+    static bool hdrEnabled();
 
     void setRenderTypeMask(U32 type, ...);
     // This is equivalent to 'setRenderTypeMask'
@@ -597,7 +743,6 @@ public:
     static bool getRenderHighlights();
     static void setRenderHighlightTextureChannel(LLRender::eTexIndex channel); // sets which UV setup to display in highlight overlay
 
-    static void updateRenderTransparentWater();
     static void refreshCachedSettings();
 
     void addDebugBlip(const LLVector3& position, const LLColor4& color);
@@ -607,7 +752,6 @@ public:
     void skipRenderingOfTerrain( bool flag );
     void hideObject( const LLUUID& id );
     void restoreHiddenObject( const LLUUID& id );
-    void handleShadowDetailChanged();
 
     LLReflectionMapManager mReflectionMapManager;
     LLHeroProbeManager mHeroProbeManager;
@@ -808,7 +952,6 @@ public:
     static S32              sUseOcclusion;  // 0 = no occlusion, 1 = read only, 2 = read/write
     static bool             sAutoMaskAlphaDeferred;
     static bool             sAutoMaskAlphaNonDeferred;
-    static bool             sRenderTransparentWater;
     static bool             sBakeSunlight;
     static bool             sNoAlpha;
     static bool             sUseFarClip;
@@ -824,6 +967,9 @@ public:
     static bool             sRenderAttachedLights;
     static bool             sRenderAttachedParticles;
     static bool             sRenderDeferred;
+    // Render inputs as the passes read them: set from the latched inputs (latchRenderInputs), never from a setting's
+    // commit, so a pass and the programs and targets it draws with agree on them.
+    static bool             sRenderTransparentWater;
     static bool             sReflectionProbesEnabled;
     static S32              sVisibleLightCount;
     static bool             sRenderingHUDs;
@@ -893,35 +1039,13 @@ public:
         //screen texture
         LLRenderTarget          screen;
         LLRenderTarget          deferredScreen;
-        LLRenderTarget          deferredLight;
-
-        // tonemapped and gamma corrected render ready for post
-        LLRenderTarget          postPingMap;
-        LLRenderTarget          postPongMap;
-
-        // Depth of field owns no scratch. It runs pre-tonemap on linear HDR,
-        // so it cannot use postPingMap (GL_RGB10_A2 under HDR), and it does
-        // not widen deferredLight to serve one late pass. It borrows two
-        // full-frame targets that are idle for exactly the stretch of
-        // renderFinalize it runs in: mWaterDis for the sharp copy plus CoF,
-        // bloomMip[0] for the blur. renderDoF says why each is free.
 
         //sun shadow map
         LLRenderTarget          shadow[4];
 
-        // HDR bloom pyramid (RGB = bloom, A = halation intensity).
-        // mBloomMip[0] is full-res extract; subsequent levels are halved.
-        LLRenderTarget              bloomMip[BLOOM_MAX_MIPS];
+        // How deep the HDR bloom pyramid generateBloomHDR acquires is: the
+        // levels the plan describes, from the first, that the pool can build.
         U32                         bloomMipCount = 0;
-
-        // Cross-screen filter state for this frame. The three streak buffers
-        // own no memory: they are quadrants of mWaterDis, which is idle from
-        // the water pass to the next frame -- see generateBloomHDR. What
-        // colorCorrect needs to know is whether streaks were drawn this frame
-        // and at what size, to find the accumulator's quadrant.
-        bool                        crossFilterReady = false;
-        U32                         crossFilterWidth = 0;
-        U32                         crossFilterHeight = 0;
     };
 
     // main full resoltuion render target
@@ -937,6 +1061,22 @@ public:
     // currently used render target pack
     RenderTargetPack* mRT;
 
+    // The frame's short-lived targets, lent by description to the passes and effects that use them: the plan's
+    // transient resources (ALRenderResourcePlan::isTransient) and the scratch an effect takes in a resource's
+    // description. Each is a pass's from its acquisition to its scope's end, and the next pass's after that.
+    ALTransientTargetPool mTransientTargets;
+
+    // A target of the description the plan gives @a id, from @a scope, named @a name or else as the plan names it: the
+    // transient resource itself, or scratch in a resource's description. Null where the plan wants none, or none can be
+    // built. One sharing a persistent resource's depth is attached to it; one sharing a transient resource's, to
+    // @a depth_from, the target the caller acquired for it.
+    LLRenderTarget* acquireResource(ALTransientTargets& scope, ALRenderResourcePlan::Id id, std::string_view name = {},
+                                    LLRenderTarget* depth_from = nullptr);
+
+    // The light map of the view whose deferred lighting is running, which bindDeferredShader binds where it is given
+    // none; null outside that lighting, where a program reading it reads white.
+    LLRenderTarget* mLightMap = nullptr;
+
     LLRenderTarget          mSpotShadow[2];
 
     LLRenderTarget          mPbrBrdfLut;
@@ -947,7 +1087,8 @@ public:
 
     // The auto-exposure: the meter grid (luminanceF.glsl), its 64-bin histogram
     // (exposureHistogramV.glsl), and the exposure, 1x1: x the scale, y the EV the next
-    // frame adapts from (exposureF.glsl). mLastExposure is last frame's.
+    // frame adapts from (exposureF.glsl). mLastExposure is last frame's: the two swap their
+    // storage as each frame's exposure is made.
     LLRenderTarget          mLuminanceMap;
     LLRenderTarget          mExposureHistogram;
     LLRenderTarget          mExposureMap;
@@ -959,19 +1100,16 @@ public:
     bool                    mLensFlareStateValid = false;
     bool                    mLensFlareSunUp = true;    // which body the history describes
 
-    // FXAA helper target
-    LLRenderTarget          mFXAAMap;
-    LLRenderTarget          mSMAABlendBuffer;
-
     // downres scratch space for GPU downscaling of textures
     LLRenderTarget          mDownResMap;
 
     // Scopes floater sample. Point-decimated copy of the presented frame plus
-    // two pixel-pack buffers: the read-back of one capture is collected at the
-    // next one, several frames later, so glReadPixels never stalls the frame.
+    // two readback slots: the read-back of one capture is collected at the
+    // next one, several frames later, once it has landed, so neither the read
+    // nor the collect waits -- on the GPU, or on a threaded driver's own
+    // thread.
     LLRenderTarget          mScopeSample;
-    U32                     mScopePBO[2] = { 0, 0 };
-    S32                     mScopePBOInFlight = -1;
+    ALGPUReadback           mScopeCaptures;
     LLFrameTimer            mScopeSampleTimer;
     ALScopeData             mScopeData;
     std::vector<U8>         mScopeReadback;
@@ -989,12 +1127,6 @@ public:
     S32                     mScenePixelX = 0;
     S32                     mScenePixelY = 0;
     bool                    mScenePixelPending = false;
-
-    // UI previews must not inherit reflection-probe resolution or scene scaling.
-    LLRenderTarget          mPreviewMap;
-
-    // 2k bom scratch target
-    LLRenderTarget          mBakeMap;
 
     LLCullResult            mSky;
     LLCullResult            mReflectedObjects;
@@ -1036,13 +1168,13 @@ public:
     LLVector2               mScreenScale;
 
     // ---- Shared deferred uniform block (UB_DEFERRED) --------------------------------------
-    // std140-packed shadow/SSAO constants, uploaded once per deferred pass instead of being
-    // re-pushed by every bindDeferredShader call. Holds only what is constant across a pass:
-    // screen_res is overridden per call and sun_dir/moon_dir are entangled with atmospherics,
-    // so those stay loose.
+    // std140-packed shadow/SSAO constants and the specular exponent, uploaded once per deferred
+    // pass instead of being re-pushed by every bindDeferredShader call. Holds only what is
+    // constant across a pass: screen_res is overridden per call and sun_dir/moon_dir are
+    // entangled with atmospherics, so those stay loose.
     //
     // shadow_matrix@0, ssao_effect_mat@384, shadow_clip@432, shadow_res@448,
-    // proj_shadow_res@456, scalars @464..492, size 496. Matrices go up as they lie: an
+    // proj_shadow_res@456, scalars @464..500, size 512. Matrices go up as they lie: an
     // LLMatrix4a's rows are the columns std140 reads by default, and ssao_effect_mat is
     // symmetric either way. Checked against the driver at shader load by
     // validateEngineBlockLayouts() in debug builds.
@@ -1061,19 +1193,36 @@ public:
         F32 ssao_max_radius;
         F32 ssao_factor;
         F32 ssao_factor_inv;
+        F32 shadow_pcss_scale;
+        F32 specular_exponent;
     };
 
     DeferredUBOData             mDeferredUBOData{};
     ALUniformBuffer             mDeferredUBO;
     bool                        mDeferredUBODirty{ true };
 
-    //water distortion texture (refraction)
-    LLRenderTarget              mWaterDis;
+    // The water pool's copies of the scene under its surface, from the pool for its pass alone (beginWaterTargets to
+    // endWaterTargets) where the water is transparent: the screen's colour over the part of the screen the surface
+    // reads it at (its field's screen rectangle and the ripples' reach past it), and the scene's depth, copied since the
+    // surface writes its own depth over the scene's while it reads what lies beneath, and which the waves' depth
+    // pyramid is built from. The frame's one copy of the depth: the haze passes, which write none, read the scene's in
+    // place. Null outside that pass, and for opaque water, which reads neither.
+    void            beginWaterTargets();
+    void            endWaterTargets();
+    LLRenderTarget* waterRefraction() const { return mWaterRefraction; }
+    LLRenderTarget* waterDepthCopy() const { return mWaterDepthCopy; }
+    std::optional<ALTransientTargets> mWaterTargets;
+    LLRenderTarget*                   mWaterRefraction = nullptr;
+    LLRenderTarget*                   mWaterDepthCopy  = nullptr;
 
     // The sky dome behind everything at half resolution: the sky pool draws it again here, with no depth, and the
-    // haze pass converges far water on it (hazeF.glsl). Holds the main view's sky for mSkyBehindFrame only.
-    LLRenderTarget              mSkyBehind;
-    U32                         mSkyBehindFrame = 0;
+    // haze pass converges far water on it (hazeF.glsl). The main view's alone, from the pool from the sky pool's draw
+    // (acquireSkyBehind) to the end of the deferred lighting its haze runs in (releaseSkyBehind): null outside that,
+    // and in a frame that has none to draw.
+    LLRenderTarget*             acquireSkyBehind();
+    void                        releaseSkyBehind();
+    ALTransientTargets          mSkyBehindTargets{ mTransientTargets };
+    LLRenderTarget*             mSkyBehind = nullptr;
     // Whether any water was in front of the sky's depth when the sky pool drew: the sky behind is drawn only then, and
     // the haze shades the water's pixels only then. An occlusion query of gGL's, asked in mSkyBehindQueryFrame.
     ALQueryTicket               mSkyBehindQuery;
@@ -1096,10 +1245,8 @@ public:
     ALPrimitivePlot             mWaterPatchPrimitives{ "water patch primitives", true };
     U32                         mWaterDraws = 0;
 
-    static const U32 MAX_PREVIEW_WIDTH;
+    static constexpr U32 MAX_PREVIEW_WIDTH = ALRenderResourcePlan::PREVIEW_SIZE;
 
-    //texture for making the glow
-    LLRenderTarget              mGlow[3];
 
     //noise map
     U32                 mNoiseMap;
@@ -1175,8 +1322,8 @@ public:
     bool                mLensDirtSliderHeld = false;
     // Tone curve LUT: a 512x1 RGBA16 row (ALToneCurveSet::LUT_SIZE) whose R, G
     // and B texels hold master(channel(x)) for each channel. A raw GL name
-    // like the SMAA maps above: created empty in createGLBuffers, filled by
-    // bakeToneCurveLut, released in releaseGLBuffers.
+    // like the SMAA maps above: created empty by reconcileResources, filled by
+    // bakeToneCurveLut, released in releaseAllGLResources.
     U32                 mToneCurveLut = 0;
     bool                mToneCurveLutDirty = true;   // settings changed, or the texture was recreated, since the last bake
     bool                mToneCurveIdentity = true;   // the last bake found all four curves on the diagonal
@@ -1394,15 +1541,7 @@ public:
     static bool WindLightUseAtmosShaders;
     static bool RenderDeferred;
     static F32 RenderDeferredSunWash;
-    static U32 RenderFSAAType;
-    static U32 RenderResolutionDivisor;
-// [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
-    static F32 RenderResolutionMultiplier;
-// [/SL:KB]
-    static S32 RenderShadowDetail;
     static S32 RenderShadowSplits;
-    static bool RenderDeferredSSAO;
-    static F32 RenderShadowResolutionScale;
     static bool RenderDelayCreation;
     static bool RenderAnimateRes;
     static bool FreezeTime;
@@ -1426,11 +1565,9 @@ public:
     static F32 RenderGlowWarmthAmount;
     static LLVector3 RenderGlowLumWeights;
     static LLVector3 RenderGlowWarmthWeights;
-    static S32 RenderGlowResolutionPow;
     static S32 RenderGlowIterations;
     static F32 RenderGlowWidth;
     static F32 RenderGlowStrength;
-    static bool RenderGlowNoise;
     static bool RenderDepthOfField;
     static F32 CameraFocusTransitionTime;
     static F32 CameraFNumber;
@@ -1463,7 +1600,6 @@ public:
     static F32 CameraMaxCoF;
     static F32 CameraDoFResScale;
     static F32 RenderAutoHideSurfaceAreaLimit;
-    static bool RenderScreenSpaceReflections;
     static S32 RenderScreenSpaceReflectionIterations;
     static F32 RenderScreenSpaceReflectionRayStep;
     static F32 RenderScreenSpaceReflectionDistanceBias;
@@ -1471,10 +1607,8 @@ public:
     static F32 RenderScreenSpaceReflectionAdaptiveStepMultiplier;
     static S32 RenderScreenSpaceReflectionGlossySamples;
     static S32 RenderBufferVisualization;
-    static bool RenderMirrors;
     static S32 RenderHeroProbeUpdateRate;
     static S32 RenderHeroProbeConservativeUpdateMultiplier;
-    static bool RenderAvatarCloth;
 
 private:
     // The main camera's view of the world: not a shadow map, an impostor

@@ -81,13 +81,15 @@ void ALFloaterTransactionLog::addTransaction(const LLDate& date, const LLUUID& s
 
     updateLabels();
 
+    // A cell finds its column by name, not by its place in the row, so the
+    // name cell, written when the name arrives, goes after the amount.
     LLSD row;
     row["value"]               = sender;
     row["column"][0]["column"] = "time";
     row["column"][0]["value"]  = date.toHTTPDateString(LLStringExplicit("%H:%M:%S"));
-    row["column"][2]["column"] = "amount";
-    row["column"][2]["value"]  = llformat("L$%d", (incoming ? amount : -amount));
-    row["column"][2]["halign"] = LLFontGL::RIGHT;
+    row["column"][1]["column"] = "amount";
+    row["column"][1]["value"]  = llformat("L$%d", (incoming ? amount : -amount));
+    row["column"][1]["halign"] = LLFontGL::RIGHT;
 
     mAvatarNameCacheConnection =
         LLAvatarNameCache::get(sender, boost::bind(&ALFloaterTransactionLog::onAvatarNameCache, this, _1, _2, row));
@@ -95,8 +97,8 @@ void ALFloaterTransactionLog::addTransaction(const LLDate& date, const LLUUID& s
 
 void ALFloaterTransactionLog::onAvatarNameCache(const LLUUID& agent_id, const LLAvatarName& av_name, LLSD& row)
 {
-    row["column"][1]["column"] = "name";
-    row["column"][1]["value"]  = av_name.getDisplayName();
+    row["column"][2]["column"] = "name";
+    row["column"][2]["value"]  = av_name.getDisplayName();
     mList->addElement(row);
 }
 

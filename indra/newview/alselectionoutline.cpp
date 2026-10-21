@@ -104,6 +104,16 @@ namespace
     }
 }
 
+ALSelectionOutline::ALSelectionOutline()
+{
+    mIdMap.setLabel("outline.ids");
+    mJumpMap.setLabel("outline.jumps");
+    mTileMap.setLabel("outline.tiles");
+    mGlowReachMap.setLabel("outline.glow.reach");
+    mGlowRowMap.setLabel("outline.glow.rows");
+    mBackdropMap.setLabel("outline.backdrop");
+}
+
 ALSelectionOutline::View ALSelectionOutline::worldView()
 {
     View view = makeView(LLViewerCamera::getCurrent().getModelview(), gGL.getProjectionMatrix(), contour_setting(),

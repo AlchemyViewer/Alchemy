@@ -31,14 +31,16 @@
 #include "llassettype.h"
 #include "llinventorytype.h"
 
+#include <string_view>
+
 class LLInventoryIcon
 {
 public:
-    static const std::string& getIconName(LLAssetType::EType asset_type,
-                                          LLInventoryType::EType inventory_type = LLInventoryType::IT_NONE,
-                                          U32 misc_flag = 0, // different meanings depending on item type
-                                          bool item_is_multi = false);
-    static const std::string& getIconName(LLInventoryType::EIconName idx);
+    static std::string_view getIconName(LLAssetType::EType asset_type,
+                                        LLInventoryType::EType inventory_type = LLInventoryType::IT_NONE,
+                                        U32 misc_flag = 0, // different meanings depending on item type
+                                        bool item_is_multi = false);
+    static std::string_view getIconName(LLInventoryType::EIconName idx);
 
     static LLPointer<class LLUIImage> getIcon(LLAssetType::EType asset_type,
                                 LLInventoryType::EType inventory_type = LLInventoryType::IT_NONE,

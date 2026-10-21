@@ -272,10 +272,9 @@ public:
 
     virtual void onCompleted(LLCore::HttpHandle handle, LLCore::HttpResponse * response);
 
-    inline LLEventStream &getReplyPump()
-    {
-        return mReplyPump;
-    }
+    /// Suspend the calling coroutine until the reply is posted to its pump, and return it.
+    /// Main thread, as the reply is.
+    LLSD suspendUntilReply();
 
 protected:
     /// this method may modify the status value
@@ -287,6 +286,11 @@ private:
     void replyPost(LLCore::HttpResponse* response, LLCore::HttpStatus& status, LLSD& result);
 
     LLEventStream &mReplyPump;
+    // The pump is the waiting coroutine's, gone with it if it ends first -- stopped as the
+    // viewer quits, say -- while a reply parsed on the General queue is still on its way, and
+    // its name is then free for the next coroutine's. The reply is posted only while a
+    // coroutine waits on the pump in suspendUntilReply: the pump outlives every such wait.
+    bool mWaiting = false;
 };
 
 //=========================================================================

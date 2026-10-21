@@ -3052,9 +3052,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		メディアの再生／一時停止
 	</string>
 	<!-- Drivers support/update pages -->
-	<string name="IntelDriverPage">https://www.intel.co.jp/content/www/jp/ja/support/detect.html</string>
-	<string name="NvidiaDriverPage">https://www.nvidia.com/Download/index.aspx?lang=ja-jp</string>
-	<string name="AMDDriverPage">https://www.amd.com/ja/support</string>
 	<!-- OSMessageBox messages -->
 	<string name="MBCmdLineError">
 		コマンドラインにエラーが見つかりました。

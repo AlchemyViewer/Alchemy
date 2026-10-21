@@ -576,7 +576,6 @@ private:
     class LLDebugText* mDebugText; // Internal class for debug text
 
     bool            mResDirty;
-    bool            mStatesDirty;
 
     std::unique_ptr<LLWindowListener> mWindowListener;
     std::unique_ptr<LLViewerWindowListener> mViewerWindowListener;

@@ -1,6 +1,7 @@
 /**
  * @file llglslshader_gl_test.cpp
- * @brief LLGLSLShader on the hidden window. Its uniform value cache: what a program holds, read back from GL, after
+ * @brief LLGLSLShader on the hidden window. The latched layout flags its binary cache key folds in. Its uniform value
+ *        cache: what a program holds, read back from GL, after
  *        each kind of set, across a relink, and where two setters write one location. And the compute path,
  *        through the shader manager as the viewer builds programs: the #version a stage gets, a compute program's
  *        work group size, its dispatches direct, by thread count and indirect, the image units its reserved names
@@ -50,6 +51,7 @@
 #include <bit>
 #include <climits>
 #include <initializer_list>
+#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -111,6 +113,7 @@ namespace
             TEST_SOURCE_MAP,
             TEST_UINT_MAP,
             TEST_INT_MAP,
+            TEST_BOOLS,
             TEST_RESERVED_END
         };
 
@@ -128,6 +131,7 @@ namespace
             "testSourceMap",
             "testUintMap",
             "testIntMap",
+            "testBools",
         };
         static_assert(std::size(kTestReservedNames) == TEST_RESERVED_END - TEST_COUNT, "one name per test entry");
 
@@ -497,6 +501,34 @@ namespace
               "{\n"
               "    frag_color = test_global_stub(vec4(0.25, 0.5, 0.75, 1.0));\n"
               "}\n" },
+
+            // A fragment stage that does not compile.
+            { "test/brokenF.glsl",
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = not_declared_anywhere;\n"
+              "}\n" },
+            // A fragment stage that compiles for a program and not for its skinned variant.
+            { "test/skinBrokenF.glsl",
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "#ifdef HAS_SKIN\n"
+              "    frag_color = not_declared_anywhere;\n"
+              "#else\n"
+              "    frag_color = vec4(1.0);\n"
+              "#endif\n"
+              "}\n" },
+
+            // A bool array under a reserved name, both elements read so the whole array stays active.
+            { "test/boolsF.glsl",
+              "uniform bool testBools[2];\n"
+              "out vec4 frag_color;\n"
+              "void main()\n"
+              "{\n"
+              "    frag_color = vec4(testBools[0] ? 1.0 : 0.0, testBools[1] ? 1.0 : 0.0, 0.0, 1.0);\n"
+              "}\n" },
         };
 
         bool writeShaderFiles(const ll_test::TestShaderDir& dir)
@@ -809,6 +841,335 @@ namespace
     };
 
 
+    // The binary cache is keyed by hash(). REVERSE_Z and GBUFFER_NORM_HDR are injected at compile time from latched
+    // statics rather than carried in a defines map, so each has to reach the key on its own: a program compiled
+    // for RGBA16 normals and handed back for RGB10_A2 ones unpacks the geometric normal as noise.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the cache key follows the normal layout and the depth convention", "[llglslshader_gl]")
+    {
+        const bool norm_hdr = LLRender::sGBufferNormHDR;
+        const bool reverse_z = LLRender::sReverseZ;
+        mShader.mName = "Cache Key Probe";
+
+        LLRender::sGBufferNormHDR = true;
+        LLRender::sReverseZ = false;
+        const LLUUID base = mShader.hash();
+        const LLUUID again = mShader.hash();
+        LLRender::sGBufferNormHDR = false;
+        const LLUUID packed_normals = mShader.hash();
+        LLRender::sGBufferNormHDR = true;
+        LLRender::sReverseZ = true;
+        const LLUUID reversed = mShader.hash();
+
+        LLRender::sGBufferNormHDR = norm_hdr;
+        LLRender::sReverseZ = reverse_z;
+
+        CHECK(again == base);
+        CHECK(packed_normals != base);
+        CHECK(reversed != base);
+        CHECK(packed_normals != reversed);
+    }
+
+    // A load configures every program from nothing and asks createShader for it again (LLViewerShaderMgr::setShaders). One
+    // configured as it linked is kept: its name, its uniforms and its hook's work stand, and nothing is compiled. One
+    // configured otherwise links again. GL may hand a deleted program's name straight back out, so the link count, not
+    // the name, says which.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: createShader keeps a program configured as it linked and links one configured otherwise", "[llglslshader_gl]")
+    {
+        setUpShaders();
+
+        U32 hooks = 0;
+        const auto configure = [&](LLGLSLShader& shader)
+        {
+            shader.clearConfiguration();
+            shader.mName = "kept (test)";
+            shader.mShaderLevel = 1;
+            shader.mShaderFiles.push_back({ "test/fullscreenV.glsl", GL_VERTEX_SHADER });
+            shader.mShaderFiles.push_back({ "test/boolsF.glsl", GL_FRAGMENT_SHADER });
+            shader.mOnLink = [&hooks](LLGLSLShader&) { ++hooks; };
+        };
+        const auto held = [this]()
+        {
+            GLint value = -1;
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &value);
+            return value;
+        };
+
+        mDraw.unload();
+        configure(mDraw);
+        REQUIRE(mDraw.createShader());
+        const GLuint name  = mDraw.mProgramObject;
+        const U32    links = mDraw.linkCount();
+        CHECK(hooks == 1);
+        mDraw.bind();
+        const GLint ints[2] = { 0, 1 };
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        mDraw.unbind();
+        REQUIRE(held() == 1);
+
+        SECTION("configured as it linked")
+        {
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.mProgramObject == name);
+            CHECK(mDraw.linkCount() == links);
+            CHECK(hooks == 1);
+            CHECK(held() == 1);
+        }
+
+        SECTION("with a define of its own")
+        {
+            configure(mDraw);
+            mDraw.addPermutation("TEST_DEFINE", "1");
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+            CHECK(held() == 0);
+        }
+
+        SECTION("with a feature")
+        {
+            // One that attaches nothing either way, so the program links with the objects the test has.
+            configure(mDraw);
+            mDraw.mFeatures.attachNothing = true;
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+        }
+
+        SECTION("against shared objects compiled from other inputs")
+        {
+            const LLUUID key = LLGLSLShader::sSharedObjectsKey;
+            LLGLSLShader::sSharedObjectsKey.generate();
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            LLGLSLShader::sSharedObjectsKey = key;
+        }
+
+        SECTION("unloaded")
+        {
+            mDraw.unload();
+            configure(mDraw);
+            CHECK(mDraw.createShader());
+            CHECK(mDraw.linkCount() == links + 1);
+            CHECK(hooks == 2);
+        }
+
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A program takes the uniforms every program shares (LLShaderMgr::updateShaderUniforms) on its first bind after it
+    // links, with no environment change since: mapUniforms binds it before any location is known, and a set applied
+    // there would reach none of them.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program's first bind after it links applies the uniforms every program shares", "[llglslshader_gl]")
+    {
+        setUpShaders();
+
+        mShaders.mUpdateUniforms = [](LLGLSLShader* shader)
+        {
+            const GLint ints[2] = { 0, 1 };
+            shader->uniform1iv(TEST_BOOLS, 2, ints);
+        };
+        const auto held = [this]()
+        {
+            GLint value = -1;
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &value);
+            return value;
+        };
+        const auto configure = [this](bool define)
+        {
+            mDraw.clearConfiguration();
+            mDraw.mName = "shared uniforms (test)";
+            mDraw.mShaderLevel = 1;
+            mDraw.mShaderFiles.push_back({ "test/fullscreenV.glsl", GL_VERTEX_SHADER });
+            mDraw.mShaderFiles.push_back({ "test/boolsF.glsl", GL_FRAGMENT_SHADER });
+            if (define)
+            {
+                mDraw.addPermutation("TEST_DEFINE", "1");
+            }
+        };
+        const U32 generation = LLGLSLShader::sEnvironmentGeneration;
+
+        mDraw.unload();
+        configure(false);
+        REQUIRE(mDraw.createShader());
+        mDraw.bind();
+        mDraw.unbind();
+        CHECK(held() == 1);
+
+        SECTION("linked again in place")
+        {
+            const U32 links = mDraw.linkCount();
+            configure(true);
+            REQUIRE(mDraw.createShader());
+            REQUIRE(mDraw.linkCount() == links + 1);
+            UNSCOPED_INFO("a link resets what the program held");
+            CHECK(held() == 0);
+            mDraw.bind();
+            mDraw.unbind();
+            CHECK(held() == 1);
+        }
+
+        SECTION("kept")
+        {
+            configure(false);
+            REQUIRE(mDraw.createShader());
+            CHECK(held() == 1);
+        }
+
+        CHECK(LLGLSLShader::sEnvironmentGeneration == generation);
+        mShaders.mUpdateUniforms = nullptr;
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A program that did not build takes nothing down: bind() puts a stand-in in its place that draws nothing, skinned
+    // or not, and its uniform, texture and dispatch calls do nothing. A solid program drawn the same way first shows the
+    // draw would have covered the target.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program that did not build draws nothing and its calls do nothing", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        constexpr U32 SIDE = 4;
+        REQUIRE(mTargets[0].allocate(SIDE, SIDE, GL_RGBA8));
+        REQUIRE(buildProgram(mDraw2, "solid (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/solidF.glsl", GL_FRAGMENT_SHADER } }));
+
+        CHECK_FALSE(buildProgram(mDraw, "broken (test)",
+                                 { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/brokenF.glsl", GL_FRAGMENT_SHADER } }));
+        REQUIRE_FALSE(mDraw.isComplete());
+        // The failed compile's own error, which is not what is under test.
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+
+        LLGLDisable blend(GL_BLEND);
+        const auto draw = [&](LLGLSLShader& shader, bool rigged)
+        {
+            mTargets[0].bindTarget();
+            gGL.setClearColor(LLColor4::transparent);
+            mTargets[0].clear();
+            shader.bind(rigged);
+            gGL.drawArraysInstanced(LLRender::TRIANGLES, 0, 3, 1);
+            const std::vector<F32> drawn = readBoundTarget(SIDE, SIDE, 4, GL_RGBA);
+            mTargets[0].flush();
+            LLGLSLShader::unbind();
+            return drawn;
+        };
+
+        UNSCOPED_INFO("the solid program covers the target");
+        CHECK(draw(mDraw2, false) == std::vector<F32>(SIDE * SIDE * 4, 1.f));
+
+        mDraw.bind();
+        CHECK(LLGLSLShader::sCurBoundShaderPtr == &mDraw);
+        GLint current = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &current);
+        UNSCOPED_INFO("a linked program stands in");
+        CHECK(current != 0);
+        GLint linked = GL_FALSE;
+        glGetProgramiv((GLuint)llmax(current, 0), GL_LINK_STATUS, &linked);
+        CHECK(linked == GL_TRUE);
+        mDraw.uniform1f(LLShaderMgr::MINIMUM_ALPHA, 0.5f);
+        CHECK(mDraw.enableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        CHECK(mDraw.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mTargets[0]) == -1);
+        CHECK(mDraw.disableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        CHECK(mDraw.getTextureChannel(LLShaderMgr::DIFFUSE_MAP) == -1);
+        mDraw.dispatch(1);
+        LLGLSLShader::unbind();
+
+        UNSCOPED_INFO("it draws nothing");
+        CHECK(draw(mDraw, false) == std::vector<F32>(SIDE * SIDE * 4, 0.f));
+        UNSCOPED_INFO("nor skinned, having no skinned variant");
+        CHECK(draw(mDraw, true) == std::vector<F32>(SIDE * SIDE * 4, 0.f));
+
+        LLGLSLShader::releaseStandIn();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A program whose skinned variant does not build fails whole. The passes bind the variant for skinned draws and set
+    // its uniforms through the program, so a base left built would set them on the stand-in bound in the variant's
+    // place. A program with no variant is its own riggedVariant(), and binding that binds the stand-in, its calls doing
+    // nothing. Asked for without the variant, the same sources build.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a program whose skinned variant does not build fails whole", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        const auto configure = [&]()
+        {
+            mDraw.unload();
+            mDraw.mName        = "skin broken (test)";
+            mDraw.mShaderLevel = 1;
+            mDraw.mShaderFiles = { { "test/fullscreenV.glsl", GL_VERTEX_SHADER },
+                                   { "test/skinBrokenF.glsl", GL_FRAGMENT_SHADER } };
+        };
+
+        configure();
+        CHECK_FALSE(mDraw.createShader(LLGLSLShader::VARIANT_RIGGED));
+        // The failed compile's own error, which is not what is under test.
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        CHECK_FALSE(mDraw.isComplete());
+        CHECK(mDraw.mRiggedVariant == nullptr);
+        CHECK(mDraw.riggedVariant() == &mDraw);
+
+        mDraw.riggedVariant()->bind();
+        CHECK(LLGLSLShader::sCurBoundShaderPtr == &mDraw);
+        mDraw.uniform1f(LLShaderMgr::MINIMUM_ALPHA, 0.5f);
+        CHECK(mDraw.enableTexture(LLShaderMgr::DIFFUSE_MAP) == -1);
+        LLGLSLShader::unbind();
+        LLGLSLShader::releaseStandIn();
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+
+        configure();
+        CHECK(mDraw.createShader());
+        CHECK(mDraw.isComplete());
+        CHECK(mDraw.riggedVariant() == &mDraw);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A copy of a shared object compiled under a key of its own that does not build is attached by that key all the
+    // same, so a program wanting it fails rather than linking the base object in its place: only a copy never compiled
+    // falls back to the base, as a source that does not vary on the axis needs no second object. A copy that builds
+    // under the key later, or the objects cleared, forgets the failure.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a shared object's copy that does not build is not replaced by the base", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        const std::string base = "test/brokenF.glsl";
+        const std::string copy = base + LLShaderMgr::CLASSIC_OBJECT_SUFFIX;
+        LLGLSLShader classic;
+        classic.addPermutation("CLASSIC_MODE", "1");
+        const auto key = [&]()
+        { return mShaders.variantObjectKey(base, LLShaderMgr::OBJ_AXIS_CLASSIC, &classic, GL_FRAGMENT_SHADER); };
+
+        UNSCOPED_INFO("no copy compiled: the base object");
+        CHECK(key() == base);
+
+        S32 level = 1;
+        std::map<std::string, std::string> defines{ { "CLASSIC_MODE", "1" } };
+        CHECK(mShaders.loadShaderFile(base, level, GL_FRAGMENT_SHADER, &defines, -1, copy) == 0);
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        UNSCOPED_INFO("a copy that did not build: its own key, which attaches nothing");
+        CHECK(key() == copy);
+        CHECK_FALSE(mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT].contains(copy));
+
+        level = 1;
+        CHECK(mShaders.loadShaderFile("test/solidF.glsl", level, GL_FRAGMENT_SHADER, &defines, -1, copy) != 0);
+        UNSCOPED_INFO("a copy built under the key since");
+        CHECK(key() == copy);
+        CHECK(mShaders.mShaderObjects[LLShaderMgr::STAGE_FRAGMENT].contains(copy));
+
+        mShaders.clearShaderObjects();
+        level = 1;
+        CHECK(mShaders.loadShaderFile(base, level, GL_FRAGMENT_SHADER, &defines, -1, copy) == 0);
+        while (glGetError() != GL_NO_ERROR)
+        {
+        }
+        mShaders.clearShaderObjects();
+        UNSCOPED_INFO("cleared, the failure goes with the objects");
+        CHECK(key() == base);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // Ints and uints arrive exactly past 2^24: each set below differs from the one before only in values that
     // convert to the same float, and only in some of its components.
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: ints and uints arrive exactly past 2^24", "[llglslshader_gl]")
@@ -1009,6 +1370,71 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // The other setters a bool takes -- the uint one, and the float one's fast and array forms -- each followed by
+    // the int set that repeats the last one: AMD's driver drops that set unless every set of a bool reaches GL as an
+    // int (see LLGLSLShader::mBoolLocations). Any float but zero is true, 0.5 included.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a bool holds an int set made after its uint and float setters' other forms", "[llglslshader_gl]")
+    {
+        setUp();
+
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        mShader.uniform1ui(LLShaderMgr::GRAIN_ANIMATE, 0u);
+        require_ints("false by uint", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the uint", "uGrainAnimate", { 1 });
+
+        mShader.fastUniform1f(LLShaderMgr::GRAIN_ANIMATE, 0.f);
+        require_ints("false by the fast float", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the fast float", "uGrainAnimate", { 1 });
+
+        const F32 zero = 0.f;
+        mShader.uniform1fv(LLShaderMgr::GRAIN_ANIMATE, 1, &zero);
+        require_ints("false by the float array form", "uGrainAnimate", { 0 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 1);
+        require_ints("true by int after the float array form", "uGrainAnimate", { 1 });
+
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 0);
+        mShader.uniform1f(LLShaderMgr::GRAIN_ANIMATE, 0.5f);
+        require_ints("true by 0.5", "uGrainAnimate", { 1 });
+        mShader.uniform1i(LLShaderMgr::GRAIN_ANIMATE, 0);
+        require_ints("false by int after 0.5", "uGrainAnimate", { 0 });
+
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A bool array set whole by ints, then by floats, then by the ints again holds the ints: the driver that drops a
+    // bool's repeated int set drops an array's too.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: a bool array takes int and float array sets and holds whichever set it last", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        REQUIRE(buildProgram(mDraw, "bools (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/boolsF.glsl", GL_FRAGMENT_SHADER } }));
+        mDraw.bind();
+
+        // What the two elements hold, as GL reads them back.
+        const auto require_elements = [this](const char* what, GLint first, GLint second)
+        {
+            INFO(what);
+            GLint held[2] = { -1, -1 };
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[0]"), &held[0]);
+            glGetUniformiv(mDraw.mProgramObject, glGetUniformLocation(mDraw.mProgramObject, "testBools[1]"), &held[1]);
+            REQUIRE(held[0] == first);
+            REQUIRE(held[1] == second);
+        };
+
+        const GLint ints[2] = { 1, 0 };
+        const F32 floats[2] = { 0.f, 0.5f };
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        require_elements("by ints", 1, 0);
+        mDraw.uniform1fv(TEST_BOOLS, 2, floats);
+        require_elements("by floats", 0, 1);
+        mDraw.uniform1iv(TEST_BOOLS, 2, ints);
+        require_elements("by the ints again", 1, 0);
+
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // The reserved index and the name of one uniform share its slot: A by index, B by name, then A by index holds A.
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the reserved index and the name of one uniform share its cache slot", "[llglslshader_gl]")
     {
@@ -1176,10 +1602,6 @@ namespace
     TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: stages compile at the usual GLSL version unless they ask for 4.30", "[llglslshader_gl]")
     {
         setUpShaders();
-        if (gGLManager.mGLSLVersionMajor < 4)
-        {
-            SKIP("the context's GLSL is below 4.00");
-        }
         const std::string usual = gGLManager.mGLSLVersionMinor >= 20 ? "#version 420" : "#version 400";
 
         CHECK(buildProgram(mDraw, "ladder (test)",

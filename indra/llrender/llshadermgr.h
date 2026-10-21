@@ -34,6 +34,7 @@
 #include "llglslshader.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 class LLShaderMgr
 {
@@ -70,6 +71,8 @@ public:
         TERRAIN_UV_TRANSFORM,                 //  "terrain_uv_transform"
         TERRAIN_UV_OFFSET,                    //  "terrain_uv_offset"
         TERRAIN_NORMAL_AXES,                  //  "terrain_normal_axes"
+        TERRAIN_HEX_FRAC,                     //  "terrain_hex_frac"  each projection's uv origin's place on the hex lattice, its fraction
+        TERRAIN_HEX_BASE,                     //  "terrain_hex_base"  and the low 32 bits of its floor
 
         VIEWPORT,                           //  "viewport"
         LIGHT_POSITION,                     //  "light_position"
@@ -98,6 +101,7 @@ public:
         EMISSIVE_COLOR,                     //  "emissiveColor"
         METALLIC_FACTOR,                    //  "metallicFactor"
         ROUGHNESS_FACTOR,                   //  "roughnessFactor"
+        BASE_COLOR_ALPHA,                   //  "baseColorAlpha"
         CLIP_PLANE,                         //  "clipPlane"
         CLIP_SIGN,                          //  "clipSign"
         DIFFUSE_MAP,                        //  "diffuseMap"
@@ -166,6 +170,7 @@ public:
 
         MINIMUM_ALPHA,                      //  "minimum_alpha"
         EMISSIVE_BRIGHTNESS,                //  "emissive_brightness"
+        VERTEX_ALPHA_COVERAGE,              //  "vertex_alpha_coverage"
 
         DEFERRED_SHADOW_MATRIX,             //  "shadow_matrix"
         DEFERRED_ENV_MAT,                   //  "env_mat"
@@ -190,6 +195,8 @@ public:
         DEFERRED_DEPTH_CUTOFF,              //  "depth_cutoff"
         DEFERRED_NORM_CUTOFF,               //  "norm_cutoff"
         DEFERRED_SHADOW_TARGET_WIDTH,       //  "shadow_target_width"
+        DEFERRED_SHADOW_STIPPLE,            //  "shadow_stipple"
+        DEFERRED_SPOT_SHADOW_LIVE,          //  "spot_shadow_live"
 
         DEFERRED_SSR_ITR_COUNT,             //  "iterationCount"
         DEFERRED_SSR_RAY_STEP,              //  "rayStep"
@@ -202,6 +209,8 @@ public:
         MODELVIEW_DELTA_MATRIX,             //  "modelview_delta"
         INVERSE_MODELVIEW_DELTA_MATRIX,     //  "inv_modelview_delta"
         CUBE_SNAPSHOT,                      //  "cube_snapshot"
+        SUN_SHADOW_CASCADES,                //  "sun_shadow_cascades"
+        UNBUILT_SHADOW_MAPS,                //  "unbuilt_shadow_maps"
 
         FXAA_TC_SCALE,                      //  "tc_scale"
         FXAA_RCP_SCREEN_RES,                //  "rcp_screen_res"
@@ -276,6 +285,7 @@ public:
         AVATAR_WIND,                        //  "gWindDir"
         AVATAR_SINWAVE,                     //  "gSinWaveParams"
         AVATAR_GRAVITY,                     //  "gGravity"
+        AVATAR_CLOTH_DEPTH,                 //  "gClothDepthRow"
 
         TERRAIN_DETAIL0,                    //  "detail_0"
         TERRAIN_DETAIL1,                    //  "detail_1"
@@ -289,6 +299,9 @@ public:
         TERRAIN_COMPOSITION_MAP,            //  "terrain_composition_map"
         TERRAIN_TESS_ORIGIN,                //  "terrain_tess_origin"
         TERRAIN_TESS_DENSITY,               //  "terrain_tess_density"
+        TERRAIN_TESS_CLIP,                  //  "terrain_tess_clip"
+        TERRAIN_TESS_CLIP_ORIGIN,           //  "terrain_tess_clip_origin"
+        TERRAIN_TESS_RASTER,                //  "terrain_tess_raster"
         TERRAIN_GRID_SCALE,                 //  "terrain_grid_scale"
         TERRAIN_SMOOTHING,                  //  "terrain_smoothing"
         TERRAIN_PARCEL_OVERLAY,             //  "parcel_overlay"
@@ -327,6 +340,7 @@ public:
         GLTF_METALLIC_FACTOR,                      //  "gltf_metallic_factor" (GLTF)
         GLTF_NORMAL_TRANSFORM,                     // "gltf_normal_transform" (GLTF)
         GLTF_MR_TRANSFORM,                         // "gltf_mr_transform" (GLTF)
+        GLTF_BASE_COLOR_ALPHA,                     // "gltf_base_color_alpha" (GLTF)
 
         MAT_SPECULAR_COLOR,                     //  "mat_specular_color"
         MAT_ENV_INTENSITY,                      //  "mat_env_intensity"
@@ -585,8 +599,6 @@ public:
         CROSS_CHROMATIC,                    //  "uCrossChromatic"
         CROSS_PASS_SCALE,                   //  "uCrossPassScale"      1, 4, 16 across the passes
         CROSS_STRENGTH,                     //  "uCrossStrength"       1.0 until the final composite
-        CROSS_REGION,                       //  "uCrossRegion"         xy origin, zw scale of the source inside its texture
-        CROSS_CLAMP,                        //  "uCrossClamp"          half a source texel in region units; 0 for a whole texture
 
         // Lens aberrations -- bokeh shape contributed by the glass rather than
         // by the iris, so these sit alongside the aperture controls above
@@ -610,6 +622,24 @@ public:
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
         SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
+
+        // The WindLight atmospherics' terms that only the sky settings set, Environment block members
+        // (LLSettingsVOSky::applySpecial, LLEnvironment::packAtmosphericTerms)
+        HAZE_EXTINCTION,                    //  "haze_extinction"  blue plus haze density, floored, the haze's extinction
+        BLUE_WEIGHT,                        //  "blue_weight"  blue density's share of it
+        HAZE_WEIGHT,                        //  "haze_weight"  haze density's share of it
+        ATMOS_SUNLIT,                       //  "atmos_sunlit"  the sun or moon lighting geometry, attenuated on its way down
+        ATMOS_AMBIENT,                      //  "atmos_ambient"  the ambient, raised under cloud
+        SKY_SUNLIGHT,                       //  "sky_sunlight"  the sun lighting the clouds
+        SKY_LIGHT,                          //  "sky_light"  the sun or moon lighting the sky dome
+        SKY_AMBIENT,                        //  "sky_ambient"  the ambient lighting the sky dome
+        ATMOS_SUNLIT_LINEAR,                //  "atmos_sunlit_linear"  atmos_sunlit, linear
+        ATMOS_AMBLIT,                       //  "atmos_amblit"  the ambient lighting geometry, before its facing
+        HAZE_ADDITIVE,                      //  "haze_additive"  the haze's colour, but for its glow toward the light
+        HAZE_ADDITIVE_GLOW,                 //  "haze_additive_glow"  the haze's colour per unit of that glow
+        SKY_LIGHT_ATTEN,                    //  "sky_light_atten"  the atmosphere's extinction of the light, per unit of its path
+        CLOUD_SUNLIGHT,                     //  "cloud_sunlight"  the sun lighting the clouds, attenuated on its way to them
+        SKY_AMBIENT_BELOW,                  //  "sky_ambient_below"  the sky dome's ambient, raised under cloud
 
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
@@ -659,6 +689,7 @@ public:
         WATER_WAVE_REACH,                   //  "waterWaveReach"  the tessellation reach, and the most the waves move the surface
         WATER_WAVE_EYE,                     //  "waterWaveEye"  the camera the waves were laid out around, in agent space
         WATER_RAISE,                        //  "waterRaise"  how far the field a draw places is raised
+        WATER_GROUND_FADE,                  //  "waterGroundFade"  how far the water has faded into the sky behind it, seen from high above (ALFarPlane::groundFade)
 
         // The depth pyramid (ALDepthPyramid): each level the farthest scene depth under its texels
         DEPTH_PYRAMID,                      //  "depthPyramid"  sampler2D, a built pyramid for its readers
@@ -668,9 +699,20 @@ public:
         DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
         DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
 
+        // The light map's ambient occlusion blur in one dispatch (ALLightMapBlur)
+        BLUR_LIGHT_APRON,                   //  "blur_light_apron"  int, the rows above and below a tile its taps down reach
+        BLUR_LIGHT_TARGET,                  //  "blurLightTarget"  image2D, the sun's shadow and the blurred occlusion
+
         // The waves' patches
         WATER_OCCLUSION,                    //  "waterOcclusion"  int, whether the control stage culls against the depth pyramid
         WATER_PATCH_ORDER,                  //  "waterPatchOrder"  ivec4, the order the patches are drawn in
+
+        // Settings the programs read as uniforms, so that changing one reloads nothing, each set by the pass that binds
+        // its readers: the terrain's in LLDrawPoolTerrain::bindSurface, SMAA's in LLPipeline::generateSMAABuffers
+        TERRAIN_TRIPLANAR_BLEND,            //  "terrainTriplanarBlend"  the triplanar weights' sharpness (RenderTerrainPBRTriplanarBlendFactor)
+        SMAA_PREDICATION_THRESHOLD,         //  "smaaPredicationThreshold"  the predication buffer's edge threshold (RenderSMAAPredicationThreshold)
+        SMAA_PREDICATION_SCALE,             //  "smaaPredicationScale"  how much predication scales the edge threshold, 1 to 5
+        SMAA_PREDICATION_STRENGTH,          //  "smaaPredicationStrength"  how much it lowers the threshold locally, 0 to 1
 
         END_RESERVED_UNIFORMS
     } eGLSLReservedUniforms;
@@ -781,6 +823,9 @@ public:
     // distinct key an axis copy was stored under (see loadShaderFile). The
     // manager owns them: unloading a program that attached one leaves it here.
     boost::unordered_flat_map<std::string, GLuint> mShaderObjects[STAGE_COUNT];
+    // The keys of the copies loadShaderFile compiled under a key of their own that did not build, per stage, until
+    // clearShaderObjects or the copy builds.
+    boost::unordered_flat_set<std::string> mFailedCopies[STAGE_COUNT];
 
     //global (reserved slot) shader parameters
     std::vector<std::string> mReservedAttribs;

@@ -39,7 +39,7 @@ public:
     static const EVisualEffect EffectCode = EVisualEffect::RlvOverlay;
 public:
     bool hitTest(const LLCoordGL& ptMouse) const;
-    void run(const LLVisualEffectParams*) override;
+    void run(LLVisualEffectParams*) override;
     void setBlockTouch(bool block_touch)                { m_fBlockTouch = block_touch; }
     void tweenAlpha(float endAlpha, double duration)    { m_nAlpha.start(endAlpha, duration); }
     void tweenColor(LLColor3 endColor, double duration) { m_Color.start(endColor, duration); }
@@ -74,7 +74,7 @@ public:
 
     static const EVisualEffect EffectCode = EVisualEffect::RlvSphere;
 public:
-    void run(const LLVisualEffectParams* pParams) override;
+    void run(LLVisualEffectParams* pParams) override;
     static ERlvCmdRet onModeChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue);
     static ERlvCmdRet onOriginChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue);
     static ERlvCmdRet onColorChanged(const LLUUID& idRlvObj, const boost::optional<RlvBehaviourModifierValue> newValue);

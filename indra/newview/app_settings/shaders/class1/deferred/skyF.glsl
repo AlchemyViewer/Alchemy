@@ -47,10 +47,6 @@ uniform float ice_level;
 uniform vec3 camPosLocal;
 
 uniform vec3  lightnorm;
-uniform vec3  sunlight_color;
-uniform vec3  moonlight_color;
-uniform int   sun_up_factor;
-uniform vec3  ambient_color;
 // Shared per-frame sky/water constants, spliced from class1/deferred/environmentBlock.glsl
 // and bound at UB_ENVIRONMENT. Members are read by bare name.
 //[ENGINE_BLOCK Environment]
@@ -87,14 +83,16 @@ vec3 rainbow(float d)
     d = clamp(d, 0.0, 0.25) + interior_coord;
 
     float rad = (droplet_radius - 5.0f) / 1024.0f;
-    return pow(texture(rainbow_map, vec2(rad+0.5, d)).rgb, vec3(1.8)) * moisture_level;
+    // Level 0, here and in halo22: both are read inside the HDRI split's per-pixel branch, where
+    // an implicit LOD's derivatives are undefined, and both lookups vary slowly across the dome.
+    return pow(textureLod(rainbow_map, vec2(rad+0.5, d), 0.0).rgb, vec3(1.8)) * moisture_level;
 }
 
 vec3 halo22(float d)
 {
     d       = clamp(d, 0.1, 1.0);
     float v = sqrt(clamp(1 - (d * d), 0, 1));
-    return texture(halo_map, vec2(0, v)).rgb * ice_level;
+    return textureLod(halo_map, vec2(0, v), 0.0).rgb * ice_level;
 }
 
 // Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
@@ -106,10 +104,12 @@ void main()
     // Get relative position
     vec3 rel_pos = pos.xyz - camPosLocal.xyz + vec3(0, 50, 0);
 
-    // Adj position vector to clamp altitude
+    // Adj position vector to clamp altitude. max_y is held at 1 m or more, as calcAtmosphericVars
+    // holds it: the sky settings allow 0, which would scale every rising ray to the origin and
+    // normalize it into NaN.
     if (rel_pos.y > 0.)
     {
-        rel_pos *= (max_y / rel_pos.y);
+        rel_pos *= (max(max_y, 1.0) / rel_pos.y);
     }
     if (rel_pos.y < 0.)
     {
@@ -117,10 +117,12 @@ void main()
     }
 
     vec3 color;
+    bool hdri = false;
 #ifdef HAS_HDRI
     vec3 frag_coord = vary_position.xyz/vary_position.w;
     if (-frag_coord.x > ((1.0-hdri_split_screen)*2.0-1.0))
     {
+        hdri = true;
         vec3 pos = normalize(rel_pos);
         pos = env_mat * pos;
         vec2 texCoord = vec2(atan(pos.z, pos.x) + PI, acos(pos.y)) / vec2(2.0 * PI, PI);
@@ -140,16 +142,16 @@ void main()
         float rel_pos_lightnorm_dot = dot(rel_pos_norm, lightnorm.xyz);
 
         // Initialize temp variables
-        vec3 sunlight = (sun_up_factor == 1) ? sunlight_color : moonlight_color * 0.7; //magic 0.7 to match legacy color
+        // The sun, or the moon at 0.7 to match the legacy color, and the ambient: the Environment
+        // block's sky_light and sky_ambient (LLSettingsVOSky::applySpecial)
+        vec3 sunlight = sky_light;
 
-        // Sunlight attenuation effect (hue and brightness) due to atmosphere
-        // this is used later for sunlight modulation at various altitudes
-        vec3 light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
+        // Sunlight attenuation effect (hue and brightness) due to atmosphere, per unit of the
+        // light's path: the Environment block's sky_light_atten
+        vec3 light_atten = sky_light_atten;
 
-        // Calculate relative weights
-        vec3 combined_haze = max(abs(blue_density) + vec3(abs(haze_density)), vec3(1e-6));
-        vec3 blue_weight   = blue_density / combined_haze;
-        vec3 haze_weight   = haze_density / combined_haze;
+        // The relative weights, blue_weight and haze_weight, and the haze_extinction they are
+        // shares of, are the Environment block's (LLSettingsVOSky::applySpecial).
 
         // Compute sunlight from rel_pos & lightnorm (for long rays like sky)
         float off_axis = 1.0 / max(1e-6, max(0., rel_pos_norm.y) + lightnorm.y);
@@ -161,7 +163,7 @@ void main()
         // Transparency (-> combined_haze)
         // ATI Bugfix -- can't store combined_haze*density_dist in a variable because the ati
         // compiler gets confused.
-        combined_haze = exp(-combined_haze * density_dist);
+        vec3 combined_haze = exp(-haze_extinction * density_dist);
 
         // Compute haze glow
         float haze_glow = 1.0 - rel_pos_lightnorm_dot;
@@ -178,14 +180,14 @@ void main()
         haze_glow = (sun_moon_glow_factor < 1.0) ? 0.0 : (sun_moon_glow_factor * (haze_glow + 0.25));
 
         // Haze color above cloud
-        color = (blue_horizon * blue_weight * (sunlight + ambient_color)
-                + (haze_horizon * haze_weight) * (sunlight * haze_glow + ambient_color));
+        color = (blue_horizon * blue_weight * (sunlight + sky_ambient)
+                + (haze_horizon * haze_weight) * (sunlight * haze_glow + sky_ambient));
 
         // Final atmosphere additive
         color *= (1. - combined_haze);
 
-        // Increase ambient when there are more clouds
-        vec3 ambient = ambient_color + max(vec3(0), (1. - ambient_color)) * cloud_shadow * 0.5;
+        // Increase ambient when there are more clouds: the Environment block's sky_ambient_below
+        vec3 ambient = sky_ambient_below;
 
         // Dim sunlight by cloud shadow percentage
         sunlight *= max(0.0, (1. - cloud_shadow));
@@ -216,7 +218,10 @@ void main()
     frag_data[0] = vec4(0);
     frag_data[3] = vec4(ditherEmissive(color.rgb, gl_FragCoord.xy), 1.0);
 #else
-    frag_data[0] = vec4(color.rgb, 1.0);
+    // No emissive target (vintage mode): the albedo target carries the sky, and the soften pass
+    // reads it through sRGB decode. WindLight's colour is display encoded already; an HDRI's is
+    // linear, so it is encoded, within the 0..1 the target holds.
+    frag_data[0] = vec4(hdri ? linear_to_srgb(clamp(color.rgb, vec3(0.0), vec3(1.0))) : color.rgb, 1.0);
 #endif
 }
 

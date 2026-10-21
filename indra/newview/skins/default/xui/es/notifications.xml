@@ -574,13 +574,6 @@ Por favor, escribe el nombre de la región en el cuadro de Posición inicial o e
 		<usetemplate ignoretext="El hardware de mi ordenador no está admitido" name="okcancelignore" notext="No" yestext="Sí"/>
 	</notification>
 	<notification name="RunLauncher">Por favor no inicies directamente el visualizador ejecutable. Actualiza los atajos existentes para utilizar SL_Launcher en vez.</notification>
-	<notification name="OldGPUDriver">
-		Probablemente ya existe un controlador más reciente para tu procesador de gráficos.  La actualización del controlador de gráficos puede mejorar sustancialmente el rendimiento.
-
-    ¿Deseas visitar [URL] para buscar controladores actualizados?
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="Mi controlador de gráficos no está actualizado" name="okcancelignore" notext="No" yestext="Sí"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Tu sistema usa una tarjeta gráfica que [APP_NAME] no reconoce.
 Suele suceder con hardware nuevo que todavía no ha sido probado con [APP_NAME].  Probablemente todo irá bien, pero deberás ajustar tus configuraciones gráficas.
@@ -2785,7 +2778,6 @@ Algunos de los linksets seleccionados no pueden configurarse como '[REQUESTED_TY
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- Tu tarjeta gráfica no cumple los requerimientos mínimos.</global>
 	<global name="UnsupportedRAM">- La memoria de tu sistema no cumple los requerimientos mínimos.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Si posees un terreno, puedes hacerlo tu Base.
 También puedes buscar en el Mapa lugares marcados como &quot;Puntos de Información&quot;.</global>

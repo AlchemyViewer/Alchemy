@@ -49,22 +49,23 @@ uniform float cloud_variance;
 uniform vec3 camPosLocal;
 
 uniform vec3 lightnorm;
-uniform vec3 sunlight_color;
-uniform vec3 moonlight_color;
-uniform int sun_up_factor;
-uniform vec3 ambient_color;
 
 uniform float density_multiplier;
 
 uniform float sun_moon_glow_factor;
 
 
-vec4 cloudNoise(vec2 uv)
+// Only the red channel is read. The next texture is fetched only while the sky blends
+// toward it: blend_factor is 0 whenever the two match, one is missing or the clouds do not
+// scroll (LLDrawPoolWLSky), and the branch is on a uniform.
+float cloudNoise(vec2 uv)
 {
-   vec4 a = texture(cloud_noise_texture, uv);
-   vec4 b = texture(cloud_noise_texture_next, uv);
-   vec4 cloud_noise_sample = mix(a, b, blend_factor);
-   return cloud_noise_sample;
+    float cloud_noise_sample = texture(cloud_noise_texture, uv).x;
+    if (blend_factor > 0.0)
+    {
+        cloud_noise_sample = mix(cloud_noise_sample, texture(cloud_noise_texture_next, uv).x, blend_factor);
+    }
+    return cloud_noise_sample;
 }
 
 // Hides the R11F_G11F_B10F emissive attachment's 6/6/5-mantissa banding in this writer's
@@ -94,10 +95,12 @@ void main()
     // where the haze has already taken the clouds most of the way to the horizon's colour.
     float altitude_blend_factor = smoothstep(0.0, 0.035, rel_pos.y / length(rel_pos));
 
-    // Set altitude
+    // Set altitude. max_y is held at 1 m or more, as skyF and calcAtmosphericVars hold it: the
+    // sky settings allow 0, which would scale every rising ray to the origin and normalize it
+    // into NaN.
     if (rel_pos.y > 0)
     {
-        rel_pos *= (max_y / rel_pos.y);
+        rel_pos *= (max(max_y, 1.0) / rel_pos.y);
     }
     if (rel_pos.y < 0)
     {
@@ -110,17 +113,18 @@ void main()
     float rel_pos_len  = length(rel_pos);
 
     // Initialize temp variables
-    vec3 sunlight = sunlight_color;
+    // The sun lighting the clouds, and below the ambient raised under cloud: the Environment
+    // block's sky_sunlight and atmos_ambient (LLSettingsVOSky::applySpecial)
+    vec3 sunlight = sky_sunlight;
     vec3 light_atten;
 
-    // Sunlight attenuation effect (hue and brightness) due to atmosphere
-    // this is used later for sunlight modulation at various altitudes
-    light_atten = (blue_density + vec3(haze_density * 0.25)) * (density_multiplier * max_y);
+    // Sunlight attenuation effect (hue and brightness) due to atmosphere, per unit of the light's
+    // path: the Environment block's sky_light_atten
+    light_atten = sky_light_atten;
 
-    // Calculate relative weights
-    vec3 combined_haze = abs(blue_density) + vec3(abs(haze_density));
-    vec3 blue_weight   = blue_density / combined_haze;
-    vec3 haze_weight   = haze_density / combined_haze;
+    // The relative weights, blue_weight and haze_weight, and the haze_extinction they are shares
+    // of, are the Environment block's (LLSettingsVOSky::applySpecial), floored there so a channel
+    // with both densities 0, which the settings allow, does not weigh 0 / 0.
 
     // Compute sunlight from rel_pos & lightnorm (for long rays like sky)
     float off_axis = 1.0 / max(1e-6, max(0., rel_pos_norm.y) + lightnorm.y);
@@ -132,7 +136,7 @@ void main()
     // Transparency (-> combined_haze)
     // ATI Bugfix -- can't store combined_haze*density_dist in a variable because the ati
     // compiler gets confused.
-    combined_haze = exp(-combined_haze * density_dist);
+    vec3 combined_haze = exp(-haze_extinction * density_dist);
 
     // Compute haze glow
     float haze_glow = 1.0 - dot(rel_pos_norm, lightnorm.xyz);
@@ -151,8 +155,7 @@ void main()
     haze_glow = (sun_moon_glow_factor < 1.0) ? 0.0 : (haze_glow + 0.25);
 
     // Increase ambient when there are more clouds
-    vec3 tmpAmbient = ambient_color;
-    tmpAmbient += (1. - tmpAmbient) * cloud_shadow * 0.5;
+    vec3 tmpAmbient = atmos_ambient;
 
     // Dim sunlight by cloud shadow percentage
     sunlight *= (1. - cloud_shadow);
@@ -161,10 +164,8 @@ void main()
     vec3 additiveColorBelowCloud =
         (blue_horizon * blue_weight * (sunlight + tmpAmbient) + (haze_horizon * haze_weight) * (sunlight * haze_glow + tmpAmbient));
 
-    // CLOUDS
-    sunlight = sunlight_color;
-    off_axis = 1.0 / max(1e-6, lightnorm.y * 2.);
-    sunlight *= exp(-light_atten * off_axis);
+    // CLOUDS: the sun attenuated over twice its elevation, the Environment block's cloud_sunlight
+    sunlight = cloud_sunlight;
 
     // Cloud color out
     vec3 cloudColorSun = (sunlight * haze_glow) * cloud_color;
@@ -183,8 +184,8 @@ void main()
     cloudColorAmbient += oHazeColorBelowCloud;
 
     // Cloud Fragment
-    vec2 disturbance  = vec2(cloudNoise(uv1 / 8.0f).x, cloudNoise((uv3 + uv1) / 16.0f).x) * cloud_variance * (1.0f - cloud_scale * 0.25f);
-    vec2 disturbance2 = vec2(cloudNoise((uv1 + uv3) / 4.0f).x, cloudNoise((uv4 + uv2) / 8.0f).x) * cloud_variance * (1.0f - cloud_scale * 0.25f);
+    vec2 disturbance  = vec2(cloudNoise(uv1 / 8.0f), cloudNoise((uv3 + uv1) / 16.0f)) * cloud_variance * (1.0f - cloud_scale * 0.25f);
+    vec2 disturbance2 = vec2(cloudNoise((uv1 + uv3) / 4.0f), cloudNoise((uv4 + uv2) / 8.0f)) * cloud_variance * (1.0f - cloud_scale * 0.25f);
 
     // Offset texture coords
     uv1 += cloud_pos_density1.xy + (disturbance * 0.2);    //large texture, visible density
@@ -198,7 +199,7 @@ void main()
 
     // Compute alpha1, the main cloud opacity
 
-    float alpha1 = (cloudNoise(uv1).x - 0.5) + (cloudNoise(uv3).x - 0.5) * cloud_pos_density2.z;
+    float alpha1 = (cloudNoise(uv1) - 0.5) + (cloudNoise(uv3) - 0.5) * cloud_pos_density2.z;
     alpha1 = min(max(alpha1 + cloudDensity, 0.) * 10 * cloud_pos_density1.z, 1.);
 
     // And smooth
@@ -210,7 +211,7 @@ void main()
 
     // Compute alpha2, for self shadowing effect
     // (1 - alpha2) will later be used as percentage of incoming sunlight
-    float alpha2 = (cloudNoise(uv2).x - 0.5);
+    float alpha2 = (cloudNoise(uv2) - 0.5);
     alpha2 = min(max(alpha2 + cloudDensity, 0.) * 2.5 * cloud_pos_density1.z, 1.);
 
     // And smooth

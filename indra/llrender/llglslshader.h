@@ -32,6 +32,7 @@
 #include "llsd.h"
 #include "llstaticstringtable.h"
 
+#include <functional>
 #include <type_traits>
 
 class ALGPUBuffer;
@@ -242,6 +243,9 @@ public:
     // that trade. Nothing touches this before dynamic initialisation finishes: entries only ever
     // arrive from createShader(), which needs a GL context.
     static std::set<LLGLSLShader*>& sInstances;
+    // Every program createShader has been asked to build, linked or not, until it is destroyed: what a load configures
+    // from nothing (clearConfiguration). Leaked for the reason sInstances is.
+    static std::set<LLGLSLShader*>& sConfigured;
     static bool sProfileEnabled;
 
     LLGLSLShader();
@@ -339,7 +343,43 @@ public:
     // program; freed by unload()). Any previously built variants are dropped first, since
     // recreating the program invalidates them. Returns false if the program OR any requested
     // variant fails; a failed axis leaves its pointer null.
+    //
+    // A program already linked under the configuration hash() gives now, with the same variants, is
+    // kept as it is, its variants and its uniforms with it: nothing is compiled, linked or read from
+    // the binary cache, and its post-link hook does not run.
     bool createShader(U32 variants = 0);
+
+    // What a loader configures, cleared for a load to configure again from nothing, as unload()
+    // leaves it: the files, the defines, the features and the post-link hook. A linked program stays
+    // linked, and createShader keeps it where it is configured as it was.
+    void clearConfiguration();
+
+    // Run after this program links, and after each variant built from it links: what a program needs
+    // set once per link, such as the units its samplers read. Part of the configuration, so a program
+    // kept linked by createShader does not run it again.
+    std::function<void(LLGLSLShader&)> mOnLink;
+
+    // How many times this program has linked since it was constructed, for what derives from what it
+    // draws.
+    U32 linkCount() const { return mLinkCount; }
+
+    // The program bound in place of one that did not build, which draws nothing, released with the
+    // context's programs.
+    static void releaseStandIn();
+
+    // The load running (LLViewerShaderMgr::setShaders), which every program its loaders configure is
+    // stamped with by createShader: a program not stamped by a load was not asked for by it.
+    static U32 sLoadGeneration;
+    U32 mLoadGeneration = 0;
+
+    // The programs linked, and those kept linked as they were, since the counts were last cleared,
+    // each variant counted.
+    static U32 sLinked;
+    static U32 sKept;
+
+    // The digest of what every shared object was compiled from, which every program links against,
+    // so every program's hash() follows it (set by the viewer with the objects).
+    static LLUUID sSharedObjectsKey;
     // Attach the shared object compiled for `stage` under `object` (a path, or a variant key
     // from LLShaderMgr::variantObjectKey). An object compiled for another stage does not
     // count: GLSL resolves calls within a stage.
@@ -544,8 +584,7 @@ public:
     S32 mShaderLevel;
     S32 mShaderGroup; // see LLGLSLShader::eGroup
     // environment-uniform generation this program last applied; see sEnvironmentGeneration.
-    // Starts LEVEL with it, never behind -- a program built before LLEnvironment exists must
-    // not try to apply an environment on its first bind.
+    // A program starts one behind it when it links, so its first bind applies the set.
     U32 mEnvUniformsGeneration = 1;
     // cached in mapUniforms(); see declaresShadowSamplers()
     bool mDeclaresShadowSamplers = false;
@@ -604,6 +643,11 @@ public:
     LLGLSLShader* mClassicVariant = nullptr;
     LLGLSLShader* mMirrorVariant = nullptr;
 
+    // The program a pass binds for skinned draws of this one: its rigged variant, or, where it has none, this program.
+    // A program that did not build has none, and binding it binds the stand-in, which draws nothing, while the uniform
+    // and texture calls the pass then makes set nothing.
+    LLGLSLShader* riggedVariant() { return mRiggedVariant ? mRiggedVariant : this; }
+
     // true when this program was heap-allocated as a variant and is owned by its parent
     bool mOwnedVariant = false;
 
@@ -650,8 +694,8 @@ public:
     // Generation of the shared environment uniform set. LLEnvironment bumps it via
     // dirtyEnvironmentUniforms(); a program re-applies on bind when its own generation is
     // behind. A counter rather than a per-program dirty flag so the per-frame environment
-    // update stays O(1) and reaches programs no list happens to hold. A new program starts
-    // level with it, never behind -- see createShader().
+    // update stays O(1) and reaches programs no list happens to hold. A program that links starts
+    // one behind it -- see linkProgram().
     static U32 sEnvironmentGeneration;
 
 
@@ -665,6 +709,20 @@ public:
 
 private:
     void unloadInternal();
+
+    // createShader's build: compiled, attached, linked, its hook run and its variants built.
+    bool linkProgram(U32 variants);
+
+    // Bound in place of this program, or its skinned variant, where it did not build; warned of once a link.
+    void bindStandIn();
+    bool mStandInWarned = false;
+
+    // What the program linked under, for createShader to keep it: its configuration's hash() as the
+    // loader set it, its variants, and the level it linked at, which a fallback may have lowered.
+    LLUUID mLinkedHash;
+    U32    mLinkedVariants = 0;
+    S32    mLinkedLevel    = 0;
+    U32    mLinkCount      = 0;
 
     // The stage objects createShader compiled of mShaderFiles, which this program owns: deleted once it links, or at
     // unload where it never did. The shared objects attachShaderFeatures attaches by name are LLShaderMgr's.
@@ -690,6 +748,26 @@ private:
     // Give the reserved storage blocks this program declares their binding points; see getStorageBinding.
     void mapStorageBlocks();
 
+#if LL_WINDOWS
+    // The locations of this program's bools -- an array's at its first element, the one the setters reach -- filled by
+    // mapUniforms under AMD's Windows driver alone and emptied with mUniform.
+    //
+    // There every set of a bool reaches GL as an int, whichever setter makes it: the float and uint setters convert as
+    // GL would, any value but zero true. AMD's Windows driver drops an int set of a bool -- glUniform1i, glUniform1iv,
+    // glProgramUniform1i -- that matches, as a bool, the last int set of it, even when a float or uint set has changed
+    // the bool since: glUniform1i(1), glUniform1f(0), glUniform1i(1) leaves it false, for draws and glGetUniformiv
+    // alike, with no error. Its float and uint sets always arrive, and bvecs are unaffected (Radeon RX 6800, driver
+    // 26.8.1). Sent as ints alone, a bool always holds its last int set, so a set the driver drops changes nothing.
+    // mIsAMD alone would also take in Mesa's and Apple's GL on AMD's cards, which are not that driver.
+    std::vector<GLint> mBoolLocations;
+    bool isBoolLocation(GLint location) const;
+#endif
+    // The uploads of the setters that can reach a bool as another kind: as ints where `location` is in mBoolLocations,
+    // as the setter made them everywhere else.
+    void uploadFloat(GLint location, GLfloat x) const;
+    void uploadFloats(GLint location, U32 count, const GLfloat* v) const;
+    void uploadUInt(GLint location, GLuint x) const;
+
     // What this program holds at each uniform location, as the setters last uploaded it, so a set of the value a
     // location already holds skips its glUniform* call. Every setter but the matrices' comes through here, on the
     // path of every draw.
@@ -698,7 +776,8 @@ private:
     // component type and count. A set matches only when both agree exactly, so ints and uints are compared as
     // themselves and floats by their bits -- +0 against -0, or two NaN payloads, cost an upload and never skip one.
     // A location written through one kind and then set through another uploads: what GL holds there was converted
-    // from the first kind's bytes.
+    // from the first kind's bytes. A bool's slot holds a set as its setter made it, though under AMD's Windows driver
+    // the set reached GL as an int (see mBoolLocations): a match still means GL holds what the set would leave.
     //
     // Indexed by location. Implementations number a program's uniforms from 0 at link, an array taking a location
     // an element, so a flat array sized past the largest location a setter can reach -- every active uniform's,

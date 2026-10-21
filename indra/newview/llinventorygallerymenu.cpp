@@ -983,7 +983,7 @@ void LLInventoryGalleryContextMenu::updateMenuItemsVisibility(LLContextMenu* men
                 disabled_items.push_back(std::string("Wearable And Object Wear"));
                 disabled_items.push_back(std::string("Wearable Add"));
             }
-            if (selected_item && (obj->getType() != LLAssetType::AT_OBJECT) && LLWearableType::getInstance()->getAllowMultiwear(selected_item->getWearableType()))
+            if (selected_item && (obj->getType() != LLAssetType::AT_OBJECT) && LLWearableType::getAllowMultiwear(selected_item->getWearableType()))
             {
                 items.push_back(std::string("Wearable Add"));
                 if (!gAgentWearables.canAddWearable(selected_item->getWearableType()))

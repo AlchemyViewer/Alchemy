@@ -30,6 +30,8 @@
 #ifndef LL_VIEWER_SHADER_MGR_H
 #define LL_VIEWER_SHADER_MGR_H
 
+#include "alrenderinputrequests.h"
+#include "alshaderinputs.h"
 #include "llshadermgr.h"
 #include "llmaterial.h"
 
@@ -39,7 +41,6 @@ class LLViewerShaderMgr: public LLShaderMgr
 {
 public:
     static bool sInitialized;
-    static bool sSkipReload;
 
     LLViewerShaderMgr();
     /* virtual */ ~LLViewerShaderMgr();
@@ -53,7 +54,14 @@ public:
     static void releaseInstance();
 
     void initAttribsAndUniforms(void) override;
-    void setShaders();
+    /// Loads the programs for @a inputs, which the pipeline's application latched (LLPipeline::applyRenderInputs), and
+    /// keeps them, as @a application says: every program built from its sources, or every loader run and only the
+    /// programs it configures otherwise than they linked linked again, the shared objects compiled again only where it
+    /// asks. A program no loader asks for is unloaded. Whether the programs were loaded: not before the pipeline is
+    /// initialised, nor on a context that cannot build them.
+    bool setShaders(const ALShaderInputs& inputs, const ALRenderApplication& application);
+    /// The inputs the programs were last loaded for, which every loader reads in place of the settings.
+    const ALShaderInputs& inputs() const { return mInputs; }
     void unloadShaders();
     S32  getShaderLevel(S32 type);
 
@@ -61,12 +69,14 @@ public:
     // name of a file error happened at, otherwise
     // returns an empty string
     std::string loadBasicShaders();
-    bool loadShadersEffects();
-    bool loadShadersDeferred();
-    bool loadShadersObject();
-    bool loadShadersAvatar();
-    bool loadShadersWater();
-    bool loadShadersInterface();
+    // The objects only the water waves' programs attach, compiled with the global defines while the waves are wanted.
+    void loadWaterWaveObjects();
+    void loadShadersEffects();
+    void loadShadersDeferred();
+    void loadShadersObject();
+    void loadShadersAvatar();
+    void loadShadersWater();
+    void loadShadersInterface();
 
     std::vector<S32> mShaderLevel;
     S32 mMaxAvatarShaderLevel;
@@ -89,6 +99,16 @@ public:
 
     void updateShaderUniforms(LLGLSLShader * shader) override;
 
+private:
+    // A program a loader asked for, recorded where it did not build; whether it built. The loader goes on to the next
+    // either way, and a program that did not build draws nothing (LLGLSLShader::bind).
+    bool built(bool linked, const LLGLSLShader& shader);
+
+    ALShaderInputs mInputs;
+    // Whether the water waves' objects are compiled among the shared objects.
+    bool mWaterWaveObjects = false;
+    // The programs the load running could not build, by name.
+    std::vector<std::string> mFailedPrograms;
 }; //LLViewerShaderMgr
 
 extern LLVector4            gShinyOrigin;
@@ -104,7 +124,6 @@ extern LLGLSLShader         gHeroRadianceGenProgram;
 extern LLGLSLShader         gSHProjectionProgram;
 extern LLGLSLShader         gSHProjectionRowsProgram;
 extern LLGLSLShader         gSHProjectionReduceProgram;
-extern LLGLSLShader         gGlowCombineFXAAProgram;
 extern LLGLSLShader         gDebugProgram;
 enum NormalDebugShaderVariant : S32
 {
@@ -136,7 +155,7 @@ extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 //environment shaders
 extern LLGLSLShader         gWaterProgram;
 extern LLGLSLShader         gUnderWaterProgram;
-// The patches within the tessellation reach, displaced by the waves; built where tessellation is (water_waves_supported).
+// The patches within the tessellation reach, displaced by the waves; built while they are wanted (ALWaterSurface::wavesWanted).
 extern LLGLSLShader         gWaterWavesProgram;
 extern LLGLSLShader         gUnderWaterWavesProgram;
 extern LLGLSLShader         gWaterExclusionProgram;
@@ -212,6 +231,7 @@ extern LLGLSLShader         gHazeProgram;
 extern LLGLSLShader         gHazeOnWaterProgram;
 extern LLGLSLShader         gHazeWaterProgram;
 extern LLGLSLShader         gDeferredBlurLightProgram;
+extern LLGLSLShader         gDeferredBlurLightComputeProgram;
 extern LLGLSLShader         gDeferredAvatarProgram;
 extern LLGLSLShader         gDeferredSoftenProgram;
 extern LLGLSLShader         gDeferredSoftenSkyProgram;
@@ -232,7 +252,6 @@ extern LLGLSLShader         gDeferredPostProgram;
 extern LLGLSLShader         gDeferredPostProgramNoNear;
 extern LLGLSLShader         gDeferredPostProgramShaped;
 extern LLGLSLShader         gDeferredPostProgramNoNearShaped;
-extern LLGLSLShader         gDeferredCoFProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgram;
 extern LLGLSLShader         gDeferredDoFCombineProgramNoNear;
 extern LLGLSLShader         gFXAAProgram[4];
@@ -247,6 +266,7 @@ extern LLGLSLShader         gExposureHistogramProgram;
 extern LLGLSLShader         gLuminanceProgram;
 extern LLGLSLShader         gLensFlareStateProgram;
 extern LLGLSLShader         gDeferredAvatarShadowProgram;
+extern LLGLSLShader         gDeferredAvatarCutShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaShadowProgram;
 extern LLGLSLShader         gDeferredAvatarAlphaMaskShadowProgram;
 extern LLGLSLShader         gDeferredAlphaProgram;
@@ -275,6 +295,7 @@ extern LLGLSLShader         gNormalMapGenProgram;
 extern LLGLSLShader         gDeferredGenBrdfLutProgram;
 extern LLGLSLShader         gDeferredBufferVisualProgram;
 extern LLGLSLShader         gBlitWithEffectsProgram;
+extern LLGLSLShader         gBlitWithEffectsSharpenProgram;
 extern LLGLSLShader         gCGGammaProgram;
 extern LLGLSLShader         gCGLegacyGammaProgram;
 extern LLGLSLShader         gCGTonemapProgram;
@@ -302,28 +323,6 @@ extern LLGLSLShader         gDeferredPBRAlphaProgram;
 extern LLGLSLShader         gDeferredPBRAlphaImpostorProgram;
 extern LLGLSLShader         gHUDPBRAlphaProgram;
 
-// Encodes detail level for dropping textures, in accordance with the GLTF spec where possible
-// 0 is highest detail, -1 drops emissive, etc
-// Dropping metallic roughness is off-spec - Reserve for potato machines as needed
-// https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#additional-textures
-enum TerrainPBRDetail : S32
-{
-    TERRAIN_PBR_DETAIL_MAX                = 0,
-    TERRAIN_PBR_DETAIL_EMISSIVE           = 0,
-    TERRAIN_PBR_DETAIL_OCCLUSION          = -1,
-    TERRAIN_PBR_DETAIL_NORMAL             = -2,
-    TERRAIN_PBR_DETAIL_METALLIC_ROUGHNESS = -3,
-    TERRAIN_PBR_DETAIL_BASE_COLOR         = -4,
-    TERRAIN_PBR_DETAIL_MIN                = -4,
-};
-// Clamp a requested RenderTerrainPBRDetail to the enum range AND to what the GL
-// implementation's fragment texture-unit budget can actually link (full detail
-// needs 17 samplers; macOS GL 4.1 provides 16). Shader compilation and the
-// terrain draw pool must both use this so the maps bound match the samplers built.
-S32 clamp_terrain_detail(S32 detail);
-// Whether the water's waves can be drawn: tessellation, on the effective GL version. The shader manager builds the
-// waves' programs and the water draws them only then.
-bool water_waves_supported();
 enum TerrainPaintType : U32
 {
     // Use LLVLComposition::mDatap (heightmap) generated by generateHeights, plus noise from TERRAIN_ALPHARAMP

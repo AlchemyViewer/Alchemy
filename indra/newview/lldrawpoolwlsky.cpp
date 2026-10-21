@@ -186,7 +186,9 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
         // The sky again, behind everything, for the haze pass to converge far water on (hazeF.glsl): the main view's
         // only, and only when water is in it; an HDRI sky is colour already shaded, which the haze cannot take the
         // same way. Whether any water shows is asked first, before the sky binds its textures.
-        const bool sky_behind = !use_hdri_sky() && gPipeline.skyBehindWanted();
+        // From the pool until the haze has read it, acquired before the sky binds its textures.
+        LLRenderTarget* const behind = !use_hdri_sky() && gPipeline.skyBehindWanted() ? gPipeline.acquireSkyBehind() : nullptr;
+        const bool            sky_behind = behind != nullptr;
         if (!gCubeSnapshot && gPipeline.mRT == &gPipeline.mMainRT)
         {
             LL_PROFILE_PLOT("sky behind", (int64_t)sky_behind);
@@ -253,9 +255,8 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
 
         // Again into the sky behind, with the same program and uniforms and no depth, so it covers what the world hides.
         // The GPU clears and draws it only if the query saw water, with no readback: a frame late, the far water would
-        // show WindLight's seam for a frame whenever the camera turned onto the sea. The frame is stamped either way;
-        // with no water in view no pixel is marked as water, so the haze never reads the target.
-        LLRenderTarget& behind = gPipeline.mSkyBehind;
+        // show WindLight's seam for a frame whenever the camera turned onto the sea. The target is held either way; with
+        // no water in view no pixel is marked as water, so the haze never reads what it holds.
         if (sky_behind)
         {
             LL_PROFILE_GPU_ZONE("sky behind");
@@ -264,18 +265,16 @@ void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 ca
             {
                 if_water.emplace(gGL.queries(), gPipeline.mSkyBehindQuery);
             }
-            behind.bindTarget();
-            behind.clear();
+            behind->bindTarget();
+            behind->clear();
             // skyF writes its colour to frag_data[3] with the emissive buffer, and to frag_data[0] without it.
-            static LLCachedControl<bool> has_emissive(gSavedSettings, "RenderEnableEmissiveBuffer", false);
-            behind.setDrawOutput(has_emissive ? 3 : 0);
+            behind->setDrawOutput(gPipeline.shaderInputs().mGlobal.mEmissive ? 3 : 0);
             {
                 LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
                 LLGLDisable no_blend(GL_BLEND);
                 renderDome(origin, camHeightLocal, sky_shader);
             }
-            behind.flush();
-            gPipeline.mSkyBehindFrame = gFrameCount;
+            behind->flush();
         }
 
         sky_shader->unbind();
@@ -637,7 +636,6 @@ void LLDrawPoolWLSky::renderHeavenlyBodies()
             F32 moon_brightness = (float)psky->getMoonBrightness();
 
             moon_shader->uniform1f(LLShaderMgr::MOON_BRIGHTNESS, moon_brightness);
-            moon_shader->uniform3fv(LLShaderMgr::MOONLIGHT_COLOR, 1, gSky.mVOSkyp->getMoon().getColor().mV);
             moon_shader->uniform4fv(LLShaderMgr::DIFFUSE_COLOR, 1, color.mV);
             //moon_shader->uniform1f(LLShaderMgr::BLEND_FACTOR, blend_factor);
             moon_shader->uniform3fv(LLShaderMgr::DEFERRED_MOON_DIR, 1, psky->getMoonDirection().mV); // shader: moon_dir

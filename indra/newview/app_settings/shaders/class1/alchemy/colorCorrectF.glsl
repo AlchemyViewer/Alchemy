@@ -54,12 +54,6 @@ uniform float uCutoutPremultiplied;
 uniform sampler2D bloomMap;
 uniform float bloom_strength;
 uniform sampler2D crossFilterMap;   // streak accumulator; uCrossStrength gates it
-// The accumulator is a quadrant of a borrowed target, not a texture of its own:
-// uCrossRegion maps a screen coordinate into it (xy origin, zw scale) after
-// uCrossClamp pins the coordinate to the quadrant's texel-centre range, as a
-// CLAMP_TO_EDGE sampler would have at the edge of a dedicated target.
-uniform vec4  uCrossRegion;
-uniform vec2  uCrossClamp;
 uniform float     uCrossStrength;   // 0 when the filter is off or unbound
 #ifdef BLOOM_HALATION
 uniform float halation_strength;
@@ -158,6 +152,13 @@ void main()
 #ifdef BLOOM_COMPOSITE
     // Additively composite the HDR bloom pyramid before exposure/tonemap so the
     // glow is rolled through the same exposure curve as the underlying scene.
+    // Nothing of the pyramid is read at zero strength, where generateBloomHDR
+    // builds none.
+#ifdef BLOOM_HALATION
+    if (bloom_strength > 0.0 || halation_strength > 0.0)
+#else
+    if (bloom_strength > 0.0)
+#endif
     {
         vec4 bloom_sample = texture(bloomMap, vary_fragcoord);
     #ifdef BLOOM_HALATION
@@ -172,9 +173,7 @@ void main()
         // strength scales them, and they light the lens dirt below.
         if (uCrossStrength > 0.0)
         {
-            vec2 cross_tc = clamp(vary_fragcoord, uCrossClamp, vec2(1.0) - uCrossClamp);
-            bloom_term += texture(crossFilterMap, uCrossRegion.xy + cross_tc * uCrossRegion.zw).rgb
-                        * uCrossStrength * bloom_strength;
+            bloom_term += texture(crossFilterMap, vary_fragcoord).rgb * uCrossStrength * bloom_strength;
         }
 
         diff.rgb   += bloom_term;

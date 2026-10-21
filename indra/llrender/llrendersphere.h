@@ -42,6 +42,7 @@ class LLRenderSphere
 public:
     void render();                      // render at highest LOD
     void renderGGL();                   // render using LLRender
+    void cleanupGL();                   // give the buffer back while there is a pool to take it
 
 private:
     std::vector< std::vector<LLVector3> > mSpherePoints;

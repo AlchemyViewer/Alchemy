@@ -711,8 +711,10 @@ namespace
         // bit32's answer LSL's.
         bool mSaidHexSign = false;
         bool mSaidSigned  = false;
-        // A number not below nought: as nonNegative says, or a global the
-        // script never sets, declared one.
+        // A number not below nought: as nonNegative says; a global the
+        // script never sets, declared one, or a local never set after its
+        // declaration; one of ll's answers that never is (ALLSLTraits::
+        // bounds); and what is made of those that cannot be.
         bool notBelowZero(LSLExpression* e) const;
         Expr unary(LSLUnaryExpression* e);
         Expr typecast(LSLTypecastExpression* e);
@@ -908,6 +910,8 @@ namespace
         // fewer; and an item written as the list holds it.
         LSLASTNode* soleItem(LSLExpression* e) const;
         std::string itemText(LSLASTNode* item);
+        // An item looked for in a list, as table.find is to be given it.
+        std::string soughtText(LSLASTNode* item, LSLExpression* list);
         // Why a read of a list hands the list itself on, or null where it
         // does not.
         Shared handedOn(LSLASTNode* read) const;
@@ -1003,7 +1007,8 @@ namespace
         // link_message's id -- and the key variables given text that is no
         // UUID, or such a parameter, or another such, which SLua holds as
         // strings; and a key that may hold any text -- given a string --
-        // given on to one of those.
+        // given on to one of those. A key function of the script's own is
+        // one more, given what it returns.
         void findTextKeys();
         // An expression's type as SLua has it: LSL's, but a key for the
         // constants SLua types a uuid, and a string for those above.
@@ -1018,11 +1023,11 @@ namespace
         // text, which uuid() would stop the script on where it is no UUID.
         LSLIType itemType(LSLExpression* e) const { return e->getIType() == LST_KEY && slType(e) == LST_STRING ? LST_STRING : e->getIType(); }
         // What a function of the script's own gives, as SLua holds it: a
-        // key as text where the script's keys are.
+        // key as text where the script's keys are, or where it returns text.
         LSLIType givenType(LSLSymbol* function) const
         {
             const LSLIType lsl = function ? function->getIType() : LST_NULL;
-            return lsl == LST_KEY && !mOptions.uuidKeys ? LST_STRING : lsl;
+            return lsl == LST_KEY && (!mOptions.uuidKeys || mTextKeys.contains(function)) ? LST_STRING : lsl;
         }
 
         // x = x op y, which Luau writes x op= y: the compound operator and
@@ -1092,6 +1097,10 @@ namespace
         // The globals the script never sets, declared a number not below
         // nought; and declared any whole number, by what it is.
         boost::unordered_flat_set<LSLSymbol*>      mSteadyNonNegative;
+        // The locals the script never sets after their declaration, by
+        // what they are declared (null for none, LSL's 0).
+        boost::unordered_flat_map<LSLSymbol*, LSLExpression*> mSteadyLocals;
+        mutable boost::unordered_flat_set<LSLSymbol*>         mSteadyAsked;
         boost::unordered_flat_map<LSLSymbol*, int> mSteadyWhole;
         bool mLslInteger = false;
         bool mLslFloat   = false;
@@ -1120,6 +1129,12 @@ namespace
         std::vector<LSLASTNode*> mLoops;
         // The labels a jump reaches that SLua has nothing for.
         boost::unordered_flat_set<LSLSymbol*> mUnstructured;
+        // Each jump that is a loop's break, or its continue: as Tailslide
+        // says, or as it would say where it lost the loop around the jump
+        // (findJumps).
+        boost::unordered_flat_set<LSLASTNode*> mBreaks;
+        boost::unordered_flat_set<LSLASTNode*> mContinues;
+        void                                   findJumps();
         // Whether a `return` from the handler being written ends the
         // script's setup: state_entry of a script of one state, written at
         // the top level.
@@ -3602,7 +3617,7 @@ namespace
             if (LSLASTNode* sought = soleItem(argumentAt(e, 1)))
             {
                 called = "table.find";
-                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + itemText(sought) + ")";
+                const std::string found = "table.find(" + anyItems(argumentAt(e, 0), arg(0)) + ", " + soughtText(sought, argumentAt(e, 0)) + ")";
                 return Expr{ "(" + found + " or 0) - 1", ADD, false, found };
             }
         }
@@ -3768,7 +3783,7 @@ namespace
         LSLASTNode* sought = mOptions.idioms && lsl == "llListFindList" ? soleItem(argumentAt(call, 1)) : nullptr;
         if (sought)
         {
-            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + itemText(sought) + ")";
+            asked = "table.find(" + anyItems(argumentAt(call, 0), value(argumentAt(call, 0))) + ", " + soughtText(sought, argumentAt(call, 0)) + ")";
         }
         // Text in other text: string.find's plain search from the start,
         // which finds it where LSL's did -- the empty text anywhere, as
@@ -4001,21 +4016,93 @@ namespace
             return true;
         }
         e = unbracketed(e);
-        if (e && e->getNodeSubType() == NODE_BINARY_EXPRESSION)
+        if (!e)
         {
-            // An & with one, an | or ^ of two, a >> of one.
-            auto* b = static_cast<LSLBinaryExpression*>(e);
-            switch (b->getOperation())
-            {
-                case OP_BIT_AND: return notBelowZero(b->getLHS()) || notBelowZero(b->getRHS());
-                case OP_BIT_OR:
-                case OP_BIT_XOR: return notBelowZero(b->getLHS()) && notBelowZero(b->getRHS());
-                case OP_SHIFT_RIGHT: return notBelowZero(b->getLHS());
-                default: return false;
-            }
+            return false;
         }
-        return e && e->getNodeSubType() == NODE_LVALUE_EXPRESSION && !static_cast<LSLLValueExpression*>(e)->getMember() &&
-               mSteadyNonNegative.contains(static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol());
+        switch (e->getNodeSubType())
+        {
+            case NODE_BINARY_EXPRESSION:
+            {
+                // An & with one, an | or ^ of two, a >> of one; an integer
+                // quotient of two; and a float's sum, product or quotient
+                // of two, which no wrap takes below nought.
+                auto*      b     = static_cast<LSLBinaryExpression*>(e);
+                const bool both  = notBelowZero(b->getLHS()) && notBelowZero(b->getRHS());
+                const bool whole = e->getIType() == LST_INTEGER;
+                switch (b->getOperation())
+                {
+                    case OP_BIT_AND: return notBelowZero(b->getLHS()) || notBelowZero(b->getRHS());
+                    case OP_BIT_OR:
+                    case OP_BIT_XOR: return both;
+                    case OP_SHIFT_RIGHT: return notBelowZero(b->getLHS());
+                    case OP_DIV: return both && (whole || e->getIType() == LST_FLOATINGPOINT);
+                    case OP_PLUS:
+                    case OP_MUL: return both && e->getIType() == LST_FLOATINGPOINT;
+                    default: return false;
+                }
+            }
+            case NODE_CONSTANT_EXPRESSION:
+            {
+                // A float written out, not -0.
+                LSLASTNode* c = e->getChild(0);
+                if (c && c->getNodeSubType() == NODE_FLOAT_CONSTANT)
+                {
+                    const double v = static_cast<LSLFloatConstant*>(c)->getValue();
+                    return v >= 0 && !std::signbit(v);
+                }
+                return false;
+            }
+            case NODE_TYPECAST_EXPRESSION:
+            {
+                // A number made a float, or a whole number kept one. Not a
+                // float cut to a whole one, which past the 32-bit range LSL
+                // made -2147483648.
+                LSLExpression* child = static_cast<LSLTypecastExpression*>(e)->getChildExpr();
+                const LSLIType to    = e->getIType();
+                return (to == LST_FLOATINGPOINT || (to == LST_INTEGER && child->getIType() == LST_INTEGER)) && notBelowZero(child);
+            }
+            case NODE_FUNCTION_EXPRESSION:
+            {
+                // One of ll's that answers nothing below nought.
+                LSLSymbol* f     = static_cast<LSLFunctionExpression*>(e)->getIdentifier()->getSymbol();
+                S32        least = 0;
+                S32        most  = 0;
+                return f && f->getSubType() == SYM_BUILTIN && ALLSLTraits::bounds(f->getName(), least, most) && least >= 0;
+            }
+            case NODE_LVALUE_EXPRESSION:
+            {
+                // A global never set, declared one; a local never set
+                // after it is declared one, or declared with nothing.
+                if (static_cast<LSLLValueExpression*>(e)->getMember())
+                {
+                    return false;
+                }
+                LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
+                if (mSteadyNonNegative.contains(var))
+                {
+                    return true;
+                }
+                const auto steady = mSteadyLocals.find(var);
+                if (steady == mSteadyLocals.end() || (e->getIType() != LST_INTEGER && e->getIType() != LST_FLOATINGPOINT))
+                {
+                    return false;
+                }
+                // Not again for a local its own declaration reads.
+                if (!steady->second)
+                {
+                    return true;
+                }
+                if (!mSteadyAsked.insert(var).second)
+                {
+                    return false;
+                }
+                const bool held = notBelowZero(steady->second);
+                mSteadyAsked.erase(var);
+                return held;
+            }
+            default: return false;
+        }
     }
 
     Expr Writer::binary(LSLBinaryExpression* e)
@@ -4377,6 +4464,19 @@ namespace
             case LST_INTEGER:
                 if (from == LST_FLOATINGPOINT)
                 {
+                    // A quotient not below nought rounded down by //, which
+                    // is cutting it toward nought there.
+                    LSLExpression* inner = unbracketed(child);
+                    if (inner && inner->getNodeSubType() == NODE_BINARY_EXPRESSION && inner->getOperation() == OP_DIV)
+                    {
+                        auto* q = static_cast<LSLBinaryExpression*>(inner);
+                        if (notBelowZero(q->getLHS()) && notBelowZero(q->getRHS()))
+                        {
+                            const Expr a = oneValue(value(q->getLHS()));
+                            const Expr b = oneValue(value(q->getRHS()));
+                            return { bracketed(a, MUL) + " // " + bracketed(b, MUL + 1), MUL };
+                        }
+                    }
                     // Toward zero, as LSL cuts a float, by bit32.s32, which
                     // gives 0 where math.modf would give a -0 that tostring
                     // writes, and LSL's -2147483648 for NaN and the
@@ -5389,12 +5489,12 @@ namespace
             case NODE_JUMP_STATEMENT:
             {
                 auto* j = static_cast<LSLJumpStatement*>(s);
-                if (j->getIsBreakLike() && !mLoops.empty())
+                if (mBreaks.contains(j) && !mLoops.empty())
                 {
                     line("break");
                     return;
                 }
-                if (j->getIsContinueLike() && !mLoops.empty())
+                if (mContinues.contains(j) && !mLoops.empty())
                 {
                     // A for's steps run before its next turn, as they would
                     // at the end of its body.
@@ -6549,6 +6649,27 @@ namespace
         return coerced(e, itemType(e)).text;
     }
 
+    std::string Writer::soughtText(LSLASTNode* item, LSLExpression* list)
+    {
+        // A key SLua holds as text -- link_message's id -- looked for in a
+        // list whose keys are all uuids: LSL found a key among the keys by
+        // its text, so the uuid made of it, or the text where it is no
+        // UUID. Not for "", which touuid makes NULL_KEY: LSL's "" found no
+        // NULL_KEY, and the text finds no uuid.
+        const std::string text = itemText(item);
+        if (!mOptions.uuidKeys || item->getNodeType() == NODE_CONSTANT)
+        {
+            return text;
+        }
+        auto*    e    = static_cast<LSLExpression*>(item);
+        const U8 held = itemTypes(list);
+        if (wholeVariable(e) && e->getIType() == LST_KEY && slType(e) == LST_STRING && (held & ItemKey) != 0 && (held & ItemString) == 0)
+        {
+            return "if " + text + " == \"\" then " + text + " else touuid(" + text + ") or " + text;
+        }
+        return text;
+    }
+
     Shared Writer::handedOn(LSLASTNode* read) const
     {
         // Up through brackets, and casts to what it already is.
@@ -7587,6 +7708,11 @@ namespace
         {
             return LST_STRING;
         }
+        // A key function of the script's own that returns text.
+        if (inner && e->getIType() == LST_KEY && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && mTextKeys.contains(readOf(inner)))
+        {
+            return LST_STRING;
+        }
         if (inner && inner->getNodeSubType() == NODE_LVALUE_EXPRESSION && isNull(static_cast<LSLLValueExpression*>(inner)->getMember()))
         {
             return varType(static_cast<LSLLValueExpression*>(inner)->getIdentifier()->getSymbol(), e->getIType());
@@ -7624,9 +7750,10 @@ namespace
                 }
             }
         });
-        // What each key variable is given; each that is given text, until
-        // none more is. One declared with nothing holds LSL's "", no UUID,
-        // which a uuid cannot: uuid("") is NULL_KEY.
+        // What each key variable is given, and each key function of the
+        // script's own returns; each that is given text, until none more
+        // is. One declared with nothing holds LSL's "", no UUID, which a
+        // uuid cannot: uuid("") is NULL_KEY.
         std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
         std::vector<LSLSymbol*>                            unset;
         const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
@@ -7670,6 +7797,16 @@ namespace
                     key(target->getIdentifier(), b->getRHS());
                 }
             }
+            else if (node->getNodeSubType() == NODE_RETURN_STATEMENT)
+            {
+                // What a key function of the script's own returns, given it.
+                LSLExpression* e = static_cast<LSLReturnStatement*>(node)->getExpr();
+                LSLSymbol*     f = enclosingFunction(node);
+                if (f && f->getIType() == LST_KEY && !isNull(e))
+                {
+                    given.emplace_back(f, e);
+                }
+            }
             else if (node->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
             {
                 // Each argument to a parameter of the script's own.
@@ -7699,11 +7836,20 @@ namespace
                 LSLSymbol* var = static_cast<LSLLValueExpression*>(e)->getIdentifier()->getSymbol();
                 return mTextParams.contains(var) || mTextKeys.contains(var);
             }
+            if (e && e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                return mTextKeys.contains(readOf(e));
+            }
             return false;
         };
-        // A key variable, as given whole.
+        // A key variable, as given whole; or a key function of the script's
+        // own, as called.
         const auto keyVar = [](LSLExpression* e) -> LSLSymbol* {
             e = unbracketed(e);
+            if (e && e->getIType() == LST_KEY && e->getNodeSubType() == NODE_FUNCTION_EXPRESSION)
+            {
+                return readOf(e);
+            }
             if (!e || e->getIType() != LST_KEY || e->getNodeSubType() != NODE_LVALUE_EXPRESSION ||
                 !isNull(static_cast<LSLLValueExpression*>(e)->getMember()))
             {
@@ -8236,20 +8382,114 @@ end
         }
     }
 
-    std::string Writer::write()
+    void Writer::findJumps()
     {
+        // Tailslide says which jumps are a loop's break or its continue,
+        // but it forgets the loop it is in once a loop inside that one
+        // ends: a jump after an inner loop reads as in no loop, and SLua
+        // got no break for it. Where it found neither, the same is asked
+        // again of the innermost loop around the jump, found by walking up:
+        // a break where the label follows that loop, a continue where
+        // nothing but labels follows the label in it. Not in a body with a
+        // label named twice, where Tailslide works out nothing.
+        const auto loopOf = [](LSLASTNode* node) -> LSLASTNode* {
+            for (node = node->getParent(); node; node = node->getParent())
+            {
+                const LSLNodeSubType sub = node->getNodeSubType();
+                if (sub == NODE_WHILE_STATEMENT || sub == NODE_DO_STATEMENT || sub == NODE_FOR_STATEMENT)
+                {
+                    return node;
+                }
+                if (node->getNodeType() == NODE_GLOBAL_FUNCTION || node->getNodeType() == NODE_EVENT_HANDLER)
+                {
+                    return nullptr;
+                }
+            }
+            return nullptr;
+        };
+        const auto bodyOf = [](LSLASTNode* node) -> LSLASTNode* {
+            while (node && node->getNodeType() != NODE_GLOBAL_FUNCTION && node->getNodeType() != NODE_EVENT_HANDLER)
+            {
+                node = node->getParent();
+            }
+            return node;
+        };
+        boost::unordered_flat_set<LSLASTNode*> twice;
+        {
+            boost::unordered_flat_set<std::pair<LSLASTNode*, std::string>> seen;
+            walk(mScript, [&](LSLASTNode* node) {
+                if (node->getNodeSubType() == NODE_LABEL)
+                {
+                    LSLASTNode* body = bodyOf(node);
+                    if (!seen.emplace(body, static_cast<LSLLabel*>(node)->getIdentifier()->getName()).second)
+                    {
+                        twice.insert(body);
+                    }
+                }
+            });
+        }
+        const auto kind = [&](LSLJumpStatement* j, bool& breaks, bool& continues) {
+            breaks    = j->getIsBreakLike();
+            continues = j->getIsContinueLike();
+            LSLSymbol*  sym   = j->getSymbol();
+            LSLASTNode* label = sym ? sym->getLabelDecl() : nullptr;
+            LSLASTNode* loop  = loopOf(j);
+            if (breaks || continues || !label || !loop || twice.contains(bodyOf(j)))
+            {
+                return;
+            }
+            for (LSLASTNode* after = loop->getNext(); after && after->getNodeSubType() == NODE_LABEL; after = after->getNext())
+            {
+                if (after == label)
+                {
+                    breaks = true;
+                    return;
+                }
+            }
+            if (loopOf(label) != loop)
+            {
+                return;
+            }
+            for (LSLASTNode* at = label; at != loop; at = at->getParent())
+            {
+                for (LSLASTNode* next = at->getNext(); next; next = next->getNext())
+                {
+                    if (next->getNodeType() == NODE_STATEMENT && next->getNodeSubType() != NODE_LABEL)
+                    {
+                        return;
+                    }
+                }
+            }
+            continues = true;
+        };
         // The jumps SLua has nothing for, whose labels are kept as a mark.
         walk(mScript, [&](LSLASTNode* node) {
             if (node->getNodeSubType() != NODE_JUMP_STATEMENT)
             {
                 return;
             }
-            auto* j = static_cast<LSLJumpStatement*>(node);
-            if (!j->getIsBreakLike() && !j->getIsContinueLike())
+            auto* j         = static_cast<LSLJumpStatement*>(node);
+            bool  breaks    = false;
+            bool  continues = false;
+            kind(j, breaks, continues);
+            if (breaks)
+            {
+                mBreaks.insert(j);
+            }
+            else if (continues)
+            {
+                mContinues.insert(j);
+            }
+            else
             {
                 mUnstructured.insert(j->getIdentifier()->getSymbol());
             }
         });
+    }
+
+    std::string Writer::write()
+    {
+        findJumps();
         // What the script sets going: a timer on LLTimers where it sets one.
         LSLASTNode* first = mScript->getStates()->getChild(0);
         mManyStates       = first && first->getNext();
@@ -8302,6 +8542,17 @@ end
                 }
             }
         }
+        walk(mScript, [&](LSLASTNode* node) {
+            if (node->getNodeSubType() == NODE_DECLARATION)
+            {
+                auto*      d   = static_cast<LSLDeclaration*>(node);
+                LSLSymbol* sym = d->getIdentifier()->getSymbol();
+                if (sym && !written.writes(sym))
+                {
+                    mSteadyLocals.emplace(sym, isNull(d->getInitializer()) ? nullptr : d->getInitializer());
+                }
+            }
+        });
         findBitsOnly();
         globals();
         functions();

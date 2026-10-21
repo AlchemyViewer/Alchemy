@@ -87,13 +87,15 @@ std::string LLShaderMgr::variantObjectKey(const std::string& path, U32 axes, con
         return path;
     }
 
-    // No object under the variant key means the loader decided this source could not vary on
-    // the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
-    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one
-    // and no second copy was compiled. Absence is always that decision and never a failure:
-    // loadBasicShaders aborts the whole load if a copy it did want fails to build.
-    const std::string key = path + suffix;
-    return mShaderObjects[stageIndex(stage)].contains(key) ? key : path;
+    // No object under the variant key means either that the loader decided this source could not
+    // vary on the axis at the class level it resolved to -- deferred/reflectionProbeF.glsl reads
+    // CLASSIC_MODE at class3 and not at class2 -- so the base object already IS the right one and
+    // no second copy was compiled, or that the copy it compiled did not build. A copy that did not
+    // build is attached by its own key all the same, which attaches nothing, so the programs
+    // wanting it fail rather than linking the base object in its place.
+    const std::string key   = path + suffix;
+    const S32         index = stageIndex(stage);
+    return mShaderObjects[index].contains(key) || mFailedCopies[index].contains(key) ? key : path;
 }
 
 // static
@@ -137,6 +139,10 @@ void LLShaderMgr::clearShaderObjects()
             deleteShaderObject(object.second);
         }
         objects.clear();
+    }
+    for (auto& failed : mFailedCopies)
+    {
+        failed.clear();
     }
 }
 
@@ -656,6 +662,16 @@ GLuint LLShaderMgr::loadShaderFile(const std::string& filename, S32 & shader_lev
             deleteShaderObject(slot);
         }
         slot = object;
+        if (!cache_key.empty())
+        {
+            mFailedCopies[stageIndex(type)].erase(cache_key);
+        }
+    }
+    else if (!cache_key.empty())
+    {
+        // A copy under keys of its own that did not build: variantObjectKey attaches it by its key, which fails the
+        // programs that want it.
+        mFailedCopies[stageIndex(type)].insert(cache_key);
     }
     return object;
 }
@@ -773,55 +789,10 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     BOOST_STATIC_ASSERT(LL_ARRAY_SIZE(extra_code_text) < LL_ARRAY_SIZE(shader_code_text));
 
 
-    S32 major_version = gGLManager.mGLSLVersionMajor;
-    S32 minor_version = gGLManager.mGLSLVersionMinor;
-
-    if (major_version == 1 && minor_version < 30)
-    {
-        llassert(false); // GL 3.1 or later required
-    }
-    else
-    {
-        if (major_version >= 4)
-        {
-            //set version to 400 or 420, or to what the stage requires past that
-            const U32 version = llmax(minor_version >= 20 ? 420u : 400u, required_version);
-            shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
-        }
-        else if (major_version == 3)
-        {
-            if (minor_version <= 29)
-            {
-                // OpenGL 3.2 had GLSL version 1.50.  anything after that the version numbers match.
-                // https://www.khronos.org/opengl/wiki/Core_Language_(GLSL)#OpenGL_and_GLSL_versions
-                shader_code_text[shader_code_count++] = strdup("#version 150\n");
-            }
-            else
-            {
-                shader_code_text[shader_code_count++] = strdup("#version 330\n");
-            }
-        }
-        else
-        {
-            // OpenGL 3.2 had GLSL version 1.50.  anything after that the version numbers match.
-            if (type == GL_GEOMETRY_SHADER || minor_version >= 50)
-            {
-                //set version to 1.50
-                shader_code_text[shader_code_count++] = strdup("#version 150\n");
-                //some implementations of GLSL 1.30 require integer precision be explicitly declared
-                extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
-                extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
-            }
-            else
-            {
-                //set version to 1.40
-                shader_code_text[shader_code_count++] = strdup("#version 140\n");
-                //some implementations of GLSL 1.30 require integer precision be explicitly declared
-                extra_code_text[extra_code_count++] = strdup("precision mediump int;\n");
-                extra_code_text[extra_code_count++] = strdup("precision highp float;\n");
-            }
-        }
-    }
+    // 400, or 420 where the context has it, or what the stage requires past that. The floor's
+    // GLSL is 4.10 (GL_MINIMUM_VERSION), so nothing compiles lower.
+    const U32 version = llmax(gGLManager.mGLSLVersionMinor >= 20 ? 420u : 400u, required_version);
+    shader_code_text[shader_code_count++] = strdup(fmt::format("#version {}\n", version).c_str());
 
     extra_code_text[extra_code_count++] = strdup(stageDefine(type));
 
@@ -950,8 +921,8 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
             extra_code_text[extra_code_count++] = strdup("return texture(tex0, texcoord);\n");
             extra_code_text[extra_code_count++] = strdup("}\n");
         }
-        else if (major_version > 1 || minor_version >= 30)
-        {  //switches are supported in GLSL 1.30 and later
+        else
+        {
             if (gGLManager.mIsNVIDIA)
             { //switches are unreliable on some NVIDIA drivers
                 for (S32 i = 0; i < texture_index_channels; ++i)
@@ -979,11 +950,6 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
                 extra_code_text[extra_code_count++] = strdup("\treturn ret;\n");
                 extra_code_text[extra_code_count++] = strdup("}\n");
             }
-        }
-        else
-        { //should never get here.  Indexed texture rendering requires GLSL 1.30 or later
-            // (for passing integers between vertex and fragment shaders)
-            LL_ERRS() << "Indexed texture rendering requires GLSL 1.30 or later." << LL_ENDL;
         }
     }
 
@@ -1320,7 +1286,7 @@ void LLShaderMgr::initShaderCache(bool enabled, const LLUUID& old_cache_version,
     LL_PROFILE_ZONE_SCOPED;
     LL_INFOS("ShaderMgr") << "Initializing shader cache" << LL_ENDL;
 
-    mShaderCacheEnabled = gGLManager.mGLVersion >= 4.09 && enabled;
+    mShaderCacheEnabled = enabled;
 
     // A 4.1 version string (or ARB_get_program_binary) is necessary but NOT
     // sufficient to actually retrieve/restore program binaries, and assuming it is
@@ -1665,8 +1631,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("terrain_uv_transform");
     mReservedUniforms.push_back("terrain_uv_offset");
     mReservedUniforms.push_back("terrain_normal_axes");
+    mReservedUniforms.push_back("terrain_hex_frac");
+    mReservedUniforms.push_back("terrain_hex_base");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_NORMAL_AXES +1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::TERRAIN_HEX_BASE +1);
 
     mReservedUniforms.push_back("viewport");
 
@@ -1703,6 +1671,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("emissiveColor");
     mReservedUniforms.push_back("metallicFactor");
     mReservedUniforms.push_back("roughnessFactor");
+    mReservedUniforms.push_back("baseColorAlpha");
     mReservedUniforms.push_back("clipPlane");
     mReservedUniforms.push_back("clipSign");
 
@@ -1782,6 +1751,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("minimum_alpha");
     mReservedUniforms.push_back("emissive_brightness");
+    mReservedUniforms.push_back("vertex_alpha_coverage");
 
     // Deferred
     mReservedUniforms.push_back("shadow_matrix");
@@ -1807,8 +1777,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("depth_cutoff");
     mReservedUniforms.push_back("norm_cutoff");
     mReservedUniforms.push_back("shadow_target_width");
+    mReservedUniforms.push_back("shadow_stipple");
+    mReservedUniforms.push_back("spot_shadow_live");
 
-    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SHADOW_TARGET_WIDTH + 1);
+    llassert(mReservedUniforms.size() == LLShaderMgr::DEFERRED_SPOT_SHADOW_LIVE + 1);
 
     mReservedUniforms.push_back("iterationCount");
     mReservedUniforms.push_back("rayStep");
@@ -1821,6 +1793,8 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("modelview_delta");
     mReservedUniforms.push_back("inv_modelview_delta");
     mReservedUniforms.push_back("cube_snapshot");
+    mReservedUniforms.push_back("sun_shadow_cascades");
+    mReservedUniforms.push_back("unbuilt_shadow_maps");
 
     mReservedUniforms.push_back("tc_scale");
     mReservedUniforms.push_back("rcp_screen_res");
@@ -1900,6 +1874,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("gWindDir");
     mReservedUniforms.push_back("gSinWaveParams");
     mReservedUniforms.push_back("gGravity");
+    mReservedUniforms.push_back("gClothDepthRow");
 
     mReservedUniforms.push_back("detail_0");
     mReservedUniforms.push_back("detail_1");
@@ -1913,6 +1888,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("terrain_composition_map");
     mReservedUniforms.push_back("terrain_tess_origin");
     mReservedUniforms.push_back("terrain_tess_density");
+    mReservedUniforms.push_back("terrain_tess_clip");
+    mReservedUniforms.push_back("terrain_tess_clip_origin");
+    mReservedUniforms.push_back("terrain_tess_raster");
     mReservedUniforms.push_back("terrain_grid_scale");
     mReservedUniforms.push_back("terrain_smoothing");
     mReservedUniforms.push_back("parcel_overlay");
@@ -1952,6 +1930,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("gltf_metallic_factor");
     mReservedUniforms.push_back("gltf_normal_transform");
     mReservedUniforms.push_back("gltf_mr_transform");
+    mReservedUniforms.push_back("gltf_base_color_alpha");
 
     mReservedUniforms.push_back("mat_specular_color");
     mReservedUniforms.push_back("mat_env_intensity");
@@ -2207,8 +2186,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("uCrossChromatic");
     mReservedUniforms.push_back("uCrossPassScale");
     mReservedUniforms.push_back("uCrossStrength");
-    mReservedUniforms.push_back("uCrossRegion");
-    mReservedUniforms.push_back("uCrossClamp");
 
     mReservedUniforms.push_back("uBokehSpherical");
     mReservedUniforms.push_back("uBokehFieldStretch");
@@ -2231,6 +2208,22 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     mReservedUniforms.push_back("eyeToSky");
     mReservedUniforms.push_back("skyBehindMap");
+
+    mReservedUniforms.push_back("haze_extinction");
+    mReservedUniforms.push_back("blue_weight");
+    mReservedUniforms.push_back("haze_weight");
+    mReservedUniforms.push_back("atmos_sunlit");
+    mReservedUniforms.push_back("atmos_ambient");
+    mReservedUniforms.push_back("sky_sunlight");
+    mReservedUniforms.push_back("sky_light");
+    mReservedUniforms.push_back("sky_ambient");
+    mReservedUniforms.push_back("atmos_sunlit_linear");
+    mReservedUniforms.push_back("atmos_amblit");
+    mReservedUniforms.push_back("haze_additive");
+    mReservedUniforms.push_back("haze_additive_glow");
+    mReservedUniforms.push_back("sky_light_atten");
+    mReservedUniforms.push_back("cloud_sunlight");
+    mReservedUniforms.push_back("sky_ambient_below");
 
     mReservedUniforms.push_back("moonQuadCenter");
     mReservedUniforms.push_back("moonQuadU");
@@ -2280,6 +2273,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterWaveReach");
     mReservedUniforms.push_back("waterWaveEye");
     mReservedUniforms.push_back("waterRaise");
+    mReservedUniforms.push_back("waterGroundFade");
 
     // The depth pyramid
     mReservedUniforms.push_back("depthPyramid");
@@ -2289,9 +2283,19 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("depthPyramidSize");
     mReservedUniforms.push_back("depthPyramidCount");
 
+    // The light map's ambient occlusion blur in one dispatch
+    mReservedUniforms.push_back("blur_light_apron");
+    mReservedUniforms.push_back("blurLightTarget");
+
     // The waves' patches
     mReservedUniforms.push_back("waterOcclusion");
     mReservedUniforms.push_back("waterPatchOrder");
+
+    // Settings the programs read as uniforms
+    mReservedUniforms.push_back("terrainTriplanarBlend");
+    mReservedUniforms.push_back("smaaPredicationThreshold");
+    mReservedUniforms.push_back("smaaPredicationScale");
+    mReservedUniforms.push_back("smaaPredicationStrength");
 
     // The enum and this list are parallel, and an entry added or removed on one side only
     // shifts every later uniform index for every shader in the viewer -- silently, since a

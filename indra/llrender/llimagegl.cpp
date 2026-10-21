@@ -45,6 +45,7 @@
 #include "llwindow.h"
 #include "llframetimer.h"
 #include <atomic>
+#include <chrono>
 #include <bit>
 #include <boost/unordered_map.hpp>
 
@@ -102,7 +103,8 @@ U32 LLImageGL::sFrameCount = 0;
 // texture memory accounting (for macOS)
 static LLMutex sTexMemMutex;
 static boost::unordered_map<U32, U64> sTextureAllocs;
-static U64 sTextureBytes = 0;
+// Changed under sTexMemMutex, and read by getTextureBytesAllocated without it.
+static std::atomic<U64> sTextureBytes{0};
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
@@ -306,9 +308,10 @@ void LLImageGL::initClass(LLWindow* window, S32 num_catagories, bool skip_analyz
 
     if (thread_texture_loads || thread_media_updates)
     {
-        LLImageGLThread::createInstance(window);
         LLImageGLThread::sEnabledTextures = thread_texture_loads;
         LLImageGLThread::sEnabledMedia = thread_media_updates;
+        // Which clears both again if it gets no context to upload on.
+        LLImageGLThread::createInstance(window);
     }
 }
 
@@ -878,9 +881,11 @@ void LLImageGL::init(bool usemipmaps)
     mPickMaskHeight = 0;
     mUseMipMaps = usemipmaps;
     mHasExplicitFormat = false;
+    mFormatComponents = -1;
 
     mIsMask = false;
     mMaxAlpha = 255;
+    mMinAlpha = 0;
     mNeedsAlphaAndPickMask = true ;
     mAlphaAnalysisSerial = 0;
     mAlphaStride = 0 ;
@@ -1047,6 +1052,7 @@ void LLImageGL::setExplicitFormat( LLGLint internal_format, LLGLenum primary_for
     // Note: must be called before createTexture()
     // Note: it's up to the caller to ensure that the format matches the number of components.
     mHasExplicitFormat = true;
+    mFormatComponents = -1;
     mFormatInternal = internal_format;
     mFormatPrimary = primary_format;
     if(type_format == 0)
@@ -1801,10 +1807,7 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
 // quietly linearising. Harmless on a non-sRGB format: the state exists but nothing reads it.
 static void skipSRGBDecode(U32 target)
 {
-    if (gGLManager.mHasTextureSRGBDecode)
-    {
-        glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
-    }
+    glTexParameteri(target, GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
 }
 
 // Allocate a 2D texture on the currently-bound name and upload level 0.
@@ -1949,52 +1952,7 @@ bool LLImageGL::createGLTexture(S32 discard_level, const LLImageRaw* imageraw, S
 
     if( !mHasExplicitFormat )
     {
-        switch (mComponents)
-        {
-        case 1:
-            // Single-channel -- used by font glyph maps, but the path is generic for
-            // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
-            // read back through a gray-replicate swizzle.
-            mFormatInternal = GL_LUMINANCE8;
-            mFormatPrimary = GL_LUMINANCE;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 2:
-            // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
-            // same way.
-            mFormatInternal = GL_LUMINANCE8_ALPHA8;
-            mFormatPrimary = GL_LUMINANCE_ALPHA;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 3:
-            // sRGB, not linear. The bits are identical either way -- an 8-bit texture
-            // uploaded from a JPEG2000/PNG/TGA asset already holds sRGB-encoded values --
-            // so this changes nothing about what is stored, only whether GL is willing to
-            // decode it. Sampling is unaffected unless a bind asks for the decode with
-            // ALSampler::SRGBDecode, and nothing does by default.
-            //
-            // Worth stating why it cannot be narrowed to colour textures: the same
-            // LLViewerFetchedTexture object serves whichever glTF slot references its UUID
-            // (see fetch_texture), so one image can be base colour for one material and a
-            // normal map for another. The format cannot know; only the bind can. Which is
-            // exactly the split the sampler work established.
-            mFormatInternal = GL_SRGB8;
-            mFormatPrimary = GL_RGB;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        case 4:
-            mFormatInternal = GL_SRGB8_ALPHA8;
-            mFormatPrimary = GL_RGBA;
-            mFormatType = GL_UNSIGNED_BYTE;
-            break;
-        default:
-            LL_ERRS() << "Bad number of components for texture: " << (U32)getComponents() << LL_ENDL;
-        }
-
-        // Calc alpha layout first (keys on the deprecated names), then
-        // rewrite the format to core-profile-valid forms.
-        calcAlphaChannelOffsetAndStride() ;
-        resolveDeprecatedFormat();
+        resolveComponentFormat(mComponents);
     }
 
     if(!to_create) //not create a gl texture
@@ -2227,6 +2185,19 @@ void LLImageGL::afterPublish(std::function<void()> fn)
 }
 
 // static
+void LLImageGL::finishUploads()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+    const auto give_up = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (publishUploads() > 0 && std::chrono::steady_clock::now() < give_up)
+    {
+        // The oldest is the first to signal, its context's fences signalling in order.
+        constexpr GLuint64 WAIT_NS = 10'000'000;
+        glClientWaitSync(sPendingPublishes.front().mFence, 0, WAIT_NS);
+    }
+}
+
 U32 LLImageGL::publishUploads()
 {
     if (sPendingPublishes.empty())
@@ -2237,23 +2208,20 @@ U32 LLImageGL::publishUploads()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(on_main_thread());
 
-    // Fences of one context signal in the order they were issued, so walking oldest first
-    // publishes an image's uploads in order. The ready ones are taken out before any is
-    // published: publishing runs the callers' callbacks, which must find the list settled.
+    // Fences of one context signal in the order they were issued, and every one here is the
+    // LLImageGL thread's, queued in the order it laid them: walking oldest first publishes an
+    // image's uploads in order, and the first still pending leaves every later one pending
+    // too, so the walk stops there. Each poll is a call that returns a value, which a threaded
+    // driver such as Mesa's glthread answers only once its own thread has caught up. The ready
+    // ones are taken out before any is published: publishing runs the callers' callbacks,
+    // which must find the list settled.
     std::vector<PendingPublish> ready;
-    size_t kept = 0;
-    for (size_t i = 0; i < sPendingPublishes.size(); ++i)
+    for (PendingPublish& pending : sPendingPublishes)
     {
-        PendingPublish& pending = sPendingPublishes[i];
         const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
         if (res == GL_TIMEOUT_EXPIRED)
         {
-            if (kept != i)
-            {
-                sPendingPublishes[kept] = std::move(pending);
-            }
-            ++kept;
-            continue;
+            break;
         }
         if (res == GL_WAIT_FAILED)
         {
@@ -2264,7 +2232,7 @@ U32 LLImageGL::publishUploads()
         glDeleteSync(pending.mFence);
         ready.push_back(std::move(pending));
     }
-    sPendingPublishes.erase(sPendingPublishes.begin() + kept, sPendingPublishes.end());
+    sPendingPublishes.erase(sPendingPublishes.begin(), sPendingPublishes.begin() + ready.size());
 
     for (PendingPublish& pending : ready)
     {
@@ -2299,7 +2267,24 @@ void LLImageGL::beginUpload()
     mPublished.mComponents          = mComponents;
     mPublished.mCurrentDiscardLevel = mCurrentDiscardLevel;
     mPublished.mMaxDiscardLevel     = mMaxDiscardLevel;
+    mPublished.mFormatPrimary          = mFormatPrimary;
+    mPublished.mDeprecatedSourceFormat = mDeprecatedSourceFormat;
+    mPublished.mTextureMemory          = mTextureMemory;
     mUploadInFlight = true;
+}
+
+void LLImageGL::beginUpload(S8 components)
+{
+    llassert(on_main_thread());
+    // With no upload of this image under way, nothing reads the format while it is set. It
+    // is set once the snapshot has the format of the texture mTexName still names, which the
+    // getters answer with until the new one publishes.
+    const bool resolve = !mUploadInFlight && !mHasExplicitFormat;
+    beginUpload();
+    if (resolve)
+    {
+        resolveComponentFormat(components);
+    }
 }
 
 void LLImageGL::endUpload()
@@ -2380,12 +2365,14 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 
     mIsMask = analysis.mIsMask;
     mMaxAlpha = analysis.mMaxAlpha;
+    mMinAlpha = analysis.mMinAlpha;
 }
 
 void LLImageGL::clearAlphaAnalysis()
 {
     mIsMask = false;
     mMaxAlpha = 255;
+    mMinAlpha = 0;
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2402,6 +2389,7 @@ void LLImageGL::publishPendingAlpha()
     {
         mIsMask = mPendingAlpha.mAnalysis.mIsMask;
         mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
+        mMinAlpha = mPendingAlpha.mAnalysis.mMinAlpha;
     }
     mPendingAlpha = PendingAlpha();
 }
@@ -2734,6 +2722,8 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
     if(mNeedsAlphaAndPickMask != need_mask)
     {
         mNeedsAlphaAndPickMask = need_mask;
+        // The alpha layout is worked out with the format, so the next upload works both out again.
+        mFormatComponents = -1;
 
         if(mNeedsAlphaAndPickMask)
         {
@@ -2770,8 +2760,10 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_RED:
     case GL_RGB:
     case GL_SRGB:
+        // The texture the format is for has no alpha. Staged while an upload is in flight:
+        // the texture on screen keeps its own until the new one publishes.
         mNeedsAlphaAndPickMask = false;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(opaqueAlphaAnalysis());
         return; //no alpha channel.
     case GL_RED_INTEGER:
     case GL_RG_INTEGER:
@@ -2781,7 +2773,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
     case GL_BGRA_INTEGER:
         // Integers: even a fourth channel is a value, not coverage.
         mNeedsAlphaAndPickMask = false;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(opaqueAlphaAnalysis());
         return;
     case GL_RGBA:
     case GL_SRGB_ALPHA:
@@ -2829,7 +2821,7 @@ void LLImageGL::calcAlphaChannelOffsetAndStride()
         LL_WARNS() << "Cannot analyze alpha for image with format type " << std::hex << mFormatType << std::dec << LL_ENDL;
 
         mNeedsAlphaAndPickMask = false ;
-        clearAlphaAnalysis();
+        setAlphaAnalysis(AlphaAnalysis());
     }
 }
 
@@ -2860,6 +2852,65 @@ void LLImageGL::applySwizzleForDeprecatedFormat(ALTextureSlot::eTextureType type
         return;  // not a format we re-express via swizzle
     }
     glTexParameteriv(ALTextureSlot::getInternalType(type), GL_TEXTURE_SWIZZLE_RGBA, mask);
+}
+
+// The format of an image without an explicit one, from its component count. Worked out
+// once a count: beginUpload does it on the main thread before an upload is posted, so the
+// upload on LLImageGLThread finds it done and writes none of what the main thread reads.
+void LLImageGL::resolveComponentFormat(S8 components)
+{
+    if (components == mFormatComponents)
+    {
+        return;
+    }
+
+    switch (components)
+    {
+    case 1:
+        // Single-channel -- used by font glyph maps, but the path is generic for
+        // any 1-component upload. resolveDeprecatedFormat below stores it as R8,
+        // read back through a gray-replicate swizzle.
+        mFormatInternal = GL_LUMINANCE8;
+        mFormatPrimary = GL_LUMINANCE;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 2:
+        // Two-channel (luminance + alpha): RG8 under the matching swizzle, the
+        // same way.
+        mFormatInternal = GL_LUMINANCE8_ALPHA8;
+        mFormatPrimary = GL_LUMINANCE_ALPHA;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 3:
+        // sRGB, not linear. The bits are identical either way -- an 8-bit texture
+        // uploaded from a JPEG2000/PNG/TGA asset already holds sRGB-encoded values --
+        // so this changes nothing about what is stored, only whether GL is willing to
+        // decode it. Sampling is unaffected unless a bind asks for the decode with
+        // ALSampler::SRGBDecode, and nothing does by default.
+        //
+        // Worth stating why it cannot be narrowed to colour textures: the same
+        // LLViewerFetchedTexture object serves whichever glTF slot references its UUID
+        // (see fetch_texture), so one image can be base colour for one material and a
+        // normal map for another. The format cannot know; only the bind can. Which is
+        // exactly the split the sampler work established.
+        mFormatInternal = GL_SRGB8;
+        mFormatPrimary = GL_RGB;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    case 4:
+        mFormatInternal = GL_SRGB8_ALPHA8;
+        mFormatPrimary = GL_RGBA;
+        mFormatType = GL_UNSIGNED_BYTE;
+        break;
+    default:
+        LL_ERRS() << "Bad number of components for texture: " << (U32)components << LL_ENDL;
+    }
+
+    // Calc alpha layout first (keys on the deprecated names), then
+    // rewrite the format to core-profile-valid forms.
+    calcAlphaChannelOffsetAndStride() ;
+    resolveDeprecatedFormat();
+    mFormatComponents = components;
 }
 
 void LLImageGL::resolveDeprecatedFormat()
@@ -2918,6 +2969,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
     U32 length = w * h;
     U32 alphatotal = 0;
     U32 max_alpha = 0;
+    U32 min_alpha = 255;
 
     U32 sample[16];
     memset(sample, 0, sizeof(U32) * 16);
@@ -2964,6 +3016,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
                 sample[asum / (16 * 4)] += 4;
 
                 max_alpha = llmax(max_alpha, llmax(llmax(s1, s2), llmax(s3, s4)));
+                min_alpha = llmin(min_alpha, llmin(llmin(s1, s2), llmin(s3, s4)));
             }
 
             rowstart += 2 * w * alpha_stride;
@@ -2972,20 +3025,24 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
         length = 2 * paired_w * paired_h;
 
         // The trailing odd row and column are left out of the histogram, but one of their texels may be the only
-        // one with any alpha.
+        // one with any alpha, or the only one without.
         const GLubyte* alpha = ((const GLubyte*)data_in) + alpha_offset;
         if (paired_w < w)
         {
             for (U32 y = 0; y < h; ++y)
             {
-                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)y * w + paired_w) * alpha_stride]);
+                const U32 a = alpha[((size_t)y * w + paired_w) * alpha_stride];
+                max_alpha = llmax(max_alpha, a);
+                min_alpha = llmin(min_alpha, a);
             }
         }
         if (paired_h < h)
         {
             for (U32 x = 0; x < w; ++x)
             {
-                max_alpha = llmax(max_alpha, (U32)alpha[((size_t)paired_h * w + x) * alpha_stride]);
+                const U32 a = alpha[((size_t)paired_h * w + x) * alpha_stride];
+                max_alpha = llmax(max_alpha, a);
+                min_alpha = llmin(min_alpha, a);
             }
         }
     }
@@ -2998,6 +3055,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
             alphatotal += s1;
             ++sample[s1 / 16];
             max_alpha = llmax(max_alpha, s1);
+            min_alpha = llmin(min_alpha, s1);
             current += alpha_stride;
         }
     }
@@ -3027,6 +3085,7 @@ LLImageGL::AlphaAnalysis LLImageGL::analyzeAlphaData(
 
     AlphaAnalysis analysis;
     analysis.mMaxAlpha = (U8)max_alpha;
+    analysis.mMinAlpha = (U8)min_alpha;
     if (midrangetotal > length / 48 ||
         (lowerhalftotal == length && alphatotal != 0) ||
         (upperhalftotal == length && alphatotal != 255 * length))
@@ -3109,6 +3168,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             {
                 mIsMask = analysis.mIsMask;
                 mMaxAlpha = analysis.mMaxAlpha;
+                mMinAlpha = analysis.mMinAlpha;
             }
             unref();
         }
@@ -3554,6 +3614,14 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
     mContext = mWindow->createSharedContext();
+    if (!mContext)
+    {
+        // Nothing to upload on, so the thread never starts and textures and media keep to the main thread.
+        LL_WARNS("LLImageGL") << "No GL context shared with the window's; uploading on the main thread" << LL_ENDL;
+        sEnabledTextures = false;
+        sEnabledMedia = false;
+        return;
+    }
     LL::ThreadPool::start();
 }
 

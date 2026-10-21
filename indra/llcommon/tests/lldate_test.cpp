@@ -33,6 +33,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <limits>
+#include <sstream>
 
 #define VALID_DATE                                  "2003-04-30T04:00:00Z"
 #define VALID_DATE_LEAP                             "2004-02-29T04:00:00Z"
@@ -276,5 +278,53 @@ namespace
         const size_t day_end = rfc.find(", ");
         CHECK(day_end != std::string::npos);
         CHECK(day_end > 0);
+    }
+
+    // A binary LLSD date is whatever eight bytes it was sent.
+    TEST_CASE("LLDate: seconds no time can hold format as the epoch or not at all", "[LLDate]")
+    {
+        const F64 unholdable[] =
+        {
+            std::numeric_limits<F64>::quiet_NaN(),
+            std::numeric_limits<F64>::infinity(),
+            -std::numeric_limits<F64>::infinity(),
+            1e300,
+            -1e300,
+        };
+        for (F64 seconds : unholdable)
+        {
+            CAPTURE(seconds);
+            LLDate date(seconds);
+            CHECK(date.asString() == "1970-01-01T00:00:00Z");
+            std::ostringstream stream;
+            stream << date;
+            CHECK(stream.str() == "1970-01-01T00:00:00Z");
+            CHECK(date.toHTTPDateString(std::string("%Y-%m-%d")).empty());
+            CHECK(date.toLocalDateString(std::string("%Y-%m-%d")).empty());
+            S32 year = 0;
+            CHECK_FALSE(date.split(&year, nullptr, nullptr, nullptr, nullptr, nullptr));
+        }
+    }
+
+    TEST_CASE("LLDate: fields past nine digits fail, and offsets past an S32 parse without overflowing", "[LLDate]")
+    {
+        LLDate date;
+        // past an S32, and within one but carried by timegm() into another date
+        CHECK_FALSE(date.fromString("99999999999-01-01T00:00:00Z"));
+        CHECK_FALSE(date.fromString("-99999999999-01-01T00:00:00Z"));
+        CHECK_FALSE(date.fromString("2000-01-01T00:00:1000000000Z"));
+
+        // an offset of a hundred million hours is worked out in full
+        REQUIRE(date.fromString("2000-01-01T00:00:00+99999999"));
+        CHECK(date.secondsSinceEpoch() == 946684800.0 - 99999999.0 * 3600.0);
+        REQUIRE(date.fromString("2000-01-01T00:00:00-99999999:30"));
+        CHECK(date.secondsSinceEpoch() == 946684800.0 + 99999999.0 * 3600.0 + 30.0 * 60.0);
+    }
+
+    TEST_CASE("LLDate: a format too long for the buffer gives an empty string", "[LLDate]")
+    {
+        // strftime() leaves its buffer indeterminate when the result does not fit
+        LLDate d;
+        CHECK(d.toHTTPDateString(std::string(200, 'x')).empty());
     }
 }

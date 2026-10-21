@@ -606,12 +606,6 @@ Wpisz proszę nazwę regionu w lokalizację startu w polu Lokalizacja Startu lub
 Odwiedzić [_URL], aby uzyskać więcej informacji?
 		<usetemplate ignoretext="Sprzęt w moim komputerze nie jest wspierany" name="okcancelignore" notext="Nie" yestext="Tak" />
 	</notification>
-	<notification name="OldGPUDriver">
-		Prawdopodobnie istnieje nowszy sterownik dla Twojej karty graficznej. Aktualizacja sterowników graficznych może znacznie zwiększyć wydajność.
-
-Odwiedzić [URL] aby sprawdzić, czy są nowsze sterowniki?
-		<usetemplate ignoretext="Moje sterowniki grafiki są przestarzałe" name="okcancelignore" notext="Nie" yestext="Tak"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Twój system jest wyposażony w kartę graficzną, która nie jest rozpoznana przez [APP_NAME].
 Zdarza się to często w przypadku nowego sprzętu, który nie był testowany z [APP_NAME]. Prawdopodobnie wystarczy dostosowanie ustawień grafiki aby działanie było poprawne.
@@ -3547,9 +3541,6 @@ Czy chcesz kontynuować?
 		Wybrany obiekt ma wpływ na Navmesh. Dodanie elastyczności spowoduje usunięcie go z Navmesha.
 		<usetemplate ignoretext="Wybrany obiekt ma wpływ na Navmesh. Dodanie elastyczności spowoduje usunięcie go z Navmesha." name="okcancelignore" notext="Anuluj" />
 	</notification>
-	<global name="UnsupportedGPU">
-		- Twoja karta graficzna nie spełnia minimalnych wymagań.
-	</global>
 	<global name="UnsupportedRAM">
 		- Pamięć Twojego systemu nie spełnia minimalnych wymagań.
 	</global>

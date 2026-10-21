@@ -2245,6 +2245,17 @@
             <key>Value</key>
             <integer>30</integer>
         </map>
+        <key>AlchemyRenderProbeAllShadowCascades</key>
+        <map>
+            <key>Comment</key>
+            <string>Reflection probe captures render all four sun shadow cascades instead of two: two more shadow passes a probe face and two more shadow maps, for finer shadows across a capture. Mirrors keep two.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderReverseZ</key>
         <map>
             <key>Comment</key>
@@ -2304,6 +2315,17 @@
         <map>
             <key>Comment</key>
             <string>Shrink draw distance while free system memory is critically low, restoring it as memory frees up. Turn off to keep the full draw distance at all times.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderMirrorShaderReload</key>
+        <map>
+            <key>Comment</key>
+            <string>Debug: the first mirror update of a session purges the program binary cache, builds every program from its sources and rebuilds the mirrors (the #3331 workaround). Turn off and restart to see whether mirrors work without it.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2387,6 +2409,17 @@
             <string>F32</string>
             <key>Value</key>
             <real>64</real>
+        </map>
+        <key>AlchemyRenderTerrainTessRasterSegment</key>
+        <map>
+            <key>Comment</key>
+            <string>Shadow maps, but for the main view's nearest sun cascade, and reflection probe and mirror captures tessellate the terrain no finer than one segment per this many of their own texels or pixels, where the main view's levels would be finer. Their terrain shadows are then cast by a coarser cut of the surface the main view shades. 0 tessellates them as the main view does.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>8</real>
         </map>
         <key>AlchemyRenderWaterGlintRoughness</key>
         <map>
@@ -2562,7 +2595,7 @@
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>1.0</real>
+            <real>0.25</real>
         </map>
         <key>AlchemyScopeLayout</key>
         <map>
@@ -3069,7 +3102,7 @@
         <key>RenderAvatarShadowDetail</key>
         <map>
             <key>Comment</key>
-            <string>Which avatar passes cast shadows. 0 = opaque only, 1 = opaque + alpha mask, 2 = full (also alpha blend). Lower values speed up crowd scenes by skipping the expensive alpha-blend avatar shadow pass across all cascades.</string>
+            <string>How an avatar's transparent parts (hair, eyelashes, skirts, alpha layers) cast shadows. 0 = they cast none, only the body does. 1 = solid wherever their alpha passes the cutoff. 2 = the same, with semi-transparent texels cast as a stippled half shadow. 1 and 2 cost about the same; 0 skips their pass across all cascades, which speeds up crowd scenes.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

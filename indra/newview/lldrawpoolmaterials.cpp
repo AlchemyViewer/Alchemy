@@ -218,8 +218,8 @@ void LLDrawPoolMaterials::beginDeferredPass(S32 pass)
 
     if (rigged)
     {
-        llassert(mShader->mRiggedVariant != nullptr);
-        mShader = mShader->mRiggedVariant;
+        llassert(mShader->mRiggedVariant || !mShader->isComplete());
+        mShader = mShader->riggedVariant();
     }
 
     gPipeline.bindDeferredShader(*mShader);

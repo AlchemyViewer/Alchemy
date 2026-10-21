@@ -239,7 +239,7 @@ protected:
     F32         mCurrentGamma;
     U32         mFSAASamples;
     U32         mMaxCores; // for debugging only -- maximum number of CPU cores to use, or 0 for no limit
-    F32         mMaxGLVersion; // maximum OpenGL version to attempt to use (clamps to 3.2 - 4.6)
+    F32         mMaxGLVersion; // maximum OpenGL version to attempt to use (clamps to 4.1 - 4.6)
     WORD        mPrevGammaRamp[3][256];
     WORD        mCurrentGammaRamp[3][256];
     bool        mCustomGammaSet;

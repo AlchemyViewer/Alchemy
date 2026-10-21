@@ -244,7 +244,7 @@ uniform float uLensFlareGhostSpacing;             // step size along the axis
 
 // ---- Halo: ring opposite the sun -------------------------------------------
 uniform float uLensFlareHalo;                     // 0 = off, else brightness
-uniform float uLensFlareHaloRadius;               // ring radius in UV space
+uniform float uLensFlareHaloRadius;               // ring radius in screen heights (aspect corrected, as the ghosts)
 uniform float uLensFlareHaloWidth;                // ring thickness
 
 // ---- Starburst: angular spikes radiating from the sun ----------------------
@@ -346,7 +346,9 @@ vec3 computeLensFlare(vec2 uv)
     if (uLensFlareHalo > 0.0 && uLensFlareHaloRadius > 0.0)
     {
         vec2  halo_center = vec2(0.5) + (vec2(0.5) - sun_uv);
-        float halo_dist   = length(uv - halo_center);
+        vec2  hd          = uv - halo_center;
+        hd.x *= aspect;
+        float halo_dist   = length(hd);
         float halo_w      = max(uLensFlareHaloWidth, 0.01);
         float halo        = 1.0 - abs(halo_dist - uLensFlareHaloRadius) / halo_w;
         halo  = clamp(halo, 0.0, 1.0);
@@ -498,11 +500,17 @@ uniform float uGrainRange;                       // [0, 1]   luma position where
 uniform vec3  uGrainTint;                        // neutral gray; try (1, 0.9, 0.8) warm, (0.8, 0.9, 1) cool
 uniform bool  uGrainAnimate;                     // false = frozen pattern (static frame for stills)
 
+// Coarse grain's cells, in multiples of the size every other style uses.
+const float GRAIN_COARSE_SCALE = 2.5;
+
 // Noise sample in ~[-0.5, 0.5]. Style controls color vs luma and whether
 // cells are quantized for a coarser look. The caller scales by amplitude.
+// A cell is a whole number of pixels, so every cell on the screen is the
+// same size; a fractional one tiles as a fixed beat of wide and narrow cells.
 vec3 grainSample(vec2 fragCoord, int style, float size)
 {
-    float cell = max(size, 1.0);
+    float cell = (style == 2) ? size * GRAIN_COARSE_SCALE : size;
+    cell       = max(floor(cell + 0.5), 1.0);
     vec2  gp   = floor(fragCoord / cell) * cell;
     if (style == 1)
     {
@@ -526,8 +534,9 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord)
     float gluma = dot(color, LUMA);
 
     // Scale grain cells by resolution so a "size 1" grain looks the same
-    // perceptual size on 1080p and 4K displays.
-    float pixelScale    = max(uResolution.x, uResolution.y) / 1080.0;
+    // perceptual size on 1080p and 4K displays. 1080p names the frame's
+    // height, so the height sets the scale, whatever the aspect ratio.
+    float pixelScale    = uResolution.y / 1080.0;
     float effectiveSize = uGrainSize * pixelScale;
     vec3  n = grainSample(fragCoord + frameNoiseOffset(uGrainAnimate),
                           uGrainStyle, effectiveSize);
@@ -566,6 +575,13 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord)
 // grounded and slightly more accurate than Brettel/Viénot, especially for
 // tritanopia. Monochromacy/achromatomaly modes are implemented as
 // desaturation toward Rec.709 luma.
+//
+// Machado's matrices act on linear RGB and the blit's input is display
+// encoded, so both entry points below decode before simulating and encode
+// after.
+
+vec3 srgb_to_linear(vec3 cs);
+vec3 linear_to_srgb(vec3 cl);
 
 // ---- Compensation (daltonization, output path) -----------------------------
 uniform int   uCompensateMode;           // [0, 3] — 0 off, 1 protan, 2 deutan, 3 tritan
@@ -611,6 +627,9 @@ vec3 simulateCVD(vec3 c, int mode)
         return mix(c, vec3(dot(c, LUMA)), 0.8);
     }
 
+    // Each literal row below is one of Machado's rows. GLSL fills a mat3
+    // column by column, so m is the transpose of Machado's matrix and c * m
+    // is his M * c. Every row sums to 1, so white stays white.
     mat3 m;
     if (mode == 1)
     {
@@ -629,11 +648,11 @@ vec3 simulateCVD(vec3 c, int mode)
     else
     {
         // Tritanopia (Machado 2009, severity 1.0)
-        m = mat3(1.255528,-0.078441, -0.004733,
-                -0.076749, 0.930809,  0.691367,
-                 0.178779,-0.147632,  0.303900);
+        m = mat3(1.255528,-0.076749, -0.178779,
+                -0.078411, 0.930809,  0.147602,
+                 0.004733, 0.691367,  0.303900);
     }
-    return m * c;
+    return c * m;
 }
 
 // Daltonization: compute the error between original and CVD-simulated
@@ -681,7 +700,8 @@ vec3 applyCVDCompensation(vec3 color)
 {
     if (uCompensateMode <= 0 || uCompensateAmount <= 0.0)
         return color;
-    return clamp(daltonize(color, uCompensateMode, uCompensateAmount), 0.0, 1.0);
+    vec3 lin = daltonize(srgb_to_linear(clamp(color, 0.0, 1.0)), uCompensateMode, uCompensateAmount);
+    return linear_to_srgb(clamp(lin, 0.0, 1.0));
 }
 
 // Preview overlay entry. Mode 7 replaces the image entirely with a
@@ -696,7 +716,8 @@ vec3 applyPreview(vec3 color)
         return color;
     if (uPreviewMode == 7)
         return falseColor(color);
-    return simulateCVD(clamp(color, 0.0, 1.0), uPreviewMode);
+    vec3 lin = simulateCVD(srgb_to_linear(clamp(color, 0.0, 1.0)), uPreviewMode);
+    return linear_to_srgb(clamp(lin, 0.0, 1.0));
 }
 
 
@@ -704,10 +725,13 @@ vec3 applyPreview(vec3 color)
 // Dither — triangular PDF noise for banding suppression at the output stage
 // =============================================================================
 //
-// Interleaved Gradient Noise (Jimenez, COD:AW 2014) sampled twice with a
-// small offset to produce a TPDF-shaped noise in [-1, 1]. TPDF is
-// perceptually superior to rectangular PDF — it fully masks quantization
-// banding with no residual noise-floor shift.
+// Interleaved Gradient Noise (Jimenez, COD:AW 2014), one sample a pixel,
+// remapped through the triangular distribution's inverse CDF to a TPDF noise
+// in [-1, 1] (Gjøl, "Banding in Games", 2016). TPDF is perceptually superior
+// to rectangular PDF — it fully masks quantization banding with no residual
+// noise-floor shift. The sum of two IGN taps is not a substitute: IGN is a
+// gradient, so a second tap at a fixed offset is the first shifted by a
+// constant, and the pair sums to a rectangular ±0.5.
 //
 // Temporal decorrelation is handled by frameNoiseOffset() (see top of file):
 // the noise pattern fully reshuffles between frames instead of visibly
@@ -723,8 +747,7 @@ uniform bool  uDitherAnimate;           // false = freeze pattern. Almost always
 
 // Interleaved Gradient Noise core — hashes a 2D input to a well-distributed
 // [0, 1) sample. Frame decorrelation is applied at the call site via
-// frameNoiseOffset(); the TPDF pair must share the same offset so keeping it
-// outside IGN is essential, not just an optimization.
+// frameNoiseOffset().
 float ign(vec2 p)
 {
     return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
@@ -735,16 +758,19 @@ vec3 applyDither(vec3 color, vec2 fragCoord)
     if (uDitherAmount <= 0.0)
         return color;
 
-    // Compute the frame offset *once* and reuse for both TPDF taps — the
-    // IGN calls are cheap but factoring the per-frame hash out keeps the
-    // pattern coherent across the pair (otherwise the two taps would
-    // decorrelate from each other, not just from previous frames).
     vec2 p = fragCoord + frameNoiseOffset(uDitherAnimate);
 
-    float tpdf = ign(p) + ign(p + vec2(1.618, 2.414)) - 1.0;
+    // Uniform [-1, 1) to triangular [-1, 1]: |x| = 1 - sqrt(1 - |u|) has density
+    // 2(1 - |x|), and the sign carries over.
+    float u    = ign(p) * 2.0 - 1.0;
+    float tpdf = sign(u) * (1.0 - sqrt(1.0 - abs(u)));
 
     float levels = (uDitherBits >= 10) ? 1023.0 : 255.0;
-    return color + tpdf * (uDitherAmount / levels);
+
+    // Within a step of black or white the noise shrinks to nothing: a full step's either way
+    // would round an eighth of exact black up a code, and as much of exact white down one.
+    vec3 room = clamp(min(color, 1.0 - color) * levels, 0.0, 1.0);
+    return color + tpdf * (uDitherAmount / levels) * room;
 }
 
 

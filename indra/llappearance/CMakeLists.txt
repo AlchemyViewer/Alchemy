@@ -73,3 +73,30 @@ target_include_directories(
   PRIVATE $<TARGET_PROPERTY:llui,INTERFACE_INCLUDE_DIRECTORIES>
 )
 target_precompile_headers(llappearance REUSE_FROM llprecompiled)
+
+if(AL_BUILD_TESTS)
+  al_add_test_binary(
+    llappearance_tests
+    PROJECT llappearance
+    SOURCES tests/llavatarappearancedefines_test.cpp tests/llwearabletype_test.cpp
+    # The dictionary lookups LLVOAvatar::updateTextures makes for every texture entry.
+    BENCH_SOURCES tests/llavatarappearancedefines_bench.cpp
+    LIBRARIES llappearance
+  )
+
+  # What llappearance asks the viewer for, defined once.
+  add_library(llappearance_test_fakes OBJECT tests/llappearance_test_fakes.cpp)
+  target_link_libraries(llappearance_test_fakes PRIVATE al::flags llrender)
+  set_target_properties(llappearance_test_fakes PROPERTIES FOLDER "Tests/llappearance")
+
+  # The texture layers' morph mask readback on the hidden window, in the one
+  # context the process shares.
+  al_add_test_binary(
+    llappearance_gl_tests
+    PROJECT llappearance
+    SOURCES tests/lltexlayer_gl_test.cpp
+    LIBRARIES llappearance
+    SUPPORT llappearance_test_fakes llrender_test_checks llcommon_test_checks
+    GL
+  )
+endif()

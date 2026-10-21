@@ -28,6 +28,7 @@
 #define LL_LLASSETTYPE_H
 
 #include <string>
+#include <string_view>
 
 class LL_COMMON_API LLAssetType
 {
@@ -146,18 +147,18 @@ public:
         AT_NONE = -1
     };
 
-    // machine transation between type and strings
-    static EType                lookup(const char* name); // safe conversion to std::string, *TODO: deprecate
-    static EType                lookup(const std::string& type_name);
-    static const char*          lookup(EType asset_type);
+    // machine translation between type and strings
+    static EType                lookup(std::string_view type_name); // AT_UNKNOWN when no type has the name
+    static std::string_view     lookup(EType asset_type);           // BADLOOKUP when the type has no entry
 
     // translation from a type to a human readable form.
-    static EType                lookupHumanReadable(const char* desc_name); // safe conversion to std::string, *TODO: deprecate
-    static EType                lookupHumanReadable(const std::string& readable_name);
-    static const char*          lookupHumanReadable(EType asset_type);
+    static EType                lookupHumanReadable(std::string_view readable_name); // AT_NONE when no type has the name
+    static std::string_view     lookupHumanReadable(EType asset_type); // empty for AT_UNKNOWN and AT_NONE
 
-    static EType                getType(const std::string& desc_name);
-    static const std::string&   getDesc(EType asset_type);
+    static std::string_view     getDesc(EType asset_type);
+
+    // the type has an entry; AT_UNKNOWN and AT_NONE have one
+    static bool                 isKnown(EType asset_type);
 
     static bool                 lookupCanLink(EType asset_type);
     static bool                 lookupIsLinkType(EType asset_type);
@@ -167,7 +168,7 @@ public:
 
     static LLSD getTypeNames();
 
-    static const std::string    BADLOOKUP;
+    static constexpr std::string_view BADLOOKUP = "llassettype_bad_lookup";
 
 protected:
     LLAssetType() {}

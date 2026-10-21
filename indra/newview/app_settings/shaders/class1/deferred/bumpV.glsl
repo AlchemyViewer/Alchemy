@@ -43,6 +43,7 @@ out vec3 vary_position;
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #endif
 
@@ -59,7 +60,7 @@ void main()
     vary_position = pos;
     gl_Position = projection_matrix*vec4(pos, 1.0);
 
-    vec3 n = normalize(mat3(modelview_matrix) * skinDirection(skin, normal.xyz));
+    vec3 n = normalize(mat3(modelview_matrix) * skinNormal(skin, normal.xyz));
     vec3 t = normalize(mat3(modelview_matrix) * skinDirection(skin, tangent.xyz));
 #else
     vary_position = (modelview_matrix*vec4(position.xyz, 1.0)).xyz;

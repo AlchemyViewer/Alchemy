@@ -37,6 +37,13 @@ void main()
 {
     float alpha = texture(diffuseMap,vary_texcoord0.xy).a;
 
+    // The cutoff renderAlphaObjects sets for blended casters (ALPHA_BLEND_CUTOFF), on the
+    // texture's alpha, as shadowAlphaMaskF takes it for a legacy blended prim.
+    if (alpha < minimum_alpha)
+    {
+        discard;
+    }
+
     alpha *= vertex_color.a;
 
     if (alpha < 0.05) // treat as totally transparent
@@ -44,9 +51,10 @@ void main()
         discard;
     }
 
-    if (alpha < 0.88) // treat as semi-transparent
+    // Semi-transparent: a half-density shadow, in shadowAlphaMaskF's checkerboard.
+    if (alpha < 0.88)
     {
-        if (fract(0.5*floor(target_pos_x / post_pos.w )) < 0.25)
+        if (((int(gl_FragCoord.x) + int(gl_FragCoord.y)) & 1) == 0)
         {
             discard;
         }

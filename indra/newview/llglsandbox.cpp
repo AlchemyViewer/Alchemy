@@ -72,6 +72,8 @@
 
 #include <vector>
 
+#include <fmt/format.h>
+
 // Height of the yellow selection highlight posts for land
 constexpr F32 PARCEL_POST_HEIGHT = 0.666f;
 
@@ -1028,6 +1030,12 @@ F32 gpu_benchmark()
     const F32 time_limit = 30;
 
     std::vector<LLRenderTarget> dest(count);
+    for (U32 i = 0; i < count; ++i)
+    {
+        char label[32];
+        const auto result = fmt::format_to_n(label, sizeof(label), "benchmark{}", i);
+        dest[i].setLabel(std::string_view(label, (size_t)(result.out - label)));
+    }
     TextureHolder texHolder(0, count);
     std::vector<F32> results;
 

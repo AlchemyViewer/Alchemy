@@ -34,6 +34,7 @@
 #include <vector>
 
 #include "llavatarappearancedefines.h"
+#include "lldrawpoolalpha.h"
 #include "llenvironment.h"
 #include "llselectmgr.h"
 #include "llviewercamera.h"
@@ -187,28 +188,62 @@ namespace
 
 };  // namespace
 
+U32 LLGLTFPreviewTexture::sLiveCount = 0;
+
 LLGLTFPreviewTexture::LLGLTFPreviewTexture(LLPointer<LLFetchedGLTFMaterial> material, S32 width)
     : LLViewerDynamicTexture(width, width, 4, EOrder::ORDER_MIDDLE)
     , mGLTFMaterial(material)
 {
+    ++sLiveCount;
+}
+
+LLGLTFPreviewTexture::~LLGLTFPreviewTexture()
+{
+    // The last preview gone, the probe pack's post targets and bloom, there for previews alone, are freed with the next
+    // frame's resources, and with them the pack where reflection probes are off.
+    if (--sLiveCount == 0)
+    {
+        gPipeline.markRenderInputsDirty();
+    }
 }
 
 // static
 LLPointer<LLGLTFPreviewTexture> LLGLTFPreviewTexture::create(LLPointer<LLFetchedGLTFMaterial> material)
 {
-    return new LLGLTFPreviewTexture(material, LLPipeline::MAX_PREVIEW_WIDTH);
+    // No larger than the probe pack the preview renders through (render()): the probe resolution
+    // times ALProbeSuperSample, which is below MAX_PREVIEW_WIDTH at a supersample under 4, and a
+    // larger viewport would render only the corner of the sphere that fits. That is the size the
+    // pack is planned at whether or not it is built. Its post targets and bloom are planned only
+    // while a preview is alive, and with reflection probes off the rest of it too: they are built
+    // for the previews with the next frame's resources, and needsRender waits for them.
+    const ALRenderResourceInputs& inputs = gPipeline.resourceInputs();
+    const U32 pack_width = inputs.mProbeResolution * inputs.mProbeSuperSample;
+    if (!gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::ProbePostPing))
+    {
+        gPipeline.markRenderInputsDirty();
+    }
+    const U32 width = llmin(LLPipeline::MAX_PREVIEW_WIDTH, pack_width);
+    return new LLGLTFPreviewTexture(material, (S32)width);
 }
 
 bool LLGLTFPreviewTexture::needsRender()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
+    // Not before the probe pack it renders through is there, and planned with the post target the
+    // preview takes from the pool; asked again each frame until it is.
+    if (!gPipeline.mAuxillaryRT.screen.isComplete() ||
+        !gPipeline.resourcePlan().wants(ALRenderResourcePlan::Id::ProbePostPing))
+    {
+        return false;
+    }
+
     if (!mShouldRender && mBestLoad.isFullyLoaded()) { return false; }
     MaterialLoadLevels current_load = get_material_load_levels(*mGLTFMaterial.get());
     if (current_load < mBestLoad)
     {
         mShouldRender = true;
-        mBestLoad = current_load;
+        mPendingLoad = current_load;
         return true;
     }
     return false;
@@ -254,7 +289,8 @@ PreviewSphere create_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, 
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_UI;
 
-    const LLColor4U vertex_color(material->mBaseColor);
+    // sRGB in the attribute, as LLFace stores it; pbralphaV linearises it
+    const LLColor4U vertex_color(srgbColor4(material->mBaseColor));
 
     LLPrimitive prim;
     prim.init_primitive(LL_PCODE_VOLUME);
@@ -349,7 +385,7 @@ void set_preview_sphere_material(PreviewSphere& preview_sphere, LLPointer<LLFetc
     llassert(!preview_sphere.empty());
     if (preview_sphere.empty()) { return; }
 
-    const LLColor4U vertex_color(material->mBaseColor);
+    const LLColor4U vertex_color(srgbColor4(material->mBaseColor));
 
     // See comments about unmapBuffer in llvertexbuffer.h
     for (PreviewSpherePart& part : preview_sphere)
@@ -385,20 +421,21 @@ PreviewSphere& get_preview_sphere(LLPointer<LLFetchedGLTFMaterial>& material, co
 // Final, direct modifications to shader constants, just before render
 void fixup_shader_constants(LLGLSLShader& shader)
 {
-    // Sunlight intensity of 0 no matter what
+    // Lit by the sun, with no haze. Its white light is the Environment block's
+    // (bindEnvironmentUBOLitBy, around the draw).
     shader.uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
-    shader.uniform3fv(LLShaderMgr::SUNLIGHT_COLOR, 1, LLColor3::white.mV);
     shader.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, 0.0f);
 
-    // Ignore sun shadow (if enabled)
-    for (U32 i = 0; i < 6; i++)
-    {
-        const S32 channel = shader.getTextureChannel(LLShaderMgr::DEFERRED_SHADOW0+i);
-        if (channel != -1)
-        {
-            gGL.getTextureSlot(channel)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
-        }
-    }
+    // Ignore shadows (if enabled): the preview has none of the maps, the sun's four cascades and the spot pair, so each
+    // reads lit without a sample. Their units keep the depth maps bindShadowMaps put there, under the sampler the
+    // program declares them for, and the next bind through bindShadowMaps hands the program its real set again.
+    constexpr S32 every_shadow_map = (1 << 6) - 1;
+    shader.uniform1i(LLShaderMgr::UNBUILT_SHADOW_MAPS, every_shadow_map);
+
+    // Every alpha mode draws through the alpha pool's program here, and the material's bind sets a
+    // mask or opaque cutoff but leaves a blended one to the pass: without this a blended sphere
+    // would keep the cutoff of whichever preview drew before it.
+    LLDrawPoolAlpha::setCoverageCutoff(&shader);
 }
 
 // Set a variable to a value temporarily, and restor the variable's old value
@@ -428,6 +465,15 @@ bool LLGLTFPreviewTexture::render()
 
     if (!mShouldRender) { return false; }
 
+    // The probe pack's post target the colour correction writes, from the pool with the bloom
+    // until the preview is drawn; acquired ahead of every bind below.
+    ALTransientTargets    post(gPipeline.mTransientTargets);
+    LLRenderTarget* const post_ping = gPipeline.acquireResource(post, ALRenderResourcePlan::Id::ProbePostPing);
+    if (!post_ping)
+    {
+        return false;
+    }
+
     // The swatch's alpha is its coverage, drawn over a checkerboard. Without this the
     // preview takes whatever mask the last frame ended on, and after a HUD pass that leaves
     // alpha unwritten from the clears through the final blit.
@@ -441,8 +487,6 @@ bool LLGLTFPreviewTexture::render()
     LLGLDisable scissor(GL_SCISSOR_TEST);
     SetTemporarily<bool> no_dof(&LLPipeline::RenderDepthOfField, false);
     SetTemporarily<bool> no_glow(&LLPipeline::sRenderGlow, false);
-    SetTemporarily<bool> no_ssr(&LLPipeline::RenderScreenSpaceReflections, false);
-    SetTemporarily<U32> no_aa(&LLPipeline::RenderFSAAType, U32(0));
     SetTemporarily<LLPipeline::RenderTargetPack*> use_auxiliary_render_target(&gPipeline.mRT, &gPipeline.mAuxillaryRT);
 
     LLVector3 light_dir3(1.0f, 1.0f, 1.0f);
@@ -521,12 +565,17 @@ bool LLGLTFPreviewTexture::render()
         gPipeline.bindDeferredShader(shader);
         fixup_shader_constants(shader);
 
+        // A white sun through no atmosphere, whatever the sky's light is.
+        LLEnvironment::instance().bindEnvironmentUBOLitBy(LLColor3::white);
+
         LLFetchedGLTFMaterial* lastMat = nullptr;
         LLViewerTexture* lastTex = nullptr;
         for (PreviewSpherePart& part : preview_sphere)
         {
             LLRenderPass::pushGLTFBatch(*part->mDrawInfo, lastMat, lastTex);
         }
+
+        LLEnvironment::instance().bindEnvironmentUBO();
 
         gPipeline.unbindDeferredShader(shader);
 
@@ -536,7 +585,8 @@ bool LLGLTFPreviewTexture::render()
     // *HACK: Hide mExposureMap from generateExposure
     gPipeline.mExposureMap.swapFBORefs(gPipeline.mLastExposure);
 
-    static LLCachedControl<bool> hdr(gSavedSettings, "RenderHDREnabled", false);
+    const bool hdr = LLPipeline::hdrEnabled();
+    LLPipeline::Bloom bloom;
     if (hdr)
     {
         gPipeline.generateLuminance(&screen, &gPipeline.mLuminanceMap);
@@ -544,16 +594,18 @@ bool LLGLTFPreviewTexture::render()
 
         // Bloom composite is folded into colorCorrect's tonemap variants, so we
         // only generate the pyramid here.
-        gPipeline.generateBloomHDR(&screen);
+        bloom = gPipeline.generateBloomHDR(&screen, post);
     }
 
-    gPipeline.colorCorrect(&screen, &gPipeline.mRT->postPingMap, true, false);
+    gPipeline.colorCorrect(&screen, post_ping, true, false, &bloom);
     LLVertexBuffer::unbind();
 
     if (!hdr)
     {
-        gPipeline.generateGlow(&gPipeline.mRT->postPingMap);
-        gPipeline.combineGlow(&gPipeline.mRT->postPingMap, &screen);
+        if (LLRenderTarget* glow = gPipeline.generateGlow(post_ping, post))
+        {
+            gPipeline.combineGlow(post_ping, &screen, glow);
+        }
     }
 
     // *HACK: Restore mExposureMap (it will be consumed by generateExposure next frame)
@@ -565,9 +617,9 @@ bool LLGLTFPreviewTexture::render()
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."
-    // Under HDR that is colorCorrect's output in postPingMap; otherwise the glow combine has
+    // Under HDR that is colorCorrect's output in post_ping; otherwise the glow combine has
     // written the result back to the screen.
-    LLRenderTarget* last_in_chain = hdr ? &gPipeline.mRT->postPingMap : &screen;
+    LLRenderTarget* last_in_chain = hdr ? post_ping : &screen;
     gDeferredPostNoDoFProgram.bindTexture(LLShaderMgr::DEFERRED_DIFFUSE, last_in_chain);
     gDeferredPostNoDoFProgram.bindDepthTexture(LLShaderMgr::DEFERRED_DEPTH, &gPipeline.mAuxillaryRT.deferredScreen);
 
@@ -594,6 +646,10 @@ void LLGLTFPreviewTexture::postRender(bool success)
 
     if (!mShouldRender) { return; }
     mShouldRender = false;
+    if (success)
+    {
+        mBestLoad = mPendingLoad;
+    }
 
     LLViewerDynamicTexture::postRender(success);
 }
@@ -603,13 +659,6 @@ LLPointer<LLViewerTexture> LLGLTFMaterialPreviewMgr::getPreview(LLPointer<LLFetc
     if (!material)
     {
         return nullptr;
-    }
-
-    static LLCachedControl<bool> sUIPreviewMaterial(gSavedSettings, "UIPreviewMaterial", false);
-    if (!sUIPreviewMaterial)
-    {
-        fetch_texture_for_ui(material->mBaseColorTexture, material->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
-        return material->mBaseColorTexture;
     }
 
     if (!is_material_loaded_enough_for_ui(*material))

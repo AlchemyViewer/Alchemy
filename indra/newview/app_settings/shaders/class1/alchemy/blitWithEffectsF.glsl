@@ -7,9 +7,12 @@
  * the orchestrator that sequences them in the canonical order.
  *
  * Order matters:
- *   vignette  → CVD compensation → film grain → dither → preview
- * Vignette runs before CVD so the accessibility pass considers the final
- * darkening. Film grain runs after CVD so the grain stays neutral in tint.
+ *   sharpen → vignette  → CVD compensation → film grain → dither → preview
+ * Sharpening is in the sample itself, where the post chain ends with it: the
+ * live frame is read as the image CAS would have written, through the lens
+ * distortion's warp as that image was. Vignette runs before CVD so the
+ * accessibility pass considers the final darkening. Film grain runs after CVD
+ * so the grain stays neutral in tint.
  * Dither runs last (before preview) so quantization is resolved against
  * the true final color. It is only active here when the post chain is
  * HDR; in the 8-bit case, colorCorrectF dithers earlier instead. Preview overlays are
@@ -45,7 +48,7 @@ out vec4 frag_color;
 // Uniforms
 // =============================================================================
 
-uniform sampler2D diffuseRect;      // Linear Rec.709 / linear-sRGB.
+uniform sampler2D diffuseRect;      // Display encoded: colorCorrect writes it through linear_to_srgb.
 uniform sampler2D depthMap;
 
 // Reference still: a grabbed frame that the live image is wiped against.
@@ -70,6 +73,54 @@ vec3 applyFilmGrain(vec3 color, vec2 fragCoord);
 vec3 applyDither(vec3 color, vec2 fragCoord);
 #endif
 vec3 applyPreview(vec3 color);
+
+// =============================================================================
+// Sharpening
+// =============================================================================
+//
+// Contrast adaptive sharpening, where it is the last of the post chain: the live frame is sampled as the image CAS
+// would have written, worked out here from diffuseRect rather than read back from a pass of its own. The program
+// built with CAS_LIBRARY links CASF.glsl's filter in, with its cas_param_0 and cas_param_1.
+
+#ifdef CAS_LIBRARY
+vec3 casSharpenedTexel(ivec2 p);
+
+// The texel GL_MIRRORED_REPEAT reads for texel index i of an axis `size` texels long, as the GL specification states
+// it: mirrored about the first texel's outer edge, then repeating every 2 * size.
+int mirroredTexel(int i, int size)
+{
+    int m = (i < 0) ? -1 - i : i;
+    m = m % (2 * size);
+    return (m < size) ? m : 2 * size - 1 - m;
+}
+
+// What texture(diffuseRect, uv) returns from the image CAS sharpens, under the bilinear, mirrored repeat sampler
+// diffuseRect is bound with: the filter's four texels, each sharpened as CAS's own pass writes it, weighted as the
+// filter weighs them, in the 1/256 steps a texture unit takes its weights in. Where uv lies on a texel's centre, as
+// it does wherever the frame is drawn one to one, that is the one texel, and the filter's weights select it alone.
+// The alpha is CAS's, which writes none.
+vec4 sampleSharpened(vec2 uv)
+{
+    ivec2 size = textureSize(diffuseRect, 0);
+    vec2  p    = uv * vec2(size) - 0.5;
+    vec2  i0   = floor(p);
+    vec2  f    = round((p - i0) * 256.0) / 256.0;
+
+    ivec2 lo = ivec2(mirroredTexel(int(i0.x), size.x), mirroredTexel(int(i0.y), size.y));
+    ivec2 hi = ivec2(mirroredTexel(int(i0.x) + 1, size.x), mirroredTexel(int(i0.y) + 1, size.y));
+
+    if ((f.x == 0.0 || f.x == 1.0) && (f.y == 0.0 || f.y == 1.0))
+    {
+        return vec4(casSharpenedTexel(ivec2(f.x == 0.0 ? lo.x : hi.x, f.y == 0.0 ? lo.y : hi.y)), 0.0);
+    }
+
+    vec3 c00 = casSharpenedTexel(lo);
+    vec3 c10 = casSharpenedTexel(ivec2(hi.x, lo.y));
+    vec3 c01 = casSharpenedTexel(ivec2(lo.x, hi.y));
+    vec3 c11 = casSharpenedTexel(hi);
+    return vec4(mix(mix(c00, c10, f.x), mix(c01, c11, f.x), f.y), 0.0);
+}
+#endif
 
 // =============================================================================
 // Reference still
@@ -110,8 +161,13 @@ vec4 sampleWithReference(vec2 uv)
     }
 
     vec2 duv = applyLensDistortion(pane_uv);
+#ifdef CAS_LIBRARY
+    vec4 s   = from_still ? texture(uReferenceStill, duv)
+                          : sampleSharpened(duv);
+#else
     vec4 s   = from_still ? texture(uReferenceStill, duv)
                           : texture(diffuseRect, duv);
+#endif
 
     // Resolve out-of-frame samples to black rather than smearing the edge
     // texel into the corners. rgb only: alpha carries no meaning at the

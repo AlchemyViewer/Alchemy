@@ -29,10 +29,13 @@
 
 // LLRenderTarget is unavailible on the mapserver since it uses FBOs.
 
+#include "alrendertargetdesc.h"
 #include "llgl.h"
 #include "llrender.h"
 
 #include <array>
+#include <string>
+#include <string_view>
 
 /*
  Wrapper around OpenGL framebuffer objects for use in render-to-texture
@@ -63,8 +66,6 @@
 class LLRenderTarget
 {
 public:
-    // Whether or not to use FBO implementation
-    static bool sUseFBO;
     static U32 sBytesAllocated;
     static U32 sCurFBO;
     static U32 sCurResX;
@@ -89,6 +90,14 @@ public:
         MIPS_MANUAL,        // Levels allocated; the owner regenerates them when it chooses.
     };
 
+    // What ensure did.
+    enum class EnsureResult : U8
+    {
+        Kept,   // The target already matched: no GL call was made, and every name is the one it had.
+        Built,  // The target was built from the description.
+        Failed, // The target could not be built, and is released.
+    };
+
     LLRenderTarget();
     ~LLRenderTarget();
 
@@ -103,6 +112,55 @@ public:
     // usage - deprecated, should always be TT_TEXTURE
     // depth_fmt - bit depth for the depth component (ignored unless depth is true)
     bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
+
+    // What this target's own storage is: its size, the formats of the colour attachments it allocated, the depth it
+    // allocated, and its mips. A released target is the default description. A depth attachment shared from another
+    // target is not part of it, nor is a texture lent by setColorAttachment.
+    ALRenderTargetDesc desc() const;
+
+    // Make this target what `desc` describes, with a depth attachment of its own where the description has one.
+    //
+    // A target that already is what `desc` describes, and holds nothing else -- no shared depth, no lent texture --
+    // returns Kept, without a GL call. Any other is released and built from the description, as allocate and
+    // addColorAttachment would build it, and returns Built. The size is held to the context's largest texture before
+    // comparing, as allocate holds it, so a description past that size is kept rather than built again on every call.
+    //
+    // A description no target can be built from -- no size, no attachment, a format after a 0 in the colour list,
+    // stencil without depth, generated mips of an integer first attachment or of none -- and one GL cannot build, return
+    // Failed and leave the target released.
+    EnsureResult ensure(const ALRenderTargetDesc& desc);
+
+    // Make this target what `desc` describes, its depth attachment the one `depth_from` allocated. `desc` describes
+    // this target's own storage, so it has no depth or stencil, and it is the size of depth_from.
+    //
+    // The colour is built only where it differs from the description, as ensure(desc) builds it, and the depth is
+    // attached only where this target shares none or depth_from's depth was built since it was attached. That is told
+    // by a serial each depth build takes, not by the texture name, which GL hands out again once a texture is deleted.
+    // So building a depth owner again re-points its sharers without building their colour again.
+    //
+    // Kept means no GL call; Built that the colour was built, the depth attached, or both. A description that cannot
+    // be built, one with depth of its own or a size other than depth_from's, and a depth_from with no depth of its
+    // own, return Failed and leave this target released.
+    EnsureResult ensure(const ALRenderTargetDesc& desc, const LLRenderTarget& depth_from);
+
+    // Whether the depth attachment is another target's, attached by shareDepthBuffer or ensure.
+    bool sharesDepth() const { return mUseDepth && !mDepth; }
+
+    // Which build of its own depth this target holds, unique for the process: a target sharing it can tell the depth
+    // it attached from one built since in its place. 0 for none.
+    U64 getDepthSerial() const { return mDepthSerial; }
+
+    // What sBytesAllocated counts for a target built from `desc`: each colour attachment's first level and the depth
+    // of its own, not a depth it shares.
+    static U64 bytesFor(const ALRenderTargetDesc& desc);
+
+    // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the
+    // colour attachments it allocated `label.color0` on, and the depth it allocated `label.depth`. The label is kept
+    // across builds and given to what each builds, so an owner names its target once; set on a built target, it
+    // names what the target holds now. Empty leaves the target unnamed. Objects are labelled under debug GL (gDebugGL)
+    // alone; the label is kept either way.
+    void setLabel(std::string_view label);
+    const std::string& getLabel() const { return mLabel; }
 
     //resize existing attachments to use new resolution and color format
     // CAUTION: if the GL runs out of memory attempting to resize, this render target will be undefined
@@ -254,6 +312,9 @@ public:
     static LLRenderTarget* getCurrentBoundTarget() { return sBoundTarget; }
 
     // *HACK
+    // Trades framebuffers and colour textures with `other`, a target of the same description, and with them the shared
+    // depth each framebuffer holds. Each keeps its label, given to what it holds now: where the two differ under debug
+    // GL, every object of both is labelled again, a glObjectLabel call each.
     void swapFBORefs(LLRenderTarget& other);
 
     static LLRenderTarget* sBoundTarget;
@@ -270,11 +331,15 @@ protected:
     LLRenderTarget* mPreviousRT = nullptr;
 
     U32 mDepth;
+    // Which build of the depth attachment mDepth is, unique for the process; 0 for none.
+    U64 mDepthSerial = 0;
+    // The serial of the depth attached from another target; 0 for none.
+    U64 mSharedDepthSerial = 0;
     bool mUseDepth;
     bool mStencil;
     eDepthFormat mDepthFormat;
-    eMipGeneration mGenerateMipMaps;
-    U32 mMipLevels;
+    eMipGeneration mGenerateMipMaps = MIPS_NONE;
+    U32 mMipLevels = 0;
 
     ALTextureSlot::eTextureType mUsage;
 
@@ -284,6 +349,22 @@ protected:
 
     // Clear each colour draw buffer to the clear colour by the call its attachment's kind takes, float or integer.
     void clearColorBuffers();
+
+    // Release what the target holds and allocate what `desc` describes, depth included. False leaves it released.
+    bool build(const ALRenderTargetDesc& desc);
+
+    // Attach `owner`'s depth, in place of any depth this target shared before.
+    void attachSharedDepth(const LLRenderTarget& owner);
+
+    // Give the framebuffer and the depth this target allocated their labels.
+    void labelFramebuffer() const;
+    // Give the colour attachment this target allocated at `attachment` its label.
+    void labelColor(U32 attachment) const;
+
+    std::string mLabel;
+
+    // The serial the last depth build took.
+    static U64 sLastDepthSerial;
 };
 
 #endif

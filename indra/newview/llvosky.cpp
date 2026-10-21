@@ -535,7 +535,7 @@ void LLVOSky::initCubeMap()
         images.push_back(mShinyTex[side].getImageRaw());
     }
 
-    if (!mCubeMap && gSavedSettings.getBOOL("RenderWater") && LLCubeMap::sUseCubeMaps)
+    if (!mCubeMap && gSavedSettings.getBOOL("RenderWater"))
     {
         mCubeMap = new LLCubeMap();
     }
@@ -580,7 +580,7 @@ void LLVOSky::restoreGL()
 
     updateDirections(psky);
 
-    if (gSavedSettings.getBOOL("RenderWater") && LLCubeMap::sUseCubeMaps)
+    if (gSavedSettings.getBOOL("RenderWater"))
     {
         initCubeMap();
     }

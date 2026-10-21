@@ -37,6 +37,7 @@
 #ifdef HAS_SKIN
 mat3x4 getSkinBlend();
 vec3 skinDirection(mat3x4 b, vec3 dir);
+vec3 skinNormal(mat3x4 b, vec3 n);
 vec4 skinTransformH(mat3x4 b, vec3 pos, mat4 m);
 #else
 #endif
@@ -70,6 +71,7 @@ out vec3 vary_normal;
 out vec3 vary_position;
 
 vec2 texture_transform(vec2 vertex_texcoord, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
+vec4 linearizeVertexTint(vec4 tint);
 vec4 tangent_space_transform(vec4 vertex_tangent, vec3 vertex_normal, vec4[2] khr_gltf_transform, mat4 sl_animation_transform);
 
 void main()
@@ -102,7 +104,7 @@ void main()
     emissive_texcoord           = texture_transform(texcoord0, em, ident);
 
 #ifdef HAS_SKIN
-    vec3 n = mat3(modelview_matrix) * skinDirection(skin, normal.xyz);
+    vec3 n = mat3(modelview_matrix) * skinNormal(skin, normal.xyz);
     vec3 t = mat3(modelview_matrix) * skinDirection(skin, tangent.xyz);
 #else
     vec3 n = normal_matrix * normal;
@@ -116,5 +118,5 @@ void main()
     vary_sign = transformed_tangent.w;
     vary_normal = n;
 
-    vertex_color = diffuse_color;
+    vertex_color = linearizeVertexTint(diffuse_color);
 }

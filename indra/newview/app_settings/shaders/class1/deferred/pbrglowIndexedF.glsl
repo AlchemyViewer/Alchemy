@@ -39,6 +39,7 @@
 
 uniform vec3  gltf_emissive_color[GLTF_INDEXED_CHANNELS];
 uniform float gltf_minimum_alpha[GLTF_INDEXED_CHANNELS]; // PBR alphaMode MASK cutoff, -1 for opaque
+uniform float gltf_base_color_alpha[GLTF_INDEXED_CHANNELS]; // baseColorFactor alpha, which the emissive stream displaces from vertex_color
 
 uniform sampler2D basecolor0;    // always in sRGB space
 uniform sampler2D emissivemap0;
@@ -132,9 +133,9 @@ void main()
 {
     int mi = vary_material_index;
 
-    vec4 basecolor = sample_basecolor(base_color_texcoord.xy).rgba;
+    float coverage = sample_basecolor(base_color_texcoord.xy).a * gltf_base_color_alpha[mi];
 
-    if (basecolor.a < gltf_minimum_alpha[mi])
+    if (coverage < gltf_minimum_alpha[mi])
     {
         discard;
     }

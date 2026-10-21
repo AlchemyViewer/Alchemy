@@ -29,6 +29,8 @@
 
 #include "llassettype.h"
 
+#include <string_view>
+
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Class LLInventoryType
 //
@@ -132,11 +134,11 @@ public:
     };
 
 
-    // machine transation between type and strings
-    static EType lookup(const std::string& name);
-    static const std::string &lookup(EType type);
+    // machine translation between type and strings
+    static EType lookup(std::string_view name);   // IT_NONE when no type has the name
+    static std::string_view lookup(EType type);   // empty when the type has no entry
     // translation from a type to a human readable form.
-    static const std::string &lookupHumanReadable(EType type);
+    static std::string_view lookupHumanReadable(EType type);
 
     // return the default inventory for the given asset type.
     static EType defaultForAssetType(LLAssetType::EType asset_type);

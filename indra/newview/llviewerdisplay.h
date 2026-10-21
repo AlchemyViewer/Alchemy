@@ -43,8 +43,5 @@ extern bool gDepthDirty;
 extern bool gTeleportDisplay;
 extern LLFrameTimer gTeleportDisplayTimer;
 extern bool         gForceRenderLandFence;
-extern bool gResizeScreenTexture;
-extern bool gResizeShadowTexture;
-extern bool gWindowResized;
 
 #endif // LL_LLVIEWERDISPLAY_H

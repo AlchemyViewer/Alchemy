@@ -3,6 +3,7 @@
 set(
   llrender_SOURCES
   aldepthbounds.cpp
+  alframefences.cpp
   algpubuffer.cpp
   algputimer.cpp
   alimageslot.cpp
@@ -42,11 +43,13 @@ set(
 set(
   llrender_HEADERS
   aldepthbounds.h
+  alframefences.h
   algpubuffer.h
   algputimer.h
   alimageslot.h
   alprimitiveplot.h
   alquerypool.h
+  alrendertargetdesc.h
   alsamplerstate.h
   altexture3d.h
   altextureslot.h
@@ -149,18 +152,20 @@ if(AL_BUILD_TESTS)
 
   # The suites that need no GL: arithmetic (where a local coordinate lands
   # under the UI transform; the matrix stack, the projection helpers and the
-  # clip-plane classes), and the font tables and shaping. alfontshaping holds
-  # both Unicode tables against each other, so this binary links ICU, which
-  # llrender itself has no need of.
+  # clip-plane classes; the GL floor's version test), the font tables and
+  # shaping, and render target descriptions. alfontshaping holds both Unicode tables against each other, so
+  # this binary links ICU, which llrender itself has no need of.
   al_add_test_binary(
     llrender_tests
     PROJECT llrender
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
       tests/llfontregistry_test.cpp
+      tests/llglfloor_test.cpp
       tests/llrendermatrix_test.cpp
       tests/lluitransform_test.cpp
     LIBRARIES llrender ll::icu
@@ -199,30 +204,42 @@ if(AL_BUILD_TESTS)
   #   order out to 100 km;
   # - the depth bounds test against the depth test it stands in for, and the
   #   depths a light's sphere spans;
-  # - which fragment output reaches a render target's colour attachment, and
-  #   integer attachments cleared and drawn;
+  # - which fragment output reaches a render target's colour attachment,
+  #   integer attachments cleared and drawn, targets kept, built again and
+  #   re-pointed at a shared depth by their descriptions, and their labels;
   # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
-  # - LLGLSLShader's uniform value cache, the compute path (programs built
-  #   through the shader manager, their images, storage blocks and
-  #   dispatches), integer textures through reserved samplers, what the debug
-  #   validator says of images and stencil reads, and which shader objects a
-  #   program owns and which the manager does;
+  # - LLGLSLShader's cache key, its uniform value cache, the compute path
+  #   (programs built through the shader manager, their images, storage
+  #   blocks and dispatches), integer textures through reserved samplers,
+  #   what the debug validator says of images and stencil reads, and which
+  #   shader objects a program owns and which the manager does;
   # - LLRender::drawArraysInstanced: attribute-less instanced geometry, placed
   #   by the matrices the draw syncs;
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
+  # - ALUniformBuffer's persistently mapped rings: the store each makes, how
+  #   it is mapped, what the GPU reads where a slice is bound, and the scratch
+  #   ring's segments reused once the frame each was left in has finished;
   # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
   #   queries;
+  # - ALFrameFences: one fence a frame, polled at the frame's end under
+  #   Mesa's glthread and where its user asks elsewhere, and waits that stall
+  #   only on frames the GPU has not finished;
   # - ALQueryPool: each kind's names kept to its target, a held target
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
-  #   it, and integer images.
+  #   it, and integer images;
+  # - LLVertexBuffer: what a buffer draws straight after an upload, after a
+  #   second upload and after a new size, and that an upload sends only the
+  #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
+  #   GL checks.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender
     SOURCES
       tests/aldepthbounds_gl_test.cpp
+      tests/alframefences_gl_test.cpp
       tests/algpubuffer_gl_test.cpp
       tests/algputimer_gl_test.cpp
       tests/alimageslot_gl_test.cpp
@@ -231,13 +248,16 @@ if(AL_BUILD_TESTS)
       tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
       tests/altessellation_gl_test.cpp
+      tests/aluniformbuffer_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp
       tests/llfonttextcache_test.cpp
       tests/llglslshader_gl_test.cpp
       tests/llrender2dutils_gl_test.cpp
       tests/llrendertarget_gl_test.cpp
+      tests/llrendersphere_gl_test.cpp
       tests/lluiimage_test.cpp
+      tests/llvertexbuffer_gl_test.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}

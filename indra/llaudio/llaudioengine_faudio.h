@@ -373,7 +373,8 @@ public:
 
     struct ChannelCallback : public FAudioVoiceCallback
     {
-        LLAudioChannelFAudio* owner = nullptr;
+        // Read by those functions on FAudio's mixer thread; written on the main thread.
+        std::atomic<LLAudioChannelFAudio*> owner{nullptr};
     };
 
     // Move the current source voice into the dying-voice slot for cross-

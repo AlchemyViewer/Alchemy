@@ -103,9 +103,21 @@ LLCallbackList::find(callback_t func, void *data)
     return std::find(mCallbackList.begin(), mCallbackList.end(), t);
 }
 
+namespace
+{
+    void delete_if_shim(LLCallbackList::callback_t func, void* data);
+}
+
 void LLCallbackList::deleteAllFunctions()
 {
-    mCallbackList.clear();
+    // Emptied before the shims go, so a callable's destructor that asks after the
+    // list finds it settled.
+    callback_list_t pending;
+    pending.swap(mCallbackList);
+    for (const callback_pair_t& entry : pending)
+    {
+        delete_if_shim(entry.first, entry.second);
+    }
 }
 
 
@@ -181,6 +193,24 @@ void doOnIdleRepeating(bool_func_t callable)
 {
     OnIdleCallbackRepeating* cb_functor = new OnIdleCallbackRepeating(callable);
     gIdleCallbacks.addFunction(&OnIdleCallbackRepeating::onIdle,cb_functor);
+}
+
+namespace
+{
+    // The shims are the list's own, made by doOnIdleOneTime() and doOnIdleRepeating() and
+    // deleted as they finish. One still waiting when the list is emptied would otherwise
+    // be lost, and with it whatever its callable holds.
+    void delete_if_shim(LLCallbackList::callback_t func, void* data)
+    {
+        if (func == &OnIdleCallbackOneTime::onIdle)
+        {
+            delete static_cast<OnIdleCallbackOneTime*>(data);
+        }
+        else if (func == &OnIdleCallbackRepeating::onIdle)
+        {
+            delete static_cast<OnIdleCallbackRepeating*>(data);
+        }
+    }
 }
 
 class NullaryFuncEventTimer: public LLEventTimer

@@ -26,11 +26,14 @@
 
 #include "alquerypool.h"
 
+#include "alframefences.h"
 #include "llgl.h"
 #include "llglheaders.h"
 #include "llrender.h"
 
 #include <algorithm>
+#include <cstdint>
+#include <cstring>
 
 namespace
 {
@@ -53,7 +56,37 @@ namespace
     constexpr U32 SLOTS_AT_ONCE = 32;
 
     // How long endFrame() waits on one try for a batch the GPU has not finished.
-    constexpr GLuint64 WAIT_NANOSECONDS = 1000000000ull;
+    constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
+
+    // The query buffer writes name their buffer where the context has direct state access. Through the binding they
+    // pass a pointer, which Mesa's glthread cannot queue: it runs each such call only once it has caught up.
+    bool writes_named()
+    {
+        return gGLManager.mHasDirectStateAccess && glGetQueryBufferObjectui64v;
+    }
+
+    // The GPU writes the result of query `name` at `offset` in `buffer`, once it is in. Through the binding, `buffer`
+    // is the one bound to GL_QUERY_BUFFER.
+    void write_result(U32 name, U32 buffer, size_t offset)
+    {
+        if (writes_named())
+        {
+            glGetQueryBufferObjectui64v(name, buffer, GL_QUERY_RESULT, GLintptr(offset));
+        }
+        else
+        {
+            glGetQueryObjectui64v(name, GL_QUERY_RESULT, reinterpret_cast<GLuint64*>(static_cast<uintptr_t>(offset)));
+        }
+    }
+
+    // Binds the buffer the results are written into, where the writes go through the binding.
+    void bind_results(U32 buffer)
+    {
+        if (!writes_named())
+        {
+            glBindBuffer(GL_QUERY_BUFFER, buffer);
+        }
+    }
 }
 
 //static
@@ -217,12 +250,14 @@ void ALQueryPool::end(const ALQueryTicket& ticket)
     endGL(ticket.mKind);
     mOpen[target] = {};
 
-    // A query begun in a frame since closed ends after that batch's fence, which is laid again behind it, so that the
-    // fence still follows every command of the batch and reading it never waits.
+    // A query begun in a frame since closed ends in a later frame, which the batch then waits for, so that reading it
+    // still follows every command of the batch and never waits. Its results were not written with the batch's, and are
+    // written now, ahead of this frame's fence.
     Batch& begun = batch(ticket.mSerial);
     if (ticket.mSerial != mSerial && begun.mSerial == ticket.mSerial && begun.mClosed && !begun.mRead)
     {
-        fence(begun);
+        writeLate(begun, ticket);
+        begun.mFrame = mFrames.frame();
     }
 }
 
@@ -475,40 +510,113 @@ bool ALQueryPool::isOpenIn(U32 serial) const
     return false;
 }
 
+void ALQueryPool::write(Batch& batch)
+{
+    batch.mWritten = false;
+    if (!gGLManager.mHasQueryBufferObject || mWriteFailed)
+    {
+        return;
+    }
+    U32 names = 0;
+    U32 made  = 0;
+    for (U32 k = 0; k < KINDS; ++k)
+    {
+        batch.mFirst[k] = names;
+        names += batch.mUsed[k] * namesPer(k);
+        made += U32(batch.mNames[k].size());
+    }
+    // Sized for every name the batch has made, so that it is made again only when they grow. The batch was read before
+    // it was opened again, so nothing in the store it replaces is still wanted.
+    if (batch.mResults.size() < names * sizeof(U64))
+    {
+        if (!batch.mResults.allocate(made * sizeof(U64), ALGPUBuffer::READBACK, nullptr, "Query results")
+            || !batch.mResults.getMapped())
+        {
+            LL_WARNS("Queries") << "No mapped buffer for query results; reading them from GL instead" << LL_ENDL;
+            batch.mResults.release();
+            mWriteFailed = true;
+            return;
+        }
+    }
+
+    const U32 buffer = batch.mResults.getGLName();
+    bind_results(buffer);
+    for (U32 k = 0; k < KINDS; ++k)
+    {
+        // A query still open is written when it ends: GL refuses to write one that counts.
+        const S32  target    = targetOf(k);
+        const bool open      = target >= 0 && mOpen[target].mSerial == batch.mSerial && mOpen[target].mKind == k;
+        const U32  open_slot = open ? U32(mOpen[target].mSlot) : U32_MAX;
+        const U32  per       = namesPer(k);
+        for (U32 slot = 0; slot < batch.mUsed[k]; ++slot)
+        {
+            if (slot == open_slot)
+            {
+                continue;
+            }
+            for (U32 i = slot * per; i < (slot + 1) * per; ++i)
+            {
+                write_result(batch.mNames[k][i], buffer, (batch.mFirst[k] + i) * sizeof(U64));
+            }
+        }
+    }
+    bind_results(0);
+    batch.mWritten = true;
+}
+
+void ALQueryPool::writeLate(Batch& batch, const ALQueryTicket& ticket)
+{
+    if (!batch.mWritten)
+    {
+        return;
+    }
+    const U32 per    = namesPer(ticket.mKind);
+    const U32 buffer = batch.mResults.getGLName();
+    bind_results(buffer);
+    for (U32 i = ticket.mSlot * per; i < (ticket.mSlot + 1) * per; ++i)
+    {
+        write_result(batch.mNames[ticket.mKind][i], buffer, (batch.mFirst[ticket.mKind] + i) * sizeof(U64));
+    }
+    bind_results(0);
+}
+
 void ALQueryPool::read(Batch& batch)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    // The fence has signalled, and it follows every command of the batch, so every result is in and reading it does
-    // not wait.
+    // Its frame has finished, and with it every command of the batch, so every result is in and reading it does not
+    // wait on the GPU.
     Results& frame = mResults[batch.mSerial % RESULT_FRAMES];
     frame.mSerial = batch.mSerial;
-    for (U32 k = 0; k < KINDS; ++k)
+    if (batch.mWritten)
     {
-        const U32 names = batch.mUsed[k] * namesPer(k);
-        frame.mValues[k].resize(names);
-        for (U32 i = 0; i < names; ++i)
+        // The GPU's writes came before the frame's fence, and the map is coherent.
+        const U64* written = reinterpret_cast<const U64*>(batch.mResults.getMapped());
+        for (U32 k = 0; k < KINDS; ++k)
         {
-            GLuint64 counted = 0;
-            glGetQueryObjectui64v(batch.mNames[k][i], GL_QUERY_RESULT, &counted);
-            frame.mValues[k][i] = counted;
+            const U32 names = batch.mUsed[k] * namesPer(k);
+            frame.mValues[k].resize(names);
+            if (names > 0)
+            {
+                std::memcpy(frame.mValues[k].data(), written + batch.mFirst[k], names * sizeof(U64));
+            }
         }
     }
-    if (batch.mFence)
+    else
     {
-        glDeleteSync((GLsync)batch.mFence);
-        batch.mFence = nullptr;
+        ++mAskedReads;
+        for (U32 k = 0; k < KINDS; ++k)
+        {
+            const U32 names = batch.mUsed[k] * namesPer(k);
+            frame.mValues[k].resize(names);
+            for (U32 i = 0; i < names; ++i)
+            {
+                GLuint64 counted = 0;
+                glGetQueryObjectui64v(batch.mNames[k][i], GL_QUERY_RESULT, &counted);
+                frame.mValues[k][i] = counted;
+            }
+        }
     }
     batch.mRead = true;
-}
-
-void ALQueryPool::fence(Batch& batch)
-{
-    if (batch.mFence)
-    {
-        glDeleteSync((GLsync)batch.mFence);
-    }
-    batch.mFence   = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-    batch.mFlushed = false;
 }
 
 void ALQueryPool::retire()
@@ -526,13 +634,7 @@ void ALQueryPool::retire()
             continue;
         }
         // A query still open in it is ended in a later frame; the batch waits for it.
-        if (isOpenIn(closed.mSerial))
-        {
-            break;
-        }
-        const GLenum status = glClientWaitSync((GLsync)closed.mFence, closed.mFlushed ? 0 : GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-        closed.mFlushed = true;
-        if (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED)
+        if (isOpenIn(closed.mSerial) || !mFrames.isComplete(closed.mFrame))
         {
             break;
         }
@@ -553,7 +655,8 @@ void ALQueryPool::endFrame()
     }
     if (used > 0)
     {
-        fence(closing);
+        write(closing);
+        closing.mFrame = mFrames.frame();
     }
     else
     {
@@ -565,30 +668,29 @@ void ALQueryPool::endFrame()
     // A query left open for FRAMES frames would have its name begun again under it.
     llassert(reused.mSerial == 0 || !isOpenIn(reused.mSerial));
     bool stalled = false;
-    if (reused.mSerial != 0 && !reused.mRead && reused.mFence && !isOpenIn(reused.mSerial))
+    if (reused.mSerial != 0 && reused.mClosed && !reused.mRead && !isOpenIn(reused.mSerial))
     {
-        GLenum status = glClientWaitSync((GLsync)reused.mFence, GL_SYNC_FLUSH_COMMANDS_BIT, 0);
-        if (status == GL_TIMEOUT_EXPIRED)
+        for (;;)
         {
-            LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("query batch stall");
-            ++mStalls;
-            stalled = true;
-            do
+            bool waited = false;
+            const bool finished = mFrames.wait(reused.mFrame, WAIT_NANOSECONDS, &waited);
+            stalled = stalled || waited;
+            if (finished)
             {
-                status = glClientWaitSync((GLsync)reused.mFence, GL_SYNC_FLUSH_COMMANDS_BIT, WAIT_NANOSECONDS);
-            } while (status == GL_TIMEOUT_EXPIRED);
+                break;
+            }
+        }
+        if (stalled)
+        {
+            ++mStalls;
         }
         read(reused);
     }
-    if (reused.mFence)
-    {
-        glDeleteSync((GLsync)reused.mFence);
-        reused.mFence = nullptr;
-    }
     reused.mSerial  = mSerial;
+    reused.mFrame   = 0;
     reused.mClosed  = false;
     reused.mRead    = false;
-    reused.mFlushed = false;
+    reused.mWritten = false;
     for (U32 k = 0; k < KINDS; ++k)
     {
         reused.mUsed[k] = 0;
@@ -640,15 +742,12 @@ void ALQueryPool::release()
             each.mNames[k].clear();
             each.mUsed[k] = 0;
         }
-        if (current && each.mFence)
-        {
-            glDeleteSync((GLsync)each.mFence);
-        }
-        each.mFence   = nullptr;
+        each.mResults.release();
         each.mSerial  = 0;
+        each.mFrame   = 0;
         each.mClosed  = false;
         each.mRead    = false;
-        each.mFlushed = false;
+        each.mWritten = false;
     }
     for (Results& frame : mResults)
     {
@@ -663,6 +762,8 @@ void ALQueryPool::release()
         mOpen[t]     = {};
         mReserved[t] = false;
     }
+    // The next context may map what this one could not.
+    mWriteFailed = false;
     // Tickets taken before stay expired.
     ++mSerial;
     mFirstSerial = mSerial;

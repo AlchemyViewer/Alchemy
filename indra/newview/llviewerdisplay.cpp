@@ -113,9 +113,6 @@ constexpr F32 RESTORE_GL_TIME = 5.f;  // Wait this long while reloading textures
 bool gForceRenderLandFence = false;
 bool gDisplaySwapBuffers = false;
 bool gDepthDirty = false;
-bool gResizeScreenTexture = false;
-bool gResizeShadowTexture = false;
-bool gWindowResized = false;
 bool gSnapshot = false;
 bool gCubeSnapshot = false;
 bool gSnapshotNoPost = false;
@@ -197,7 +194,12 @@ void display_startup()
     LLGLState::checkStates();
 
     if (gViewerWindow && gViewerWindow->getWindow())
-    gViewerWindow->getWindow()->swapBuffers();
+    {
+        gViewerWindow->getWindow()->swapBuffers();
+        // Every swap ends a frame, the login screen's too: the uniform rings and the queries key their reuse on the
+        // frames the GPU has finished.
+        gGL.endFrame();
+    }
 }
 
 void display_update_camera()
@@ -444,25 +446,20 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_DISPLAY); // render time capture - This is the main stat for overall rendering.
 
-    if (gWindowResized)
+    // What the settings and the window changed since the last frame, applied once, here, whatever the frame goes on to
+    // draw: the login screen's frames apply them as the world's do.
+    if (gPipeline.windowResizePending())
     { //skip render on frames where window has been resized
         LL_DEBUGS("Window") << "Resizing window" << LL_ENDL;
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Resize Window");
         gGL.flush();
         glClear(GL_COLOR_BUFFER_BIT);
         gViewerWindow->getWindow()->swapBuffers();
-        LLPipeline::refreshCachedSettings();
-        gPipeline.resizeScreenTexture();
-        gResizeScreenTexture = false;
-        gWindowResized = false;
+        gGL.endFrame();
+        gPipeline.applyRenderInputs();
         return;
     }
-
-    if (gResizeShadowTexture)
-    { //skip render on frames where window has been resized
-        gPipeline.resizeShadowTexture();
-        gResizeShadowTexture = false;
-    }
+    gPipeline.applyRenderInputs();
 
     gSnapshot = for_snapshot;
 
@@ -730,7 +727,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         // Render mirrors and associated hero probes before we render the rest of the scene.
         // This ensures the scene state in the hero probes are exactly the same as the rest of the scene before we render it.
-        if (gPipeline.RenderMirrors && !gSnapshot)
+        if (gPipeline.resourceInputs().mMirrors && !gSnapshot)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Update hero probes");
             LL_PROFILE_GPU_ZONE("hero manager")
@@ -794,12 +791,18 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         { //depth buffer is invalid, don't overwrite occlusion state
             LLPipeline::sUseOcclusion = llmin(occlusion, 1);
         }
+        // The queries draw through gOcclusionCubeProgram. One that did not build would draw them through the stand-in,
+        // which passes no sample, so that every group queried read as occluded: the frame culls by no occlusion.
+        if (!gOcclusionCubeProgram.isComplete())
+        {
+            LLPipeline::sUseOcclusion = 0;
+        }
         gDepthDirty = false;
 
         LLGLState::checkStates();
 
-        // The queries of the frames the GPU has finished, read just before the cull asks for them: as late as they can
-        // be, so that the GPU has had the mirrors and the geometry updates above to finish the last frame.
+        // The queries of the frames the frame fences have shown finished, read before the cull asks for them. No GL
+        // call: the fences are polled only at the frame's end (see ALFrameFences).
         gGL.queries().retire();
         gPipeline.readAttachmentTimes();
 
@@ -815,12 +818,6 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("display - 2")
-            if (gResizeScreenTexture)
-            {
-                gPipeline.resizeScreenTexture();
-                gResizeScreenTexture = false;
-            }
-
             gGL.setColorMask(true, true);
             gGL.setClearColor(LLColor4::transparent);
 
@@ -1075,10 +1072,13 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Fence the frame's queries, and close out the UBO streaming rings' per-frame counters (slices,
-    // wraps, GPU stalls) and let them resize. Here rather than in resetFrameStats(): a resize deletes
-    // and remaps a ring and invalidates every outstanding slice, which must land past this frame's
-    // draws, not before its heaviest passes. See ALUniformBuffer::endFrame.
+    // Close the frame's queries, poll the frame fences and lay this frame's, and close out the UBO
+    // streaming rings' per-frame counters (slices, wraps, GPU stalls) and let them resize. Straight
+    // after the swap: the frame's one poll waits on a threaded driver's own thread here, if
+    // anywhere, which is behind the swap already (see ALFrameFences). And here rather than in
+    // resetFrameStats(): a resize deletes and remaps a ring and invalidates every outstanding slice,
+    // which must land past this frame's draws, not before its heaviest passes. See
+    // ALUniformBuffer::endFrame.
     gGL.endFrame();
 
     display_stats();

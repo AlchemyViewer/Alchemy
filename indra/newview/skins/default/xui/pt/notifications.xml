@@ -572,13 +572,6 @@ Consultar [_URL] para mais informações?
 		<usetemplate ignoretext="O hardware do meu computador não é suportado" name="okcancelignore" notext="Não" yestext="Sim"/>
 	</notification>
 	<notification name="RunLauncher">Não executar diretamente o visualizador executável. Atualizar quaisquer atalhos existentes para executar o SL_Launcher.</notification>
-	<notification name="OldGPUDriver">
-		Provavelmente, há um driver mais recente para o seu chip gráfico.  A atualização dos drivers gráficos pode melhorar significativamente o desempenho.
-
-    Visitar [URL] para verificar se há atualizações do driver?
-		<url name="url">[URL]</url>
-		<usetemplate ignoretext="Meu driver gráfico está desatualizado" name="okcancelignore" notext="Não" yestext="Sim"/>
-	</notification>
 	<notification name="UnknownGPU">
 		A placa de vídeo do seu sistema não é reconhecida pelo [APP_NAME].
 Isto acontece quando novos hardwares que ainda não foram testados no [APP_NAME].  Talvez isso não cause problemas, mas pode ser preciso checar as configurações de vídeo. 
@@ -2777,7 +2770,6 @@ Deseja continuar?
 	</notification>
 	<global name="UnsupportedCPUAmount">796</global>
 	<global name="UnsupportedRAMAmount">510</global>
-	<global name="UnsupportedGPU">- A sua placa de vídeo não atende os requisitos mínimos exigidos.</global>
 	<global name="UnsupportedRAM">- A memória do seu sistema não suporta os requisitos mínimos exigidos.</global>
 	<global name="You can only set your 'Home Location' on your land or at a mainland Infohub.">Se você tem um terreno, seu terreno pode ser seu início. 
 Outra opção é procurar por lugares com a tag 'Infohub' no mapa.</global>

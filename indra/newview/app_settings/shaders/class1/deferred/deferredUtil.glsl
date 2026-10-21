@@ -76,6 +76,9 @@ uniform float proj_ambiance;
 uniform vec3 color; // light_color
 uniform float size; // light_size
 
+// Shared shadow/SSAO constants and the specular exponent, spliced from
+// class1/deferred/deferredBlock.glsl and bound at UB_DEFERRED.
+//[ENGINE_BLOCK Deferred]
 // Shared matrix stack + derived matrices, spliced from
 // class1/deferred/matricesBlock.glsl and bound at UB_MATRICES.
 //[ENGINE_BLOCK Matrices]
@@ -136,10 +139,10 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
     return dist_atten;
 }
 
-// The normalized Blinn-Phong specular lobe for a legacy glossiness.
+// The normalized Blinn-Phong specular lobe for a legacy glossiness, at specular_exponent (RenderSpecularExponent) when
+// the glossiness is full.
 //
-// SPECULAR_EXPONENT is injected alongside the GBuffer flags, from RenderSpecularExponent. The
-// square is this tree's mapping from an 8-bit material field to an exponent, and it is what
+// The square is this tree's mapping from an 8-bit material field to an exponent, and it is what
 // makes the top of the glossiness range spend most of its resolution on very tight lobes.
 //
 // The normalization keeps the lobe's integral independent of the exponent, so polishing a
@@ -152,7 +155,7 @@ float calcLegacyDistanceAttenuation(float distance, float falloff)
 // zero, and every call site already gates on that being positive.
 float blinnPhongLobe(float nh, float glossiness)
 {
-    float n = glossiness * glossiness * SPECULAR_EXPONENT;
+    float n = glossiness * glossiness * specular_exponent;
     float norm = ((n + 2.0) * (n + 4.0)) / (8.0 * M_PI * (exp2(-n * 0.5) + n));
 
     return pow(nh, n) * norm;
@@ -287,11 +290,7 @@ float getDepth(vec2 pos_screen)
 
 vec4 getTexture2DLodAmbient(vec2 tc, float lod)
 {
-#ifndef FXAA_GLSL_120
     vec4 ret = textureLod(projectionMap, tc, lod);
-#else
-    vec4 ret = texture(projectionMap, tc);
-#endif
     // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
     // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
@@ -304,11 +303,7 @@ vec4 getTexture2DLodAmbient(vec2 tc, float lod)
 
 vec4 getTexture2DLodDiffuse(vec2 tc, float lod)
 {
-#ifndef FXAA_GLSL_120
     vec4 ret = textureLod(projectionMap, tc, lod);
-#else
-    vec4 ret = texture(projectionMap, tc);
-#endif
     // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
     // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
@@ -316,7 +311,9 @@ vec4 getTexture2DLodDiffuse(vec2 tc, float lod)
     float det = min(lod/(proj_lod*0.5), 1.0);
     float d = min(dist.x, dist.y);
     float edge = 0.25*det;
-    ret *= clamp(d/edge, 0.0, 1.0);
+    // At lod 0 there is no edge to fade over; the floor keeps a texel on the cookie's border
+    // at 0 rather than 0 / 0.
+    ret *= clamp(d/max(edge, 1e-6), 0.0, 1.0);
 
     return ret;
 }
@@ -352,11 +349,7 @@ vec3 getProjectedLightDiffuseColor(float light_distance, vec2 projected_uv)
 
 vec4 texture2DLodSpecular(vec2 tc, float lod)
 {
-#ifndef FXAA_GLSL_120
     vec4 ret = textureLod(projectionMap, tc, lod);
-#else
-    vec4 ret = texture(projectionMap, tc);
-#endif
     // projectionMap is decoded on the sampler (SRGBDecode, see setupSpotLight), so the
     // cookie is filtered in linear -- the mipped LOD read included. Already linear here.
 
@@ -365,7 +358,9 @@ vec4 texture2DLodSpecular(vec2 tc, float lod)
     float d = min(dist.x, dist.y);
     d *= min(1, d * (proj_lod - lod)); // BUG? extra factor compared to diffuse causes N repeats
     float edge = 0.25*det;
-    ret *= clamp(d/edge, 0.0, 1.0);
+    // At lod 0 there is no edge to fade over; the floor keeps a texel on the cookie's border
+    // at 0 rather than 0 / 0.
+    ret *= clamp(d/max(edge, 1e-6), 0.0, 1.0);
 
     return ret;
 }
@@ -530,10 +525,15 @@ vec3 clampRadiance(vec3 c)
 //
 // Constant across the lights hitting a fragment, so callers evaluate it once and apply it to
 // the accumulated specular rather than paying a LUT fetch per light.
+//
+// nv is taken as pbrPunctual takes it, clamp(abs(n.v), 0.001, 1), so the compensation looks
+// up the same view angle as the lobe it scales, whichever form a caller hands in: where a
+// shading normal faces away from the view, the raw dot product would read the LUT at 0 while
+// the lobe uses |n.v|.
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv)
 {
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
-    vec2 brdf = BRDF(clamp(nv, 0.0, 1.0), 1.0 - perceptualRoughness);
+    vec2 brdf = BRDF(clamp(abs(nv), 0.001, 1.0), 1.0 - perceptualRoughness);
     float Ess = max(brdf.x + brdf.y, 1e-4);
     return 1.0 + specularColor * (1.0 / Ess - 1.0);
 }
@@ -631,7 +631,10 @@ void pbrIbl(vec3 diffuseColor,
     // nothing and keeps a degenerate one (a white metal against a fully absorbing tap) from
     // reaching the rest of the frame as an inf.
     vec3 FmsEms = Ems * FssEss * F_avg / max(vec3(1.0) - F_avg * Ems, vec3(1e-4));
-    vec3 k_D = diffuseColor * (1.0 - FssEss + FmsEms);
+    // The paper's E_dss = 1 - (FssEss + FmsEms): both specular terms leave the diffuse lobe,
+    // so the three sum to at most 1 under a white furnace. Held at 0 for a LUT tap whose two
+    // specular terms come to a hair over 1.
+    vec3 k_D = diffuseColor * max(vec3(1.0) - FssEss - FmsEms, vec3(0.0));
 
     // Both lobes off the one visibility.
     //
@@ -985,6 +988,11 @@ void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, 
 
 vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v, vec3 norm, float perceptualRoughness, vec3 light_dir, vec3 sunlit, float scol, vec3 radiance, vec3 irradiance, vec3 colorEmissive, float ao, vec3 additive, vec3 atten)
 {
+    // The sun's lobe is widened from the surface's own roughness, before the floor: the disc is
+    // the sun's bound (MIN_PBR_ROUGHNESS above), and widening the floored value instead would
+    // count both, flattening a mirror's sun highlight to half its peak. The widened value is
+    // past the floor, so pbrPunctual's own does not apply to it.
+    float sunRoughness = sunDiscRoughness(perceptualRoughness);
     perceptualRoughness = max(perceptualRoughness, MIN_PBR_ROUGHNESS);
     vec3 color = vec3(0);
 
@@ -1002,7 +1010,7 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
     // The sun is a disc, not a delta light. Widening its lobe by the disc's own angular size
     // is what gives a polished surface a sun highlight with a real edge, and is why
     // MIN_PBR_ROUGHNESS no longer has to invent one for every light at once.
-    pbrPunctual(diffuseColor, specularColor, sunDiscRoughness(perceptualRoughness), metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
+    pbrPunctual(diffuseColor, specularColor, sunRoughness, metallic, norm, v, normalize(light_dir), nl, diffPunc, specPunc);
     specPunc *= pbrEnergyCompensation(specularColor, perceptualRoughness, NdotV);
 
     // Depending on the sky, we combine these differently.
@@ -1050,7 +1058,9 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
 uniform vec4 waterPlane;
 uniform float waterSign;
 
-// discard if given position in eye space is on the wrong side of the waterPlane according to waterSign
+// discard if given position in eye space is on the wrong side of the waterPlane according to waterSign. Fragments
+// alone discard: a compute program attaches this object for its depth and normal reads.
+#ifdef FRAGMENT_SHADER
 void waterClip(vec3 pos)
 {
     // TODO: make this less branchy
@@ -1070,4 +1080,5 @@ void waterClip(vec3 pos)
     }
 
 }
+#endif
 

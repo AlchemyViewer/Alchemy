@@ -35,6 +35,7 @@
 #endif
 
 #include "llerror.h"
+#include "llgl.h"
 #include "llkeyboard.h"
 #include "llsdl.h"
 #include "llwindowcallbacks.h"
@@ -132,6 +133,20 @@ bool LLWindow::isValid()
 bool LLWindow::canDelete()
 {
     return true;
+}
+
+std::string LLWindow::glInitFailureMessage() const
+{
+    if (gGLManager.mUnmetRequirement.empty())
+    {
+        return mCallbacks->translateString("MBVideoDrvErr");
+    }
+
+    std::map<std::string, std::string> args;
+    args["[MISSING]"]  = gGLManager.mUnmetRequirement;
+    args["[VERSION]"]  = gGLManager.mGLVersionString;
+    args["[RENDERER]"] = gGLManager.getRawGLString();
+    return mCallbacks->translateString("MBGLVersionErr", args);
 }
 
 //virtual

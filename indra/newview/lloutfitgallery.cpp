@@ -763,6 +763,7 @@ void LLOutfitGallery::moveRowPanel(LLPanel* stack, int left, int bottom)
 LLOutfitGallery::~LLOutfitGallery()
 {
     delete mOutfitGalleryMenu;
+    delete mSortMenu;
 
     while (!mUnusedRowPanels.empty())
     {
@@ -1268,7 +1269,7 @@ LLContextMenu* LLOutfitGalleryContextMenu::createMenu()
 
 void LLOutfitGalleryContextMenu::onCreate(const LLSD& data)
 {
-    LLWearableType::EType type = LLWearableType::getInstance()->typeNameToType(data.asString());
+    LLWearableType::EType type = LLWearableType::typeNameToType(data.asString());
     if (type == LLWearableType::WT_NONE)
     {
         LL_WARNS() << "Invalid wearable type" << LL_ENDL;

@@ -2301,7 +2301,7 @@ void LLLocalMeshMgr::feedScrollList(LLScrollListCtrl* ctrl)
         return;
     }
 
-    const std::string icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
+    const std::string_view icon_name = LLInventoryIcon::getIconName(LLAssetType::AT_OBJECT, LLInventoryType::IT_OBJECT);
 
     for (LLLocalMesh* unit : mMeshList)
     {

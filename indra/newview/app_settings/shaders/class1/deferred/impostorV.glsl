@@ -31,10 +31,12 @@ in vec3 position;
 in vec2 texcoord0;
 
 out vec2 vary_texcoord0;
+out vec3 vary_position; // eye space, for the mirror clip
 
 void main()
 {
     //transform vertex
     gl_Position = modelview_projection_matrix * vec4(position.xyz, 1.0);
+    vary_position = (modelview_matrix * vec4(position.xyz, 1.0)).xyz;
     vary_texcoord0 = (texture_matrix0 * vec4(texcoord0,0,1)).xy;
 }

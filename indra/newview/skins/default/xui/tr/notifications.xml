@@ -685,15 +685,6 @@ Daha fazla bilgi için [_URL] adresini ziyaret etmek ister misiniz?
 	<notification name="RunLauncher">
 		Lütfen çalıştırılabilir görüntüleyiciyi doğrudan çalıştırmayın. SL_Launcher&apos;ı çalıştırmak yerine tüm mevcut kısayolları güncelleyin.
 	</notification>
-	<notification name="OldGPUDriver">
-		Grafik yonganız için muhtemelen daha yeni bir sürücü mevcut.  Grafik sürücüleri güncellemek performansınızı kayda değer şekilde artırabilir.
-
-    Sürücü güncellemesi olup olmadığına bakmak için [URL] adresini ziyaret etmek ister misiniz?
-		<url name="url">
-			[URL]
-		</url>
-		<usetemplate ignoretext="Grafik sürücüm güncel değil" name="okcancelignore" notext="Hayır" yestext="Evet"/>
-	</notification>
 	<notification name="UnknownGPU">
 		Sisteminiz [APP_NAME] uygulamasının tanımadığı bir grafik kartı içeriyor.
 Bu durum genellikle [APP_NAME] uygulaması ile henüz denenmemiş yeni donanımlar kullanıldığında ortaya çıkar.  Büyük olasılıkla bir sorun çıkmayacaktır, fakat grafik ayarlarınızı değiştirmeniz gerekebilir.
@@ -3676,9 +3667,6 @@ Devam etmek istiyor musunuz?
 	</global>
 	<global name="UnsupportedRAMAmount">
 		510
-	</global>
-	<global name="UnsupportedGPU">
-		- Grafik kartınız minimum gereksinimleri karşılamıyor.
 	</global>
 	<global name="UnsupportedRAM">
 		- Sistem belleğiniz minimum gereksinimleri karşılamıyor.
