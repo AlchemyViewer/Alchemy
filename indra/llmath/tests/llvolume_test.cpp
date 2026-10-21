@@ -2146,6 +2146,66 @@ namespace
         return std::adjacent_find(keys.begin(), keys.end()) == keys.end();
     }
 
+#if defined(_MSC_VER) || defined(__clang__)
+#pragma float_control(precise, on, push)
+#elif defined(__GNUC__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off", "no-associative-math", "no-reciprocal-math")
+#endif
+    // Whether MikkTSpace takes a triangle of a decoded face as one with a
+    // tangent space of its own, by its own float arithmetic over the face as
+    // authored, the positions scaled out of the unit cube: distinct corners,
+    // a UV area, and a tangent and bitangent whose lengths over that area
+    // exceed FLT_MIN. A triangle that is not takes its orientation from the
+    // triangles about it. This compiles precise, as meshoptimizer does, so
+    // that the squares and products round as there.
+    bool mikkGood(const LLVolumeFace& face, S32 t)
+    {
+        const LLVector3& scale = face.mNormalizedScale;
+        F32 p[3][3];
+        F32 uv[3][2];
+        for (S32 k = 0; k < 3; ++k)
+        {
+            const U16 v = face.mIndices[t * 3 + k];
+            for (S32 i = 0; i < 3; ++i)
+            {
+                p[k][i] = face.mPositions[v][i] * scale.mV[i];
+            }
+            uv[k][0] = face.mTexCoords[v].mV[0];
+            uv[k][1] = face.mTexCoords[v].mV[1];
+        }
+        for (S32 a = 0; a < 3; ++a)
+        {
+            const S32 b = (a + 1) % 3;
+            if (p[a][0] == p[b][0] && p[a][1] == p[b][1] && p[a][2] == p[b][2])
+            {
+                return false;
+            }
+        }
+        const F32 t21x = uv[1][0] - uv[0][0], t21y = uv[1][1] - uv[0][1];
+        const F32 t31x = uv[2][0] - uv[0][0], t31y = uv[2][1] - uv[0][1];
+        const F32 area = fabsf(t21x * t31y - t21y * t31x);
+        if (!(area > FLT_MIN))
+        {
+            return false;
+        }
+        F32 os[3], ot[3];
+        for (S32 i = 0; i < 3; ++i)
+        {
+            const F32 d1 = p[1][i] - p[0][i], d2 = p[2][i] - p[0][i];
+            os[i] = t31y * d1 - t21y * d2;
+            ot[i] = -t31x * d1 + t21x * d2;
+        }
+        const F32 los = sqrtf(os[0] * os[0] + os[1] * os[1] + os[2] * os[2]);
+        const F32 lot = sqrtf(ot[0] * ot[0] + ot[1] * ot[1] + ot[2] * ot[2]);
+        return los / area > FLT_MIN && lot / area > FLT_MIN;
+    }
+#if defined(_MSC_VER) || defined(__clang__)
+#pragma float_control(pop)
+#elif defined(__GNUC__)
+#pragma GCC pop_options
+#endif
+
     // cacheOptimize keeps every triangle, and every corner's position,
     // normal at unit length, UV and weights, while it welds and reorders;
     // it gives every vertex a unit tangent orthogonal to its normal, whose
@@ -2211,6 +2271,7 @@ namespace
             S32 out_first = 0;
             const TriangleKey key = keyOf(after, t, &out_first);
             bool kept = false;
+            S32 source = -1;
             for (auto [it, end] = by_key.equal_range(key); it != end && !kept; ++it)
             {
                 S32 in_first = 0;
@@ -2220,6 +2281,7 @@ namespace
                 {
                     kept = sameCorner(before, before.mIndices[it->second * 3 + (in_first + k) % 3], after, after.mIndices[t * 3 + (out_first + k) % 3]);
                 }
+                source = kept ? it->second : -1;
             }
             if (!kept)
             {
@@ -2238,14 +2300,17 @@ namespace
             // meshoptimizer takes them, and their products exact. A triangle
             // whose UVs are all but in a line, against their size, wind by
             // less than MikkTSpace's least area, or have products past a
-            // float's range, has no winding to follow.
+            // float's range, has no winding to follow, nor has one that
+            // MikkTSpace, taking the triangle as it was decoded, gives no
+            // tangent space of its own.
             const F32 d1u = uv1.mV[0] - uv0.mV[0], d1v = uv1.mV[1] - uv0.mV[1];
             const F32 d2u = uv2.mV[0] - uv0.mV[0], d2v = uv2.mV[1] - uv0.mV[1];
             const F64 along = (F64)d1u * d2v, across = (F64)d2u * d1v;
             const F64 uv_area = along - across;
             const F64 edges = sqrt(((F64)d1u * d1u + (F64)d1v * d1v) * ((F64)d2u * d2u + (F64)d2v * d2v));
             const F32 expected_w = uv_area > 0. ? 1.f : -1.f;
-            const bool winds = fabs(along) <= FLT_MAX && fabs(across) <= FLT_MAX && fabs(uv_area) > llmax(1e-5 * edges, (F64)FLT_MIN);
+            const bool winds = fabs(along) <= FLT_MAX && fabs(across) <= FLT_MAX && fabs(uv_area) > llmax(1e-5 * edges, (F64)FLT_MIN) &&
+                               mikkGood(before, source);
             for (S32 k = 0; k < 3 && winds; ++k)
             {
                 const U16 o = after.mIndices[t * 3 + k];
@@ -3092,7 +3157,10 @@ namespace
             { "cube with split normals", 2.0000, 1.0000 },
             { "strip with mirrored UVs", 0.7361, 1.0122 },
             { "rigged UV sphere", 0.7366, 1.0066 },
-            { "grid with degenerate triangles", 0.7368, 1.0154 },
+            // Its degenerate triangles' tangents group as the compiler that
+            // built meshoptimizer rounds its tests of them: MSVC's build gives
+            // 0.7763 and 1.0182, GCC's and Clang's on ARM 0.8158 and 1.0207.
+            { "grid with degenerate triangles", 0.8158, 1.0207 },
             { "grid of vertices held twice", 0.7361, 1.0122 },
             { "UV sphere 64 by 32", 0.6557, 1.0005 },
             { "UV sphere 128 by 64", 0.6425, 1.0001 },
