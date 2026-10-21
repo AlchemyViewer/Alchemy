@@ -906,8 +906,6 @@ SD& drill_walk(SD& blob, const LLSD& rawPath)
     // path entry that's bad.
     for (LLSD::Integer i = 0; i < path.size(); ++i)
     {
-        LL_PROFILE_ZONE_NUM(i);
-
         const LLSD& key{path[i]};
         if (key.isString())
         {
