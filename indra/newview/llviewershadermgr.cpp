@@ -2519,10 +2519,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
             {
                 program.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
                 program.addPermutation("HAZE_ON_WATER", "1");
-                if (!(mInputs.mLocal.mHDR && mInputs.mGlobal.mEmissive))
-                {
-                    program.addPermutation("HAZE_DOME_LDR", "1");
-                }
             }
 
             program.mShaderLevel = mShaderLevel[SHADER_DEFERRED];

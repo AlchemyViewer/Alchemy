@@ -114,11 +114,8 @@ void main()
         vec3 weight = vec3(1.0) - atten;
         if (max(weight.r, max(weight.g, weight.b)) >= HAZE_DOME_MIN_WEIGHT)
         {
+            // The dome as the sky above the water has it, unclamped on every path.
             vec3 dome = windlightDome(eyeToSky * normalize(pos.xyz));
-#ifdef HAZE_DOME_LDR
-            // Without HDR's float emissive buffer, the dome held to the [0, 1] an 8-bit sky holds.
-            dome = min(dome, vec3(1.0));
-#endif
             // atmosFragLighting doubles additive, so the sky is halved
             vec3 sky = dome * 0.5;
             additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);

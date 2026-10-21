@@ -268,6 +268,8 @@ namespace
         REQUIRE(haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
         UNSCOPED_INFO("the dome is worked out along the ray to the water");
         REQUIRE(haze.find("windlightDome(eyeToSky * normalize(pos.xyz))") != std::string::npos);
+        UNSCOPED_INFO("the dome behind the water is unclamped, as the sky above it is");
+        REQUIRE(haze.find("min(dome") == std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);
