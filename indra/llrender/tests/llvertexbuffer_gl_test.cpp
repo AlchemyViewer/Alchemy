@@ -328,4 +328,72 @@ namespace
 
         CHECK(at(RIGHT) == packed(green));
     }
+
+    // A pass that keeps what it drew compares stamps to tell whether its geometry is as it was: each write must move
+    // the stamp as it is made, before the upload that sends it, and nothing that only draws may.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: a buffer's content stamp moves with each write and holds through draws", "[llvertexbuffer_gl]")
+    {
+        setUp();
+        const LLColor4U green(0, 255, 0, 255);
+        const LLColor4U blue(0, 0, 255, 255);
+
+        LLPointer<LLVertexBuffer> vb    = makeBuffer(4, 6);
+        LLPointer<LLVertexBuffer> other = makeBuffer(4, 6);
+        CHECK(vb->getContentStamp() != 0);
+        CHECK(vb->getContentStamp() != other->getContentStamp());
+
+        writeQuad(*vb, 0, 0.f, 1.f, green);
+        writeIndices(*vb, 0, 0);
+        uploadAndDrawFromScratch(*vb);
+        REQUIRE(at(RIGHT) == packed(green));
+
+        U64 stamp = vb->getContentStamp();
+        draw(*vb);
+        draw(*vb);
+        CHECK(vb->getContentStamp() == stamp);
+
+        // Mapped for writing: moved before the upload.
+        writeColours(*vb, 0, blue);
+        CHECK(vb->getContentStamp() != stamp);
+        vb->unmapBuffer();
+        draw(*vb);
+        stamp = vb->getContentStamp();
+        draw(*vb);
+        CHECK(vb->getContentStamp() == stamp);
+
+        LLStrider<U16> idx;
+        REQUIRE(vb->getIndexStrider(idx, 0, 6));
+        CHECK(vb->getContentStamp() != stamp);
+        vb->unmapBuffer();
+        stamp = vb->getContentStamp();
+
+        // Written straight to GL, with the buffer bound.
+        vb->setBuffer();
+        LLVector4a positions[4];
+        for (LLVector4a& position : positions)
+        {
+            position.set(0.5f, 0.f, 0.f, 1.f);
+        }
+        vb->setPositionData(positions);
+        CHECK(vb->getContentStamp() != stamp);
+        stamp = vb->getContentStamp();
+
+        const U16 indices[6] = { 0, 1, 2, 2, 1, 3 };
+        vb->setIndexData(indices);
+        CHECK(vb->getContentStamp() != stamp);
+        stamp = vb->getContentStamp();
+
+        // New stores hold nothing yet that was drawn.
+        REQUIRE(vb->allocateBuffer(8, 12));
+        CHECK(vb->getContentStamp() != stamp);
+
+        // A buffer made where one was freed is still not the one that was there: no stamp comes round again.
+        U64 latest = std::max(vb->getContentStamp(), other->getContentStamp());
+        for (S32 i = 0; i < 4; ++i)
+        {
+            other = makeBuffer(4, 6);
+            CHECK(other->getContentStamp() > latest);
+            latest = other->getContentStamp();
+        }
+    }
 }
