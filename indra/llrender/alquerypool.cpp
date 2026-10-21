@@ -513,7 +513,7 @@ bool ALQueryPool::isOpenIn(U32 serial) const
 void ALQueryPool::write(Batch& batch)
 {
     batch.mWritten = false;
-    if (!gGLManager.mHasQueryBufferObject || mWriteFailed)
+    if (!gGLManager.mWritesQueryResults || mWriteFailed)
     {
         return;
     }
