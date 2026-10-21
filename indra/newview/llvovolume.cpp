@@ -4975,10 +4975,17 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                     {
                         if (transform)
                         {
+                            // A tangent lies in the surface, so it goes through the volume's scale as positions do,
+                            // not through the inverse scale volumeDirectionToAgent gives normals.
                             LLVector3 v_tn(tn.getF32ptr());
+                            if (!isVolumeGlobal())
+                            {
+                                v_tn.scaleVec(getScale());
+                            }
+                            v_tn = v_tn * getRenderRotation();
 
                             LLVector4a trans_tangent;
-                            trans_tangent.load3(volumeDirectionToAgent(v_tn).mV);
+                            trans_tangent.load3(v_tn.mV);
 
                             LLVector4Logical mask;
                             mask.clear();
