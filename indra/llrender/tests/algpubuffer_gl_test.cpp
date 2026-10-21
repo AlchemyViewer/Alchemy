@@ -2,7 +2,8 @@
  * @file algpubuffer_gl_test.cpp
  * @brief ALGPUBuffer on the hidden window: what its store holds after each way of writing it, what it accounts, how
  *        a move leaves it, which stores are mapped; LLRender's indirect draw binding over a buffer's life; and the
- *        rings, ALGPUReadback's results in order and ALGPUStream's regions round the ring.
+ *        rings, ALGPUReadback's results in order, its reads of the framebuffer, and ALGPUStream's regions round the
+ *        ring.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -368,6 +369,86 @@ namespace
         REQUIRE(readback.collect(result.data(), result.size() * sizeof(U32)));
         UNSCOPED_INFO("and holds the source");
         CHECK(result == std::vector<U32>(last.begin(), last.begin() + COUNT));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // ALGPUReadback::requestPixels: each request reads the rectangle it names of the framebuffer bound for reading, as
+    // the framebuffer held it then, into its own slot; a request past the slots is refused; and the pack binding is
+    // left at none, so that a read into memory after it writes to memory.
+    TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: ALGPUReadback reads pixels of the framebuffer into each slot", "[algpubuffer_gl]")
+    {
+        constexpr S32 SIZE = 8;
+        GLuint colour = 0;
+        GLuint fbo = 0;
+        glGenRenderbuffers(1, &colour);
+        glBindRenderbuffer(GL_RENDERBUFFER, colour);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, SIZE, SIZE);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
+        glGenFramebuffers(1, &fbo);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colour);
+        REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
+        glViewport(0, 0, SIZE, SIZE);
+
+        // The left half one colour and the right another, so that a rectangle read from the wrong place shows.
+        auto fill = [](U8 left, U8 right)
+        {
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(0, 0, SIZE / 2, SIZE);
+            glClearColor(left / 255.f, 0.f, 0.f, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glScissor(SIZE / 2, 0, SIZE / 2, SIZE);
+            glClearColor(right / 255.f, 0.f, 0.f, 1.f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_SCISSOR_TEST);
+        };
+        // The red of each pixel of the 4 x 2 rectangle at (2, 3), row by row: two of the left half, two of the right.
+        auto expected = [](U8 left, U8 right)
+        {
+            return std::vector<U8>{ left, left, right, right, left, left, right, right };
+        };
+        auto reds = [](const std::vector<U8>& rgba)
+        {
+            std::vector<U8> red;
+            for (size_t i = 0; i < rgba.size(); i += 4)
+            {
+                red.push_back(rgba[i]);
+            }
+            return red;
+        };
+
+        constexpr S32    WIDTH = 4;
+        constexpr S32    HEIGHT = 2;
+        constexpr size_t BYTES = WIDTH * HEIGHT * 4;
+        ALGPUReadback readback;
+        REQUIRE(readback.allocate(BYTES, 2, "pixels (test)"));
+
+        fill(51, 102);
+        REQUIRE(readback.requestPixels(2, 3, WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, BYTES));
+        fill(153, 204);
+        REQUIRE(readback.requestPixels(2, 3, WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, BYTES));
+        UNSCOPED_INFO("a request past the slots refused");
+        CHECK_FALSE(readback.requestPixels(2, 3, WIDTH, HEIGHT, GL_RGBA, GL_UNSIGNED_BYTE, BYTES));
+
+        GLint pack = -1;
+        glGetIntegerv(GL_PIXEL_PACK_BUFFER_BINDING, &pack);
+        UNSCOPED_INFO("the pack binding left at none");
+        CHECK(pack == 0);
+
+        glFinish();
+        std::vector<U8> result(BYTES, 0);
+        UNSCOPED_INFO("the first, finished, collected without waiting");
+        REQUIRE(readback.collect(result.data(), result.size()));
+        UNSCOPED_INFO("the rectangle as the framebuffer held it at the first request");
+        CHECK(reds(result) == expected(51, 102));
+        REQUIRE(readback.collect(result.data(), result.size()));
+        UNSCOPED_INFO("and at the second");
+        CHECK(reds(result) == expected(153, 204));
+        CHECK(readback.getPending() == 0u);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glDeleteFramebuffers(1, &fbo);
+        glDeleteRenderbuffers(1, &colour);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

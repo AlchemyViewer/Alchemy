@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "algpubuffer.h"
 #include "stdtypes.h"
 
 #include <vector>
@@ -97,6 +98,12 @@ private:
 /// apart from the names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames,
 /// as the object cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a
 /// ticket has expired.
+///
+/// Where the context has query buffers (gGLManager.mHasQueryBufferObject), endFrame() has the GPU write the batch's
+/// results into a mapped buffer of the batch's own, ahead of its fence, and reading the batch copies them out of the
+/// map: no GL call. Asking GL for a result instead (glGetQueryObject) waits on more than the GPU: a threaded driver,
+/// such as NVIDIA's with threaded optimization, answers it only once its own thread has caught up on every command
+/// issued before it, which at the end of a frame is the whole frame.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is
@@ -181,6 +188,8 @@ public:
 
     /// The frames whose batch endFrame() had to wait for.
     U32 getStalls() const { return mStalls; }
+    /// The batches read by asking GL for each result, where the GPU wrote none into a buffer.
+    U32 getAskedReads() const { return mAskedReads; }
     /// The GL query objects the pool holds, in use or not.
     U32 getNameCount() const;
 
@@ -199,8 +208,11 @@ private:
         bool             mClosed  = false;
         bool             mRead    = false;
         bool             mFlushed = false;   // the fence has been flushed toward the GPU
+        bool             mWritten = false;   // its results are written into mResults, ahead of the fence
         std::vector<U32> mNames[KINDS];      // namesPer(kind) a slot, kept from frame to frame
         U32              mUsed[KINDS] = {};  // slots
+        ALGPUBuffer      mResults;           // a U64 a used name, kind after kind, kept from frame to frame
+        U32              mFirst[KINDS] = {}; // where each kind's names start in mResults, in names
     };
 
     // A read frame's results, by kind and slot, namesPer(kind) a slot.
@@ -235,6 +247,10 @@ private:
     Status        results(const ALQueryTicket& ticket, U64* values, U32 count) const;
     bool          waitFor(const ALQueryTicket& ticket, U64* values, U32 count);
     bool          isOpenIn(U32 serial) const;
+    // Has the GPU write the closing batch's results into its buffer, all but those of a query still open.
+    void          write(Batch& batch);
+    // Has the GPU write the results of the query `ticket` began, which ended after its batch was written.
+    void          writeLate(Batch& batch, const ALQueryTicket& ticket);
     void          read(Batch& batch);
     void          fence(Batch& batch);
 
@@ -245,7 +261,10 @@ private:
     ALQueryTicket mOpen[TARGETS];
     bool          mReserved[TARGETS] = {};
     bool          mConditional = false;
+    // A batch's results buffer could not be made: every batch asks GL, until release().
+    bool          mWriteFailed = false;
     U32           mStalls = 0;
+    U32           mAskedReads = 0;
 };
 
 /// begin() for the scope, end() as it goes. ticket() is what began: no query where the pool refused.

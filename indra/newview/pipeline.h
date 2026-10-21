@@ -42,6 +42,7 @@
 #include "lldrawable.h"
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
+#include "algpubuffer.h"
 #include "alquerypool.h"
 #include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
@@ -1103,11 +1104,12 @@ public:
     LLRenderTarget          mDownResMap;
 
     // Scopes floater sample. Point-decimated copy of the presented frame plus
-    // two pixel-pack buffers: the read-back of one capture is collected at the
-    // next one, several frames later, so glReadPixels never stalls the frame.
+    // two readback slots: the read-back of one capture is collected at the
+    // next one, several frames later, once it has landed, so neither the read
+    // nor the collect waits -- on the GPU, or on a threaded driver's own
+    // thread.
     LLRenderTarget          mScopeSample;
-    U32                     mScopePBO[2] = { 0, 0 };
-    S32                     mScopePBOInFlight = -1;
+    ALGPUReadback           mScopeCaptures;
     LLFrameTimer            mScopeSampleTimer;
     ALScopeData             mScopeData;
     std::vector<U8>         mScopeReadback;

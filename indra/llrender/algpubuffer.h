@@ -143,11 +143,12 @@ private:
     U8*    mMapped = nullptr;
 };
 
-// Results the GPU wrote, read back without waiting on it. request() copies a range of a buffer into the next of a few
-// slots, GPU-side, and fences it; collect() hands back the oldest result once its fence has signalled, which is a frame
-// or two later. A request that finds every slot holding a result not yet collected is refused rather than stalling on
-// the oldest. Slots are mapped for reading where persistent maps resolved, and read by glGetBufferSubData elsewhere --
-// after the fence, so neither waits.
+// Results the GPU wrote, read back without waiting on it. request() copies a range of a buffer, and requestPixels() a
+// rectangle of the framebuffer, into the next of a few slots, GPU-side, and fences it; collect() hands back the oldest
+// result once its fence has signalled, which is a frame or two later. A request that finds every slot holding a result
+// not yet collected is refused rather than stalling on the oldest. Slots are mapped for reading where persistent maps
+// resolved, and read by glGetBufferSubData elsewhere -- after the fence, so neither waits on the GPU, and a mapped
+// slot asks GL for nothing, so nothing waits on a threaded driver's own thread either.
 //
 // All operations require a current GL context. Non-copyable.
 class ALGPUReadback
@@ -172,6 +173,11 @@ public:
     // are ordered before the copy here. False, and nothing copied, while every slot is pending.
     bool request(const ALGPUBuffer& src, size_t src_offset, size_t bytes);
 
+    // Read the `width` x `height` rectangle at (x, y) of the framebuffer bound for reading into the next slot, as
+    // glReadPixels reads it in `format` and `type` under LLRender's pack alignment of 1, and fence the read. `bytes` is
+    // what the read writes. False, and nothing read, while every slot is pending.
+    bool requestPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, size_t bytes);
+
     // The oldest pending result into `out`, the `bytes` its request copied, once the GPU has finished it: false while
     // it is still in flight, or when nothing is pending. `wait` waits for it instead, for a teardown or a test.
     bool collect(void* out, size_t bytes, bool wait = false);
@@ -183,6 +189,9 @@ private:
         size_t mBytes   = 0;
         bool   mFlushed = false;    // the fence has been flushed toward the GPU
     };
+
+    // Fences the `bytes` just written into the next slot, and moves on to the one after.
+    void fenceNext(size_t bytes);
 
     ALGPUBuffer       mStore;
     std::vector<Slot> mSlots;

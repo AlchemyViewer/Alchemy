@@ -31,6 +31,7 @@
 #include "llglheaders.h"
 #include "llrender.h"
 
+#include <cstdint>
 #include <cstring>
 #include <vector>
 
@@ -454,15 +455,42 @@ bool ALGPUReadback::request(const ALGPUBuffer& src, size_t src_offset, size_t by
         gGL.memoryBarrier(LLRender::BARRIER_BUFFER_UPDATE);
     }
 
-    Slot& slot = mSlots[mNext];
     mStore.copyFrom(src, src_offset, (size_t)mNext * mSlotStride, bytes);
+    fenceNext(bytes);
+    return true;
+}
+
+bool ALGPUReadback::requestPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, size_t bytes)
+{
+    if (!mStore.isAllocated() || width <= 0 || height <= 0 || bytes == 0 || bytes > mSlotBytes)
+    {
+        llassert(false);
+        return false;
+    }
+    if (mPending == (U32)mSlots.size())
+    {
+        return false;
+    }
+
+    // Through the pack buffer binding, which nothing else in the renderer caches, and back to none after: while a
+    // buffer is bound there, a read writes into it at the offset it is given in place of a pointer.
+    const uintptr_t offset = (uintptr_t)mNext * mSlotStride;
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, mStore.getGLName());
+    glReadPixels(x, y, width, height, format, type, reinterpret_cast<void*>(offset));
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    fenceNext(bytes);
+    return true;
+}
+
+void ALGPUReadback::fenceNext(size_t bytes)
+{
+    Slot& slot = mSlots[mNext];
     slot.mFence   = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
     slot.mBytes   = bytes;
     slot.mFlushed = false;
 
     mNext = (mNext + 1) % (U32)mSlots.size();
     ++mPending;
-    return true;
 }
 
 bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)

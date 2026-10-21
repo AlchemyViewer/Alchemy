@@ -2,7 +2,8 @@
  * @file alquerypool_gl_test.cpp
  * @brief ALQueryPool on the hidden window: each kind's names kept to its own target, the targets one query holds
  *        refused to the rest, results read only once their frame has ended, queries across a frame's end, the ring
- *        reading what it comes back to, pipeline statistics, spans, release, and conditional draws.
+ *        reading what it comes back to, results written by the GPU or asked of GL, pipeline statistics, spans,
+ *        release, and conditional draws.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -65,6 +66,19 @@ namespace
                 gGLManager.mHasTimestampQuery = counts;
             }
             ~TimestampFlag() { gGLManager.mHasTimestampQuery = mHad; }
+
+            bool mHad;
+        };
+
+        // Puts the query buffers flag back however the case leaves. Turns them off, or leaves them as the context has
+        // them.
+        struct QueryBufferFlag
+        {
+            explicit QueryBufferFlag(bool writes) : mHad(gGLManager.mHasQueryBufferObject)
+            {
+                gGLManager.mHasQueryBufferObject = mHad && writes;
+            }
+            ~QueryBufferFlag() { gGLManager.mHasQueryBufferObject = mHad; }
 
             bool mHad;
         };
@@ -470,13 +484,19 @@ namespace
     }
 
     // A query begun in a frame and ended in the next holds its batch unread until it ends, and counts the draws on
-    // both sides of the frame's end.
+    // both sides of the frame's end. The batch's other queries are read with it, from the same slot of their own kind.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a query open across a frame's end holds its batch until it ends", "[alquerypool_gl]")
     {
         setUp();
         const ALQueryTicket open = mPool.begin(ALQueryKind::Samples);
         REQUIRE(open.isValid());
-        draw(false);
+        ALQueryTicket primitives;
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Primitives);
+            primitives = scope.ticket();
+            draw(false);
+        }
+        REQUIRE(primitives.isValid());
         mPool.endFrame();
         draw(false);
         glFinish();
@@ -494,6 +514,102 @@ namespace
             CHECK(count == U64(2 * SIZE * SIZE));
             CHECK(glGetError() == GL_NO_ERROR);
         }
+        {
+            INFO("and the query that ended in its own frame with it");
+            REQUIRE(mPool.result(primitives, count) == ALQueryPool::Status::Ready);
+            CHECK(count == 1);
+        }
+    }
+
+    // Where the context has query buffers, the GPU writes each batch's results, and reading them asks GL for none: each
+    // kind's, and each slot's, in its own place, round the ring and back.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: results are read from the GPU's writes, asking GL for none", "[alquerypool_gl]")
+    {
+        setUp();
+        if (!gGLManager.mHasQueryBufferObject)
+        {
+            SKIP("the context has no query buffers");
+        }
+        const bool statistics = ALQueryPool::supports(ALQueryKind::Statistics);
+        const U32  asked      = mPool.getAskedReads();
+        auto query = [this](ALQueryKind kind, bool hidden)
+        {
+            ALQueryScope scope(mPool, kind);
+            draw(hidden);
+            return scope.ticket();
+        };
+
+        ALQueryTicket seen, unseen, exact, samples, no_samples, primitives, counted;
+        ALQuerySpan   span;
+        for (U32 frame = 0; frame < ALQueryPool::FRAMES * 2; ++frame)
+        {
+            span       = mPool.beginSpan();
+            seen       = query(ALQueryKind::Occlusion, false);
+            unseen     = query(ALQueryKind::Occlusion, true);
+            samples    = query(ALQueryKind::Samples, false);
+            no_samples = query(ALQueryKind::Samples, true);
+            exact      = query(ALQueryKind::OcclusionExact, false);
+            primitives = query(ALQueryKind::Primitives, false);
+            if (statistics)
+            {
+                counted = query(ALQueryKind::Statistics, false);
+            }
+            mPool.endSpan(span);
+            finishFrame();
+        }
+
+        U64 value = 7;
+        {
+            INFO("each kind's results, each slot's apart");
+            REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+            REQUIRE(mPool.result(unseen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 0);
+            REQUIRE(mPool.result(samples, value) == ALQueryPool::Status::Ready);
+            CHECK(value == U64(SIZE * SIZE));
+            REQUIRE(mPool.result(no_samples, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 0);
+            REQUIRE(mPool.result(exact, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+            REQUIRE(mPool.result(primitives, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+            CHECK(mPool.result(span, value) == ALQueryPool::Status::Ready);
+        }
+        if (statistics)
+        {
+            ALStatistics stats;
+            REQUIRE(mPool.result(counted, stats) == ALQueryPool::Status::Ready);
+            CHECK(stats[ALStatistic::ClippingPrimitives] == 1);
+            CHECK(stats[ALStatistic::FragmentInvocations] >= U64(SIZE * SIZE));
+        }
+        {
+            INFO("no batch was read by asking GL");
+            CHECK(mPool.getAskedReads() == asked);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Without query buffers, a batch's results are asked of GL, once its fence has signalled.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: without query buffers, results are asked of GL", "[alquerypool_gl]")
+    {
+        setUp();
+        QueryBufferFlag no_buffers(false);
+        const U32 asked = mPool.getAskedReads();
+        ALQueryTicket samples;
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Samples);
+            samples = scope.ticket();
+            draw(false);
+        }
+        finishFrame();
+        U64 count = 0;
+        {
+            INFO("read, by asking GL");
+            REQUIRE(mPool.result(samples, count) == ALQueryPool::Status::Ready);
+            CHECK(count == U64(SIZE * SIZE));
+            CHECK(mPool.getAskedReads() == asked + 1);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
     }
 
     // A batch the ring comes back to is read before its names count again, retired or not; once the GPU has finished
