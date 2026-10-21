@@ -2029,10 +2029,12 @@ bool LLGLManager::initGL()
 
     // Extract video card strings and convert to upper case to
     // work around driver-to-driver variation in capitalization.
-    mGLVendor = ll_safe_string((const char *)glGetString(GL_VENDOR));
+    mGLVendorString = ll_safe_string((const char *)glGetString(GL_VENDOR));
+    mGLVendor = mGLVendorString;
     LLStringUtil::toUpper(mGLVendor);
 
-    mGLRenderer = ll_safe_string((const char *)glGetString(GL_RENDERER));
+    mGLRendererString = ll_safe_string((const char *)glGetString(GL_RENDERER));
+    mGLRenderer = mGLRendererString;
     LLStringUtil::toUpper(mGLRenderer);
 
     parse_gl_version( &mDriverVersionMajor,

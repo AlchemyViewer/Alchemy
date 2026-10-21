@@ -631,6 +631,13 @@ namespace ll_test
                 glGetIntegerv(GL_CLIP_DEPTH_MODE, &mClipDepthMode);
             }
             mClearColor = gGL.getClearColor();
+            mPolygonMode = gGL.getPolygonMode();
+            mCullFace = gGL.getCullFace();
+            mPointSize = gGL.getPointSize();
+            gGL.getStencilFunc(mStencilFunc, mStencilRef, mStencilReadMask);
+            gGL.getStencilOp(mStencilFail, mStencilDepthFail, mStencilPass);
+            mStencilWriteMask = gGL.getStencilMask();
+            gGL.getBlendEquation(mBlendEquationRGB, mBlendEquationAlpha);
             mReverseZ = LLRender::sReverseZ;
             mCompute = LLRender::sCompute;
             mMatrixMode = gGL.getMatrixMode();
@@ -660,6 +667,12 @@ namespace ll_test
 
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mDrawFramebuffer);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, mReadFramebuffer);
+            S32 viewport[4];
+            gGL.getViewport(viewport);
+            if (viewport[2] >= 0)
+            {
+                gGL.setViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
+            }
             glViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
 
             S32 scissor[4];
@@ -684,6 +697,13 @@ namespace ll_test
             LLRender::sCompute = mCompute;
 
             gGL.setClearColor(mClearColor);
+            gGL.setPolygonMode(mPolygonMode);
+            gGL.setCullFace(mCullFace);
+            gGL.setPointSize(mPointSize);
+            gGL.setStencilFunc(mStencilFunc, mStencilRef, mStencilReadMask);
+            gGL.setStencilOp(mStencilFail, mStencilDepthFail, mStencilPass);
+            gGL.setStencilMask(mStencilWriteMask);
+            gGL.setBlendEquation(mBlendEquationRGB, mBlendEquationAlpha);
             gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -730,6 +750,18 @@ namespace ll_test
         GLint mClipOrigin = GL_LOWER_LEFT;
         GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
         LLColor4 mClearColor;
+        U32 mPolygonMode = GL_FILL;
+        U32 mCullFace = GL_BACK;
+        F32 mPointSize = 1.f;
+        U32 mStencilFunc = GL_ALWAYS;
+        S32 mStencilRef = 0;
+        U32 mStencilReadMask = ~0u;
+        U32 mStencilFail = GL_KEEP;
+        U32 mStencilDepthFail = GL_KEEP;
+        U32 mStencilPass = GL_KEEP;
+        U32 mStencilWriteMask = ~0u;
+        U32 mBlendEquationRGB = GL_FUNC_ADD;
+        U32 mBlendEquationAlpha = GL_FUNC_ADD;
         bool mReverseZ = false;
         bool mCompute = false;
         LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
