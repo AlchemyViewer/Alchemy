@@ -29,7 +29,7 @@
 /// One fence a frame, laid by endFrame() after the frame's last command, and the frames it shows finished: a frame is
 /// complete once every command issued in it has finished on the GPU. What reuses memory the GPU reads or writes notes
 /// the frame it last used it in and reuses it once that frame is complete, laying no fence of its own: the query pool's
-/// batches, the uniform buffer rings' segments.
+/// batches, the uniform buffer rings' segments, ALGPUReadback's slots and ALGPUStream's regions.
 ///
 /// Laying a fence and polling one are calls that return a value, and Mesa's glthread answers each such call only once
 /// its thread has run every command queued before it (gGLManager.mMesaGLThread): in the middle of a frame the main
