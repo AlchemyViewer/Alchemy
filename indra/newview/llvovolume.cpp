@@ -1716,7 +1716,9 @@ bool LLVOVolume::updateLOD()
         return false;
     }
 
-    if (lod_changed)
+    // An LOD-invariant volume is the same at the new LOD, so its faces and
+    // its spatial group's buffers stay as they are.
+    if (lod_changed && !getVolume()->isLODInvariant())
     {
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
         mLODChanged = true;
