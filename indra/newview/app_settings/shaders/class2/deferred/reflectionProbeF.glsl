@@ -71,6 +71,20 @@ void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout 
     glossenv = legacyenv;
 }
 
+void sampleReflectionProbesEither(bool pbr, inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
+        vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear)
+{
+    if (pbr)
+    {
+        sampleReflectionProbes(ambenv, glossenv, tc, pos, norm, glossiness, transparent, amblit_linear);
+    }
+    else
+    {
+        sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, tc, pos, norm, glossiness, envIntensity, transparent,
+                                     amblit_linear);
+    }
+}
+
 void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 norm)
 {
 
