@@ -248,6 +248,7 @@ std::ostream& operator<<(std::ostream& s, const LLVolumeMgr& volume_mgr)
 
 LLVolumeLODGroup::LLVolumeLODGroup(const LLVolumeParams &params)
     : mVolumeParams(params),
+      mLODInvariant(LLVolume::isLODInvariant(params)),
       mRefs(0)
 {
     for (S32 i = 0; i < NUM_LODS; i++)
@@ -293,13 +294,15 @@ LLVolume* LLVolumeLODGroup::refLOD(const S32 lod)
     llassert(lod >=0 && lod < NUM_LODS);
     mAccessCount[lod]++;
 
+    const S32 slot = mLODInvariant ? NUM_LODS - 1 : lod;
     mRefs++;
-    if (mVolumeLODs[lod].isNull())
+    if (mVolumeLODs[slot].isNull())
     {
-        mVolumeLODs[lod] = new LLVolume(mVolumeParams, mDetailScales[lod]);
+        mVolumeLODs[slot] = new LLVolume(mVolumeParams, mDetailScales[slot]);
+        llassert(mVolumeLODs[slot]->isLODInvariant() == mLODInvariant);
     }
-    mLODRefs[lod]++;
-    return mVolumeLODs[lod];
+    mLODRefs[slot]++;
+    return mVolumeLODs[slot];
 }
 
 bool LLVolumeLODGroup::derefLOD(LLVolume *volumep)

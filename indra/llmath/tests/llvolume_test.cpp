@@ -4204,4 +4204,41 @@ namespace
         CHECK(accepted == 84);
     }
 
+    // The volume manager refs one volume, the highest LOD's, for every LOD
+    // of an LOD-invariant prim, and a volume of its own for each LOD of any
+    // other; each unref returns the ref its LOD took, in any order.
+    TEST_CASE("llvolume: the volume manager shares one volume between the LODs of an LOD-invariant prim", "[llvolume]")
+    {
+        LLVolumeMgr manager;
+        Shape hollow_box = box();
+        hollow_box.hollow = 0.5f;
+        for (const Shape& s : { box(), hollow_box, prism(), cylinder(), torus() })
+        {
+            const LLVolumeParams params = s.params();
+            const bool invariant = LLVolume::isLODInvariant(params);
+            INFO(s.name);
+            LLVolume* volumes[LOD_COUNT];
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                volumes[lod] = manager.refVolume(params, lod);
+            }
+            // A second object at LOD 1 shares what the first one has.
+            CHECK(manager.refVolume(params, 1) == volumes[1]);
+            const LLVolumeLODGroup* group = manager.getGroup(params);
+            REQUIRE(group != nullptr);
+            CHECK(group->getNumRefs() == LOD_COUNT + 1);
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                CHECK(volumes[lod]->isLODInvariant() == invariant);
+                CHECK(volumes[lod]->getDetail() == (invariant ? LOD_DETAIL[LOD_COUNT - 1] : LOD_DETAIL[lod]));
+                CHECK((volumes[lod] == volumes[LOD_COUNT - 1]) == (invariant || lod == LOD_COUNT - 1));
+            }
+            for (S32 lod : { 3, 1, 0, 1, 2 })
+            {
+                manager.unrefVolume(volumes[lod]);
+            }
+            CHECK(manager.getGroup(params) == nullptr);
+        }
+        CHECK(manager.cleanup());
+    }
 }
