@@ -25,6 +25,7 @@ target_sources(
     alregex.cpp
     alsanitizer.cpp
     alsavehistory.cpp
+    alscratcharena.cpp
     alwatchedfile.cpp
     apply.cpp
     commoncontrol.cpp
@@ -131,6 +132,7 @@ target_sources(
         alregex.h
         alsanitizer.h
         alsavehistory.h
+        alscratcharena.h
         alsimd.h
         alwatchedfile.h
         always_return.h
@@ -310,6 +312,7 @@ if(AL_BUILD_TESTS)
       tests/alrecoverystore_test.cpp
       tests/alregex_test.cpp
       tests/alsavehistory_test.cpp
+      tests/alscratcharena_test.cpp
       tests/alserialworker_test.cpp
       tests/alsimd_test.cpp
       tests/alwatchedfile_test.cpp
