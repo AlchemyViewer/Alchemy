@@ -581,6 +581,37 @@ namespace al_sky_test
         gGL.popMatrix();
     }
 
+    // The meteors' quads as LLVOWLSky::updateMeteorGeometry filled them: six vertices a meteor, each with the streak's
+    // midpoint, its half toward the head, its colour and its corner.
+    inline LLPointer<LLVertexBuffer> meteorQuads(const std::vector<ALSkyLayers::Meteor>& meteors)
+    {
+        static const LLVector2 CORNERS[6] = { LLVector2(-1.f, -1.f), LLVector2(1.f, -1.f), LLVector2(1.f, 1.f),
+                                              LLVector2(-1.f, -1.f), LLVector2(1.f, 1.f), LLVector2(-1.f, 1.f) };
+        LLPointer<LLVertexBuffer> quads = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_NORMAL |
+                                                             LLVertexBuffer::MAP_COLOR | LLVertexBuffer::MAP_TEXCOORD0);
+        REQUIRE(quads->allocateBuffer((U32)meteors.size() * 6, 0));
+        LLStrider<LLVector3> positions;
+        LLStrider<LLVector3> normals;
+        LLStrider<LLColor4U> colours;
+        LLStrider<LLVector2> tex_coords;
+        REQUIRE(quads->getVertexStrider(positions));
+        REQUIRE(quads->getNormalStrider(normals));
+        REQUIRE(quads->getColorStrider(colours));
+        REQUIRE(quads->getTexCoord0Strider(tex_coords));
+        for (const ALSkyLayers::Meteor& meteor : meteors)
+        {
+            for (const LLVector2& corner : CORNERS)
+            {
+                *positions++  = meteor.mMidpoint;
+                *normals++    = meteor.mHalf;
+                *colours++    = meteor.mColour;
+                *tex_coords++ = LLVector2(corner.mV[VX], corner.mV[VY] * meteor.mWidth);
+            }
+        }
+        quads->unmapBuffer();
+        return quads;
+    }
+
     // The screen triangle the layers' passes draw.
     inline LLPointer<LLVertexBuffer> screenTriangle()
     {

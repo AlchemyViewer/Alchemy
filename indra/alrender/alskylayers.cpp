@@ -34,7 +34,9 @@
 #include "alfarplane.h"
 
 #include "llmath.h"
+#include "llmatrix4a.h"
 #include "llquaternion.h"
+#include "llvector4a.h"
 
 #include <cmath>
 
@@ -120,6 +122,73 @@ bool quadCoord(const std::array<LLVector3, 3>& quad, const LLVector3& dir, F32& 
     u = (offset * quad[1]) * 0.5f + 0.5f;
     v = (offset * quad[2]) * 0.5f + 0.5f;
     return true;
+}
+
+U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 width, F32 height, F32 width_px,
+                std::vector<LLVector4>& out)
+{
+    out.clear();
+    U32 packed = 0;
+    for (const Meteor& meteor : meteors)
+    {
+        if (packed >= MAX_METEORS)
+        {
+            break;
+        }
+
+        // Both ends in clip space. An end at or behind the camera turns the streak through the perspective divide.
+        LLVector4a clip_mid;
+        LLVector4a clip_head;
+        mvp.transform4(LLVector4a(meteor.mMidpoint.mV[VX], meteor.mMidpoint.mV[VY], meteor.mMidpoint.mV[VZ], 1.f),
+                       clip_mid);
+        const LLVector3 head = meteor.mMidpoint + meteor.mHalf;
+        mvp.transform4(LLVector4a(head.mV[VX], head.mV[VY], head.mV[VZ], 1.f), clip_head);
+        if (clip_mid[VW] < 0.01f || clip_head[VW] < 0.01f)
+        {
+            continue;
+        }
+
+        // The half streak in normalized device coordinates, and the half width square to it on the screen.
+        const F32 mid_x    = clip_mid[VX] / clip_mid[VW];
+        const F32 mid_y    = clip_mid[VY] / clip_mid[VW];
+        const F32 streak_x = clip_head[VX] / clip_head[VW] - mid_x;
+        const F32 streak_y = clip_head[VY] / clip_head[VW] - mid_y;
+        F32 perp_x = -streak_y;
+        F32 perp_y = streak_x;
+        const F32 perp_len = llmax(sqrtf(perp_x * perp_x + perp_y * perp_y), 1e-5f);
+        perp_x = perp_x / perp_len * (width_px * (2.f / llmax(width, 1.f)));
+        perp_y = perp_y / perp_len * (width_px * (2.f / llmax(height, 1.f)));
+
+        // The quad reaches the half streak along it and the width class across it, each way; wholly off the screen it
+        // draws nothing.
+        const F32 reach_x = fabsf(streak_x) + fabsf(perp_x) * meteor.mWidth;
+        const F32 reach_y = fabsf(streak_y) + fabsf(perp_y) * meteor.mWidth;
+        if (mid_x - reach_x > 1.f || mid_x + reach_x < -1.f || mid_y - reach_y > 1.f || mid_y + reach_y < -1.f)
+        {
+            continue;
+        }
+
+        const F32 det = streak_x * perp_y - streak_y * perp_x;
+        if (fabsf(det) < 1e-12f)
+        {
+            continue;
+        }
+
+        // The colour and width as the vertex stage unpacked them from eight bits: the colour to the power 2.2, the
+        // width four times its quarter.
+        LLVector3 colour;
+        for (S32 c = 0; c < 3; ++c)
+        {
+            colour.mV[c] = powf((F32)meteor.mColour.mV[c] / 255.f, 2.2f);
+        }
+        const F32 profile_width = llmax((F32)meteor.mColour.mV[VALPHA] / 255.f * 4.f, 1e-3f);
+
+        out.emplace_back(mid_x, mid_y, perp_y / det, -perp_x / det);
+        out.emplace_back(-streak_y / det, streak_x / det, meteor.mWidth, profile_width);
+        out.emplace_back(colour.mV[VRED], colour.mV[VGREEN], colour.mV[VBLUE], 0.f);
+        ++packed;
+    }
+    return packed;
 }
 
 } // namespace ALSkyLayers

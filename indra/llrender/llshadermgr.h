@@ -659,6 +659,8 @@ public:
         SKY_BLOOM_QUAD,                     //  "skyBloomQuad"  vec3[3], the bloom's square (ALSkyLayers::bloomCorners)
         SKY_BLOOM_COLOR,                    //  "skyBloomColor"  the sun's colour the bloom is tinted by
         SKY_CLOUD_BLEND,                    //  "skyCloudBlend"  how far the clouds have blended toward the next noise (deferred/skyCloudsF.glsl)
+        SKY_METEOR_DATA,                    //  "skyMeteorData"  vec4[], the meteors' streaks on the screen (ALSkyLayers::packMeteors)
+        SKY_METEOR_COUNT,                   //  "skyMeteorCount"  how many streaks skyMeteorData holds
 
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535

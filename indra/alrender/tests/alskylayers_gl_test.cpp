@@ -47,6 +47,7 @@ namespace
         TEST_BLOOM = 3,
         TEST_CLOUDS = 4,
         TEST_AURORA = 5,
+        TEST_METEORS = 6,
     };
 
     // The screen triangle the layers are drawn over.
@@ -79,6 +80,7 @@ vec4 skyMoon(vec3 dir);
 vec4 skyBloom(vec3 dir);
 vec4 skyClouds(vec3 dir);
 vec3 skyAurora(vec3 dir);
+vec3 skyMeteors(vec2 ndc);
 
 void main()
 {
@@ -108,6 +110,10 @@ void main()
     else if (test_layer == 5)
     {
         color += skyAurora(dir);
+    }
+    else if (test_layer == 6)
+    {
+        color += skyMeteors(vary_fragcoord * 2.0 - 1.0);
     }
     frag_color = vec4(color, 1.0);
 }
@@ -236,6 +242,56 @@ void main()
         { "aurora, wide and bright", { 130.f, 20.f, 100.f }, 1.4f, 777.f },
     };
 
+    // A view onto the meteors, and the meteors about the camera: by their midpoint's elevation and bearing, their
+    // half-length toward the head (in radians of the dome), the bearing they travel along, their colour and width.
+    // A thin common one, a standard one, a fireball, one at the edge of the view, one end on to the camera, and one
+    // behind it.
+    const View METEOR_VIEW = { 60.f, 35.f, 70.f };
+
+    struct MeteorCase
+    {
+        F32       mElevation;
+        F32       mBearing;
+        F32       mHalfAngle;
+        F32       mHeading;
+        LLColor4U mColour;
+        F32       mWidth;
+    };
+
+    const MeteorCase METEORS[] = {
+        { 40.f, 55.f, 0.05f, 30.f, LLColor4U(160, 90, 40, 0), 0.6f },
+        { 30.f, 75.f, 0.08f, 160.f, LLColor4U(220, 210, 180, 0), 1.0f },
+        { 45.f, 40.f, 0.12f, 250.f, LLColor4U(90, 255, 115, 0), 2.7f },
+        { 52.f, 18.f, 0.1f, 90.f, LLColor4U(255, 230, 200, 0), 1.2f },
+        { 25.f, 60.f, 0.f, 0.f, LLColor4U(255, 255, 255, 0), 1.0f },
+        { 35.f, 240.f, 0.1f, 90.f, LLColor4U(255, 255, 255, 0), 1.0f },
+    };
+
+    // The meteors as LLVOWLSky ticks them: at the dome's radius about the camera, each a streak of its half-length
+    // along a tangent at its heading, its width a quarter in its colour's alpha. The one end on has its half along
+    // its own direction.
+    std::vector<ALSkyLayers::Meteor> meteors()
+    {
+        std::vector<ALSkyLayers::Meteor> out;
+        for (const MeteorCase& m : METEORS)
+        {
+            const LLVector3 dir = agentDirection(m.mElevation, m.mBearing);
+            LLVector3 east = LLVector3::z_axis % dir;
+            east.normVec();
+            const LLVector3 north = dir % east;
+            const F32 heading = m.mHeading * DEG_TO_RAD;
+            ALSkyLayers::Meteor meteor;
+            meteor.mMidpoint = dir * DOME_RADIUS;
+            meteor.mHalf = m.mHalfAngle > 0.f ? (east * sinf(heading) + north * cosf(heading)) * (DOME_RADIUS * m.mHalfAngle)
+                                              : dir * 100.f;
+            meteor.mColour = m.mColour;
+            meteor.mColour.mV[VALPHA] = (U8)llclamp(std::lround(m.mWidth * 0.25f * 255.f), 0L, 255L);
+            meteor.mWidth = m.mWidth;
+            out.push_back(meteor);
+        }
+        return out;
+    }
+
     // How a layer drawn two ways differs, over the colour channels: the most, the pixels past the bound compare() is
     // given, and the pixels the layer reached in either.
     struct Difference
@@ -268,6 +324,7 @@ void main()
                 mHalo[path].unload();
                 mOldClouds[path].unload();
                 mOldAurora[path].unload();
+                mOldMeteors[path].unload();
                 mLayers[path].unload();
                 for (LLRenderTarget& target : mGBuffer[path])
                 {
@@ -331,6 +388,10 @@ void main()
                              { { "skyraster/deferred/auroraV.glsl", GL_VERTEX_SHADER },
                                { "skyraster/deferred/auroraF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
+                buildProgram(mOldMeteors[path], "Deferred Meteor Program (before the composite)",
+                             { { "skyraster/deferred/meteorsV.glsl", GL_VERTEX_SHADER },
+                               { "skyraster/deferred/meteorsF.glsl", GL_FRAGMENT_SHADER } },
+                             emissive);
                 buildProgram(mLayers[path], "The sky's layers along the view ray (test)",
                              { { "skytest/skyLayerTestV.glsl", GL_VERTEX_SHADER },
                                { "skytest/skyLayerTestF.glsl", GL_FRAGMENT_SHADER },
@@ -338,6 +399,7 @@ void main()
                                { "deferred/skyCloudsF.glsl", GL_FRAGMENT_SHADER },
                                { "deferred/valueNoiseUtil.glsl", GL_FRAGMENT_SHADER },
                                { "deferred/skyAuroraF.glsl", GL_FRAGMENT_SHADER },
+                               { "deferred/skyMeteorsF.glsl", GL_FRAGMENT_SHADER },
                                { "windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER } },
                              emissive, { { "SUN_BLOOM", "1" } });
 
@@ -561,6 +623,45 @@ void main()
             }, SKIES[2]);
         }
 
+        // The meteors by their old program, as LLDrawPoolWLSky::renderMeteorsDeferred drew them: six vertices a meteor
+        // about the camera, sized on the screen, added.
+        std::vector<F32> oldMeteors(bool emissive, bool stored)
+        {
+            LLPointer<LLVertexBuffer> quads = meteorQuads(meteors());
+            return drawOld(METEOR_VIEW, emissive, stored, [&]
+            {
+                gGL.setSceneBlendType(LLRender::BT_ADD);
+                LLGLSLShader& program = mOldMeteors[emissive];
+                program.bind();
+                program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)W, (F32)H);
+                program.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, ALSkyLayers::METEOR_WIDTH_PIXELS);
+                gGL.pushMatrix();
+                gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
+                quads->setBuffer();
+                quads->drawArrays(LLRender::TRIANGLES, 0, quads->getNumVerts());
+                gGL.popMatrix();
+                program.unbind();
+            });
+        }
+
+        // The meteors at each pixel, their streaks packed through the matrices that drew the old ones.
+        std::vector<F32> rayMeteors(bool emissive, U32& packed)
+        {
+            loadView(METEOR_VIEW, W, H);
+            gGL.pushMatrix();
+            gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
+            LLMatrix4a mvp;
+            mvp.setMul(gGL.getModelviewMatrix(), gGL.getProjectionMatrix());
+            gGL.popMatrix();
+            std::vector<LLVector4> data;
+            packed = ALSkyLayers::packMeteors(meteors(), mvp, (F32)W, (F32)H, ALSkyLayers::METEOR_WIDTH_PIXELS, data);
+            return drawLayer(METEOR_VIEW, emissive, TEST_METEORS, [&](LLGLSLShader& program)
+            {
+                program.uniform4fv(LLShaderMgr::SKY_METEOR_DATA, (U32)data.size(), data.empty() ? nullptr : data[0].mV);
+                program.uniform1i(LLShaderMgr::SKY_METEOR_COUNT, (S32)packed);
+            }, SKIES[2]);
+        }
+
         // The dome's sphere as a far finer mesh than the dome's, with no skirt: rings every tenth of a degree from the
         // zenith to 22.5 degrees, past where the camera's level meets it, with the dome's planar texture coordinates.
         // Its facets are a hundredth of the dome's in depth, so the clouds drawn over it are the sphere's.
@@ -726,6 +827,7 @@ void main()
         LLGLSLShader           mHalo[2];
         LLGLSLShader           mOldClouds[2];
         LLGLSLShader           mOldAurora[2];
+        LLGLSLShader           mOldMeteors[2];
         LLGLSLShader           mLayers[2];
         LLRenderTarget         mGBuffer[2][2];
         LLRenderTarget         mFloat;
@@ -748,6 +850,10 @@ void main()
     constexpr F32 CLOUD_MATHS  = 2.f / 255.f;
     constexpr F32 CLOUD_FACETS = 40.f / 255.f;
     constexpr F32 CLOUD_SKIRT  = 4.f / 255.f;
+
+    // How far the meteors at each pixel may lie from the old program's, display encoded: a streak's edge, where the
+    // quad's coverage and the loop's bound disagree on a pixel centre, adds under 0.006 of its colour times its gain.
+    constexpr F32 METEOR_MATHS = 2.f / 255.f;
 
     // How far the per-ray aurora may lie from the old program's, display encoded: next to nothing, but at a pixel
     // whose strength lies on the 0.003 the aurora is cut at, which the two rays' last bits can put either side of it
@@ -912,5 +1018,27 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the aurora along the view
         }
     }
     UNSCOPED_INFO("the 8-bit albedo clamped the bright aurora");
+    CHECK(clamped_pixels > 0);
+}
+
+TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the meteors at each pixel are the meteors' quads", "[alskylayers_gl]")
+{
+    // Every corner of a meteor's quad lies at the depth of its midpoint, so the quad interpolated its coordinates
+    // linearly on the screen, as the loop over the packed streaks solves them. The meteor behind the camera is left out
+    // of the loop, and drew nothing before; the one end on to the camera is a sliver both ways. The fireball passes 1,
+    // which the 8-bit albedo clamped (D6).
+    setUp();
+    S32 clamped_pixels = 0;
+    for (S32 path = 0; path < 2; ++path)
+    {
+        const bool emissive = path == 1;
+        CAPTURE(emissive);
+        U32 packed = 0;
+        const std::vector<F32> ray = rayMeteors(emissive, packed);
+        CHECK(packed == 5);
+        check(ray, oldMeteors(emissive, false), oldMeteors(emissive, true), emissive, METEOR_MATHS, clamped_pixels,
+              true);
+    }
+    UNSCOPED_INFO("the 8-bit albedo clamped the fireball");
     CHECK(clamped_pixels > 0);
 }

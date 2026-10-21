@@ -1,7 +1,7 @@
 /**
  * @file alskylayers_test.cpp
- * @brief What the sky's composite takes of its layers: the sun's and moon's quads, where a ray meets one, and the
- *        sun bloom's square.
+ * @brief What the sky's composite takes of its layers: the sun's and moon's quads, where a ray meets one, the sun
+ *        bloom's square, and the meteors' streaks on the screen.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,9 +31,16 @@
 #include "../alskylayers.h"
 
 #include "llmath.h"
+#include "llmatrix4a.h"
 #include "llquaternion.h"
+#include "llvector4a.h"
 
 #include <cmath>
+#include <filesystem>
+#include <fstream>
+#include <map>
+#include <sstream>
+#include <string>
 
 namespace
 {
@@ -161,4 +168,131 @@ TEST_CASE("alskylayers: the moon fades as the square of its height near the hori
     CHECK(fabsf(ALSkyLayers::moonFade(0.25f) - 0.25f) < 1e-6f);
     CHECK(ALSkyLayers::moonFade(0.5f) == 1.f);
     CHECK(ALSkyLayers::moonFade(0.9f) == 1.f);
+}
+
+TEST_CASE("alskylayers: a meteor's streak is packed as its quad on the screen", "[alskylayers]")
+{
+    // A camera at the origin looking down -z, 90 degrees across on a 200 by 100 viewport.
+    constexpr F32 WIDTH  = 200.f;
+    constexpr F32 HEIGHT = 100.f;
+    LLMatrix4a mvp;
+    mvp.clear();
+    F32* p = mvp.getF32ptr();
+    p[0]  = 0.5f;
+    p[5]  = 1.f;
+    p[10] = -1.f;
+    p[11] = -1.f;
+    p[14] = -1.f;
+
+    // Clip space of a point, and its normalized device coordinates.
+    const auto ndc = [&](const LLVector3& v)
+    {
+        LLVector4a clip;
+        mvp.transform4(LLVector4a(v.mV[VX], v.mV[VY], v.mV[VZ], 1.f), clip);
+        return LLVector3(clip[VX] / clip[VW], clip[VY] / clip[VW], clip[VW]);
+    };
+
+    ALSkyLayers::Meteor ahead;
+    ahead.mMidpoint = LLVector3(10.f, 5.f, -100.f);
+    ahead.mHalf     = LLVector3(8.f, 2.f, 0.f);
+    ahead.mColour   = LLColor4U(255, 128, 0, 64);
+    ahead.mWidth    = 2.5f;
+
+    ALSkyLayers::Meteor behind = ahead;
+    behind.mMidpoint.mV[VZ] = 100.f;
+
+    ALSkyLayers::Meteor aside = ahead;
+    aside.mMidpoint = LLVector3(500.f, 0.f, -100.f);
+
+    ALSkyLayers::Meteor end_on = ahead;
+    end_on.mHalf = ahead.mMidpoint * 0.1f;
+
+    std::vector<LLVector4> out;
+    const U32 count = ALSkyLayers::packMeteors({ behind, ahead, aside, end_on }, mvp, WIDTH, HEIGHT, 1.5f, out);
+    REQUIRE(count == 1);
+    REQUIRE(out.size() == ALSkyLayers::METEOR_VECTORS);
+
+    // The head is (1, 0) in the streak's frame and the tail (-1, 0); a point the width across from the midpoint is
+    // (0, width), the width 1.5 pixels to the unit.
+    const LLVector3 mid  = ndc(ahead.mMidpoint);
+    const LLVector3 head = ndc(ahead.mMidpoint + ahead.mHalf);
+    const LLVector3 tail = ndc(ahead.mMidpoint - ahead.mHalf);
+    CHECK(fabsf(out[0].mV[0] - mid.mV[0]) < 1e-6f);
+    CHECK(fabsf(out[0].mV[1] - mid.mV[1]) < 1e-6f);
+    const auto coord = [&](F32 x, F32 y)
+    {
+        const F32 dx = x - out[0].mV[0];
+        const F32 dy = y - out[0].mV[1];
+        return LLVector2(out[0].mV[2] * dx + out[0].mV[3] * dy, out[1].mV[0] * dx + out[1].mV[1] * dy);
+    };
+    CHECK(dist_vec(coord(head.mV[0], head.mV[1]), LLVector2(1.f, 0.f)) < 1e-4f);
+    CHECK(dist_vec(coord(tail.mV[0], tail.mV[1]), LLVector2(-1.f, 0.f)) < 1e-3f);
+    LLVector2 across(-(head.mV[1] - mid.mV[1]), head.mV[0] - mid.mV[0]);
+    across.normVec();
+    const LLVector2 side(mid.mV[0] + across.mV[0] * 1.5f * 2.f / WIDTH * ahead.mWidth,
+                         mid.mV[1] + across.mV[1] * 1.5f * 2.f / HEIGHT * ahead.mWidth);
+    CHECK(dist_vec(coord(side.mV[0], side.mV[1]), LLVector2(0.f, ahead.mWidth)) < 1e-3f);
+
+    // The width it reaches, and the one its profile divides by, from the eight bits it was packed in.
+    CHECK(out[1].mV[2] == ahead.mWidth);
+    CHECK(fabsf(out[1].mV[3] - 64.f / 255.f * 4.f) < 1e-6f);
+
+    // The colour, linear as the vertex stage made it.
+    CHECK(fabsf(out[2].mV[0] - 1.f) < 1e-6f);
+    CHECK(fabsf(out[2].mV[1] - powf(128.f / 255.f, 2.2f)) < 1e-6f);
+    CHECK(out[2].mV[2] == 0.f);
+}
+
+namespace
+{
+    // The integer defines of @a file in the viewer's shader tree whose names begin with @a prefix: each
+    // `#define NAME value` line, read as the viewer compiles it.
+    std::map<std::string, S64> shaderDefines(const std::string& file, const std::string& prefix)
+    {
+        std::ifstream in(std::filesystem::path(AL_TEST_SHADER_DIR) / file);
+        CAPTURE(file);
+        REQUIRE(in.good());
+        std::map<std::string, S64> out;
+        std::string line;
+        while (std::getline(in, line))
+        {
+            std::istringstream words(line);
+            std::string directive;
+            std::string name;
+            S64 value = 0;
+            if (words >> directive >> name >> value && directive == "#define" && name.rfind(prefix, 0) == 0)
+            {
+                out[name] = value;
+            }
+        }
+        return out;
+    }
+}
+
+TEST_CASE("alskylayers: the composite's meteor array is as long as packMeteors packs", "[alskylayers]")
+{
+    const std::map<std::string, S64> defines = shaderDefines("class1/deferred/skyMeteorsF.glsl", "SKY_");
+    const std::map<std::string, S64> expected = { { "SKY_MAX_METEORS", ALSkyLayers::MAX_METEORS },
+                                                  { "SKY_METEOR_VECTORS", ALSkyLayers::METEOR_VECTORS } };
+    CHECK(defines.size() == expected.size());
+    for (const auto& [name, value] : expected)
+    {
+        CAPTURE(name);
+        REQUIRE(defines.count(name) == 1);
+        CHECK(defines.at(name) == value);
+    }
+}
+
+TEST_CASE("alskylayers: no more meteors are packed than the composite holds", "[alskylayers]")
+{
+    LLMatrix4a mvp;
+    mvp.setIdentity();
+    ALSkyLayers::Meteor meteor;
+    meteor.mMidpoint = LLVector3(0.f, 0.f, 0.5f);
+    meteor.mHalf     = LLVector3(0.1f, 0.f, 0.f);
+    meteor.mColour   = LLColor4U(255, 255, 255, 64);
+    std::vector<LLVector4> out;
+    const std::vector<ALSkyLayers::Meteor> meteors(ALSkyLayers::MAX_METEORS + 5, meteor);
+    CHECK(ALSkyLayers::packMeteors(meteors, mvp, 100.f, 100.f, 1.5f, out) == ALSkyLayers::MAX_METEORS);
+    CHECK(out.size() == ALSkyLayers::MAX_METEORS * ALSkyLayers::METEOR_VECTORS);
 }
