@@ -233,10 +233,11 @@ namespace
         REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
         UNSCOPED_INFO("haze drawn on the far plane, forward");
         REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
-        // The lighting passes draw there too: the light map's passes, the lights and the soften pass's lit program in
-        // front of it, the soften pass's sky program on it.
+        // The lighting passes draw there too: the light map's passes, the lights and the soften pass in front of it,
+        // the sky's pass on it.
         for (const char* path : { "class2/deferred/softenLightV.glsl", "class3/deferred/multiPointLightV.glsl",
-                                  "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl" })
+                                  "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl",
+                                  "class1/deferred/skyCompositeV.glsl" })
         {
             const std::string v = shader_source(path);
             UNSCOPED_INFO(path << " drawn on the far plane, reversed");
@@ -244,9 +245,10 @@ namespace
             UNSCOPED_INFO(path << " drawn on the far plane, forward");
             REQUIRE(v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         }
-        const std::string soften = shader_source("class3/deferred/softenLightF.glsl");
-        UNSCOPED_INFO("the sky's soften program lights nothing");
-        REQUIRE(soften.find("writeColor(skyColor(getGBuffer(tc)));") != std::string::npos);
+        const std::string sky = shader_source("class1/deferred/skyCompositeMainF.glsl");
+        UNSCOPED_INFO("the sky's pass lights nothing: it composites the sky along the view ray");
+        REQUIRE(sky.find("frag_color.rgb = min(clampHDRRange(skyComposite(vary_fragcoord) * sky_classic_scale), "
+                         "vec3(65504.0));") != std::string::npos);
         UNSCOPED_INFO("haze takes geometry where it is");
         REQUIRE(haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
         UNSCOPED_INFO("void water fog keys on the far depth");

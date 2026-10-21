@@ -809,6 +809,9 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     // classic_mode is a compile-time program variant now; sClassicMode is what selectVariant()
     // reads to pick the CLASSIC_MODE=1 clone.
     LLRender::sClassicMode = classic_mode;
+    // The sky's pass has no classic variant: it takes the classic sky's gain on the lit screen, which the soften
+    // pass's classic variant gives what it lights (softenLightF.glsl's writeColor), as a uniform.
+    shader->uniform1f(LLShaderMgr::SKY_CLASSIC_SCALE, classic_mode ? 1.1f : 1.f);
 
     F32 probe_ambiance = getReflectionProbeAmbiance();
 

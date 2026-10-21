@@ -1,7 +1,8 @@
 /**
  * @file alskylayers.h
  * @brief What the sky's composite takes of the layers it works out along each view ray from a few values a frame: the
- *        sun's and moon's quads, the sun bloom's square, and the meteors' streaks on the screen.
+ *        layers a view draws, the sun's and moon's quads, the sun bloom's square, and the meteors' streaks on the
+ *        screen.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -41,10 +42,64 @@
 class LLMatrix4a;
 class LLQuaternion;
 
-/// The sky's layers as the composite takes them (deferred/skyBodiesF.glsl, deferred/skyMeteorsF.glsl): no GL and no
-/// settings, so LLVOSky, LLVOWLSky, the pass that binds the layers and the GL tests share one definition.
+/// The sky's layers as the composite takes them (deferred/skyCompositeF.glsl and the layers' files): no GL and no
+/// settings, so LLVOSky, LLVOWLSky, the pass that binds the composite and the GL tests share one definition.
 namespace ALSkyLayers
 {
+
+/// The layers the composite draws, one bit each in its skyLayers. These are deferred/skyCompositeF.glsl's
+/// SKY_LAYER_* and must stay equal to them.
+enum Layer : S32
+{
+    STARS   = 1 << 0, ///< the stars' attachment of the G-buffer, added
+    BLOOM   = 1 << 1, ///< the sun bloom, laid under the sun disc (its program's SUN_BLOOM only)
+    SUN     = 1 << 2, ///< the sun disc
+    MOON    = 1 << 3, ///< the moon
+    METEORS = 1 << 4, ///< the meteors' streaks, added
+    AURORA  = 1 << 5, ///< the aurora, added
+    CLOUDS  = 1 << 6, ///< the clouds
+    HDRI    = 1 << 7, ///< an HDRI sky in place of every other layer, beside WindLight's dome by the split screen
+};
+
+/// The fragment files the composite is built from: the composite itself and the layers it works out, with the value
+/// noise the aurora takes. The sky's pass links them under its own stages (deferred/skyCompositeV.glsl,
+/// deferred/skyCompositeMainF.glsl), as the GL tests that draw the composite link them under theirs.
+inline constexpr const char* COMPOSITE_FILES[] = {
+    "deferred/skyCompositeF.glsl", "deferred/skyBodiesF.glsl",  "deferred/skyCloudsF.glsl",
+    "deferred/skyAuroraF.glsl",    "deferred/skyMeteorsF.glsl", "windlight/windlightDomeF.glsl",
+    "deferred/valueNoiseUtil.glsl",
+};
+
+/// The star brightness over 500 (Frame::mStarAlpha) from which a view draws the night's layers: the stars, the
+/// meteors and the aurora.
+constexpr F32 NIGHT_STAR_ALPHA = 0.001f;
+
+/// What decides the layers a view of the sky draws.
+struct Frame
+{
+    bool mProbe     = false; ///< a reflection probe's face or a mirror's (gCubeSnapshot)
+    bool mMirror    = false; ///< a mirror's (LLHeroProbeManager::isMirrorPass)
+    bool mRadiance  = true;  ///< not an irradiance pass of the probes (LLReflectionMapManager::isRadiancePass)
+    bool mHdri      = false; ///< an HDRI sky in place of WindLight's (LLDrawPoolWLSky::useHDRISky)
+    bool mSun       = false; ///< the sun is up and has a texture
+    bool mBloom     = false; ///< the sun bloom is drawn (AlchemyRenderSunBloom, latched) and has a texture
+    bool mMoon      = false; ///< the moon is up and has a texture
+    F32  mStarAlpha = 0.f;   ///< the star brightness over 500
+    bool mMeteors   = false; ///< meteors are on (RenderMeteorsEnabled) and some fly
+    F32  mAurora    = 0.f;   ///< the aurora's intensity after the moon's wash
+    bool mClouds    = false; ///< clouds are shown (RENDER_TYPE_CLOUDS) and have a noise texture
+};
+
+/// The layers @a frame draws, as the sky's raster draws drew them in each kind of view: an HDRI alone; in a probe's face
+/// neither the stars, the meteors nor the aurora, and no sun, so that the punctual sun is not counted twice, but in a
+/// mirror, which is a picture rather than lighting; no clouds in an irradiance pass; and the night's layers only while
+/// the stars are bright enough to draw.
+S32 layersFor(const Frame& frame);
+
+/// The attachment of the G-buffer the stars are drawn into and the composite reads them from: the emissive with the
+/// emissive buffer (frag_data[3]), the albedo without it (frag_data[0]). A view whose layers leave the stars out
+/// does not read it.
+constexpr U32 starAttachment(bool emissive) { return emissive ? 3 : 0; }
 
 /// A sun's or moon's quad about the camera, in the agent's frame: corners 0 to 3 at (-right, +up), (-right, -up),
 /// (+right, +up) and (+right, -up), texture coordinates (0, 1), (0, 0), (1, 1) and (1, 0). A parallelogram, its right

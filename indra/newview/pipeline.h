@@ -622,6 +622,15 @@ public:
     // (drawsWater), which is what leaves pixels for the haze's draw over the water to shade.
     bool hazeOnWater() const;
 
+    // Whether this view draws the sky: the sky's render types on, WindLight's shaders in use, and not a snapshot
+    // cutout's frame, which leaves the background empty.
+    bool drawsSky() const;
+
+    // Clear the bound G-buffer's attachment the stars add into to black, the emissive with the emissive buffer and the
+    // albedo without it: the sky's composite adds it to every pixel the world leaves at the far plane, where nothing
+    // else writes it. Right after the G-buffer's own clear.
+    void clearStarAttachment();
+
     // apply water haze based on contents of color and depth buffer
     // should be called just before rendering pre-water alpha objects
     void doWaterHaze();

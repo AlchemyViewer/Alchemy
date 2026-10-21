@@ -1677,6 +1677,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sky_hdr_scale");
     mReservedUniforms.push_back("sky_sunlight_scale");
     mReservedUniforms.push_back("sky_ambient_scale");
+    mReservedUniforms.push_back("sky_classic_scale");
     mReservedUniforms.push_back("blue_horizon");
     mReservedUniforms.push_back("blue_density");
     mReservedUniforms.push_back("haze_horizon");
@@ -2225,6 +2226,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("skyCloudBlend");
     mReservedUniforms.push_back("skyMeteorData");
     mReservedUniforms.push_back("skyMeteorCount");
+    mReservedUniforms.push_back("skyLayers");
+    mReservedUniforms.push_back("skyHdriMap");
+    mReservedUniforms.push_back("skyHdriRotation");
+    mReservedUniforms.push_back("skyHdriScale");
 
     // Selection outlines, hover glow and wireframe (ALSelectionOutline)
     mReservedUniforms.push_back("selection_id");

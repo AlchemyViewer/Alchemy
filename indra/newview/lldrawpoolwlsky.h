@@ -76,6 +76,15 @@ public:
     /// Whether the sky this view draws is the HDRI rather than WindLight's: always in a capture that has one (unless
     /// only the irradiance takes it), and in the main view while its split screen shows any of it.
     static bool useHDRISky();
+
+    /// The sky's composite's inputs on the bound @a shader, the soften pass's sky variant (deferred/skyCompositeF.glsl):
+    /// the dome's (bindDome), the layers this view draws (ALSkyLayers::layersFor) and what each takes, about the view's
+    /// camera. Ticks the meteors and the aurora's clock in a view that draws them, as their draws did.
+    static void bindComposite(LLGLSLShader& shader);
+
+    /// The textures bindComposite bound on @a shader, let go, and those alone: a unit whose map this view's layers left
+    /// unbound holds what an earlier pass bound there.
+    static void unbindComposite(LLGLSLShader& shader);
 private:
     void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
 

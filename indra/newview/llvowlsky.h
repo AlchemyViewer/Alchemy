@@ -32,6 +32,7 @@
 
 #include "llviewerobject.h"
 
+#include "alskylayers.h"
 #include "alstarfield.h"
 
 #include <boost/signals2/connection.hpp>
@@ -59,6 +60,10 @@ public:
     void tickMeteors(F32 dt_seconds);
     void updateMeteorGeometry();
     void drawMeteors();
+
+    // The meteors in flight, as the sky's composite takes them (ALSkyLayers::packMeteors): each one's streak about the
+    // camera as its envelope has carried it this far, its colour times that envelope, and its width class.
+    void meteors(std::vector<ALSkyLayers::Meteor>& out) const;
 
     void cleanupGL();
     void restoreGL();

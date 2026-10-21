@@ -662,51 +662,6 @@ void main()
             }, SKIES[2]);
         }
 
-        // The dome's sphere as a far finer mesh than the dome's, with no skirt: rings every tenth of a degree from the
-        // zenith to 22.5 degrees, past where the camera's level meets it, with the dome's planar texture coordinates.
-        // Its facets are a hundredth of the dome's in depth, so the clouds drawn over it are the sphere's.
-        static LLPointer<LLVertexBuffer> fineSphere()
-        {
-            constexpr U32 RINGS  = 225;
-            constexpr U32 SLICES = 256;
-            LLPointer<LLVertexBuffer> mesh = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0);
-            REQUIRE(mesh->allocateBuffer((RINGS + 1) * SLICES, RINGS * SLICES * 6));
-            LLStrider<LLVector3> vertices;
-            LLStrider<LLVector2> tex_coords;
-            LLStrider<U16>       index;
-            REQUIRE(mesh->getVertexStrider(vertices));
-            REQUIRE(mesh->getTexCoord0Strider(tex_coords));
-            REQUIRE(mesh->getIndexStrider(index));
-            for (U32 ring = 0; ring <= RINGS; ++ring)
-            {
-                const F32 phi = (F32)ring / RINGS * (F_PI / 8.f);
-                for (U32 slice = 0; slice < SLICES; ++slice)
-                {
-                    const F32 theta = F_TWO_PI * (F32)slice / SLICES;
-                    const F32 x = sinf(phi) * cosf(theta);
-                    const F32 y = cosf(phi);
-                    const F32 z = sinf(phi) * sinf(theta);
-                    *vertices++   = LLVector3(x, y, z) * DOME_RADIUS;
-                    *tex_coords++ = LLVector2((1.f - z) / 2.f, (1.f - x) / 2.f);
-                }
-            }
-            for (U32 ring = 0; ring < RINGS; ++ring)
-            {
-                for (U32 slice = 0; slice < SLICES; ++slice)
-                {
-                    const U16 a = (U16)(ring * SLICES + slice);
-                    const U16 b = (U16)(ring * SLICES + (slice + 1) % SLICES);
-                    const U16 c = (U16)(a + SLICES);
-                    const U16 d = (U16)(b + SLICES);
-                    for (U16 i : { a, c, b, b, c, d })
-                    {
-                        *index++ = i;
-                    }
-                }
-            }
-            mesh->unmapBuffer();
-            return mesh;
-        }
 
         // The clouds by their old program, as LLDrawPoolWLSky::renderSkyCloudsDeferred drew them: the dome's mesh,
         // alpha blended, the next noise bound only while the sky blends toward it.

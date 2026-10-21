@@ -126,6 +126,7 @@ public:
         SKY_HDR_SCALE,                      //  "sky_hdr_scale"
         SKY_SUNLIGHT_SCALE,                 //  "sky_sunlight_scale"
         SKY_AMBIENT_SCALE,                  //  "sky_ambient_scale"
+        SKY_CLASSIC_SCALE,                  //  "sky_classic_scale"  the classic sky's gain on the lit screen (deferred/skyCompositeMainF.glsl)
         BLUE_HORIZON,                       //  "blue_horizon"
         BLUE_DENSITY,                       //  "blue_density"
         HAZE_HORIZON,                       //  "haze_horizon"
@@ -662,6 +663,10 @@ public:
         SKY_CLOUD_BLEND,                    //  "skyCloudBlend"  how far the clouds have blended toward the next noise (deferred/skyCloudsF.glsl)
         SKY_METEOR_DATA,                    //  "skyMeteorData"  vec4[], the meteors' streaks on the screen (ALSkyLayers::packMeteors)
         SKY_METEOR_COUNT,                   //  "skyMeteorCount"  how many streaks skyMeteorData holds
+        SKY_LAYERS,                         //  "skyLayers"  the layers the sky's composite draws (ALSkyLayers::Layer)
+        SKY_HDRI_MAP,                       //  "skyHdriMap"  the HDRI sky, wrapped about the dome's sphere
+        SKY_HDRI_ROTATION,                  //  "skyHdriRotation"  the HDRI's turn about the vertical (RenderHDRIRotation)
+        SKY_HDRI_SCALE,                     //  "skyHdriScale"  the HDRI's exposure (RenderHDRIExposure)
 
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535

@@ -11854,7 +11854,7 @@ void LLPipeline::renderDeferredLighting()
                 {
                     // The triangle lies on the far plane (sunLightV.glsl) and the target shares the scene's
                     // depth: only geometry is shadowed and occluded, and the sky keeps the clear's white, which
-                    // nothing reads there (the soften pass's sky program lights nothing).
+                    // nothing reads there (the sky's pass lights nothing).
                     LLGLDisable   blend(GL_BLEND);
                     ALDrawnOnly   drawn;
                     mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
@@ -11976,16 +11976,23 @@ void LLPipeline::renderDeferredLighting()
 
             unbindDeferredShader(soften_shader);
 
-            LLGLSLShader& sky_shader = *gDeferredSoftenSkyProgram.selectVariant();
-            bindDeferredShader(sky_shader);
+            // The sky, every layer composited along the view ray, where the world left the far plane
+            // (deferred/skyCompositeF.glsl). A view that draws no sky leaves the screen's clear there.
+            if (drawsSky())
             {
-                LL_PROFILE_GPU_ZONE("sky resolve");
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
+                LLGLSLShader& sky_shader = gDeferredSkyCompositeProgram;
+                bindDeferredShader(sky_shader);
+                LLDrawPoolWLSky::bindComposite(sky_shader);
+                {
+                    LL_PROFILE_GPU_ZONE("sky composite");
+                    LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
 
-                mScreenTriangleVB->setBuffer();
-                mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                    mScreenTriangleVB->setBuffer();
+                    mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+                }
+                LLDrawPoolWLSky::unbindComposite(sky_shader);
+                unbindDeferredShader(sky_shader);
             }
-            unbindDeferredShader(sky_shader);
         }
 
         static LLCachedControl<S32> local_light_count(gSavedSettings, "RenderLocalLightCount", 256);
@@ -12370,6 +12377,29 @@ void LLPipeline::renderDeferredLighting()
         LLViewerCamera::getInstance()->rememberModelview();
     }
     gGL.setColorMask(true, true);
+}
+
+bool LLPipeline::drawsSky() const
+{
+    // As the sky's draws were gated: its two objects pushed to the cull, and the pool drawing.
+    return !cullingToCutoutSubject() && canUseWindLightShaders() && hasRenderType(RENDER_TYPE_SKY) &&
+           hasRenderType(RENDER_TYPE_WL_SKY) && gSky.mVOSkyp.notNull() && gSky.mVOWLSkyp.notNull();
+}
+
+void LLPipeline::clearStarAttachment()
+{
+    LLRenderTarget* gbuffer = LLRenderTarget::getCurrentBoundTarget();
+    const U32 attachment = ALSkyLayers::starAttachment(shaderInputs().mGlobal.mEmissive);
+    if (!gbuffer || attachment >= gbuffer->getNumTextures())
+    {
+        return;
+    }
+    const LLColor4 clear_color = gGL.getClearColor();
+    gbuffer->setDrawAttachment(attachment);
+    gGL.setClearColor(LLColor4::transparent);
+    gbuffer->clear(GL_COLOR_BUFFER_BIT);
+    gGL.setClearColor(clear_color);
+    gbuffer->setDrawBuffers();
 }
 
 bool LLPipeline::hazeOnWater() const
@@ -14821,10 +14851,10 @@ void LLPipeline::seedCutoutCoverageFromDepth()
     LLGLDisable blend(GL_BLEND);
 
     // Nothing covers the background, so it is cleared to nothing, colour and
-    // alpha both. Lighting left it the sky's emissive copy (magenta, with the
-    // emissive buffer on) or black; the blended geometry drawn over it next has
-    // to be composited over black for the colour to come out premultiplied by
-    // the coverage accumulated alongside it.
+    // alpha both. Lighting left it as the screen's clear, since a cutout's frame
+    // draws no sky; the blended geometry drawn over it next has to be composited
+    // over black for the colour to come out premultiplied by the coverage
+    // accumulated alongside it.
     {
         LLGLSColorMask mask(true, true);
         drawFarPlaneQuad(GL_LEQUAL, &LLColor4::transparent);

@@ -50,7 +50,7 @@ namespace
     // Meteor tuning. kMeteorHardMax is a fixed upper bound used for dynamic VB
     // sizing — the user-facing RenderMeteorMaxCount setting is clamped to this
     // so the VB never has to be reallocated at runtime.
-    constexpr U32 kMeteorHardMax        = 64;
+    constexpr U32 kMeteorHardMax        = ALSkyLayers::MAX_METEORS;
     constexpr U32 kMeteorVertsPerQuad   = 6;
 
     // Pick a random unit vector perpendicular to `n`. Uses a deterministic
@@ -510,52 +510,21 @@ void LLVOWLSky::updateMeteorGeometry()
         LLVector2(-1.f,  1.f), // tail R
     };
 
+    std::vector<ALSkyLayers::Meteor> in_flight;
+    meteors(in_flight);
     U32 written = 0;
-    for (const MeteorState& m : mMeteors)
+    for (const ALSkyLayers::Meteor& m : in_flight)
     {
-        if (written >= kMeteorHardMax) break;
-
-        // Envelope: quick fade in, steady, slower fade out. These ratios read
-        // as a meteor "blooming" and then trailing off.
-        const F32 frac = m.age / llmax(m.lifetime, 1e-4f);
-        F32 alpha = 1.0f;
-        if (frac < 0.10f)      alpha = frac / 0.10f;
-        else if (frac > 0.80f) alpha = (1.0f - frac) / 0.20f;
-        alpha = llclamp(alpha, 0.0f, 1.0f) * m.peak_intensity;
-        if (alpha <= 0.0f) continue;
-
-        // Head progresses linearly along the travel direction. Tail is a fixed
-        // length behind the head regardless of age — the trail doesn't grow,
-        // it just moves with the head.
-        const LLVector3 head = m.origin_world + m.direction_world * (m.path_length_world * frac);
-        const LLVector3 tail = head - m.direction_world * m.trail_length_world;
-        const LLVector3 midpoint = (head + tail) * 0.5f;
-        const LLVector3 half_vec = (head - tail) * 0.5f;
-
-        // Pack per-frame envelope alpha into the RGB channels (in sRGB space — a
-        // mild nonlinearity vs. linear-space premultiply, but the envelope is
-        // smooth enough that the difference isn't visible). This frees the
-        // color's alpha slot to carry the per-meteor width_scale, which the
-        // fragment shader needs to normalize its cross-streak Gaussian so
-        // thicker meteors are actually thicker (not just bigger empty quads).
-        LLColor4 color4;
-        color4.mV[VRED]   = m.color.mV[VRED]   * alpha;
-        color4.mV[VGREEN] = m.color.mV[VGREEN] * alpha;
-        color4.mV[VBLUE]  = m.color.mV[VBLUE]  * alpha;
-        // Width_scale range is [0, 4]; pack as /4 so it fits in 8-bit unsigned.
-        color4.mV[VALPHA] = llclamp(m.width_scale * 0.25f, 0.0f, 1.0f);
-        const LLColor4U color_u(color4);
-
         for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
         {
-            *(positions++) = midpoint;
-            *(normals++)   = half_vec;
-            *(colors++)    = color_u;
+            *(positions++) = m.mMidpoint;
+            *(normals++)   = m.mHalf;
+            *(colors++)    = m.mColour;
             // Scale the cross-streak coordinate by width_scale. The vertex
             // shader multiplies this by meteor_width_pixels to get the
             // screen-space half-width; the fragment shader divides by
             // width_scale to keep the Gaussian shape constant across classes.
-            *(texcoords++) = LLVector2(kUV[v].mV[VX], kUV[v].mV[VY] * m.width_scale);
+            *(texcoords++) = LLVector2(kUV[v].mV[VX], kUV[v].mV[VY] * m.mWidth);
         }
         ++written;
     }
@@ -575,6 +544,50 @@ void LLVOWLSky::updateMeteorGeometry()
     }
 
     mMeteorVerts->unmapBuffer();
+}
+
+void LLVOWLSky::meteors(std::vector<ALSkyLayers::Meteor>& out) const
+{
+    out.clear();
+    for (const MeteorState& m : mMeteors)
+    {
+        if (out.size() >= kMeteorHardMax) break;
+
+        // Envelope: quick fade in, steady, slower fade out. These ratios read
+        // as a meteor "blooming" and then trailing off.
+        const F32 frac = m.age / llmax(m.lifetime, 1e-4f);
+        F32 alpha = 1.0f;
+        if (frac < 0.10f)      alpha = frac / 0.10f;
+        else if (frac > 0.80f) alpha = (1.0f - frac) / 0.20f;
+        alpha = llclamp(alpha, 0.0f, 1.0f) * m.peak_intensity;
+        if (alpha <= 0.0f) continue;
+
+        // Head progresses linearly along the travel direction. Tail is a fixed
+        // length behind the head regardless of age — the trail doesn't grow,
+        // it just moves with the head.
+        const LLVector3 head = m.origin_world + m.direction_world * (m.path_length_world * frac);
+        const LLVector3 tail = head - m.direction_world * m.trail_length_world;
+
+        // Pack per-frame envelope alpha into the RGB channels (in sRGB space — a
+        // mild nonlinearity vs. linear-space premultiply, but the envelope is
+        // smooth enough that the difference isn't visible). This frees the
+        // color's alpha slot to carry the per-meteor width_scale, which the
+        // fragment shader needs to normalize its cross-streak Gaussian so
+        // thicker meteors are actually thicker (not just bigger empty quads).
+        LLColor4 color4;
+        color4.mV[VRED]   = m.color.mV[VRED]   * alpha;
+        color4.mV[VGREEN] = m.color.mV[VGREEN] * alpha;
+        color4.mV[VBLUE]  = m.color.mV[VBLUE]  * alpha;
+        // Width_scale range is [0, 4]; pack as /4 so it fits in 8-bit unsigned.
+        color4.mV[VALPHA] = llclamp(m.width_scale * 0.25f, 0.0f, 1.0f);
+
+        ALSkyLayers::Meteor meteor;
+        meteor.mMidpoint = (head + tail) * 0.5f;
+        meteor.mHalf     = (head - tail) * 0.5f;
+        meteor.mColour   = LLColor4U(color4);
+        meteor.mWidth    = m.width_scale;
+        out.push_back(meteor);
+    }
 }
 
 void LLVOWLSky::drawMeteors()

@@ -1,7 +1,7 @@
 /**
  * @file alskylayers_test.cpp
- * @brief What the sky's composite takes of its layers: the sun's and moon's quads, where a ray meets one, the sun
- *        bloom's square, and the meteors' streaks on the screen.
+ * @brief What the sky's composite takes of its layers: the layers each kind of view draws, the sun's and moon's
+ *        quads, where a ray meets one, the sun bloom's square, and the meteors' streaks on the screen.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -29,6 +29,7 @@
 
 #include "../alfarplane.h"
 #include "../alskylayers.h"
+#include "../alstarfield.h"
 
 #include "llmath.h"
 #include "llmatrix4a.h"
@@ -295,4 +296,129 @@ TEST_CASE("alskylayers: no more meteors are packed than the composite holds", "[
     const std::vector<ALSkyLayers::Meteor> meteors(ALSkyLayers::MAX_METEORS + 5, meteor);
     CHECK(ALSkyLayers::packMeteors(meteors, mvp, 100.f, 100.f, 1.5f, out) == ALSkyLayers::MAX_METEORS);
     CHECK(out.size() == ALSkyLayers::MAX_METEORS * ALSkyLayers::METEOR_VECTORS);
+}
+
+TEST_CASE("alskylayers: each kind of view draws the layers the raster sky drew in it", "[alskylayers]")
+{
+    using L = ALSkyLayers::Layer;
+
+    // A night with everything up and drawn.
+    ALSkyLayers::Frame night;
+    night.mSun       = true;
+    night.mBloom     = true;
+    night.mMoon      = true;
+    night.mStarAlpha = 0.5f;
+    night.mMeteors   = true;
+    night.mAurora    = 0.6f;
+    night.mClouds    = true;
+
+    // The main view draws every layer.
+    CHECK(ALSkyLayers::layersFor(night) ==
+          (L::STARS | L::BLOOM | L::SUN | L::MOON | L::METEORS | L::AURORA | L::CLOUDS));
+
+    // A probe's radiance face: no stars, sun, bloom, meteors or aurora.
+    ALSkyLayers::Frame probe = night;
+    probe.mProbe = true;
+    CHECK(ALSkyLayers::layersFor(probe) == (L::MOON | L::CLOUDS));
+
+    // Its irradiance pass leaves the clouds out too.
+    probe.mRadiance = false;
+    CHECK(ALSkyLayers::layersFor(probe) == L::MOON);
+
+    // A mirror keeps the sun and its bloom.
+    ALSkyLayers::Frame mirror = night;
+    mirror.mProbe  = true;
+    mirror.mMirror = true;
+    CHECK(ALSkyLayers::layersFor(mirror) == (L::BLOOM | L::SUN | L::MOON | L::CLOUDS));
+
+    // An HDRI stands alone, in any view.
+    ALSkyLayers::Frame hdri = night;
+    hdri.mHdri = true;
+    CHECK(ALSkyLayers::layersFor(hdri) == L::HDRI);
+    probe.mHdri = true;
+    CHECK(ALSkyLayers::layersFor(probe) == L::HDRI);
+
+    // Daylight: below a thousandth of the stars' brightness the night's layers go.
+    ALSkyLayers::Frame day = night;
+    day.mStarAlpha = 0.0009f;
+    CHECK(ALSkyLayers::layersFor(day) == (L::BLOOM | L::SUN | L::MOON | L::CLOUDS));
+
+    // The aurora washed out by the moon, no meteors flying, the bloom off, nothing up.
+    ALSkyLayers::Frame quiet = night;
+    quiet.mAurora  = 0.001f;
+    quiet.mMeteors = false;
+    quiet.mBloom   = false;
+    CHECK(ALSkyLayers::layersFor(quiet) == (L::STARS | L::SUN | L::MOON | L::CLOUDS));
+    quiet.mSun    = false;
+    quiet.mMoon   = false;
+    quiet.mClouds = false;
+    CHECK(ALSkyLayers::layersFor(quiet) == L::STARS);
+
+    // The bloom goes with the sun.
+    ALSkyLayers::Frame sunless = night;
+    sunless.mSun = false;
+    CHECK((ALSkyLayers::layersFor(sunless) & (L::SUN | L::BLOOM)) == 0);
+}
+
+TEST_CASE("alskylayers: a view draws the stars only where one can show and the night's layers with them", "[alskylayers]")
+{
+    // A view clears the stars' attachment, draws the stars into it and reads them back only where its layers have
+    // them, so where they do some star must add what the display shows (ALStarField::faintestVisible), whatever the
+    // moon and on either path; and the meteors and the aurora, which are the night's too, come only with them.
+    using L = ALSkyLayers::Layer;
+    const F32 ALPHAS[] = { 0.f, 0.5f * ALSkyLayers::NIGHT_STAR_ALPHA, 0.999f * ALSkyLayers::NIGHT_STAR_ALPHA,
+                           ALSkyLayers::NIGHT_STAR_ALPHA, 1.001f * ALSkyLayers::NIGHT_STAR_ALPHA,
+                           2.f * ALSkyLayers::NIGHT_STAR_ALPHA, 0.01f, 0.1f, 0.5f, 1.f, 2.f };
+    U32 drawn = 0;
+    for (S32 kind = 0; kind < 4; ++kind)
+    {
+        for (const F32 alpha : ALPHAS)
+        {
+            ALSkyLayers::Frame frame;
+            frame.mProbe     = kind >= 2;
+            frame.mMirror    = kind == 3;
+            frame.mHdri      = kind == 1;
+            frame.mSun       = true;
+            frame.mMoon      = true;
+            frame.mStarAlpha = alpha;
+            frame.mMeteors   = true;
+            frame.mAurora    = 0.6f;
+            frame.mClouds    = true;
+            const S32 layers = ALSkyLayers::layersFor(frame);
+            CAPTURE(kind, alpha, layers);
+            if ((layers & L::STARS) == 0)
+            {
+                CHECK((layers & (L::METEORS | L::AURORA)) == 0);
+                continue;
+            }
+            ++drawn;
+            for (const F32 moon_power : { 0.f, 0.5f, 1.f })
+            {
+                for (const bool emissive : { false, true })
+                {
+                    CAPTURE(moon_power, emissive);
+                    CHECK(ALStarField::faintestVisible(alpha, moon_power, emissive) <= 255);
+                }
+            }
+        }
+    }
+    // The main view draws the stars from the threshold up, and no other kind of view draws them.
+    CHECK(drawn == 8);
+}
+
+TEST_CASE("alskylayers: the composite's layer bits are ALSkyLayers::Layer", "[alskylayers]")
+{
+    using L = ALSkyLayers::Layer;
+    const std::map<std::string, S64> defines = shaderDefines("class1/deferred/skyCompositeF.glsl", "SKY_LAYER_");
+    const std::map<std::string, S64> expected = {
+        { "SKY_LAYER_STARS", L::STARS },     { "SKY_LAYER_BLOOM", L::BLOOM },   { "SKY_LAYER_SUN", L::SUN },
+        { "SKY_LAYER_MOON", L::MOON },       { "SKY_LAYER_METEORS", L::METEORS }, { "SKY_LAYER_AURORA", L::AURORA },
+        { "SKY_LAYER_CLOUDS", L::CLOUDS },   { "SKY_LAYER_HDRI", L::HDRI } };
+    CHECK(defines.size() == expected.size());
+    for (const auto& [name, value] : expected)
+    {
+        CAPTURE(name);
+        REQUIRE(defines.count(name) == 1);
+        CHECK(defines.at(name) == value);
+    }
 }

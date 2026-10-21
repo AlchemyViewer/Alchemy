@@ -49,6 +49,49 @@ namespace
     constexpr F32 BODY_FACTOR = 0.1f;
 } // namespace
 
+S32 layersFor(const Frame& frame)
+{
+    if (frame.mHdri)
+    {
+        return HDRI;
+    }
+
+    const bool night = frame.mStarAlpha >= NIGHT_STAR_ALPHA;
+    // The sun is left out of a probe's face but a mirror's.
+    const bool sun = frame.mSun && (!frame.mProbe || frame.mMirror);
+
+    S32 layers = 0;
+    if (night && !frame.mProbe)
+    {
+        layers |= STARS;
+    }
+    if (sun)
+    {
+        layers |= SUN;
+    }
+    if (sun && frame.mBloom)
+    {
+        layers |= BLOOM;
+    }
+    if (frame.mMoon)
+    {
+        layers |= MOON;
+    }
+    if (night && !frame.mProbe && frame.mMeteors)
+    {
+        layers |= METEORS;
+    }
+    if (night && !frame.mProbe && frame.mAurora > 0.001f)
+    {
+        layers |= AURORA;
+    }
+    if (frame.mClouds && (!frame.mProbe || frame.mRadiance))
+    {
+        layers |= CLOUDS;
+    }
+    return layers;
+}
+
 Corners bodyCorners(const LLQuaternion& rotation, F32 distance, F32 scale, F32 disk_radius)
 {
     const LLVector3 to_dir = LLVector3::x_axis * rotation;

@@ -37,6 +37,7 @@
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 
+#include "alskylayers.h"
 #include "alwatersurface.h"
 #include "llviewercontrol.h"
 #include "llversioninfo.h"
@@ -179,7 +180,7 @@ LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredBlurLightComputeProgram;
 LLGLSLShader            gDeferredSoftenProgram;
-LLGLSLShader            gDeferredSoftenSkyProgram;
+LLGLSLShader            gDeferredSkyCompositeProgram;
 LLGLSLShader            gDeferredShadowProgram;
 LLGLSLShader            gDeferredTerrainShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
@@ -1342,7 +1343,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.unload();
         gDeferredBlurLightComputeProgram.unload();
         gDeferredSoftenProgram.unload();
-        gDeferredSoftenSkyProgram.unload();
+        gDeferredSkyCompositeProgram.unload();
         gDeferredShadowProgram.unload();
         gDeferredTerrainShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
@@ -2449,49 +2450,64 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        // The soften pass, and its variant for the sky alone (softenLightF.glsl, SOFTEN_SKY), from one configuration,
-        // so the two resolve the same shader level and link the same objects.
-        const auto load_soften = [&](LLGLSLShader& shader, const char* name, bool sky)
+        gDeferredSoftenProgram.mName = "Deferred Soften Shader";
+        gDeferredSoftenProgram.mShaderFiles.clear();
+        gDeferredSoftenProgram.mFeatures.hasSrgb = true;
+        gDeferredSoftenProgram.mFeatures.calculatesAtmospherics = true;
+        gDeferredSoftenProgram.mFeatures.hasAtmospherics = true;
+        gDeferredSoftenProgram.mFeatures.hasGamma = true;
+        gDeferredSoftenProgram.mFeatures.isDeferred = true;
+        gDeferredSoftenProgram.mFeatures.hasFullGBuffer = true;
+        gDeferredSoftenProgram.mFeatures.hasShadows = use_sun_shadow;
+        gDeferredSoftenProgram.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
+
+        gDeferredSoftenProgram.clearPermutations();
+        add_common_permutations(&gDeferredSoftenProgram);
+        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
+        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
+
+        gDeferredSoftenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+        if (use_sun_shadow)
         {
-            shader.mName = name;
-            shader.mShaderFiles.clear();
-            shader.mFeatures.hasSrgb = true;
-            shader.mFeatures.calculatesAtmospherics = true;
-            shader.mFeatures.hasAtmospherics = true;
-            shader.mFeatures.hasGamma = true;
-            shader.mFeatures.isDeferred = true;
-            shader.mFeatures.hasFullGBuffer = true;
-            shader.mFeatures.hasShadows = use_sun_shadow;
-            shader.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
+            gDeferredSoftenProgram.addPermutation("HAS_SUN_SHADOW", "1");
+        }
 
-            shader.clearPermutations();
-            add_common_permutations(&shader);
-            shader.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
-            shader.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
+        if (mInputs.mLocal.mSSAO)
+        { //if using SSAO, take screen space light map into account as if shadows are enabled
+            gDeferredSoftenProgram.mShaderLevel = llmax(gDeferredSoftenProgram.mShaderLevel, 2);
+            gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
+        }
 
-            shader.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        built(gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC), gDeferredSoftenProgram);
+    }
 
-            if (use_sun_shadow)
-            {
-                shader.addPermutation("HAS_SUN_SHADOW", "1");
-            }
+    {
+        // The sky at the far plane: every layer along the view ray, composited (deferred/skyCompositeF.glsl and the
+        // layers' files, ALSkyLayers::COMPOSITE_FILES), the sun bloom only where it is on. It reads the stars'
+        // attachment and nothing else of the G-buffer, and takes the classic sky's gain as a uniform, so it links again
+        // only where what it reads changes.
+        gDeferredSkyCompositeProgram.mName = "Deferred Sky Composite Shader";
+        gDeferredSkyCompositeProgram.mShaderFiles.clear();
+        gDeferredSkyCompositeProgram.mFeatures.hasSrgb = true;
+        gDeferredSkyCompositeProgram.mFeatures.isDeferred = true;
 
-            if (mInputs.mLocal.mSSAO)
-            { //if using SSAO, take screen space light map into account as if shadows are enabled
-                shader.mShaderLevel = llmax(shader.mShaderLevel, 2);
-                shader.addPermutation("HAS_SSAO", "1");
-            }
+        gDeferredSkyCompositeProgram.clearPermutations();
+        add_common_permutations(&gDeferredSkyCompositeProgram);
+        gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair("deferred/skyCompositeV.glsl", GL_VERTEX_SHADER));
+        gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair("deferred/skyCompositeMainF.glsl", GL_FRAGMENT_SHADER));
+        for (const char* file : ALSkyLayers::COMPOSITE_FILES)
+        {
+            gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair(file, GL_FRAGMENT_SHADER));
+        }
+        if (mInputs.mLocal.mSunBloom)
+        {
+            gDeferredSkyCompositeProgram.addPermutation("SUN_BLOOM", "1");
+        }
 
-            if (sky)
-            {
-                shader.addPermutation("SOFTEN_SKY", "1");
-            }
+        gDeferredSkyCompositeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
 
-            built(shader.createShader(LLGLSLShader::VARIANT_CLASSIC), shader);
-        };
-
-        load_soften(gDeferredSoftenProgram, "Deferred Soften Shader", false);
-        load_soften(gDeferredSoftenSkyProgram, "Deferred Soften Sky Shader", true);
+        built(gDeferredSkyCompositeProgram.createShader(), gDeferredSkyCompositeProgram);
     }
 
     {

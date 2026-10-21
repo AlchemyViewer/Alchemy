@@ -150,7 +150,14 @@ float ssaoVisibility(float ambocc)
 #endif
 }
 
-// The colour the sky family wrote, which nothing lights: an HDRI sky's as it is, WindLight's scaled for fake HDR.
+#ifdef SOFTEN_SKY
+// The whole sky at a pixel the world left at the far plane: every layer along the view ray, composited
+// (deferred/skyCompositeF.glsl).
+vec3 skyComposite(vec2 tc);
+#endif
+
+// The colour a sky-flagged fragment in front of the far plane wrote, which nothing lights: an HDRI's as it is,
+// WindLight's scaled for fake HDR.
 vec3 skyColor(GBufferInfo gb)
 {
     if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
@@ -189,9 +196,9 @@ void main()
 {
     vec2  tc           = vary_fragcoord.xy;
 #ifdef SOFTEN_SKY
-    // This variant's draw passes only at the cleared depth, where nothing but the sky family draws, so nothing here
-    // is lit or hazed: the sky's colour goes through as it was written (LLPipeline::renderDeferredLighting).
-    writeColor(skyColor(getGBuffer(tc)));
+    // This variant's draw passes only at the cleared depth, where the world drew nothing: the sky, which nothing here
+    // lights or hazes (LLPipeline::renderDeferredLighting).
+    writeColor(skyComposite(tc));
 #else
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);

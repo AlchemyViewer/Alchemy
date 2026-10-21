@@ -185,12 +185,10 @@ void main()
     vary_corner = corner;
 #endif
 
-    // NB: this linearises the sRGB black-body colour, and softenLight's SKIP_ATMOS branch
-    // then srgb_to_linear's it a SECOND time and multiplies by sky_hdr_scale (the sky dome's
-    // fake-HDR boost, ~2x with HDR on -- stars inherit it via the shared SKIP_ATMOS flag).
-    // Long-standing upstream behaviour. Net star brightness balances that double-decode
-    // against the gains here (bloom_boost, the (1 + intensity) gain) and sky_hdr_scale -- if
-    // star brightness is ever retuned, this whole chain is the place to look, not one line.
+    // This linearises the sRGB black-body colour, and the composite decodes it a second time: it adds what the stars
+    // left in their attachment to the display-encoded dome, decodes the sum and multiplies it by sky_hdr_scale, the
+    // dome's fake-HDR boost (deferred/skyCompositeF.glsl). Star brightness is tuned against that double decode, the
+    // gains here (the bloom boost, the 1 + intensity gain) and sky_hdr_scale together: retune the chain, not one line.
     vec3 color = srgb_to_linear(star.rgb);
 
     // --- Atmospheric extinction ----------------------------------------------

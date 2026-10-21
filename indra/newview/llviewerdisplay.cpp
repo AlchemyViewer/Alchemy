@@ -1071,6 +1071,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             gGL.setClearColor(LLColor4::magenta);
         }
         gPipeline.mRT->deferredScreen.clear();
+        gPipeline.clearStarAttachment();
 
         gGL.setColorMask(true, false);
 
@@ -1356,6 +1357,7 @@ void display_cube_face()
         gGL.setClearColor(LLColor4::magenta);
     }
     gPipeline.mRT->deferredScreen.clear();
+    gPipeline.clearStarAttachment();
 
     LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
 

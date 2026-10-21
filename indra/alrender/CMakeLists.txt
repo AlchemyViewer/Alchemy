@@ -116,7 +116,8 @@ if(AL_BUILD_TESTS)
   # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
   # WindLight's dome along the view ray against the dome's mesh, the sky's
-  # other layers along it against the programs that drew them, the stars
+  # other layers along it against the programs that drew them and the whole
+  # sky's composite against the sky they drew, the stars
   # against the picture they left before their rework, FXAA on an RGB10_A2
   # source, the reflection probes' taps in one pass over them against their
   # list, the transient target pool's GL objects, shared depth and poison,
@@ -129,6 +130,7 @@ if(AL_BUILD_TESTS)
       tests/alhuddepth_gl_test.cpp
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp
+      tests/alskycomposite_gl_test.cpp
       tests/alskydome_gl_test.cpp
       tests/alskylayers_gl_test.cpp
       tests/alspotshadowcache_gl_test.cpp

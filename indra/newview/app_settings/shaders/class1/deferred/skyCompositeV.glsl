@@ -1,0 +1,43 @@
+/**
+ * @file class1/deferred/skyCompositeV.glsl
+ * @brief The sky's pass: the screen triangle on the far plane, its pixels' places on the screen for the composite.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
+ * $/LicenseInfo$
+ */
+
+in vec3 position;
+
+out vec2 vary_fragcoord;
+
+void main()
+{
+    // Level with the depth the sky leaves cleared, as the soften pass's triangle is (softenLightV.glsl): the sky's draw
+    // passes only on the far plane, where the world drew nothing (LLPipeline::renderDeferredLighting). Reverse-Z puts the
+    // far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
+
+    vary_fragcoord = position.xy * 0.5 + 0.5;
+}

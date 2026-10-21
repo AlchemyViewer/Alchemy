@@ -648,7 +648,7 @@ void main()
                 LLGLDisable   srgb(GL_FRAMEBUFFER_SRGB);
                 LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
                 gGL.setSceneBlendType(LLRender::BT_ADD);
-                target.setDrawAttachment(emissive ? 3 : 0);
+                target.setDrawAttachment(ALSkyLayers::starAttachment(emissive));
                 gGL.pushMatrix();
                 gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
                 gGL.rotatef(scene.mRotation, 0.f, 0.f, 1.f);
@@ -776,7 +776,7 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the stars leave the pictu
         for (S32 path = 0; path < 2; ++path)
         {
             const bool emissive = path == 1;
-            const S32 attachment = emissive ? 3 : 0;
+            const S32 attachment = ALSkyLayers::starAttachment(emissive);
             CAPTURE(scene.mName, emissive);
             const Picture blank   = drawNothing(emissive);
             const Picture before  = drawOld(scene, emissive);
@@ -823,7 +823,7 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the cull leaves out only 
         for (S32 path = 0; path < 2; ++path)
         {
             const bool emissive = path == 1;
-            const S32 attachment = emissive ? 3 : 0;
+            const S32 attachment = ALSkyLayers::starAttachment(emissive);
             CAPTURE(scene.mName, emissive);
             const Picture blank = drawNothing(emissive);
             const Picture all   = drawStars(scene, emissive, true);
@@ -849,7 +849,7 @@ TEST_CASE_METHOD(alstarfield_gl_data, "alstarfield_gl: the brightness cull leave
         for (S32 path = 0; path < 2; ++path)
         {
             const bool emissive = path == 1;
-            const S32 attachment = emissive ? 3 : 0;
+            const S32 attachment = ALSkyLayers::starAttachment(emissive);
             CAPTURE(scene.mName, emissive);
             const Picture blank   = drawNothing(emissive);
             const Picture every   = drawStars(scene, emissive, false, true);

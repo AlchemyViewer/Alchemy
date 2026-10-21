@@ -271,6 +271,23 @@ namespace al_sky_test
         }
     }
 
+    // The shared objects a deferred program attaches besides (LLShaderMgr::attachShaderFeatures' isDeferred), as the
+    // sky's pass is built, loaded into @a shaders after loadSharedObjects.
+    inline void loadDeferredObjects(ll_test::TestShaderMgr& shaders)
+    {
+        std::map<std::string, std::string> defines;
+        for (const auto& [object, stage] : { std::make_pair("windlight/atmosphericsVarsV.glsl", GL_VERTEX_SHADER),
+                                             std::make_pair("windlight/atmosphericsVarsF.glsl", GL_FRAGMENT_SHADER),
+                                             std::make_pair("deferred/deferredUtil.glsl", GL_FRAGMENT_SHADER),
+                                             std::make_pair("windlight/atmosphericsFuncs.glsl", GL_FRAGMENT_SHADER),
+                                             std::make_pair("windlight/atmosphericsF.glsl", GL_FRAGMENT_SHADER) })
+        {
+            CAPTURE(object);
+            S32 level = 1;
+            REQUIRE(shaders.loadShaderFile(object, level, stage, &defines) != 0);
+        }
+    }
+
     // Build @a program from @a files, with @a permutations, the emissive buffer's HAS_EMISSIVE where @a emissive.
     inline void buildProgram(LLGLSLShader& program, const char* name,
                              const std::vector<std::pair<std::string, GLenum>>& files, bool emissive,
@@ -541,6 +558,57 @@ namespace al_sky_test
         dome->setBuffer();
         dome->drawRange(mode, 0, dome->getNumVerts() - 1, dome->getNumIndices(), 0);
         gGL.popMatrix();
+    }
+
+    // The dome's whole sphere as a far finer mesh than the dome's, with no skirt, and the dome's planar texture
+    // coordinates: rings a ninth of a degree apart from the zenith to 25 degrees, past where the camera's level meets
+    // the sphere (16.3 degrees), whose facets lie a hundredth as deep as the dome's, and on to the nadir three degrees
+    // apart. A ray meets it where it meets the sphere, so what the old programs draw over it is the sphere's.
+    inline LLPointer<LLVertexBuffer> fineSphere()
+    {
+        constexpr U32 CAP_RINGS  = 225;
+        constexpr U32 REST_RINGS = 52;
+        constexpr U32 RINGS      = CAP_RINGS + REST_RINGS;
+        constexpr U32 SLICES     = 230;
+        constexpr F32 CAP        = 25.f * DEG_TO_RAD;
+        LLPointer<LLVertexBuffer> mesh = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0);
+        REQUIRE(mesh->allocateBuffer((RINGS + 1) * SLICES, RINGS * SLICES * 6));
+        LLStrider<LLVector3> vertices;
+        LLStrider<LLVector2> tex_coords;
+        LLStrider<U16>       index;
+        REQUIRE(mesh->getVertexStrider(vertices));
+        REQUIRE(mesh->getTexCoord0Strider(tex_coords));
+        REQUIRE(mesh->getIndexStrider(index));
+        for (U32 ring = 0; ring <= RINGS; ++ring)
+        {
+            const F32 phi = ring <= CAP_RINGS ? (F32)ring / CAP_RINGS * CAP
+                                              : CAP + (F32)(ring - CAP_RINGS) / REST_RINGS * (F_PI - CAP);
+            for (U32 slice = 0; slice < SLICES; ++slice)
+            {
+                const F32 theta = F_TWO_PI * (F32)slice / SLICES;
+                const F32 x = sinf(phi) * cosf(theta);
+                const F32 y = cosf(phi);
+                const F32 z = sinf(phi) * sinf(theta);
+                *vertices++   = LLVector3(x, y, z) * DOME_RADIUS;
+                *tex_coords++ = LLVector2((1.f - z) / 2.f, (1.f - x) / 2.f);
+            }
+        }
+        for (U32 ring = 0; ring < RINGS; ++ring)
+        {
+            for (U32 slice = 0; slice < SLICES; ++slice)
+            {
+                const U16 a = (U16)(ring * SLICES + slice);
+                const U16 b = (U16)(ring * SLICES + (slice + 1) % SLICES);
+                const U16 c = (U16)(a + SLICES);
+                const U16 d = (U16)(b + SLICES);
+                for (U16 i : { a, c, b, b, c, d })
+                {
+                    *index++ = i;
+                }
+            }
+        }
+        mesh->unmapBuffer();
+        return mesh;
     }
 
     // A sun's or moon's quad as LLVOSky filled its face: the corners about the camera, their texture coordinates, and

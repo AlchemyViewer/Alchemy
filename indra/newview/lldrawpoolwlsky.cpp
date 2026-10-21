@@ -51,6 +51,8 @@
 
 #include "llglstates.h"
 
+#include "alskylayers.h"
+
 extern bool gCubeSnapshot;
 
 static LLGLSLShader* cloud_shader = NULL;
@@ -124,6 +126,45 @@ void LLDrawPoolWLSky::renderDome(const LLVector3& camPosLocal, F32 camHeightLoca
 
 extern LLPointer<LLImageGL> gEXRImage;
 
+namespace
+{
+    // A texture pair the sky blends between, as the sun's and the clouds' draws took one: the first, and the next
+    // only while they differ and both are there, with how far the sky has blended toward it.
+    struct TexturePair
+    {
+        LLViewerTexture* mFirst = nullptr;
+        LLViewerTexture* mNext  = nullptr;
+        F32              mBlend = 0.f;
+    };
+
+    TexturePair texturePair(LLViewerTexture* first, LLViewerTexture* next, F32 blend)
+    {
+        if (first && (!next || first == next))
+        {
+            return { first, nullptr, 0.f };
+        }
+        if (next && !first)
+        {
+            return { next, nullptr, 0.f };
+        }
+        if (first && next)
+        {
+            return { first, next, blend };
+        }
+        return {};
+    }
+
+    // A body's quad as LLVOSky keeps it.
+    ALSkyLayers::Corners corners(const LLHeavenBody& body)
+    {
+        const LLVector3* c = body.corners();
+        return { c[0], c[1], c[2], c[3] };
+    }
+
+    // The maps the last bindComposite bound, which unbindComposite lets go.
+    std::vector<U32> sCompositeBound;
+}
+
 // static
 bool LLDrawPoolWLSky::useHDRISky()
 {
@@ -168,6 +209,197 @@ void LLDrawPoolWLSky::bindDome(LLGLSLShader& shader)
     // LLVOWLSky builds the mesh at.
     shader.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, environment.getCamHeight(), 0.f);
     shader.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, psky->getDomeRadius());
+}
+
+// static
+void LLDrawPoolWLSky::bindComposite(LLGLSLShader& shader)
+{
+    LLEnvironment&             environment = LLEnvironment::instance();
+    const LLSettingsSky::ptr_t psky        = environment.getCurrentSky();
+    LLVOSky*                   sky         = gSky.mVOSkyp;
+
+    // Every map bound below is recorded, so that unbindComposite lets go of these and no other unit.
+    sCompositeBound.clear();
+    const auto bind = [&shader](U32 map, LLViewerTexture* texture, ALSampler sampler)
+    {
+        if (shader.bindTexture(map, texture, sampler) > -1)
+        {
+            sCompositeBound.push_back(map);
+        }
+    };
+
+    // The dome's two maps, which bindDome binds wherever the program reads them.
+    bindDome(shader);
+    sCompositeBound.push_back(LLShaderMgr::RAINBOW_MAP);
+    sCompositeBound.push_back(LLShaderMgr::HALO_MAP);
+
+    ALSkyLayers::Frame frame;
+    frame.mProbe    = gCubeSnapshot;
+    frame.mMirror   = gPipeline.mHeroProbeManager.isMirrorPass();
+    frame.mRadiance = gPipeline.mReflectionMapManager.isRadiancePass();
+    frame.mHdri     = useHDRISky();
+
+    if (frame.mHdri)
+    {
+        static LLCachedControl<F32> hdri_exposure(gSavedSettings, "RenderHDRIExposure", 0.0f);
+        static LLCachedControl<F32> hdri_rotation(gSavedSettings, "RenderHDRIRotation", 0.f);
+        static LLCachedControl<F32> hdri_split(gSavedSettings, "RenderHDRISplitScreen", 1.f);
+
+        const S32 channel = shader.enableTexture(LLShaderMgr::SKY_HDRI_MAP);
+        if (channel > -1 && gGL.getTextureSlot(channel)->bindSampled(gEXRImage, ALSamplers::TrilinearClamp))
+        {
+            sCompositeBound.push_back(LLShaderMgr::SKY_HDRI_MAP);
+        }
+        LLMatrix3 rot;
+        rot.setRot(0.f, hdri_rotation * DEG_TO_RAD, 0.f);
+        shader.uniformMatrix3fv(LLShaderMgr::SKY_HDRI_ROTATION, 1, GL_FALSE, (F32*)rot.mMatrix);
+        shader.uniform1f(LLShaderMgr::SKY_HDRI_SCALE, powf(2.f, hdri_exposure));
+        shader.uniform1f(LLShaderMgr::HDRI_SPLIT_SCREEN, gCubeSnapshot ? 1.f : (F32)hdri_split);
+        shader.uniform1i(LLShaderMgr::SKY_LAYERS, ALSkyLayers::layersFor(frame));
+        return;
+    }
+
+    const F32 blend_factor = (F32)psky->getBlendFactor();
+
+    // The sun, and its bloom while the latched input draws it (its textures are fetched only then).
+    LLFace* sun_face = sky->mFace[LLVOSky::FACE_SUN];
+    const TexturePair sun = sun_face ? texturePair(sun_face->getTexture(LLRender::DIFFUSE_MAP),
+                                                   sun_face->getTexture(LLRender::ALTERNATE_DIFFUSE_MAP), blend_factor)
+                                     : TexturePair();
+    frame.mSun = sky->getSun().getDraw() && sun.mFirst;
+    const TexturePair bloom = texturePair(sky->getBloomTex(), sky->getBloomTexNext(), blend_factor);
+    frame.mBloom = gPipeline.shaderInputs().mLocal.mSunBloom && bloom.mFirst;
+
+    // The moon, its first texture alone.
+    LLFace* moon_face = sky->mFace[LLVOSky::FACE_MOON];
+    LLViewerTexture* moon_texture = moon_face ? moon_face->getTexture(LLRender::DIFFUSE_MAP) : nullptr;
+    frame.mMoon = sky->getMoon().getDraw() && moon_texture;
+
+    // The night: the stars' brightness gates the meteors and the aurora, and the moon washes the aurora out.
+    static LLCachedControl<bool> meteors_enabled(gSavedSettings, "RenderMeteorsEnabled", true);
+    static LLCachedControl<F32> aurora_intensity(gSavedSettings, "RenderAuroraIntensity", 0.6f);
+    frame.mStarAlpha = psky->getStarBrightness() / 500.0f;
+    const F32 moon_wash = psky->getIsMoonUp() ? (F32)psky->getMoonBrightness() : 0.0f;
+    frame.mAurora = aurora_intensity > 0.f ? aurora_intensity * llmax(0.0f, 1.0f - moon_wash * 0.85f) : 0.f;
+
+    // The clouds, which take their first noise texture to draw.
+    const F32 cloud_blend = psky->getCloudScrollRate().isExactlyZero() ? 0.f : blend_factor;
+    const TexturePair clouds = texturePair(sky->getCloudNoiseTex(), sky->getCloudNoiseTexNext(), cloud_blend);
+    frame.mClouds = gPipeline.hasRenderType(LLPipeline::RENDER_TYPE_CLOUDS) && sky->getCloudNoiseTex();
+
+    // Each frame's interval, clamped after a long one so a meteor does not snap to the end of its life. Zero while the
+    // world is paused, which freezes the meteors and the aurora with it.
+    F32 dt = (F32)gFrameIntervalSeconds.value();
+    if (dt > 0.1f)
+    {
+        dt = 0.1f;
+    }
+
+    // The meteors fly in the views that draw them, through the matrices that drew their quads: the camera's, taken to
+    // its origin.
+    static std::vector<ALSkyLayers::Meteor> in_flight;
+    static std::vector<LLVector4> meteor_data;
+    meteor_data.clear();
+    U32 meteor_count = 0;
+    if (meteors_enabled && frame.mStarAlpha >= 0.001f && !frame.mProbe && gSky.mVOWLSkyp.notNull())
+    {
+        gSky.mVOWLSkyp->tickMeteors(dt);
+        gSky.mVOWLSkyp->meteors(in_flight);
+
+        const LLVector3& origin = LLViewerCamera::getInstance()->getOrigin();
+        gGL.matrixMode(LLRender::MM_MODELVIEW);
+        gGL.pushMatrix();
+        gGL.loadMatrix(LLViewerCamera::getCurrent().getModelview());
+        gGL.translatef(origin.mV[VX], origin.mV[VY], origin.mV[VZ]);
+        LLMatrix4a mvp;
+        mvp.setMul(gGL.getModelviewMatrix(), LLViewerCamera::getCurrent().getProjection());
+        gGL.popMatrix();
+
+        const LLRenderTarget& screen = gPipeline.mRT->deferredScreen;
+        meteor_count = ALSkyLayers::packMeteors(in_flight, mvp, (F32)screen.getWidth(), (F32)screen.getHeight(),
+                                                ALSkyLayers::METEOR_WIDTH_PIXELS, meteor_data);
+        frame.mMeteors = meteor_count > 0;
+    }
+
+    const S32 layers = ALSkyLayers::layersFor(frame);
+    shader.uniform1i(LLShaderMgr::SKY_LAYERS, layers);
+
+    if (layers & ALSkyLayers::SUN)
+    {
+        // The disc lowered as its vertex stage lowered it.
+        const std::array<LLVector3, 3> quad =
+            ALSkyLayers::rayQuad(corners(sky->getSun()), LLVector3(0.f, 0.f, -ALSkyLayers::SUN_DROP));
+        shader.uniform3fv(LLShaderMgr::SKY_SUN_QUAD, 3, quad[0].mV);
+        bind(LLShaderMgr::SKY_SUN_MAP, sun.mFirst, ALSamplers::AnisoClamp);
+        if (sun.mNext)
+        {
+            bind(LLShaderMgr::SKY_SUN_MAP_NEXT, sun.mNext, ALSamplers::AnisoClamp);
+        }
+        shader.uniform1f(LLShaderMgr::SKY_SUN_BLEND, sun.mBlend);
+    }
+
+    if (layers & ALSkyLayers::BLOOM)
+    {
+        // The halo's square about the disc, lowered with it, tinted by the sun's colour as a vertex colour held to 1.
+        const std::array<LLVector3, 3> quad = ALSkyLayers::rayQuad(ALSkyLayers::bloomCorners(corners(sky->getSun())),
+                                                                   LLVector3(0.f, 0.f, -ALSkyLayers::SUN_DROP));
+        shader.uniform3fv(LLShaderMgr::SKY_BLOOM_QUAD, 3, quad[0].mV);
+        bind(LLShaderMgr::SKY_BLOOM_MAP, bloom.mFirst, ALSamplers::AnisoClamp);
+        if (bloom.mNext)
+        {
+            bind(LLShaderMgr::SKY_BLOOM_MAP_NEXT, bloom.mNext, ALSamplers::AnisoClamp);
+        }
+        shader.uniform1f(LLShaderMgr::SKY_BLOOM_BLEND, bloom.mBlend);
+        LLColor3 colour = psky->getSunDiffuse();
+        colour.clamp();
+        shader.uniform3fv(LLShaderMgr::SKY_BLOOM_COLOR, 1, colour.mV);
+    }
+
+    if (layers & ALSkyLayers::MOON)
+    {
+        const std::array<LLVector3, 3> quad = ALSkyLayers::rayQuad(corners(sky->getMoon()));
+        shader.uniform3fv(LLShaderMgr::SKY_MOON_QUAD, 3, quad[0].mV);
+        bind(LLShaderMgr::SKY_MOON_MAP, moon_texture, ALSamplers::AnisoClamp);
+        shader.uniform1f(LLShaderMgr::SKY_MOON_FADE, ALSkyLayers::moonFade(psky->getMoonDirection().mV[VZ]));
+        shader.uniform1f(LLShaderMgr::MOON_BRIGHTNESS, (F32)psky->getMoonBrightness());
+    }
+
+    if (layers & ALSkyLayers::METEORS)
+    {
+        shader.uniform4fv(LLShaderMgr::SKY_METEOR_DATA, (U32)meteor_data.size(), meteor_data[0].mV);
+        shader.uniform1i(LLShaderMgr::SKY_METEOR_COUNT, (S32)meteor_count);
+    }
+
+    if (layers & ALSkyLayers::AURORA)
+    {
+        // Accumulated in F64: an F32 near the wrap holds the time only to 8 ms, so adding a frame's
+        // dt to it rounds each step to whole multiples of that, and the aurora moves unevenly.
+        static F64 s_aurora_time = 0.0;
+        s_aurora_time = fmod(s_aurora_time + dt, 86400.0);
+        shader.uniform1f(LLShaderMgr::AURORA_INTENSITY, frame.mAurora);
+        shader.uniform1f(LLShaderMgr::AURORA_TIME, (F32)s_aurora_time);
+    }
+
+    if (layers & ALSkyLayers::CLOUDS)
+    {
+        bind(LLShaderMgr::CLOUD_NOISE_MAP, clouds.mFirst, ALSamplers::AnisoWrap);
+        if (clouds.mNext)
+        {
+            bind(LLShaderMgr::CLOUD_NOISE_MAP_NEXT, clouds.mNext, ALSamplers::AnisoWrap);
+        }
+        shader.uniform1f(LLShaderMgr::SKY_CLOUD_BLEND, clouds.mBlend);
+        shader.uniform1f(LLShaderMgr::CLOUD_VARIANCE, (F32)psky->getCloudVariance());
+    }
+}
+
+// static
+void LLDrawPoolWLSky::unbindComposite(LLGLSLShader& shader)
+{
+    for (U32 map : sCompositeBound)
+    {
+        shader.disableTexture(map);
+    }
+    sCompositeBound.clear();
 }
 
 void LLDrawPoolWLSky::renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const
@@ -677,43 +909,24 @@ void LLDrawPoolWLSky::renderDeferred(S32 pass)
     // HAS_EMISSIVE path, which writes the sky to the float emissive attachment instead.
     LLGLDisable srgb(GL_FRAMEBUFFER_SRGB);
 
-    // TODO: remove gSky.mVOSkyp and fold sun/moon into LLVOWLSky
+    // The sun's and moon's quads and whether each is up, which the stars' moon mask and the composite read.
     gSky.mVOSkyp->updateGeometry(gSky.mVOSkyp->mDrawable);
-
-    const F32 camHeightLocal = LLEnvironment::instance().getCamHeight();
 
     LLVector3 const & origin = LLViewerCamera::getInstance()->getOrigin();
 
-    if (gPipeline.canUseWindLightShaders())
+    if (gPipeline.canUseWindLightShaders() && !gCubeSnapshot)
     {
-        // Every layer lies on the far plane and writes no depth. The pool draws after all the
-        // opaque geometry, so the depth test passes only where the world drew nothing, and the
-        // layers cover one another in the order they are drawn: the stars behind the sun and
-        // moon, the meteors and aurora in front of them, the clouds in front of everything.
+        // The stars are the one layer the G-buffer takes: into their attachment, cleared to black, which the sky's
+        // composite adds to every pixel the world leaves at the far plane, where it works the other layers out
+        // (deferred/skyCompositeF.glsl). They lie on the far plane and write no depth, and the pool draws after all
+        // the opaque geometry, so the depth test passes only where the world drew nothing.
         LLGLDisable cull(GL_CULL_FACE);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_LEQUAL);
 
-        renderSkyHazeDeferred(origin, camHeightLocal);
-        if (!gCubeSnapshot)
-        {
-            renderStarsDeferred(origin);
-        }
+        renderStarsDeferred(origin);
 
-        renderHeavenlyBodies();
-
-        if (!gCubeSnapshot)
-        {
-            renderMeteorsDeferred(origin);
-            renderAuroraDeferred(origin, camHeightLocal);
-        }
-
-        // Reset blend type after drawing effects that need BT_ADD
+        // Reset blend type after the stars' BT_ADD
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
-
-        if (!gCubeSnapshot || gPipeline.mReflectionMapManager.isRadiancePass()) // don't draw clouds in irradiance maps to avoid popping
-        {
-            renderSkyCloudsDeferred(origin, camHeightLocal, cloud_shader);
-        }
     }
 }
 
