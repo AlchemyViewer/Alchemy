@@ -67,7 +67,8 @@ public:
     // point of the east column and the north row, which neither edge update
     // writes: from the diagonal region when one is connected, from whichever
     // of north and east exists and has data, else the patch's own diagonal.
-    void updateNorthEastCorner();
+    // Returns whether the sample changed.
+    bool updateNorthEastCorner();
 
     void updateGL();
 

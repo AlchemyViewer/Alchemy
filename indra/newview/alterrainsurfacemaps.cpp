@@ -41,14 +41,25 @@ ALTerrainSurfaceMaps::ALTerrainSurfaceMaps(LLSurface& surface) :
 
 ALTerrainSurfaceMaps::~ALTerrainSurfaceMaps() = default;
 
+void ALTerrainSurfaceMaps::markDirty()
+{
+    mDirtyWhole = true;
+}
+
+void ALTerrainSurfaceMaps::markDirty(const Rect& rect)
+{
+    mDirtyRect = merge(mDirtyRect, intersect(rect, wholeMap(mSurface.getGridsPerEdge())));
+}
+
 void ALTerrainSurfaceMaps::ensureUploaded()
 {
-    if (!mDirty || !mSurface.hasZData())
+    if ((!mDirtyWhole && mDirtyRect.empty()) || !mSurface.hasZData())
     {
         return;
     }
     refresh();
-    mDirty = false;
+    mDirtyWhole = false;
+    mDirtyRect = Rect();
 }
 
 void ALTerrainSurfaceMaps::bind(S32 height_slot, S32 composition_slot)
@@ -69,33 +80,52 @@ void ALTerrainSurfaceMaps::refresh()
 {
     LL_PROFILE_ZONE_SCOPED;
     const S32 grids_per_edge = mSurface.getGridsPerEdge();
-    mSize = grids_per_edge + 2 * APRON;
+    const S32 size = grids_per_edge + 2 * APRON;
+    // The first upload builds both maps whole, and so does one after the
+    // surface changed size, which also lays the noise out again.
+    if (size != mSize)
+    {
+        mNoiseReady = false;
+    }
+    const bool whole = mDirtyWhole || size != mSize || mHeight.isNull() || mComposition.isNull();
+    const Rect rect = whole ? wholeMap(grids_per_edge) : mDirtyRect;
+    mSize = size;
 
     bool has_neighbor[8];
     for (U32 dir = 0; dir < 8; ++dir)
     {
         has_neighbor[dir] = mSurface.mNeighbors[dir] != nullptr;
     }
-    fill(mHeightStaging, grids_per_edge, 1, [&](S32 gx, S32 gy, F32* texel)
+    const auto height = [&](S32 gx, S32 gy, F32* texel)
     {
         texel[0] = mSurface.sampleZ(gx, gy, has_neighbor);
-    });
+    };
 
     // The noise is a function of world position alone, so it is computed once
     // per region and kept in the staging buffer across refreshes.
     const bool noise_ready = mNoiseReady;
-    fill(mCompositionStaging, grids_per_edge, 2, [&](S32 gx, S32 gy, F32* texel)
+    const auto composition = [&](S32 gx, S32 gy, F32* texel)
     {
         texel[0] = compositionAt(gx, gy);
         if (!noise_ready)
         {
             texel[1] = noiseAt(gx, gy);
         }
-    });
+    };
+    if (whole)
+    {
+        fill(mHeightStaging, grids_per_edge, 1, height);
+        fill(mCompositionStaging, grids_per_edge, 2, composition);
+    }
+    else
+    {
+        fillRect(mHeightStaging, grids_per_edge, 1, rect, height);
+        fillRect(mCompositionStaging, grids_per_edge, 2, rect, composition);
+    }
     mNoiseReady = true;
 
-    upload(mHeight, GL_R32F, GL_RED, 1, mHeightStaging);
-    upload(mComposition, GL_RG16F, GL_RG, 2, mCompositionStaging);
+    upload(mHeight, GL_R32F, GL_RED, 1, mHeightStaging, rect, whole);
+    upload(mComposition, GL_RG16F, GL_RG, 2, mCompositionStaging, rect, whole);
 }
 
 F32 ALTerrainSurfaceMaps::compositionAt(S32 gx, S32 gy) const
@@ -119,18 +149,24 @@ F32 ALTerrainSurfaceMaps::noiseAt(S32 gx, S32 gy) const
     return terrain_composition_noise(origin.mdV[VX] + gx * meters_per_grid, origin.mdV[VY] + gy * meters_per_grid);
 }
 
-void ALTerrainSurfaceMaps::upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data)
+void ALTerrainSurfaceMaps::upload(LLPointer<LLImageGL>& image, S32 internal_format, U32 primary_format, U8 components, const std::vector<F32>& data, const Rect& rect, bool whole)
 {
     const U8* bytes = reinterpret_cast<const U8*>(data.data());
-    if (image.isNull())
+    if (image.isNull() || image->getWidth() != mSize)
     {
         image = new LLImageGL(mSize, mSize, components, /*usemipmaps=*/false);
         image->setExplicitFormat(internal_format, primary_format, GL_FLOAT);
         image->createGLTexture(0, bytes);
     }
-    else
+    else if (whole)
     {
         image->setImage(bytes);
         gGL.getTextureSlot(0)->unbind();
+    }
+    else
+    {
+        // Texel (u, v) holds grid (u - APRON, v - APRON); the staging buffer is the whole map.
+        image->setSubImage(bytes, mSize, mSize, rect.x0 + APRON, rect.y0 + APRON, rect.x1 - rect.x0 + 1, rect.y1 - rect.y0 + 1,
+                           /*force_fast_update=*/true);
     }
 }

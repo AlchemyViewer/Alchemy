@@ -2410,6 +2410,17 @@
             <key>Value</key>
             <real>64</real>
         </map>
+        <key>AlchemyRenderTerrainTessRasterSegment</key>
+        <map>
+            <key>Comment</key>
+            <string>Shadow maps, but for the main view's nearest sun cascade, and reflection probe and mirror captures tessellate the terrain no finer than one segment per this many of their own texels or pixels, where the main view's levels would be finer. Their terrain shadows are then cast by a coarser cut of the surface the main view shades. 0 tessellates them as the main view does.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>8</real>
+        </map>
         <key>AlchemyRenderWaterGlintRoughness</key>
         <map>
             <key>Comment</key>
