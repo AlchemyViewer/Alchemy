@@ -391,6 +391,8 @@ public:
     void setAmbientLightColor(const LLColor4& color);
 
     void setLineWidth(F32 width);
+    // The width setLineWidth() left GL with, which only it sets.
+    F32  getLineWidth() const { return mLineWidth; }
 
     // Depth offset applied to polygons while GL_POLYGON_OFFSET_FILL/LINE is enabled.
     // Stated in the forward/semantic convention: a negative factor/units pulls a fragment

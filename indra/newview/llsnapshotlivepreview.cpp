@@ -289,8 +289,7 @@ bool LLSnapshotLivePreview::setSnapshotQuality(S32 quality, bool set_by_user)
 
 void LLSnapshotLivePreview::drawPreviewRect(S32 offset_x, S32 offset_y, LLColor4 alpha_color)
 {
-    F32 line_width ;
-    glGetFloatv(GL_LINE_WIDTH, &line_width) ;
+    const F32 line_width = gGL.getLineWidth();
     gGL.setLineWidth(2.0f * line_width) ;
     LLColor4 color(0.0f, 0.0f, 0.0f, 1.0f) ;
     gl_rect_2d( mPreviewRect.mLeft + offset_x, mPreviewRect.mTop + offset_y,
