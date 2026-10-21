@@ -288,12 +288,13 @@ void LLSurfacePatch::updateVerticalStats()
 }
 
 
-void LLSurfacePatch::updateNorthEastCorner()
+bool LLSurfacePatch::updateNorthEastCorner()
 {
     U32 grids_per_patch_edge = mSurfacep->getGridsPerPatchEdge();
     U32 grids_per_edge = mSurfacep->getGridsPerEdge();
 
     F32* corner = mDataZ + grids_per_patch_edge + grids_per_patch_edge*grids_per_edge;
+    const F32 before = *corner;
     const F32 own_diagonal = *(mDataZ + grids_per_patch_edge - 1 + (grids_per_patch_edge - 1)*grids_per_edge);
 
     if (!getNeighborPatch(NORTHEAST))
@@ -356,6 +357,7 @@ void LLSurfacePatch::updateNorthEastCorner()
         // We've got a northeast patch in the same surface.
         // The z will be handled by that patch.
     }
+    return *corner != before;
 }
 
 
