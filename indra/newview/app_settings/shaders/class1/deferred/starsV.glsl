@@ -91,9 +91,9 @@ float airmassKastenYoung(float cos_zenith)
     return 1.0 / (cz + 0.50572 * pow(max(6.07995 + elev_deg, 1.0), -1.6364));
 }
 
-// SL-14113: no star behind the moon. The moon draws after the stars and fades low in the sky, which would let them
-// through its disc, so a star whose direction falls on a texel moonF.glsl draws, taken from the moon's own quad and
-// texture, is left out whole.
+// SL-14113: no star behind the moon. The composite lays the moon over the stars and fades it low in the sky
+// (deferred/skyBodiesF.glsl's skyMoon), which would let them through its disc, so a star whose direction falls on a
+// texel the moon draws, taken from the moon's own quad and texture, is left out whole.
 bool behindMoon(vec3 dir)
 {
     float moon_facing = dot(dir, moonQuadCenter);

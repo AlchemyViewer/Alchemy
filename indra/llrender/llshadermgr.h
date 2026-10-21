@@ -105,7 +105,6 @@ public:
         CLIP_PLANE,                         //  "clipPlane"
         CLIP_SIGN,                          //  "clipSign"
         DIFFUSE_MAP,                        //  "diffuseMap"
-        ALTERNATE_DIFFUSE_MAP,              //  "altDiffuseMap"
         SPECULAR_MAP,                       //  "specularMap"
         METALLIC_ROUGHNESS_MAP,             //  "metallicRoughnessMap"
         NORMAL_MAP,                         //  "normalMap"
@@ -435,7 +434,6 @@ public:
 
         // Alchemy-specific uniforms for Sky
         CUSTOM_ALPHA,                       //  "custom_alpha"
-        METEOR_WIDTH_PIXELS,                //  "meteor_width_pixels"
         AURORA_INTENSITY,                   //  "aurora_intensity"
         AURORA_TIME,                        //  "aurora_time"
 

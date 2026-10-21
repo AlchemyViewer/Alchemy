@@ -37,26 +37,18 @@ class LLGLSLShader;
 class LLDrawPoolWLSky : public LLDrawPool {
 public:
 
-    static const U32 SKY_VERTEX_DATA_MASK = LLVertexBuffer::MAP_VERTEX |
-                            LLVertexBuffer::MAP_TEXCOORD0;
     // A star's centre, and its colour in the position's fourth word, where the texture index goes (ALStarField).
     static const U32 STAR_VERTEX_DATA_MASK =    LLVertexBuffer::MAP_VERTEX |
         LLVertexBuffer::MAP_TEXTURE_INDEX;
-    static const U32 METEOR_VERTEX_DATA_MASK =  LLVertexBuffer::MAP_VERTEX |
-        LLVertexBuffer::MAP_NORMAL | LLVertexBuffer::MAP_COLOR |
-        LLVertexBuffer::MAP_TEXCOORD0;
     LLDrawPoolWLSky(void);
     /*virtual*/ ~LLDrawPoolWLSky();
 
     /*virtual*/ bool isDead() { return false; }
 
     /*virtual*/ S32 getNumDeferredPasses() { return 1; }
-    /*virtual*/ void beginDeferredPass(S32 pass);
-    /*virtual*/ void endDeferredPass(S32 pass);
     /*virtual*/ void renderDeferred(S32 pass);
 
     /*virtual*/ LLViewerTexture *getDebugTexture();
-    /*virtual*/ U32 getVertexDataMask() { return SKY_VERTEX_DATA_MASK; }
     /*virtual*/ bool verify() const { return true; }        // Verify that all data in the draw pool is correct!
     /*virtual*/ S32 getShaderLevel() const { return mShaderLevel; }
 
@@ -86,15 +78,8 @@ public:
     /// unbound holds what an earlier pass bound there.
     static void unbindComposite(LLGLSLShader& shader);
 private:
-    void renderDome(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader * shader) const;
-
-    void renderSkyHazeDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderSkyCloudsDeferred(const LLVector3& camPosLocal, F32 camHeightLocal, LLGLSLShader* cloudshader) const;
-
+    // The stars into their attachment of the bound G-buffer, the one layer of the sky drawn into it.
     void renderStarsDeferred(const LLVector3& camPosLocal) const;
-    void renderMeteorsDeferred(const LLVector3& camPosLocal) const;
-    void renderAuroraDeferred(const LLVector3& camPosLocal, F32 camHeightLocal) const;
-    void renderHeavenlyBodies();
 };
 
 #endif // LL_DRAWPOOLWLSKY_H

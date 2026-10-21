@@ -1,7 +1,8 @@
 /**
  * @file alskydome_gl_test.cpp
- * @brief WindLight's dome two ways on the hidden window: the sky program over the dome's mesh (deferred/skyF.glsl on
- *        ALSkyDome's strips, placed as LLDrawPoolWLSky::renderDome places them), and windlightDome along each pixel's
+ * @brief WindLight's dome two ways on the hidden window: the sky program over the dome's mesh, as it was drawn before
+ *        the sky's composite (tests/skyraster/deferred/skyF.glsl on ALSkyDome's strips, placed as
+ *        LLDrawPoolWLSky::renderDome placed them), and windlightDome along each pixel's
  *        view ray turned into the dome's frame by ALFarPlane::eyeToSkyFrame, as the haze calls it for far water.
  *        Above the camera's level the two differ by the facets; below it the mesh's skirt leaves the sphere the function
  *        continues.
@@ -43,6 +44,8 @@
 #include "llshadermgr.h"
 #include "llstrider.h"
 #include "llvertexbuffer.h"
+
+#include "alskyraster_gl.h"
 
 #include "../../llrender/tests/llheadlessgl_fixture.h"
 
@@ -160,7 +163,7 @@ namespace
     struct alskydome_data
     {
         alskydome_data()
-        : mShaders(std::string(AL_TEST_SHADER_DIR) + "/class")
+        : mShaders(mTree.prefix())
         {
         }
 
@@ -207,11 +210,12 @@ namespace
             return new LLImageGL(raw, false);
         }
 
-        // The sky program as LLViewerShaderMgr builds it, without the emissive buffer, so it writes the dome's colour
+        // The sky program as LLViewerShaderMgr built it, without the emissive buffer, so it writes the dome's colour
         // to the albedo attachment as it is; the analytic pass; the dome's mesh as LLVOWLSky fills it; and a float
         // target the size of the view.
         void setUp()
         {
+            mTree.populate();
             std::map<std::string, std::string> defines;
             for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
             {
@@ -229,8 +233,8 @@ namespace
             mSky.mName = "Deferred Windlight Sky Shader";
             mSky.mFeatures.hasSrgb = true;
             mSky.mShaderFiles.clear();
-            mSky.mShaderFiles.push_back(std::make_pair("deferred/skyV.glsl", GL_VERTEX_SHADER));
-            mSky.mShaderFiles.push_back(std::make_pair("deferred/skyF.glsl", GL_FRAGMENT_SHADER));
+            mSky.mShaderFiles.push_back(std::make_pair("skyraster/deferred/skyV.glsl", GL_VERTEX_SHADER));
+            mSky.mShaderFiles.push_back(std::make_pair("skyraster/deferred/skyF.glsl", GL_FRAGMENT_SHADER));
             mSky.mShaderFiles.push_back(std::make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
             mSky.mShaderLevel = 1;
             UNSCOPED_INFO("the sky program builds");
@@ -395,7 +399,7 @@ namespace
             gGL.translatef(-CAMERA.mV[VX], -CAMERA.mV[VY], -CAMERA.mV[VZ]);
         }
 
-        // The sky program over the mesh into @a target, as LLDrawPoolWLSky::renderDome draws it: the dome taken to the
+        // The sky program over the mesh into @a target, as LLDrawPoolWLSky::renderDome drew it: the dome taken to the
         // camera, turned from its frame to the agent's and lowered by the camera's height, every band drawn on the far
         // plane in order, so the later covers the earlier where they overlap. Read back.
         std::vector<F32> raster(LLRenderTarget& target, const Sky& sky, const View& view)
@@ -480,6 +484,7 @@ namespace
             return LLVector3(p[0], p[1], p[2]);
         }
 
+        al_sky_test::SkyShaderTree mTree;
         ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader           mSky;

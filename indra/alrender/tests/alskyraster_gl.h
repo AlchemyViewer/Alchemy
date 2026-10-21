@@ -210,7 +210,8 @@ namespace al_sky_test
         return std::ldexp(1.f, exponent - 1 - mantissa);
     }
 
-    // globalF.glsl's ditherEmissive: how far it moves a value written to the emissive buffer, relative to the value.
+    // The raster sky's ditherEmissive (skyraster/deferred/ditherEmissiveF.glsl): how far it moves a value written to
+    // the emissive buffer, relative to the value.
     inline F32 ditherReach(S32 channel)
     {
         return channel == 2 ? 0.5f / 32.f : 0.5f / 64.f;

@@ -64,9 +64,8 @@ float cloudNoise(vec2 uv)
     return cloud_noise_sample;
 }
 
-// The clouds along dir, a unit vector in the dome's frame: their colour, display encoded, in [0, 2], and their opacity,
-// as the raster clouds wrote them before their storage. The noise is fetched with implicit derivatives, so this runs in
-// uniform control flow only.
+// The clouds along dir, a unit vector in the dome's frame: their colour, display encoded, in [0, 2], and their opacity.
+// The noise is fetched with implicit derivatives, so this runs in uniform control flow only.
 vec4 skyClouds(vec3 dir)
 {
     if (cloud_scale < 0.001)
@@ -74,14 +73,12 @@ vec4 skyClouds(vec3 dir)
         return vec4(0.0);
     }
 
-    // Where the ray meets the dome less the camera's position, and the point itself, which the raster clouds' mesh was
-    // faceted about.
+    // Where the ray meets the dome, less the camera's position, and the point itself.
     vec3 hit = windlightDomeHit(dir);
     vec3 pos = camPosLocal + hit;
 
-    // The dome's texture coordinates there. A vertex of the mesh takes ((1 - east) / 2, (1 - north) / 2) of its
-    // direction from the sphere's centre (ALSkyDome::buildStrips), which is linear in the point, so what the raster
-    // interpolated across a facet is this up to the facets. Continuous across the horizon, as the derivatives need.
+    // The dome's texture coordinates there: ((1 - east) / 2, (1 - north) / 2) of the direction from the sphere's
+    // centre, linear in the point and continuous across the horizon, as the derivatives need.
     vec2 texcoord = (vec2(1.0) - vec2(pos.z, pos.x) / skyDomeRadius) * 0.5;
 
     // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds >

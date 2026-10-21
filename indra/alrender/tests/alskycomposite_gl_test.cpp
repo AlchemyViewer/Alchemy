@@ -402,7 +402,8 @@ void main()
                 {
                     std::vector<std::pair<std::string, GLenum>> files = {
                         { fmt::format("skyraster/deferred/{}V.glsl", stem), GL_VERTEX_SHADER },
-                        { fmt::format("skyraster/deferred/{}F.glsl", stem), GL_FRAGMENT_SHADER } };
+                        { fmt::format("skyraster/deferred/{}F.glsl", stem), GL_FRAGMENT_SHADER },
+                        { "skyraster/deferred/ditherEmissiveF.glsl", GL_FRAGMENT_SHADER } };
                     if (std::string(stem) == "sky")
                     {
                         files.emplace_back("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER);
@@ -688,7 +689,8 @@ void main()
                     LLGLSLShader& program = mOldMeteors[emissive];
                     program.bind();
                     program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)W, (F32)H);
-                    program.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, ALSkyLayers::METEOR_WIDTH_PIXELS);
+                    glUniform1f(glGetUniformLocation(program.mProgramObject, "meteor_width_pixels"),
+                                ALSkyLayers::METEOR_WIDTH_PIXELS);
                     gGL.pushMatrix();
                     gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
                     quads->setBuffer();

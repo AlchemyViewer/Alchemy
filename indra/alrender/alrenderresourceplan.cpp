@@ -97,9 +97,10 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // Albedo, ORM or specular, the normal and the emissive. The normal's layout is the one the programs were compiled
     // against (GBUFFER_NORM_HDR), which setShaders latches from RenderHDREnabled before it compiles; nothing compiles
     // against the emissive's, which follows HDR as the other HDR targets do. R11F_G11F_B10F rather than RGB16F, which
-    // pads to RGBA16F in memory: half the bandwidth, still float so it filters linearly and holds the sky writers'
-    // boosts past 1, and unsigned is enough since the writers clamp emissive at zero. Its 6/6/5 mantissa bits band in
-    // smooth gradients, which the sky, cloud and aurora writers' ditherEmissive covers.
+    // pads to RGBA16F in memory: half the bandwidth, still float so it filters linearly and holds what the stars and
+    // emissive materials write past 1, and unsigned is enough since the writers clamp emissive at zero. Its 6/6/5
+    // mantissa bits would band in smooth gradients; the smoothest, the sky's, are composited in registers and never
+    // stored here.
     const std::array<U32, ALRenderTargetDesc::MAX_COLOR> gbuffer_color = {
         GL_SRGB8_ALPHA8, GL_RGBA8, in.mGBufferNormHDR ? (U32)GL_RGBA16 : (U32)GL_RGB10_A2,
         in.mEmissive ? (hdr ? (U32)GL_R11F_G11F_B10F : (U32)GL_RGB8) : 0u

@@ -72,12 +72,6 @@ namespace
     const F32 MOON_DISK_RADIUS  = SUN_DISK_RADIUS * 0.9f;
     const F32 SUN_INTENSITY = 1e5;
 
-// Texture coordinates:
-    const LLVector2 TEX00 = LLVector2(0.f, 0.f);
-    const LLVector2 TEX01 = LLVector2(0.f, 1.f);
-    const LLVector2 TEX10 = LLVector2(1.f, 0.f);
-    const LLVector2 TEX11 = LLVector2(1.f, 1.f);
-
     F32Seconds UPDATE_EXPRY(0.25f);
 
     const F32 UPDATE_MIN_DELTA_THRESHOLD = 0.0005f;
@@ -958,90 +952,28 @@ bool LLVOSky::updateGeometry(LLDrawable *drawable)
     mEarthCenter.mV[0] = mCameraPosAgent.mV[0];
     mEarthCenter.mV[1] = mCameraPosAgent.mV[1];
 
-    const LLVector3 &look_at = LLViewerCamera::getInstance()->getAtAxis();
-    LLVector3 right = look_at % LLVector3::z_axis;
-    LLVector3 up = right % look_at;
-    right.normalize();
-    up.normalize();
+    updateHeavenlyBody(mSunScale, mSun);
+    updateHeavenlyBody(mMoonScale, mMoon);
 
-    bool draw_sun  = updateHeavenlyBodyGeometry(drawable, mSunScale, FACE_SUN, mSun, up, right);
-    bool draw_moon = updateHeavenlyBodyGeometry(drawable, mMoonScale, FACE_MOON, mMoon, up, right);
-
-    draw_sun  &= LLEnvironment::getInstance()->getIsSunUp();
-    draw_moon &= LLEnvironment::getInstance()->getIsMoonUp();
-
-    mSun.setDraw(draw_sun);
-    mMoon.setDraw(draw_moon);
+    mSun.setDraw(LLEnvironment::getInstance()->getIsSunUp());
+    mMoon.setDraw(LLEnvironment::getInstance()->getIsMoonUp());
 
     LLPipeline::sCompiles++;
     return true;
 }
 
-bool LLVOSky::updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const S32 f, LLHeavenBody& hb, const LLVector3 &up, const LLVector3 &right)
+void LLVOSky::updateHeavenlyBody(F32 scale, LLHeavenBody& hb)
 {
     mHeavenlyBodyUpdated = true ;
 
-    LLStrider<LLVector3> verticesp;
-    LLStrider<LLVector3> normalsp;
-    LLStrider<LLVector2> texCoordsp;
-    LLStrider<U16> indicesp;
-    S32 index_offset;
-    LLFace *facep;
-
-
-    const ALSkyLayers::Corners v_clipped =
+    const ALSkyLayers::Corners corners =
         ALSkyLayers::bodyCorners(hb.getRotation(), HEAVENLY_BODY_DIST, scale, hb.getDiskRadius());
-
-    hb.setVisible(true);
-
-    facep = mFace[f];
-
-    if (!facep->getVertexBuffer())
-    {
-        facep->setSize(4, 6);
-        LLVertexBuffer* buff = new LLVertexBuffer(LLDrawPoolSky::VERTEX_DATA_MASK);
-        if (!buff->allocateBuffer(facep->getGeomCount(), facep->getIndicesCount()))
-        {
-            LL_WARNS() << "Failed to allocate Vertex Buffer for vosky to "
-                << facep->getGeomCount() << " vertices and "
-                << facep->getIndicesCount() << " indices" << LL_ENDL;
-        }
-        facep->setGeomIndex(0);
-        facep->setIndicesIndex(0);
-        facep->setVertexBuffer(buff);
-    }
-
-    llassert(facep->getVertexBuffer()->getNumIndices() == 6);
-
-    index_offset = facep->getGeometry(verticesp,normalsp,texCoordsp, indicesp);
-
-    if (-1 == index_offset)
-    {
-        return true;
-    }
-
     for (S32 vtx = 0; vtx < 4; ++vtx)
     {
-        hb.corner(vtx) = v_clipped[vtx];
-        *(verticesp++)  = hb.corner(vtx) + mCameraPosAgent;
+        hb.corner(vtx) = corners[vtx];
     }
 
-    *(texCoordsp++) = TEX01;
-    *(texCoordsp++) = TEX00;
-    *(texCoordsp++) = TEX11;
-    *(texCoordsp++) = TEX10;
-
-    *indicesp++ = index_offset + 0;
-    *indicesp++ = index_offset + 2;
-    *indicesp++ = index_offset + 1;
-
-    *indicesp++ = index_offset + 1;
-    *indicesp++ = index_offset + 2;
-    *indicesp++ = index_offset + 3;
-
-    facep->getVertexBuffer()->unmapBuffer();
-
-    return true;
+    hb.setVisible(true);
 }
 
 void LLVOSky::updateFog(const F32 distance)

@@ -235,7 +235,8 @@ public:
     void setSunDirectionCFR(const LLVector3 &sun_direction);
     void setMoonDirectionCFR(const LLVector3 &moon_direction);
 
-    bool updateHeavenlyBodyGeometry(LLDrawable *drawable, F32 scale, const S32 side, LLHeavenBody& hb, const LLVector3 &up, const LLVector3 &right);
+    // The body's quad about the camera (ALSkyLayers::bodyCorners), at @a scale times its disk.
+    void updateHeavenlyBody(F32 scale, LLHeavenBody& hb);
 
     F32 getWorldScale() const                           { return mWorldScale; }
     void setWorldScale(const F32 s)                     { mWorldScale = s; }

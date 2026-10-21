@@ -14813,8 +14813,7 @@ void LLPipeline::drawFarPlaneQuad(U32 depth_func, const LLColor4* color)
     gGL.pushMatrix();
     gGL.loadIdentity();
 
-    // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO),
-    // consistent with the sunDisc/moon far pins.
+    // Mirror the forward WINDOW depth (0.99999 ndc -> 0.999995 window -> 0.000005 under ZO).
     const F32 clip_plane = LLRender::sReverseZ ? 0.000005f : 0.99999f;
 
     gDebugProgram.bind();

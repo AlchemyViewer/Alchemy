@@ -150,33 +150,15 @@ float ssaoVisibility(float ambocc)
 #endif
 }
 
-#ifdef SOFTEN_SKY
-// The whole sky at a pixel the world left at the far plane: every layer along the view ray, composited
-// (deferred/skyCompositeF.glsl).
-vec3 skyComposite(vec2 tc);
-#endif
-
-// The colour a sky-flagged fragment in front of the far plane wrote, which nothing lights: an HDRI's as it is,
-// WindLight's scaled for fake HDR.
+// The colour a fragment in front of the far plane flagged to skip the atmospherics wrote (the debug highlight,
+// highlightF.glsl), which nothing lights, scaled for fake HDR.
 vec3 skyColor(GBufferInfo gb)
 {
-    if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
-    {
-        // actual HDRI sky, just copy color value -- from the albedo target when there is no
-        // emissive one, where skyF encodes it and the read decodes it back to linear
-#if defined(HAS_EMISSIVE)
-        return gb.emissive.rgb;
-#else
-        return gb.albedo.rgb;
-#endif
-    }
-
-    //should only be true of WL sky, port over base color value and scale for fake HDR
 #if defined(HAS_EMISSIVE)
     vec3 color = srgb_to_linear(gb.emissive.rgb);
 #else
-    // the sky wrote display-encoded values raw into the sRGB albedo target, and this pass reads it
-    // with hardware decode, so baseColor is already linear; decoding again darkened the vintage sky
+    // the sRGB albedo target holds the colour display encoded, and this pass reads it with hardware
+    // decode, so it is linear already
     vec3 color = gb.albedo.rgb;
 #endif
     return color * sky_hdr_scale;
@@ -195,11 +177,6 @@ void writeColor(vec3 color)
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
-#ifdef SOFTEN_SKY
-    // This variant's draw passes only at the cleared depth, where the world drew nothing: the sky, which nothing here
-    // lights or hazes (LLPipeline::renderDeferredLighting).
-    writeColor(skyComposite(tc));
-#else
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);
 
@@ -250,7 +227,7 @@ void main()
     bool pbr = GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR);
     vec3 irradiance = amblit_linear;
     vec3 legacyenv = vec3(0);
-    if (pbr || !(GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS)))
+    if (pbr || !GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
         // PBR IBL from the roughness, the legacy environment from the glossiness.
         float glossiness = pbr ? 1.0 - unpackRoughness(spec.ga) : spec.a;
@@ -288,7 +265,7 @@ void main()
         vec3 v = -normalize(pos.xyz);
         color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
-    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
+    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
         // unlit in front of the far plane, where the sky's own draw does not reach: a debug highlight writes SKIP_ATMOS
         color = skyColor(gb);
@@ -374,5 +351,4 @@ void main()
 
     //color.r = classic_mode > 0 ? 1.0 : 0.0;
     writeColor(color);
-#endif
 }

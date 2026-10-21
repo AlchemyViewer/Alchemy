@@ -39,7 +39,6 @@
 #include "llenvironment.h"
 #include "llsettingssky.h"
 
-#include "alskydome.h"
 #include "alstarfield.h"
 
 namespace
@@ -47,11 +46,8 @@ namespace
     // The global generator, for the meteors.
     F32 globalRandom() { return ll_frand(); }
 
-    // Meteor tuning. kMeteorHardMax is a fixed upper bound used for dynamic VB
-    // sizing — the user-facing RenderMeteorMaxCount setting is clamped to this
-    // so the VB never has to be reallocated at runtime.
+    // The most meteors in flight: the user-facing RenderMeteorMaxCount setting is clamped to the composite's array.
     constexpr U32 kMeteorHardMax        = ALSkyLayers::MAX_METEORS;
-    constexpr U32 kMeteorVertsPerQuad   = 6;
 
     // Pick a random unit vector perpendicular to `n`. Uses a deterministic
     // orthogonal basis built from `n` and a fixed "up" swap for robustness
@@ -111,18 +107,14 @@ LLDrawable * LLVOWLSky::createDrawable(LLPipeline * pipeline)
 
 void LLVOWLSky::resetVertexBuffers()
 {
-    mStripsVerts.clear();
     mStarsVerts = nullptr;
-    mMeteorVerts = nullptr;
 
     gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_ALL);
 }
 
 void LLVOWLSky::cleanupGL()
 {
-    mStripsVerts.clear();
     mStarsVerts = nullptr;
-    mMeteorVerts = nullptr;
 
     LLDrawPoolWLSky::cleanupGL();
 }
@@ -136,97 +128,6 @@ void LLVOWLSky::restoreGL()
 bool LLVOWLSky::updateGeometry(LLDrawable * drawable)
 {
     LL_PROFILE_ZONE_SCOPED;
-    LLStrider<LLVector3>    vertices;
-    LLStrider<LLVector2>    texCoords;
-    LLStrider<U16>          indices;
-
-    {
-        const F32 dome_radius = LLEnvironment::instance().getCurrentSky()->getDomeRadius();
-
-        const U32 max_buffer_bytes = gSavedSettings.getS32("RenderMaxVBOSize")*1024;
-        const U32 data_mask = LLDrawPoolWLSky::SKY_VERTEX_DATA_MASK;
-        const U32 max_verts = max_buffer_bytes / LLVertexBuffer::calcVertexSize(data_mask);
-
-        const U32 total_stacks = ALSkyDome::STACKS;
-
-        const U32 verts_per_stack = ALSkyDome::SLICES;
-
-        // each seg has to have one more row of verts than it has stacks
-        // then round down
-        const U32 stacks_per_seg = (max_verts - verts_per_stack) / verts_per_stack;
-
-        // round up to a whole number of segments
-        const U32 strips_segments = (total_stacks+stacks_per_seg-1) / stacks_per_seg;
-
-        mStripsVerts.resize(strips_segments, NULL);
-
-#if RELEASE_SHOW_DEBUG
-        LL_INFOS() << "WL Skydome strips in " << strips_segments << " batches." << LL_ENDL;
-
-        LLTimer timer;
-        timer.start();
-#endif
-
-        for (U32 i = 0; i < strips_segments ;++i)
-        {
-            LLVertexBuffer * segment = new LLVertexBuffer(LLDrawPoolWLSky::SKY_VERTEX_DATA_MASK);
-            mStripsVerts[i] = segment;
-
-            U32 num_stacks_this_seg = stacks_per_seg;
-            if ((i == strips_segments - 1) && (total_stacks % stacks_per_seg) != 0)
-            {
-                // for the last buffer only allocate what we'll use
-                num_stacks_this_seg = total_stacks % stacks_per_seg;
-            }
-
-            // figure out what range of the sky we're filling
-            const U32 begin_stack = i * stacks_per_seg;
-            const U32 end_stack = begin_stack + num_stacks_this_seg;
-            llassert(end_stack <= total_stacks);
-
-            const U32 num_verts_this_seg = ALSkyDome::vertexCount(num_stacks_this_seg);
-            llassert(num_verts_this_seg <= max_verts);
-
-            const U32 num_indices_this_seg = ALSkyDome::indexCount(num_stacks_this_seg);
-            llassert(num_indices_this_seg * sizeof(U16) <= max_buffer_bytes);
-
-            bool allocated = segment->allocateBuffer(num_verts_this_seg, num_indices_this_seg);
-#if RELEASE_SHOW_WARNS
-            if( !allocated )
-            {
-                LL_WARNS() << "Failed to allocate Vertex Buffer on update to "
-                    << num_verts_this_seg << " vertices and "
-                    << num_indices_this_seg << " indices" << LL_ENDL;
-            }
-#else
-            (void) allocated;
-#endif
-
-            // lock the buffer
-            bool success = segment->getVertexStrider(vertices)
-                && segment->getTexCoord0Strider(texCoords)
-                && segment->getIndexStrider(indices);
-
-#if RELEASE_SHOW_DEBUG
-            if(!success)
-            {
-                LL_ERRS() << "Failed updating WindLight sky geometry." << LL_ENDL;
-            }
-#else
-            (void) success;
-#endif
-
-            // fill it
-            ALSkyDome::buildStrips(begin_stack, end_stack, dome_radius, vertices, texCoords, indices);
-
-            // and unlock the buffer
-            segment->unmapBuffer();
-        }
-
-#if RELEASE_SHOW_DEBUG
-        LL_INFOS() << "completed in " << llformat("%.2f", timer.getElapsedTimeF32().value()) << "seconds" << LL_ENDL;
-#endif
-    }
 
     updateStarGeometry(drawable);
 
@@ -262,33 +163,6 @@ void LLVOWLSky::drawStarQuads(U32 faintest)
         mStarsVerts->setBuffer();
         mStarsVerts->drawArrays(LLRender::TRIANGLES, 0, quads * ALStarField::QUAD_VERTICES);
     }
-}
-
-void LLVOWLSky::drawDome(void)
-{
-    if (mStripsVerts.empty())
-    {
-        updateGeometry(mDrawable);
-    }
-
-    LLGLDepthTest gls_depth(GL_TRUE, GL_FALSE);
-
-    std::vector< LLPointer<LLVertexBuffer> >::const_iterator strips_vbo_iter, end_strips;
-    end_strips = mStripsVerts.end();
-    for(strips_vbo_iter = mStripsVerts.begin(); strips_vbo_iter != end_strips; ++strips_vbo_iter)
-    {
-        LLVertexBuffer * strips_segment = strips_vbo_iter->get();
-
-        strips_segment->setBuffer();
-
-        strips_segment->drawRange(
-            LLRender::TRIANGLE_STRIP,
-            0, strips_segment->getNumVerts()-1, strips_segment->getNumIndices(),
-            0);
-        gPipeline.addTrianglesDrawn(strips_segment->getNumIndices());
-    }
-
-    LLVertexBuffer::unbind();
 }
 
 void LLVOWLSky::initStars()
@@ -470,82 +344,6 @@ void LLVOWLSky::tickMeteors(F32 dt_seconds)
     }
 }
 
-void LLVOWLSky::updateMeteorGeometry()
-{
-    LL_PROFILE_ZONE_SCOPED;
-
-    constexpr U32 total_verts = kMeteorHardMax * kMeteorVertsPerQuad;
-
-    if (mMeteorVerts.isNull())
-    {
-        mMeteorVerts = new LLVertexBuffer(LLDrawPoolWLSky::METEOR_VERTEX_DATA_MASK);
-        if (!mMeteorVerts->allocateBuffer(total_verts, 0))
-        {
-            LL_WARNS() << "Failed to allocate meteor VB" << LL_ENDL;
-            mMeteorVerts = nullptr;
-            return;
-        }
-    }
-
-    LLStrider<LLVector3> positions;
-    LLStrider<LLVector3> normals;
-    LLStrider<LLColor4U> colors;
-    LLStrider<LLVector2> texcoords;
-    if (!mMeteorVerts->getVertexStrider(positions)
-        || !mMeteorVerts->getNormalStrider(normals)
-        || !mMeteorVerts->getColorStrider(colors)
-        || !mMeteorVerts->getTexCoord0Strider(texcoords))
-    {
-        LL_WARNS() << "Failed striding meteor VB" << LL_ENDL;
-        return;
-    }
-
-    // Six-vertex stretched quad: u in {-1,+1} (tail..head), v in {-1,+1} (side).
-    static const LLVector2 kUV[kMeteorVertsPerQuad] = {
-        LLVector2(-1.f, -1.f), // tail L
-        LLVector2( 1.f, -1.f), // head L
-        LLVector2( 1.f,  1.f), // head R
-        LLVector2(-1.f, -1.f), // tail L
-        LLVector2( 1.f,  1.f), // head R
-        LLVector2(-1.f,  1.f), // tail R
-    };
-
-    std::vector<ALSkyLayers::Meteor> in_flight;
-    meteors(in_flight);
-    U32 written = 0;
-    for (const ALSkyLayers::Meteor& m : in_flight)
-    {
-        for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
-        {
-            *(positions++) = m.mMidpoint;
-            *(normals++)   = m.mHalf;
-            *(colors++)    = m.mColour;
-            // Scale the cross-streak coordinate by width_scale. The vertex
-            // shader multiplies this by meteor_width_pixels to get the
-            // screen-space half-width; the fragment shader divides by
-            // width_scale to keep the Gaussian shape constant across classes.
-            *(texcoords++) = LLVector2(kUV[v].mV[VX], kUV[v].mV[VY] * m.mWidth);
-        }
-        ++written;
-    }
-
-    // Zero-fill the unused meteor slots so they produce degenerate triangles
-    // (all verts at origin) that rasterize to nothing.
-    const LLColor4U black_u(0, 0, 0, 0);
-    for (U32 i = written; i < kMeteorHardMax; ++i)
-    {
-        for (U32 v = 0; v < kMeteorVertsPerQuad; ++v)
-        {
-            *(positions++) = LLVector3::zero;
-            *(normals++)   = LLVector3::zero;
-            *(colors++)    = black_u;
-            *(texcoords++) = LLVector2(0.f, 0.f);
-        }
-    }
-
-    mMeteorVerts->unmapBuffer();
-}
-
 void LLVOWLSky::meteors(std::vector<ALSkyLayers::Meteor>& out) const
 {
     out.clear();
@@ -590,11 +388,3 @@ void LLVOWLSky::meteors(std::vector<ALSkyLayers::Meteor>& out) const
     }
 }
 
-void LLVOWLSky::drawMeteors()
-{
-    if (mMeteorVerts.isNull()) return;
-    if (mMeteors.empty()) return;   // skip the GL call entirely when nothing's active
-
-    mMeteorVerts->setBuffer();
-    mMeteorVerts->drawArrays(LLRender::TRIANGLES, 0, (S32)(kMeteorHardMax * kMeteorVertsPerQuad));
-}

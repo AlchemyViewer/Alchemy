@@ -217,8 +217,8 @@ U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 w
             continue;
         }
 
-        // The colour and width as the vertex stage unpacked them from eight bits: the colour to the power 2.2, the
-        // width four times its quarter.
+        // The colour and width unpacked from their eight bits: the colour to the power 2.2, the width four times its
+        // quarter.
         LLVector3 colour;
         for (S32 c = 0; c < 3; ++c)
         {

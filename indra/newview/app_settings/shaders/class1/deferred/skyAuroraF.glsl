@@ -31,8 +31,8 @@ uniform float aurora_time;      // seconds, wrapped to avoid precision drift
 // deferred/valueNoiseUtil.glsl
 float valueNoise3D(vec3 p);
 
-// What the aurora adds along dir, a unit vector in the dome's frame (y up): its colour times the gain of the path's
-// attachment, 1.5 into the emissive buffer and 1 into the albedo, as its program added it, display encoded.
+// What the aurora adds along dir, a unit vector in the dome's frame (y up), display encoded: its colour times the gain
+// of the path, 1.5 with the emissive buffer and 1 without.
 vec3 skyAurora(vec3 dir)
 {
     float elev = dir.y;

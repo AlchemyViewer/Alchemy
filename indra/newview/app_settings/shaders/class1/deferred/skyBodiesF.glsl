@@ -66,8 +66,8 @@ vec2 skyQuadCoord(vec3 dir, vec3 quad[3], out bool hit)
     return offset * 0.5 + 0.5;
 }
 
-// The sun disc along dir: its colour, display encoded, and its opacity, as the sun's program wrote them. Uniform control
-// flow only: the coordinates' derivatives are taken before the test of the quad.
+// The sun disc along dir: its colour, display encoded, and its opacity. Uniform control flow only: the coordinates'
+// derivatives are taken before the test of the quad.
 vec4 skySun(vec3 dir)
 {
     bool hit;
@@ -86,8 +86,7 @@ vec4 skySun(vec3 dir)
     return c;
 }
 
-// The moon along dir: its colour, display encoded, and its opacity, as the moon's program wrote them. Uniform control
-// flow only.
+// The moon along dir: its colour, display encoded, and its opacity. Uniform control flow only.
 vec4 skyMoon(vec3 dir)
 {
     bool hit;

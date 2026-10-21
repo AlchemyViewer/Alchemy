@@ -238,7 +238,7 @@ TEST_CASE("alskylayers: a meteor's streak is packed as its quad on the screen", 
     CHECK(out[1].mV[2] == ahead.mWidth);
     CHECK(fabsf(out[1].mV[3] - 64.f / 255.f * 4.f) < 1e-6f);
 
-    // The colour, linear as the vertex stage made it.
+    // The colour, linear.
     CHECK(fabsf(out[2].mV[0] - 1.f) < 1e-6f);
     CHECK(fabsf(out[2].mV[1] - powf(128.f / 255.f, 2.2f)) < 1e-6f);
     CHECK(out[2].mV[2] == 0.f);

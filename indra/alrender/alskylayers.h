@@ -90,10 +90,10 @@ struct Frame
     bool mClouds    = false; ///< clouds are shown (RENDER_TYPE_CLOUDS) and have a noise texture
 };
 
-/// The layers @a frame draws, as the sky's raster draws drew them in each kind of view: an HDRI alone; in a probe's face
-/// neither the stars, the meteors nor the aurora, and no sun, so that the punctual sun is not counted twice, but in a
-/// mirror, which is a picture rather than lighting; no clouds in an irradiance pass; and the night's layers only while
-/// the stars are bright enough to draw.
+/// The layers @a frame draws in its kind of view: an HDRI alone; in a probe's face neither the stars, the meteors nor
+/// the aurora, and no sun, so that the punctual sun is not counted twice, but in a mirror, which is a picture rather
+/// than lighting; no clouds in an irradiance pass; and the night's layers only while the stars are bright enough to
+/// draw.
 S32 layersFor(const Frame& frame);
 
 /// The attachment of the G-buffer the stars are drawn into and the composite reads them from: the emissive with the
@@ -117,11 +117,11 @@ Corners bodyCorners(const LLQuaternion& rotation, F32 distance, F32 scale, F32 d
 Corners bloomCorners(const Corners& sun);
 
 /// The moon's opacity as it nears the horizon, from @a moon_z, the agent's z of its direction: four times its square,
-/// to 1, the pre-EEP fade the moon's program restored; 1 below the horizon, where the moon is not drawn.
+/// to 1, the pre-EEP fade; 1 below the horizon, where the moon is not drawn.
 F32 moonFade(F32 moon_z);
 
-/// How far below its quad the sun disc was drawn, in metres down the agent's z: the sun's vertex stage lowered every
-/// corner by it. The bloom is lowered with it, so the two stay centred on each other.
+/// How far the sun disc lies below its quad, in metres down the agent's z: rayQuad's offset for the sun. The bloom is
+/// lowered with it, so the two stay centred on each other.
 constexpr F32 SUN_DROP = 50.f;
 
 /// What the composite's ray test takes of a quad (deferred/skyBodiesF.glsl's skyQuadCoord), the quad moved by
@@ -160,13 +160,12 @@ struct Meteor
 /// - the midpoint's normalized device coordinates, and the first row of the inverse of the streak's frame (the half
 ///   streak toward the head and the half width across it, each in normalized device coordinates);
 /// - that inverse's second row, the width class the quad reaches across, and the one its profile is divided by, read
-///   back from eight bits as the vertex stage read it;
-/// - the colour, linear as the vertex stage made it (sRGB to the power 2.2).
+///   back from the eight bits the meteor holds it in;
+/// - the colour, linear (sRGB to the power 2.2).
 ///
 /// Each streak is a quad on the screen of @a width_px pixels a side for each unit of width, through @a mvp (the
-/// agent's frame about the camera to clip space) onto a @a width by @a height viewport, as the meteors' vertex stage
-/// placed it. A streak with an end at or behind the camera, one wholly off the screen, and one with no area are left
-/// out. Returns how many are in @a out.
+/// agent's frame about the camera to clip space) onto a @a width by @a height viewport. A streak with an end at or
+/// behind the camera, one wholly off the screen, and one with no area are left out. Returns how many are in @a out.
 U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 width, F32 height, F32 width_px,
                 std::vector<LLVector4>& out);
 

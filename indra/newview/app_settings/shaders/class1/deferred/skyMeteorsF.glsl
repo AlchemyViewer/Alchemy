@@ -35,7 +35,7 @@ uniform vec4 skyMeteorData[SKY_MAX_METEORS * SKY_METEOR_VECTORS];
 uniform int  skyMeteorCount;
 
 // What the meteors add at ndc, the pixel's normalized device coordinates: each streak's colour times its profile and
-// the gain of the path's attachment, 4 into the emissive buffer and 2 into the albedo, as their program added it.
+// the gain of the path, 4 with the emissive buffer and 2 without.
 vec3 skyMeteors(vec2 ndc)
 {
     vec3 sum = vec3(0.0);
@@ -44,8 +44,7 @@ vec3 skyMeteors(vec2 ndc)
         vec4 a = skyMeteorData[i * SKY_METEOR_VECTORS];
         vec4 b = skyMeteorData[i * SKY_METEOR_VECTORS + 1];
 
-        // (u, v): along the streak, -1 at the tail to 1 at the head, and across it in units of the width class, as
-        // the streak's quad interpolated them.
+        // (u, v): along the streak, -1 at the tail to 1 at the head, and across it in units of the width class.
         vec2 d = ndc - a.xy;
         vec2 coord = vec2(dot(a.zw, d), dot(b.xy, d));
         if (abs(coord.x) > 1.0 || abs(coord.y) > b.z)

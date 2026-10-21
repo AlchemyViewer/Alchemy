@@ -1656,7 +1656,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("clipSign");
 
     mReservedUniforms.push_back("diffuseMap");
-    mReservedUniforms.push_back("altDiffuseMap");
     mReservedUniforms.push_back("specularMap");
     mReservedUniforms.push_back("metallicRoughnessMap");
     mReservedUniforms.push_back("normalMap");
@@ -2004,7 +2003,6 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // Stars/Aurora/Meteors
     mReservedUniforms.push_back("custom_alpha");
-    mReservedUniforms.push_back("meteor_width_pixels");
     mReservedUniforms.push_back("aurora_intensity");
     mReservedUniforms.push_back("aurora_time");
     llassert(mReservedUniforms.size() == LLShaderMgr::AURORA_TIME + 1);

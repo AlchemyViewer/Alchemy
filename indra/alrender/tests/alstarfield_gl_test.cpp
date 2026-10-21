@@ -69,8 +69,9 @@ namespace
     // Where the camera is in the agent's frame. The stars are taken to it, so nothing should depend on it.
     const LLVector3 CAMERA(118.f, -43.f, 27.f);
 
-    // What the dome leaves in each attachment where the stars draw over it (deferred/skyF.glsl): its colour in the
-    // albedo, or in the emissive with the emissive buffer, and the sky's flags in the normal's alpha.
+    // What the dome left in each attachment where the stars drew over it before the sky's composite
+    // (tests/skyraster/deferred/skyF.glsl): its colour in the albedo, or in the emissive with the emissive buffer, and
+    // the sky's flags in the normal's alpha.
     const F32 DOME[4]     = { 0.021f, 0.034f, 0.071f, 1.f };
     const F32 NO_COLOUR[4] = { 0.f, 0.f, 0.f, 1.f };
     const F32 SKY_FLAGS[4] = { 0.f, 0.f, 0.f, 0.f };

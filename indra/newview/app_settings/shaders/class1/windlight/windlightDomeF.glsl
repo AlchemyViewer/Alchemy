@@ -1,8 +1,8 @@
 /**
  * @file class1/windlight/windlightDomeF.glsl
- * @brief WindLight's sky dome as a function of the view ray: the colour the sky program writes where a ray from the
- *        camera meets the dome, before it is stored. The sky program, and the haze for the water it converges on the
- *        dome, attach it.
+ * @brief WindLight's sky dome as a function of the view ray: the sky's colour, display encoded, where a ray from the
+ *        camera meets the dome. The programs that draw the sky or bake it, and the haze for the water it converges on
+ *        the dome, attach it.
  *
  * $LicenseInfo:firstyear=2005&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -65,8 +65,9 @@ vec3 rainbow(float d)
     d = clamp(d, 0.0, 0.25) + interior_coord;
 
     float rad = (droplet_radius - 5.0f) / 1024.0f;
-    // Level 0, here and in halo22: the sky program reads both inside the HDRI split's per-pixel branch, where an
-    // implicit LOD's derivatives are undefined, and both lookups vary slowly across the dome.
+    // Level 0, here and in halo22: the dome is worked out under per-pixel branches (the composite's HDRI split and its
+    // clouds' test, the haze's weight floor), where an implicit LOD's derivatives are undefined, and both lookups vary
+    // slowly across the dome.
     return pow(textureLod(rainbow_map, vec2(rad+0.5, d), 0.0).rgb, vec3(1.8)) * moisture_level;
 }
 
@@ -176,7 +177,7 @@ vec3 windlightDomeAt(vec3 rel_pos)
 }
 
 // Where the ray from the camera along dir, a unit vector in the dome's frame, meets the dome's sphere, less the camera's
-// position. Below the camera's level this continues the sphere, where the raster dome's skirt bent down to the axis.
+// position, below the camera's level as above it.
 vec3 windlightDomeHit(vec3 dir)
 {
     // camPosLocal + t * dir on the sphere: the far root, the camera lying inside it.

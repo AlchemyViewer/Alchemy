@@ -36,11 +36,12 @@ class LLVector2;
 class LLVector3;
 
 /// The WindLight sky dome's mesh, in the dome's frame (north, up, east): rings of a sphere about the origin, from the
-/// zenith down past the camera's level, which the sky program shades from the camera's point inside the sphere
+/// zenith down past the camera's level, which the sky program shaded from the camera's point inside the sphere
 /// (windlight/windlightDomeF.glsl's windlightDomeAt). The last rings are a skirt: the third from last lowered 2048 m,
 /// the next collapsed onto the axis below it, and the last two back out on the sphere, so the strips overlap below the
-/// camera's level and the later band drawn covers the earlier. Triangle strips of SLICES vertices a ring; LLVOWLSky
-/// fills its buffers from it, and the GL tests draw it beside windlightDome.
+/// camera's level and the later band drawn covers the earlier. Triangle strips of SLICES vertices a ring. The sky's
+/// layers were drawn over it before its composite worked them out along the view ray; the GL tests draw it, with the
+/// programs that drew them (tests/skyraster), beside the composite.
 namespace ALSkyDome
 {
     /// The stacks the dome has, and the vertices a ring has. Any fewer and the facets show.

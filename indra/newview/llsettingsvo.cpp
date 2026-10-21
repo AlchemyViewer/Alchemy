@@ -767,8 +767,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
     // SL-13084 EEP added support for custom cloud textures -- flip them horizontally to match the preview of Clouds > Cloud Scroll
     // Keep in Sync!
     // * indra\newview\llsettingsvo.cpp
-    // * indra\newview\app_settings\shaders\class2\windlight\cloudsV.glsl
-    // * indra\newview\app_settings\shaders\class1\deferred\cloudsV.glsl
+    // * indra\newview\app_settings\shaders\class1\deferred\skyCloudsF.glsl
     cloud_scroll[0] = -cloud_scroll[0];
     vect_c_p_d1 += cloud_scroll;
     shader->uniform3fv(LLShaderMgr::CLOUD_POS_DENSITY1, LLVector3(vect_c_p_d1.mV));
@@ -865,7 +864,7 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
     // The WindLight haze's terms that take nothing per pixel, worked here once rather than at every
     // pixel of every lit pass, in the arithmetic the shaders did them in. Keep in step with
-    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), windlight/windlightDomeF.glsl and cloudsF.glsl.
+    // calcAtmosphericVars (windlight/atmosphericsFuncs.glsl), windlight/windlightDomeF.glsl and deferred/skyCloudsF.glsl.
     {
         const F32 haze_density = getHazeDensity();
 
@@ -918,13 +917,13 @@ void LLSettingsVOSky::applySpecial(void *ptarget, bool force)
 
         const LLColor3 sky_sun  = classic_mode ? (sun_up ? lit_sun : lit_moon) : psky->getSunlightColor();
         const LLColor3 sky_moon = classic_mode ? lit_moon : psky->getMoonlightColor();
-        // skyF's light: the moon's at 0.7 to match the legacy colour
+        // The dome's light: the moon's at 0.7 to match the legacy colour
         const LLColor3 sky_light = sun_up ? sky_sun : sky_moon * 0.7f;
         shader->uniform3fv(LLShaderMgr::SKY_SUNLIGHT, sky_sun.mV);
         shader->uniform3fv(LLShaderMgr::SKY_LIGHT, sky_light.mV);
         shader->uniform3fv(LLShaderMgr::SKY_AMBIENT, shader_ambient.mV);
 
-        // skyF's and cloudsF's: the light's extinction per unit of its path, which each pixel
+        // The dome's and the clouds': the light's extinction per unit of its path, which each pixel
         // takes over its own ray; the clouds' sun, which takes it over twice the light's
         // elevation; and the dome's ambient raised under cloud, unclamped above 1 as the dome
         // has it.

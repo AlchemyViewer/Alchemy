@@ -51,15 +51,11 @@ public:
     // (ALStarField::faintestVisible).
     void drawStarPoints(const ALStarField::Frustum& frustum, U32 faintest);
     void drawStarQuads(U32 faintest);
-    void drawDome(void);
     void resetVertexBuffers(void);
 
-    // Meteors: CPU-side simulation of short-lived streaks. Tick once per
-    // frame, then updateMeteorGeometry to push state into the dynamic VB,
-    // then drawMeteors in a dedicated deferred pass.
+    // Meteors: CPU-side simulation of short-lived streaks. Tick once per frame in a view that draws them, then hand
+    // their streaks to the sky's composite (LLDrawPoolWLSky::bindComposite).
     void tickMeteors(F32 dt_seconds);
-    void updateMeteorGeometry();
-    void drawMeteors();
 
     // The meteors in flight, as the sky's composite takes them (ALSkyLayers::packMeteors): each one's streak about the
     // camera as its envelope has carried it this far, its colour times that envelope, and its width class.
@@ -77,9 +73,7 @@ private:
     bool updateStarGeometry(LLDrawable *drawable);
 
 private:
-    std::vector< LLPointer<LLVertexBuffer> >    mStripsVerts;
     LLPointer<LLVertexBuffer>                   mStarsVerts;
-    LLPointer<LLVertexBuffer>                   mMeteorVerts;
 
     // The star field RenderStarCount asked for, in the order the buffer takes it, and where each kind lies in it.
     std::vector<ALStarField::Star> mStars;

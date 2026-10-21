@@ -222,15 +222,8 @@ LLGLSLShader            gSMAABlendWeightsProgram[4];
 LLGLSLShader            gSMAANeighborhoodBlendProgram[4];
 LLGLSLShader            gCASProgram;
 LLGLSLShader            gDeferredPostNoDoFProgram;
-LLGLSLShader            gDeferredWLSkyProgram;
-LLGLSLShader            gEnvironmentMapProgram;
-LLGLSLShader            gDeferredWLCloudProgram;
-LLGLSLShader            gDeferredWLSunProgram;
-LLGLSLShader            gDeferredWLMoonProgram;
 LLGLSLShader            gDeferredStarProgram;
 LLGLSLShader            gDeferredStarQuadProgram;
-LLGLSLShader            gDeferredMeteorProgram;
-LLGLSLShader            gDeferredAuroraProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
 LLGLSLShader            gHUDFullbrightShinyProgram;
 LLGLSLShader            gNormalMapGenProgram;
@@ -1388,15 +1381,8 @@ void LLViewerShaderMgr::loadShadersDeferred()
             gSMAANeighborhoodBlendProgram[i].unload();
         }
         gCASProgram.unload();
-        gEnvironmentMapProgram.unload();
-        gDeferredWLSkyProgram.unload();
-        gDeferredWLCloudProgram.unload();
-        gDeferredWLSunProgram.unload();
-        gDeferredWLMoonProgram.unload();
         gDeferredStarProgram.unload();
         gDeferredStarQuadProgram.unload();
-        gDeferredMeteorProgram.unload();
-        gDeferredAuroraProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
 
@@ -3158,102 +3144,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        gEnvironmentMapProgram.mName = "Environment Map Program";
-        gEnvironmentMapProgram.mShaderFiles.clear();
-        gEnvironmentMapProgram.mFeatures.calculatesAtmospherics = true;
-        gEnvironmentMapProgram.mFeatures.hasAtmospherics = true;
-        gEnvironmentMapProgram.mFeatures.hasGamma = true;
-        gEnvironmentMapProgram.mFeatures.hasSrgb = true;
-
-        gEnvironmentMapProgram.clearPermutations();
-        gEnvironmentMapProgram.addPermutation("HAS_HDRI", "1");
-        add_common_permutations(&gEnvironmentMapProgram);
-        gEnvironmentMapProgram.mShaderFiles.push_back(make_pair("deferred/skyV.glsl", GL_VERTEX_SHADER));
-        gEnvironmentMapProgram.mShaderFiles.push_back(make_pair("deferred/skyF.glsl", GL_FRAGMENT_SHADER));
-        gEnvironmentMapProgram.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
-        gEnvironmentMapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gEnvironmentMapProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        built(gEnvironmentMapProgram.createShader(), gEnvironmentMapProgram);
-    }
-
-    {
-        gDeferredWLSkyProgram.mName = "Deferred Windlight Sky Shader";
-        gDeferredWLSkyProgram.mShaderFiles.clear();
-        gDeferredWLSkyProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLSkyProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSkyProgram.mFeatures.hasGamma = true;
-        gDeferredWLSkyProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLSkyProgram.mShaderFiles.push_back(make_pair("deferred/skyV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLSkyProgram.mShaderFiles.push_back(make_pair("deferred/skyF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLSkyProgram.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLSkyProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLSkyProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredWLSkyProgram);
-
-        built(gDeferredWLSkyProgram.createShader(), gDeferredWLSkyProgram);
-    }
-
-    {
-        gDeferredWLCloudProgram.mName = "Deferred Windlight Cloud Program";
-        gDeferredWLCloudProgram.mShaderFiles.clear();
-        gDeferredWLCloudProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLCloudProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLCloudProgram.mFeatures.hasGamma = true;
-        gDeferredWLCloudProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLCloudProgram.mShaderFiles.push_back(make_pair("deferred/cloudsV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLCloudProgram.mShaderFiles.push_back(make_pair("deferred/cloudsF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLCloudProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLCloudProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-        gDeferredWLCloudProgram.addConstant( LLGLSLShader::SHADER_CONST_CLOUD_MOON_DEPTH ); // SL-14113
-
-        add_common_permutations(&gDeferredWLCloudProgram);
-
-        built(gDeferredWLCloudProgram.createShader(), gDeferredWLCloudProgram);
-    }
-
-    {
-        gDeferredWLSunProgram.mName = "Deferred Windlight Sun Program";
-        gDeferredWLSunProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasGamma = true;
-        gDeferredWLSunProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasSrgb = true;
-        gDeferredWLSunProgram.mShaderFiles.clear();
-        gDeferredWLSunProgram.mShaderFiles.push_back(make_pair("deferred/sunDiscV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLSunProgram.mShaderFiles.push_back(make_pair("deferred/sunDiscF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLSunProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLSunProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredWLSunProgram);
-
-        built(gDeferredWLSunProgram.createShader(), gDeferredWLSunProgram);
-    }
-
-    {
-        gDeferredWLMoonProgram.mName = "Deferred Windlight Moon Program";
-        gDeferredWLMoonProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasGamma = true;
-        gDeferredWLMoonProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLMoonProgram.mShaderFiles.clear();
-        gDeferredWLMoonProgram.mShaderFiles.push_back(make_pair("deferred/moonV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLMoonProgram.mShaderFiles.push_back(make_pair("deferred/moonF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLMoonProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLMoonProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-        gDeferredWLMoonProgram.addConstant( LLGLSLShader::SHADER_CONST_CLOUD_MOON_DEPTH ); // SL-14113
-
-        add_common_permutations(&gDeferredWLMoonProgram);
-
-        built(gDeferredWLMoonProgram.createShader(), gDeferredWLMoonProgram);
-    }
-
-    {
         gDeferredStarProgram.mName = "Deferred Star Program";
         gDeferredStarProgram.mShaderFiles.clear();
         gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
@@ -3282,32 +3172,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
         add_common_permutations(&gDeferredStarQuadProgram);
 
         built(gDeferredStarQuadProgram.createShader(), gDeferredStarQuadProgram);
-    }
-
-    {
-        gDeferredMeteorProgram.mName = "Deferred Meteor Program";
-        gDeferredMeteorProgram.mShaderFiles.clear();
-        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsV.glsl", GL_VERTEX_SHADER));
-        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredMeteorProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredMeteorProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredMeteorProgram);
-
-        built(gDeferredMeteorProgram.createShader(), gDeferredMeteorProgram);
-    }
-
-    {
-        gDeferredAuroraProgram.mName = "Deferred Aurora Program";
-        gDeferredAuroraProgram.mShaderFiles.clear();
-        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraV.glsl", GL_VERTEX_SHADER));
-        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredAuroraProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredAuroraProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredAuroraProgram);
-
-        built(gDeferredAuroraProgram.createShader(), gDeferredAuroraProgram);
     }
 
     {

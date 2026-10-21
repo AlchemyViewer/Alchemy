@@ -144,7 +144,7 @@ void main()
 out vec4 frag_data[4];
 
 uniform sampler2D diffuseMap;
-uniform sampler2D altDiffuseMap;
+uniform sampler2D skyBloomMapNext;
 uniform float blend_factor;
 uniform vec4 color;
 
@@ -152,7 +152,7 @@ in vec2 vary_texcoord0;
 
 void main()
 {
-    vec4 c = mix(texture(diffuseMap, vary_texcoord0), texture(altDiffuseMap, vary_texcoord0), blend_factor) * color;
+    vec4 c = mix(texture(diffuseMap, vary_texcoord0), texture(skyBloomMapNext, vary_texcoord0), blend_factor) * color;
     frag_data[0] = vec4(0.0);
     frag_data[1] = vec4(0.0);
     frag_data[2] = vec4(0.0);
@@ -368,10 +368,12 @@ void main()
             for (S32 path = 0; path < 2; ++path)
             {
                 const bool emissive = path == 1;
+                // The old program's second map, altDiffuseMap, read under the composite's name for it, a sampler the
+                // viewer still reserves.
                 buildProgram(mOldSun[path], "Deferred Windlight Sun Program (before the composite)",
                              { { "skyraster/deferred/sunDiscV.glsl", GL_VERTEX_SHADER },
                                { "skyraster/deferred/sunDiscF.glsl", GL_FRAGMENT_SHADER } },
-                             emissive);
+                             emissive, { { "altDiffuseMap", "skySunMapNext" } });
                 buildProgram(mOldMoon[path], "Deferred Windlight Moon Program (before the composite)",
                              { { "skyraster/deferred/moonV.glsl", GL_VERTEX_SHADER },
                                { "skyraster/deferred/moonF.glsl", GL_FRAGMENT_SHADER } },
@@ -382,11 +384,13 @@ void main()
                              emissive);
                 buildProgram(mOldClouds[path], "Deferred Windlight Cloud Program (before the composite)",
                              { { "skyraster/deferred/cloudsV.glsl", GL_VERTEX_SHADER },
-                               { "skyraster/deferred/cloudsF.glsl", GL_FRAGMENT_SHADER } },
+                               { "skyraster/deferred/cloudsF.glsl", GL_FRAGMENT_SHADER },
+                               { "skyraster/deferred/ditherEmissiveF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
                 buildProgram(mOldAurora[path], "Deferred Aurora Program (before the composite)",
                              { { "skyraster/deferred/auroraV.glsl", GL_VERTEX_SHADER },
-                               { "skyraster/deferred/auroraF.glsl", GL_FRAGMENT_SHADER } },
+                               { "skyraster/deferred/auroraF.glsl", GL_FRAGMENT_SHADER },
+                               { "skyraster/deferred/ditherEmissiveF.glsl", GL_FRAGMENT_SHADER } },
                              emissive);
                 buildProgram(mOldMeteors[path], "Deferred Meteor Program (before the composite)",
                              { { "skyraster/deferred/meteorsV.glsl", GL_VERTEX_SHADER },
@@ -509,7 +513,7 @@ void main()
                 bindMap(program, LLShaderMgr::DIFFUSE_MAP, mSunTexture, ALSamplers::AnisoClamp);
                 if (sun.mBlend > 0.f)
                 {
-                    bindMap(program, LLShaderMgr::ALTERNATE_DIFFUSE_MAP, mSunTextureNext, ALSamplers::AnisoClamp);
+                    bindMap(program, LLShaderMgr::SKY_SUN_MAP_NEXT, mSunTextureNext, ALSamplers::AnisoClamp);
                 }
                 program.uniform1f(LLShaderMgr::BLEND_FACTOR, sun.mBlend);
                 drawQuad(quad);
@@ -572,7 +576,7 @@ void main()
                 LLGLSLShader& program = mHalo[emissive];
                 program.bind();
                 bindMap(program, LLShaderMgr::DIFFUSE_MAP, mBloomTexture, ALSamplers::AnisoClamp);
-                bindMap(program, LLShaderMgr::ALTERNATE_DIFFUSE_MAP, mBloomTextureNext, ALSamplers::AnisoClamp);
+                bindMap(program, LLShaderMgr::SKY_BLOOM_MAP_NEXT, mBloomTextureNext, ALSamplers::AnisoClamp);
                 program.uniform1f(LLShaderMgr::BLEND_FACTOR, sun.mBlend);
                 program.uniform4f(LLShaderMgr::DIFFUSE_COLOR, BLOOM_COLOR.mV[VRED], BLOOM_COLOR.mV[VGREEN],
                                   BLOOM_COLOR.mV[VBLUE], BLOOM_OPACITY);
@@ -634,7 +638,8 @@ void main()
                 LLGLSLShader& program = mOldMeteors[emissive];
                 program.bind();
                 program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)W, (F32)H);
-                program.uniform1f(LLShaderMgr::METEOR_WIDTH_PIXELS, ALSkyLayers::METEOR_WIDTH_PIXELS);
+                glUniform1f(glGetUniformLocation(program.mProgramObject, "meteor_width_pixels"),
+                            ALSkyLayers::METEOR_WIDTH_PIXELS);
                 gGL.pushMatrix();
                 gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
                 quads->setBuffer();
