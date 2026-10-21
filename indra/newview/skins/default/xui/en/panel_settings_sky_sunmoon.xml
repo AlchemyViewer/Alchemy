@@ -60,22 +60,40 @@
                     layout="topleft"
                     left_delta="160"
                     top_delta="-20"
-                    width="200">
+                    width="60">
                 Image:
             </text>
             <texture_picker
-                    height="123"
+                    height="83"
                     layout="topleft"
                     left_delta="5"
                     name="sun_image"
                     top_pad="10"
-                    width="100"/>
+                    width="60"/>
+            <text
+                    name="bloom_label"
+                    follows="left|top"
+                    height="10"
+                    layout="topleft"
+                    left_delta="65"
+                    top_delta="-20"
+                    width="60">
+                Bloom:
+            </text>
+            <texture_picker
+                    height="83"
+                    layout="topleft"
+                    left_delta="5"
+                    name="bloom_image"
+                    tool_tip="The sun's bloom: the halo this texture paints around the sun disc, sized four times the disc. Only Alchemy draws it, and only with Sun Bloom on in the Lightbox's Sky Effects; other viewers keep the texture with the sky and draw nothing."
+                    top_pad="10"
+                    width="60"/>
             <text
                     name="scale_label"
                     follows="left|top"
                     height="10"
                     layout="topleft"
-                    left_delta="-5"
+                    left_delta="-75"
                     top_delta="110"
                     width="80">
                 Scale:

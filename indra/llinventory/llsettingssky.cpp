@@ -1951,6 +1951,13 @@ LLUUID LLSettingsSky::getBloomTextureId() const
     return mBloomTextureId;
 }
 
+void LLSettingsSky::setBloomTextureId(LLUUID id)
+{
+    mBloomTextureId = id;
+    setDirtyFlag(true);
+    setLLSDDirty();
+}
+
 LLUUID LLSettingsSky::getRainbowTextureId() const
 {
     return mRainbowTextureId;

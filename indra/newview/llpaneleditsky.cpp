@@ -72,6 +72,7 @@ namespace
     const std::string   FIELD_SKY_SUN_AZIMUTH("sun_azimuth");
     const std::string   FIELD_SKY_SUN_ELEVATION("sun_elevation");
     const std::string   FIELD_SKY_SUN_IMAGE("sun_image");
+    const std::string   FIELD_SKY_SUN_BLOOM_IMAGE("bloom_image");
     const std::string   FIELD_SKY_SUN_SCALE("sun_scale");
     const std::string   FIELD_SKY_SUN_BEACON("sunbeacon");
     const std::string   FIELD_SKY_MOON_BEACON("moonbeacon");
@@ -523,6 +524,12 @@ bool LLPanelSettingsSkySunMoonTab::postBuild()
     getChild<LLTextureCtrl>(FIELD_SKY_SUN_IMAGE)->setBlankImageAssetID(LLSettingsSky::GetBlankSunTextureId());
     getChild<LLTextureCtrl>(FIELD_SKY_SUN_IMAGE)->setDefaultImageAssetID(LLSettingsSky::GetBlankSunTextureId());
     getChild<LLTextureCtrl>(FIELD_SKY_SUN_IMAGE)->setAllowNoTexture(true);
+    // No texture draws the default bloom, as a sky without one does; the blank bloom is the transparent texture,
+    // which draws none.
+    getChild<LLUICtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onBloomImageChanged(); });
+    getChild<LLTextureCtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->setDefaultImageAssetID(LLSettingsSky::GetDefaultBloomTextureId());
+    getChild<LLTextureCtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->setBlankImageAssetID(IMG_TRANSPARENT);
+    getChild<LLTextureCtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->setAllowNoTexture(true);
     getChild<LLUICtrl>(FIELD_SKY_MOON_ROTATION)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onMoonRotationChanged(); });
     getChild<LLUICtrl>(FIELD_SKY_MOON_AZIMUTH)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onMoonAzimElevChanged(); });
     getChild<LLUICtrl>(FIELD_SKY_MOON_ELEVATION)->setCommitCallback([this](LLUICtrl *, const LLSD &) { onMoonAzimElevChanged(); });
@@ -585,6 +592,7 @@ void LLPanelSettingsSkySunMoonTab::refresh()
 
     getChild<LLUICtrl>(FIELD_SKY_STAR_BRIGHTNESS)->setValue(mSkySettings->getStarBrightness());
     getChild<LLTextureCtrl>(FIELD_SKY_SUN_IMAGE)->setValue(mSkySettings->getSunTextureId());
+    getChild<LLTextureCtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->setValue(mSkySettings->getBloomTextureId());
     getChild<LLUICtrl>(FIELD_SKY_SUN_SCALE)->setValue(mSkySettings->getSunScale());
     getChild<LLTextureCtrl>(FIELD_SKY_MOON_IMAGE)->setValue(mSkySettings->getMoonTextureId());
     getChild<LLUICtrl>(FIELD_SKY_MOON_SCALE)->setValue(mSkySettings->getMoonScale());
@@ -701,6 +709,14 @@ void LLPanelSettingsSkySunMoonTab::onSunImageChanged()
 {
     if (!mSkySettings) return;
     mSkySettings->setSunTextureId(getChild<LLTextureCtrl>(FIELD_SKY_SUN_IMAGE)->getValue().asUUID());
+    mSkySettings->update();
+    setIsDirty();
+}
+
+void LLPanelSettingsSkySunMoonTab::onBloomImageChanged()
+{
+    if (!mSkySettings) return;
+    mSkySettings->setBloomTextureId(getChild<LLTextureCtrl>(FIELD_SKY_SUN_BLOOM_IMAGE)->getValue().asUUID());
     mSkySettings->update();
     setIsDirty();
 }

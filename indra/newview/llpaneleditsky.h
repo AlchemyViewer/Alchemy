@@ -137,6 +137,7 @@ private:
     void                    onSunAzimElevChanged();
     void                    onSunScaleChanged();
     void                    onSunImageChanged();
+    void                    onBloomImageChanged();
     void                    onMoonRotationChanged();
     void                    onMoonAzimElevChanged();
     void                    onMoonScaleChanged();
