@@ -2459,6 +2459,93 @@ namespace
         }
     }
 
+    // A flat parallelogram as authored, P = a e1 + b e2 for a and b in
+    // [-0.5, 0.5], whose box is 4 by 1 by 1. Its UVs are turned 45 degrees
+    // against its edges, u = (a + b) / 2 + 0.5 and v = (b - a) / 2 + 0.5, so u
+    // runs along e1 + e2, across the box's long side and its short ones at
+    // once. The face holds it as a decoded mesh does: positions divided by
+    // the box's size, which is mNormalizedScale, and normals taken through
+    // the inverse transpose of that.
+    //
+    // A mesh rezzed at its authored size has the box's size as its scale, so
+    // the face's vertex transform is diag(mNormalizedScale) and its normal
+    // transform the inverse of that. Through them the face's tangents must
+    // be the authored surface's dP/du, at right angles to its normal, with
+    // a handedness that makes n x t * w run the way v does.
+    TEST_CASE("llvolume: a mesh face's tangents follow its UVs at the size it was authored", "[llvolume]")
+    {
+        const LLVector3 e1(4.f, 0.5f, 0.f);
+        const LLVector3 e2(0.f, 0.5f, 1.f);
+        const LLVector3 size(4.f, 1.f, 1.f);
+        const LLVector3 inv_size(1.f / size.mV[VX], 1.f / size.mV[VY], 1.f / size.mV[VZ]);
+
+        const LLVector3 dp_du = e1 + e2;
+        const LLVector3 dp_dv = e2 - e1;
+        LLVector3 authored_normal = e1 % e2;
+        authored_normal.normalize();
+
+        constexpr F32 corners[4][2] = { { -0.5f, -0.5f }, { 0.5f, -0.5f }, { 0.5f, 0.5f }, { -0.5f, 0.5f } };
+        constexpr U16 indices[6] = { 0, 1, 2, 0, 2, 3 };
+
+        LLVolumeFace face;
+        face.resizeVertices(4);
+        face.resizeIndices(6);
+        REQUIRE(face.mNumVertices == 4);
+        REQUIRE(face.mNumIndices == 6);
+        face.mNormalizedScale = size;
+
+        for (S32 i = 0; i < 4; ++i)
+        {
+            const F32 a = corners[i][0];
+            const F32 b = corners[i][1];
+
+            LLVector3 position = e1 * a + e2 * b;
+            position.scaleVec(inv_size);
+            face.mPositions[i].load3(position.mV);
+
+            LLVector3 normal = authored_normal;
+            normal.scaleVec(size);
+            normal.normalize();
+            face.mNormals[i].load3(normal.mV);
+
+            face.mTexCoords[i].set((a + b) * 0.5f + 0.5f, (b - a) * 0.5f + 0.5f);
+        }
+        std::copy(std::begin(indices), std::end(indices), face.mIndices);
+
+        REQUIRE(face.cacheOptimize(true));
+        REQUIRE(face.mTangents != nullptr);
+        REQUIRE(face.mNumVertices == 4);
+
+        LLVector3 expected = dp_du;
+        expected.normalize();
+
+        for (S32 i = 0; i < face.mNumVertices; ++i)
+        {
+            LLVector3 tangent = v3(face.mTangents[i]);
+            tangent.scaleVec(size);
+            tangent.normalize();
+
+            LLVector3 normal = v3(face.mNormals[i]);
+            normal.scaleVec(inv_size);
+            normal.normalize();
+
+            const F32 w = face.mTangents[i][3];
+            const LLVector3 bitangent = (normal % tangent) * w;
+
+            // By the sine as well as the cosine: acos alone cannot tell
+            // apart directions a float's rounding apart.
+            const F32 degrees_from_du = atan2f((tangent % expected).length(), tangent * expected) * RAD_TO_DEG;
+            const F32 degrees_off_surface = asinf(llclamp(tangent * normal, -1.f, 1.f)) * RAD_TO_DEG;
+
+            INFO(fmt::format("vertex {}: tangent ({}, {}, {}), normal ({}, {}, {}), w {}", i, tangent.mV[VX], tangent.mV[VY], tangent.mV[VZ],
+                             normal.mV[VX], normal.mV[VY], normal.mV[VZ], w));
+            CHECK(degrees_from_du <= 0.01f);
+            CHECK(fabsf(degrees_off_surface) <= 0.01f);
+            CHECK(fabsf(w) == 1.f);
+            CHECK(bitangent * dp_dv > 0.f);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Today's defects
 

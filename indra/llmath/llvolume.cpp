@@ -5396,7 +5396,8 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 }
             }
 
-            // put back in normalized coordinate frame
+            // put back in normalized coordinate frame: tangents lie in the surface and scale as positions do,
+            // normals take the inverse transpose
             LLVector4a inv_scale(1.f/mNormalizedScale.mV[0], 1.f / mNormalizedScale.mV[1], 1.f / mNormalizedScale.mV[2]);
             LLVector4a scale;
             scale.load3(mNormalizedScale.mV);
@@ -5408,7 +5409,7 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
                 mNormals[i].mul(scale);
                 mNormals[i].normalize3();
                 F32 w = mTangents[i].getF32ptr()[3];
-                mTangents[i].mul(scale);
+                mTangents[i].mul(inv_scale);
                 mTangents[i].normalize3();
                 mTangents[i].getF32ptr()[3] = w;
             }
