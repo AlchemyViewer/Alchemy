@@ -8211,13 +8211,7 @@ void LLPipeline::serviceScenePixelProbe(LLRenderTarget* src)
 
 void LLPipeline::releaseScopeBuffers()
 {
-    if (mScopePBO[0])
-    {
-        glDeleteBuffers(2, mScopePBO);
-        mScopePBO[0] = 0;
-        mScopePBO[1] = 0;
-    }
-    mScopePBOInFlight = -1;
+    mScopeCaptures.release();
     mScopeSample.release();
     mScopeData.clear();
 }
@@ -8359,19 +8353,12 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
     {
         // Resolution changed under us (window resize, or the debug key moved).
         // Anything in flight was measured against the old size, so drop it --
-        // and the pack buffers with it, since their stores were sized to that
-        // old frame. Left alone, a grown sample reads past the end of the old
-        // store on the next collect: glReadPixels into the too-small buffer is
-        // refused with GL_INVALID_OPERATION, and the memcpy out of the map
-        // then walks off its end. The block below rebuilds them at the new
-        // size, exactly as it built them the first time.
+        // and the readback slots with it, since they were sized to that old
+        // frame. Left alone, a grown sample would be read into slots too small
+        // for it. The block below rebuilds them at the new size, exactly as it
+        // built them the first time.
         mScopeSample.release();
-        if (mScopePBO[0])
-        {
-            glDeleteBuffers(2, mScopePBO);
-            mScopePBO[0] = 0;
-            mScopePBO[1] = 0;
-        }
+        mScopeCaptures.release();
         // The last readback was laid out at the old stride. getScopePixel
         // indexes it against the target's dimensions, which are about to be
         // the new ones, so a shrink would read the wrong pixel until the next
@@ -8384,19 +8371,42 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
             LL_WARNS("Pipeline") << "Could not allocate the scope sample target; scopes disabled." << LL_ENDL;
             return;
         }
-        mScopePBOInFlight = -1;
     }
 
-    if (!mScopePBO[0])
+    if (!mScopeCaptures.isAllocated() && !mScopeCaptures.allocate(bytes, 2, "Scope readback"))
     {
-        glGenBuffers(2, mScopePBO);
-        for (S32 i = 0; i < 2; ++i)
+        sScopeCapture = false;
+        LL_WARNS("Pipeline") << "Could not allocate the scope readback; scopes disabled." << LL_ENDL;
+        return;
+    }
+
+    // Collect the previous capture first. It was issued a whole sample
+    // interval ago -- many frames -- so it has all but always landed, and
+    // collecting it waits on nothing. One that has not is left for the next
+    // sample, and nothing is captured meanwhile: the plot can wait.
+    if (mScopeCaptures.getPending() > 0)
+    {
+        const bool new_size = mScopeReadback.size() != bytes;
+        mScopeReadback.resize(bytes);
+        if (!mScopeCaptures.collect(mScopeReadback.data(), bytes))
         {
-            glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[i]);
-            glBufferData(GL_PIXEL_PACK_BUFFER, bytes, nullptr, GL_STREAM_READ);
+            // Nothing was written: what it held stays, and a store just sized
+            // for the new frame holds nothing yet.
+            if (new_size)
+            {
+                mScopeReadback.clear();
+            }
+            return;
         }
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-        mScopePBOInFlight = -1;
+
+        ALScopeData fresh;
+        fresh.accumulate(mScopeReadback.data(), width, height);
+
+        // Ease towards the new measurement. A point sample of ~57k pixels
+        // spread over 256 bins carries visible shot noise; without this
+        // the plot shimmers even on a still frame.
+        static LLCachedControl<F32> smoothing(gSavedSettings, "AlchemyScopeSmoothing", 0.5f);
+        mScopeData.blendToward(fresh, llclamp(smoothing(), 0.f, 1.f));
     }
 
     // GL_NEAREST on a downscaling blit picks one source texel per destination
@@ -8408,39 +8418,11 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
     mScopeSample.copyContents(*src, 0, 0, src->getWidth(), src->getHeight(),
                               0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
-    const S32 next = (mScopePBOInFlight + 1) & 1;
-
-    // Collect the previous capture first. It was issued a whole sample
-    // interval ago -- many frames -- so the map finds it long since landed and
-    // never blocks. Reading the buffer we are about to write would.
-    if (mScopePBOInFlight >= 0)
-    {
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[mScopePBOInFlight]);
-        if (const void* mapped = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY))
-        {
-            mScopeReadback.resize(bytes);
-            memcpy(mScopeReadback.data(), mapped, bytes);
-            glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
-
-            ALScopeData fresh;
-            fresh.accumulate(mScopeReadback.data(), width, height);
-
-            // Ease towards the new measurement. A point sample of ~57k pixels
-            // spread over 256 bins carries visible shot noise; without this
-            // the plot shimmers even on a still frame.
-            static LLCachedControl<F32> smoothing(gSavedSettings, "AlchemyScopeSmoothing", 0.5f);
-            mScopeData.blendToward(fresh, llclamp(smoothing(), 0.f, 1.f));
-        }
-        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-    }
-
+    // No capture is in flight here, so one of the two slots is free and the
+    // request is never refused.
     mScopeSample.bindTarget();
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, mScopePBO[next]);
-    glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    mScopeCaptures.requestPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, bytes);
     mScopeSample.flush();
-
-    mScopePBOInFlight = next;
 }
 
 void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
