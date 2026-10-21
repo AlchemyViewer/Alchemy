@@ -34,6 +34,7 @@
 #include "../alwaterheightbake.h"
 #include "../alwaterstencil.h"
 
+#include "alframefences.h"
 #include "alquerypool.h"
 
 #include "llgl.h"
@@ -539,6 +540,7 @@ namespace
             mHeights = nullptr;
             mSlopes.release();
             mQueries.release();
+            mFrames.release();
             mScene.release();
             mBehind.release();
         }
@@ -1414,7 +1416,8 @@ namespace
         LLGLSLShader           mColour;
         LLGLSLShader           mExclusion;
         LLGLSLShader           mField;
-        ALQueryPool            mQueries;
+        ALFrameFences          mFrames;
+        ALQueryPool            mQueries{ mFrames };
         ALQueryTicket          mQuery;
         LLRenderTarget         mScene;
         LLRenderTarget         mBehind;
