@@ -1,7 +1,8 @@
 /**
  * @file aluniformbuffer_gl_test.cpp
  * @brief ALUniformBuffer's persistently mapped rings on the hidden window: the store each one makes and how it is
- *        mapped, what the GPU reads where a slice or a scratch payload is bound, and what the rings account.
+ *        mapped, what the GPU reads where a slice or a scratch payload is bound, what the rings account, and the
+ *        scratch ring's segments reused by the frames they were left in.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -25,10 +26,12 @@
 
 #include "linden_common.h"
 
+#include "../alframefences.h"
 #include "../algpubuffer.h"
 #include "../aluniformbuffer.h"
 #include "../llgl.h"
 #include "../llglheaders.h"
+#include "../llrender.h"
 
 #include "llheadlessgl_fixture.h"
 
@@ -264,5 +267,58 @@ namespace
         ALUniformBuffer::cleanupClass();
         UNSCOPED_INFO("cleanupClass returns what the ring accounted");
         CHECK(ALGPUBuffer::sBytesAllocated == before);
+    }
+
+    // The head steps into a scratch segment with no GL call once the frame that segment was left in has finished; a
+    // segment left in the open frame waits for what has been issued, with a fence of its own.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: a scratch segment is reused once the frame it was left in has finished", "[aluniformbuffer_gl]")
+    {
+        if (!glBufferStorage)
+        {
+            SKIP("no buffer storage: the scratch ring is the orphan fallback");
+        }
+        // The largest payload the scratch ring takes is a whole segment of its smallest ring: four of them fill it.
+        constexpr size_t SEGMENT  = 256 * 1024;
+        constexpr U32    SEGMENTS = 4;
+        ll_test::MesaGLThreadFlag no_glthread(false);
+        // A ring of the smallest size, its head at the start.
+        ALUniformBuffer::cleanupClass();
+        ALFrameFences& frames = gGL.frameFences();
+        // Every frame so far finished and seen.
+        glFinish();
+        frames.poll();
+
+        const std::vector<U8> payload(SEGMENT, 0x5a);
+        // One payload a segment: the first lands at the start, and each after steps the head, leaving segments 0-2 in
+        // this frame.
+        for (U32 i = 0; i < SEGMENTS; ++i)
+        {
+            const S64 offset = ALUniformBuffer::scratchWrite(payload.data(), payload.size());
+            REQUIRE(offset == S64(i * SEGMENT));
+        }
+        frames.endFrame();
+        glFinish();
+        frames.poll();
+
+        const U32 calls = frames.getCalls();
+        // Into segments 0, 1 and 2, left in the frame that has finished; segment 3 is left in this one.
+        for (U32 i = 0; i < SEGMENTS - 1; ++i)
+        {
+            const S64 offset = ALUniformBuffer::scratchWrite(payload.data(), payload.size());
+            REQUIRE(offset == S64(i * SEGMENT));
+        }
+        {
+            INFO("no GL call for a segment whose frame has finished");
+            CHECK(frames.getCalls() == calls);
+        }
+
+        // Into segment 3, left in this frame.
+        const S64 offset = ALUniformBuffer::scratchWrite(payload.data(), payload.size());
+        REQUIRE(offset == S64((SEGMENTS - 1) * SEGMENT));
+        {
+            INFO("a segment left in the open frame waits for what has been issued");
+            CHECK(frames.getCalls() >= calls + 2);
+        }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }

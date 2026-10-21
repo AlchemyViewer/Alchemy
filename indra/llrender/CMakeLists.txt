@@ -3,6 +3,7 @@
 set(
   llrender_SOURCES
   aldepthbounds.cpp
+  alframefences.cpp
   algpubuffer.cpp
   algputimer.cpp
   alimageslot.cpp
@@ -42,6 +43,7 @@ set(
 set(
   llrender_HEADERS
   aldepthbounds.h
+  alframefences.h
   algpubuffer.h
   algputimer.h
   alimageslot.h
@@ -216,9 +218,13 @@ if(AL_BUILD_TESTS)
   # - ALGPUBuffer's store, LLRender's indirect buffer bindings over its
   #   lifetime, and the readback and stream rings;
   # - ALUniformBuffer's persistently mapped rings: the store each makes, how
-  #   it is mapped, and what the GPU reads where a slice is bound;
+  #   it is mapped, what the GPU reads where a slice is bound, and the scratch
+  #   ring's segments reused once the frame each was left in has finished;
   # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
   #   queries;
+  # - ALFrameFences: one fence a frame, polled at the frame's end under
+  #   Mesa's glthread and where its user asks elsewhere, and waits that stall
+  #   only on frames the GPU has not finished;
   # - ALQueryPool: each kind's names kept to its target, a held target
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;
@@ -233,6 +239,7 @@ if(AL_BUILD_TESTS)
     PROJECT llrender
     SOURCES
       tests/aldepthbounds_gl_test.cpp
+      tests/alframefences_gl_test.cpp
       tests/algpubuffer_gl_test.cpp
       tests/algputimer_gl_test.cpp
       tests/alimageslot_gl_test.cpp

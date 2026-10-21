@@ -45,6 +45,7 @@
 #include "../alfontshaping.h"
 #include "../aluniformbuffer.h"
 #include "../llfonttextcache.h"
+#include "../llgl.h"
 #include "../llrender.h"
 #include "../llshadermgr.h"
 #include "../llvertexbuffer.h"
@@ -712,6 +713,19 @@ namespace ll_test
         LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;
         LLMatrix4a mModelview;
         LLMatrix4a mProjection;
+    };
+
+    // Takes the context to run Mesa's glthread or not (gGLManager.mMesaGLThread), which moves the frame fences' polls
+    // to the frame's end, and puts the flag back however the case leaves.
+    struct MesaGLThreadFlag
+    {
+        explicit MesaGLThreadFlag(bool on) : mHad(gGLManager.mMesaGLThread) { gGLManager.mMesaGLThread = on; }
+        ~MesaGLThreadFlag() { gGLManager.mMesaGLThread = mHad; }
+
+        MesaGLThreadFlag(const MesaGLThreadFlag&)            = delete;
+        MesaGLThreadFlag& operator=(const MesaGLThreadFlag&) = delete;
+
+        bool mHad;
     };
 }
 

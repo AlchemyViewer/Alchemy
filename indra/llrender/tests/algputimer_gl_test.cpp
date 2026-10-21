@@ -25,6 +25,7 @@
 
 #include "linden_common.h"
 
+#include "../alframefences.h"
 #include "../algputimer.h"
 #include "../alquerypool.h"
 #include "../llgl.h"
@@ -87,10 +88,21 @@ namespace
                 glEndQuery(GL_TIME_ELAPSED);
             }
             mPool.release();
+            mFrames.release();
+        }
+
+        // The frame ended as LLRender ends it: the pool's batch closed, then the frame's fence laid.
+        void endFrame()
+        {
+            mPool.endFrame();
+            mFrames.endFrame();
         }
 
         ll_test::SharedGLScope mGL;
-        ALQueryPool mPool;
+        // The polls where retire() asks for them, whatever the context.
+        ll_test::MesaGLThreadFlag mNoGLThread{ false };
+        ALFrameFences mFrames;
+        ALQueryPool mPool{ mFrames };
     };
 
 
@@ -183,7 +195,7 @@ namespace
         U64 ns = 0;
         REQUIRE(timer.begin());
         timer.end();
-        mPool.endFrame();
+        endFrame();
         glFinish();
         mPool.retire();
         {
@@ -200,7 +212,7 @@ namespace
         {
             ALQuerySpan other = mPool.beginSpan();
             mPool.endSpan(other);
-            mPool.endFrame();
+            endFrame();
             glFinish();
             mPool.retire();
         }

@@ -1,9 +1,9 @@
 /**
  * @file alquerypool_gl_test.cpp
  * @brief ALQueryPool on the hidden window: each kind's names kept to its own target, the targets one query holds
- *        refused to the rest, results read only once their frame has ended, queries across a frame's end, the ring
- *        reading what it comes back to, results written by the GPU or asked of GL, pipeline statistics, spans,
- *        release, and conditional draws.
+ *        refused to the rest, results read only once their frame has ended and finished, with no poll of their own
+ *        under glthread, queries across a frame's end, the ring reading what it comes back to, results written by the
+ *        GPU or asked of GL, pipeline statistics, spans, release, and conditional draws.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,6 +27,7 @@
 
 #include "linden_common.h"
 
+#include "../alframefences.h"
 #include "../alquerypool.h"
 #include "../llgl.h"
 #include "../llglheaders.h"
@@ -70,6 +71,19 @@ namespace
             bool mHad;
         };
 
+        // Puts the direct state access flag back however the case leaves. Turns it off, or leaves it as the context
+        // has it.
+        struct DirectStateAccessFlag
+        {
+            explicit DirectStateAccessFlag(bool named) : mHad(gGLManager.mHasDirectStateAccess)
+            {
+                gGLManager.mHasDirectStateAccess = mHad && named;
+            }
+            ~DirectStateAccessFlag() { gGLManager.mHasDirectStateAccess = mHad; }
+
+            bool mHad;
+        };
+
         // Puts the query buffers flag back however the case leaves. Turns them off, or leaves them as the context has
         // them.
         struct QueryBufferFlag
@@ -83,12 +97,14 @@ namespace
             bool mHad;
         };
 
-    // The target, program and pool go here; the target's binding, the viewport and the tests' state with mGL.
+    // The target, program, frame fences and pool go here; the target's binding, the viewport and the tests' state with
+    // mGL.
     struct alquerypool_data
     {
         ~alquerypool_data()
         {
             mPool.release();
+            mFrames.release();
             if (mFBO)
             {
                 glDeleteFramebuffers(1, &mFBO);
@@ -170,16 +186,26 @@ namespace
             return rgba[0];
         }
 
+        // The frame ended as LLRender ends it: its batch closed, then its fence laid.
+        void endFrame()
+        {
+            mPool.endFrame();
+            mFrames.endFrame();
+        }
+
         // The frame's batch closed and finished on the GPU, then read.
         void finishFrame()
         {
-            mPool.endFrame();
+            endFrame();
             glFinish();
             mPool.retire();
         }
 
         ll_test::SharedGLScope mGL;
-        ALQueryPool mPool;
+        // The polls where retire() asks for them, whatever the context.
+        ll_test::MesaGLThreadFlag mNoGLThread{ false };
+        ALFrameFences mFrames;
+        ALQueryPool mPool{ mFrames };
         GLuint mProgram = 0;
         GLuint mVAO = 0;
         GLuint mColor = 0;
@@ -497,7 +523,7 @@ namespace
             draw(false);
         }
         REQUIRE(primitives.isValid());
-        mPool.endFrame();
+        endFrame();
         draw(false);
         glFinish();
         mPool.retire();
@@ -507,6 +533,12 @@ namespace
             CHECK(mPool.result(open, count) == ALQueryPool::Status::Pending);
         }
         mPool.end(open);
+        glFinish();
+        mPool.retire();
+        {
+            INFO("nor once it has ended, while the frame it ended in is open");
+            CHECK(mPool.result(open, count) == ALQueryPool::Status::Pending);
+        }
         finishFrame();
         {
             INFO("read once it has ended, with both frames' draws");
@@ -589,7 +621,50 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // Without query buffers, a batch's results are asked of GL, once its fence has signalled.
+    // Without direct state access the GPU writes the results through the query buffer binding, which is left as it was.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: without direct state access, results are written through the binding", "[alquerypool_gl]")
+    {
+        setUp();
+        if (!gGLManager.mHasQueryBufferObject)
+        {
+            SKIP("the context has no query buffers");
+        }
+        DirectStateAccessFlag through_binding(false);
+        const U32 asked = mPool.getAskedReads();
+        ALQueryTicket samples, unseen;
+        for (U32 frame = 0; frame < ALQueryPool::FRAMES * 2; ++frame)
+        {
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Samples);
+                samples = scope.ticket();
+                draw(false);
+            }
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+                unseen = scope.ticket();
+                draw(true);
+            }
+            finishFrame();
+        }
+        U64 value = 7;
+        {
+            INFO("written by the GPU, and asked of GL for none");
+            REQUIRE(mPool.result(samples, value) == ALQueryPool::Status::Ready);
+            CHECK(value == U64(SIZE * SIZE));
+            REQUIRE(mPool.result(unseen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 0);
+            CHECK(mPool.getAskedReads() == asked);
+        }
+        GLint bound = -1;
+        glGetIntegerv(GL_QUERY_BUFFER_BINDING, &bound);
+        {
+            INFO("no buffer left at the binding");
+            CHECK(bound == 0);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Without query buffers, a batch's results are asked of GL, once its frame has finished.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: without query buffers, results are asked of GL", "[alquerypool_gl]")
     {
         setUp();
@@ -625,12 +700,12 @@ namespace
         }
         REQUIRE(seen.isValid());
         const U32 stalls = mPool.getStalls();
-        mPool.endFrame();
-        // The batch's fence too.
+        endFrame();
+        // The frame's fence too.
         glFinish();
         for (U32 frame = 1; frame < ALQueryPool::FRAMES; ++frame)
         {
-            mPool.endFrame();
+            endFrame();
         }
         U64 value = 0;
         {
@@ -641,6 +716,88 @@ namespace
         {
             INFO("no stall: the GPU had finished it");
             CHECK(mPool.getStalls() == stalls);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A batch is read once the frame fences show its frame finished, and not before: closed but its frame not ended, it
+    // waits, however long the GPU has had.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch is read only once its frame is shown finished", "[alquerypool_gl]")
+    {
+        setUp();
+        ALQueryTicket seen;
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            seen = scope.ticket();
+            draw(false);
+        }
+        mPool.endFrame();
+        glFinish();
+        mPool.retire();
+        U64 value = 0;
+        {
+            INFO("closed, with its frame's fence not laid");
+            CHECK(mPool.result(seen, value) == ALQueryPool::Status::Pending);
+        }
+        mFrames.endFrame();
+        glFinish();
+        mPool.retire();
+        {
+            INFO("read once the fence is laid and seen signalled");
+            REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Under glthread, retire() polls no fence: a batch is read once a frame's end, where glthread has caught up, has
+    // seen its frame finished. Elsewhere retire() polls, once.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: under glthread retire polls nothing, and reads what the frame's end saw", "[alquerypool_gl]")
+    {
+        setUp();
+        auto frame_with_query = [this]()
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            draw(false);
+            return scope.ticket();
+        };
+        U64 value = 0;
+        {
+            ll_test::MesaGLThreadFlag glthread(true);
+            const ALQueryTicket seen = frame_with_query();
+            endFrame();
+            glFinish();
+            const U32 calls = mFrames.getCalls();
+            mPool.retire();
+            {
+                INFO("no poll");
+                CHECK(mFrames.getCalls() == calls);
+            }
+            endFrame();
+            const U32 ended = mFrames.getCalls();
+            mPool.retire();
+            {
+                INFO("read once the next frame's end has seen its frame finished, still with no poll");
+                CHECK(mFrames.getCalls() == ended);
+                REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
+                CHECK(value == 1);
+            }
+        }
+        {
+            // Every frame so far finished and seen, so that the next poll has one frame to look at.
+            glFinish();
+            mFrames.poll();
+            const ALQueryTicket seen = frame_with_query();
+            endFrame();
+            glFinish();
+            const U32 calls = mFrames.getCalls();
+            mPool.retire();
+            {
+                INFO("elsewhere one poll, and read");
+                CHECK(mFrames.getCalls() == calls + 1);
+                REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
+                CHECK(value == 1);
+            }
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }

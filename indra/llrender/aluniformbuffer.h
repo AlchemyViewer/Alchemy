@@ -61,8 +61,9 @@ public:
                                  // (unsynchronized map/unmap) and glBindBufferRange the slice
         UPDATE_PERSISTENT   = 3, // accumulate in the shadow; per draw, memcpy into a persistently
                                  // mapped COHERENT ring (ARB_buffer_storage, no per-draw map/unmap
-                                 // or orphan) and glBindBufferRange the slice. Segment fences keep
-                                 // the CPU from overwriting a region the GPU may still be reading.
+                                 // or orphan) and glBindBufferRange the slice. A segment is reused only
+                                 // once the frame it was left in has finished (ALFrameFences), so the
+                                 // CPU never overwrites a region the GPU may still be reading.
                                  // Falls back to UPDATE_ORPHAN when buffer-storage is unavailable.
         UPDATE_PERSISTENT_FLUSH = 4, // as UPDATE_PERSISTENT but the ring is mapped NON-coherent
                                  // (GL_MAP_FLUSH_EXPLICIT_BIT); each slice is published with
@@ -162,7 +163,7 @@ public:
     // Ring consumption is driven by the NUMBER of slices, not their size: every flush
     // takes a GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT-rounded slot (256 bytes on most
     // drivers), so a 64-byte block and a 2 KB block cost the same. Once a frame's slice
-    // traffic laps the whole ring, the segment fence in flushPersistent() stops being
+    // traffic laps the whole ring, the segment wait in flushPersistent() stops being
     // free and starts blocking on the GPU -- and it does so QUIETLY (one warning, then
     // it proceeds), which is exactly the shape of an unexplained frame-time cliff.
     // These counters make the pressure visible before it becomes one.
@@ -172,7 +173,7 @@ public:
         U64 mBytes         = 0; // aligned bytes consumed
         U32 mSegmentSteps  = 0; // segment advances (persistent ring only)
         U32 mWraps         = 0; // full laps -- outstanding slices invalidated
-        U32 mStalls        = 0; // segment fences that actually blocked on the GPU
+        U32 mStalls        = 0; // segment waits that actually blocked on the GPU
         U32 mStallTimeouts = 0; // ... and gave up after the 1s timeout
         U32 mSegmentMask   = 0; // bit per segment LEFT by an advance this frame
         U32 mChurnFlushes  = 0; // re-flushes of UNCHANGED blocks that lost slice liveness
@@ -198,7 +199,7 @@ public:
     // (rigged-mesh skinning palettes at UB_OBJECT_SKIN). A caller writes a payload
     // once per frame (scratchWrite -> ring offset) and re-binds its range cheaply on
     // every subsequent use (scratchBindRange) -- upload-once, bind-per-use. Backed by a
-    // persistently-mapped fenced ring when buffer-storage is available (a write is a
+    // persistently-mapped segmented ring when buffer-storage is available (a write is a
     // plain memcpy; the map/unmap-per-write fallback measurably stalled for milliseconds
     // in late-frame passes), and by its own buffer either way so the shadowed streaming
     // machinery never interacts. scratchGeneration() bumps when the ring laps (or the
