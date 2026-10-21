@@ -837,8 +837,7 @@ namespace
             LLSD::Integer arity(ae[0].asInteger());
             LLSD names(ae[1]);
             LLSD req(LLSD::emptyArray());
-            if (arity)
-                req[arity - 1] = LLSD();
+            req.resize(arity);
             for (LLSD nm: inArray(names))
             {
                 CAPTURE(nm);

@@ -43,6 +43,7 @@ typedef U32 uint32_t;
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llformat.h"
+#include "llmemory.h"
 #include "llmemorystream.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -2150,5 +2151,328 @@ namespace
         test["baz"] = 100;
         require_via_binary_and_notation("map", test);
         require_via_binary_and_xml("map", test);
+    }
+
+    // Hostile input: nesting, sized values and compressed blocks.
+
+    constexpr S32 MAX_DEPTH = LLSDParser::DEFAULT_MAX_DEPTH;
+    // Deep enough to overflow any thread's stack in a parser that recursed per
+    // level, or in destroying a tree built that deep.
+    constexpr S32 HOSTILE_DEPTH = 200000;
+
+    std::string be32(U32 value)
+    {
+        const U32 nbo = htonl(value);
+        return std::string((const char*)&nbo, sizeof(nbo));
+    }
+
+    // The integer 1 inside the given number of arrays: one level deeper than
+    // the arrays alone.
+    LLSD nested_arrays(S32 arrays)
+    {
+        LLSD value(1);
+        for (S32 i = 0; i < arrays; ++i)
+        {
+            LLSD outer = LLSD::emptyArray();
+            outer.append(std::move(value));
+            value = std::move(outer);
+        }
+        return value;
+    }
+
+    std::string notation_nested(S32 arrays)
+    {
+        return std::string(arrays, '[') + "i1" + std::string(arrays, ']');
+    }
+
+    std::string binary_nested(S32 arrays, bool closed = true)
+    {
+        std::string out;
+        for (S32 i = 0; i < arrays; ++i)
+        {
+            out += '[';
+            out += be32(1);
+        }
+        if (closed)
+        {
+            out += 'i';
+            out += be32(1);
+            out.append(arrays, ']');
+        }
+        return out;
+    }
+
+    std::string xml_nested(S32 arrays, bool closed = true)
+    {
+        std::string out = "<llsd>";
+        for (S32 i = 0; i < arrays; ++i)
+        {
+            out += "<array>";
+        }
+        if (closed)
+        {
+            out += "<integer>1</integer>";
+            for (S32 i = 0; i < arrays; ++i)
+            {
+                out += "</array>";
+            }
+            out += "</llsd>";
+        }
+        return out;
+    }
+
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: nesting is held to the default depth", "[llsd_notation_parsing]")
+    {
+        // A value counts one level, so the deepest that parses is one fewer
+        // array than the depth around a scalar.
+        require_parse("at the default depth", notation_nested(MAX_DEPTH - 1),
+                      nested_arrays(MAX_DEPTH - 1), MAX_DEPTH);
+        require_parse("past the default depth", notation_nested(MAX_DEPTH),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+        // a byte a level
+        require_parse("hostile depth", std::string(HOSTILE_DEPTH, '['),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDBinaryParsing, "llsd binary parsing: nesting is held to the default depth", "[llsd_binary_parsing]")
+    {
+        require_parse("at the default depth", binary_nested(MAX_DEPTH - 1),
+                      nested_arrays(MAX_DEPTH - 1), MAX_DEPTH);
+        require_parse("past the default depth", binary_nested(MAX_DEPTH),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+        require_parse("hostile depth", binary_nested(HOSTILE_DEPTH, false),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: nesting is held to the default depth or the one named", "[llsd_XML_parsing]")
+    {
+        require_parse("at the default depth", xml_nested(MAX_DEPTH - 1),
+                      nested_arrays(MAX_DEPTH - 1), MAX_DEPTH);
+        require_parse("past the default depth", xml_nested(MAX_DEPTH),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+        // The parser builds without recursing, but no tree this deep could be
+        // destroyed, and an unclosed one goes with the parser.
+        require_parse("hostile depth, unclosed", xml_nested(HOSTILE_DEPTH, false),
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+        require_parse("within a named depth", xml_nested(2), nested_arrays(2), 3, 3);
+        require_parse("past a named depth", xml_nested(2), LLSD(), LLSDParser::PARSE_FAILURE, 2);
+    }
+
+    TEST_CASE("llsd serialization: deserialize holds every format to the default depth", "[llsd_serialization]")
+    {
+        // what an LLSD capability response goes through: the body picks the
+        // parser, and the size is the only limit the caller has
+        const std::string bodies[] =
+        {
+            "<? llsd/notation ?>\n" + std::string(HOSTILE_DEPTH, '['),
+            "<? LLSD/Binary ?>\n" + binary_nested(HOSTILE_DEPTH, false),
+            "<? LLSD/XML ?>\n" + xml_nested(HOSTILE_DEPTH, false),
+            std::string(HOSTILE_DEPTH, '['),
+            xml_nested(HOSTILE_DEPTH, false),
+        };
+        for (const std::string& body : bodies)
+        {
+            INFO(body.substr(0, 24));
+            std::istringstream in(body);
+            LLSD out;
+            CHECK_FALSE(LLSDSerialize::deserialize(out, in, (llssize)body.size()));
+        }
+    }
+
+    // Hands its input out a byte at a time and notes the most memory resident
+    // while it does: a parser that commits what a size field claims before
+    // reading the bytes claimed shows it here, whatever ran before it.
+    class ResidentWatchingBuf : public std::streambuf
+    {
+    public:
+        explicit ResidentWatchingBuf(std::string data) : mData(std::move(data)) {}
+
+        U64 mMostResident = 0;
+
+    protected:
+        int_type underflow() override
+        {
+            mMostResident = llmax(mMostResident, LLMemory::getCurrentRSS());
+            if (mNext >= mData.size())
+            {
+                return traits_type::eof();
+            }
+            char* const at = &mData[mNext++];
+            setg(at, at, at + 1);
+            return traits_type::to_int_type(*at);
+        }
+
+    private:
+        std::string mData;
+        size_t      mNext = 0;
+    };
+
+    TEST_CASE("llsd serialization: a sized value takes no more memory than its input supplies", "[llsd_serialization]")
+    {
+        // Each claims two gigabytes and supplies a few bytes, and with no
+        // byte budget there is nothing to hold the claim against.
+        const std::string claim = be32(0x7FFFFFFF);
+        struct Case
+        {
+            const char* what;
+            LLPointer<LLSDParser> parser;
+            std::string input;
+        };
+        const Case cases[] =
+        {
+            { "notation raw string", new LLSDNotationParser, "s(2147483647)\"abc\"" },
+            { "notation raw binary", new LLSDNotationParser, "b(2147483647)\"abc\"" },
+            { "binary string",       new LLSDBinaryParser,   "s" + claim + "abc" },
+            { "binary uri",          new LLSDBinaryParser,   "l" + claim + "abc" },
+            { "binary binary",       new LLSDBinaryParser,   "b" + claim + "abc" },
+            { "binary map key",      new LLSDBinaryParser,   "{" + be32(1) + "k" + claim + "abc" },
+        };
+        constexpr U64 MARGIN = 256 * 1024 * 1024;
+        for (const Case& c : cases)
+        {
+            INFO(c.what);
+            const U64 before = LLMemory::getCurrentRSS();
+            ResidentWatchingBuf watched(c.input);
+            std::istream in(&watched);
+            LLSD out;
+            CHECK(c.parser->parse(in, out, LLSDSerialize::SIZE_UNLIMITED) == LLSDParser::PARSE_FAILURE);
+            CHECK(watched.mMostResident > 0);
+            CHECK(watched.mMostResident < before + MARGIN);
+        }
+
+        // and a value that does arrive whole still reads, across the chunks
+        // the reading grows by
+        const std::string big(300 * 1024, 'x');
+        std::istringstream in("s(" + std::to_string(big.size()) + ")\"" + big + "\"");
+        LLSD out;
+        LLPointer<LLSDParser> notation = new LLSDNotationParser;
+        CHECK(notation->parse(in, out, LLSDSerialize::SIZE_UNLIMITED) == 1);
+        CHECK(out.asStringRef() == big);
+    }
+
+    TEST_CASE("llsd serialization: a sized value within the byte budget keeps no slack", "[llsd_serialization]")
+    {
+        // The budget holds the size to bytes the caller has, so the buffer is
+        // sized once rather than grown to it with room left over.
+        const std::string bytes(300000, 'x');
+        const std::string notation_doc = "b(" + std::to_string(bytes.size()) + ")\"" + bytes + "\"";
+        const std::string binary_doc = "b" + be32((U32)bytes.size()) + bytes;
+        const struct
+        {
+            const char* what;
+            LLPointer<LLSDParser> parser;
+            const std::string& input;
+        } cases[] =
+        {
+            { "notation", new LLSDNotationParser, notation_doc },
+            { "binary",   new LLSDBinaryParser,   binary_doc },
+        };
+        for (const auto& c : cases)
+        {
+            INFO(c.what);
+            std::istringstream in(c.input);
+            LLSD out;
+            REQUIRE(c.parser->parse(in, out, c.input.size()) == 1);
+            CHECK(out.asBinary().size() == bytes.size());
+            CHECK(out.asBinary().capacity() == bytes.size());
+        }
+    }
+
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a raw size closes with a paren and fits what is left of the budget", "[llsd_notation_parsing]")
+    {
+        // The length is read up to 18 characters. One that runs past them
+        // without its ')' is malformed, not a length with junk after it.
+        require_parse("raw string without its closing paren", "s(5xxxxxxxxxxxxxxxxQ'hello'",
+                      LLSD(), LLSDParser::PARSE_FAILURE);
+
+        // Once the byte budget is spent, a sized string is held to none left,
+        // as the binary parser holds it, rather than to no limit at all.
+        std::istringstream in("[i1,s(5)'hello']");
+        LLSD out;
+        mParser->reset();
+        CHECK(mParser->parse(in, out, 2) == LLSDParser::PARSE_FAILURE);
+    }
+
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a high-bit byte where a boolean's letters go fails", "[llsd_notation_parsing]")
+    {
+        // read as an int, which tolower() takes, never as a negative char
+        require_parse("high-bit byte in true", "tr\xE9", LLSD(), LLSDParser::PARSE_FAILURE);
+        require_parse("high-bit byte in false", "fa\xC3\xA9", LLSD(), LLSDParser::PARSE_FAILURE);
+    }
+
+    // total zero bytes, deflated with zlib's wrapping (window_bits 15) or gzip's (31)
+    std::string deflate_zeros(size_t total, int window_bits)
+    {
+        z_stream strm{};
+        REQUIRE(deflateInit2(&strm, Z_BEST_SPEED, Z_DEFLATED, window_bits, 8, Z_DEFAULT_STRATEGY) == Z_OK);
+        const std::vector<Bytef> zeros(1024 * 1024, 0);
+        std::vector<Bytef> chunk(256 * 1024);
+        std::string compressed;
+        size_t fed = 0;
+        int flush = Z_NO_FLUSH;
+        while (flush != Z_FINISH)
+        {
+            const size_t n = std::min(zeros.size(), total - fed);
+            fed += n;
+            flush = (fed == total) ? Z_FINISH : Z_NO_FLUSH;
+            strm.next_in = const_cast<Bytef*>(zeros.data());
+            strm.avail_in = (uInt)n;
+            do
+            {
+                strm.next_out = chunk.data();
+                strm.avail_out = (uInt)chunk.size();
+                deflate(&strm, flush);
+                compressed.append((const char*)chunk.data(), chunk.size() - strm.avail_out);
+            } while (strm.avail_out == 0);
+        }
+        deflateEnd(&strm);
+        return compressed;
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd and unzip_llsdNavMesh refuse to inflate past their cap", "[llsd_serialization]")
+    {
+        // A little over a quarter of a gigabyte of zeros deflates to a few
+        // hundred kilobytes; nothing a grid serves inflates that far.
+        constexpr size_t BOMB = 260 * 1024 * 1024;
+        {
+            const std::string bomb = deflate_zeros(BOMB, 15);
+            LLSD out;
+            CHECK(LLUZipHelper::unzip_llsd(out, (const U8*)bomb.data(), (S32)bomb.size()) ==
+                  LLUZipHelper::ZR_SIZE_ERROR);
+        }
+        {
+            const std::string bomb = deflate_zeros(BOMB, 15 + 16);
+            std::istringstream in(bomb);
+            bool valid = true;
+            size_t outsize = 0;
+            NavMeshBytes out(unzip_llsdNavMesh(valid, outsize, in, (S32)bomb.size()));
+            CHECK_FALSE(valid);
+            CHECK(out.get() == nullptr);
+        }
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd from a stream shorter than its size fails", "[llsd_serialization]")
+    {
+        // the missing tail would be inflated from uninitialised memory
+        LLSD sd;
+        sd["message"] = "destination unknown";
+        const std::string compressed = zip_llsd(sd);
+        REQUIRE_FALSE(compressed.empty());
+        std::istringstream in(compressed.substr(0, compressed.size() / 2));
+        LLSD out;
+        CHECK(LLUZipHelper::unzip_llsd(out, in, (S32)compressed.size()) == LLUZipHelper::ZR_SIZE_ERROR);
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsdNavMesh rejects a stream that inflates to nothing", "[llsd_serialization]")
+    {
+        // a well-formed gzip stream of no bytes is no navmesh, and the caller
+        // reads the first byte of what comes back valid
+        const std::string empty = deflate_zeros(0, 15 + 16);
+        std::istringstream in(empty);
+        bool valid = true;
+        size_t outsize = 1;
+        NavMeshBytes out(unzip_llsdNavMesh(valid, outsize, in, (S32)empty.size()));
+        CHECK_FALSE(valid);
+        CHECK(out.get() == nullptr);
     }
 }

@@ -133,9 +133,12 @@ public:
         }
         else
         {
+            // Built before the old value goes: value may live inside it, as
+            // in sd = sd["key"].asStringRef().
+            Impl* fresh = new ImplT(std::forward<V>(value));
             sd.releaseValue();
             sd.mData.impl = nullptr;
-            reset(sd.mData.impl, new ImplT(std::forward<V>(value)));
+            reset(sd.mData.impl, fresh);
             sd.mType = type;
         }
     }
@@ -482,6 +485,7 @@ namespace
         LLSD& ref(size_t);
         const LLSD& ref(size_t) const;
         void reserve(size_t size) { mData.reserve(size); }
+        void resize(size_t size) { mData.resize(size); }
 
         LLSD::array_iterator beginArray() { return mData.begin(); }
         LLSD::array_iterator endArray() { return mData.end(); }
@@ -499,64 +503,86 @@ namespace
         return (index < mData.size()) ? mData[index] : LLSD();
     }
 
+    // An array is written at an index it has or at its end, which appends: a
+    // write further out, or at a negative index (an Integer below zero
+    // arrives as a size_t past INT_MAX), changes nothing. Padding to the index
+    // would let one integer from the wire commit 16 bytes an element up to
+    // it; resize() is how a caller pads on purpose. A non-const read that far
+    // out comes here as well, since operator[] cannot tell it from a write.
+    void refuse(size_t i, size_t size)
+    {
+        LL_WARNS_ONCE("LLSD") << "array index past the end or negative: a write there is dropped" << LL_ENDL;
+        LL_DEBUGS("LLSD") << "index " << static_cast<std::ptrdiff_t>(i) << ", size " << size << LL_ENDL;
+    }
+
+    // What operator[] gives for such an index: Undefined, as the const lookup
+    // reads, and a write into it is lost at the next refusal, which is as long
+    // as it holds what was written. One a thread, since each thread's LLSDs
+    // are its own.
+    LLSD& sink()
+    {
+        static thread_local LLSD sd;
+        sd.clear();
+        return sd;
+    }
+
     void ImplArray::set(size_t i, const LLSD& v)
     {
-        NEGATIVE_EXIT(i);
-        DataVector::size_type index = i;
-
-        if (index >= mData.size())
+        if (i < mData.size())
         {
-            mData.resize(index + 1);
+            mData[i] = v;
         }
-
-        mData[index] = v;
-    }
-
-    void ImplArray::set(size_t i, LLSD&& v)
-    {
-        NEGATIVE_EXIT(i);
-        DataVector::size_type index = i;
-
-        if (index >= mData.size())
+        else if (i == mData.size())
         {
-            mData.resize(index + 1);
-        }
-
-        mData[index] = std::move(v);
-    }
-
-    void ImplArray::insert(size_t i, const LLSD& v)
-    {
-        NEGATIVE_EXIT(i);
-        DataVector::size_type index = i;
-
-        if (index >= mData.size())  // tbd - sanity check limit for index ?
-        {
-            // beyond the end: pad with undefined so v lands at index, rather
-            // than double-shifting and leaving a trailing undefined element
-            mData.resize(index);
             mData.push_back(v);
         }
         else
         {
-            mData.insert(mData.begin() + index, v);
+            refuse(i, mData.size());
         }
+    }
+
+    // Growing the vector moves its elements, so a v that is one of them is
+    // taken out before it grows: a.set(a.size(), std::move(a[0])).
+    void ImplArray::set(size_t i, LLSD&& v)
+    {
+        if (i < mData.size())
+        {
+            mData[i] = std::move(v);
+        }
+        else if (i == mData.size())
+        {
+            LLSD keep(std::move(v));
+            mData.push_back(std::move(keep));
+        }
+        else
+        {
+            refuse(i, mData.size());
+        }
+    }
+
+    // past the end appends, so v lands at the end rather than past a gap
+    void ImplArray::insert(size_t i, const LLSD& v)
+    {
+        if (was_negative(i))
+        {
+            refuse(i, mData.size());
+            return;
+        }
+
+        mData.insert(mData.begin() + std::min(i, mData.size()), v);
     }
 
     void ImplArray::insert(size_t i, LLSD&& v)
     {
-        NEGATIVE_EXIT(i);
-        DataVector::size_type index = i;
+        if (was_negative(i))
+        {
+            refuse(i, mData.size());
+            return;
+        }
 
-        if (index >= mData.size()) // tbd - sanity check limit for index ?
-        {
-            mData.resize(index);
-            mData.push_back(std::move(v));
-        }
-        else
-        {
-            mData.insert(mData.begin() + index, std::move(v));
-        }
+        LLSD keep(std::move(v));
+        mData.insert(mData.begin() + std::min(i, mData.size()), std::move(keep));
     }
 
     LLSD& ImplArray::append(const LLSD& v)
@@ -584,14 +610,16 @@ namespace
 
     LLSD& ImplArray::ref(size_t i)
     {
-        DataVector::size_type index = was_negative(i)? 0 : i;
-
-        if (index >= mData.size())
+        if (i < mData.size())
         {
-            mData.resize(index + 1);
+            return mData[i];
         }
-
-        return mData[index];
+        if (i == mData.size())
+        {
+            return mData.emplace_back();
+        }
+        refuse(i, mData.size());
+        return sink();
     }
 
     const LLSD& ImplArray::ref(size_t i) const
@@ -667,9 +695,10 @@ ImplMap& LLSD::Impl::mutableMap(LLSD& sd)
         }
         return *m;
     }
+    // allocated before the old value goes, so a bad_alloc leaves sd whole
+    ImplMap* im = new ImplMap;
     sd.releaseValue();
     sd.mData.impl = nullptr;
-    ImplMap* im = new ImplMap;
     reset(sd.mData.impl, im);
     sd.mType = LLSD::TypeMap;
     return *im;
@@ -688,9 +717,10 @@ ImplArray& LLSD::Impl::mutableArray(LLSD& sd)
         }
         return *a;
     }
+    // allocated before the old value goes, so a bad_alloc leaves sd whole
+    ImplArray* ia = new ImplArray;
     sd.releaseValue();
     sd.mData.impl = nullptr;
-    ImplArray* ia = new ImplArray;
     reset(sd.mData.impl, ia);
     sd.mType = LLSD::TypeArray;
     return *ia;
@@ -813,11 +843,15 @@ void LLSD::assign(LLSD&& other)
 {
     if (this != &other)
     {
-        releaseValue();
-        mData = other.mData;
-        mType = other.mType;
+        // take other's value before releasing ours: other may live inside
+        // it, as in sd = std::move(sd["key"])
+        const Data d = other.mData;
+        const Type t = other.mType;
         other.mData.impl = nullptr;
         other.mType = TypeUndefined;
+        releaseValue();
+        mData = d;
+        mType = t;
     }
 }
 
@@ -1196,6 +1230,7 @@ LLSD& LLSD::with(Integer i, LLSD&& v)
 LLSD& LLSD::append(const LLSD& v)       { return Impl::mutableArray(*this).append(v); }
 LLSD& LLSD::append(LLSD&& v)            { return Impl::mutableArray(*this).append(std::move(v)); }
 void LLSD::erase(Integer i)             { Impl::mutableArray(*this).erase(i); }
+void LLSD::resize(size_t size)          { Impl::mutableArray(*this).resize(size); }
 
 LLSD& LLSD::operator[](size_t i)
 {

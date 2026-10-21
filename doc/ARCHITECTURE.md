@@ -54,7 +54,9 @@ The codebase uses `LLSingleton<T>` (`indra/llcommon/llsingleton.h`) extensively.
 
 ### Event System & LLSD
 
-**LLSD** (`indra/llcommon/llsd.h`) is the universal data container used for event messages, network messages, settings, HTTP bodies, and capability responses. Supports: Boolean, Integer, Real, UUID, String, Date, URI, Binary, Map, Array, and Undefined. Value semantics. Not thread-safe — transfer ownership across threads.
+**LLSD** (`indra/llcommon/llsd.h`) is the universal data container used for event messages, network messages, settings, HTTP bodies, and capability responses. Supports: Boolean, Integer, Real, UUID, String, Date, URI, Binary, Map, Array, and Undefined. Value semantics. Not thread-safe — transfer ownership across threads. An array is written only at an index it has or at its end, which appends: a non-const `operator[]` or `set()` further out, or any write at a negative index, leaves the array as it was (a value that is not an array still becomes an empty one) and `insert()` past the end appends, so an index read off the wire cannot grow an array to reach it. `resize()` is the one way to leave a gap, for formats that place values by position (`LLGLTFMaterial::getOverrideLLSD`'s texture slots, `LLEventDispatcher`'s parameters).
+
+Every parser takes its input as hostile: an LLSD capability response picks its own format, notation included. The XML, notation and binary parsers and the JSON reader (`llsdjson.h`) hold nesting to `LLSDParser::DEFAULT_MAX_DEPTH` (256) unless the caller names a depth, since the notation and binary parsers recurse per level and every tree is destroyed and formatted recursively. A sized value (`s(N)`, `b(N)`, binary lengths) grows with the bytes that arrive rather than being allocated from its size field, and `unzip_llsd`/`unzip_llsdNavMesh` refuse to inflate past 256 MB.
 
 **LLEventPump** (`indra/llcommon/llevents.h`) is the pub/sub event bus. Subsystems communicate by posting LLSD events to named pumps. Listeners return true to stop propagation. `LLEventAPI` wraps C++ APIs as event-driven interfaces with introspection. The `LLEventDispatcher` dispatches events to methods by string name.
 

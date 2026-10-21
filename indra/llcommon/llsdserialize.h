@@ -56,6 +56,17 @@ public:
     };
 
     /**
+     * @brief The nesting a parse allows when the caller names none.
+     *
+     * A value counts one level and each map or array around it one more.
+     * Real documents stay far inside it -- an inventory fetch 50 folders deep
+     * nests about 155 -- while the notation and binary parsers recurse once
+     * per level, and the tree any of them builds is destroyed and formatted
+     * recursively, so it also bounds the stack a hostile document can take.
+     */
+    static constexpr S32 DEFAULT_MAX_DEPTH = 256;
+
+    /**
      * @brief Constructor
      */
     LLSDParser();
@@ -74,13 +85,16 @@ public:
      * @param max_bytes The maximum number of bytes that will be in
      * the stream. Pass in LLSDSerialize::SIZE_UNLIMITED (-1) to set no
      * byte limit.
+     * @param max_depth The deepest nesting to accept; a negative value
+     * means DEFAULT_MAX_DEPTH.
      * @return Returns the number of LLSD objects parsed into
      * data. Returns PARSE_FAILURE (-1) on parse failure.
      */
     S32 parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max_depth = -1);
 
     /** Like parse(), but with no byte budget to enforce, for a stream that
-     *  holds one document and nothing after it.
+     *  holds one document and nothing after it. Nesting is held to
+     *  DEFAULT_MAX_DEPTH.
      */
     S32 parseLines(std::istream& istr, LLSD& data);
 
@@ -103,11 +117,11 @@ protected:
      * @param istr The input stream.
      * @param data[out] The newly parse structured data.
      * @param max_depth Max depth parser will check before exiting
-     *  with parse error, -1 - unlimited.
+     *  with parse error.
      * @return Returns the number of LLSD objects parsed into
      * data. Returns PARSE_FAILURE (-1) on parse failure.
      */
-    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth = -1) const = 0;
+    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth) const = 0;
 
     /**
      * @brief Virtual default function for resetting the parser
@@ -195,6 +209,14 @@ protected:
      */
     void account(llssize bytes) const;
 
+    /**
+     * @brief The most bytes a sized value may still claim.
+     *
+     * What is left of the budget, and none once it is spent; or
+     * LLSDSerialize::SIZE_UNLIMITED when the parse has no budget.
+     */
+    llssize sizeBudget() const;
+
 protected:
     /**
      * @brief boolean to set if byte counts should be checked during parsing.
@@ -239,11 +261,11 @@ protected:
      * @param istr The input stream.
      * @param data[out] The newly parse structured data. Undefined on failure.
      * @param max_depth Max depth parser will check before exiting
-     *  with parse error, -1 - unlimited.
+     *  with parse error.
      * @return Returns the number of LLSD objects parsed into
      * data. Returns PARSE_FAILURE (-1) on parse failure.
      */
-    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth = -1) const;
+    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth) const;
 
 private:
     /**
@@ -316,11 +338,11 @@ protected:
      * @param istr The input stream.
      * @param data[out] The newly parse structured data.
      * @param max_depth Max depth parser will check before exiting
-     *  with parse error, -1 - unlimited.
+     *  with parse error.
      * @return Returns the number of LLSD objects parsed into
      * data. Returns PARSE_FAILURE (-1) on parse failure.
      */
-    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth = -1) const;
+    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth) const;
 
     /**
      * @brief Virtual default function for resetting the parser
@@ -366,11 +388,11 @@ protected:
      * @param istr The input stream.
      * @param data[out] The newly parse structured data.
      * @param max_depth Max depth parser will check before exiting
-     *  with parse error, -1 - unlimited.
+     *  with parse error.
      * @return Returns the number of LLSD objects parsed into
      * data. Returns -1 on parse failure.
      */
-    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth = -1) const;
+    virtual S32 doParse(std::istream& istr, LLSD& data, S32 max_depth) const;
 
 private:
     /**

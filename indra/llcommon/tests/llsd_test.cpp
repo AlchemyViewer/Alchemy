@@ -684,13 +684,9 @@ namespace
 
             LLSD beyond;
             beyond.insert(2, "far");
-            UNSCOPED_INFO("beyond-end insert size");
-            REQUIRE(beyond.size() == 3);
-            UNSCOPED_INFO("beyond-end insert pad 0");
-            REQUIRE(beyond[0].isUndefined());
-            UNSCOPED_INFO("beyond-end insert pad 1");
-            REQUIRE(beyond[1].isUndefined());
-            require_type_and_value("beyond-end insert value", beyond[2], "far");
+            UNSCOPED_INFO("beyond-end insert appends");
+            REQUIRE(beyond.size() == 1);
+            require_type_and_value("beyond-end insert value", beyond[0], "far");
 
             require_type_and_value("get 1", v.get(1), 88);
             v.set(1, "hot");
@@ -718,6 +714,55 @@ namespace
             require_type_and_value("copy array 3", w[3], false);
             require_type_and_value("copy array 4", w[4], true);
             require_type_and_value("copy array 5", w[5], 34);
+        });
+    }
+
+    TEST_CASE("LLSD(new): an array is written at an index it has or at its end", "[LLSD_new]")
+    {
+        require_cleaned_up([&]
+        {
+            LLSD a = LLSD::emptyArray();
+            a.append(1);
+            a.append(2);
+            a[2] = 3;
+            UNSCOPED_INFO("the end appends");
+            REQUIRE(a.size() == 3);
+            require_type_and_value("appended", a[2], 3);
+
+            a[1000] = 4;
+            a[-1] = 9;
+            a.set(10, 5);
+            a.set(-1, 5);
+            UNSCOPED_INFO("a write past the end or at a negative index changes nothing");
+            REQUIRE(a.size() == 3);
+            require_type_and_value("element 0 kept", a[0], 1);
+
+            a.insert(10, 5);
+            UNSCOPED_INFO("an insert past the end appends");
+            REQUIRE(a.size() == 4);
+            require_type_and_value("insert appended", a[3], 5);
+            a.insert(-1, 6);
+            REQUIRE(a.size() == 4);
+
+            UNSCOPED_INFO("a non-const lookup past the end grows nothing");
+            REQUIRE(a[7].isUndefined());
+            REQUIRE(a.size() == 4);
+
+            a.resize(6);
+            UNSCOPED_INFO("resize pads with Undefined");
+            REQUIRE(a.size() == 6);
+            REQUIRE(a[4].isUndefined());
+            a[5] = 7;
+            require_type_and_value("written in the padding", a[5], 7);
+            a.resize(2);
+            REQUIRE(a.size() == 2);
+            require_type_and_value("resize keeps what it does not cut", a[1], 2);
+
+            LLSD undefined;
+            undefined[3] = 1;
+            UNSCOPED_INFO("a value that is not an array still becomes an empty one");
+            REQUIRE(undefined.isArray());
+            REQUIRE(undefined.size() == 0);
         });
     }
 
@@ -850,6 +895,67 @@ namespace
         LLSD v;
         v = (const char*)NULL;
         CHECK(v.isString());
+    }
+
+    TEST_CASE("LLSD(new): a value assigned from inside the value it replaces survives", "[LLSD_new]")
+    {
+        // Each right-hand side lives in storage the assignment releases, so
+        // the new value has to be taken before the old one goes.
+        const std::string text("a string long enough to be kept on the heap rather than in place");
+        require_cleaned_up([&]
+        {
+            // The value is also held outside, so one adopted without its
+            // reference shows up as an implementation let go too soon.
+            LLSD outside(text);
+            LLSD sd;
+            sd["k"] = outside;
+            sd = std::move(sd["k"]);
+            CHECK(sd.asString() == text);
+            if constexpr (llsd::COUNTS_IMPLS)
+            {
+                const U32 live = llsd::outstandingCount();
+                sd.clear();
+                CHECK(llsd::outstandingCount() == live);
+            }
+            CHECK(outside.asString() == text);
+        });
+
+        LLSD from_string;
+        from_string["k"] = text;
+        from_string = from_string["k"].asStringRef();
+        CHECK(from_string.asString() == text);
+
+        const LLSD::Binary bytes(64, 7);
+        LLSD from_binary;
+        from_binary[0] = bytes;
+        from_binary = from_binary[0].asBinary();
+        CHECK(from_binary.asBinary() == bytes);
+    }
+
+    TEST_CASE("LLSD(new): an element set or inserted at the end from its own array", "[LLSD_new]")
+    {
+        // Growing the array moves its elements, the one passed among them.
+        const std::string text("a string long enough to be kept on the heap rather than in place");
+
+        LLSD set = LLSD::emptyArray();
+        set.append(text);
+        set.set(1, set[0]);
+        CHECK(set.size() == 2);
+        CHECK(set[1].asString() == text);
+        CHECK(set[0].asString() == text);
+        set.set(2, std::move(set[0]));
+        CHECK(set.size() == 3);
+        CHECK(set[2].asString() == text);
+
+        LLSD inserted = LLSD::emptyArray();
+        inserted.append(text);
+        inserted.insert(9, inserted[0]);
+        CHECK(inserted.size() == 2);
+        CHECK(inserted[1].asString() == text);
+        CHECK(inserted[0].asString() == text);
+        inserted.insert(1, std::move(inserted[0]));
+        CHECK(inserted.size() == 3);
+        CHECK(inserted[1].asString() == text);
     }
 
     TEST_CASE("LLSD(new): asXMLRPCValue serializes each type", "[LLSD_new]")

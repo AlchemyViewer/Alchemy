@@ -60,6 +60,10 @@
 // File constants
 static const size_t MAX_HDR_LEN = 20;
 static const S32 UNZIP_LLSD_MAX_DEPTH = 96;
+// Deflate expands up to about a thousandfold, so the compressed size bounds
+// nothing a hostile block can make the inflaters allocate. The largest mesh
+// LOD or navmesh a grid serves inflates to tens of megabytes.
+static const llssize UNZIP_LLSD_MAX_SIZE = 256 * 1024 * 1024;
 static const char LEGACY_NON_HEADER[] = "<llsd>";
 const std::string LLSD_BINARY_HEADER("LLSD/Binary");
 const std::string LLSD_XML_HEADER("LLSD/XML");
@@ -392,7 +396,7 @@ S32 LLSDParser::parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max
 {
     mCheckLimits = LLSDSerialize::SIZE_UNLIMITED != max_bytes;
     mMaxBytesLeft = max_bytes;
-    return doParse(istr, data, max_depth);
+    return doParse(istr, data, max_depth < 0 ? DEFAULT_MAX_DEPTH : max_depth);
 }
 
 
@@ -400,7 +404,7 @@ S32 LLSDParser::parse(std::istream& istr, LLSD& data, llssize max_bytes, S32 max
 S32 LLSDParser::parseLines(std::istream& istr, LLSD& data)
 {
     mCheckLimits = false;
-    return doParse(istr, data);
+    return doParse(istr, data, DEFAULT_MAX_DEPTH);
 }
 
 
@@ -540,9 +544,55 @@ void LLSDParser::account(llssize bytes) const
     if(mCheckLimits) mMaxBytesLeft -= bytes;
 }
 
+llssize LLSDParser::sizeBudget() const
+{
+    if (!mCheckLimits)
+    {
+        return LLSDSerialize::SIZE_UNLIMITED;
+    }
+    return llmax(mMaxBytesLeft, (llssize)0);
+}
+
+
+// The notation and binary parsers recurse once per level of nesting, so
+// whatever doParse()'s frame holds is paid again at every level. The helpers
+// with large locals stay out of it.
+#if LL_WINDOWS
+#define LLSD_NOINLINE __declspec(noinline)
+#else
+#define LLSD_NOINLINE __attribute__((noinline))
+#endif
 
 namespace
 {
+    // Reads the len bytes of a sized value into out, which is left holding
+    // what was actually read. A size field is untrusted. Within the parse's
+    // byte budget (budget < 0 is none) it is held to the bytes the caller said
+    // there are, and the buffer is sized from it once. With no budget the
+    // buffer grows with the bytes that arrive rather than being sized from the
+    // field: a few bytes claiming two gigabytes must not allocate them.
+    // Doubling keeps the copying linear in what is read.
+    template <typename Bytes>
+    llssize read_sized(std::istream& istr, Bytes& out, llssize len, llssize budget)
+    {
+        constexpr llssize FIRST_CHUNK = 64 * 1024;
+        const llssize first = (budget >= 0 && len <= budget) ? len : FIRST_CHUNK;
+        llssize got = 0;
+        while (got < len)
+        {
+            const llssize want = llmin(len - got, llmax(got, first));
+            out.resize((size_t)(got + want));
+            const llssize n = (llssize)fullread(istr, (char*)out.data() + got, want);
+            got += n;
+            if (n < want)
+            {
+                break;
+            }
+        }
+        out.resize((size_t)got);
+        return got;
+    }
+
     void scan_digits(std::istream& istr, char*& out, const char* const out_end)
     {
         int c;
@@ -624,6 +674,42 @@ namespace
             }
         }
         return p - buf;
+    }
+
+    // Parses the integer after a notation 'i' into data. False when the
+    // token is malformed or out of range.
+    LLSD_NOINLINE bool parse_notation_integer(std::istream& istr, LLSD& data)
+    {
+        char buf[64];
+        size_t len = scan_integer_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
+        S32 integer = 0;
+        auto [ptr, ec] = std::from_chars(start, buf + len, integer);
+        data = integer;
+        return !numeric_token_truncated(istr, len, sizeof(buf)) &&
+               ec == std::errc() && ptr == buf + len;
+    }
+
+    // Parses the real after a notation 'r' into data. False when the token
+    // is malformed.
+    LLSD_NOINLINE bool parse_notation_real(std::istream& istr, LLSD& data)
+    {
+        char buf[512];
+        size_t len = scan_real_token(istr, buf, sizeof(buf));
+        const char* start = buf;
+        if (len && *start == '+')
+        {
+            ++start; // from_chars does not accept an explicit plus
+        }
+        F64 real = 0.0;
+        auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
+        data = real;
+        return !numeric_token_truncated(istr, len, sizeof(buf)) &&
+               ec == std::errc() && ptr == buf + len;
     }
 }
 
@@ -776,48 +862,22 @@ S32 LLSDNotationParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) c
         break;
 
     case 'i':
-    {
         c = get(istr);
-        char buf[64];
-        size_t len = scan_integer_token(istr, buf, sizeof(buf));
-        const char* start = buf;
-        if (len && *start == '+')
-        {
-            ++start; // from_chars does not accept an explicit plus
-        }
-        S32 integer = 0;
-        auto [ptr, ec] = std::from_chars(start, buf + len, integer);
-        data = integer;
-        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
-            ec != std::errc() || ptr != buf + len)
+        if (!parse_notation_integer(istr, data))
         {
             LL_INFOS() << "STREAM FAILURE reading integer." << LL_ENDL;
             parse_count = PARSE_FAILURE;
         }
         break;
-    }
 
     case 'r':
-    {
         c = get(istr);
-        char buf[512];
-        size_t len = scan_real_token(istr, buf, sizeof(buf));
-        const char* start = buf;
-        if (len && *start == '+')
-        {
-            ++start; // from_chars does not accept an explicit plus
-        }
-        F64 real = 0.0;
-        auto [ptr, ec] = fast_float::from_chars(start, buf + len, real);
-        data = real;
-        if (numeric_token_truncated(istr, len, sizeof(buf)) ||
-            ec != std::errc() || ptr != buf + len)
+        if (!parse_notation_real(istr, data))
         {
             LL_INFOS() << "STREAM FAILURE reading real." << LL_ENDL;
             parse_count = PARSE_FAILURE;
         }
         break;
-    }
 
     case 'u':
     {
@@ -941,7 +1001,7 @@ S32 LLSDNotationParser::parseMap(std::istream& istr, LLSD& map, S32 max_depth) c
                 {
                     putback(istr, (char)c);
                     found_name = true;
-                    auto count = deserialize_string(istr, name, mMaxBytesLeft);
+                    auto count = deserialize_string(istr, name, sizeBudget());
                     if(PARSE_FAILURE == count) return PARSE_FAILURE;
                     account(count);
                 }
@@ -1028,14 +1088,14 @@ bool LLSDNotationParser::parseString(std::istream& istr, LLSD& data) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
     std::string value;
-    auto count = deserialize_string(istr, value, mMaxBytesLeft);
+    auto count = deserialize_string(istr, value, sizeBudget());
     if(PARSE_FAILURE == count) return false;
     account(count);
     data = std::move(value);
     return true;
 }
 
-bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
+LLSD_NOINLINE bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_LLSD;
     // binary: b##"ff3120ab1"
@@ -1057,15 +1117,11 @@ bool LLSDNotationParser::parseBinary(std::istream& istr, LLSD& data) const
         // We probably have a valid raw binary stream. determine
         // the size, and read it.
         auto len = strtol(buf + 2, NULL, 0);
-        // A negative length would sign-extend to a huge resize() request.
         if(len < 0) return false;
-        if(mCheckLimits && (len > mMaxBytesLeft)) return false;
+        const llssize budget = sizeBudget();
+        if(budget >= 0 && len > budget) return false;
         std::vector<U8> value;
-        if(len)
-        {
-            value.resize(len);
-            account(fullread(istr, (char*)value.data(), len));
-        }
+        account(read_sized(istr, value, len, budget));
         c = get(istr); // strip off the trailing double-quote
         if(c != '"') return false;
         data = std::move(value);
@@ -1364,11 +1420,7 @@ S32 LLSDBinaryParser::doParse(std::istream& istr, LLSD& data, S32 max_depth) con
         else
         {
             std::vector<U8> value;
-            if(size > 0)
-            {
-                value.resize(size);
-                account(fullread(istr, (char*)&value[0], size));
-            }
+            account(read_sized(istr, value, size, sizeBudget()));
             data = std::move(value);
         }
         if(istr.fail())
@@ -1508,12 +1560,9 @@ bool LLSDBinaryParser::parseString(
     S32 size = (S32)ntohl(value_nbo);
     if(mCheckLimits && (size > mMaxBytesLeft)) return false;
     if(size < 0) return false;
-    if(size)
-    {
-        value.resize(size);
-        account(fullread(istr, value.data(), size));
-    }
-    return true;
+    const llssize got = read_sized(istr, value, size, sizeBudget());
+    account(got);
+    return got == size;
 }
 
 
@@ -2132,22 +2181,17 @@ llssize deserialize_string_raw(
     char buf[BUF_LEN];      /* Flawfinder: ignore */
     istr.get(buf, BUF_LEN - 1, ')');
     count += istr.gcount();
+    const int close = stream_bump(istr);
     int c = stream_bump(istr);
-    c = stream_bump(istr);
     count += 2;
-    if(((c == '"') || (c == '\'')) && (buf[0] == '('))
+    if(close == ')' && ((c == '"') || (c == '\'')) && (buf[0] == '('))
     {
         // We probably have a valid raw string. determine
         // the size, and read it.
         auto len = strtol(buf + 1, nullptr, 0);
-        // A negative length would sign-extend to a huge resize() request.
         if(len < 0) return LLSDParser::PARSE_FAILURE;
-        if((max_bytes>0)&&(len>max_bytes)) return LLSDParser::PARSE_FAILURE;
-        if(len)
-        {
-            value.resize(len);
-            count += fullread(istr, value.data(), len);
-        }
+        if((max_bytes >= 0) && (len > max_bytes)) return LLSDParser::PARSE_FAILURE;
+        count += read_sized(istr, value, len, max_bytes);
         c = stream_bump(istr);
         ++count;
         if(!((c == '"') || (c == '\'')))
@@ -2468,14 +2512,16 @@ llssize deserialize_boolean(
     //
     llssize bytes_read = 0;
     std::string::size_type ii = 0;
-    char c = (char)stream_peek(istr);
+    // int, not char: a high-bit byte as a negative char is undefined for
+    // tolower(); peek() yields EOF or 0..255, which it takes.
+    int c = stream_peek(istr);
     while((++ii < compare.size())
           && (tolower(c) == (int)compare[ii])
           && istr.good())
     {
         stream_bump(istr);
         ++bytes_read;
-        c = (char)stream_peek(istr);
+        c = stream_peek(istr);
     }
     if(compare.size() != ii)
     {
@@ -2588,12 +2634,21 @@ std::string zip_llsd(LLSD& data)
 // and deserializes from that copy using LLSDSerialize
 LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, std::istream& is, S32 size)
 {
+    if (size <= 0)
+    {
+        return ZR_SIZE_ERROR;
+    }
     std::unique_ptr<U8[]> in = std::unique_ptr<U8[]>(new(std::nothrow) U8[size]);
     if (!in)
     {
         return ZR_MEM_ERROR;
     }
     is.read((char*) in.get(), size);
+    if (is.gcount() != size)
+    {
+        // a short stream would leave the tail of the buffer uninitialised
+        return ZR_SIZE_ERROR;
+    }
 
     return unzip_llsd(data, in.get(), size);
 }
@@ -2602,6 +2657,7 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 {
     U8* result = NULL;
     llssize cur_size = 0;
+    llssize capacity = 0;
     z_stream strm;
 
     constexpr U32 CHUNK = 1024 * 512;
@@ -2661,20 +2717,39 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
         }
 
         U32 have = CHUNK-strm.avail_out;
-
-        U8* new_result = (U8*)realloc(result, cur_size + have);
-        if (new_result == NULL)
+        if (cur_size + have > UNZIP_LLSD_MAX_SIZE)
         {
+            LL_WARNS() << "Refusing to inflate LLSD past " << UNZIP_LLSD_MAX_SIZE
+                       << " bytes from " << size << " compressed" << LL_ENDL;
             inflateEnd(&strm);
-            if (result)
-            {
-                free(result);
-            }
-            return ZR_MEM_ERROR;
+            free(result);
+            return ZR_SIZE_ERROR;
         }
-        result = new_result;
-        memcpy(result+cur_size, out.get(), have);
-        cur_size += have;
+
+        if (cur_size + have > capacity)
+        {
+            // Doubling: growing a chunk at a time copies the whole block again
+            // for every chunk realloc() cannot extend in place.
+            const llssize new_capacity = llmin(llmax(capacity * 2, cur_size + (llssize)have),
+                                               UNZIP_LLSD_MAX_SIZE);
+            U8* new_result = (U8*)realloc(result, new_capacity);
+            if (new_result == NULL)
+            {
+                inflateEnd(&strm);
+                if (result)
+                {
+                    free(result);
+                }
+                return ZR_MEM_ERROR;
+            }
+            result = new_result;
+            capacity = new_capacity;
+        }
+        if (have > 0)
+        {
+            memcpy(result+cur_size, out.get(), have);
+            cur_size += have;
+        }
 
     } while (ret == Z_OK);
 
@@ -2707,14 +2782,18 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
 //and trailers are different for the formats.
 U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size )
 {
-    if (size == 0)
+    valid = false;
+    if (size <= 0)
     {
         LL_WARNS() << "No data to unzip." << LL_ENDL;
         return NULL;
     }
 
     U8* result = NULL;
-    U32 cur_size = 0;
+    // size_t, not U32: a U32 total wraps past 4 GB, and the realloc() then
+    // shrinks the buffer the next memcpy() writes past.
+    size_t cur_size = 0;
+    size_t capacity = 0;
     z_stream strm;
 
     const U32 CHUNK = 0x4000;
@@ -2726,6 +2805,12 @@ U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size 
         return NULL;
     }
     is.read((char*) in, size);
+    if (is.gcount() != size)
+    {
+        LL_WARNS() << "Navmesh block is shorter than its size." << LL_ENDL;
+        delete [] in;
+        return NULL;
+    }
 
     U8 out[CHUNK];
 
@@ -2765,33 +2850,54 @@ U8* unzip_llsdNavMesh( bool& valid, size_t& outsize, std::istream& is, S32 size 
         }
 
         U32 have = CHUNK-strm.avail_out;
-
-        U8* new_result = (U8*) realloc(result, cur_size + have);
-        if (new_result == NULL)
+        if (cur_size + have > (size_t)UNZIP_LLSD_MAX_SIZE)
         {
-            LL_WARNS() << "Failed to unzip LLSD NavMesh block: can't reallocate memory, current size: " << cur_size
-                << " bytes; requested " << cur_size + have
-                << " bytes; total syze: ." << size << " bytes."
-                << LL_ENDL;
+            LL_WARNS() << "Refusing to inflate a navmesh past " << UNZIP_LLSD_MAX_SIZE
+                       << " bytes from " << size << " compressed" << LL_ENDL;
             inflateEnd(&strm);
-            if (result)
-            {
-                free(result);
-            }
+            free(result);
             delete[] in;
-            valid = false;
             return NULL;
         }
-        result = new_result;
-        memcpy(result+cur_size, out, have);
-        cur_size += have;
+
+        if (cur_size + have > capacity)
+        {
+            // doubling, as unzip_llsd() does
+            const size_t new_capacity = llmin(llmax(capacity * 2, cur_size + have),
+                                              (size_t)UNZIP_LLSD_MAX_SIZE);
+            U8* new_result = (U8*) realloc(result, new_capacity);
+            if (new_result == NULL)
+            {
+                LL_WARNS() << "Failed to unzip LLSD NavMesh block: can't reallocate memory, current size: " << cur_size
+                    << " bytes; requested " << new_capacity
+                    << " bytes; total syze: ." << size << " bytes."
+                    << LL_ENDL;
+                inflateEnd(&strm);
+                if (result)
+                {
+                    free(result);
+                }
+                delete[] in;
+                valid = false;
+                return NULL;
+            }
+            result = new_result;
+            capacity = new_capacity;
+        }
+        if (have > 0)
+        {
+            memcpy(result+cur_size, out, have);
+            cur_size += have;
+        }
 
     } while (ret == Z_OK);
 
     inflateEnd(&strm);
     delete [] in;
 
-    if (ret != Z_STREAM_END)
+    // A stream that inflates to nothing is no navmesh, and leaves no buffer to
+    // hand back: the caller reads the first byte of a valid one.
+    if (ret != Z_STREAM_END || cur_size == 0)
     {
         free(result);
         valid = false;
