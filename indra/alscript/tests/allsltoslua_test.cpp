@@ -272,6 +272,7 @@ namespace
     {
         const ALLSLToSLua::Result r = require_converted("default { state_entry() {\n"
                                                         "    integer a = 7; integer b = 2; float f = 1.5; string s = \"x\"; list l = [1, 2];\n"
+                                                        "    if (llGetLinkNumber()) { a = -a; b = -b; }\n"
                                                         "    integer same = a == b;\n"
                                                         "    if (a) llOwnerSay(\"a\");\n"
                                                         "    if (s) llOwnerSay(\"said\");\n"
@@ -4665,6 +4666,237 @@ namespace
         UNSCOPED_INFO("a key that holds a UUID given on to text, made text there");
         CHECK(has(r, "local owner: uuid = ll.GetOwner()"));
         CHECK(has(r, "gOwner = tostring(owner)"));
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key function that returns text returns it as text", "[ALLSLToSLua]")
+    {
+        // Tapple's, with the global given each way they tried.
+        const std::string body = "onDriverChange(key newDriver) {\n"
+                                 "    driver = newDriver;\n"
+                                 "    if (driver == \"\") {\n"
+                                 "        llOwnerSay(\"no driver\");\n"
+                                 "    } else {\n"
+                                 "        llOwnerSay(\"driver\");\n"
+                                 "    }\n"
+                                 "}\n"
+                                 "onStateChange(string value) {\n"
+                                 "    onDriverChange(value);\n"
+                                 "}\n"
+                                 "key newDriver() {\n"
+                                 "    return \"\";\n"
+                                 "}\n"
+                                 "key owner() {\n"
+                                 "    return llGetOwner();\n"
+                                 "}\n"
+                                 "key echo(string s) {\n"
+                                 "    return s;\n"
+                                 "}\n"
+                                 "key passed(string s) {\n"
+                                 "    return s;\n"
+                                 "}\n"
+                                 "default {\n"
+                                 "    state_entry() {\n"
+                                 "        onStateChange(newDriver());\n"
+                                 "        key o = owner();\n"
+                                 "        llGiveInventory(echo(llGetObjectDesc()), \"x\");\n"
+                                 "        driver = passed(llGetObjectDesc());\n"
+                                 "    }\n"
+                                 "}\n";
+        ALLSLToSLua::Options o;
+        o.types = true;
+        for (const char* global : { "key driver = \"\";\n", "key driver;\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
+            CAPTURE(global, r.text);
+            REQUIRE(r.converted);
+            {
+                INFO("the function's \"\" kept, and handed on as it is");
+                CHECK(has(r, "local function newDriver(): string\n"));
+                CHECK(has(r, "    return \"\"\n"));
+                CHECK(has(r, "onStateChange(newDriver())\n"));
+                CHECK_FALSE(has(r, "tostring(newDriver())"));
+                CHECK_FALSE(has(r, "uuid(\"\")"));
+            }
+            {
+                INFO("the driver, its parameter, and the string param, all text");
+                CHECK(has(r, "local driver: string = \"\"\n"));
+                CHECK(has(r, "local function onDriverChange(newDriver: string)"));
+                CHECK(has(r, "    onDriverChange(value)\n"));
+            }
+            {
+                INFO("one returning a UUID, a uuid");
+                CHECK(has(r, "local function owner(): uuid\n"));
+                CHECK(has(r, "local o: uuid = owner()\n"));
+            }
+            {
+                INFO("one that may hold any text, a uuid unless given on to text");
+                CHECK(has(r, "local function echo(s: string): uuid\n"));
+                CHECK(has(r, "    return uuid(s)\n"));
+                CHECK(has(r, "local function passed(s: string): string\n"));
+                CHECK(has(r, "    return s\n"));
+                CHECK(has(r, "driver = passed(ll.GetObjectDesc())\n"));
+            }
+            require_checks_clean(r);
+        }
+        for (const char* global : { "key driver = NULL_KEY;\n", "key driver = \"00000000-0000-0000-0000-000000000000\";\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
+            CAPTURE(global, r.text);
+            REQUIRE(r.converted);
+            {
+                INFO("a driver held as a uuid: the \"\" made one on the way in, and compared as one");
+                CHECK(has(r, "local function newDriver(): string\n"));
+                CHECK(has(r, "onStateChange(newDriver())\n"));
+                CHECK(has(r, "    onDriverChange(uuid(value))\n"));
+                CHECK(has(r, "if driver == uuid(\"\") then"));
+            }
+            require_checks_clean(r);
+        }
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key held as text looked for among uuids is looked for as one", "[ALLSLToSLua]")
+    {
+        // Tapple's: a uuid kept, sent as a link message's id, and looked
+        // for again in the list by the id SLua passes as text.
+        const std::string lsl = "list l = [];\n"
+                                "list seen;\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        key k = llGenerateKey();\n"
+                                "        key none = NULL_KEY;\n"
+                                "        l += [k, none];\n"
+                                "        llMessageLinked(LINK_SET, 0, \"\", k);\n"
+                                "        llMessageLinked(LINK_SET, 0, \"\", \"\");\n"
+                                "    }\n"
+                                "    link_message(integer sender_num, integer num, string str, key id) {\n"
+                                "        integer i = llListFindList(l, [id]);\n"
+                                "        if (~i) {\n"
+                                "            llOwnerSay(\"found\");\n"
+                                "        }\n"
+                                "        if (llListFindList(l, [id]) != -1) llOwnerSay(\"again\");\n"
+                                "        if (llListFindList(seen, [id]) == -1) seen += [id];\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("among uuids: the uuid made of it, or the text where it is none, or \"\", which finds no NULL_KEY");
+            CHECK(has(r, "local i: number = (table.find(l, if id == \"\" then id else touuid(id) or id) or 0) - 1\n"));
+            CHECK(has(r, "if table.find(l, if id == \"\" then id else touuid(id) or id) ~= nil then"));
+        }
+        UNSCOPED_INFO("among keys held as text, as it is");
+        CHECK(has(r, "if table.find(seen, id) == nil then"));
+        require_checks_clean(r);
+
+        o.uuidKeys                    = false;
+        const ALLSLToSLua::Result off = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(off.text);
+        REQUIRE(off.converted);
+        UNSCOPED_INFO("every key text: as it is");
+        CHECK(has(off, "local i: number = (table.find(l, id) or 0) - 1\n"));
+        CHECK_FALSE(has(off, "touuid(id)"));
+        require_checks_clean(off);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a jump after an inner loop is its outer loop's break or continue", "[ALLSLToSLua]")
+    {
+        // Tapple's: the second jump end follows the for inside the while.
+        const std::string lsl = "default { state_entry() {\n"
+                                "    list sync = [1, 4];\n"
+                                "    integer invCount = llGetInventoryNumber(INVENTORY_NOTECARD);\n"
+                                "    integer i;\n"
+                                "    while (TRUE) {\n"
+                                "        if (5 >= invCount) {\n"
+                                "            jump end;\n"
+                                "        } else {\n"
+                                "            for (; i < invCount; i++) {\n"
+                                "                string invName = llGetInventoryName(INVENTORY_NOTECARD, i);\n"
+                                "            }\n"
+                                "            jump end;\n"
+                                "        }\n"
+                                "    }\n"
+                                "    @end;\n"
+                                "    integer n;\n"
+                                "    while (n < 10) {\n"
+                                "        n++;\n"
+                                "        while (llFrand(1.0) < 0.5) { llOwnerSay(\"spin\"); }\n"
+                                "        if (n == 5) jump next;\n"
+                                "        do { llOwnerSay(\"a\"); } while (FALSE);\n"
+                                "        while (llFrand(1.0) < 0.5) { if (n == 7) jump out; }\n"
+                                "        llOwnerSay((string)n);\n"
+                                "        @next;\n"
+                                "    }\n"
+                                "    @out;\n"
+                                "    llOwnerSay(\"done\");\n"
+                                "} }\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: both jumps a break, and the label gone");
+            CHECK(count(r, "break\n") == 2);
+            CHECK_FALSE(has(r, "-- jump end"));
+            CHECK_FALSE(has(r, "-- @end"));
+        }
+        UNSCOPED_INFO("after two inner loops, a jump to the end of the body its continue");
+        CHECK(has(r, "if n == 5 then continue end"));
+        {
+            INFO("out of two loops at once, still noted");
+            CHECK(has(r, "-- jump out"));
+            CHECK(has(r, "-- @out"));
+            CHECK(noted(r, "SluaJump"));
+        }
+        require_checks_clean(r);
+    }
+
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a quotient of numbers never below nought is rounded down by //", "[ALLSLToSLua]")
+    {
+        const std::string lsl = "integer PARTICIPANTS_STRIDE = 3;\n"
+                                "list participants;\n"
+                                "printFreeMemory() {\n"
+                                "    integer freemem = llGetFreeMemory();\n"
+                                "    integer memory = (integer)((float)freemem * 100.0 / llGetMemoryLimit());\n"
+                                "    llOwnerSay(llGetScriptName() + \": \" + (string)memory + \"% memory free (\" + (string)freemem + \" Bytes)\");\n"
+                                "}\n"
+                                "integer last(integer stride, float scale) {\n"
+                                "    integer i = llGetListLength(participants) / PARTICIPANTS_STRIDE - 1;\n"
+                                "    integer k = llGetListLength(participants) / stride;\n"
+                                "    integer left = llGetListLength(participants) % PARTICIPANTS_STRIDE;\n"
+                                "    integer used = llGetUsedMemory();\n"
+                                "    used = used - 70000;\n"
+                                "    integer part = (integer)((float)used / 2.0);\n"
+                                "    integer scaled = (integer)(scale / 2.0);\n"
+                                "    return i + k + left + part + scaled;\n"
+                                "}\n"
+                                "default { state_entry() { printFreeMemory(); llOwnerSay((string)last(2, 1.5)); } }\n";
+        ALLSLToSLua::Options o;
+        o.types                     = true;
+        const ALLSLToSLua::Result r = ALLSLToSLua::convert(lsl, o);
+        CAPTURE(r.text);
+        REQUIRE(r.converted);
+        {
+            INFO("Tapple's: a list's length over a global never set; and what is left over");
+            CHECK(has(r, "local i: number = #participants // PARTICIPANTS_STRIDE - 1\n"));
+            CHECK(has(r, "local left: number = #participants % PARTICIPANTS_STRIDE\n"));
+        }
+        {
+            INFO("Tapple's: a float quotient cut, from a local never set again and ll's limit");
+            CHECK(has(r, "local memory: number = freemem * 100.0 // ll.GetMemoryLimit()\n"));
+            CHECK_FALSE(has(r, "bit32.s32(freemem"));
+        }
+        {
+            INFO("a divisor that may be below nought, a local set again, a parameter: toward nought as before");
+            CHECK(has(r, "local k: number = bit32.s32(#participants / stride)\n"));
+            CHECK(has(r, "local part: number = bit32.s32(used / 2.0)\n"));
+            CHECK(has(r, "local scaled: number = bit32.s32(scale / 2.0)\n"));
+            CHECK(noted(r, "SluaFloatToInteger"));
+        }
         require_checks_clean(r);
     }
 

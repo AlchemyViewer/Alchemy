@@ -3809,7 +3809,17 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
     LLFloater::setFloaterHost(NULL);
     if (multi_previewp)
     {
-        multi_previewp->openFloater(LLSD());
+        // Nothing went into it where every item opened in a window of its
+        // own -- scripts, in the studio: let go of unopened, so that it
+        // neither sounds nor takes the keyboard from them.
+        if (multi_previewp->getFloaterCount() > 0)
+        {
+            multi_previewp->openFloater(LLSD());
+        }
+        else
+        {
+            multi_previewp->closeFloater();
+        }
     }
     else if (multi_itempropertiesp)
     {

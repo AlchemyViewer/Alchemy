@@ -305,6 +305,18 @@ namespace
         }
     }
 
+    TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: SLua's functions fold from their own line after an end", "[alcodeeditor]")
+    {
+        ALCodeEditor& e = make("local function a()\nend\n\nfunction LLEvents.touch_start(n)\n    x()\nend\n", "slua");
+        std::string   out;
+        for (const ALCodeEditor::FoldRegion& region : e.foldRegions())
+        {
+            out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+        }
+        UNSCOPED_INFO("the handler from its function, not from the end above it");
+        CHECK(out == std::string("0-1 3-5"));
+    }
+
     TEST_CASE_METHOD(alcodeeditor_data, "alcodeeditor: completion offers document and grammar words and puts the choice in", "[alcodeeditor]")
     {
         ALCodeEditor& e = make("integer count;\nllSay(0, co");

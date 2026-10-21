@@ -141,10 +141,15 @@ const ALFoldModel::Line& ALFoldModel::lineAt(const ALTextDocument& doc, S32 line
     if (mBlocks && !body.empty())
     {
         mBlocks(line, entry.blocks);
-        const S32 first = static_cast<S32>(lead);
+        // A bracket the line begins with stands under the header above it,
+        // as a brace under `default` does. A word that opens a block --
+        // `function`, `repeat` -- begins a statement, which folds from its
+        // own line, whatever ended above it.
+        const size_t first = lead;
         for (Block& block : entry.blocks)
         {
-            block.first = block.column == first;
+            const size_t at = static_cast<size_t>(block.column);
+            block.first     = at == first && at < text.size() && (text[at] == '{' || text[at] == '(' || text[at] == '[');
         }
     }
     return entry;

@@ -28,6 +28,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <string>
 
 namespace
@@ -323,6 +324,48 @@ namespace
         CHECK(folds.openAt(doc, 4, 2, 8) == std::vector<S32>({ 0, 1 }));
         UNSCOPED_INFO("the innermost alone the list's");
         CHECK(folds.openAt(doc, 4, 2, 1) == std::vector<S32>({ 1 }));
+    }
+
+    TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: a word that begins its line opens a block there, not under the end above", "[alfoldmodel]")
+    {
+        const ALTextDocument doc("local function a()\nend\n\nfunction LLEvents.touch_start(n)\n    x()\nend\nrepeat\n    y()\nuntil z\n");
+        ALFoldModel          folds;
+        // As SLua's grammar has them: `function` and `repeat` open, `end`
+        // and `until` close, and the brackets.
+        folds.setSyntax(
+            [&doc](S32 line, std::vector<ALFoldModel::Block>& out) {
+                const std::string& text = doc.line(line);
+                for (const char* word : { "function", "repeat", "end", "until" })
+                {
+                    const size_t at = text.find(word);
+                    if (at != std::string::npos)
+                    {
+                        const bool opens = word[0] == 'f' || word[0] == 'r';
+                        out.push_back({ static_cast<S32>(at), opens ? ALFoldModel::Event::Open : ALFoldModel::Event::Close });
+                    }
+                }
+                for (S32 i = 0; i < static_cast<S32>(text.size()); ++i)
+                {
+                    const char c = text[static_cast<size_t>(i)];
+                    if (c == '(' || c == ')')
+                    {
+                        out.push_back({ i, c == '(' ? ALFoldModel::Event::Open : ALFoldModel::Event::Close });
+                    }
+                }
+                std::stable_sort(out.begin(), out.end(), [](const ALFoldModel::Block& l, const ALFoldModel::Block& r) { return l.column < r.column; });
+            },
+            nullptr);
+        std::string out;
+        for (const ALFoldModel::Region& region : folds.regions(doc, 4))
+        {
+            out += (out.empty() ? "" : " ") + std::to_string(region.start) + "-" + std::to_string(region.end);
+        }
+        UNSCOPED_INFO("each from its own line: the handler's not from the end above it, the repeat's not from that end");
+        CHECK(out == std::string("0-1 3-5 6-8"));
+        UNSCOPED_INFO("the handler's line pinned over its body");
+        CHECK(folds.openAt(doc, 4, 4, 3) == std::vector<S32>({ 3 }));
+        UNSCOPED_INFO("the repeat's over its");
+        CHECK(folds.openAt(doc, 4, 7, 3) == std::vector<S32>({ 6 }));
     }
 
     TEST_CASE_METHOD(alfoldmodel_data, "alfoldmodel: syntax blocks are read once and again only for lines relexed", "[alfoldmodel]")
