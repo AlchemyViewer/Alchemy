@@ -4764,8 +4764,10 @@ namespace
                                 "default {\n"
                                 "    state_entry() {\n"
                                 "        key k = llGenerateKey();\n"
-                                "        l += [k];\n"
+                                "        key none = NULL_KEY;\n"
+                                "        l += [k, none];\n"
                                 "        llMessageLinked(LINK_SET, 0, \"\", k);\n"
+                                "        llMessageLinked(LINK_SET, 0, \"\", \"\");\n"
                                 "    }\n"
                                 "    link_message(integer sender_num, integer num, string str, key id) {\n"
                                 "        integer i = llListFindList(l, [id]);\n"
@@ -4782,9 +4784,9 @@ namespace
         CAPTURE(r.text);
         REQUIRE(r.converted);
         {
-            INFO("among uuids: the uuid made of it, or the text where it is none");
-            CHECK(has(r, "local i: number = (table.find(l, touuid(id) or id) or 0) - 1\n"));
-            CHECK(has(r, "if table.find(l, touuid(id) or id) ~= nil then"));
+            INFO("among uuids: the uuid made of it, or the text where it is none, or \"\", which finds no NULL_KEY");
+            CHECK(has(r, "local i: number = (table.find(l, if id == \"\" then id else touuid(id) or id) or 0) - 1\n"));
+            CHECK(has(r, "if table.find(l, if id == \"\" then id else touuid(id) or id) ~= nil then"));
         }
         UNSCOPED_INFO("among keys held as text, as it is");
         CHECK(has(r, "if table.find(seen, id) == nil then"));
@@ -4796,7 +4798,7 @@ namespace
         REQUIRE(off.converted);
         UNSCOPED_INFO("every key text: as it is");
         CHECK(has(off, "local i: number = (table.find(l, id) or 0) - 1\n"));
-        CHECK_FALSE(has(off, "touuid(id) or id"));
+        CHECK_FALSE(has(off, "touuid(id)"));
         require_checks_clean(off);
     }
 

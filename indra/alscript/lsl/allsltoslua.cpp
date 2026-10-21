@@ -6654,7 +6654,8 @@ namespace
         // A key SLua holds as text -- link_message's id -- looked for in a
         // list whose keys are all uuids: LSL found a key among the keys by
         // its text, so the uuid made of it, or the text where it is no
-        // UUID. touuid("") is NULL_KEY, which LSL's "" was not.
+        // UUID. Not for "", which touuid makes NULL_KEY: LSL's "" found no
+        // NULL_KEY, and the text finds no uuid.
         const std::string text = itemText(item);
         if (!mOptions.uuidKeys || item->getNodeType() == NODE_CONSTANT)
         {
@@ -6664,7 +6665,7 @@ namespace
         const U8 held = itemTypes(list);
         if (wholeVariable(e) && e->getIType() == LST_KEY && slType(e) == LST_STRING && (held & ItemKey) != 0 && (held & ItemString) == 0)
         {
-            return "touuid(" + text + ") or " + text;
+            return "if " + text + " == \"\" then " + text + " else touuid(" + text + ") or " + text;
         }
         return text;
     }
