@@ -2309,6 +2309,13 @@ void LLGLManager::initQueries()
     mHasPipelineStatistics    = mGLVersion >= 4.59f || mGLExtensions.contains("GL_ARB_pipeline_statistics_query");
     mHasQueryBufferObject     = mGLVersion >= 4.39f || mGLExtensions.contains("GL_ARB_query_buffer_object");
 
+    // The GPU writes the results only on NVIDIA's driver, whose threaded optimization answers a glGetQueryObject only
+    // once its own thread has caught up on the frame. Elsewhere a write costs more than the ask it saves: radeonsi runs
+    // an internal compute dispatch for each, behind a wait for the query and cache flushes, and from Mesa 25.3 each one
+    // also keeps a reference to the compute constant buffer bound before it (si_restore_qbo_state), which runs its
+    // 32-bit address space out within minutes and aborts the process.
+    mWritesQueryResults = mHasQueryBufferObject && mIsNVIDIA;
+
     GLint bits = 0;
     glGetQueryiv(GL_TIMESTAMP, GL_QUERY_COUNTER_BITS, &bits);
     mHasTimestampQuery = bits > 0;
@@ -2316,7 +2323,8 @@ void LLGLManager::initQueries()
     LL_INFOS("RenderInit") << "Queries: conservative occlusion " << (mHasConservativeOcclusion ? "yes" : "no")
                            << ", timestamps " << bits << " bits, pipeline statistics "
                            << (mHasPipelineStatistics ? "yes" : "no") << ", query buffers "
-                           << (mHasQueryBufferObject ? "yes" : "no") << LL_ENDL;
+                           << (mHasQueryBufferObject ? "yes" : "no") << ", results written by the GPU "
+                           << (mWritesQueryResults ? "yes" : "no") << LL_ENDL;
 }
 
 // Here rather than in initExtensions, whose version ladder returns before its end on any context below 4.6: this

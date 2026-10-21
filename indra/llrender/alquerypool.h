@@ -101,13 +101,13 @@ private:
 /// their own: a user that reads its queries only every few frames, as the object cache's cull does while the camera
 /// rests (LLVOCachePartition::cull), still finds them. Past that a ticket has expired.
 ///
-/// Where the context has query buffers (gGLManager.mHasQueryBufferObject), endFrame() has the GPU write the batch's
-/// results into a mapped buffer of the batch's own, ahead of the frame's fence, and reading the batch copies them out
-/// of the map: no GL call. The writes are queued as any draw is where the context has direct state access; through the
-/// buffer binding they are calls Mesa's glthread runs only once it has caught up, each one. Asking GL for a result
-/// instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as NVIDIA's with threaded
-/// optimization, answers it only once its own thread has caught up on every command issued before it, which at the end
-/// of a frame is the whole frame.
+/// Where the session has the GPU write the results (gGLManager.mWritesQueryResults: query buffers, on NVIDIA's driver),
+/// endFrame() has it write the batch's results into a mapped buffer of the batch's own, ahead of the frame's fence, and
+/// reading the batch copies them out of the map: no GL call. The writes are queued as any draw is where the context has
+/// direct state access; through the buffer binding they are calls Mesa's glthread runs only once it has caught up, each
+/// one. Asking GL for a result instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as
+/// NVIDIA's with threaded optimization, answers it only once its own thread has caught up on every command issued
+/// before it, which at the end of a frame is the whole frame. Elsewhere the batch's results are asked of GL.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is

@@ -156,6 +156,10 @@ public:
     // GL_QUERY_BUFFER: glGetQueryObject writes a result into the buffer bound there, by the GPU, rather than returning
     // it to the CPU. Core in 4.4, also GL_ARB_query_buffer_object.
     bool mHasQueryBufferObject = false;
+    // Whether the query pool has the GPU write its results through GL_QUERY_BUFFER, rather than asking GL for them: on
+    // NVIDIA's driver alone, where asking waits on its threaded optimization (ALQueryPool). What the session does, not
+    // what the context can.
+    bool mWritesQueryResults = false;
     // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
     // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
     // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,
