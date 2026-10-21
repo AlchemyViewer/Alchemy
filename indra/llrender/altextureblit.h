@@ -43,8 +43,8 @@ public:
 
     // Copy the `width` x `height` rectangle at the origin of `src`, a texture of `src_target` (GL_TEXTURE_2D or
     // GL_TEXTURE_RECTANGLE), into the same rectangle of `dst`, a GL_TEXTURE_2D, texel for texel, its rows in the
-    // opposite order where `flip_y`. What gGL has batched is drawn first. Neither texture stays attached, and the
-    // framebuffer bound before (LLRenderTarget::sCurFBO) is bound again.
+    // opposite order where `flip_y`. What gGL has batched is drawn first, and the scissor does not clip the copy.
+    // Neither texture stays attached, and the framebuffer bound before (LLRenderTarget::sCurFBO) is bound again.
     void blit(U32 src_target, U32 src, U32 dst, S32 width, S32 height, bool flip_y);
 
     // Delete the framebuffers, if any. Call from a teardown that still has the context; the destructor calls it as a

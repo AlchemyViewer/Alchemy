@@ -54,9 +54,13 @@ void ALTextureBlit::blit(U32 src_target, U32 src, U32 dst, S32 width, S32 height
     glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mDrawFBO);
     glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dst, 0);
 
-    glBlitFramebuffer(0, 0, width, height,
-                      0, flip_y ? height : 0, width, flip_y ? 0 : height,
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    {
+        // glBlitFramebuffer writes only where the scissor test passes.
+        LLGLDisable scissor(GL_SCISSOR_TEST);
+        glBlitFramebuffer(0, 0, width, height,
+                          0, flip_y ? height : 0, width, flip_y ? 0 : height,
+                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
 
     // Detached, so neither framebuffer keeps a texture its owner may delete or hand to another context.
     glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, src_target, 0, 0);

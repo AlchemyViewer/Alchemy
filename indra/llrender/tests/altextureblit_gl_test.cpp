@@ -28,6 +28,7 @@
 #include "../altextureblit.h"
 #include "../llgl.h"
 #include "../llglheaders.h"
+#include "../llglstates.h"
 #include "../llrender.h"
 #include "../llrendertarget.h"
 
@@ -157,6 +158,24 @@ namespace
         {
             CAPTURE(y);
             CHECK(dstRow(y) == rowColour(H - 1 - y));
+        }
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A scissor in force does not clip the copy, and is in force again after it.
+    TEST_CASE_METHOD(altextureblit_data, "altextureblit_gl: the scissor does not clip the copy", "[altextureblit_gl]")
+    {
+        setUp(GL_TEXTURE_2D);
+        {
+            LLGLSScissor corner(0, 0, 1, 1);
+            mBlit.blit(GL_TEXTURE_2D, mSrc, mDst, W, H, false);
+            UNSCOPED_INFO("the scissor test is on again");
+            CHECK(glIsEnabled(GL_SCISSOR_TEST) == GL_TRUE);
+        }
+        for (S32 y = 0; y < H; ++y)
+        {
+            CAPTURE(y);
+            CHECK(dstRow(y) == rowColour(y));
         }
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
