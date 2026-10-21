@@ -45,7 +45,7 @@
 
 namespace
 {
-    // LLVOSky's HEAVENLY_BODY_DIST, and the sun's disk radius.
+    // ALSky's HEAVENLY_BODY_DIST, and the sun's disk radius.
     constexpr F32 BODY_DISTANCE   = 1004.f;
     constexpr F32 SUN_DISK_RADIUS = 0.5f;
 
@@ -59,6 +59,28 @@ namespace
     LLVector3 dome(const LLVector3& agent)
     {
         return ALFarPlane::skyFrame(agent);
+    }
+
+    // The texture coordinates, unclipped, where @a dir, a direction from the camera in the dome's frame, meets the
+    // plane of @a quad (ALSkyLayers::rayQuad's), as deferred/skyBodiesF.glsl's skyQuadCoord works them out; false, and
+    // the coordinates unset, where it runs parallel to the plane or away from it.
+    bool quadCoord(const std::array<LLVector3, 3>& quad, const LLVector3& dir, F32& u, F32& v)
+    {
+        const LLVector3 normal = quad[1] % quad[2];
+        const F32 facing = dir * normal;
+        if (fabsf(facing) < 1e-12f)
+        {
+            return false;
+        }
+        const F32 t = (quad[0] * normal) / facing;
+        if (t <= 0.f)
+        {
+            return false;
+        }
+        const LLVector3 offset = dir * t - quad[0];
+        u = (offset * quad[1]) * 0.5f + 0.5f;
+        v = (offset * quad[2]) * 0.5f + 0.5f;
+        return true;
     }
 }
 
@@ -121,7 +143,7 @@ TEST_CASE("alskylayers: a ray meets a quad at the texture coordinates of the poi
             const LLVector3 point = (i < 4 ? c[i] : (c[0] + c[3]) * 0.5f) + offset;
             F32 u = -1.f;
             F32 v = -1.f;
-            REQUIRE(ALSkyLayers::quadCoord(quad, dome(point / point.length()), u, v));
+            REQUIRE(quadCoord(quad, dome(point / point.length()), u, v));
             CHECK(fabsf(u - expected[i][0]) < 1e-4f);
             CHECK(fabsf(v - expected[i][1]) < 1e-4f);
         }
@@ -129,9 +151,9 @@ TEST_CASE("alskylayers: a ray meets a quad at the texture coordinates of the poi
         // A ray away from the quad, or along its plane, misses it.
         F32 u = 0.f;
         F32 v = 0.f;
-        CHECK_FALSE(ALSkyLayers::quadCoord(quad, dome(-dir), u, v));
+        CHECK_FALSE(quadCoord(quad, dome(-dir), u, v));
         const LLVector3 along = (c[2] - c[0]) / (c[2] - c[0]).length();
-        CHECK_FALSE(ALSkyLayers::quadCoord(quad, dome(along), u, v));
+        CHECK_FALSE(quadCoord(quad, dome(along), u, v));
     }
 
     // The dome's frame is the agent's (east, north, up) turned to (north, up, east).

@@ -53,7 +53,6 @@
 #include "llviewershadermgr.h"
 
 #include "llhudtext.h"
-#include "llsky.h"
 #include "llvieweraudio.h"
 #include "llviewermenu.h"
 #include "llviewertexturelist.h"
@@ -74,7 +73,6 @@
 #include "llerrorcontrol.h"
 #include "llappviewer.h"
 #include "llmemory.h"
-#include "llvowlsky.h"
 #include "alsamplerstate.h"
 #include "llrender.h"
 #include "llnavigationbar.h"
@@ -430,7 +428,7 @@ const F32 MIN_USER_FOG_RATIO = 0.5f;
 static bool handleFogRatioChanged(const LLSD& newvalue)
 {
     F32 fog_ratio = llmax(MIN_USER_FOG_RATIO, llmin((F32) newvalue.asReal(), MAX_USER_FOG_RATIO));
-    gSky.setFogRatio(fog_ratio);
+    gPipeline.mSky.setFogRatio(fog_ratio);
     return true;
 }
 

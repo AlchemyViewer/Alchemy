@@ -57,8 +57,7 @@ public:
         // before grass, so grass should be the first alpha masked pool.  Other ordering should be done
         // based on fill rate and likelihood to occlude future passes (faster, large occluders first).
         //
-        POOL_SKY = 1,
-        POOL_WATEREXCLUSION,
+        POOL_WATEREXCLUSION = 1,
         POOL_SIMPLE,
         POOL_FULLBRIGHT,
         POOL_BUMP,
@@ -72,7 +71,6 @@ public:
         POOL_FULLBRIGHT_ALPHA_MASK,
         POOL_AVATAR,
         POOL_CONTROL_AV, // Animesh
-        POOL_WL_SKY, // after every opaque pool, so the depth test spares it all they cover
         POOL_GLOW,
         POOL_ALPHA_PRE_WATER,
         POOL_VOIDWATER,
@@ -140,7 +138,7 @@ public:
 // the pass renders at the wrong gamma.
 //
 // Converted: diffuse, diffusealphamask (incl. grass), bump, tree, terrain, materials,
-// avatar skin, PBR. The remaining raw writers -- the WL sky family, the avatar
+// avatar skin, PBR. The remaining raw writers -- the stars (ALSky::renderStars), the avatar
 // impostor/rigid passes, and the parcel-owner overlay -- opt OUT of the hoisted encode
 // locally and keep the AnisoWrap default on their samples.
 //
@@ -403,7 +401,7 @@ public:
     // AnisoWrap, plus the SRGBDecode bit when the program's mLinearDiffuse (the
     // LINEAR_DIFFUSE permutation) says the pass shades in linear. The matching re-encode
     // on store comes from the deferred pass's hoisted GL_FRAMEBUFFER_SRGB
-    // (renderGeomDeferred); raw pass-through writers -- the WL sky family, the avatar
+    // (renderGeomDeferred); raw pass-through writers -- the stars (ALSky::renderStars), the avatar
     // impostor/rigid passes -- opt out of that encode locally and keep undecoded samples,
     // letting the lighting pass's decoded read close the loop instead.
     static void bindIndexedTextures(const LLDrawInfo& params, const LLGLSLShader* shader);

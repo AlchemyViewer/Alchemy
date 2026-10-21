@@ -54,8 +54,9 @@ uniform mat3      skyHdriRotation;
 uniform float     skyHdriScale;
 uniform float     hdri_split_screen;
 
-// The stars' attachment of the G-buffer (LLDrawPoolWLSky::renderStarsDeferred), cleared to black where nothing else
-// writes it: the emissive buffer, or the sRGB albedo, read decoded.
+// The stars' attachment of the G-buffer (ALSky::renderStars, ALSkyLayers::starAttachment): the emissive buffer, or the
+// sRGB albedo, read decoded. It is cleared to black, where nothing else writes it, only in a view that draws the stars,
+// and read only there.
 #if defined(HAS_EMISSIVE)
 uniform sampler2D emissiveRect;
 #else

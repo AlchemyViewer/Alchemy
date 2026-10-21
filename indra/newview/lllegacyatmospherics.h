@@ -270,8 +270,6 @@ protected:
     bool                mInitialized;
     LLVector3           mLastLightingDirection;
     LLColor3            mLastTotalAmbient;
-    F32                 mAmbientScale;
-    LLColor3            mNightColorShift;
     F32                 mInterpVal;
     LLColor4            mFogColor;
     LLColor4            mGLFogCol;

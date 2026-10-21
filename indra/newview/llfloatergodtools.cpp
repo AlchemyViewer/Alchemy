@@ -52,7 +52,6 @@
 #include "llmenugl.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
-#include "llsky.h"
 #include "llspinctrl.h"
 #include "llstatusbar.h"
 #include "lltabcontainer.h"

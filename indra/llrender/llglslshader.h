@@ -469,6 +469,8 @@ public:
 
     // bindTexture returns the texture unit we've bound the texture to.
     // You can reuse the return value to unbind a texture when required.
+    // A null texture or target binds nothing there, and the unit is let go of what it held; the
+    // unit is returned all the same. bindDepthTexture likewise.
     //
     // The sampler is NAMED BY THE CALLER, and there is no overload that infers it. How a pass
     // reads an image is a property of the pass: two materials can reference one texture and

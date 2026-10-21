@@ -115,7 +115,7 @@ TEST_CASE("alstarfield: a count lays out the same field every time", "[alstarfie
 
 TEST_CASE("alstarfield: the default field is the one the fixed seed laid out before", "[alstarfield]")
 {
-    // The first stars of the default field, as LLVOWLSky::initStars laid them out from the fixed seed: a change of
+    // The first stars of the default field, as ALSky has them laid out from the fixed seed: a change of
     // seed, draw order or tier would move every image of the night sky the sky's A/B captures compare.
     struct Pinned
     {
@@ -490,7 +490,7 @@ namespace
     };
 
     // The stars' frame to clip space for @a view, built as LLRender builds it for the star draw: the view from a camera
-    // in the agent's frame, then the stars taken to the camera and turned (LLDrawPoolWLSky::renderStarsDeferred).
+    // in the agent's frame, then the stars taken to the camera and turned (ALSky::renderStars).
     LLMatrix4a starMVP(const View& view)
     {
         const LLVector3 camera(118.f, -43.f, 27.f);

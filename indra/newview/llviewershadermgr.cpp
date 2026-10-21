@@ -46,7 +46,6 @@
 #include "llenvironment.h"
 #include "llerrorcontrol.h"
 #include "llworld.h"
-#include "llsky.h"
 
 #include "pipeline.h"
 
@@ -726,10 +725,10 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs, const ALRenderA
         shader->unload();
     }
 
-    // The fallback sky cube map is drawn with these programs, and again by the sky once it is told to.
-    if (LLGLSLShader::sLinked > 0 && gSky.mVOSkyp.notNull())
+    // The environment cube is drawn with these programs, and again by the sky once it is told to.
+    if (LLGLSLShader::sLinked > 0)
     {
-        gSky.mVOSkyp->forceSkyUpdate();
+        gPipeline.mSky.forceSkyUpdate();
     }
 
     if (!mFailedPrograms.empty())

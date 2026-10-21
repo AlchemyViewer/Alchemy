@@ -267,7 +267,7 @@ void main()
         { 35.f, 240.f, 0.1f, 90.f, LLColor4U(255, 255, 255, 0), 1.0f },
     };
 
-    // The meteors as LLVOWLSky ticks them: at the dome's radius about the camera, each a streak of its half-length
+    // The meteors as ALSky ticks them: at the dome's radius about the camera, each a streak of its half-length
     // along a tangent at its heading, its width a quarter in its colour's alpha. The one end on has its half along
     // its own direction.
     std::vector<ALSkyLayers::Meteor> meteors()
@@ -487,7 +487,7 @@ void main()
             return out;
         }
 
-        // The sun's quad, as LLVOSky makes it.
+        // The sun's quad, as ALSky makes it.
         static ALSkyLayers::Corners sunCorners(const BodyCase& sun)
         {
             return ALSkyLayers::bodyCorners(bodyRotation(sun.mElevation, sun.mBearing), BODY_DISTANCE, sun.mScale,

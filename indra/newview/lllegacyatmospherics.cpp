@@ -37,7 +37,6 @@
 #include "lldrawable.h"
 #include "llface.h"
 #include "llglheaders.h"
-#include "llsky.h"
 #include "llviewercamera.h"
 #include "llviewertexturelist.h"
 #include "llviewerobjectlist.h"
@@ -181,8 +180,6 @@ LLAtmospherics::LLAtmospherics()
 {
     /// WL PARAMS
     mInitialized = false;
-    mAmbientScale = gSavedSettings.getF32("SkyAmbientScale");
-    mNightColorShift = gSavedSettings.getColor3("SkyNightColorShift");
     mFogColor.mV[VRED] = mFogColor.mV[VGREEN] = mFogColor.mV[VBLUE] = 0.5f;
     mFogColor.mV[VALPHA] = 0.0f;
     mFogRatio = 1.2f;
@@ -423,7 +420,7 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
     LLSettingsSky::ptr_t psky = LLEnvironment::instance().getCurrentSky();
 
-    // NOTE: This is very similar to LLVOSky::cacheEnvironment()
+    // NOTE: This is very similar to ALSky::cacheEnvironment()
     // Differences:
     //     vars.sun_norm
     //     vars.sunlight

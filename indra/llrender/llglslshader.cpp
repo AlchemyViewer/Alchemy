@@ -2032,7 +2032,15 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler ke
 
     if (uniform > -1)
     {
-        texture->bindTexture(index, uniform, key);
+        if (texture)
+        {
+            texture->bindTexture(index, uniform, key);
+        }
+        else
+        {
+            // No target binds nothing, and the unit is let go of what an earlier bind left there.
+            gGL.getTextureSlot(uniform)->unbind();
+        }
     }
 
     return uniform;
@@ -2055,7 +2063,12 @@ S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampl
 
     uniform = getTextureChannel(uniform);
 
-    if (uniform > -1)
+    if (uniform > -1 && !texture)
+    {
+        // No target binds nothing, and the unit is let go of what an earlier bind left there.
+        gGL.getTextureSlot(uniform)->unbind();
+    }
+    else if (uniform > -1)
     {
         // Clamp by default, and a shadow-compare sampler is never wanted here -- this is a
         // plain depth fetch. A repeat wrap on depth returns the opposite edge of the screen

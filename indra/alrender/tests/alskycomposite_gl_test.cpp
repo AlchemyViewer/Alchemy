@@ -231,13 +231,6 @@ void main()
 }
 )";
 
-    // A rainbow and a halo, which the dome draws in bands below the horizon too.
-    const Sky RAINBOW_SKY = { "midday, rainbow and halo", { 0.2447f, 0.4487f, 0.7599f }, { 0.4954f, 0.4954f, 0.6399f },
-                              0.7f, 0.19f, 0.0001f, 1605.f, { 5.f, 0.001f, -0.4799f }, 0.27f,
-                              { 0.7342f, 0.7815f, 0.8999f }, { 0.35f, 0.35f, 0.45f }, 35.f, 200.f, 1.f, 0.6f, 800.f,
-                              0.5f, { 0.41f, 0.41f, 0.41f }, { 1.6869f, 0.5269f, 0.88f }, { 0.07f, 0.4f, 0.125f },
-                              0.4199f, 0.27f };
-
     // The moonlit night under a cloud deck dense enough to be opaque over most of the sky, with gaps.
     const Sky CLOUD_DECK_SKY = { "night, moonlit, a cloud deck", { 0.12f, 0.18f, 0.38f }, { 0.18f, 0.22f, 0.36f }, 0.5f,
                                  0.12f, 0.00018f, 1200.f, { 5.f, 0.001f, -0.4799f }, 0.45f, { 0.21f, 0.245f, 0.35f },
@@ -535,7 +528,7 @@ void main()
                                             MOON_DISK_RADIUS);
         }
 
-        // The stars into the bound G-buffer, as LLDrawPoolWLSky::renderStarsDeferred draws them: every star, into
+        // The stars into the bound G-buffer, as ALSky::renderStars draws them: every star, into
         // the one attachment, the moon's quad masking those behind it.
         void drawStars(const Scene& scene, bool emissive, LLRenderTarget& target)
         {

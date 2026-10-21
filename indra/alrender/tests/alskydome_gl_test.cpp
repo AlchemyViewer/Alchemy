@@ -29,111 +29,29 @@
 
 #include "linden_common.h"
 
-#include "alfarplane.h"
-#include "alskydome.h"
-
-#include "llgl.h"
-#include "llglheaders.h"
-#include "llglslshader.h"
-#include "llglstates.h"
-#include "llimage.h"
-#include "llimagegl.h"
-#include "llmatrix4a.h"
-#include "llrender.h"
-#include "llrendertarget.h"
-#include "llshadermgr.h"
-#include "llstrider.h"
-#include "llvertexbuffer.h"
-
 #include "alskyraster_gl.h"
 
-#include "../../llrender/tests/llheadlessgl_fixture.h"
-
-#include <catch2/catch_test_macros.hpp>
-
-#include <algorithm>
-#include <array>
-#include <cmath>
-#include <cstring>
 #include <limits>
-#include <map>
-#include <string>
-#include <vector>
 
 namespace
 {
+    using namespace al_sky_test;
+
     constexpr S32 W = 192;
     constexpr S32 H = 128;
-    constexpr F32 TAN_HALF_FOV = 0.6f;
-    constexpr F32 NEAR_CLIP    = 0.5f;
-    constexpr F32 FAR_CLIP     = 1024.f;
-
-    // LLSettingsSky's DOME_RADIUS, and its DOME_OFFSET of it: where LLEnvironment::getCamHeight puts the camera.
-    constexpr F32 DOME_RADIUS   = 15000.f;
-    constexpr F32 CAMERA_HEIGHT = 0.96f * 15000.f;
-
-    // Where the camera is in the agent's frame. renderDome takes the dome to it, so nothing should depend on it.
-    const LLVector3 CAMERA(118.f, -43.f, 27.f);
-
-    // A sky's settings, as the Environment block and the sky's loose uniforms take them.
-    struct Sky
-    {
-        const char* mName;
-        LLVector3   mBlueDensity;
-        LLVector3   mBlueHorizon;
-        F32         mHazeDensity;
-        F32         mHazeHorizon;
-        F32         mDensityMultiplier;
-        F32         mMaxY;
-        LLVector3   mGlow;
-        F32         mCloudShadow;
-        LLVector3   mLight;      ///< sky_light: the sun's colour, or the moon's at 0.7
-        LLVector3   mAmbient;    ///< sky_ambient
-        F32         mElevation;  ///< the light's, in degrees
-        F32         mAzimuth;    ///< the light's, in degrees clockwise from north
-        F32         mGlowFactor; ///< sun_moon_glow_factor: 1 with the sun up, the moon's brightness / 4 with it down
-        F32         mMoisture;
-        F32         mDroplet;
-        F32         mIce;
-    };
 
     // The default sky at midday, the same with a rainbow's moisture and a halo's ice, a sunset under thicker haze, and
     // a night lit by the moon, whose glow factor below 1 takes the glow away.
-    const Sky SKIES[] = {
-        { "midday", { 0.2447f, 0.4487f, 0.7599f }, { 0.4954f, 0.4954f, 0.6399f }, 0.7f, 0.19f, 0.0001f, 1605.f,
-          { 5.f, 0.001f, -0.4799f }, 0.27f, { 0.7342f, 0.7815f, 0.8999f }, { 0.35f, 0.35f, 0.45f }, 60.f, 80.f, 1.f,
-          0.f, 800.f, 0.f },
-        { "midday, rainbow and halo", { 0.2447f, 0.4487f, 0.7599f }, { 0.4954f, 0.4954f, 0.6399f }, 0.7f, 0.19f, 0.0001f,
-          1605.f, { 5.f, 0.001f, -0.4799f }, 0.27f, { 0.7342f, 0.7815f, 0.8999f }, { 0.35f, 0.35f, 0.45f }, 35.f, 200.f,
-          1.f, 0.6f, 800.f, 0.5f },
-        { "sunset", { 0.18f, 0.3f, 0.52f }, { 0.62f, 0.42f, 0.38f }, 1.4f, 0.32f, 0.00025f, 906.f,
-          { 2.2f, 0.001f, -0.62f }, 0.32f, { 1.25f, 0.62f, 0.31f }, { 0.16f, 0.12f, 0.14f }, 3.f, 260.f, 1.f, 0.f, 800.f,
-          0.f },
-        { "night, moonlit", { 0.12f, 0.18f, 0.38f }, { 0.18f, 0.22f, 0.36f }, 0.5f, 0.12f, 0.00018f, 1200.f,
-          { 5.f, 0.001f, -0.4799f }, 0.2f, { 0.21f, 0.245f, 0.35f }, { 0.04f, 0.045f, 0.08f }, 35.f, 140.f, 0.125f, 0.f,
-          800.f, 0.f },
-    };
+    const Sky* const DOME_SKIES[] = { &SKIES[0], &RAINBOW_SKY, &SKIES[1], &SKIES[2] };
 
-    // A view: the camera's bearing clockwise from north, and its pitch above the horizon, in degrees.
-    struct View
-    {
-        F32 mBearing;
-        F32 mPitch;
-    };
+    // The views' vertical field of view, in degrees: a tangent of 0.6 at its half.
+    const F32 FOV = 2.f * atanf(0.6f) * RAD_TO_DEG;
 
     // Toward the light and away from it at the horizon, up into the cap, and down onto water.
     std::array<View, 4> views(const Sky& sky)
     {
-        return { View{ sky.mAzimuth, 0.f }, View{ sky.mAzimuth + 180.f, -4.f }, View{ sky.mAzimuth + 60.f, 35.f },
-                 View{ sky.mAzimuth - 30.f, -22.f } };
-    }
-
-    // The light in the dome's frame, (north, up, east).
-    LLVector3 lightNorm(const Sky& sky)
-    {
-        const F32 el = sky.mElevation * DEG_TO_RAD;
-        const F32 az = sky.mAzimuth * DEG_TO_RAD;
-        return LLVector3(cosf(az) * cosf(el), sinf(el), sinf(az) * cosf(el));
+        return { View{ sky.mAzimuth, 0.f, FOV }, View{ sky.mAzimuth + 180.f, -4.f, FOV },
+                 View{ sky.mAzimuth + 60.f, 35.f, FOV }, View{ sky.mAzimuth - 30.f, -22.f, FOV } };
     }
 
     // The analytic pass: a screen triangle, each pixel's view ray in eye space turned into the dome's frame.
@@ -159,6 +77,78 @@ namespace
         "    vec3 eye = vec3(vary_ndc * test_tan_half, -1.0);\n"
         "    frag_color = vec4(windlightDome(test_eye_to_sky * normalize(eye)), 1.0);\n"
         "}\n";
+
+    // The haze pass's screen triangle (deferred/hazeV.glsl) without the atmospherics' varyings.
+    const char* kHazeVertex = R"(/*[EXTRA_CODE_HERE]*/
+
+in vec3 position;
+
+out vec2 vary_fragcoord;
+
+void main()
+{
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+    vary_fragcoord = position.xy * 0.5 + 0.5;
+}
+)";
+
+    // What the haze pass reads of the scene and of WindLight's in-scatter, made up so that the dome's weight runs
+    // across the screen: none over the left quarter, then the square of the distance from it, a little less in green and
+    // blue. The water lies 1 km out along each pixel's ray, and WindLight's in-scatter grows with the weight.
+    const char* kHazeScene = R"(/*[EXTRA_CODE_HERE]*/
+
+in vec2 vary_fragcoord;
+
+uniform vec2 test_tan_half;
+
+float getDepth(vec2 tc)
+{
+    return 0.5;
+}
+
+bool isFarDepth(float d)
+{
+    return false;
+}
+
+vec4 getNorm(vec2 tc)
+{
+    return vec4(0.0, 0.0, 1.0, 0.0);
+}
+
+vec4 getPositionWithDepth(vec2 tc, float depth)
+{
+    return vec4(normalize(vec3((tc * 2.0 - 1.0) * test_tan_half, -1.0)) * 1000.0, 1.0);
+}
+
+void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit,
+                               out vec3 additive, out vec3 atten)
+{
+    float x = max(vary_fragcoord.x - 0.25, 0.0);
+    vec3 weight = vec3(1.0, 0.9, 0.8) * (x * x);
+    atten = vec3(1.0) - weight;
+    additive = vec3(0.5, 0.6, 0.7) * weight;
+    sunlit = vec3(0.0);
+    amblit = vec3(0.0);
+}
+
+vec3 getAdditiveColor()
+{
+    return vec3(0.0);
+}
+
+vec3 getAtmosAttenuation()
+{
+    return vec3(1.0);
+}
+)";
+
+    // The weight the haze scene gives the dome at column @a x, in its strongest channel.
+    F32 hazeWeight(S32 x)
+    {
+        const F32 from = llmax(((F32)x + 0.5f) / (F32)W - 0.25f, 0.f);
+        return from * from;
+    }
 
     struct alskydome_data
     {
@@ -188,59 +178,21 @@ namespace
             gGL.loadIdentity();
         }
 
-        // A smooth texture, so a lookup's place shows in what it reads.
-        static LLPointer<LLImageGL> gradient(U32 seed)
-        {
-            constexpr S32 SIZE = 64;
-            LLPointer<LLImageRaw> raw = new LLImageRaw(SIZE, SIZE, 4);
-            U8* data = raw->getData();
-            for (S32 y = 0; y < SIZE; ++y)
-            {
-                for (S32 x = 0; x < SIZE; ++x)
-                {
-                    const F32 u = (F32)x / (SIZE - 1);
-                    const F32 v = (F32)y / (SIZE - 1);
-                    U8* px = data + (y * SIZE + x) * 4;
-                    px[0] = (U8)std::lround(255.f * (0.5f + 0.5f * sinf(6.f * v + (F32)seed)));
-                    px[1] = (U8)std::lround(255.f * (0.5f + 0.5f * cosf(5.f * v + 2.f * u)));
-                    px[2] = (U8)std::lround(255.f * v);
-                    px[3] = 255;
-                }
-            }
-            return new LLImageGL(raw, false);
-        }
-
         // The sky program as LLViewerShaderMgr built it, without the emissive buffer, so it writes the dome's colour
-        // to the albedo attachment as it is; the analytic pass; the dome's mesh as LLVOWLSky fills it; and a float
-        // target the size of the view.
+        // to the albedo attachment as it is; the analytic pass; the dome's mesh; and a float target the size of the
+        // view.
         void setUp()
         {
             mTree.populate();
-            std::map<std::string, std::string> defines;
-            for (const char* object : { "deferred/textureUtilV.glsl", "objects/nonindexedTextureV.glsl" })
-            {
-                CAPTURE(object);
-                S32 level = 1;
-                REQUIRE(mShaders.loadShaderFile(object, level, GL_VERTEX_SHADER, &defines) != 0);
-            }
-            for (const char* object : { "deferred/globalF.glsl", "environment/srgbF.glsl" })
-            {
-                CAPTURE(object);
-                S32 level = 1;
-                REQUIRE(mShaders.loadShaderFile(object, level, GL_FRAGMENT_SHADER, &defines) != 0);
-            }
-
-            mSky.mName = "Deferred Windlight Sky Shader";
-            mSky.mFeatures.hasSrgb = true;
-            mSky.mShaderFiles.clear();
-            mSky.mShaderFiles.push_back(std::make_pair("skyraster/deferred/skyV.glsl", GL_VERTEX_SHADER));
-            mSky.mShaderFiles.push_back(std::make_pair("skyraster/deferred/skyF.glsl", GL_FRAGMENT_SHADER));
-            mSky.mShaderFiles.push_back(std::make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
-            mSky.mShaderLevel = 1;
-            UNSCOPED_INFO("the sky program builds");
-            REQUIRE(mSky.createShader());
+            loadSharedObjects(mShaders);
+            buildProgram(mSky, "Deferred Windlight Sky Shader",
+                         { { "skyraster/deferred/skyV.glsl", GL_VERTEX_SHADER },
+                           { "skyraster/deferred/skyF.glsl", GL_FRAGMENT_SHADER },
+                           { "windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER } },
+                         false);
 
             {
+                std::map<std::string, std::string> defines;
                 S32 level = 1;
                 const GLuint dome = mShaders.loadShaderFile("windlight/windlightDomeF.glsl", level, GL_FRAGMENT_SHADER, &defines);
                 UNSCOPED_INFO("windlightDomeF compiles");
@@ -263,173 +215,40 @@ namespace
                 REQUIRE(mRay.mapUniforms());
             }
 
-            const U32 verts   = ALSkyDome::vertexCount(ALSkyDome::STACKS);
-            const U32 indices = ALSkyDome::indexCount(ALSkyDome::STACKS);
-            mDome = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX | LLVertexBuffer::MAP_TEXCOORD0);
-            REQUIRE(mDome->allocateBuffer(verts, indices));
-            LLStrider<LLVector3> vertices;
-            LLStrider<LLVector2> tex_coords;
-            LLStrider<U16>       index;
-            REQUIRE(mDome->getVertexStrider(vertices));
-            REQUIRE(mDome->getTexCoord0Strider(tex_coords));
-            REQUIRE(mDome->getIndexStrider(index));
-            ALSkyDome::buildStrips(0, ALSkyDome::STACKS, DOME_RADIUS, vertices, tex_coords, index);
-            mDome->unmapBuffer();
-
-            mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
-            REQUIRE(mTriangle->allocateBuffer(3, 0));
-            LLStrider<LLVector3> vert;
-            mTriangle->getVertexStrider(vert);
-            vert[0].set(-1.f, 1.f, 0.f);
-            vert[1].set(-1.f, -3.f, 0.f);
-            vert[2].set(3.f, 1.f, 0.f);
-            mTriangle->unmapBuffer();
-
-            mRainbow = gradient(1);
-            mHalo    = gradient(4);
+            mDome     = domeMesh();
+            mTriangle = screenTriangle();
+            mRainbow  = gradient(1);
+            mHalo     = gradient(4);
 
             REQUIRE(mFull.allocate(W, H, GL_RGBA32F));
 
             glGenBuffers(1, &mEnvironment);
         }
 
-        // The Environment block as LLEnvironment packs it from @a sky (LLSettingsVOSky::applySpecial's terms), at the
-        // offsets the linked program gives each member, and bound where every program reads it.
-        void bindEnvironment(const Sky& sky)
+        // The sky program over the mesh into the float target, every band drawn on the far plane in order, so the
+        // later covers the earlier where they overlap. Read back.
+        std::vector<F32> raster(const Sky& sky, const View& view)
         {
-            const GLuint program = mSky.mProgramObject;
-            const GLuint block = glGetUniformBlockIndex(program, "Environment");
-            REQUIRE(block != GL_INVALID_INDEX);
-            GLint size = 0;
-            glGetActiveUniformBlockiv(program, block, GL_UNIFORM_BLOCK_DATA_SIZE, &size);
-            REQUIRE(size > 0);
-            std::vector<U8> data((size_t)size, 0);
-            const auto put = [&](const char* name, const F32* value, S32 count)
-            {
-                GLuint index = GL_INVALID_INDEX;
-                glGetUniformIndices(program, 1, &name, &index);
-                if (index == GL_INVALID_INDEX)
-                {
-                    return;
-                }
-                GLint offset = -1;
-                glGetActiveUniformsiv(program, 1, &index, GL_UNIFORM_OFFSET, &offset);
-                REQUIRE(offset >= 0);
-                REQUIRE((size_t)offset + count * sizeof(F32) <= data.size());
-                std::memcpy(data.data() + offset, value, count * sizeof(F32));
-            };
-            const auto put3 = [&](const char* name, const LLVector3& v) { put(name, v.mV, 3); };
-            const auto put1 = [&](const char* name, F32 v) { put(name, &v, 1); };
-
-            LLVector3 extinction;
-            LLVector3 blue_weight;
-            LLVector3 haze_weight;
-            LLVector3 light_atten;
-            LLVector3 ambient_below;
-            for (S32 c = 0; c < 3; ++c)
-            {
-                extinction.mV[c]    = llmax(fabsf(sky.mBlueDensity.mV[c]) + fabsf(sky.mHazeDensity), 1e-6f);
-                blue_weight.mV[c]   = sky.mBlueDensity.mV[c] / extinction.mV[c];
-                haze_weight.mV[c]   = sky.mHazeDensity / extinction.mV[c];
-                light_atten.mV[c]   = (sky.mBlueDensity.mV[c] + sky.mHazeDensity * 0.25f) * (sky.mDensityMultiplier * sky.mMaxY);
-                ambient_below.mV[c] = sky.mAmbient.mV[c] + llmax(0.f, 1.f - sky.mAmbient.mV[c]) * sky.mCloudShadow * 0.5f;
-            }
-            put3("blue_density", sky.mBlueDensity);
-            put1("haze_density", sky.mHazeDensity);
-            put3("blue_horizon", sky.mBlueHorizon);
-            put1("haze_horizon", sky.mHazeHorizon);
-            put3("glow", sky.mGlow);
-            put1("max_y", sky.mMaxY);
-            put1("cloud_shadow", sky.mCloudShadow);
-            put3("haze_extinction", extinction);
-            put3("blue_weight", blue_weight);
-            put3("haze_weight", haze_weight);
-            put3("sky_light", sky.mLight);
-            put3("sky_ambient", sky.mAmbient);
-            put3("sky_light_atten", light_atten);
-            put3("sky_ambient_below", ambient_below);
-
-            glBindBuffer(GL_UNIFORM_BUFFER, mEnvironment);
-            glBufferData(GL_UNIFORM_BUFFER, size, data.data(), GL_STATIC_DRAW);
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-            glBindBufferBase(GL_UNIFORM_BUFFER, LLGLSLShader::UB_ENVIRONMENT, mEnvironment);
-        }
-
-        // The dome's loose uniforms and maps, as LLDrawPoolWLSky::bindDome binds them, on the bound @a program.
-        void bindDome(LLGLSLShader& program, const Sky& sky)
-        {
-            const LLVector3 light = lightNorm(sky);
-            program.uniform3fv(LLShaderMgr::LIGHTNORM, 1, light.mV);
-            program.uniform1f(LLShaderMgr::DENSITY_MULTIPLIER, sky.mDensityMultiplier);
-            program.uniform1f(LLShaderMgr::SUN_MOON_GLOW_FACTOR, sky.mGlowFactor);
-            program.uniform1f(LLShaderMgr::MOISTURE_LEVEL, sky.mMoisture);
-            program.uniform1f(LLShaderMgr::DROPLET_RADIUS, sky.mDroplet);
-            program.uniform1f(LLShaderMgr::ICE_LEVEL, sky.mIce);
-            program.uniform3f(LLShaderMgr::WL_CAMPOSLOCAL, 0.f, CAMERA_HEIGHT, 0.f);
-            program.uniform1f(LLShaderMgr::SKY_DOME_RADIUS, DOME_RADIUS);
-            for (const auto& [uniform, map] : { std::make_pair(LLShaderMgr::RAINBOW_MAP, mRainbow.get()),
-                                                std::make_pair(LLShaderMgr::HALO_MAP, mHalo.get()) })
-            {
-                const S32 channel = program.enableTexture(uniform);
-                if (channel > -1)
-                {
-                    gGL.getTextureSlot(channel)->bindSampled(map, ALSamplers::AnisoWrap);
-                }
-            }
-        }
-
-        // The camera looking along @a view from CAMERA: the agent's frame (east, north, up) turned to the eye's.
-        static void loadView(const View& view)
-        {
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            LLMatrix4a proj;
-            proj.clear();
-            F32* p = proj.getF32ptr();
-            p[0]  = 1.f / (TAN_HALF_FOV * (F32)W / (F32)H);
-            p[5]  = 1.f / TAN_HALF_FOV;
-            p[10] = (FAR_CLIP + NEAR_CLIP) / (NEAR_CLIP - FAR_CLIP);
-            p[11] = -1.f;
-            p[14] = 2.f * FAR_CLIP * NEAR_CLIP / (NEAR_CLIP - FAR_CLIP);
-            gGL.loadMatrix(proj);
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.loadIdentity();
-            gGL.rotatef(-view.mPitch, 1.f, 0.f, 0.f);
-            gGL.rotatef(-90.f, 1.f, 0.f, 0.f);
-            gGL.rotatef(view.mBearing, 0.f, 0.f, 1.f);
-            gGL.translatef(-CAMERA.mV[VX], -CAMERA.mV[VY], -CAMERA.mV[VZ]);
-        }
-
-        // The sky program over the mesh into @a target, as LLDrawPoolWLSky::renderDome drew it: the dome taken to the
-        // camera, turned from its frame to the agent's and lowered by the camera's height, every band drawn on the far
-        // plane in order, so the later covers the earlier where they overlap. Read back.
-        std::vector<F32> raster(LLRenderTarget& target, const Sky& sky, const View& view)
-        {
-            target.bindTarget();
+            mFull.bindTarget();
             gGL.setClearColor(LLColor4(-1.f, -1.f, -1.f, 0.f));
-            target.clear(GL_COLOR_BUFFER_BIT);
+            mFull.clear(GL_COLOR_BUFFER_BIT);
             gGL.setClearColor(LLColor4::transparent);
 
-            loadView(view);
+            loadView(view, W, H);
+            bindEnvironment(mSky, mEnvironment, sky, ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix()));
             mSky.bind();
-            bindDome(mSky, sky);
-            gGL.pushMatrix();
-            gGL.translatef(CAMERA.mV[VX], CAMERA.mV[VY], CAMERA.mV[VZ]);
-            gGL.rotatef(120.f, 1.f / F_SQRT3, 1.f / F_SQRT3, 1.f / F_SQRT3);
-            gGL.scalef(0.333f, 0.333f, 0.333f);
-            gGL.translatef(0.f, -CAMERA_HEIGHT, 0.f);
+            bindDome(mSky, sky, mRainbow, mHalo);
             {
-                LLGLDisable          blend(GL_BLEND);
-                LLGLDisable          cull(GL_CULL_FACE);
-                LLGLDepthTest        no_depth(GL_FALSE, GL_FALSE);
-                mDome->setBuffer();
-                mDome->drawRange(LLRender::TRIANGLE_STRIP, 0, mDome->getNumVerts() - 1, mDome->getNumIndices(), 0);
+                LLGLDisable   blend(GL_BLEND);
+                LLGLDisable   cull(GL_CULL_FACE);
+                LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+                drawDome(mDome);
             }
-            gGL.popMatrix();
             mSky.unbind();
 
-            std::vector<F32> out(size_t(target.getWidth()) * target.getHeight() * 4);
-            glReadPixels(0, 0, target.getWidth(), target.getHeight(), GL_RGBA, GL_FLOAT, out.data());
-            target.flush();
+            std::vector<F32> out(size_t(W) * H * 4);
+            glReadPixels(0, 0, W, H, GL_RGBA, GL_FLOAT, out.data());
+            mFull.flush();
             return out;
         }
 
@@ -442,12 +261,13 @@ namespace
             mFull.clear(GL_COLOR_BUFFER_BIT);
             gGL.setClearColor(LLColor4::transparent);
 
-            loadView(view);
+            loadView(view, W, H);
             mEyeToSky = ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix());
+            bindEnvironment(mRay, mEnvironment, sky, mEyeToSky);
             mRay.bind();
-            bindDome(mRay, sky);
-            glUniform2f(glGetUniformLocation(mRay.mProgramObject, "test_tan_half"), TAN_HALF_FOV * (F32)W / (F32)H,
-                        TAN_HALF_FOV);
+            bindDome(mRay, sky, mRainbow, mHalo);
+            const F32 tan_half = tanf(view.mFov * 0.5f * DEG_TO_RAD);
+            glUniform2f(glGetUniformLocation(mRay.mProgramObject, "test_tan_half"), tan_half * (F32)W / (F32)H, tan_half);
             glUniformMatrix3fv(glGetUniformLocation(mRay.mProgramObject, "test_eye_to_sky"), 1, GL_FALSE, mEyeToSky.data());
             {
                 LLGLDisable   blend(GL_BLEND);
@@ -463,39 +283,24 @@ namespace
             return out;
         }
 
-        // Pixel (x, y)'s view ray in the dome's frame, as the ray pass works it.
-        LLVector3 domeRay(S32 x, S32 y) const
-        {
-            const F32 nx = ((F32)x + 0.5f) / (F32)W * 2.f - 1.f;
-            const F32 ny = ((F32)y + 0.5f) / (F32)H * 2.f - 1.f;
-            LLVector3 eye(nx * TAN_HALF_FOV * (F32)W / (F32)H, ny * TAN_HALF_FOV, -1.f);
-            eye.normVec();
-            LLVector3 dir;
-            for (S32 r = 0; r < 3; ++r)
-            {
-                dir.mV[r] = mEyeToSky[0 * 3 + r] * eye.mV[0] + mEyeToSky[1 * 3 + r] * eye.mV[1] + mEyeToSky[2 * 3 + r] * eye.mV[2];
-            }
-            return dir;
-        }
-
         static LLVector3 colour(const std::vector<F32>& image, S32 x, S32 y)
         {
             const F32* p = &image[(size_t(y) * W + x) * 4];
             return LLVector3(p[0], p[1], p[2]);
         }
 
-        al_sky_test::SkyShaderTree mTree;
-        ll_test::SharedGLScope mGL;
-        ll_test::TestShaderMgr mShaders;
-        LLGLSLShader           mSky;
-        LLGLSLShader           mRay;
-        LLRenderTarget         mFull;
+        SkyShaderTree             mTree;
+        ll_test::SharedGLScope    mGL;
+        ll_test::TestShaderMgr    mShaders;
+        LLGLSLShader              mSky;
+        LLGLSLShader              mRay;
+        LLRenderTarget            mFull;
         LLPointer<LLVertexBuffer> mDome;
         LLPointer<LLVertexBuffer> mTriangle;
-        LLPointer<LLImageGL>   mRainbow;
-        LLPointer<LLImageGL>   mHalo;
-        GLuint                 mEnvironment = 0;
-        std::array<F32, 9>     mEyeToSky{};
+        LLPointer<LLImageGL>      mRainbow;
+        LLPointer<LLImageGL>      mHalo;
+        GLuint                    mEnvironment = 0;
+        std::array<F32, 9>        mEyeToSky{};
     };
 
     // How far windlightDome may lie from the raster dome, relative to the brighter of the two (or to RELATIVE_FLOOR,
@@ -525,6 +330,13 @@ namespace
         return worst;
     }
 
+    // The haze's weight floor, below which it leaves the dome out (class3/deferred/hazeF.glsl's HAZE_DOME_MIN_WEIGHT),
+    // and what it allows there: 0.94% of the in-scatter, or 2e-5 times WindLight's HDR scale.
+    constexpr F32 HAZE_FLOOR    = 1.f / 256.f;
+    constexpr F32 HAZE_RELATIVE = 0.0094f;
+    constexpr F32 HAZE_ABSOLUTE = 2e-5f;
+    constexpr F32 SKY_HDR_SCALE = 1.25f;
+
     // A map whose every texel is infinite, so that any read of it shows, even one weighed by zero.
     LLPointer<LLImageGL> infiniteMap()
     {
@@ -545,14 +357,14 @@ TEST_CASE_METHOD(alskydome_data, "alskydome_gl: windlightDome is the raster dome
     setUp();
     S32 cap_pixels = 0;
     S32 skirt_pixels = 0;
-    for (const Sky& sky : SKIES)
+    for (const Sky* entry : DOME_SKIES)
     {
-        bindEnvironment(sky);
+        const Sky& sky = *entry;
         const bool bands = sky.mMoisture > 0.f || sky.mIce > 0.f;
         for (const View& view : views(sky))
         {
             CAPTURE(sky.mName, view.mBearing, view.mPitch);
-            const std::vector<F32> mesh = raster(mFull, sky, view);
+            const std::vector<F32> mesh = raster(sky, view);
             const std::vector<F32> ray  = analytic(sky, view);
 
             F32 cap = 0.f;
@@ -569,7 +381,7 @@ TEST_CASE_METHOD(alskydome_data, "alskydome_gl: windlightDome is the raster dome
                         FAIL("the mesh leaves a pixel uncovered");
                     }
                     const F32 diff = relativeDifference(colour(ray, x, y), m);
-                    const F32 rise = domeRay(x, y).mV[VY];
+                    const F32 rise = domeRay(view, mEyeToSky, W, H, x, y).mV[VY];
                     if (rise >= 0.f)
                     {
                         cap = llmax(cap, diff);
@@ -602,14 +414,13 @@ TEST_CASE_METHOD(alskydome_data, "alskydome_gl: windlightDome reads the rainbow'
     const LLPointer<LLImageGL> halo    = mHalo;
     const LLPointer<LLImageGL> poison  = infiniteMap();
     // The rainbow and halo sky, with each of its two strengths and with neither.
-    const Sky& both = SKIES[1];
+    const Sky& both = RAINBOW_SKY;
     for (const auto& [moisture, ice] : { std::make_pair(0.f, 0.f), std::make_pair(both.mMoisture, 0.f),
                                          std::make_pair(0.f, both.mIce), std::make_pair(both.mMoisture, both.mIce) })
     {
         Sky sky = both;
         sky.mMoisture = moisture;
         sky.mIce = ice;
-        bindEnvironment(sky);
         const View view = views(sky)[1];
         mRainbow = rainbow;
         mHalo = halo;
@@ -644,4 +455,110 @@ TEST_CASE_METHOD(alskydome_data, "alskydome_gl: windlightDome reads the rainbow'
     }
     mRainbow = rainbow;
     mHalo = halo;
+}
+
+TEST_CASE_METHOD(alskydome_data, "alskydome_gl: the haze on water leaves the dome out only where its weight cannot show",
+                 "[alskydome_gl]")
+{
+    setUp();
+    // The haze on water as the viewer builds it, and the same with its weight floor at zero, so that it converges on
+    // the dome at every pixel, over the made-up scene.
+    std::error_code ec;
+    const std::string haze = LLFile::getContents(std::string(AL_TEST_SHADER_DIR) + "/class3/deferred/hazeF.glsl", ec);
+    REQUIRE(!ec);
+    const std::string floor_test = ">= HAZE_DOME_MIN_WEIGHT";
+    const size_t at = haze.find(floor_test);
+    UNSCOPED_INFO("the haze tests the dome's weight against its floor");
+    REQUIRE(at != std::string::npos);
+    std::string everywhere = haze;
+    everywhere.replace(at, floor_test.size(), ">= 0.0");
+    REQUIRE(mTree.write("skytest/hazeF.glsl", haze));
+    REQUIRE(mTree.write("skytest/hazeEverywhereF.glsl", everywhere));
+    REQUIRE(mTree.write("skytest/hazeV.glsl", kHazeVertex));
+    REQUIRE(mTree.write("skytest/hazeSceneF.glsl", kHazeScene));
+    LLGLSLShader programs[2];
+    for (S32 floored = 0; floored < 2; ++floored)
+    {
+        buildProgram(programs[floored], floored ? "Haze On Water Shader (test)" : "Haze On Water Shader, no floor (test)",
+                     { { "skytest/hazeV.glsl", GL_VERTEX_SHADER },
+                       { floored ? "skytest/hazeF.glsl" : "skytest/hazeEverywhereF.glsl", GL_FRAGMENT_SHADER },
+                       { "skytest/hazeSceneF.glsl", GL_FRAGMENT_SHADER },
+                       { "windlight/atmosphericsF.glsl", GL_FRAGMENT_SHADER },
+                       { "windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER } },
+                     false, { { "HAZE_ON_WATER", "1" } });
+    }
+
+    // Down onto the water toward a low sun, where the dome behind it glows.
+    const Sky& sky = SKIES[1];
+    const View view{ sky.mAzimuth, -10.f, FOV };
+    std::vector<F32> pictures[2];
+    for (S32 floored = 0; floored < 2; ++floored)
+    {
+        LLGLSLShader& program = programs[floored];
+        mFull.bindTarget();
+        loadView(view, W, H);
+        bindEnvironment(program, mEnvironment, sky, ALFarPlane::eyeToSkyFrame(gGL.getModelviewMatrix()));
+        program.bind();
+        bindDome(program, sky, mRainbow, mHalo);
+        program.uniform1f(LLShaderMgr::SKY_HDR_SCALE, SKY_HDR_SCALE);
+        const F32 tan_half = tanf(view.mFov * 0.5f * DEG_TO_RAD);
+        glUniform2f(glGetUniformLocation(program.mProgramObject, "test_tan_half"), tan_half * (F32)W / (F32)H, tan_half);
+        glUniform4f(glGetUniformLocation(program.mProgramObject, "waterPlane"), 0.f, 0.f, 0.f, 1.f);
+        glUniform1f(glGetUniformLocation(program.mProgramObject, "waterGroundFade"), 0.f);
+        {
+            LLGLDisable   blend(GL_BLEND);
+            LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+            mTriangle->setBuffer();
+            mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
+        }
+        program.unbind();
+        pictures[floored].resize(size_t(W) * H * 4);
+        glReadPixels(0, 0, W, H, GL_RGBA, GL_FLOAT, pictures[floored].data());
+        mFull.flush();
+    }
+
+    // Where the weight is zero, or at the floor and past it, the two are one picture; under the floor they differ by
+    // what the floor allows.
+    S32 none = 0;
+    S32 under = 0;
+    S32 over = 0;
+    S32 apart = 0;
+    F32 most = 0.f;
+    for (S32 y = 0; y < H; ++y)
+    {
+        for (S32 x = 0; x < W; ++x)
+        {
+            const F32 weight = hazeWeight(x);
+            const bool skipped = weight > 0.f && weight < HAZE_FLOOR;
+            none += weight == 0.f;
+            under += skipped;
+            over += weight >= HAZE_FLOOR;
+            for (S32 c = 0; c < 3; ++c)
+            {
+                const size_t i = (size_t(y) * W + x) * 4 + c;
+                const F32 floored = pictures[1][i];
+                const F32 converged = pictures[0][i];
+                const F32 diff = fabsf(floored - converged);
+                if (skipped)
+                {
+                    most = llmax(most, diff / llmax(converged, 1e-6f));
+                    apart += diff > llmax(HAZE_RELATIVE * converged, HAZE_ABSOLUTE * SKY_HDR_SCALE);
+                }
+                else
+                {
+                    apart += floored != converged;
+                }
+            }
+        }
+    }
+    CAPTURE(none, under, over, most);
+    UNSCOPED_INFO("the scene runs the weight from zero through the floor");
+    CHECK(none > 0);
+    CHECK(under > 0);
+    CHECK(over > 0);
+    CHECK(apart == 0);
+    for (LLGLSLShader& program : programs)
+    {
+        program.unload();
+    }
 }

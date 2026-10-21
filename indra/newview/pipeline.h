@@ -47,6 +47,7 @@
 #include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
 #include "alshaderinputs.h"
+#include "alsky.h"
 #include "alspotshadowcache.h"
 #include "altransienttargetpool.h"
 #include "altransienttargets.h"
@@ -626,10 +627,11 @@ public:
     // cutout's frame, which leaves the background empty.
     bool drawsSky() const;
 
-    // Clear the bound G-buffer's attachment the stars add into to black, the emissive with the emissive buffer and the
-    // albedo without it: the sky's composite adds it to every pixel the world leaves at the far plane, where nothing
-    // else writes it. Right after the G-buffer's own clear.
-    void clearStarAttachment();
+    // Begin a view's sky, right after its G-buffer's clear: take what the view draws of it, once (ALSky::beginView),
+    // and where that has the stars, clear the bound G-buffer's attachment they add into to black
+    // (ALSkyLayers::starAttachment). The sky's composite adds it to every pixel the world leaves at the far plane, where
+    // nothing else writes it, in that view alone.
+    void beginSkyView();
 
     // apply water haze based on contents of color and depth buffer
     // should be called just before rendering pre-water alpha objects
@@ -826,8 +828,6 @@ public:
     enum LLRenderTypeMask
     {
         // Following are pool types (some are also object types)
-        RENDER_TYPE_SKY                         = LLDrawPool::POOL_SKY,
-        RENDER_TYPE_WL_SKY                      = LLDrawPool::POOL_WL_SKY,
         RENDER_TYPE_TERRAIN                     = LLDrawPool::POOL_TERRAIN,
         RENDER_TYPE_SIMPLE                      = LLDrawPool::POOL_SIMPLE,
         RENDER_TYPE_GRASS                       = LLDrawPool::POOL_GRASS,
@@ -916,6 +916,9 @@ public:
         RENDER_TYPE_PARTICLES,
         RENDER_TYPE_CLOUDS,
         RENDER_TYPE_HUD_PARTICLES,
+        // The sky's, drawn by ALSky rather than a pool: the sky, and WindLight's sky beside an HDRI
+        RENDER_TYPE_SKY,
+        RENDER_TYPE_WL_SKY,
         NUM_RENDER_TYPES,
         END_RENDER_TYPES = NUM_RENDER_TYPES
     };
@@ -1183,7 +1186,6 @@ public:
     S32                     mScenePixelY = 0;
     bool                    mScenePixelPending = false;
 
-    LLCullResult            mSky;
     LLCullResult            mReflectedObjects;
     LLCullResult            mRefractedObjects;
 
@@ -1276,6 +1278,9 @@ public:
 
     // The water's layout around the main camera and its map of cell heights, laid out at the start of each main frame.
     ALWaterSurface              mWaterSurface;
+
+    // The sky: its bodies, textures, stars and environment cube, taken at the start of each main frame.
+    ALSky                       mSky;
 
     // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
     ALDepthPyramid              mDepthPyramid;
@@ -1523,7 +1528,6 @@ protected:
     std::map<uintptr_t, LLDrawPool*>    mTreePools;
     LLDrawPoolAlpha*            mAlphaPoolPreWater = nullptr;
     LLDrawPoolAlpha*            mAlphaPoolPostWater = nullptr;
-    LLDrawPool*                 mSkyPool = nullptr;
     LLDrawPool*                 mTerrainPool = nullptr;
     LLDrawPool*                 mWaterPool = nullptr;
     LLRenderPass*               mSimplePool = nullptr;
@@ -1534,7 +1538,6 @@ protected:
     LLDrawPool*                 mGlowPool = nullptr;
     LLDrawPool*                 mBumpPool = nullptr;
     LLDrawPool*                 mMaterialsPool = nullptr;
-    LLDrawPool*                 mWLSkyPool = nullptr;
     LLDrawPool*                 mPBROpaquePool = nullptr;
     LLDrawPool*                 mPBRAlphaMaskPool = nullptr;
     LLDrawPool*                 mWaterExclusionPool      = nullptr;

@@ -2,7 +2,7 @@
  * @file alstarfield_gl_test.cpp
  * @brief The stars two ways on the hidden window, from the same fixed-seed field: as they were drawn before their
  *        rework (a quad of six vertices a star, every term worked per fragment, into all four attachments), and as
- *        LLDrawPoolWLSky draws them now (a point a star, a quad for each spiked one, the cells in view, the stars bright
+ *        ALSky draws them now (a point a star, a quad for each spiked one, the cells in view, the stars bright
  *        enough to show, into the one attachment the sky's colour is in). The two must leave the same picture.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -76,7 +76,7 @@ namespace
     const F32 NO_COLOUR[4] = { 0.f, 0.f, 0.f, 1.f };
     const F32 SKY_FLAGS[4] = { 0.f, 0.f, 0.f, 0.f };
 
-    // Half a step of 8 bits: what LLDrawPoolWLSky's brightness cull lets a left-out star add, at most.
+    // Half a step of 8 bits: what ALSky's brightness cull lets a left-out star add, at most.
     constexpr F32 HALF_QUANTUM = 0.5f / 255.f;
 
     // A frame of the night sky: the camera's bearing clockwise from north, its pitch above the horizon and its
@@ -445,7 +445,7 @@ void main()
         }
 
         // The field at the default count; the old buffer, six vertices a star with their corner offsets, as
-        // LLVOWLSky::updateStarGeometry filled it, and the buffer it fills now; both paths' programs; and a G-buffer
+        // LLVOWLSky::updateStarGeometry filled it, and the buffer ALSky fills now; both paths' programs; and a G-buffer
         // for each, the emissive one with four attachments and the albedo's with three.
         void setUp()
         {
@@ -538,7 +538,7 @@ void main()
             gGL.translatef(-CAMERA.mV[VX], -CAMERA.mV[VY], -CAMERA.mV[VZ]);
         }
 
-        // The star uniforms on the bound @a program, as LLDrawPoolWLSky::renderStarsDeferred sets them, in the stars'
+        // The star uniforms on the bound @a program, as ALSky::renderStars sets them, in the stars'
         // frame; the moon's mask only where @a mask_moon.
         void bindUniforms(LLGLSLShader& program, const Scene& scene, bool mask_moon = true)
         {
@@ -629,7 +629,7 @@ void main()
             return picture;
         }
 
-        // The stars drawn as LLDrawPoolWLSky::renderStarsDeferred draws them, into the G-buffer of @a emissive's path;
+        // The stars drawn as ALSky::renderStars draws them, into the G-buffer of @a emissive's path;
         // every point, the frustum's cull aside, where @a everything, and every star however faint where
         // @a every_star.
         Picture drawStars(const Scene& scene, bool emissive, bool everything = false, bool every_star = false)

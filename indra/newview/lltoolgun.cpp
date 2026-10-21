@@ -32,13 +32,13 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "llviewercontrol.h"
-#include "llsky.h"
 #include "llappviewer.h"
 #include "llresmgr.h"
 #include "llfontgl.h"
 #include "llui.h"
 #include "llviewertexturelist.h"
 #include "llviewercamera.h"
+#include "pipeline.h"
 // [RLVa:KB] - Checked: 2014-02-24 (RLVa-1.4.10)
 #include "llfocusmgr.h"
 // [/RLVa:KB]
@@ -131,7 +131,7 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
             if (mouse_sun)
             {
                 const LLVector3& sunpos = LLViewerCamera::getInstance()->getAtAxis();
-                gSky.setSunDirectionCFR(sunpos);
+                gPipeline.mSky.setSunDirectionCFR(sunpos);
                 gSavedSettings.setVector3("SkySunDefaultPosition", sunpos);
             }
 
@@ -139,7 +139,6 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
             if (mouse_moon)
             {
                 const LLVector3& moonpos = LLViewerCamera::getInstance()->getAtAxis();
-                gSky.setMoonDirectionCFR(moonpos);
                 gSavedSettings.setVector3("SkyMoonDefaultPosition", moonpos);
             }
 

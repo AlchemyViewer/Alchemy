@@ -79,7 +79,7 @@ void main()
     vec3 premult = vary_star_color * shape;
 
     // The stars draw into one attachment and leave the rest as the sky wrote them, its flags among them
-    // (LLDrawPoolWLSky::renderStarsDeferred narrows the G-buffer's draw buffers to it).
+    // (ALSky::renderStars narrows the G-buffer's draw buffers to it).
 #if defined(HAS_EMISSIVE)
     // With a dedicated emissive buffer the stars live there (bloom source).
     frag_data[3] = vec4(premult, shape);

@@ -34,7 +34,6 @@
 #include "llrender.h"
 
 #include "llcubemap.h"
-#include "llsky.h"
 #include "lldrawable.h"
 #include "llface.h"
 #include "llviewercamera.h"

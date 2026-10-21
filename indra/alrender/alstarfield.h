@@ -37,10 +37,10 @@
 
 class LLMatrix4a;
 
-/// The star field, worked from a star count and the dome's radius alone: no GL and no settings, so LLVOWLSky's buffer
-/// and the GL tests that draw it share one definition.
+/// The star field, worked from a star count and the dome's radius alone: no GL and no settings, so ALSky's buffer and
+/// the GL tests that draw it share one definition.
 ///
-/// The stars' frame is the agent's turned slowly about z (LLDrawPoolWLSky::renderStarsDeferred): x and y on the
+/// The stars' frame is the agent's turned slowly about z (ALSky::renderStars): x and y on the
 /// horizon, z up. Every star lies on the upper hemisphere.
 namespace ALStarField
 {

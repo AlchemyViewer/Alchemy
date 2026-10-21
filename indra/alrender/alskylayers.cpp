@@ -43,12 +43,6 @@
 namespace ALSkyLayers
 {
 
-namespace
-{
-    // A body's half-extent per unit of its disk radius and its distance.
-    constexpr F32 BODY_FACTOR = 0.1f;
-} // namespace
-
 S32 layersFor(const Frame& frame)
 {
     if (frame.mHdri)
@@ -146,25 +140,6 @@ std::array<LLVector3, 3> rayQuad(const Corners& corners, const LLVector3& offset
     half_u /= half_u.lengthSquared();
     half_v /= half_v.lengthSquared();
     return { ALFarPlane::skyFrame(centre), ALFarPlane::skyFrame(half_u), ALFarPlane::skyFrame(half_v) };
-}
-
-bool quadCoord(const std::array<LLVector3, 3>& quad, const LLVector3& dir, F32& u, F32& v)
-{
-    const LLVector3 normal = quad[1] % quad[2];
-    const F32 facing = dir * normal;
-    if (fabsf(facing) < 1e-12f)
-    {
-        return false;
-    }
-    const F32 t = (quad[0] * normal) / facing;
-    if (t <= 0.f)
-    {
-        return false;
-    }
-    const LLVector3 offset = dir * t - quad[0];
-    u = (offset * quad[1]) * 0.5f + 0.5f;
-    v = (offset * quad[2]) * 0.5f + 0.5f;
-    return true;
 }
 
 U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 width, F32 height, F32 width_px,

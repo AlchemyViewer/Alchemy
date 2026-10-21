@@ -142,9 +142,9 @@ public:
     // bind implementation for inner loops
     // makes the following assumptions:
     //  - No need for gGL.flush()
-    //  - texture is not null
     //  - gl_tex->getTexName() is not zero
     //  - This texture is not being bound redundantly
+    // A null texture, or one with no GL image, binds nothing and lets the slot go (unbindFast).
     // The CALLER names how it wants to sample; the resource contributes nothing.
     void bindFast(LLTexture* texture, ALSampler key);
 

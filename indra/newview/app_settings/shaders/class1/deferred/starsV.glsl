@@ -32,7 +32,7 @@
 
 // One vertex a star, drawn as a point; or, for the stars with diffraction spikes (STAR_QUADS), six, drawn as a quad: GL
 // drops a point whose centre leaves the screen, which would pop a spiked star's arms at the edge
-// (LLDrawPoolWLSky::renderStarsDeferred, ALStarField).
+// (ALSky::renderStars, ALStarField).
 in vec3 position;       // the star's centre, in the stars' frame
 in int texture_index;   // its colour, in the position's fourth word: rgb = sRGB black-body colour, a = intensity
 
@@ -51,7 +51,7 @@ uniform vec3  moon_dir;        // moon direction in the stars' frame (z up)
 uniform float moon_brightness; // moon illumination 0..1 (from LLSettingsSky)
 
 // The moon's quad in the stars' frame, on the plane a unit away along moonQuadCenter (zero when no moon is drawn), and
-// its texture (LLDrawPoolWLSky::renderStarsDeferred).
+// its texture (ALSky::renderStars).
 uniform vec3 moonQuadCenter;
 uniform vec3 moonQuadU;
 uniform vec3 moonQuadV;

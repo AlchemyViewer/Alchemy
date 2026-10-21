@@ -64,7 +64,7 @@ namespace al_sky_test
     constexpr F32 DOME_RADIUS   = 15000.f;
     constexpr F32 CAMERA_HEIGHT = 0.96f * 15000.f;
 
-    // LLVOSky's HEAVENLY_BODY_DIST (HORIZON_DIST less 20 m), and the sun's and moon's disk radii.
+    // ALSky's HEAVENLY_BODY_DIST (HORIZON_DIST less 20 m), and the sun's and moon's disk radii.
     constexpr F32 BODY_DISTANCE    = 1024.f - 20.f;
     constexpr F32 SUN_DISK_RADIUS  = 0.5f;
     constexpr F32 MOON_DISK_RADIUS = SUN_DISK_RADIUS * 0.9f;
@@ -120,6 +120,15 @@ namespace al_sky_test
           { 5.f, 0.001f, -0.4799f }, 0.2f, { 0.21f, 0.245f, 0.35f }, { 0.04f, 0.045f, 0.08f }, 35.f, 140.f, 0.125f, 0.f,
           800.f, 0.f, { 0.22f, 0.23f, 0.3f }, { 0.81f, 0.13f, 0.76f }, { 0.09f, 0.55f, 0.11f }, 0.35f, 0.2f },
     };
+
+    // The clouded midday with a rainbow's moisture and a halo's ice, which the dome draws in bands below the horizon
+    // too.
+    inline const Sky RAINBOW_SKY = { "midday, rainbow and halo", { 0.2447f, 0.4487f, 0.7599f },
+                                     { 0.4954f, 0.4954f, 0.6399f }, 0.7f, 0.19f, 0.0001f, 1605.f,
+                                     { 5.f, 0.001f, -0.4799f }, 0.27f, { 0.7342f, 0.7815f, 0.8999f },
+                                     { 0.35f, 0.35f, 0.45f }, 35.f, 200.f, 1.f, 0.6f, 800.f, 0.5f,
+                                     { 0.41f, 0.41f, 0.41f }, { 1.6869f, 0.5269f, 0.88f }, { 0.07f, 0.4f, 0.125f },
+                                     0.4199f, 0.27f };
 
     // A view: the camera's bearing clockwise from north, its pitch above the horizon and its vertical field of view, in
     // degrees.
@@ -427,7 +436,7 @@ namespace al_sky_test
         }
     }
 
-    // The dome's loose uniforms and maps, as LLDrawPoolWLSky::bindDome binds them, on the bound @a program.
+    // The dome's loose uniforms and maps, as ALSky::bindDome binds them, on the bound @a program.
     inline void bindDome(LLGLSLShader& program, const Sky& sky, LLImageGL* rainbow, LLImageGL* halo)
     {
         const LLVector3 light = lightNorm(sky);

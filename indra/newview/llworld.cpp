@@ -39,7 +39,6 @@
 #include "llglheaders.h"
 #include "llhttpnode.h"
 #include "llregionhandle.h"
-#include "llsky.h"
 #include "llsurface.h"
 #include "lltrans.h"
 #include "llviewercamera.h"
@@ -105,7 +104,6 @@ LLWorld::LLWorld() :
 void LLWorld::resetClass()
 {
     gObjectList.destroy();
-    gSky.cleanup(); // references an object
     for(region_list_t::iterator region_it = mRegionList.begin(); region_it != mRegionList.end(); )
     {
         LLViewerRegion* region_to_delete = *region_it++;

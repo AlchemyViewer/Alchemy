@@ -39,7 +39,6 @@
 #include "alfarplane.h"
 #include "llviewercamera.h"
 #include "pipeline.h"
-#include "llsky.h"
 
 #include "llviewershadermgr.h"
 

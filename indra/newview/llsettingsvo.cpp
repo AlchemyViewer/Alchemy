@@ -49,7 +49,6 @@
 #include "llviewerinventory.h"
 
 #include "llenvironment.h"
-#include "llsky.h"
 
 #include "llpermissions.h"
 
@@ -674,14 +673,15 @@ void LLSettingsVOSky::updateSettings()
     F32 sun_dynamic_range = llmax(sdr(), 0.0001f);
     mSceneLightStrength = 2.0f * (0.75f + sun_dynamic_range * dp);
 
-    gSky.setSunAndMoonDirectionsCFR(sun_direction, moon_direction);
-    gSky.setSunTextures(getSunTextureId(), getNextSunTextureId());
-    gSky.setMoonTextures(getMoonTextureId(), getNextMoonTextureId());
-    gSky.setCloudNoiseTextures(getCloudNoiseTextureId(), getNextCloudNoiseTextureId());
-    gSky.setBloomTextures(getBloomTextureId(), getNextBloomTextureId());
+    ALSky& sky = gPipeline.mSky;
+    sky.setSunDirectionCFR(sun_direction);
+    sky.setSunTextures(getSunTextureId(), getNextSunTextureId());
+    sky.setMoonTextures(getMoonTextureId(), getNextMoonTextureId());
+    sky.setCloudNoiseTextures(getCloudNoiseTextureId(), getNextCloudNoiseTextureId());
+    sky.setBloomTextures(getBloomTextureId(), getNextBloomTextureId());
 
-    gSky.setSunScale(getSunScale());
-    gSky.setMoonScale(getMoonScale());
+    sky.setSunScale(getSunScale());
+    sky.setMoonScale(getMoonScale());
 }
 
 // A sky colour as an irradiance pass takes it under RenderDesaturateIrradiance: grey at its

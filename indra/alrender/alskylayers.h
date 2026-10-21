@@ -43,7 +43,7 @@ class LLMatrix4a;
 class LLQuaternion;
 
 /// The sky's layers as the composite takes them (deferred/skyCompositeF.glsl and the layers' files): no GL and no
-/// settings, so LLVOSky, LLVOWLSky, the pass that binds the composite and the GL tests share one definition.
+/// settings, so ALSky, the pass that binds the composite and the GL tests share one definition.
 namespace ALSkyLayers
 {
 
@@ -80,12 +80,12 @@ struct Frame
     bool mProbe     = false; ///< a reflection probe's face or a mirror's (gCubeSnapshot)
     bool mMirror    = false; ///< a mirror's (LLHeroProbeManager::isMirrorPass)
     bool mRadiance  = true;  ///< not an irradiance pass of the probes (LLReflectionMapManager::isRadiancePass)
-    bool mHdri      = false; ///< an HDRI sky in place of WindLight's (LLDrawPoolWLSky::useHDRISky)
+    bool mHdri      = false; ///< an HDRI sky in place of WindLight's (ALSky::useHDRISky)
     bool mSun       = false; ///< the sun is up and has a texture
     bool mBloom     = false; ///< the sun bloom is drawn (AlchemyRenderSunBloom, latched) and has a texture
     bool mMoon      = false; ///< the moon is up and has a texture
     F32  mStarAlpha = 0.f;   ///< the star brightness over 500
-    bool mMeteors   = false; ///< meteors are on (RenderMeteorsEnabled) and some fly
+    bool mMeteors   = false; ///< meteors are on (RenderMeteorsEnabled), so a view of the night ticks them
     F32  mAurora    = 0.f;   ///< the aurora's intensity after the moon's wash
     bool mClouds    = false; ///< clouds are shown (RENDER_TYPE_CLOUDS) and have a noise texture
 };
@@ -98,7 +98,7 @@ S32 layersFor(const Frame& frame);
 
 /// The attachment of the G-buffer the stars are drawn into and the composite reads them from: the emissive with the
 /// emissive buffer (frag_data[3]), the albedo without it (frag_data[0]). A view whose layers leave the stars out
-/// does not read it.
+/// neither clears nor reads it.
 constexpr U32 starAttachment(bool emissive) { return emissive ? 3 : 0; }
 
 /// A sun's or moon's quad about the camera, in the agent's frame: corners 0 to 3 at (-right, +up), (-right, -up),
@@ -106,14 +106,16 @@ constexpr U32 starAttachment(bool emissive) { return emissive ? 3 : 0; }
 /// and up axes square to each other.
 using Corners = std::array<LLVector3, 4>;
 
+/// A body's half-extent per unit of its disk radius, its scale and its distance.
+constexpr F32 BODY_FACTOR = 0.1f;
+
 /// The quad of a body whose direction is @a rotation's turn of +x, centred @a distance from the camera along it, its
-/// half-extents @a scale times @a disk_radius times the distance (times HEAVENLY_BODY_FACTOR, 0.1, as LLVOSky built
-/// it): wider by up to 30% and taller by up to 20% as the body nears the horizon.
+/// half-extents @a scale times @a disk_radius times a tenth of the distance: wider by up to 30% and taller by up to 20%
+/// as the body nears the horizon.
 Corners bodyCorners(const LLQuaternion& rotation, F32 distance, F32 scale, F32 disk_radius);
 
 /// The sun bloom's square about the sun's quad @a sun: centred on it, a half-extent every way of four times the disc's
-/// half-width, along the disc's axes. The square the sun's halo was drawn in before WindLight
-/// (LLVOSky::updateSunHaloGeometry at the open-source import).
+/// half-width, along the disc's axes.
 Corners bloomCorners(const Corners& sun);
 
 /// The moon's opacity as it nears the horizon, from @a moon_z, the agent's z of its direction: four times its square,
@@ -130,12 +132,7 @@ constexpr F32 SUN_DROP = 50.f;
 /// [-1, 1].
 std::array<LLVector3, 3> rayQuad(const Corners& corners, const LLVector3& offset = LLVector3::zero);
 
-/// The texture coordinates, unclipped, where @a dir, a direction from the camera in the dome's frame, meets the plane
-/// of @a quad (rayQuad's); false, and the coordinates unset, where it runs parallel to the plane or away from it. A CPU
-/// mirror of skyQuadCoord, for the tests.
-bool quadCoord(const std::array<LLVector3, 3>& quad, const LLVector3& dir, F32& u, F32& v);
-
-/// The most meteors LLVOWLSky keeps, and the composite's array of them.
+/// The most meteors ALSky keeps, and the composite's array of them.
 constexpr U32 MAX_METEORS = 64;
 
 /// The vec4s a meteor takes in the composite's skyMeteorData. deferred/skyMeteorsF.glsl's SKY_METEOR_VECTORS must equal
@@ -145,7 +142,7 @@ constexpr U32 METEOR_VECTORS = 3;
 /// The width the meteors draw at, in pixels each side of the streak for a meteor of width 1.
 constexpr F32 METEOR_WIDTH_PIXELS = 1.5f;
 
-/// A meteor as LLVOWLSky ticks it for a frame, about the camera in the agent's frame: the streak's midpoint and half
+/// A meteor as ALSky ticks it for a frame, about the camera in the agent's frame: the streak's midpoint and half
 /// of it toward the head, its colour times its envelope (sRGB) and its width class as eight bits each, the width a
 /// quarter in alpha, and its width class as it is.
 struct Meteor

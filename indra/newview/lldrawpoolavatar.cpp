@@ -39,7 +39,6 @@
 #include "lldrawpoolbump.h"
 #include "llface.h"
 #include "llmeshrepository.h"
-#include "llsky.h"
 #include "llviewercamera.h"
 #include "llviewerregion.h"
 #include "noise.h"

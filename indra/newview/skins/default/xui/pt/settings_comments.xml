@@ -2423,12 +2423,8 @@
   <string>Nome do arquivo de configuração de cor do skin do cliente (por instalação).</string>
   <key>SkipBenchmark</key>
   <string>Se verdadeiro, desativa a execução do benchmark de GPU na inicialização (padrão para classe 1).</string>
-  <key>SkyAmbientScale</key>
-  <string>Controla a intensidade da luz ambiente, ou não direcional, do sol e da lua (fração ou múltiplo do nível de ambiente padrão).</string>
   <key>SkyMoonDefaultPosition</key>
   <string>Posição padrão do sol no céu (direção em coordenadas do mundo).</string>
-  <key>SkyNightColorShift</key>
-  <string>Controla a cor do luar (cor base aplicada à lua como fonte de luz).</string>
   <key>SkyOverrideSimSunPosition</key>
   <string>Substituir a posição do sol do simulador pela posição local definida.</string>
   <key>SkySunDefaultPosition</key>

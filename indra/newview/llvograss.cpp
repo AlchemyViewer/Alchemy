@@ -35,7 +35,6 @@
 #include "lldrawable.h"
 #include "lldrawpoolalpha.h"
 #include "llface.h"
-#include "llsky.h"
 #include "llsurface.h"
 #include "llsurfacepatch.h"
 #include "llviewercamera.h"
