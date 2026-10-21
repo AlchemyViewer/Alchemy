@@ -1,8 +1,8 @@
 /**
  * @file alframefences_gl_test.cpp
- * @brief ALFrameFences on the hidden window: a frame complete only once ended and finished, the polls where glthread
- *        has caught up or where the user asks, waits on a pending frame and on the open one, the ring of fences
- *        kept whole without a poll, and release.
+ * @brief ALFrameFences on the hidden window: a frame complete only once a later frame's end has seen it finished, one
+ *        poll a frame and none of the frame just ended, waits on a pending frame and on the open one, the ring of
+ *        fences kept whole, and release.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -55,10 +55,10 @@ namespace
     };
 
 
-    // The open frame is never complete, however long the GPU has had; an ended one is once a poll sees it finished.
-    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a frame is complete once it has ended and the GPU finished it", "[alframefences_gl]")
+    // The open frame is never complete, however long the GPU has had, and the frame a frame's end ends is not either:
+    // the next frame's end shows it finished.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a frame is complete once a later frame's end has seen it finished", "[alframefences_gl]")
     {
-        ll_test::MesaGLThreadFlag no_glthread(false);
         const U32 frame = mFrames.frame();
         {
             INFO("frame 0 is complete, and the first frame is not");
@@ -66,95 +66,58 @@ namespace
             CHECK_FALSE(mFrames.isComplete(frame));
         }
         glFinish();
-        mFrames.poll();
-        {
-            INFO("not while it is open");
-            CHECK_FALSE(mFrames.isComplete(frame));
-        }
         mFrames.endFrame();
         {
             INFO("the next frame opens");
             CHECK(mFrames.frame() == frame + 1);
         }
         glFinish();
-        mFrames.poll();
         {
-            INFO("complete once it has ended, the GPU has finished it and a poll has seen it");
+            INFO("not at its own end, however long the GPU has had");
+            CHECK_FALSE(mFrames.isComplete(frame));
+        }
+        mFrames.endFrame();
+        {
+            INFO("complete once the next frame's end has seen it finished");
             CHECK(mFrames.isComplete(frame));
             CHECK_FALSE(mFrames.isComplete(frame + 1));
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // Under glthread poll() makes no call, and the frame's end polls in its place; elsewhere poll() polls and the
-    // frame's end only lays its fence.
-    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: under glthread the frame's end polls, and poll() makes no call", "[alframefences_gl]")
+    // A frame's end makes one fence and polls only the frames ended before it, never the one it has just ended.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a frame's end polls the frames before it, and lays one fence", "[alframefences_gl]")
     {
+        const U32 frame = mFrames.frame();
+        const U32 before = mFrames.getCalls();
+        mFrames.endFrame();
         {
-            ll_test::MesaGLThreadFlag glthread(true);
-            const U32 frame = mFrames.frame();
-            const U32 before = mFrames.getCalls();
-            mFrames.endFrame();
-            {
-                INFO("its fence laid, and polled");
-                CHECK(mFrames.getCalls() >= before + 2);
-            }
-            glFinish();
-            const U32 ended = mFrames.getCalls();
-            mFrames.poll();
-            {
-                INFO("poll() makes no call");
-                CHECK(mFrames.getCalls() == ended);
-            }
-            mFrames.endFrame();
-            {
-                INFO("the next frame's end polls, and sees the frame finished");
-                CHECK(mFrames.isComplete(frame));
-            }
+            INFO("the first frame's end lays its fence, and has nothing to poll");
+            CHECK(mFrames.getCalls() == before + 1);
         }
+        glFinish();
+        mFrames.endFrame();
         {
-            ll_test::MesaGLThreadFlag no_glthread(false);
-            // Every frame so far finished and seen, so that the next poll has one frame to look at.
-            glFinish();
-            mFrames.poll();
-            const U32 frame = mFrames.frame();
-            const U32 before = mFrames.getCalls();
-            mFrames.endFrame();
-            {
-                INFO("its fence laid, and no poll");
-                CHECK(mFrames.getCalls() == before + 1);
-                CHECK_FALSE(mFrames.isComplete(frame));
-            }
-            glFinish();
-            mFrames.poll();
-            {
-                INFO("poll() polls, and sees the frame finished");
-                CHECK(mFrames.getCalls() == before + 2);
-                CHECK(mFrames.isComplete(frame));
-            }
-            const U32 polled = mFrames.getCalls();
-            mFrames.poll();
-            {
-                INFO("with nothing pending it makes no call");
-                CHECK(mFrames.getCalls() == polled);
-            }
+            INFO("the next polls the frame before, which has finished, and lays its own fence");
+            CHECK(mFrames.getCalls() == before + 3);
+            CHECK(mFrames.isComplete(frame));
+            CHECK_FALSE(mFrames.isComplete(frame + 1));
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // A poll walks the ended frames oldest first, as far as the GPU has finished them.
-    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a poll shows every ended frame the GPU has finished", "[alframefences_gl]")
+    // A frame's end polls the ended frames oldest first, as far as the GPU has finished them.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a frame's end shows every ended frame the GPU has finished", "[alframefences_gl]")
     {
-        ll_test::MesaGLThreadFlag no_glthread(false);
         const U32 first = mFrames.frame();
         for (U32 i = 0; i < 3; ++i)
         {
             mFrames.endFrame();
         }
         glFinish();
-        mFrames.poll();
+        mFrames.endFrame();
         {
-            INFO("all three");
+            INFO("the three before it, and not itself");
             CHECK(mFrames.isComplete(first));
             CHECK(mFrames.isComplete(first + 2));
             CHECK_FALSE(mFrames.isComplete(first + 3));
@@ -166,7 +129,6 @@ namespace
     // and shows every frame before it finished, the open one staying open.
     TEST_CASE_METHOD(alframefences_data, "alframefences_gl: waits stall only on a frame the GPU has not finished", "[alframefences_gl]")
     {
-        ll_test::MesaGLThreadFlag no_glthread(false);
         const U32 ended = mFrames.frame();
         mFrames.endFrame();
         glFinish();
@@ -201,26 +163,25 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // Frames ended with no poll between them fill the ring of fences; the frame's end then waits out the oldest
+    // Frames ended faster than the GPU finishes them fill the ring of fences; the frame's end then waits out the oldest
     // rather than lay a fence over it.
-    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: frames ended without a poll keep the ring of fences whole", "[alframefences_gl]")
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: frames ended back to back keep the ring of fences whole", "[alframefences_gl]")
     {
-        ll_test::MesaGLThreadFlag no_glthread(false);
         const U32 first = mFrames.frame();
         for (U32 i = 0; i < ALFrameFences::FRAMES * 2; ++i)
         {
             mFrames.endFrame();
         }
         {
-            INFO("each frame FRAMES behind the open one was waited out to make room");
+            INFO("each frame FRAMES behind the open one was polled or waited out to make room");
             CHECK(mFrames.isComplete(first + ALFrameFences::FRAMES - 1));
             CHECK(mFrames.isComplete(mFrames.frame() - 1 - ALFrameFences::FRAMES));
         }
         glFinish();
-        mFrames.poll();
+        mFrames.endFrame();
         {
-            INFO("and the rest are polled from where that left them");
-            CHECK(mFrames.isComplete(mFrames.frame() - 1));
+            INFO("and the rest polled by the next frame's end");
+            CHECK(mFrames.isComplete(mFrames.frame() - 2));
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
@@ -228,7 +189,6 @@ namespace
     // release() deletes the fences and takes every frame so far as finished, the open one too; frames end after it.
     TEST_CASE_METHOD(alframefences_data, "alframefences_gl: release completes every frame so far", "[alframefences_gl]")
     {
-        ll_test::MesaGLThreadFlag no_glthread(false);
         const U32 ended = mFrames.frame();
         mFrames.endFrame();
         const U32 open = mFrames.frame();
@@ -242,7 +202,7 @@ namespace
         const U32 next = mFrames.frame();
         mFrames.endFrame();
         glFinish();
-        mFrames.poll();
+        mFrames.endFrame();
         {
             INFO("frames end again after it");
             CHECK(mFrames.isComplete(next));

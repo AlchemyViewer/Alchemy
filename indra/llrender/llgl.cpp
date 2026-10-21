@@ -2078,22 +2078,6 @@ bool LLGLManager::initGL()
     {
         LL_WARNS("RenderInit") << "GL renderer " << mGLRenderer << " draws on the CPU" << LL_ENDL;
     }
-
-    // Mesa's glthread is on by default under radeonsi and zink, and the launcher (linux_tools/wrapper.sh) sets
-    // mesa_glthread for every driver. Set, the variable decides as Mesa reads it: on for 1, y, yes, t and true in any
-    // case, off for anything else.
-    mMesaGLThread = false;
-    if (mIsMesa)
-    {
-        mMesaGLThread = true;
-        if (std::optional<std::string> setting = LLStringUtil::getoptenv("mesa_glthread"))
-        {
-            std::string value = *setting;
-            LLStringUtil::toLower(value);
-            mMesaGLThread = value == "1" || value == "y" || value == "yes" || value == "t" || value == "true";
-        }
-        LL_INFOS("RenderInit") << "Mesa glthread " << (mMesaGLThread ? "on" : "off") << LL_ENDL;
-    }
 #endif
 
     // The floor (GL_MINIMUM_VERSION). Nothing past here adapts to a context below it, so it is

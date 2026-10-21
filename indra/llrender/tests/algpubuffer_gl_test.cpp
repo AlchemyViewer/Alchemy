@@ -135,8 +135,6 @@ namespace
         ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mProgram;
-        // The polls where the rings ask for them, whatever the context.
-        ll_test::MesaGLThreadFlag mNoGLThread{ false };
         ALFrameFences mFrames;
     };
 
@@ -377,7 +375,8 @@ namespace
 
     // ALGPUReadback: each request copies what its source held then; a request with every slot pending is refused; the
     // results come back oldest first; with none pending collect has nothing to give; and a result is collected without
-    // waiting once its frame has ended and finished, and not before, laying no fence of its own.
+    // waiting once a later frame's end has seen its frame finished, and not before, the readback laying no fence and
+    // polling none of its own.
     TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: ALGPUReadback gives back each request's copy oldest first", "[algpubuffer_gl]")
     {
         constexpr U32 SLOTS = 3;
@@ -417,19 +416,20 @@ namespace
         // A request made, its copy finished: collect gives it without waiting once its frame has ended.
         const std::vector<U32> last = pattern(WORDS, 7u);
         source.upload(0, last.data(), last.size() * sizeof(U32));
-        // Every frame so far finished and seen, so that what follows counts this request's calls alone.
-        glFinish();
-        mFrames.poll();
         const U32 calls = mFrames.getCalls();
         CHECK(readback.request(source, 0, COUNT * sizeof(U32)));
         UNSCOPED_INFO("the request lays no fence");
         CHECK(mFrames.getCalls() == calls);
         glFinish();
-        UNSCOPED_INFO("not collected while its frame is open, however long the GPU has had");
+        UNSCOPED_INFO("not collected while its frame is open, however long the GPU has had, and no poll");
         CHECK_FALSE(readback.collect(result.data(), result.size() * sizeof(U32)));
+        CHECK(mFrames.getCalls() == calls);
         mFrames.endFrame();
         glFinish();
-        UNSCOPED_INFO("collected without waiting once its frame has ended and finished");
+        UNSCOPED_INFO("nor at its frame's end");
+        CHECK_FALSE(readback.collect(result.data(), result.size() * sizeof(U32)));
+        mFrames.endFrame();
+        UNSCOPED_INFO("collected without waiting once the next frame's end has seen its frame finished");
         REQUIRE(readback.collect(result.data(), result.size() * sizeof(U32)));
         UNSCOPED_INFO("and holds the source");
         CHECK(result == std::vector<U32>(last.begin(), last.begin() + COUNT));
@@ -501,6 +501,8 @@ namespace
 
         mFrames.endFrame();
         glFinish();
+        // The next frame's end shows it finished.
+        mFrames.endFrame();
         std::vector<U8> result(BYTES, 0);
         UNSCOPED_INFO("the first, its frame finished, collected without waiting");
         REQUIRE(readback.collect(result.data(), result.size()));
@@ -569,9 +571,6 @@ namespace
         constexpr U32 COUNT = 10;
         ALGPUStream stream(&mFrames);
         REQUIRE(stream.allocate(COUNT * sizeof(U32), REGIONS, "stream (test)"));
-        // Every frame so far finished and seen.
-        glFinish();
-        mFrames.poll();
 
         // Both regions mapped and published in one frame: the second map notes the first region read in it.
         for (U32 i = 0; i < REGIONS; ++i)
@@ -581,7 +580,8 @@ namespace
         }
         mFrames.endFrame();
         glFinish();
-        mFrames.poll();
+        // The next frame's end shows it finished.
+        mFrames.endFrame();
 
         const U32 calls = mFrames.getCalls();
         // Back to the first region, read in the frame that has finished. The second is noted read in this one: its

@@ -1,8 +1,8 @@
 /**
  * @file alquerypool_gl_test.cpp
  * @brief ALQueryPool on the hidden window: each kind's names kept to its own target, the targets one query holds
- *        refused to the rest, results read only once their frame has ended and finished, with no poll of their own
- *        under glthread, queries across a frame's end, the ring reading what it comes back to, results written by the
+ *        refused to the rest, results read only once a later frame's end has seen their frame finished, with no poll
+ *        of their own, queries across a frame's end, the ring reading what it comes back to, results written by the
  *        GPU or asked of GL, pipeline statistics, spans, release, and conditional draws.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -193,17 +193,16 @@ namespace
             mFrames.endFrame();
         }
 
-        // The frame's batch closed and finished on the GPU, then read.
+        // The frame's batch closed, finished on the GPU and shown finished, as the next frame's end shows it, then read.
         void finishFrame()
         {
             endFrame();
             glFinish();
+            REQUIRE(mFrames.wait(mFrames.frame() - 1, 1000000000ull));
             mPool.retire();
         }
 
         ll_test::SharedGLScope mGL;
-        // The polls where retire() asks for them, whatever the context.
-        ll_test::MesaGLThreadFlag mNoGLThread{ false };
         ALFrameFences mFrames;
         ALQueryPool mPool{ mFrames };
         GLuint mProgram = 0;
@@ -534,9 +533,11 @@ namespace
         }
         mPool.end(open);
         glFinish();
+        // The frame it began in shown finished, as the next frame's end shows it.
+        REQUIRE(mFrames.wait(mFrames.frame() - 1, 1000000000ull));
         mPool.retire();
         {
-            INFO("nor once it has ended, while the frame it ended in is open");
+            INFO("nor once it has ended, while the frame it ended in is open, the frame it began in finished");
             CHECK(mPool.result(open, count) == ALQueryPool::Status::Pending);
         }
         finishFrame();
@@ -743,61 +744,47 @@ namespace
         glFinish();
         mPool.retire();
         {
-            INFO("read once the fence is laid and seen signalled");
+            INFO("nor at its frame's end, however long the GPU has had");
+            CHECK(mPool.result(seen, value) == ALQueryPool::Status::Pending);
+        }
+        endFrame();
+        mPool.retire();
+        {
+            INFO("read once the next frame's end has seen its frame finished");
             REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
             CHECK(value == 1);
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
-    // Under glthread, retire() polls no fence: a batch is read once a frame's end, where glthread has caught up, has
-    // seen its frame finished. Elsewhere retire() polls, once.
-    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: under glthread retire polls nothing, and reads what the frame's end saw", "[alquerypool_gl]")
+    // retire() polls no fence: a batch is read once a later frame's end has seen its frame finished.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: retire polls nothing, and reads what a frame's end saw", "[alquerypool_gl]")
     {
         setUp();
-        auto frame_with_query = [this]()
+        ALQueryTicket seen;
         {
             ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            seen = scope.ticket();
             draw(false);
-            return scope.ticket();
-        };
+        }
+        endFrame();
+        glFinish();
+        const U32 calls = mFrames.getCalls();
+        mPool.retire();
         U64 value = 0;
         {
-            ll_test::MesaGLThreadFlag glthread(true);
-            const ALQueryTicket seen = frame_with_query();
-            endFrame();
-            glFinish();
-            const U32 calls = mFrames.getCalls();
-            mPool.retire();
-            {
-                INFO("no poll");
-                CHECK(mFrames.getCalls() == calls);
-            }
-            endFrame();
-            const U32 ended = mFrames.getCalls();
-            mPool.retire();
-            {
-                INFO("read once the next frame's end has seen its frame finished, still with no poll");
-                CHECK(mFrames.getCalls() == ended);
-                REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
-                CHECK(value == 1);
-            }
+            INFO("no poll, and nothing read: its own frame's end does not look at it");
+            CHECK(mFrames.getCalls() == calls);
+            CHECK(mPool.result(seen, value) == ALQueryPool::Status::Pending);
         }
+        endFrame();
+        const U32 ended = mFrames.getCalls();
+        mPool.retire();
         {
-            // Every frame so far finished and seen, so that the next poll has one frame to look at.
-            glFinish();
-            mFrames.poll();
-            const ALQueryTicket seen = frame_with_query();
-            endFrame();
-            glFinish();
-            const U32 calls = mFrames.getCalls();
-            mPool.retire();
-            {
-                INFO("elsewhere one poll, and read");
-                CHECK(mFrames.getCalls() == calls + 1);
-                REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
-                CHECK(value == 1);
-            }
+            INFO("read once the next frame's end has seen its frame finished, still with no poll");
+            CHECK(mFrames.getCalls() == ended);
+            REQUIRE(mPool.result(seen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }

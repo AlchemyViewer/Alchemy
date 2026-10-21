@@ -543,11 +543,6 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
     ALFrameFences& fences = frames();
     if (!fences.isComplete(slot.mFrame))
     {
-        // A frame may have finished since the last poll; under glthread only the frame's end looks.
-        fences.poll();
-    }
-    if (!fences.isComplete(slot.mFrame))
-    {
         if (!wait)
         {
             return false;

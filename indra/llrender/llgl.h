@@ -189,10 +189,6 @@ public:
     // True for any Mesa driver (radeonsi, iris, llvmpipe, zink, ...). Detected
     // from the GL_VERSION string; used to gate Mesa-specific workarounds.
     bool mIsMesa = false;
-    // True where Mesa runs the context's GL calls on a thread of its own (glthread), as the viewer takes it to on Linux:
-    // every call that returns a value, glFenceSync and glClientWaitSync among them, then waits until that thread has run
-    // everything queued before it. See ALFrameFences.
-    bool mMesaGLThread = false;
     // True for Mesa's d3d12 driver: GLOn12, Microsoft's GL over D3D12 and the only GL on
     // Windows on Arm. Detected from its "D3D12 (<adapter>)" GL_RENDERER.
     bool mIsD3D12 = false;

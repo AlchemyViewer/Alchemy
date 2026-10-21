@@ -622,7 +622,6 @@ void ALQueryPool::read(Batch& batch)
 void ALQueryPool::retire()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    mFrames.poll();
     for (U32 back = FRAMES - 1; back > 0; --back)
     {
         if (mSerial <= back)

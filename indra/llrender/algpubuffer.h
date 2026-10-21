@@ -192,10 +192,9 @@ public:
     // writes. False, and nothing read, while every slot is pending.
     bool requestPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, size_t bytes);
 
-    // The oldest pending result into `out`, the `bytes` its request copied, once the frame it was issued in has
-    // finished: false while it may still be in flight, or when nothing is pending. It polls the frame fences
-    // (ALFrameFences::poll()), which polls only where that waits on no driver thread. `wait` waits for it instead, for
-    // a teardown or a test.
+    // The oldest pending result into `out`, the `bytes` its request copied, once the frame fences have shown the frame
+    // it was issued in finished, which is at a later frame's end: false before, or when nothing is pending. No GL call
+    // for a mapped slot. `wait` waits for it instead, for a teardown or a test.
     bool collect(void* out, size_t bytes, bool wait = false);
 
 private:

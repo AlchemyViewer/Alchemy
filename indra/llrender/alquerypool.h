@@ -97,17 +97,17 @@ private:
 /// closes the batch, and retire() reads every result of a batch at once when the frame fences show its frame finished
 /// (ALFrameFences), so that reading a result never waits on the GPU, never polls one query and lays no fence of its own.
 /// FRAMES batches of names are in flight, and a batch's names are begun again only once it has been read, so none is
-/// begun while its last result is pending. The results are kept
-/// apart from the names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames,
-/// as the object cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a
-/// ticket has expired.
+/// begun while its last result is pending. The results are kept apart from the names, for RESULT_FRAMES frames after
+/// their own: a user that reads its queries only every few frames, as the object cache's cull does while the camera
+/// rests (LLVOCachePartition::cull), still finds them. Past that a ticket has expired.
 ///
 /// Where the context has query buffers (gGLManager.mHasQueryBufferObject), endFrame() has the GPU write the batch's
 /// results into a mapped buffer of the batch's own, ahead of the frame's fence, and reading the batch copies them out
 /// of the map: no GL call. The writes are queued as any draw is where the context has direct state access; through the
-/// buffer binding they are calls Mesa's glthread runs only once it has caught up, each one. Asking GL for a result instead (glGetQueryObject) waits on more than the GPU: a threaded driver,
-/// such as NVIDIA's with threaded optimization, answers it only once its own thread has caught up on every command
-/// issued before it, which at the end of a frame is the whole frame.
+/// buffer binding they are calls Mesa's glthread runs only once it has caught up, each one. Asking GL for a result
+/// instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as NVIDIA's with threaded
+/// optimization, answers it only once its own thread has caught up on every command issued before it, which at the end
+/// of a frame is the whole frame.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is
@@ -180,9 +180,8 @@ public:
     /// the elapsed query of a span, which is GL's alone, may cross. Checked where asserts are.
     void checkPassBoundary() const;
 
-    /// Reads every closed batch whose frame has finished, oldest first, without waiting: it polls the frame fences
-    /// (ALFrameFences::poll()), and that only where a poll waits on no driver thread. Once a frame, before the results
-    /// are wanted.
+    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first: no GL call, the fences
+    /// being polled only at the frame's end. Once a frame, before the results are wanted.
     void retire();
 
     /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only

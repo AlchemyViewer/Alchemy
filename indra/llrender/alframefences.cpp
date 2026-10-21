@@ -49,14 +49,6 @@ namespace
 
 void ALFrameFences::poll()
 {
-    if (!gGLManager.mMesaGLThread)
-    {
-        pollPending();
-    }
-}
-
-void ALFrameFences::pollPending()
-{
     while (mComplete + 1 < mFrame)
     {
         const U32 frame = mComplete + 1;
@@ -136,7 +128,7 @@ bool ALFrameFences::wait(U32 frame, U64 timeout_ns, bool* stalled)
     }
 
     // Polling up to it shows every earlier frame on the way.
-    pollPending();
+    poll();
     if (isComplete(frame))
     {
         return true;
@@ -174,6 +166,10 @@ void ALFrameFences::endFrame()
         {
         }
     }
+    // The frame's one poll, of the frames ended before this one: straight after the swap, where a threaded driver's
+    // own thread has caught up or is finishing the swap. The frame ending now has only just been sent to the GPU.
+    poll();
+
     const U32 slot = mFrame % FRAMES;
     llassert(!mFences[slot]);
     mFences[slot]  = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
@@ -181,12 +177,6 @@ void ALFrameFences::endFrame()
     ++mCalls;
     ++mFrameCalls;
     ++mFrame;
-
-    // Under glthread the poll is here, where glthread has caught up at the swap.
-    if (gGLManager.mMesaGLThread)
-    {
-        pollPending();
-    }
 
     LL_PROFILE_PLOT("GL frame fence calls", (int64_t)mFrameCalls);
     mFrameCalls = 0;

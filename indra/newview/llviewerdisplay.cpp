@@ -801,8 +801,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         LLGLState::checkStates();
 
-        // The queries of the frames the GPU has finished, read just before the cull asks for them: as late as they can
-        // be, so that the GPU has had the mirrors and the geometry updates above to finish the last frame.
+        // The queries of the frames the frame fences have shown finished, read before the cull asks for them. No GL
+        // call: the fences are polled only at the frame's end (see ALFrameFences).
         gGL.queries().retire();
         gPipeline.readAttachmentTimes();
 
@@ -1072,12 +1072,13 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Close the frame's queries, lay the frame's fence, and close out the UBO streaming rings'
-    // per-frame counters (slices, wraps, GPU stalls) and let them resize. Straight after the swap:
-    // Mesa's glthread has caught up there, so the fence and its polls wait for nothing (see
-    // ALFrameFences). And here rather than in resetFrameStats(): a resize deletes and remaps a ring
-    // and invalidates every outstanding slice, which must land past this frame's draws, not before
-    // its heaviest passes. See ALUniformBuffer::endFrame.
+    // Close the frame's queries, poll the frame fences and lay this frame's, and close out the UBO
+    // streaming rings' per-frame counters (slices, wraps, GPU stalls) and let them resize. Straight
+    // after the swap: the frame's one poll waits on a threaded driver's own thread here, if
+    // anywhere, which is behind the swap already (see ALFrameFences). And here rather than in
+    // resetFrameStats(): a resize deletes and remaps a ring and invalidates every outstanding slice,
+    // which must land past this frame's draws, not before its heaviest passes. See
+    // ALUniformBuffer::endFrame.
     gGL.endFrame();
 
     display_stats();

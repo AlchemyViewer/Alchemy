@@ -280,13 +280,12 @@ namespace
         // The largest payload the scratch ring takes is a whole segment of its smallest ring: four of them fill it.
         constexpr size_t SEGMENT  = 256 * 1024;
         constexpr U32    SEGMENTS = 4;
-        ll_test::MesaGLThreadFlag no_glthread(false);
         // A ring of the smallest size, its head at the start.
         ALUniformBuffer::cleanupClass();
         ALFrameFences& frames = gGL.frameFences();
         // Every frame so far finished and seen.
         glFinish();
-        frames.poll();
+        REQUIRE(frames.wait(frames.frame() - 1, 1000000000ull));
 
         const std::vector<U8> payload(SEGMENT, 0x5a);
         // One payload a segment: the first lands at the start, and each after steps the head, leaving segments 0-2 in
@@ -298,7 +297,8 @@ namespace
         }
         frames.endFrame();
         glFinish();
-        frames.poll();
+        // The next frame's end shows it finished.
+        frames.endFrame();
 
         const U32 calls = frames.getCalls();
         // Into segments 0, 1 and 2, left in the frame that has finished; segment 3 is left in this one.

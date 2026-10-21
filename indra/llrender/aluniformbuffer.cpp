@@ -292,7 +292,8 @@ namespace
     // segment, and before reusing the segment being ENTERED, wait out the frame it was left in a
     // lap ago, unless the frame fences have shown it finished -- as they have while the ring holds
     // several frames, so a step makes no GL call: a fence laid or polled here, in the middle of a
-    // pass, is a call Mesa's glthread answers only once it has caught up. All ring state is passed
+    // pass, is a call a threaded driver answers only once its own thread has caught up (see
+    // ALFrameFences). All ring state is passed
     // by reference so the one mechanism drives both the persistent streaming ring and the
     // persistent scratch ring. On return `head`/`seg` address the slice's home.
     void advance_segmented_ring(size_t aligned, size_t seg_bytes, int seg_count,
