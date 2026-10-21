@@ -47,6 +47,27 @@ class RawCallTests(unittest.TestCase):
                 "#endif\n")
         self.assertEqual(check.raw_calls(text), [(9, "glViewport"), (12, "glPointSize")])
 
+    def test_elif_zero_branches_are_not_counted(self):
+        text = ("#if 0\n"
+                "glClear(0);\n"
+                "#elif 0\n"
+                "glFlush();\n"
+                "#elif LL_WINDOWS\n"
+                "glFinish();\n"
+                "#endif\n"
+                "#if LL_DARWIN\n"
+                "glViewport(0, 0, 1, 1);\n"
+                "#elif 0\n"
+                "glPointSize(1.f);\n"
+                "#else\n"
+                "glCullFace(GL_BACK);\n"
+                "#endif\n")
+        self.assertEqual(check.raw_calls(text), [(6, "glFinish"), (9, "glViewport"), (13, "glCullFace")])
+
+    def test_a_call_whose_parenthesis_is_on_a_later_line_is_counted_on_its_name_line(self):
+        text = "void f()\n{\n    glClear\n        (GL_COLOR_BUFFER_BIT);\n    glFlush();\n}\n"
+        self.assertEqual(check.raw_calls(text), [(3, "glClear"), (5, "glFlush")])
+
     def test_an_unclosed_quote_keeps_the_lines_after_it(self):
         text = "int n = 1'000;\nglFlush();\n"
         self.assertEqual(check.raw_calls(text), [(2, "glFlush")])

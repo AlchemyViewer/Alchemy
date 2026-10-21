@@ -84,38 +84,32 @@ def strip_comments_and_strings(text):
 
 
 def strip_if_zero(text):
-    """The text with the lines #if 0 leaves out blanked, up to its #else, #elif or #endif."""
+    """The text with the branches of #if 0 and #elif 0 blanked. Any other condition is taken as compiled."""
     lines = text.split("\n")
-    stack = []  # per open conditional: whether it was entered dead, and whether its live part is the #else
-    dead = 0
+    stack = []  # per open conditional: whether the branch in force is a 0
     for index, line in enumerate(lines):
         match = DIRECTIVE.match(line)
         if match:
             kind, rest = match.group(1), match.group(2).strip()
+            zero = re.match(r"^0\b", rest) is not None
             if kind in ("if", "ifdef", "ifndef"):
-                zero = kind == "if" and re.match(r"^0\b", rest) is not None
-                stack.append(zero)
-                if zero:
-                    dead += 1
-            elif kind in ("elif", "else") and stack and stack[-1]:
+                stack.append(kind == "if" and zero)
+            elif kind == "elif" and stack:
+                stack[-1] = zero
+            elif kind == "else" and stack:
                 stack[-1] = False
-                dead -= 1
             elif kind == "endif" and stack:
-                if stack.pop():
-                    dead -= 1
+                stack.pop()
             lines[index] = ""
-        elif dead:
+        elif any(stack):
             lines[index] = ""
     return "\n".join(lines)
 
 
 def raw_calls(text):
-    """(line, name) for each raw gl* call the source makes."""
+    """(line, name) for each raw gl* call the source makes, its parenthesis on the same line or a later one."""
     code = strip_if_zero(strip_comments_and_strings(text))
-    calls = []
-    for number, line in enumerate(code.split("\n"), 1):
-        calls.extend((number, match.group(0)) for match in CALL.finditer(line))
-    return calls
+    return [(code.count("\n", 0, match.start()) + 1, match.group(0)) for match in CALL.finditer(code)]
 
 
 def read_baseline(path):
