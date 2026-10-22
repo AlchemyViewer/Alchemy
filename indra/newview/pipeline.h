@@ -512,8 +512,12 @@ public:
     void updateMovedList(LLDrawable::drawable_vector_t& move_list);
     void updateMove();
     bool visibleObjectsInFrustum(LLCamera& camera);
-    bool getVisibleExtents(LLCamera& camera, LLVector3 &min, LLVector3& max);
-    bool getVisiblePointCloud(LLCamera& camera, LLVector3 &min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir = LLVector3(0,0,0));
+    // With `water`, the water's field is among the receivers wherever it receives shadows (waterReceivesShadows).
+    bool getVisibleExtents(LLCamera& camera, LLVector3 &min, LLVector3& max, bool water = true);
+    bool getVisiblePointCloud(LLCamera& camera, LLVector3 &min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir = LLVector3(0,0,0),
+                              bool water = true);
+    // Whether the water's field receives shadows in `camera`'s frustum: drawn from where the water is, and in view.
+    bool waterReceivesShadows(LLCamera& camera);
 
     // Populate given LLCullResult with results of a frustum cull of the entire scene against the given LLCamera
     void updateCull(LLCamera& camera, LLCullResult& result);
