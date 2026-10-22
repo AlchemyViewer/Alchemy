@@ -7,6 +7,7 @@ set(
   algpubuffer.cpp
   algputimer.cpp
   alimageslot.cpp
+  alpacingslack.cpp
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
@@ -47,6 +48,7 @@ set(
   algpubuffer.h
   algputimer.h
   alimageslot.h
+  alpacingslack.h
   alprimitiveplot.h
   alquerypool.h
   alrendertargetdesc.h
@@ -161,6 +163,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alpacingslack_test.cpp
       tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
@@ -222,9 +225,9 @@ if(AL_BUILD_TESTS)
   #   ring's segments reused once the frame each was left in has finished;
   # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
   #   queries;
-  # - ALFrameFences: one fence a frame, polled at the frame's end under
-  #   Mesa's glthread and where its user asks elsewhere, and waits that stall
-  #   only on frames the GPU has not finished;
+  # - ALFrameFences: one fence a frame, polled at the frame's end, waits that
+  #   stall only on frames the GPU has not finished, and the frame's end's
+  #   pacing wait for the frame a given number before it, and no later one;
   # - ALQueryPool: each kind's names kept to its target, a held target
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;

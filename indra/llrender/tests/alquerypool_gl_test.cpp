@@ -822,6 +822,102 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // LLRender's frame end reads the batches its fences have just shown finished: the next frame's cull finds the
+    // results with nothing read in the middle of the frame, where asking GL waits for a threaded driver's thread.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: LLRender's frame end reads what its fences show finished", "[alquerypool_gl]")
+    {
+        setUp();
+        ALQueryPool& queries = gGL.queries();
+        // Every frame of the context so far finished and seen.
+        glFinish();
+        REQUIRE(gGL.frameFences().wait(gGL.frameFences().frame() - 1, 1000000000ull));
+        ALQueryTicket seen;
+        {
+            ALQueryScope scope(queries, ALQueryKind::Occlusion);
+            seen = scope.ticket();
+            draw(false);
+        }
+        REQUIRE(seen.isValid());
+        gGL.endFrame();
+        glFinish();
+        U64 value = 0;
+        {
+            INFO("not at its own frame's end");
+            CHECK(queries.result(seen, value) == ALQueryPool::Status::Pending);
+        }
+        gGL.endFrame();
+        {
+            INFO("read by the next frame's end, with retire() called by nothing else");
+            REQUIRE(queries.result(seen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A batch opens with names for the busiest frame so far and half again, made at a frame's end: a frame that uses no
+    // more makes no name in its middle, where glGenQueries waits for a threaded driver's thread to catch up.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch opens with room for the busiest frame so far, and half again", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 BUSIEST = 100;
+        const auto issue = [this](U32 count)
+        {
+            for (U32 i = 0; i < count; ++i)
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+                REQUIRE(scope.ticket().isValid());
+            }
+        };
+        issue(BUSIEST);
+        // Every batch opened again since, each given room at a frame's end, after its fences, as LLRender does.
+        for (U32 frame = 0; frame <= ALQueryPool::FRAMES; ++frame)
+        {
+            endFrame();
+            mPool.makeRoom();
+            glFinish();
+        }
+        const U32 names = mPool.getNameCount();
+        issue(BUSIEST + BUSIEST / 2);
+        {
+            INFO("no name made in the middle of the frame");
+            CHECK(mPool.getNameCount() == names);
+        }
+        endFrame();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Once the busiest frame is long past, a batch lets go of the names past twice the room the frames of late need.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch lets go of names once its busiest frame is long past", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 BUSIEST = 2000;
+        for (U32 i = 0; i < BUSIEST; ++i)
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            REQUIRE(scope.ticket().isValid());
+        }
+        endFrame();
+        mPool.makeRoom();
+        glFinish();
+        const U32 busy = mPool.getNameCount();
+        REQUIRE(busy >= BUSIEST);
+        // Quiet frames, long enough for that peak to fade away.
+        for (U32 frame = 0; frame < 1000; ++frame)
+        {
+            endFrame();
+            mPool.makeRoom();
+            if (frame % ALQueryPool::FRAMES == 0)
+            {
+                glFinish();
+            }
+        }
+        {
+            INFO("held " << busy << " names when busy, " << mPool.getNameCount() << " now");
+            CHECK(mPool.getNameCount() * 4 < busy);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A Statistics query counts every pipeline statistic at once, on targets of its own: the occlusion and primitives
     // queries of the frame begin while it counts.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a statistics query counts its statistics and holds no other target", "[alquerypool_gl]")

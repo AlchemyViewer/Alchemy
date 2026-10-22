@@ -548,9 +548,7 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
             return false;
         }
         // For the open frame this waits for every command issued so far, the copy among them.
-        while (!fences.wait(slot.mFrame, 1000000000ull /* 1s */))
-        {
-        }
+        fences.waitFinished(slot.mFrame);
     }
 
     const size_t offset = (size_t)oldest * mSlotStride;
@@ -683,4 +681,20 @@ size_t ALGPUStream::publish(size_t bytes)
     mPublished = mWriting;
     mWriting   = -1;
     return offset;
+}
+
+void ALGPUStream::noteRead(size_t offset)
+{
+    if (mRegionStride == 0)
+    {
+        return;
+    }
+    const size_t region = offset / mRegionStride;
+    // The region published last is noted by the next map(), in its frame or a later one; one being written is not
+    // published.
+    if (region >= mReadIn.size() || (S32)region == mPublished || (S32)region == mWriting)
+    {
+        return;
+    }
+    mReadIn[region] = frames().frame();
 }

@@ -446,6 +446,9 @@ extern U32 gForegroundFrameCount;
 
 extern LLPumpIO* gServicePump;
 
+// The work other threads post for the main thread ("mainloop"), which the main thread alone runs.
+extern LL::WorkQueue gMainloopWork;
+
 // The frame's time, sampled once at the top of LLAppViewer::idle() from the
 // same reading as LLFrameTimer, and updated every frame, teleports included.
 extern U64MicrosecondsImplicit   gFrameTime;                    // Microseconds since the epoch, as totalTime()

@@ -598,4 +598,39 @@ namespace
         CHECK(mFrames.getCalls() >= calls + 2);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
+
+    // ALGPUStream: a region its user reads again in a later frame, after the next map(), is written again only once that
+    // frame has finished, not the frame the next map() noted.
+    TEST_CASE_METHOD(algpubuffer_data, "algpubuffer_gl: ALGPUStream holds a region read again in a later frame until that frame finishes", "[algpubuffer_gl]")
+    {
+        constexpr U32 REGIONS = 3;
+        constexpr U32 COUNT = 10;
+        ALGPUStream stream(&mFrames);
+        REQUIRE(stream.allocate(COUNT * sizeof(U32), REGIONS, "stream (test)"));
+
+        // Every region mapped and published in one frame, the first noted read in it by the second's map.
+        size_t kept = 0;
+        for (U32 i = 0; i < REGIONS; ++i)
+        {
+            REQUIRE(stream.map() != nullptr);
+            const size_t offset = stream.publish(COUNT * sizeof(U32));
+            if (i == 0)
+            {
+                kept = offset;
+            }
+        }
+        mFrames.endFrame();
+        glFinish();
+        // The next frame's end shows it finished.
+        mFrames.endFrame();
+
+        // The first region read again in this frame, as a user that keeps what it published does.
+        stream.noteRead(kept);
+        const U32 calls = mFrames.getCalls();
+        REQUIRE(stream.map() != nullptr);
+        stream.publish(COUNT * sizeof(U32));
+        UNSCOPED_INFO("back to the first region, read in this open frame: it waits for what has been issued");
+        CHECK(mFrames.getCalls() >= calls + 2);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
 }

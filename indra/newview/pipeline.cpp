@@ -892,6 +892,9 @@ void LLPipeline::latchRenderInputs()
 
     sReflectionProbesEnabled = mLatchedInputs.mProbes;
     sRenderTransparentWater  = mLatchedInputs.mTransparentWater;
+
+    mMaxFramesAhead  = gSavedSettings.getU32("AlchemyRenderMaxFramesAhead");
+    mPacingSlackWork = gSavedSettings.getBOOL("AlchemyRenderPacingSlackWork");
 }
 
 const ALShaderInputs& LLPipeline::shaderInputs() const
@@ -3647,7 +3650,10 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         return;
     }
 
-    if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
+    // Not from a snapshot's camera: a tile of a snapshot larger than the window sees part of the view, and a probe off
+    // it would read as occluded, dropping it from the reflections of the tiles after and of the frames after the
+    // snapshot. A snapshot keeps the main view's occlusion instead (LLReflectionMapManager::getReflectionMaps).
+    if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot && !gSnapshot)
     {
         LLGLSColorMask color_mask(false, false);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);

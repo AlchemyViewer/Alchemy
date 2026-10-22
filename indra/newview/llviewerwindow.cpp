@@ -6070,6 +6070,8 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     // property in pipeline but that the use in pipeline.cpp
     // lags by a frame or two so rendering more than once
     // appears to help a lot.
+    // The faces look away from the main view, whose probes' occlusion says nothing of them.
+    gSnapshotOffMainView = true;
     for (int i = 0; i < num_render_passes; ++i)
     {
         // turning this flag off here prohibits the screen swap
@@ -6087,6 +6089,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
         const bool for_snapshot = true;
         display(do_rebuild, zoom, subfield, for_snapshot);
     }
+    gSnapshotOffMainView = false;
 
     LLImageDataSharedLock lock(raw);
 

@@ -2320,7 +2320,8 @@ void LLGLManager::initQueries()
     }
 
     // The GPU writes the results only on NVIDIA's driver, whose threaded optimization answers a glGetQueryObject only
-    // once its own thread has caught up on the frame. Elsewhere asking waits on no such thread, and saves the write.
+    // once its own thread has caught up on the frame. Elsewhere the pool asks, at the frame's end, where the frame
+    // fences' calls have just caught Mesa's glthread up, and saves the write.
     mWritesQueryResults = mHasQueryBufferObject && mIsNVIDIA;
 
     GLint bits = 0;

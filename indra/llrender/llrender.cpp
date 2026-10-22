@@ -539,11 +539,18 @@ void LLRender::shutdown()
     mFrameFences.release();
 }
 
-void LLRender::endFrame()
+void LLRender::endFrame(U32 frames_ahead)
 {
-    // The batch's results are written ahead of the fence that follows them.
+    // The batch's results are written ahead of the fence that follows them. The batches the fences have just shown
+    // finished are read here rather than before the next cull, the next batch's names are made here rather than by its
+    // queries, and the fences of the uploads handed over by other contexts are polled here rather than in the next
+    // idle: a threaded driver answers a call that returns a value only once its thread has caught up, and the fences'
+    // own calls have just caught it up.
     mQueries.endFrame();
-    mFrameFences.endFrame();
+    mFrameFences.endFrame(frames_ahead);
+    mQueries.retire();
+    mQueries.makeRoom();
+    LLImageGL::pollUploads();
     ALUniformBuffer::endFrame();
 }
 

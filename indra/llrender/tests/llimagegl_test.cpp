@@ -984,6 +984,67 @@ namespace
         CHECK(readTexelRGBA(img, 5, 5) == 0x55555555u);
     }
 
+    // The frame's idle publishes only the uploads a frame's end has seen signalled: their
+    // fences are polled at the end of the frame (LLRender::endFrame), never in the middle of
+    // one, where a threaded driver answers a poll only once its own thread has caught up.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload's fence is polled at the frame's end, and published in idle", "[LLImageGL]")
+    {
+        LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        LLImageGLThread::createInstance(gl->window());
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
+
+        img->beginUpload();
+        LLImageGLThread::instance().post(
+            [img, raw, &worker_done]()
+            {
+                img->createGLTexture(0, raw.get());
+                worker_done = true;
+            });
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!worker_done && std::chrono::steady_clock::now() < deadline)
+        {
+            mainloop.runPending();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        mainloop.runPending();
+        REQUIRE(worker_done.load());
+
+        bool completed = false;
+        img->afterPublish([&]() { completed = true; });
+
+        // Long enough for the GPU to have finished the upload: idle alone still publishes nothing.
+        const auto idle_until = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+        while (std::chrono::steady_clock::now() < idle_until)
+        {
+            LLImageGL::updateClass();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        UNSCOPED_INFO("idle polls no fence, so nothing is published without a frame's end");
+        CHECK_FALSE(completed);
+
+        while (!completed && std::chrono::steady_clock::now() < deadline)
+        {
+            gGL.endFrame();
+            LLImageGL::updateClass();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        LLImageGLThread::deleteSingleton();
+
+        UNSCOPED_INFO("published by idle once a frame's end saw its fence signalled");
+        CHECK(completed);
+        UNSCOPED_INFO("at the new size");
+        CHECK(img->getWidth() == 32);
+    }
+
     // And the rest of what LLRender's setters cache. A polygon offset or patch
     // size the last context was left with made the same setting on the next one
     // look redundant, so the fresh context kept GL's initial value instead.
