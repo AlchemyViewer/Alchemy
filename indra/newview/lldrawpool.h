@@ -495,8 +495,8 @@ public:
 void setup_texture_matrix(LLDrawInfo& params);
 void teardown_texture_matrix(LLDrawInfo& params);
 
-// A texture as a shadow pass samples it, folded into `draw`: which image, at which level and size. One whose contents
-// change in place while those hold, as media's and a dynamic texture's do, marks `casters` changing.
+// A texture as a shadow pass samples it, folded into `draw`: which image, what it holds, at which level and size. Media
+// and a dynamic texture, whose contents change every frame they play or draw, mark `casters` changing.
 void add_shadow_texture(ALSpotShadowCache::Casters& casters, ALSpotShadowCache::Hash& draw, const LLViewerTexture* texture);
 
 class LLFacePool : public LLDrawPool
