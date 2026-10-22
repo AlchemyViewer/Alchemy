@@ -358,7 +358,7 @@ void LLViewerCamera::setPerspective(bool for_selection,
             constexpr F32 PREVIEW_FAR = 512.f;
             z_far = PREVIEW_FAR;
         }
-        glViewport(x, y_from_bot, width, height);
+        gGL.setViewport(x, y_from_bot, width, height);
         gGLViewport[0] = x;
         gGLViewport[1] = y_from_bot;
         gGLViewport[2] = width;

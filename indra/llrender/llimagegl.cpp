@@ -3543,7 +3543,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
 
     if (use_fbo)
     { // use an FBO to downscale the texture
-        glViewport(0, 0, desired_width, desired_height);
+        gGL.setViewport(0, 0, desired_width, desired_height);
 
         // draw a full screen triangle, sampling the old (larger) texture
         if (gGL.getTextureSlot(0)->bind(this, true, true))

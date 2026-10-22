@@ -410,6 +410,75 @@ public:
     // Redundant sets are dropped without a flush.
     void setPatchVertices(U32 count);
 
+    // How polygons rasterize, front and back alike, the only face a core context takes: GL_FILL, GL_LINE or
+    // GL_POINT. A change flushes what is batched under the old mode; redundant sets are dropped without one.
+    void setPolygonMode(U32 mode);
+    U32  getPolygonMode() const { return mPolygonMode; }
+
+    // The faces GL_CULL_FACE (an LLGLState) culls: GL_BACK, GL_FRONT or GL_FRONT_AND_BACK. A change flushes what is
+    // batched; redundant sets are dropped without one.
+    void setCullFace(U32 face);
+    U32  getCullFace() const { return mCullFace; }
+
+    // The diameter in pixels points rasterize at while the program writes no gl_PointSize. A change flushes what is
+    // batched; redundant sets are dropped without one.
+    void setPointSize(F32 size);
+    F32  getPointSize() const { return mPointSize; }
+
+    // The stencil test GL_STENCIL_TEST (an LLGLState) runs, front and back alike: its function, reference and the
+    // bits it compares, what each outcome does to the stencil, and the bits a draw or a clear may write. Each setter
+    // flushes what is batched on a change and drops a redundant set without one. ALGLStencil scopes all three.
+    void setStencilFunc(U32 func, S32 ref, U32 mask);
+    void setStencilOp(U32 stencil_fail, U32 depth_fail, U32 pass);
+    void setStencilMask(U32 mask);
+    void getStencilFunc(U32& func, S32& ref, U32& mask) const
+    {
+        func = mStencilFunc;
+        ref  = mStencilRef;
+        mask = mStencilReadMask;
+    }
+    void getStencilOp(U32& stencil_fail, U32& depth_fail, U32& pass) const
+    {
+        stencil_fail = mStencilFail;
+        depth_fail   = mStencilDepthFail;
+        pass         = mStencilPass;
+    }
+    U32  getStencilMask() const { return mStencilWriteMask; }
+
+    // How blending combines source and destination, the colour by `rgb` and alpha by `alpha` (GL_FUNC_ADD, GL_MAX
+    // and the rest), for every draw buffer. A change flushes what is batched; redundant sets are dropped without one.
+    void setBlendEquation(U32 rgb, U32 alpha);
+    void getBlendEquation(U32& rgb, U32& alpha) const
+    {
+        rgb   = mBlendEquationRGB;
+        alpha = mBlendEquationAlpha;
+    }
+
+    // The viewport, in pixels of the bound framebuffer. Every writer goes through here, LLRenderTarget's binds
+    // included; a change flushes what is batched under the old viewport, and redundant sets are dropped without one.
+    void setViewport(S32 x, S32 y, S32 width, S32 height);
+    // The viewport in force: x, y, width, height. Width is negative until one is set in this context, which GL starts
+    // at the size of the window it was made for.
+    void getViewport(S32 (&box)[4]) const
+    {
+        box[0] = mViewport[0];
+        box[1] = mViewport[1];
+        box[2] = mViewport[2];
+        box[3] = mViewport[3];
+    }
+
+    // Issue the clip control and the depth clear value sReverseZ calls for: zero-to-one clip depth cleared to 0
+    // under reverse-Z, minus-one-to-one cleared to 1 otherwise, clip control only where the context has it
+    // (gGLManager.mHasClipControl). Both are issued whether or not they changed.
+    static void applyDepthConvention();
+
+    // Reads the `width` x `height` rectangle at (x, y) of the framebuffer bound for reading into `data`, as
+    // glReadPixels reads it in `format` and `type` under the pack alignment of 1 init() set, after what is batched
+    // has been drawn. Synchronous: it waits for the GPU, and for a threaded driver's own thread, to finish everything
+    // issued before it. For a read made once on purpose, a snapshot or a click's probe; anything read every frame
+    // reads through ALGPUReadback.
+    void readPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, void* data);
+
     // The colour glClear fills colour buffers with. Every writer in the tree goes through
     // here, so the cache is the state. Redundant sets are dropped; nothing batched reads it,
     // so a change needs no flush.
@@ -654,6 +723,24 @@ private:
     U32             mPatchVertices = 3; // GL's initial GL_PATCH_VERTICES
     LLColor4        mClearColor = LLColor4(0.f, 0.f, 0.f, 0.f); // GL's initial GL_COLOR_CLEAR_VALUE
     S32             mScissor[4] = { 0, 0, -1, -1 };              // unknown until set (see getScissor)
+    S32             mViewport[4] = { 0, 0, -1, -1 };             // unknown until set (see getViewport)
+    // The rest at GL's initial values, which init() issues.
+    U32             mPolygonMode = GL_FILL;
+    U32             mCullFace = GL_BACK;
+    F32             mPointSize = 1.f;
+    U32             mStencilFunc = GL_ALWAYS;
+    S32             mStencilRef = 0;
+    U32             mStencilReadMask = ~0u;
+    U32             mStencilFail = GL_KEEP;
+    U32             mStencilDepthFail = GL_KEEP;
+    U32             mStencilPass = GL_KEEP;
+    U32             mStencilWriteMask = ~0u;
+    U32             mBlendEquationRGB = GL_FUNC_ADD;
+    U32             mBlendEquationAlpha = GL_FUNC_ADD;
+
+    // Issue the polygon mode, cull face, point size, stencil state and blend equation this holds, as init() and
+    // refreshState() do.
+    void issueRasterState() const;
 
     LLPointer<LLVertexBuffer>   mBuffer;
     LLStrider<LLVector4a>       mVerticesp;

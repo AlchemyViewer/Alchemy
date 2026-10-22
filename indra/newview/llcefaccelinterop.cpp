@@ -28,9 +28,10 @@
 
 #if LL_WINDOWS
 
+#include "altextureblit.h"
 #include "llgl.h"          // viewer GL entry points + the global wglDX* pointers
+#include "llimagegl.h"
 #include "llrender.h"
-#include "llrendertarget.h"
 #include "lldxhardware.h"  // shared D3D11 device + GL interop device (gDXHardware)
 
 #include <windows.h>
@@ -62,14 +63,13 @@ namespace
         int              height = 0;
         bool             logged_register = false;
 
-        // FBOs for the flip+convert blit (created once, reused).
-        GLuint           read_fbo = 0;
-        GLuint           draw_fbo = 0;
+        // The flip+convert blit, whose framebuffers are made once and reused.
+        ALTextureBlit    blit;
 
         void releaseStable()
         {
             if (local_obj) { wglDXUnregisterObjectNV(interopDevice(), local_obj); local_obj = nullptr; }
-            if (local_gl)  { glDeleteTextures(1, &local_gl); local_gl = 0; }
+            if (local_gl)  { LLImageGL::deleteTextures(1, &local_gl); local_gl = 0; }
             if (local)     { local->Release(); local = nullptr; }
             if (mutex)     { mutex->Release(); mutex = nullptr; }
             if (stable)    { stable->Release(); stable = nullptr; }
@@ -104,8 +104,7 @@ void LLCEFAccelInterop::shutdown()
     }
     WinAccel* w = (WinAccel*)mImpl;
     w->releaseStable();
-    if (w->read_fbo) { glDeleteFramebuffers(1, &w->read_fbo); w->read_fbo = 0; }
-    if (w->draw_fbo) { glDeleteFramebuffers(1, &w->draw_fbo); w->draw_fbo = 0; }
+    w->blit.release();
     delete w;
     mImpl = nullptr;
     mValid = false;
@@ -158,7 +157,7 @@ bool LLCEFAccelInterop::setStableTexture(unsigned long long handle, int width, i
         return false;
     }
 
-    glGenTextures(1, &w->local_gl);
+    LLImageGL::generateTextures(1, &w->local_gl);
     w->local_obj = wglDXRegisterObjectNV(interopDevice(), w->local, w->local_gl, GL_TEXTURE_2D, WGL_ACCESS_READ_ONLY_NV);
     if (!w->local_obj)
     {
@@ -229,21 +228,7 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
         return false;
     }
 
-    if (!w->read_fbo) glGenFramebuffers(1, &w->read_fbo);
-    if (!w->draw_fbo) glGenFramebuffers(1, &w->draw_fbo);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, w->read_fbo);
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, w->local_gl, 0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, w->draw_fbo);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint)dst_tex, 0);
-
-    glBlitFramebuffer(0, 0, cw, ch,   // src
-                      0, ch, cw, 0,   // dst, Y-flipped
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
+    w->blit.blit(GL_TEXTURE_2D, w->local_gl, dst_tex, cw, ch, true);
 
     wglDXUnlockObjectsNV(gl_dx, 1, &w->local_obj);
     return true;
@@ -251,9 +236,10 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
 
 #elif LL_DARWIN  // macOS: bind the shared IOSurface to a GL texture, blit to media
 
+#include "altextureblit.h"
 #include "llgl.h"
+#include "llimagegl.h"
 #include "llrender.h"
-#include "llrendertarget.h"
 #include <OpenGL/CGLCurrent.h>
 #include <OpenGL/CGLIOSurface.h>
 #include <IOSurface/IOSurface.h>
@@ -270,8 +256,7 @@ namespace
         IOSurfaceRef surface = nullptr;
         int         width = 0;
         int         height = 0;
-        GLuint      read_fbo = 0;
-        GLuint      draw_fbo = 0;
+        ALTextureBlit blit;
     };
 }
 
@@ -287,7 +272,7 @@ bool LLCEFAccelInterop::init()
         return false;
     }
     MacAccel* m = new MacAccel();
-    glGenTextures(1, &m->tex);
+    LLImageGL::generateTextures(1, &m->tex);
     mImpl = m;
     mValid = true;
     return true;
@@ -300,9 +285,8 @@ void LLCEFAccelInterop::shutdown()
         return;
     }
     MacAccel* m = (MacAccel*)mImpl;
-    if (m->tex) { glDeleteTextures(1, &m->tex); }
-    if (m->read_fbo) { glDeleteFramebuffers(1, &m->read_fbo); }
-    if (m->draw_fbo) { glDeleteFramebuffers(1, &m->draw_fbo); }
+    if (m->tex) { LLImageGL::deleteTextures(1, &m->tex); }
+    m->blit.release();
     if (m->surface) { CFRelease(m->surface); }
     delete m;
     mImpl = nullptr;
@@ -377,29 +361,17 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
         return false;
     }
 
-    if (!m->read_fbo) glGenFramebuffers(1, &m->read_fbo);
-    if (!m->draw_fbo) glGenFramebuffers(1, &m->draw_fbo);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, m->read_fbo);
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE_ARB, m->tex, 0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m->draw_fbo);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint)dst_tex, 0);
-
-    glBlitFramebuffer(0, 0, cw, ch,   // src
-                      0, ch, cw, 0,   // dst, Y-flipped
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_RECTANGLE_ARB, 0, 0);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
+    // Y-flipped: the IOSurface is top-down, the media texture bottom-up.
+    m->blit.blit(GL_TEXTURE_RECTANGLE_ARB, m->tex, dst_tex, cw, ch, true);
     return true;
 }
 
 #elif LL_LINUX  // import the plugin's dma-buf via EGL, blit to the media texture
 
+#include "altextureblit.h"
 #include "llgl.h"
+#include "llimagegl.h"
 #include "llrender.h"
-#include "llrendertarget.h"
 #include <SDL3/SDL.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -428,8 +400,7 @@ namespace
         EGLImageKHR image = EGL_NO_IMAGE_KHR;
         int      width = 0;
         int      height = 0;
-        GLuint   read_fbo = 0;
-        GLuint   draw_fbo = 0;
+        ALTextureBlit blit;
 
         void releaseImage()
         {
@@ -472,7 +443,7 @@ bool LLCEFAccelInterop::init()
     const char* exts = eglQueryString ? eglQueryString(l->display, EGL_EXTENSIONS) : nullptr;
     l->has_import_modifiers = exts && strstr(exts, "EGL_EXT_image_dma_buf_import_modifiers") != nullptr;
 
-    glGenTextures(1, &l->tex);
+    LLImageGL::generateTextures(1, &l->tex);
     mImpl = l;
     mValid = true;
     return true;
@@ -486,9 +457,8 @@ void LLCEFAccelInterop::shutdown()
     }
     LinuxAccel* l = (LinuxAccel*)mImpl;
     l->releaseImage();
-    if (l->tex) { glDeleteTextures(1, &l->tex); }
-    if (l->read_fbo) { glDeleteFramebuffers(1, &l->read_fbo); }
-    if (l->draw_fbo) { glDeleteFramebuffers(1, &l->draw_fbo); }
+    if (l->tex) { LLImageGL::deleteTextures(1, &l->tex); }
+    l->blit.release();
     delete l;
     mImpl = nullptr;
     mValid = false;
@@ -616,21 +586,8 @@ bool LLCEFAccelInterop::blitTo(unsigned int dst_tex, int width, int height)
         return false;
     }
 
-    if (!l->read_fbo) glGenFramebuffers(1, &l->read_fbo);
-    if (!l->draw_fbo) glGenFramebuffers(1, &l->draw_fbo);
-
-    glBindFramebuffer(GL_READ_FRAMEBUFFER, l->read_fbo);
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, l->tex, 0);
-    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, l->draw_fbo);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, (GLuint)dst_tex, 0);
-
-    glBlitFramebuffer(0, 0, cw, ch,   // src
-                      0, ch, cw, 0,   // dst, Y-flipped
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-
-    glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, LLRenderTarget::sCurFBO);
+    // Y-flipped: the dma-buf is top-down, the media texture bottom-up.
+    l->blit.blit(GL_TEXTURE_2D, l->tex, dst_tex, cw, ch, true);
     return true;
 }
 

@@ -181,7 +181,7 @@ void display_startup()
 
     LLGLState::checkStates();
 
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
     LLGLSUIDefault gls_ui;
     gPipeline.disableLights();
 
@@ -519,8 +519,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     { //skip render on frames where window has been resized
         LL_DEBUGS("Window") << "Resizing window" << LL_ENDL;
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Resize Window");
-        gGL.flush();
-        glClear(GL_COLOR_BUFFER_BIT);
+        gGL.clear(GL_COLOR_BUFFER_BIT);
         gViewerWindow->getWindow()->swapBuffers();
         gGL.endFrame();
         gPipeline.applyRenderInputs();
@@ -782,7 +781,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (LLViewerDynamicTexture::updateAllInstances())
         {
             gGL.setColorMask(true, true);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            gGL.clear(GL_DEPTH_BUFFER_BIT);
         }
     }
 
@@ -920,7 +919,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
                 LLGLState::checkStates();
             }
-            glClear(GL_DEPTH_BUFFER_BIT);
+            gGL.clear(GL_DEPTH_BUFFER_BIT);
         }
 
         //////////////////////////////////////
@@ -1003,7 +1002,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if(gUseWireframe)
         {
             gGL.setClearColor(LLColor4(0.5f, 0.5f, 0.5f, 0.f));
-            glClear(GL_COLOR_BUFFER_BIT);
+            gGL.clear(GL_COLOR_BUFFER_BIT);
         }
 
         LLAppViewer::instance()->pingMainloopTimeout("Display:RenderStart");
@@ -1313,7 +1312,7 @@ void display_cube_face()
     gGL.setClearColor(LLColor4::transparent);
     gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
 
-    glClear(GL_DEPTH_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
 
     {
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
@@ -1880,7 +1879,7 @@ void render_ui_2d()
     // Render 2D UI elements that overlay the world (no z compare)
 
     //  Disable wireframe mode below here, as this is HUD/menus
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    gGL.setPolygonMode(GL_FILL);
 
     //  Menu overlays, HUD, etc
     gViewerWindow->setup2DRender();

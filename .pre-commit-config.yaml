@@ -18,3 +18,17 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
         files: \.(cpp|c|m|mm|h|inl|py|glsl|cmake|yaml|sh)$
+  - repo: local
+    hooks:
+      - id: raw-gl-newview
+        name: Raw GL calls in newview
+        entry: python scripts/code_tools/check_raw_gl.py
+        language: python
+        files: ^indra/newview/.*\.(c|cc|cpp|cxx|h|hh|hpp|inl|m|mm)$
+        exclude: ^indra/newview/tests/
+      - id: raw-gl-baseline
+        name: Raw GL baseline
+        entry: python scripts/code_tools/check_raw_gl.py
+        language: python
+        files: ^scripts/code_tools/(check_raw_gl\.py|raw_gl_baseline\.txt)$
+        pass_filenames: false

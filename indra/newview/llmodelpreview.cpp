@@ -3600,9 +3600,9 @@ bool LLModelPreview::render()
                     if (show_edges)
                     {
                         gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                        gGL.setPolygonMode(GL_LINE);
                         buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
-                        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                        gGL.setPolygonMode(GL_FILL);
                         gGL.setLineWidth(1.f);
                     }
                     buffer->unmapBuffer();
@@ -3612,7 +3612,7 @@ bool LLModelPreview::render()
 
             if (show_physics)
             {
-                glClear(GL_DEPTH_BUFFER_BIT);
+                gGL.clear(GL_DEPTH_BUFFER_BIT);
 
                 for (U32 pass = 0; pass < 2; pass++)
                 {
@@ -3727,10 +3727,10 @@ bool LLModelPreview::render()
 
                                     gGL.diffuseColor4fv(PREVIEW_PSYH_EDGE_COL.mV);
                                     gGL.setLineWidth(PREVIEW_PSYH_EDGE_WIDTH);
-                                    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                                    gGL.setPolygonMode(GL_LINE);
                                     buffer->drawRange(LLRender::TRIANGLES, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0);
 
-                                    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                                    gGL.setPolygonMode(GL_FILL);
                                     gGL.setLineWidth(1.f);
 
                                     buffer->unmapBuffer();
@@ -3744,7 +3744,7 @@ bool LLModelPreview::render()
                     if (mHasDegenerate)
                     {
                         gGL.setLineWidth(PREVIEW_DEG_EDGE_WIDTH);
-                        glPointSize(PREVIEW_DEG_POINT_SIZE);
+                        gGL.setPointSize(PREVIEW_DEG_POINT_SIZE);
                         gPipeline.enableLightsFullbright();
                         //show degenerate triangles
                         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
@@ -3814,7 +3814,7 @@ bool LLModelPreview::render()
                             gGL.popMatrix();
                         }
                         gGL.setLineWidth(1.f);
-                        glPointSize(1.f);
+                        gGL.setPointSize(1.f);
                         gPipeline.enableLightsPreview();
                         gGL.setSceneBlendType(LLRender::BT_ALPHA);
                     }
@@ -3936,9 +3936,9 @@ bool LLModelPreview::render()
                                 gGL.getTextureSlot(0)->unbind();
                                 gGL.diffuseColor4fv(PREVIEW_EDGE_COL.mV);
                                 gGL.setLineWidth(PREVIEW_EDGE_WIDTH);
-                                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                                gGL.setPolygonMode(GL_LINE);
                                 buffer->draw(LLRender::TRIANGLES, buffer->getNumIndices(), 0);
-                                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                                gGL.setPolygonMode(GL_FILL);
                                 gGL.setLineWidth(1.f);
                             }
                         }

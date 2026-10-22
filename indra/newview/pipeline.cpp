@@ -350,8 +350,6 @@ static LLPipelineListener sPipelineListener;
 
 static LLCullResult* sCull = NULL;
 
-void validate_framebuffer_object();
-
 // The colour attachments after the first that the main G-buffer has, in its formats: an avatar's impostor holds the
 // G-buffer's channels (generateImpostor).
 bool addDeferredAttachments(LLRenderTarget& target)
@@ -3452,18 +3450,12 @@ void LLPipeline::updateReverseZ(bool reverse_z)
         recap_draw_distance_controls();
     }
 
-    // Issued unconditionally, not just on a change. These are the only writers of clip control
-    // and clear depth in the tree, so if GL is ever reset underneath us -- a context restore,
-    // an external state reset -- a change-gated latch would have no path back and would leave
-    // reversed projections rasterizing against a [-1,1] clip volume. Four GL calls once per
-    // setShaders() is not worth gating. Safe when the cap is absent: sReverseZ is then false,
-    // the forward constants are what GL already has, and glClipControl is only reached with
-    // mHasClipControl true (which guarantees the entry point resolved).
-    if (gGLManager.mHasClipControl)
-    {
-        glClipControl(GL_LOWER_LEFT, effective ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
-    }
-    glClearDepth(effective ? 0.0 : 1.0);
+    // Issued unconditionally, not just on a change. If GL is ever reset underneath us -- a
+    // context restore, an external state reset -- a change-gated latch would have no path back
+    // and would leave reversed projections rasterizing against a [-1,1] clip volume. Four GL
+    // calls once per setShaders() is not worth gating. Safe when the cap is absent: sReverseZ is
+    // then false, and the forward constants are what GL already has.
+    LLRender::applyDepthConvention();
 
     // The ambient depth func and polygon offset are tracked in the semantic convention, so the
     // physical state has to be re-derived through the current translation.
@@ -4036,7 +4028,7 @@ void LLPipeline::shiftObjects(const LLVector3 &offset)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     assertInitialized();
 
-    glClear(GL_DEPTH_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT);
     gDepthDirty = true;
 
     LLVector4a offseta;
@@ -5064,7 +5056,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
 
     if (gUseWireframe)
     {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+        gGL.setPolygonMode(GL_LINE);
     }
 
     if (&camera == LLViewerCamera::getInstance())
@@ -5211,7 +5203,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
 
     if (gUseWireframe)
     {
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        gGL.setPolygonMode(GL_FILL);
     }
 }
 
@@ -5323,8 +5315,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
             // water exclusion would stencil only the outlines of its prims.
             if (gUseWireframe)
             {
-                gGL.flush();
-                glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                gGL.setPolygonMode(GL_LINE);
             }
 
             gGLLastMatrix = NULL;
@@ -5355,8 +5346,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
             if (gUseWireframe)
             {
-                gGL.flush();
-                glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+                gGL.setPolygonMode(GL_FILL);
             }
         }
         else
@@ -5516,7 +5506,7 @@ void LLPipeline::renderPhysicsDisplay()
 
         if (wireframe)
         {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+            gGL.setPolygonMode(GL_LINE);
         }
 
         for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
@@ -5539,7 +5529,7 @@ void LLPipeline::renderPhysicsDisplay()
 
         if (wireframe)
         {
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+            gGL.setPolygonMode(GL_FILL);
         }
     }
     gGL.setLineWidth(1.f);
@@ -5618,9 +5608,9 @@ void LLPipeline::renderDebug()
                         const LLColor4 clearColor = gSavedSettings.getColor4("PathfindingNavMeshClear");
                         gGL.setColorMask(true, true);
                         gGL.setClearColor(LLColor4(clearColor.mV[0], clearColor.mV[1], clearColor.mV[2], 0.f));
-                        glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // no stencil -- deprecated | GL_STENCIL_BUFFER_BIT);
+                        gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // no stencil -- deprecated | GL_STENCIL_BUFFER_BIT);
                         gGL.setColorMask(true, false);
-                        glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                        gGL.setPolygonMode(GL_FILL);
                     }
 
                     //NavMesh
@@ -5649,7 +5639,7 @@ void LLPipeline::renderDebug()
                         gPathfindingProgram.bind();
 
                         gGL.flush();
-                        glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                        gGL.setPolygonMode(GL_FILL);
                         gGL.setLineWidth(1.0f);
                         gGL.flush();
                     }
@@ -5706,7 +5696,7 @@ void LLPipeline::renderDebug()
                             LLGLDisable cull(i >= 2 ? GL_CULL_FACE : 0);
 
                             gGL.flush();
-                            glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                            gGL.setPolygonMode(GL_FILL);
 
                             //get rid of some z-fighting
                             LLGLEnable polyOffset(GL_POLYGON_OFFSET_FILL);
@@ -5732,7 +5722,7 @@ void LLPipeline::renderDebug()
                                 }
 
                                 LLGLEnable lineOffset(GL_POLYGON_OFFSET_LINE);
-                                glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+                                gGL.setPolygonMode(GL_LINE);
 
                                 F32 offset = gSavedSettings.getF32("PathfindingLineOffset");
 
@@ -5752,10 +5742,10 @@ void LLPipeline::renderDebug()
                                     }
                                     else
                                     {
-                                        glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                                        gGL.setPolygonMode(GL_FILL);
                                         gPathfindingProgram.uniform1f(LLShaderMgr::AMBIANCE, ambiance);
                                         llPathingLibInstance->renderNavMeshShapesVBO( render_order[i] );
-                                        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+                                        gGL.setPolygonMode(GL_LINE);
                                     }
                                 }
 
@@ -5772,7 +5762,7 @@ void LLPipeline::renderDebug()
                                     gGL.setLineWidth(1.f);
                                 }
 
-                                glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                                gGL.setPolygonMode(GL_FILL);
                             }
                         }
                     }
@@ -5800,10 +5790,10 @@ void LLPipeline::renderDebug()
 
                         if (gSavedSettings.getBOOL("PathfindingXRayWireframe"))
                         { //draw hidden wireframe as darker and less opaque
-                            glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+                            gGL.setPolygonMode(GL_LINE);
                             gPathfindingProgram.uniform1f(LLShaderMgr::AMBIANCE, 1.f);
                             llPathingLibInstance->renderNavMesh();
-                            glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
+                            gGL.setPolygonMode(GL_FILL);
                         }
                         else
                         {
@@ -5843,7 +5833,7 @@ void LLPipeline::renderDebug()
 
         gGL.getTextureSlot(0)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::AnisoWrap, true);
 
-        glPointSize(8.f);
+        gGL.setPointSize(8.f);
         LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
 
         gGL.begin(LLRender::POINTS);
@@ -5868,7 +5858,7 @@ void LLPipeline::renderDebug()
         }
         gGL.end();
         gGL.flush();
-        glPointSize(1.f);
+        gGL.setPointSize(1.f);
     }
 
     // Debug stuff.
@@ -6070,7 +6060,7 @@ void LLPipeline::renderDebug()
                 {
                     //render visible point cloud
                     gGL.flush();
-                    glPointSize(8.f);
+                    gGL.setPointSize(8.f);
                     gGL.begin(LLRender::POINTS);
 
                     F32* c = col+i*4;
@@ -6084,7 +6074,7 @@ void LLPipeline::renderDebug()
                     gGL.end();
 
                     gGL.flush();
-                    glPointSize(1.f);
+                    gGL.setPointSize(1.f);
 
                     LLVector3* ext = mShadowExtents[i];
                     LLVector3 pos = (ext[0]+ext[1])*0.5f;
@@ -8124,33 +8114,6 @@ void apply_cube_face_rotation(U32 face)
     }
 }
 
-void validate_framebuffer_object()
-{
-    GLenum status;
-    status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
-    switch(status)
-    {
-        case GL_FRAMEBUFFER_COMPLETE:
-            //framebuffer OK, no error.
-            break;
-        case GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT:
-            // frame buffer not OK: probably means unsupported depth buffer format
-            LL_ERRS() << "Framebuffer Incomplete Missing Attachment." << LL_ENDL;
-            break;
-        case GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT:
-            // frame buffer not OK: probably means unsupported depth buffer format
-            LL_ERRS() << "Framebuffer Incomplete Attachment." << LL_ENDL;
-            break;
-        case GL_FRAMEBUFFER_UNSUPPORTED:
-            /* choose different formats */
-            LL_ERRS() << "Framebuffer unsupported." << LL_ENDL;
-            break;
-        default:
-            LL_ERRS() << "Unknown framebuffer status." << LL_ENDL;
-            break;
-    }
-}
-
 void LLPipeline::bindScreenToTexture()
 {
 
@@ -8231,7 +8194,7 @@ void LLPipeline::serviceScenePixelProbe(LLRenderTarget* src)
 
     F32 texel[4] = { 0.f, 0.f, 0.f, 0.f };
     src->bindTarget();
-    glReadPixels(px, py, 1, 1, GL_RGBA, GL_FLOAT, texel);
+    gGL.readPixels(px, py, 1, 1, GL_RGBA, GL_FLOAT, texel);
     src->flush();
 
     // A synchronous read stalls the pipe. That is the right trade here: it
@@ -10114,7 +10077,7 @@ LLPipeline::SMAATargets LLPipeline::generateSMAABuffers(LLRenderTarget* src, ALT
             if (use_stencil)
             {
                 // The stencil clear writes only the bits the stencil write mask allows.
-                glStencilMask(0xFF);
+                gGL.setStencilMask(0xFF);
             }
             dest.clear(use_stencil ? (GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT) : GL_COLOR_BUFFER_BIT);
 
@@ -10749,7 +10712,7 @@ void LLPipeline::renderFinalize()
         gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
         gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
         gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-        glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+        gGL.setViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
     }
 
     Bloom bloom;
@@ -10867,7 +10830,7 @@ void LLPipeline::renderFinalize()
     gGLViewport[1] = gViewerWindow->getWorldViewRectRaw().mBottom;
     gGLViewport[2] = gViewerWindow->getWorldViewRectRaw().getWidth();
     gGLViewport[3] = gViewerWindow->getWorldViewRectRaw().getHeight();
-    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+    gGL.setViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 
 // [RLVa:KB] - @setsphere
     if (rlv_sphere && gRlvSphereProgram.isComplete() && other_target())
@@ -14769,7 +14732,7 @@ void LLPipeline::copyCutoutCoverageToAlpha()
     // Across the whole frame, sampled as the final blit sampled the colour, so
     // the two agree texel for texel whatever the scene target's resolution.
     const LLRect& rect = gViewerWindow->getWorldViewRectRaw();
-    glViewport(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight());
+    gGL.setViewport(rect.mLeft, rect.mBottom, rect.getWidth(), rect.getHeight());
 
     gCopyProgram.bind();
     gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &mRT->screen);
@@ -14787,7 +14750,7 @@ void LLPipeline::clearSceneMap()
         LLGLSColorMask mask(true, true);
         LLGLDepthTest depth(GL_TRUE, GL_TRUE);
         mSceneMap.bindTarget();
-        glClearColor(0.f, 0.f, 0.f, 0.f);
+        gGL.setClearColor(LLColor4::transparent);
         mSceneMap.clear();
         mSceneMap.flush();
     }

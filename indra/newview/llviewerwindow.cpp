@@ -33,6 +33,7 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include <deque>
 
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -442,6 +443,13 @@ private:
     LLRect mBackRectCamera1;
     LLRect mBackRectCamera2;
 
+    // DebugShowColor's reads of the pixel under the mouse, collected a frame or two after they are made, so the
+    // overlay waits on neither the GPU nor a threaded driver's own thread: where each read in flight was made, and
+    // the line for the newest that has landed.
+    ALGPUReadback mColorReads;
+    std::deque<std::pair<S32, S32>> mColorReadAt;
+    std::string mColorText;
+
     void addText(S32 x, S32 y, const std::string &text)
     {
         mLineList.push_back(Line(text, x, y));
@@ -834,16 +842,38 @@ public:
         static LLCachedControl<bool> debug_show_color(gSavedSettings, "DebugShowColor", false);
         if (debug_show_color() && !LLRender::sNsightDebugSupport)
         {
-            U8 color[4];
             LLCoordGL coord = gViewerWindow->getCurrentMouse();
 
             // Convert x,y to raw pixel coords
             S32 x_raw = (S32)ll_round(coord.mX * gViewerWindow->getWindowWidthRaw() / (F32)gViewerWindow->getWindowWidthScaled());
             S32 y_raw = (S32)ll_round(coord.mY * gViewerWindow->getWindowHeightRaw() / (F32)gViewerWindow->getWindowHeightScaled());
 
-            glReadPixels(x_raw, y_raw, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
-            addText(xpos, ypos, llformat("Pixel <%1d, %1d> R:%1d G:%1d B:%1d A:%1d", x_raw, y_raw, color[0], color[1], color[2], color[3]));
-            ypos += y_inc;
+            U8 color[4];
+            if (mColorReads.isAllocated() || mColorReads.allocate(sizeof(color), 3, "DebugShowColor"))
+            {
+                // Every read that has landed, the newest last; one still in flight is collected on a later frame.
+                while (!mColorReadAt.empty() && mColorReads.collect(color, sizeof(color)))
+                {
+                    mColorText = llformat("Pixel <%1d, %1d> R:%1d G:%1d B:%1d A:%1d", mColorReadAt.front().first,
+                                          mColorReadAt.front().second, color[0], color[1], color[2], color[3]);
+                    mColorReadAt.pop_front();
+                }
+                if (mColorReads.requestPixels(x_raw, y_raw, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, sizeof(color)))
+                {
+                    mColorReadAt.emplace_back(x_raw, y_raw);
+                }
+            }
+            if (!mColorText.empty())
+            {
+                addText(xpos, ypos, mColorText);
+                ypos += y_inc;
+            }
+        }
+        else if (mColorReads.isAllocated())
+        {
+            mColorReads.release();
+            mColorReadAt.clear();
+            mColorText.clear();
         }
 
         // only display these messages if we are actually rendering beacons at this moment
@@ -4614,9 +4644,9 @@ void LLViewerWindow::renderSelections( bool for_gl_pick, bool pick_parcel_walls,
                         gSphere.render();
 
                         // Render Inside
-                        glCullFace(GL_FRONT);
+                        gGL.setCullFace(GL_FRONT);
                         gSphere.render();
-                        glCullFace(GL_BACK);
+                        gGL.setCullFace(GL_BACK);
 
                         gGL.popMatrix();
                     }
@@ -5601,7 +5631,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
     gSnapshotNoPost = no_post;
     gDisplaySwapBuffers = false;
 
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
     setCursor(UI_CURSOR_WAIT);
 
     // Hide all the UI widgets first and draw a frame
@@ -5899,7 +5929,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                     {
                         if (type == LLSnapshotModel::SNAPSHOT_TYPE_COLOR)
                         {
-                            glReadPixels(
+                            gGL.readPixels(
                                      subimage_x_offset, out_y + subimage_y_offset,
                                      read_width, 1,
                                      cutout ? GL_RGBA : GL_RGB, GL_UNSIGNED_BYTE,
@@ -5909,7 +5939,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                         else if (type == LLSnapshotModel::SNAPSHOT_TYPE_DEPTH24)
                         {
                             LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GLfloat)); // need to store floating point values
-                            glReadPixels(
+                            gGL.readPixels(
                                          subimage_x_offset, out_y + subimage_y_offset,
                                          read_width, 1,
                                          GL_DEPTH_COMPONENT, GL_FLOAT,
@@ -5939,7 +5969,7 @@ bool LLViewerWindow::rawSnapshot(LLImageRaw *raw, S32 image_width, S32 image_hei
                         else // LLSnapshotModel::SNAPSHOT_TYPE_DEPTH
                         {
                             LLPointer<LLImageRaw> depth_line_buffer = new LLImageRaw(read_width, 1, sizeof(GLfloat)); // need to store floating point values
-                            glReadPixels(
+                            gGL.readPixels(
                                          subimage_x_offset, out_y + subimage_y_offset,
                                          read_width, 1,
                                          GL_DEPTH_COMPONENT, GL_FLOAT,
@@ -6021,7 +6051,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
     LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
     gDisplaySwapBuffers = false;
 
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
     setCursor(UI_CURSOR_WAIT);
 
     bool prev_draw_ui = gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI);
@@ -6093,7 +6123,7 @@ bool LLViewerWindow::simpleSnapshot(LLImageRaw* raw, S32 image_width, S32 image_
 
     LLImageDataSharedLock lock(raw);
 
-    glReadPixels(
+    gGL.readPixels(
         0, 0,
         image_width,
         image_height,
@@ -6171,7 +6201,7 @@ bool LLViewerWindow::cubeSnapshot(const LLVector3& origin, LLCubeMapArray* cubea
 
     gPipeline.pushRenderTypeMask();
 
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // stencil buffer is deprecated | GL_STENCIL_BUFFER_BIT);
 
     U32 dynamic_render_types[] = {
         LLPipeline::RENDER_TYPE_AVATAR,
@@ -6438,7 +6468,7 @@ void LLViewerWindow::setup2DViewport(S32 x_offset, S32 y_offset)
     gGLViewport[1] = mWindowRectRaw.mBottom + y_offset;
     gGLViewport[2] = mWindowRectRaw.getWidth();
     gGLViewport[3] = mWindowRectRaw.getHeight();
-    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+    gGL.setViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 }
 
 
@@ -6456,7 +6486,7 @@ void LLViewerWindow::setup3DViewport(S32 x_offset, S32 y_offset)
     gGLViewport[1] = mWorldViewRectRaw.mBottom + y_offset;
     gGLViewport[2] = mWorldViewRectRaw.getWidth();
     gGLViewport[3] = mWorldViewRectRaw.getHeight();
-    glViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
+    gGL.setViewport(gGLViewport[0], gGLViewport[1], gGLViewport[2], gGLViewport[3]);
 }
 
 void LLViewerWindow::revealIntroPanel()
