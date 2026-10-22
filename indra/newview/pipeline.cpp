@@ -12420,6 +12420,13 @@ void LLPipeline::doWaterHaze()
         return;
     }
 
+    // Nor where this view's water does not refract (ALRenderResourcePlan::refractsWater): its opaque surface hides what
+    // lies under it, which is all the haze fogs, and where an exclusion prim removed it the haze fogs nothing either.
+    if (!sUnderWaterRender && !ALRenderResourcePlan::refractsWater(renderPack(), sRenderTransparentWater))
+    {
+        return;
+    }
+
     if (RenderDeferredAtmospheric)
     {
         // The scene's depth as the haze reads it, after the pools before it wrote it in this binding.

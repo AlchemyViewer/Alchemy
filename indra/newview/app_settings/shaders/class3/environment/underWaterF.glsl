@@ -55,12 +55,13 @@ in vec3 view;
 in vec3 vary_position;
 
 vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
-void mirrorClip(vec3 position);
+bool mirrorClipped(vec3 position);
 void water_wave_normals(sampler2D map_a, sampler2D map_b, vec2 r, out vec3 big, out vec3 little_xy, out vec3 little_zw);
 
 void main()
 {
-    mirrorClip(vary_position);
+    // Discarded at the end: the wave normals take derivatives.
+    bool clipped = mirrorClipped(vary_position);
     vec2 screen_tc = gl_FragCoord.xy / screen_res;
 
     vec4 color;
@@ -83,6 +84,15 @@ void main()
 #endif
 
     fb = applyWaterFogViewLinearNoClip(vary_position, fb);
+
+    // Compiled only in the mirror variant: a discard the compiler cannot see is dead costs every fragment its early
+    // depth test.
+#ifdef MIRROR_CLIP
+    if (clipped)
+    {
+        discard;
+    }
+#endif
 
     frag_color = max(fb, vec4(0));
 }
