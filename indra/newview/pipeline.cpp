@@ -13815,12 +13815,12 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             }
 
             // Receivers lying in one plane square to the light, as open water or flat ground does under a sun or moon at
-            // the zenith, have no depth along it: the ortho fit would divide by its range and the perspective fit take a
-            // field of view of zero across it, and either leaves infinities in the matrices and NaN in every lookup of
-            // the split. Such a split is fitted as a slab MIN_SHADOW_DEPTH deep about their plane.
+            // the zenith, have no depth along it: the ortho fit would divide by it and the perspective fit's depth scale
+            // be infinite, either leaving infinities in the matrices and NaN in every lookup of the split. Each fit takes
+            // at least MIN_SHADOW_DEPTH of depth, the ortho one about the receivers' middle and the perspective one at the
+            // split's far end (fz). Only the depth's scale changes, only in a split with less, and by its depth smoothly.
             constexpr F32 MIN_SHADOW_DEPTH = 1.f;
-            const bool flat = max.mV[2] - min.mV[2] < MIN_SHADOW_DEPTH;
-            if (flat)
+            if (max.mV[2] - min.mV[2] < MIN_SHADOW_DEPTH)
             {
                 const F32 mid = (min.mV[2] + max.mV[2]) * 0.5f;
                 min.mV[2] = mid - MIN_SHADOW_DEPTH * 0.5f;
@@ -13852,8 +13852,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             {
                 wpf[i] -= center;
                 wpf[i].mV[0] = fabsf(wpf[i].mV[0]);
-                // A flat split's points at its slab's faces, which the perspective fit's field of view across it spans.
-                wpf[i].mV[2] = flat ? size.mV[2] : fabsf(wpf[i].mV[2]);
+                wpf[i].mV[2] = fabsf(wpf[i].mV[2]);
             }
 
             if (!wpf.empty())
@@ -13913,7 +13912,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 mShadowError.mV[j] /= wpf.size();
                 mShadowError.mV[j] /= size.mV[0];
 
-                if (mShadowError.mV[j] > RenderShadowErrorCutoff)
+                // Ortho too where no line was fitted: with every point the same distance across the light, as a split
+                // seen straight along it is, the least squares divide zero by zero and the error is NaN.
+                if (!(mShadowError.mV[j] <= RenderShadowErrorCutoff))
                 { //just use ortho projection
                     mShadowFOV.mV[j] = -1.f;
                     origin.clearVec();
@@ -14004,8 +14005,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         yfar += diff;
                     }
 
-                    if (fovx > cutoff)
-                    { //just use ortho projection
+                    if (!(fovx <= cutoff))
+                    { //just use ortho projection, also where the field of view came out NaN
                         origin.clearVec();
                         mShadowError.mV[j] = -1.f;
                         proj[j] = al_ortho(min.mV[0], max.mV[0],
@@ -14032,7 +14033,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         view[j] = LLMatrix4a::lookDir(origin_agent, LLVector4a(lightDir.mV[0], lightDir.mV[1], lightDir.mV[2]), LLVector4a(-up.mV[0], -up.mV[1], -up.mV[2]));
 
                         F32 fx = 1.f/tanf(fovx);
-                        F32 fz = 1.f/tanf(fovz);
+                        // MIN_SHADOW_DEPTH across at yfar, at least; also where the field of view came out NaN.
+                        F32 fz = 1.f/tanf(llmax(fovz, atanf(MIN_SHADOW_DEPTH * 0.5f / yfar)));
 
                         proj[j].mMatrix[0].set(-fx, 0.f, 0.f, 0.f);
                         proj[j].mMatrix[1].set(0.f, (yfar + ynear) / (ynear - yfar), 0.f, -1.f);
