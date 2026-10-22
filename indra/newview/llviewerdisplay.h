@@ -47,6 +47,9 @@ bool display_window_hidden();
 bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);
 
 extern bool gDisplaySwapBuffers;
+// A snapshot whose camera looks away from the main view's, as a 360 capture's faces do: what the main view's queries
+// found occluded says nothing of what it sees.
+extern bool gSnapshotOffMainView;
 extern bool gDepthDirty;
 extern bool gTeleportDisplay;
 extern LLFrameTimer gTeleportDisplayTimer;

@@ -115,6 +115,7 @@ bool gForceRenderLandFence = false;
 bool gDisplaySwapBuffers = false;
 bool gDepthDirty = false;
 bool gSnapshot = false;
+bool gSnapshotOffMainView = false;
 bool gCubeSnapshot = false;
 bool gSnapshotNoPost = false;
 bool gShaderProfileFrame = false;
