@@ -7,6 +7,7 @@ set(
   algpubuffer.cpp
   algputimer.cpp
   alimageslot.cpp
+  alpacingslack.cpp
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
@@ -47,6 +48,7 @@ set(
   algpubuffer.h
   algputimer.h
   alimageslot.h
+  alpacingslack.h
   alprimitiveplot.h
   alquerypool.h
   alrendertargetdesc.h
@@ -161,6 +163,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alpacingslack_test.cpp
       tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp

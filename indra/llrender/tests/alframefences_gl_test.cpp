@@ -183,10 +183,10 @@ namespace
             }
         }
 
-        // Work the GPU takes BUSY_SECONDS over at the least, issued in the open frame.
-        void keepBusy()
+        // Work the GPU takes `seconds` over at the least, as calibrated, issued in the open frame.
+        void keepBusy(F64 seconds = BUSY_SECONDS)
         {
-            const S32 draws = std::max(1, (S32)std::ceil(BUSY_SECONDS / mDrawSeconds));
+            const S32 draws = std::max(1, (S32)std::ceil(seconds / mDrawSeconds));
             for (S32 i = 0; i < draws; ++i)
             {
                 draw(mIterations);
@@ -444,6 +444,61 @@ namespace
             INFO("the busy frame is left to the GPU, and nothing waited");
             CHECK_FALSE(mFrames.isComplete(busy));
             CHECK(mFrames.getPacingWaits() == waits);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // The frames' ends note their pacing waits in the slack: frames the GPU is behind on give work a budget past the
+    // reserve. A wait that finds the GPU done after work shows none, and a frame's end that paces nothing, or a release,
+    // takes it away. The budget is not held to the busy frames' calibrated length: calibrated on an idle GPU, the draws
+    // can run faster once its clocks rise.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: paced frames the GPU is behind on give work a budget", "[alframefences_gl]")
+    {
+        setUp();
+        ALPacingSlack& slack = mFrames.slack();
+        // The first frame's end finds the frame before it finished, and shows no slack: FRAMES more wait for the GPU.
+        const auto behind = [this]
+        {
+            for (U32 i = 0; i <= ALPacingSlack::FRAMES; ++i)
+            {
+                keepBusy(BUSY_SECONDS / 4.0);
+                mFrames.endFrame(1);
+            }
+        };
+        behind();
+        {
+            INFO("the budget is " << slack.budget() << " s");
+            CHECK(slack.budget() > slack.reserve());
+        }
+        {
+            // Work as long as the budget allows, on a clock of its own, then a wait for a frame the GPU has finished.
+            F64 clock = 0.0;
+            const F64 worked = slack.fill(
+                [&clock]
+                {
+                    clock += 0.0001;
+                    return true;
+                },
+                [&clock] { return clock; });
+            REQUIRE(worked > 0.0);
+            glFinish();
+            mFrames.endFrame(1);
+            INFO("a wait that found the GPU done shows no slack, whatever work came before it");
+            CHECK(slack.budget() == 0.0);
+        }
+        behind();
+        REQUIRE(slack.budget() > 0.0);
+        mFrames.endFrame();
+        {
+            INFO("an unpaced frame's end forgets it");
+            CHECK(slack.budget() == 0.0);
+        }
+        behind();
+        REQUIRE(slack.budget() > 0.0);
+        mFrames.release();
+        {
+            INFO("and so does a release");
+            CHECK(slack.budget() == 0.0);
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }

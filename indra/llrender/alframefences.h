@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "alpacingslack.h"
 #include "stdtypes.h"
 
 /// One fence a frame, laid by endFrame() after the frame's last command, and the frames it shows finished: a frame is
@@ -42,6 +43,8 @@
 /// poll waits only when it happens on a fence not yet signalled while the driver's thread is held in a present: on
 /// NVIDIA's threaded driver, a GPU-bound CPU runs frames ahead until one frame's poll sheds the whole lead at once, two
 /// frames quick and one slow. A wait every frame holds the lead to that number and spreads the wait over every frame.
+/// GPU-bound, that wait is time the CPU could have spent on work: the frames' ends keep what it was (slack()), for the
+/// work before the next one's to take a share of.
 ///
 /// All operations require the GL context the fences were laid in to be current. Non-copyable.
 class ALFrameFences
@@ -83,11 +86,16 @@ public:
     /// `frames_ahead` is how many frames the GPU may still be working on when the CPU begins the next: with 1, the frame
     /// before the one ending has finished. That wait paces the CPU and is no stall: it has a zone and a count of its
     /// own, and is for the frames a user sees, never a capture's. 0 waits for none but the frame FRAMES before, whose
-    /// fence must make room.
+    /// fence must make room. Either way the frame's end is noted in slack().
     void endFrame(U32 frames_ahead = 0);
 
-    /// Deletes every fence, while the context is current. Every frame so far, the open one too, is complete.
+    /// Deletes every fence, while the context is current. Every frame so far, the open one too, is complete, and the
+    /// slack of the frames before is forgotten.
     void release();
+
+    /// How long the paced frames' ends have waited for the GPU, and what work before the next one's wait may have of it.
+    ALPacingSlack& slack() { return mSlack; }
+    const ALPacingSlack& slack() const { return mSlack; }
 
     /// The waits that had to wait, the frames' ends' pacing waits apart.
     U32 getStalls() const { return mStalls; }
@@ -100,8 +108,8 @@ private:
     // Polls the ended frames not yet shown complete, oldest first, up to the first that has not signalled.
     void poll();
     // Waits for the ended `frame` as a frame's end paces the CPU: one call, on that frame's fence alone, so that what
-    // the wait costs is the pacing zone's. The seconds it took.
-    F64 pace(U32 frame);
+    // the wait costs is the pacing zone's. The seconds it took; `behind` says whether the GPU was still drawing it.
+    F64 pace(U32 frame, bool& behind);
     // Every frame up to `frame` is complete: their fences go.
     void completeThrough(U32 frame);
 
@@ -113,4 +121,5 @@ private:
     U32   mPacingWaits = 0;
     U32   mCalls    = 0;
     U32   mFrameCalls = 0;       // calls since the last endFrame(), for the profiler
+    ALPacingSlack mSlack;
 };

@@ -446,6 +446,35 @@ bool display_window_hidden()
         || gNonInteractive;
 }
 
+// Runs the main loop's queued work in the time the frame's end is about to wait for the GPU, as much as the frames'
+// ends before show there is to spare (ALPacingSlack). Straight after the swap and before the frame's fence, so that
+// the frame's end waits only for what is left, and with no poll between the items, since on a threaded driver a poll
+// is that wait.
+static void fill_pacing_slack()
+{
+    ALPacingSlack& slack = gGL.frameFences().slack();
+    const F64 budget = slack.budget();
+    F64 worked = 0.0;
+    if (gPipeline.pacingSlackWork() && budget > slack.reserve())
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("frame pacing slack work");
+        // The main thread is the queue's one consumer: work it sees queued is there for it to run.
+        worked = slack.fill(
+            []
+            {
+                if (gMainloopWork.size() == 0)
+                {
+                    return false;
+                }
+                gMainloopWork.runOne();
+                return true;
+            },
+            []() -> F64 { return LLTimer::getTotalSeconds(); });
+    }
+    LL_PROFILE_PLOT("frame pacing slack budget ms", budget * 1000.0);
+    LL_PROFILE_PLOT("frame pacing slack work ms", worked * 1000.0);
+}
+
 // Paint the display!
 void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 {
@@ -1088,8 +1117,14 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // which must land past this frame's draws, not before its heaviest passes. See
     // ALUniformBuffer::endFrame. A frame that reached the screen also waits there for the one
     // AlchemyRenderMaxFramesAhead before it, every frame, so the CPU keeps an even pace that far
-    // ahead of the GPU; a capture's frames are not paced, nor the login screen's.
-    gGL.endFrame(presented ? gPipeline.maxFramesAhead() : 0);
+    // ahead of the GPU; a capture's frames are not paced, nor the login screen's. The main loop's
+    // work has a share of that wait first, where the frames before show the GPU is the slower.
+    const U32 frames_ahead = presented ? gPipeline.maxFramesAhead() : 0;
+    if (frames_ahead > 0)
+    {
+        fill_pacing_slack();
+    }
+    gGL.endFrame(frames_ahead);
 
     display_stats();
 

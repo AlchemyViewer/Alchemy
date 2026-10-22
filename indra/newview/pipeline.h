@@ -120,6 +120,9 @@ public:
     /// How many frames the GPU may still be drawing when the CPU begins the next (AlchemyRenderMaxFramesAhead), as last
     /// latched: display() paces the main view's frames by it at their end (LLRender::endFrame). 0 for no pacing.
     U32 maxFramesAhead() const { return mMaxFramesAhead; }
+    /// Whether a paced frame's end has the main loop's work run in what its wait would leave idle
+    /// (AlchemyRenderPacingSlackWork), as last latched.
+    bool pacingSlackWork() const { return mPacingSlackWork; }
     /// The inputs the programs were last loaded for (LLViewerShaderMgr::setShaders), which a pass drawing with them
     /// reads rather than the settings.
     const ALShaderInputs& shaderInputs() const;
@@ -240,6 +243,7 @@ private:
     ALRenderResourceInputs mLatchedInputs;
     ALShaderInputs         mLatchedShaderInputs;
     U32                    mMaxFramesAhead = 0;
+    bool                   mPacingSlackWork = false;
     // Whether the last reconcile built the render size in full, which a snapshot at the size it was built for finds.
     bool                   mResourcesFullSize = true;
     // The link of gDeferredGenBrdfLutProgram (LLGLSLShader::linkCount) the BRDF LUT was last drawn with.

@@ -893,7 +893,8 @@ void LLPipeline::latchRenderInputs()
     sReflectionProbesEnabled = mLatchedInputs.mProbes;
     sRenderTransparentWater  = mLatchedInputs.mTransparentWater;
 
-    mMaxFramesAhead = gSavedSettings.getU32("AlchemyRenderMaxFramesAhead");
+    mMaxFramesAhead  = gSavedSettings.getU32("AlchemyRenderMaxFramesAhead");
+    mPacingSlackWork = gSavedSettings.getBOOL("AlchemyRenderPacingSlackWork");
 }
 
 const ALShaderInputs& LLPipeline::shaderInputs() const
