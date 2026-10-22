@@ -86,7 +86,7 @@ namespace
         // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
         // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
         // above 0 otherwise whatever a debug RenderTerrainLODFactor says.
-        static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 64.f);
+        static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 48.f);
         static LLCachedControl<F32> raster_segment(gSavedSettings, "AlchemyRenderTerrainTessRasterSegment", 8.f);
         const F32 density = gPipeline.shaderInputs().mLocal.mTerrainTessPinned
             ? 0.f
