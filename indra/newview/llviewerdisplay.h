@@ -34,6 +34,10 @@ void display_cleanup();
 
 void display(bool rebuild = true, F32 zoom_factor = 1.f, int subfield = 0, bool for_snapshot = false);
 
+// Whether the window shows nothing -- inactive (minimized), hidden, or a session without one -- so that display()
+// draws nothing and ends no frame.
+bool display_window_hidden();
+
 // The projection and modelview the HUD's attachments are drawn with over the whole world view. False where the
 // agent's avatar wears no HUD.
 bool get_hud_matrices(LLMatrix4a& proj, LLMatrix4a& model);

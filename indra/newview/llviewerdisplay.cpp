@@ -438,6 +438,14 @@ static void update_tp_display(bool minimized)
     }
 }
 
+bool display_window_hidden()
+{
+    return !gViewerWindow->getActive()
+        || !gViewerWindow->getWindow()->getVisible()
+        || gViewerWindow->getWindow()->getMinimized()
+        || gNonInteractive;
+}
+
 // Paint the display!
 void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 {
@@ -480,10 +488,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // Don't draw if the window is hidden or minimized.
     // In fact, must explicitly check the minimized state before drawing.
     // Attempting to draw into a minimized window causes a GL error. JC
-    if (   !gViewerWindow->getActive()
-        || !gViewerWindow->getWindow()->getVisible()
-        || gViewerWindow->getWindow()->getMinimized()
-        || gNonInteractive)
+    if (display_window_hidden())
     {
         // Clean up memory the pools may have allocated
         if (rebuild)

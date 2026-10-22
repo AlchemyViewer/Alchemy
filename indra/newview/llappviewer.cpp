@@ -1584,7 +1584,12 @@ bool LLAppViewer::doFrame()
                     LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_IDLE);
                     LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df Snapshot");
                     pingMainloopTimeout("Main:Snapshot");
-                    gPipeline.mReflectionMapManager.update();
+                    // Probes are captured only while the world is drawn: a hidden or minimized window shows none of
+                    // them, and ends no frame for the GPU memory their captures use to be reused by.
+                    if (!display_window_hidden())
+                    {
+                        gPipeline.mReflectionMapManager.update();
+                    }
                     LLFloaterSnapshot::update(); // take snapshots
                     LLFloaterSimpleSnapshot::update();
                     gGLActive = false;
