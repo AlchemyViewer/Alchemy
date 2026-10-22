@@ -13814,6 +13814,19 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 update_min_max(min, max, wpf[i]);
             }
 
+            // Receivers lying in one plane square to the light, as open water or flat ground does under a sun or moon at
+            // the zenith, have no depth along it: the ortho fit would divide by its range and the perspective fit take a
+            // field of view of zero across it, and either leaves infinities in the matrices and NaN in every lookup of
+            // the split. Such a split is fitted as a slab MIN_SHADOW_DEPTH deep about their plane.
+            constexpr F32 MIN_SHADOW_DEPTH = 1.f;
+            const bool flat = max.mV[2] - min.mV[2] < MIN_SHADOW_DEPTH;
+            if (flat)
+            {
+                const F32 mid = (min.mV[2] + max.mV[2]) * 0.5f;
+                min.mV[2] = mid - MIN_SHADOW_DEPTH * 0.5f;
+                max.mV[2] = mid + MIN_SHADOW_DEPTH * 0.5f;
+            }
+
             // Construct a perspective transform with perspective along y-axis that contains
             // points in wpf
             //Known:
@@ -13839,7 +13852,8 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             {
                 wpf[i] -= center;
                 wpf[i].mV[0] = fabsf(wpf[i].mV[0]);
-                wpf[i].mV[2] = fabsf(wpf[i].mV[2]);
+                // A flat split's points at its slab's faces, which the perspective fit's field of view across it spans.
+                wpf[i].mV[2] = flat ? size.mV[2] : fabsf(wpf[i].mV[2]);
             }
 
             if (!wpf.empty())
