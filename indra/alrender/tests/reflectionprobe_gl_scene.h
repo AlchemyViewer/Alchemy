@@ -1024,8 +1024,8 @@ void main()
                     colour[i * 4 + 3] = 1.f;
                 }
             }
-            glTextureSubImage2D(mScene.getTexture(), 0, 0, 0, SCENE, SCENE, GL_RGBA, GL_FLOAT, colour.data());
-            glTextureSubImage2D(mScene.getDepth(), 0, 0, 0, SCENE, SCENE, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            ll_test::writeTexture(mScene.getTexture(), SCENE, SCENE, GL_RGBA, GL_FLOAT, colour.data());
+            ll_test::writeTexture(mScene.getDepth(), SCENE, SCENE, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
         }
 
         Layout layoutOf(const LLGLSLShader& program) const
@@ -1271,14 +1271,12 @@ void main()
         // The three taps the last draw left, the ambient's, the gloss's and the legacy environment's, each a target.
         std::vector<F32> read() const
         {
-            // Read by name: a bind here would land on whichever unit was left active, under a texture the slot
-            // still records there.
             const size_t texels = size_t(mW) * mH * 4;
             std::vector<F32> taps(texels * 3);
             for (U32 attachment = 0; attachment < 3; ++attachment)
             {
-                glGetTextureImage(mTarget.getTexture(attachment), 0, GL_RGBA, GL_FLOAT, (GLsizei)(texels * sizeof(F32)),
-                                  &taps[size_t(attachment) * texels]);
+                ll_test::readTexture(mTarget.getTexture(attachment), GL_RGBA, GL_FLOAT,
+                                     &taps[size_t(attachment) * texels]);
             }
             return taps;
         }

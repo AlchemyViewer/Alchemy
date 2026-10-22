@@ -283,13 +283,12 @@ namespace allightmapblur_gl
             // ALDrawnOnly then lets the fragment passes draw over sky that holds exactly the cleared value.
             LLRenderTarget staging;
             REQUIRE(staging.ensure({ .width = w, .height = h, .depth = gbuffer.depth }) == LLRenderTarget::EnsureResult::Built);
-            // Uploads and read backs name their texture, binding none: LLRender's texture slots keep what they bound.
-            glTextureSubImage2D(staging.getDepth(), 0, 0, 0, mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            ll_test::writeTexture(staging.getDepth(), mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
             mGBuffer.copyContents(staging, 0, 0, mW, mH, 0, 0, mW, mH, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-            glTextureSubImage2D(mGBuffer.getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
+            ll_test::writeTexture(mGBuffer.getTexture(), mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
             {
-                glTextureSubImage2D(target->getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+                ll_test::writeTexture(target->getTexture(), mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
             }
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
@@ -384,7 +383,7 @@ namespace allightmapblur_gl
             }
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
             {
-                glTextureSubImage2D(target->getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+                ll_test::writeTexture(target->getTexture(), mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
             }
         }
 
@@ -393,8 +392,7 @@ namespace allightmapblur_gl
             // A read back sees what the dispatch stored past this.
             gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
             std::vector<F32> texels(size_t(mW) * mH * 4);
-            glGetTextureImage(target.getTexture(), 0, GL_RGBA, GL_FLOAT, (GLsizei)(texels.size() * sizeof(F32)),
-                              texels.data());
+            ll_test::readTexture(target.getTexture(), GL_RGBA, GL_FLOAT, texels.data());
             return texels;
         }
 
@@ -404,8 +402,7 @@ namespace allightmapblur_gl
         std::vector<F32> reference(const ALLightMapBlur::Kernel& kernel) const
         {
             std::vector<F32> depth(size_t(mW) * mH);
-            glGetTextureImage(mGBuffer.getDepth(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, (GLsizei)(depth.size() * sizeof(F32)),
-                              depth.data());
+            ll_test::readTexture(mGBuffer.getDepth(), GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
             const std::vector<F32> normals = read(mGBuffer);
             const std::vector<F32> light = read(mComputeLight);
             const F32* m = mInvProj.getF32ptr(); // column-major, as GLSL indexes inv_proj[column]

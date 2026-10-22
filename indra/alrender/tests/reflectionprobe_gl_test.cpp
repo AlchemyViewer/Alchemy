@@ -129,7 +129,8 @@ TEST_CASE_METHOD(ProbeScene,
     compareEntryPoints(*this);
 
     // And they reflect something: the gloss and the legacy environment, which the tails mix over, differ from the
-    // probes' alone on many pixels through either kind of surface's entry point.
+    // probes' alone on many pixels through either kind of surface's entry point, by more than the two builds' rounding
+    // of the probes.
     for (S32 api : { 0, 1 })
     {
         CAPTURE(api);
@@ -145,7 +146,13 @@ TEST_CASE_METHOD(ProbeScene,
             S32 reflected = 0;
             for (size_t i = tap * texels; i < (tap + 1) * texels; i += 4)
             {
-                reflected += tails[i] != probes[i] || tails[i + 1] != probes[i + 1] || tails[i + 2] != probes[i + 2];
+                bool moved = false;
+                for (size_t c = 0; c < 3; ++c)
+                {
+                    moved = moved ||
+                            std::fabs(tails[i + c] - probes[i + c]) > 4e-7f * llmax(1.f, std::fabs(probes[i + c]));
+                }
+                reflected += moved;
             }
             CHECK(reflected > SIZE);
         }
