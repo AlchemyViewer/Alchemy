@@ -51,13 +51,19 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace reflectionprobe_gl
 {
     constexpr S32 PROBES = 20;
     constexpr U32 CUBE   = 16;
+    // The screen-space reflections' scene: its texels each way, and its projection's planes.
+    constexpr U32 SCENE      = 128;
+    constexpr F32 SCENE_NEAR = 0.1f;
+    constexpr F32 SCENE_FAR  = 64.f;
 
     // A full screen triangle.
     inline const char* const VERTEX = R"glsl(
@@ -70,7 +76,7 @@ void main()
 
     // Each pixel's point, normal and surface, from a hash of the pixel: points over the probes' reach, and a few past
     // the default probe's, normals every way, glossiness and environment intensity with a share of each at exactly 0,
-    // and PBR or legacy.
+    // PBR or legacy, and a share transparent, which the screen-space reflections march for apart.
     inline const char* const INPUTS = R"glsl(
 struct ProbeTestPixel
 {
@@ -81,6 +87,7 @@ struct ProbeTestPixel
     float envIntensity;
     vec3  amblit;
     bool  pbr;
+    bool  transparent;
 };
 
 uint probeTestHash(uint x)
@@ -118,6 +125,7 @@ ProbeTestPixel probeTestPixel(vec2 frag)
         p.envIntensity = fract(uv.x * 2.0) < 0.3 ? 0.0 : 0.5;
         p.amblit = vec3(0.1, 0.15, 0.2);
         p.pbr = fract(uv.x * 4.0) < 0.5;
+        p.transparent = fract(uv.y * 5.0) < 0.2;
         return p;
     }
     p.pos = vec3(mix(-12.0, 12.0, probeTestRandom(px, 0u)), mix(-6.0, 6.0, probeTestRandom(px, 1u)),
@@ -137,6 +145,7 @@ ProbeTestPixel probeTestPixel(vec2 frag)
     p.envIntensity = e < 0.3 ? 0.0 : e;
     p.amblit = vec3(0.2, 0.3, 0.4) * probeTestRandom(px, 7u);
     p.pbr = probeTestRandom(px, 8u) < 0.5;
+    p.transparent = probeTestRandom(px, 11u) < 0.25;
     return p;
 }
 )glsl";
@@ -158,6 +167,7 @@ struct ProbeTestPixel
     float envIntensity;
     vec3  amblit;
     bool  pbr;
+    bool  transparent;
 };
 ProbeTestPixel probeTestPixel(vec2 frag);
 
@@ -178,12 +188,12 @@ void main()
     vec3 legacyenv = vec3(-3.0);
     if (probe_test_api == 0)
     {
-        sampleReflectionProbes(ambenv, glossenv, p.tc, p.pos, p.norm, p.glossiness, false, p.amblit);
+        sampleReflectionProbes(ambenv, glossenv, p.tc, p.pos, p.norm, p.glossiness, p.transparent, p.amblit);
     }
     else if (probe_test_api == 1)
     {
         sampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, p.tc, p.pos, p.norm, p.glossiness, p.envIntensity,
-                                     false, p.amblit);
+                                     p.transparent, p.amblit);
     }
     else if (probe_test_api == 2)
     {
@@ -192,7 +202,7 @@ void main()
     else
     {
         sampleReflectionProbesEither(p.pbr, ambenv, glossenv, legacyenv, p.tc, p.pos, p.norm, p.glossiness,
-                                     p.envIntensity, false, p.amblit);
+                                     p.envIntensity, p.transparent, p.amblit);
     }
     out_ambient = vec4(ambenv, 1.0);
     out_gloss = vec4(glossenv, 1.0);
@@ -201,9 +211,9 @@ void main()
 )glsl";
 
     // The probes sampled as they were before their taps were fused: preProbeSample's list of the probes that hold the
-    // point, then a pass over it for the irradiance and one for each radiance tap, with the leaves the fused pass
-    // still takes from reflectionProbeF.glsl. No screen-space reflections or hero probes, which the fused pass leaves
-    // where they were.
+    // point, then a pass over it for the irradiance and one for each radiance tap, and after it the screen-space
+    // reflection and the hero probe, with the leaves the fused pass still takes from reflectionProbeF.glsl and
+    // screenSpaceReflUtil.glsl.
     inline const char* const LISTED = R"glsl(
 layout(location = 0) out vec4 out_ambient;
 layout(location = 1) out vec4 out_gloss;
@@ -231,6 +241,7 @@ struct ProbeTestPixel
     float envIntensity;
     vec3  amblit;
     bool  pbr;
+    bool  transparent;
 };
 ProbeTestPixel probeTestPixel(vec2 frag);
 
@@ -240,6 +251,15 @@ float sphereWeight(vec3 pos, vec3 dir, vec3 origin, float r, vec4 i, out float d
 float boxDistanceWeight(float d, float fade);
 vec3 evalSHIrradiance(vec3 n, int layer);
 int getStartIndex(vec3 pos);
+void tapHeroProbe(inout vec3 glossenv, vec3 pos, vec3 norm, float glossiness);
+
+#if defined(SSR)
+uniform sampler2D sceneMap;
+uniform int cube_snapshot;
+float ssrMinGlossiness();
+float tapScreenSpaceReflection(int totalSamples, vec2 tc, vec3 viewPos, vec3 n, vec3 rayDir, inout vec4 collectedColor,
+                               sampler2D source, float glossiness);
+#endif
 
 int probeIndex[REF_SAMPLE_COUNT];
 int probeInfluences = 0;
@@ -619,6 +639,26 @@ void doProbeSample(inout vec3 ambenv, inout vec3 glossenv,
 
     float lod = perceptualRoughness*reflection_lods;
     glossenv = sampleProbes(pos, refnormpersp, lod);
+
+#if defined(SSR)
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
+    {
+        vec4 ssr = vec4(0);
+        if (transparent)
+        {
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, 1);
+            ssr.a *= glossiness;
+        }
+        else
+        {
+            tapScreenSpaceReflection(1, tc, pos, norm, refnormpersp, ssr, sceneMap, glossiness);
+        }
+
+        glossenv = mix(glossenv, ssr.rgb, ssr.a);
+    }
+#endif
+
+    tapHeroProbe(glossenv, pos, norm, glossiness);
 }
 
 void listedSampleReflectionProbes(inout vec3 ambenv, inout vec3 glossenv,
@@ -670,6 +710,31 @@ void listedSampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, 
     {
         legacyenv = sampleProbes(pos, normalize(refnormpersp), 0.0);
     }
+
+#if defined(SSR)
+    if (cube_snapshot != 1 && (transparent ? glossiness > 0.0 : glossiness > ssrMinGlossiness()))
+    {
+        vec4 ssr = vec4(0);
+
+        vec3 ssrDir = normalize(reflect(pos.xyz, norm.xyz));
+
+        if (transparent)
+        {
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, 1);
+            ssr.a *= glossiness;
+        }
+        else
+        {
+            tapScreenSpaceReflection(1, tc, pos, norm, ssrDir, ssr, sceneMap, glossiness);
+        }
+
+        glossenv = mix(glossenv, ssr.rgb, ssr.a);
+        legacyenv = mix(legacyenv, ssr.rgb, ssr.a);
+    }
+#endif
+
+    tapHeroProbe(glossenv, pos, norm, glossiness);
+    tapHeroProbe(legacyenv, pos, norm, 1.0);
 }
 
 void main()
@@ -680,12 +745,12 @@ void main()
     vec3 legacyenv = vec3(-3.0);
     if (probe_test_api == 0 || (probe_test_api == 3 && p.pbr))
     {
-        listedSampleReflectionProbes(ambenv, glossenv, p.tc, p.pos, p.norm, p.glossiness, false, p.amblit);
+        listedSampleReflectionProbes(ambenv, glossenv, p.tc, p.pos, p.norm, p.glossiness, p.transparent, p.amblit);
     }
     else if (probe_test_api == 1 || probe_test_api == 3)
     {
         listedSampleReflectionProbesLegacy(ambenv, glossenv, legacyenv, p.tc, p.pos, p.norm, p.glossiness,
-                                           p.envIntensity, false, p.amblit);
+                                           p.envIntensity, p.transparent, p.amblit);
     }
     else
     {
@@ -726,6 +791,9 @@ void main()
     {
         GLint refBox = -1, refSphere = -1, refParams = -1, refIndex = -1, refNeighbor = -1, refBucket = -1,
               refmapCount = -1;
+        GLint heroBox = -1, heroSphere = -1, heroShape = -1, heroMaxLod = -1, heroProbeCount = -1;
+        GLint iterationCount = -1, rayStep = -1, distanceBias = -1, depthRejectBias = -1, glossySampleCount = -1,
+              adaptiveStepMultiplier = -1;
         GLint size = 0;
     };
 
@@ -744,8 +812,12 @@ void main()
             mShaders.clearShaderObjects();
             mTarget.release();
             mSH.release();
+            mScene.release();
             mCube = nullptr;
             mTriangle = nullptr;
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadIdentity();
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
         }
 
         // The viewer's files the programs read, as the viewer finds them for probes at class 3, and the test's own.
@@ -762,7 +834,16 @@ void main()
             copy(root / "class3" / "deferred" / "reflectionProbeF.glsl", "deferred/reflectionProbeF.glsl");
             copy(root / "class1" / "deferred" / "deferredUtil.glsl", "deferred/deferredUtil.glsl");
             copy(root / "class1" / "deferred" / "globalF.glsl", "deferred/globalF.glsl");
+            copy(root / "class1" / "deferred" / "textureUtilV.glsl", "deferred/textureUtilV.glsl");
+            copy(root / "class1" / "objects" / "nonindexedTextureV.glsl", "objects/nonindexedTextureV.glsl");
             copy(root / "class1" / "environment" / "srgbF.glsl", "environment/srgbF.glsl");
+            // The screen-space reflections' unit: its stubs at class 1, and its march at class 3, which build() puts
+            // in its place where the programs march.
+            std::error_code ec;
+            mSSRStub = LLFile::getContents((root / "class1" / "deferred" / "screenSpaceReflUtil.glsl").string(), ec);
+            REQUIRE_FALSE(ec);
+            mSSRMarch = LLFile::getContents((root / "class3" / "deferred" / "screenSpaceReflUtil.glsl").string(), ec);
+            REQUIRE_FALSE(ec);
             for (const auto& entry : std::filesystem::directory_iterator(root / "class1" / "deferred"))
             {
                 const std::string name = entry.path().filename().string();
@@ -777,27 +858,63 @@ void main()
             REQUIRE(mDir.write("test/probeListedF.glsl", LISTED));
         }
 
-        bool build(LLGLSLShader& program, const char* main, S32 level, S32 count, bool classic)
+        // `main` over the probes at probe level `level`, `count` probes a point, with the classic sky where
+        // `classic`, and where `tails` the screen-space reflections and the hero probe. The probe programs' features
+        // attach what they read as they attach it to the viewer's, the shared objects the viewer compiles once under
+        // its global defines, compiled here under this configuration's.
+        bool build(LLGLSLShader& program, const char* main, S32 level, S32 count, bool classic, bool tails = false)
         {
+            std::map<std::string, std::string> defines = LLGLSLShader::sGlobalDefines;
+            defines["REFMAP_LEVEL"] = std::to_string(level);
+            defines["REF_SAMPLE_COUNT"] = std::to_string(count);
+            if (classic)
+            {
+                defines["CLASSIC_MODE"] = "1";
+            }
+            if (tails)
+            {
+                defines["SSR"] = "1";
+                defines["HERO_PROBES"] = "1";
+            }
+            if (!mDir.write("deferred/screenSpaceReflUtil.glsl", tails ? mSSRMarch : mSSRStub))
+            {
+                return false;
+            }
+            // What LLShaderMgr::attachShaderFeatures attaches for the features below: an object it attaches that is
+            // not here fails the build on every driver.
+            const std::pair<const char*, GLenum> shared[] = {
+                { "deferred/textureUtilV.glsl", GL_VERTEX_SHADER },
+                { "objects/nonindexedTextureV.glsl", GL_VERTEX_SHADER },
+                { "deferred/globalF.glsl", GL_FRAGMENT_SHADER },
+                { "environment/srgbF.glsl", GL_FRAGMENT_SHADER },
+                { "deferred/deferredUtil.glsl", GL_FRAGMENT_SHADER },
+                { "deferred/screenSpaceReflUtil.glsl", GL_FRAGMENT_SHADER },
+                { "deferred/reflectionProbeF.glsl", GL_FRAGMENT_SHADER },
+            };
+            for (const auto& [object, stage] : shared)
+            {
+                S32 shader_level = 1;
+                if (mShaders.loadShaderFile(object, shader_level, stage, &defines) == 0)
+                {
+                    return false;
+                }
+            }
+
             program.unload();
             program.mName = main;
-            program.mFeatures.attachNothing = true;
+            program.mFeatures.hasSrgb = true;
+            program.mFeatures.hasReflectionProbes = true;
             program.mShaderFiles.clear();
             program.mShaderFiles.push_back(std::make_pair("test/probeTestV.glsl", GL_VERTEX_SHADER));
             program.mShaderFiles.push_back(std::make_pair(main, GL_FRAGMENT_SHADER));
             program.mShaderFiles.push_back(std::make_pair("test/probeTestInputsF.glsl", GL_FRAGMENT_SHADER));
-            program.mShaderFiles.push_back(std::make_pair("deferred/reflectionProbeF.glsl", GL_FRAGMENT_SHADER));
-            // deferredUtil.glsl calls what globalF.glsl and, under the classic sky, srgbF.glsl define, and Mesa links
-            // no program with a call left unresolved, made or not.
-            program.mShaderFiles.push_back(std::make_pair("deferred/deferredUtil.glsl", GL_FRAGMENT_SHADER));
-            program.mShaderFiles.push_back(std::make_pair("deferred/globalF.glsl", GL_FRAGMENT_SHADER));
-            program.mShaderFiles.push_back(std::make_pair("environment/srgbF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
-            program.addPermutation("REFMAP_LEVEL", std::to_string(level));
-            program.addPermutation("REF_SAMPLE_COUNT", std::to_string(count));
-            if (classic)
+            for (const auto& [name, value] : defines)
             {
-                program.addPermutation("CLASSIC_MODE", "1");
+                if (!LLGLSLShader::sGlobalDefines.contains(name))
+                {
+                    program.addPermutation(name, value);
+                }
             }
             return program.createShader();
         }
@@ -870,6 +987,45 @@ void main()
             mSH.bindTexture(0, 0, ALSamplers::PointClamp);
             glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 4, PROBES, GL_RGBA_INTEGER, GL_UNSIGNED_INT, sh.data());
             gGL.getTextureSlot(0)->unbind();
+
+            // The scene the screen-space reflections march: seen through a quarter turn's field of view, a floor 4 m
+            // below the eye up to a wall turned across the view, 24 to 36 m ahead, each texel's colour its own, and
+            // stored through the projection the march projects by.
+            LLMatrix4a proj;
+            proj.clear();
+            F32* m = proj.getF32ptr();
+            m[0] = 1.f;
+            m[5] = 1.f;
+            m[10] = (SCENE_FAR + SCENE_NEAR) / (SCENE_NEAR - SCENE_FAR);
+            m[11] = -1.f;
+            m[14] = 2.f * SCENE_FAR * SCENE_NEAR / (SCENE_NEAR - SCENE_FAR);
+            gGL.matrixMode(LLRender::MM_PROJECTION);
+            gGL.loadMatrix(proj);
+            gGL.matrixMode(LLRender::MM_MODELVIEW);
+            gGL.loadIdentity();
+
+            REQUIRE(mScene.ensure({ .width = SCENE, .height = SCENE, .color = { GL_RGBA16F },
+                                    .depth = ALRenderTargetDesc::Depth::D32F }) == LLRenderTarget::EnsureResult::Built);
+            std::vector<F32> colour(size_t(SCENE) * SCENE * 4);
+            std::vector<F32> depth(size_t(SCENE) * SCENE);
+            for (U32 y = 0; y < SCENE; ++y)
+            {
+                for (U32 x = 0; x < SCENE; ++x)
+                {
+                    const size_t i = size_t(y) * SCENE + x;
+                    const F32 dx = ((F32)x + 0.5f) / (F32)SCENE * 2.f - 1.f;
+                    const F32 dy = ((F32)y + 0.5f) / (F32)SCENE * 2.f - 1.f;
+                    const F32 wall = 30.f + 6.f * dx;
+                    const F32 view_depth = dy < 0.f ? llmin(4.f / -dy, wall) : wall;
+                    depth[i] = ((m[10] * -view_depth + m[14]) / view_depth) * 0.5f + 0.5f;
+                    colour[i * 4 + 0] = 0.1f + 0.9f * random(x, 40);
+                    colour[i * 4 + 1] = 0.1f + 0.9f * random(y, 41);
+                    colour[i * 4 + 2] = 0.1f + 0.9f * random((U32)i, 42);
+                    colour[i * 4 + 3] = 1.f;
+                }
+            }
+            glTextureSubImage2D(mScene.getTexture(), 0, 0, 0, SCENE, SCENE, GL_RGBA, GL_FLOAT, colour.data());
+            glTextureSubImage2D(mScene.getDepth(), 0, 0, 0, SCENE, SCENE, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
         }
 
         Layout layoutOf(const LLGLSLShader& program) const
@@ -880,9 +1036,14 @@ void main()
             REQUIRE(block != GL_INVALID_INDEX);
             glGetActiveUniformBlockiv(name, block, GL_UNIFORM_BLOCK_DATA_SIZE, &layout.size);
             const char* names[] = { "refBox", "refSphere", "refParams", "refIndex", "refNeighbor", "refBucket",
-                                    "refmapCount" };
+                                    "refmapCount", "heroBox", "heroSphere", "heroShape", "heroMaxLod",
+                                    "heroProbeCount", "iterationCount", "rayStep", "distanceBias", "depthRejectBias",
+                                    "glossySampleCount", "adaptiveStepMultiplier" };
             GLint* offsets[] = { &layout.refBox, &layout.refSphere, &layout.refParams, &layout.refIndex,
-                                 &layout.refNeighbor, &layout.refBucket, &layout.refmapCount };
+                                 &layout.refNeighbor, &layout.refBucket, &layout.refmapCount, &layout.heroBox,
+                                 &layout.heroSphere, &layout.heroShape, &layout.heroMaxLod, &layout.heroProbeCount,
+                                 &layout.iterationCount, &layout.rayStep, &layout.distanceBias,
+                                 &layout.depthRejectBias, &layout.glossySampleCount, &layout.adaptiveStepMultiplier };
             for (size_t i = 0; i < LL_ARRAY_SIZE(names); ++i)
             {
                 std::string member = names[i];
@@ -1006,6 +1167,46 @@ void main()
             const S32 count = PROBES;
             put(layout.refmapCount, 0, 0, &count, sizeof(count));
 
+            // A mirror's hero probe, a box turned a little about y or a sphere (mHeroShape), each holding part of the
+            // points' reach, its cube the first probe's layer.
+            {
+                const F32 c = std::cos(0.4f);
+                const F32 s = std::sin(0.4f);
+                const LLVector3 centre(1.f, -2.f, -14.f);
+                const LLVector3 rows[3] = { LLVector3(c / 9.f, 0.f, -s / 9.f), LLVector3(0.f, 1.f / 4.f, 0.f),
+                                            LLVector3(s / 12.f, 0.f, c / 12.f) };
+                F32 box[16] = {};
+                for (S32 row = 0; row < 3; ++row)
+                {
+                    for (S32 col = 0; col < 3; ++col)
+                    {
+                        box[col * 4 + row] = rows[row].mV[col];
+                    }
+                    box[12 + row] = -(rows[row] * centre);
+                }
+                box[15] = 1.f;
+                put(layout.heroBox, 0, 0, box, sizeof(box));
+                const F32 sphere[4] = { 2.f, -1.f, -12.f, 12.f };
+                put(layout.heroSphere, 0, 0, sphere, sizeof(sphere));
+                const S32 shape = mHeroShape;
+                put(layout.heroShape, 0, 0, &shape, sizeof(shape));
+                const F32 max_lod = (F32)(LLImageGL::calcMipLevelCount(CUBE, CUBE) - 1);
+                put(layout.heroMaxLod, 0, 0, &max_lod, sizeof(max_lod));
+                const S32 heroes = 1;
+                put(layout.heroProbeCount, 0, 0, &heroes, sizeof(heroes));
+            }
+
+            // The screen-space reflections' march, as the viewer's settings default it but for a wider bias, so the
+            // scene's coarse texels are hit.
+            const F32 march[6] = { 25.f, 0.1f, 0.3f, 0.001f, 4.f, 1.6f };
+            const GLint march_offsets[6] = { layout.iterationCount, layout.rayStep, layout.distanceBias,
+                                             layout.depthRejectBias, layout.glossySampleCount,
+                                             layout.adaptiveStepMultiplier };
+            for (size_t i = 0; i < 6; ++i)
+            {
+                put(march_offsets[i], 0, 0, &march[i], sizeof(F32));
+            }
+
             mUBO.update(block.data(), block.size(), ALUniformBuffer::EUsage::STATIC);
         }
 
@@ -1025,6 +1226,19 @@ void main()
             {
                 mSH.bindTexture(0, channel, ALSamplers::PointClamp);
             }
+            // The screen-space reflections' scene, and the hero probe's cube, where the programs take them.
+            program.bindTexture(LLShaderMgr::SCENE_MAP, &mScene);
+            program.bindDepthTexture(LLShaderMgr::SCENE_DEPTH, &mScene);
+            channel = program.enableTexture(LLShaderMgr::HERO_PROBE);
+            if (channel > -1)
+            {
+                mCube->bind(channel);
+            }
+            const LLMatrix4a identity = LLMatrix4a::identity();
+            program.uniformMatrix4fv(LLShaderMgr::MODELVIEW_DELTA_MATRIX, identity);
+            program.uniformMatrix4fv(LLShaderMgr::INVERSE_MODELVIEW_DELTA_MATRIX, identity);
+            program.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)mW, (F32)mH);
+            program.uniform4f(LLShaderMgr::CLIP_PLANE, 0.f, 1.f, 0.2f, 3.f);
             // A turn about an axis off every one of the environment's, so a tap's direction matters in all three.
             const F32 env[9] = { 0.936f, 0.290f, -0.199f, -0.249f, 0.950f, 0.189f, 0.244f, -0.123f, 0.962f };
             program.uniformMatrix3fv(LLShaderMgr::DEFERRED_ENV_MAT, 1, GL_FALSE, env);
@@ -1041,6 +1255,14 @@ void main()
                 LLGLDepthTest depth(GL_FALSE, GL_FALSE);
                 mTriangle->setBuffer();
                 mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+            // Nothing left bound for the textures' names to outlive: the scene releases them, and a texture made
+            // after under a name they had must not find its unit already holding it.
+            for (S32 uniform : { (S32)LLShaderMgr::REFLECTION_PROBES, (S32)LLShaderMgr::SH_COEFFS,
+                                 (S32)LLShaderMgr::SCENE_MAP, (S32)LLShaderMgr::SCENE_DEPTH,
+                                 (S32)LLShaderMgr::HERO_PROBE })
+            {
+                program.unbindTexture(uniform);
             }
             program.unbind();
             mTarget.flush();
@@ -1068,11 +1290,15 @@ void main()
         LLGLSLShader              mListed;
         LLRenderTarget            mTarget;
         LLRenderTarget            mSH;
+        LLRenderTarget            mScene; ///< what the screen-space reflections march: a colour and its depth
         LLPointer<LLCubeMapArray> mCube;
         ALUniformBuffer           mUBO;
         LLPointer<LLVertexBuffer> mTriangle;
         S32                       mW = 0;
         S32                       mH = 0;
         bool                      mSurface = false; ///< the surface in place of the hash's points
+        S32                       mHeroShape = 0;   ///< the hero probe's heroShape: 0 a box, 1 a sphere
+        std::string               mSSRStub;         ///< class1/deferred/screenSpaceReflUtil.glsl
+        std::string               mSSRMarch;        ///< class3/deferred/screenSpaceReflUtil.glsl
     };
 }

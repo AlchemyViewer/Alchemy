@@ -613,15 +613,6 @@ vec3 probeBoxPos(int i, vec3 pos)
     return refIndex[i].w < 0 ? (refBox[i] * vec4(pos, 1.0)).xyz : vec3(0);
 }
 
-void probeSumsClearAutomatic(inout ProbeSums s)
-{
-    s.ambient0 = vec3(0);
-    s.gloss0 = vec3(0);
-    s.legacy0 = vec3(0);
-    s.wsum0 = 0;
-    s.dwsum0 = 0;
-}
-
 // Probe `i`'s taps, weighted into `s`.
 void probeTap(int i, vec3 pos, vec3 box_pos, ProbeTaps t, inout ProbeSums s)
 {
@@ -649,9 +640,15 @@ void probeTap(int i, vec3 pos, vec3 box_pos, ProbeTaps t, inout ProbeSums s)
     }
 }
 
-// mix automatic and manual probes
+// mix automatic and manual probes, the automatic ones' sum `col0` only while `automatic`: once a box has shut them
+// out, those tapped before it give nothing
 vec3 probeMix(vec3 col0, vec3 col1, ProbeSums s, bool automatic)
 {
+    if (!automatic)
+    {
+        col0 = vec3(0);
+    }
+
     if (automatic && s.wsum0 > 0.0)
     { // some automatic probes were sampled
         col0 *= 1.0/s.wsum0;
@@ -681,12 +678,16 @@ vec3 probeMix(vec3 col0, vec3 col1, ProbeSums s, bool automatic)
 void sampleProbeTaps(vec3 pos, ProbeTaps t, inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv)
 {
     ProbeSums s;
+    s.ambient0 = vec3(0);
     s.ambient1 = vec3(0);
+    s.gloss0 = vec3(0);
     s.gloss1 = vec3(0);
+    s.legacy0 = vec3(0);
     s.legacy1 = vec3(0);
+    s.wsum0 = 0;
     s.wsum1 = 0;
+    s.dwsum0 = 0;
     s.dwsum1 = 0;
-    probeSumsClearAutomatic(s);
 
     bool automatic = !t.water;
     bool boxed = false;
@@ -730,10 +731,9 @@ void sampleProbeTaps(vec3 pos, ProbeTaps t, inout vec3 ambenv, inout vec3 glosse
         }
 
         // never allow automatic probes to encroach on box probes
-        if (boxed && automatic)
+        if (boxed)
         {
             automatic = false;
-            probeSumsClearAutomatic(s);
         }
 
         probeTap(idx, pos, box_pos, t, s);
@@ -753,8 +753,12 @@ void sampleProbeTaps(vec3 pos, ProbeTaps t, inout vec3 ambenv, inout vec3 glosse
         ++count;
     }
 #else
-    probeTap(0, pos, probeBoxPos(0, pos), t, s);
-    ++count;
+    // Water takes probe 0 below.
+    if (!t.water)
+    {
+        probeTap(0, pos, probeBoxPos(0, pos), t, s);
+        ++count;
+    }
 #endif
 
     if (t.water)
