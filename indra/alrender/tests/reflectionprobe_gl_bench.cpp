@@ -70,8 +70,8 @@ TEST_CASE_METHOD(reflectionprobe_gl::ProbeScene, "reflectionprobe_gl_bench: the 
     ll_test::skipUnlessOptimised();
     setUp(W, H);
 
-    // The soften pass's taps, PBR or legacy a pixel (sampleReflectionProbesEither), and the PBR and legacy entry points
-    // the forward shaders take.
+    // The soften pass's taps, PBR or legacy a pixel (sampleReflectionProbesEither), the PBR and legacy entry points the
+    // forward shaders take, and the water's.
     const char* apis[] = { "PBR", "legacy", "water", "soften" };
     // A surface as a view holds one, every pixel's probes its neighbours', and points scattered so a group of pixels
     // holds probes apart.
@@ -83,7 +83,7 @@ TEST_CASE_METHOD(reflectionprobe_gl::ProbeScene, "reflectionprobe_gl_bench: the 
             REQUIRE(build(mFused, "test/probeFusedF.glsl", level, 32, false));
             REQUIRE(build(mListed, "test/probeListedF.glsl", level, 32, false));
             layProbes(mFused);
-            for (S32 api : { 3, 0, 1 })
+            for (S32 api : { 3, 0, 1, 2 })
             {
                 const F64 fused = gpuTime([&] { draw(mFused, api); });
                 const F64 listed = gpuTime([&] { draw(mListed, api); });
