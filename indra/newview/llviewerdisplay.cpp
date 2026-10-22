@@ -30,6 +30,7 @@
 
 #include "alfarplane.h"
 #include "alfloaterprogressview.h"
+#include "alframeend.h"
 #include "alhuddepth.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
@@ -446,10 +447,13 @@ bool display_window_hidden()
         || gNonInteractive;
 }
 
+// The frames ahead of a frame display() showed and left for the main loop to end (display_end_frame), 0 for none.
+static U32 sFrameEndOwed = 0;
+
 // Runs the main loop's queued work in the time the frame's end is about to wait for the GPU, as much as the frames'
-// ends before show there is to spare (ALPacingSlack). Straight after the swap and before the frame's fence, so that
-// the frame's end waits only for what is left, and with no poll between the items, since on a threaded driver a poll
-// is that wait.
+// ends before show there is to spare (ALPacingSlack). After the swap and before the frame's fence, so that the frame's
+// end waits only for what is left, and with no poll between the items, since on a threaded driver a poll is that wait.
+// Out of display(), whose scope the work was never written for: it is what idle() runs, posted for the main thread.
 static void fill_pacing_slack()
 {
     ALPacingSlack& slack = gGL.frameFences().slack();
@@ -475,6 +479,23 @@ static void fill_pacing_slack()
     LL_PROFILE_PLOT("frame pacing slack work ms", worked * 1000.0);
 }
 
+void display_end_frame()
+{
+    const U32 frames_ahead = sFrameEndOwed;
+    if (frames_ahead == 0)
+    {
+        return;
+    }
+    sFrameEndOwed = 0;
+    LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("End Frame");
+    {
+        LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_IDLE);
+        fill_pacing_slack();
+    }
+    LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_DISPLAY);
+    gGL.endFrame(frames_ahead);
+}
+
 // Paint the display!
 void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 {
@@ -482,6 +503,14 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     LL_PROFILE_GPU_ZONE("Render");
 
     LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_DISPLAY); // render time capture - This is the main stat for overall rendering.
+
+    // The frame the last pass showed is the main loop's to end (display_end_frame); one left unended ends here, unpaced.
+    llassert(sFrameEndOwed == 0);
+    if (sFrameEndOwed != 0)
+    {
+        sFrameEndOwed = 0;
+        gGL.endFrame();
+    }
 
     // What the settings and the window changed since the last frame, applied once, here, whatever the frame goes on to
     // draw: the login screen's frames apply them as the world's do.
@@ -570,6 +599,12 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 // remove dead gltf materials
                 gGLTFMaterialList.flushMaterials();
             }
+
+            // A pass that draws nothing still ends a frame, unpaced (ALFrameEnd): the uploads other contexts hand over
+            // publish, the queries are read, and what the GPU used is reused, as on any frame. A session without a
+            // window has no GL to end one in.
+            const ALFrameEnd end = ALFrameEnd::make(true, false, gPipeline.maxFramesAhead());
+            gGL.endFrame(end.mFramesAhead);
         }
         return;
     }
@@ -1115,16 +1150,20 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // anywhere, which is behind the swap already (see ALFrameFences). And here rather than in
     // resetFrameStats(): a resize deletes and remaps a ring and invalidates every outstanding slice,
     // which must land past this frame's draws, not before its heaviest passes. See
-    // ALUniformBuffer::endFrame. A frame that reached the screen also waits there for the one
+    // ALUniformBuffer::endFrame. A frame that reached the screen also waits for the one
     // AlchemyRenderMaxFramesAhead before it, every frame, so the CPU keeps an even pace that far
-    // ahead of the GPU; a capture's frames are not paced, nor the login screen's. The main loop's
-    // work has a share of that wait first, where the frames before show the GPU is the slower.
-    const U32 frames_ahead = presented ? gPipeline.maxFramesAhead() : 0;
-    if (frames_ahead > 0)
+    // ahead of the GPU, with the main loop's work in that wait first; that end is the main loop's,
+    // straight after display() returns (display_end_frame, ALFrameEnd). A capture's frames, and
+    // every frame with pacing off, end here unpaced.
+    const ALFrameEnd end = ALFrameEnd::make(false, presented, gPipeline.maxFramesAhead());
+    if (end.mAfterDisplay)
     {
-        fill_pacing_slack();
+        sFrameEndOwed = end.mFramesAhead;
     }
-    gGL.endFrame(frames_ahead);
+    else
+    {
+        gGL.endFrame(end.mFramesAhead);
+    }
 
     display_stats();
 
