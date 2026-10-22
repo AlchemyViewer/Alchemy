@@ -3359,7 +3359,13 @@ bool LLPipeline::visibleObjectsInFrustum(LLCamera& camera)
     return false;
 }
 
-bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& max)
+bool LLPipeline::waterReceivesShadows(LLCamera& camera)
+{
+    return hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera) &&
+           mWaterSurface.drawnFrom(*LLViewerCamera::getInstance());
+}
+
+bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& max, bool water)
 {
     const F32 X = 65536.f;
 
@@ -3395,8 +3401,7 @@ bool LLPipeline::getVisibleExtents(LLCamera& camera, LLVector3& min, LLVector3& 
     // The water has no partition: its field, whole, with its lowest and highest water, and a receiver wherever the
     // camera meets it. Left out, a view of open sea, or a shadow split holding nothing but water, finds no receivers
     // and its split is left empty. Not from where the water is not drawn at all.
-    if (hasRenderType(LLPipeline::RENDER_TYPE_WATER) && mWaterSurface.inView(camera) &&
-        mWaterSurface.drawnFrom(*LLViewerCamera::getInstance()))
+    if (water && waterReceivesShadows(camera))
     {
         mWaterSurface.addExtents(min, max);
         res = false;
@@ -13249,12 +13254,13 @@ void LLPipeline::addShadowCasters(ALSpotShadowCache::Casters& casters)
     textured(LLRenderPass::PASS_GRASS);
 }
 
-bool LLPipeline::getVisiblePointCloud(LLCamera& camera, LLVector3& min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir)
+bool LLPipeline::getVisiblePointCloud(LLCamera& camera, LLVector3& min, LLVector3& max, std::vector<LLVector3>& fp, LLVector3 light_dir,
+                                      bool water)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
     //get point cloud of intersection of frust and min, max
 
-    if (getVisibleExtents(camera, min, max))
+    if (getVisibleExtents(camera, min, max, water))
     {
         return false;
     }
@@ -13690,9 +13696,13 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
         main_camera.calcAgentFrustumPlanes(main_camera.mAgentFrustum);
 
         LLVector3 min,max;
-        getVisiblePointCloud(main_camera,min,max,fp);
+        // The split range is set by the receivers other than the water: its field reaches past the draw distance, and
+        // among them it would stretch every split to the draw distance whenever the sea is in view. Each split still
+        // takes the water among its receivers for its own fit, and with nothing but water in view the range takes its
+        // floor rather than leaving the sun without shadows.
+        getVisiblePointCloud(main_camera, min, max, fp, LLVector3(0.f, 0.f, 0.f), false);
 
-        if (fp.empty())
+        if (fp.empty() && !waterReceivesShadows(main_camera))
         {
             if (!hasRenderDebugMask(RENDER_DEBUG_SHADOW_FRUSTA) && !gCubeSnapshot)
             {
@@ -13715,25 +13725,34 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             return;
         }
 
-        //get good split distances for frustum
-        for (U32 i = 0; i < fp.size(); ++i)
+        // The nearest and farthest receivers' depths, 0 with only water in view.
+        F32 nearest = 0.f;
+        F32 farthest = 0.f;
+        if (!fp.empty())
         {
-            LLVector4a v;
-            saved_view.affineTransform(LLVector4a(fp[i].mV[0], fp[i].mV[1], fp[i].mV[2], 1.f), v);
-            fp[i].set(v.getF32ptr());
+            //get good split distances for frustum
+            for (U32 i = 0; i < fp.size(); ++i)
+            {
+                LLVector4a v;
+                saved_view.affineTransform(LLVector4a(fp[i].mV[0], fp[i].mV[1], fp[i].mV[2], 1.f), v);
+                fp[i].set(v.getF32ptr());
+            }
+
+            min = fp[0];
+            max = fp[0];
+
+            //get camera space bounding box
+            for (U32 i = 1; i < fp.size(); ++i)
+            {
+                update_min_max(min, max, fp[i]);
+            }
+
+            nearest = -max.mV[2];
+            farthest = -min.mV[2];
         }
 
-        min = fp[0];
-        max = fp[0];
-
-        //get camera space bounding box
-        for (U32 i = 1; i < fp.size(); ++i)
-        {
-            update_min_max(min, max, fp[i]);
-        }
-
-        near_clip    = llclamp(-max.mV[2], 0.01f, 4.0f);
-        F32 far_clip = llclamp(-min.mV[2]*2.f, 16.0f, 512.0f);
+        near_clip    = llclamp(nearest, 0.01f, 4.0f);
+        F32 far_clip = llclamp(farthest*2.f, 16.0f, 512.0f);
 
         //far_clip = llmin(far_clip, 128.f);
         far_clip = llmin(far_clip, camera.getFar());
@@ -14030,12 +14049,18 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             // be infinite, either leaving infinities in the matrices and NaN in every lookup of the split. Each fit takes
             // at least MIN_SHADOW_DEPTH of depth, the ortho one about the receivers' middle and the perspective one at the
             // split's far end (fz). Only the depth's scale changes, only in a split with less, and by its depth smoothly.
+            // Receivers that collapse to a line or a point in the light's view, no wider across it than that, would be
+            // divided by in the line fit's error and the ortho fit, and the perspective fit's y range would be empty:
+            // their extent across the light is padded the same way.
             constexpr F32 MIN_SHADOW_DEPTH = 1.f;
-            if (max.mV[2] - min.mV[2] < MIN_SHADOW_DEPTH)
+            for (U32 axis = 0; axis < 3; ++axis)
             {
-                const F32 mid = (min.mV[2] + max.mV[2]) * 0.5f;
-                min.mV[2] = mid - MIN_SHADOW_DEPTH * 0.5f;
-                max.mV[2] = mid + MIN_SHADOW_DEPTH * 0.5f;
+                if (max.mV[axis] - min.mV[axis] < MIN_SHADOW_DEPTH)
+                {
+                    const F32 mid = (min.mV[axis] + max.mV[axis]) * 0.5f;
+                    min.mV[axis] = mid - MIN_SHADOW_DEPTH * 0.5f;
+                    max.mV[axis] = mid + MIN_SHADOW_DEPTH * 0.5f;
+                }
             }
 
             // Construct a perspective transform with perspective along y-axis that contains
