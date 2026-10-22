@@ -251,8 +251,8 @@ static bool handleNumpadControlChanged(const LLSD& newvalue)
 }
 
 
-// An input of the programs or the render resources (ALShaderInputs, ALRenderResourceInputs): the frame's application
-// latches the inputs again with its other changes, and reloads and reconciles only what they moved.
+// An input of the programs or the render resources (ALShaderInputs, ALRenderResourceInputs), or the frames' pacing: the
+// frame's application latches the inputs again with its other changes, and reloads and reconciles only what they moved.
 static bool handleRenderInputChanged(const LLSD& newvalue)
 {
     gPipeline.markRenderInputsDirty();
@@ -988,6 +988,8 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMaxFramesAhead", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderPacingSlackWork", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderLightingMaxLevel", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReservedTextureIndices", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);

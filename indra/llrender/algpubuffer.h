@@ -223,8 +223,10 @@ private:
 // (ALFrameFences); only a GPU that many frames behind, or a ring mapped round within one frame, makes map() wait. Where
 // persistent maps did not resolve, map() gives memory of its own and publish() uploads it.
 //
-// A published region's reads -- binds, draws, dispatches -- are all issued before the next map(), which notes the frame
-// they were issued in. Neither call lays or polls a fence while the GPU keeps up.
+// A published region's reads -- binds, draws, dispatches -- are issued before the next map(), which notes the frame
+// they were issued in, or are noted with noteRead() in the frame they are issued, as a user that keeps what it
+// published for later frames does: the region stays as published until the ring comes round to it, `regions` maps on.
+// Neither call lays or polls a fence while the GPU keeps up.
 //
 // All operations require the GL context of the frame fences to be current: gGL's, unless others are given. Non-copyable.
 class ALGPUStream
@@ -251,6 +253,10 @@ public:
     // Hand the GPU the `bytes` written since map(). Returns where they start in getBuffer(): a multiple of
     // gGLManager.mShaderStorageBufferOffsetAlignment, so a storage range can start there.
     size_t publish(size_t bytes);
+
+    // The region publish() placed at `offset` is read again in this frame, after a later map(): the ring writes it
+    // again only once this frame has finished. Every read, in every frame, is noted so.
+    void noteRead(size_t offset);
 
     // map() calls that found their region still in use by the GPU, and waited.
     U32 getStalls() const { return mStalls; }

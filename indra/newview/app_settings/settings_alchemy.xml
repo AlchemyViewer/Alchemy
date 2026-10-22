@@ -2278,6 +2278,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderMaxFramesAhead</key>
+        <map>
+            <key>Comment</key>
+            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 1 is the least latency; 2 gives a GPU that is barely keeping up a frame of slack. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderPacingSlackWork</key>
+        <map>
+            <key>Comment</key>
+            <string>While AlchemyRenderMaxFramesAhead paces the frames and the GPU is the slower, run the main loop's queued work (textures, meshes and replies arriving from other threads) in the time each frame's end would otherwise wait for the GPU, for half as long as the shortest of the last eight frames' waits shows there is. Off, that work runs only in its millisecond a frame (MainWorkTime). Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderDepthBoundsTest</key>
         <map>
             <key>Comment</key>

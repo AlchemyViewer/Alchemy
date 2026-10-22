@@ -30,6 +30,7 @@ set(
   alcutoutimage.h
   aldepthpyramid.h
   alfarplane.h
+  alframeend.h
   alhexlattice.h
   alhuddepth.h
   allightmapblur.h
@@ -68,14 +69,15 @@ if(AL_BUILD_TESTS)
   # The suites that need no GL: the render resources' plan and the changes
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
-  # heights a normal map's slopes integrate to, snapshot cutouts and the spot
-  # shadows' cache.
+  # heights a normal map's slopes integrate to, snapshot cutouts, the spot
+  # shadows' cache, and how a display pass ends its frame.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
     SOURCES
       tests/alcutoutimage_test.cpp
       tests/alfarplane_test.cpp
+      tests/alframeend_test.cpp
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp

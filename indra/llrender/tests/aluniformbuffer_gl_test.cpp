@@ -321,4 +321,45 @@ namespace
         }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
+
+    // A slice bound again in a later frame, as a cached skinning palette is, holds its segment until that frame has
+    // finished: the head comes back to it only by way of a wait for the frame that bound it, however long ago the head
+    // left it.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: a scratch slice bound in a later frame holds its segment until that frame finishes", "[aluniformbuffer_gl]")
+    {
+        if (!glBufferStorage)
+        {
+            SKIP("no buffer storage: the scratch ring is the orphan fallback");
+        }
+        constexpr size_t SEGMENT  = 256 * 1024;
+        constexpr U32    SEGMENTS = 4;
+        ALUniformBuffer::cleanupClass();
+        ALFrameFences& frames = gGL.frameFences();
+        glFinish();
+        REQUIRE(frames.wait(frames.frame() - 1, 1000000000ull));
+
+        // One payload a segment, the head stepping out of segment 0 in this frame.
+        const std::vector<U8> payload(SEGMENT, 0x5a);
+        for (U32 i = 0; i < SEGMENTS; ++i)
+        {
+            REQUIRE(ALUniformBuffer::scratchWrite(payload.data(), payload.size()) == S64(i * SEGMENT));
+        }
+        const U32 generation = ALUniformBuffer::scratchGeneration();
+        frames.endFrame();
+        glFinish();
+        // The next frame's end shows the frame segment 0 was left in finished.
+        frames.endFrame();
+
+        // The first payload bound again in this frame, its generation still current.
+        REQUIRE(ALUniformBuffer::scratchGeneration() == generation);
+        ALUniformBuffer::scratchBindRange(BINDING, 0, BYTES);
+        const U32 calls = frames.getCalls();
+        // Round the ring, into segment 0.
+        REQUIRE(ALUniformBuffer::scratchWrite(payload.data(), payload.size()) == 0);
+        {
+            INFO("the head waits for the frame that bound it, not the finished one it left it in");
+            CHECK(frames.getCalls() >= calls + 2);
+        }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
 }

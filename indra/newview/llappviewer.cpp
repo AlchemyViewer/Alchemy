@@ -1579,12 +1579,19 @@ bool LLAppViewer::doFrame()
                 gGLActive = true;
 
                 display();
+                // The frame display() showed, if paced, ends here: the main loop's work in its slack, then the wait.
+                display_end_frame();
 
                 {
                     LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_IDLE);
                     LL_PROFILE_ZONE_NAMED_CATEGORY_APP("df Snapshot");
                     pingMainloopTimeout("Main:Snapshot");
-                    gPipeline.mReflectionMapManager.update();
+                    // Probes are captured only while the world is drawn: a hidden or minimized window shows none of
+                    // them, so their captures would be GPU work for nothing.
+                    if (!display_window_hidden())
+                    {
+                        gPipeline.mReflectionMapManager.update();
+                    }
                     LLFloaterSnapshot::update(); // take snapshots
                     LLFloaterSimpleSnapshot::update();
                     gGLActive = false;
