@@ -14023,12 +14023,18 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
             // be infinite, either leaving infinities in the matrices and NaN in every lookup of the split. Each fit takes
             // at least MIN_SHADOW_DEPTH of depth, the ortho one about the receivers' middle and the perspective one at the
             // split's far end (fz). Only the depth's scale changes, only in a split with less, and by its depth smoothly.
+            // Receivers that collapse to a line or a point in the light's view, no wider across it than that, would be
+            // divided by in the line fit's error and the ortho fit, and the perspective fit's y range would be empty:
+            // their extent across the light is padded the same way.
             constexpr F32 MIN_SHADOW_DEPTH = 1.f;
-            if (max.mV[2] - min.mV[2] < MIN_SHADOW_DEPTH)
+            for (U32 axis = 0; axis < 3; ++axis)
             {
-                const F32 mid = (min.mV[2] + max.mV[2]) * 0.5f;
-                min.mV[2] = mid - MIN_SHADOW_DEPTH * 0.5f;
-                max.mV[2] = mid + MIN_SHADOW_DEPTH * 0.5f;
+                if (max.mV[axis] - min.mV[axis] < MIN_SHADOW_DEPTH)
+                {
+                    const F32 mid = (min.mV[axis] + max.mV[axis]) * 0.5f;
+                    min.mV[axis] = mid - MIN_SHADOW_DEPTH * 0.5f;
+                    max.mV[axis] = mid + MIN_SHADOW_DEPTH * 0.5f;
+                }
             }
 
             // Construct a perspective transform with perspective along y-axis that contains
