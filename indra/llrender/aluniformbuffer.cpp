@@ -1270,6 +1270,17 @@ void ALUniformBuffer::scratchBindRange(U32 binding, S64 offset, size_t bytes)
     {
         return;
     }
+    // A slice is read by every draw that binds it, in whatever frame it was written: its segment goes back to the head
+    // only once the last frame that bound it has finished, not the frame the head left it in. The head's own segment
+    // is noted as the head leaves it. The orphaning fallback writes only where nothing is bound.
+    if (sScratchRing.getMapped())
+    {
+        const size_t seg = (size_t)offset / (sScratchPersistBytes / SCRATCH_SEGMENTS);
+        if (seg < (size_t)SCRATCH_SEGMENTS && (int)seg != sScratchSeg)
+        {
+            sScratchLeftIn[seg] = gGL.frameFences().frame();
+        }
+    }
     if (binding == sScratchBoundBinding && offset == sScratchBoundOffset
         && bytes == sScratchBoundBytes && sScratchGeneration == sScratchBoundGen)
     {

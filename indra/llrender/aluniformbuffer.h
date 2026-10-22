@@ -204,7 +204,9 @@ public:
     // in late-frame passes), and by its own buffer either way so the shadowed streaming
     // machinery never interacts. scratchGeneration() bumps when the ring laps (or the
     // fallback orphans, GL restarts, or the ring is resized): cached offsets from an older
-    // generation are stale and must be re-written. The persistent ring is sized adaptively from
+    // generation are stale and must be re-written. A slice of the current generation may be
+    // bound in any later frame: each bind keeps its segment from the head until that frame has
+    // finished. The persistent ring is sized adaptively from
     // observed per-frame traffic (small floor, grown toward the cap in endFrame), so a light
     // scene costs little; payloads over the floor's segment (a generous multiple of any real
     // skinning palette) are rejected (-1). Main-thread only, like the rest of the class.
