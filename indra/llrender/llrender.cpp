@@ -1933,6 +1933,18 @@ void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, si
     ++sDrawCalls; // its count is the GPU's to know
 }
 
+void LLRender::textureBarrier()
+{
+    llassert(gGLManager.mHasTextureBarrier);
+    if (!gGLManager.mHasTextureBarrier)
+    {
+        return;
+    }
+    // The barrier orders what was issued before it, which includes what is batched.
+    flush();
+    glTextureBarrier();
+}
+
 void LLRender::memoryBarrier(U32 barriers)
 {
     llassert(sCompute);

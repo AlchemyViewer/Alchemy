@@ -159,6 +159,12 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
             plan.at(inPack(pack, Slot::Water)).mDesc = ALRenderTargetDesc{
                 .width = shape.width, .height = shape.height, .color = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format }
             };
+        }
+        // The depth copy serves the haze passes too where the context has no texture barrier, transparent water or
+        // not: each copies the scene's depth before it reads it (LLPipeline::hazeDepth), the draws before it in its
+        // binding having written the scene's own.
+        if (shape.water && (in.mTransparentWater || !in.mTextureBarrier))
+        {
             plan.at(inPack(pack, Slot::DepthCopy)).mDesc =
                 ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .depth = main_depth };
         }

@@ -166,6 +166,14 @@ namespace
             { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; },
               [](const Plan& before)
               { return wanted(before, in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Water, Slot::DepthCopy })); } },
+            // Without a texture barrier the haze passes read the depth copy, so opaque water keeps it.
+            { "RenderTransparentWater without a texture barrier", [](Inputs& in) { in.mTextureBarrier = false; },
+              [](Inputs& in) { in.mTransparentWater = false; },
+              [](const Plan& before) { return wanted(before, in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Water })); } },
+            { "a context without a texture barrier", no_change, [](Inputs& in) { in.mTextureBarrier = false; }, nothing },
+            { "a context without a texture barrier under opaque water", [](Inputs& in) { in.mTransparentWater = false; },
+              [](Inputs& in) { in.mTextureBarrier = false; },
+              [](const Plan&) { return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::DepthCopy }); } },
             { "RenderFSAAType to FXAA", no_change, [](Inputs& in) { in.mFSAAType = 1; }, nothing },
             { "RenderFSAAType to SMAA", no_change, [](Inputs& in) { in.mFSAAType = 2; },
               [](const Plan&)
