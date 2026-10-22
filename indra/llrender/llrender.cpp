@@ -539,11 +539,11 @@ void LLRender::shutdown()
     mFrameFences.release();
 }
 
-void LLRender::endFrame()
+void LLRender::endFrame(U32 frames_ahead)
 {
     // The batch's results are written ahead of the fence that follows them.
     mQueries.endFrame();
-    mFrameFences.endFrame();
+    mFrameFences.endFrame(frames_ahead);
     ALUniformBuffer::endFrame();
 }
 

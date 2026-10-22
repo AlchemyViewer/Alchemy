@@ -720,6 +720,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     gPipeline.resetFrameStats();    // Reset per-frame statistics.
 
+    // Whether the world's frame reaches the screen: a capture holds its swap back, and a viewer on its way out draws
+    // no world.
+    bool presented = false;
     if (!gDisconnected && !LLApp::isExiting())
     {
         // The water's field around the main camera, before the mirrors, the shadow fit and the probes read it.
@@ -1060,6 +1063,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (!for_snapshot)
         {
             render_ui();
+            presented = gDisplaySwapBuffers;
             swap();
         }
 
@@ -1072,14 +1076,16 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Close the frame's queries, poll the frame fences and lay this frame's, and close out the UBO
+    // Close the frame's queries, lay this frame's fence and poll the frames before, and close out the UBO
     // streaming rings' per-frame counters (slices, wraps, GPU stalls) and let them resize. Straight
     // after the swap: the frame's one poll waits on a threaded driver's own thread here, if
     // anywhere, which is behind the swap already (see ALFrameFences). And here rather than in
     // resetFrameStats(): a resize deletes and remaps a ring and invalidates every outstanding slice,
     // which must land past this frame's draws, not before its heaviest passes. See
-    // ALUniformBuffer::endFrame.
-    gGL.endFrame();
+    // ALUniformBuffer::endFrame. A frame that reached the screen also waits there for the one
+    // AlchemyRenderMaxFramesAhead before it, every frame, so the CPU keeps an even pace that far
+    // ahead of the GPU; a capture's frames are not paced, nor the login screen's.
+    gGL.endFrame(presented ? gPipeline.maxFramesAhead() : 0);
 
     display_stats();
 

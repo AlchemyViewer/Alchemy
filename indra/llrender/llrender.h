@@ -479,8 +479,9 @@ public:
 
     // Ends the frame for what is kept a frame at a time: the query pool's batch closes, the frame's fence is laid, and
     // the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
-    // context's only.
-    void endFrame();
+    // context's only. `frames_ahead`, above 0, paces the CPU: the frame that many before this one is waited for
+    // (ALFrameFences::endFrame), on the frames a user sees.
+    void endFrame(U32 frames_ahead = 0);
 
     // The scissor box, in pixels of the bound framebuffer, that GL_SCISSOR_TEST (an
     // LLGLState) cuts to. Every writer goes through here; a change flushes what is batched

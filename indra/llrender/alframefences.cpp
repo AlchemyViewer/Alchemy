@@ -28,12 +28,13 @@
 
 #include "llgl.h"
 #include "llglheaders.h"
+#include "lltimer.h"
 
 #include <cstdint>
 
 namespace
 {
-    // How long endFrame() waits on one try for a frame FRAMES behind.
+    // How long endFrame() waits on one try for a frame FRAMES behind, and at most for the frame it paces on.
     constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
 
     bool signalled(GLenum status)
@@ -156,7 +157,36 @@ bool ALFrameFences::wait(U32 frame, U64 timeout_ns, bool* stalled)
     return true;
 }
 
-void ALFrameFences::endFrame()
+F64 ALFrameFences::pace(U32 frame)
+{
+    LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("frame pacing wait");
+    const F64 start = LLTimer::getTotalSeconds();
+    // No poll before it: on a threaded driver a poll of a fence not yet signalled waits on the driver's thread as long
+    // as this wait would, and outside its zone. A fence already signalled answers at once either way.
+    const U32 slot = frame % FRAMES;
+    bool finished = true;
+    if (mFences[slot])
+    {
+        const GLenum status = glClientWaitSync((GLsync)mFences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, WAIT_NANOSECONDS);
+        ++mCalls;
+        ++mFrameCalls;
+        mFlushed[slot] = true;
+        if (status == GL_CONDITION_SATISFIED)
+        {
+            ++mPacingWaits;
+        }
+        // A GPU that much behind is not paced: the frames' ends wait for it once it is FRAMES behind.
+        finished = signalled(status);
+    }
+    if (finished)
+    {
+        completeThrough(frame);
+    }
+    const F64 end = LLTimer::getTotalSeconds();
+    return end - start;
+}
+
+void ALFrameFences::endFrame(U32 frames_ahead)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     // The slot still holds the fence of the frame FRAMES before, while the GPU is that far behind.
@@ -166,9 +196,6 @@ void ALFrameFences::endFrame()
         {
         }
     }
-    // The frame's one poll, of the frames ended before this one: straight after the swap, where a threaded driver's
-    // own thread has caught up or is finishing the swap. The frame ending now has only just been sent to the GPU.
-    poll();
 
     const U32 slot = mFrame % FRAMES;
     llassert(!mFences[slot]);
@@ -176,9 +203,23 @@ void ALFrameFences::endFrame()
     mFlushed[slot] = false;
     ++mCalls;
     ++mFrameCalls;
+
+    // The pacing wait, every frame the GPU is behind: for the frame `frames_ahead` before this one, whose fence was
+    // laid a frame or more ago. Its flush sends this frame's fence on with it.
+    F64 paced = 0.0;
+    if (frames_ahead > 0 && mFrame > frames_ahead && !isComplete(mFrame - frames_ahead))
+    {
+        paced = pace(mFrame - frames_ahead);
+    }
+
+    // The frame's one poll, of the frames ended before this one: straight after the swap, where a threaded driver's
+    // own thread has caught up or is finishing the swap, or where the pacing wait has left it. The frame ending now
+    // has only just been sent to the GPU.
+    poll();
     ++mFrame;
 
     LL_PROFILE_PLOT("GL frame fence calls", (int64_t)mFrameCalls);
+    LL_PROFILE_PLOT("frame pacing wait ms", paced * 1000.0);
     mFrameCalls = 0;
 }
 
