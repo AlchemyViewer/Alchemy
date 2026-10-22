@@ -40,7 +40,7 @@ float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 vec4 applyWaterFogViewLinearNoClip(vec3 pos, vec4 color);
 
-void mirrorClip(vec3 pos);
+bool mirrorClipped(vec3 pos);
 
 // PBR interface
 vec2 BRDF(float NoV, float roughness);
@@ -130,7 +130,8 @@ void calculateFresnelFactors(out vec3 df3, out vec2 df2, vec3 viewVec, vec3 wave
 
 void main()
 {
-    mirrorClip(vary_position);
+    // Discarded at the end: the wave normals and the shadow take derivatives.
+    bool clipped = mirrorClipped(vary_position);
 
     // The plane's frame and the light in eye space, the same at every point: agent z and x through the view.
     vec3 vN = normal_matrix[2];
@@ -325,6 +326,15 @@ void main()
             glint_glow *= 1.0 - gone;
         }
     }
+
+    // Compiled only in the mirror variant: a discard the compiler cannot see is dead costs every fragment its early
+    // depth test.
+#ifdef MIRROR_CLIP
+    if (clipped)
+    {
+        discard;
+    }
+#endif
 
     // Not capped at 1: the glint and bright reflections are HDR and have to reach white and bloom, and
     // what shows through the surface must match the shore beside it. The alpha is the glint's glow, which
