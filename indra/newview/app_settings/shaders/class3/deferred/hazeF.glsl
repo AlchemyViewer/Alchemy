@@ -36,6 +36,7 @@ vec4 getPositionWithDepth(vec2 pos_screen, float depth);
 void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, out vec3 sunlit, out vec3 amblit, out vec3 atten, out vec3 additive);
 
 float getDepth(vec2 pos_screen);
+bool isFarDepth(float d);
 
 vec3 atmosFragLighting(vec3 light, vec3 additive, vec3 atten);
 
@@ -79,17 +80,18 @@ void main()
     // mask off atmospherics below water (when camera is under water)
     bool do_atmospherics = false;
 
-    if (dot(vec3(0), waterPlane.xyz) + waterPlane.w > 0.0 ||
-        dot(pos.xyz, waterPlane.xyz) + waterPlane.w > 0.0)
+    // No sky reaches here: the pass shades only what the world drew (ALDrawnOnly), the depth bounds holding it off
+    // the cleared depth, or without them a depth test of the triangle on the far plane (hazeV.glsl). A depth read here
+    // as the far plane is stale, then, a read that missed the draws before it, and the pixel is left as it is: hazed
+    // as the far plane, the water's would turn wholly to the sky behind it.
+    if (!isFarDepth(depth) && (dot(vec3(0), waterPlane.xyz) + waterPlane.w > 0.0 ||
+                               dot(pos.xyz, waterPlane.xyz) + waterPlane.w > 0.0))
     {
         do_atmospherics = true;
     }
 
     vec3  irradiance = vec3(0);
     vec3  radiance  = vec3(0);
-
-    // No sky reaches here: the pass shades only what the world drew (ALDrawnOnly), the depth bounds holding it off
-    // the cleared depth, or without them a depth test of the triangle on the far plane (hazeV.glsl).
 
    float alpha = 0.0;
 

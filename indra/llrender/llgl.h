@@ -147,6 +147,10 @@ public:
     // GL_EXT_depth_bounds_test: passing a fragment only where the depth already stored under it lies in a range.
     // Never core. Only true once glDepthBoundsEXT has resolved, so callers may trust it directly. See ALDepthBounds.
     bool mHasDepthBoundsTest = false;
+    // glTextureBarrier: core in 4.5, also GL_ARB_texture_barrier and GL_NV_texture_barrier, which macOS's 4.1 context
+    // may lack. Only true once the entry point has resolved, so callers may trust it directly. See
+    // LLRender::textureBarrier.
+    bool mHasTextureBarrier = false;
     // GL_ANY_SAMPLES_PASSED_CONSERVATIVE: core in 4.3, also GL_ARB_ES3_compatibility.
     bool mHasConservativeOcclusion = false;
     // GL_TIMESTAMP counts time: its GL_QUERY_COUNTER_BITS are not 0, which on Apple silicon they are.

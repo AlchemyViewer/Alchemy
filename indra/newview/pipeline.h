@@ -293,8 +293,13 @@ public:
     void copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget* dst);
     // The current pack's scene depth (mRT->deferredScreen's, which mRT->screen shares) over the whole of `dst`'s,
     // stretched as a nearest blit would, through gCopyDepthProgram: the water's depth copy and mSceneMap keep depth
-    // without the screen's stencil, which a blit's matching formats would make them carry.
+    // without the screen's stencil, which a blit's matching formats would make them carry. `dst` is cleared to the far
+    // plane first, and stays so where the program has not built.
     void copySceneDepth(LLRenderTarget& dst);
+    // The scene's depth as a haze pass reads it, with mRT->screen bound and the draws since its binding having written
+    // the depth it shares: past a texture barrier, the scene's own (nullptr); without one, a copy from `scope` taken
+    // after the screen is let go and bound again, or the scene's own past that change where the pack has no copy.
+    LLRenderTarget* hazeDepth(ALTransientTargets& scope);
     void generateLuminance(LLRenderTarget* src, LLRenderTarget* dst);
     void generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history = true);
     void generateLensFlareState(LLRenderTarget* src);

@@ -431,6 +431,13 @@ public:
     // most often. GL 4.0, so it needs no compute -- but a command a shader wrote is read only past BARRIER_COMMAND.
     void drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, size_t offset);
 
+    // Makes the draws after it read what the draws before it wrote into a texture the bound framebuffer has attached,
+    // as binding another framebuffer would: a pass that samples an attachment its target's earlier draws wrote reads it
+    // only past one. Without it a driver may answer from caches the writes have not reached, as radeonsi answers a
+    // depth from the tile metadata it held before them. Needs gGLManager.mHasTextureBarrier (glTextureBarrier). What is
+    // batched is drawn first.
+    void textureBarrier();
+
     // ---- Compute ---------------------------------------------------------------------------------------------------
     // Everything here needs sCompute and asserts it.
 
