@@ -33,6 +33,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cmath>
+#include <set>
 #include <vector>
 
 namespace
@@ -70,11 +71,15 @@ TEST_CASE_METHOD(ProbeScene, "reflectionprobe_gl: one pass over the probes taps 
         // automatic probes', the compiler rounds the pass, which weighs each probe once for all its taps, apart from
         // the list's passes, which weigh it once for each, by up to that: 1.2e-7 on the NVIDIA driver this was written
         // on. Wherever a box shuts the automatic probes out, or one kind of probe alone holds the point, the two agree
-        // to the bit. And taken where the probes vary, not every pixel the same.
+        // to the bit. And taken where the probes vary: every tap the entry point writes, the ambient and the gloss
+        // always and the legacy environment from the legacy entry points, many values over the pixels, where a pass
+        // that tapped nothing would leave one and the tap's untouched starting value.
+        const size_t texels = size_t(SIZE) * SIZE * 4;
         S32 differ = 0;
-        S32 varied = 0;
+        std::set<F32> values[3];
         for (size_t i = 0; i < fused.size(); i += 4)
         {
+            values[i / texels].insert(fused[i]);
             bool close = true;
             for (size_t c = 0; c < 3; ++c)
             {
@@ -87,9 +92,13 @@ TEST_CASE_METHOD(ProbeScene, "reflectionprobe_gl: one pass over the probes taps 
                                      << ": " << fused[i] << ", " << fused[i + 1] << ", " << fused[i + 2] << " against "
                                      << listed[i] << ", " << listed[i + 1] << ", " << listed[i + 2]);
             }
-            varied += fused[i] != fused[0] ? 1 : 0;
         }
         CHECK(differ == 0);
-        CHECK(varied > SIZE * SIZE / 2);
+        const bool legacy = api == 1 || api == 3;
+        for (size_t tap = 0; tap < (legacy ? 3 : 2); ++tap)
+        {
+            CAPTURE(tap);
+            CHECK(values[tap].size() > (size_t)SIZE);
+        }
     }
 }

@@ -281,8 +281,10 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: a kernel reaching past the apron, a 
         CHECK_FALSE(ALLightMapBlur::dispatch(mCompute, kernel, small));
         small.release();
     }
+    // The dispatch blurs over the screen's size, as the viewer gives it the light map's.
     LLRenderTarget fits;
     REQUIRE(fits.ensure({ .width = least, .height = least, .color = { GL_RG8 } }) == LLRenderTarget::EnsureResult::Built);
+    mCompute.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)least, (F32)least);
     CHECK(ALLightMapBlur::dispatch(mCompute, kernel, fits));
     fits.release();
     mCompute.unbind();
