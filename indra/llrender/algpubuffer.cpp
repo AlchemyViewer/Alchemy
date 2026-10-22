@@ -548,9 +548,7 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
             return false;
         }
         // For the open frame this waits for every command issued so far, the copy among them.
-        while (!fences.wait(slot.mFrame, 1000000000ull /* 1s */))
-        {
-        }
+        fences.waitFinished(slot.mFrame);
     }
 
     const size_t offset = (size_t)oldest * mSlotStride;

@@ -55,9 +55,6 @@ namespace
     // Slots are made this many at a time.
     constexpr U32 SLOTS_AT_ONCE = 32;
 
-    // How long endFrame() waits on one try for a batch the GPU has not finished.
-    constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
-
     // The query buffer writes name their buffer where the context has direct state access. Through the binding they
     // pass a pointer, which Mesa's glthread cannot queue: it runs each such call only once it has caught up.
     bool writes_named()
@@ -670,16 +667,7 @@ void ALQueryPool::endFrame()
     bool stalled = false;
     if (reused.mSerial != 0 && reused.mClosed && !reused.mRead && !isOpenIn(reused.mSerial))
     {
-        for (;;)
-        {
-            bool waited = false;
-            const bool finished = mFrames.wait(reused.mFrame, WAIT_NANOSECONDS, &waited);
-            stalled = stalled || waited;
-            if (finished)
-            {
-                break;
-            }
-        }
+        mFrames.waitFinished(reused.mFrame, &stalled);
         if (stalled)
         {
             ++mStalls;

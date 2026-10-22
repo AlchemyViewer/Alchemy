@@ -34,7 +34,7 @@
 
 namespace
 {
-    // How long endFrame() waits on one try for a frame FRAMES behind, and at most for the frame it paces on.
+    // How long waitFinished() waits on one try, and endFrame() at most for the frame it paces on.
     constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
 
     bool signalled(GLenum status)
@@ -157,6 +157,34 @@ bool ALFrameFences::wait(U32 frame, U64 timeout_ns, bool* stalled)
     return true;
 }
 
+void ALFrameFences::waitFinished(U32 frame, bool* stalled)
+{
+    if (stalled)
+    {
+        *stalled = false;
+    }
+    // In tries of a second, so that the log can say how long; a GPU that never finishes is the main loop's watchdog's
+    // to report.
+    for (U32 tries = 1;; ++tries)
+    {
+        bool this_wait = false;
+        const bool finished = wait(frame, WAIT_NANOSECONDS, &this_wait);
+        if (stalled && this_wait)
+        {
+            *stalled = true;
+        }
+        if (finished)
+        {
+            return;
+        }
+        if (tries == LONG_WAIT_SECONDS)
+        {
+            LL_WARNS_ONCE("FrameFences") << "The GPU has not finished a frame in " << LONG_WAIT_SECONDS
+                                         << " seconds; still waiting for it" << LL_ENDL;
+        }
+    }
+}
+
 F64 ALFrameFences::pace(U32 frame)
 {
     LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("frame pacing wait");
@@ -192,9 +220,7 @@ void ALFrameFences::endFrame(U32 frames_ahead)
     // The slot still holds the fence of the frame FRAMES before, while the GPU is that far behind.
     if (mFrame > FRAMES)
     {
-        while (!wait(mFrame - FRAMES, WAIT_NANOSECONDS))
-        {
-        }
+        waitFinished(mFrame - FRAMES);
     }
 
     const U32 slot = mFrame % FRAMES;

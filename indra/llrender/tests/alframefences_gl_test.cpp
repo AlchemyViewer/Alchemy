@@ -447,4 +447,29 @@ namespace
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }
+
+    // waitFinished() waits a frame out however long the GPU takes over it, and says whether it had to wait.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: waitFinished waits out a frame the GPU is still drawing", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 busy = mFrames.frame();
+        keepBusy();
+        mFrames.endFrame();
+        const U32 stalls = mFrames.getStalls();
+        bool stalled = false;
+        mFrames.waitFinished(busy, &stalled);
+        {
+            INFO("waited out, the wait counted as a stall");
+            CHECK(mFrames.isComplete(busy));
+            CHECK(stalled);
+            CHECK(mFrames.getStalls() == stalls + 1);
+        }
+        {
+            INFO("a frame already finished is not waited for again");
+            stalled = true;
+            mFrames.waitFinished(busy, &stalled);
+            CHECK_FALSE(stalled);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
 }

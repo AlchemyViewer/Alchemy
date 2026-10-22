@@ -67,6 +67,14 @@ public:
     /// endFrame() keeps out of it.
     bool wait(U32 frame, U64 timeout_ns, bool* stalled = nullptr);
 
+    /// Waits for `frame` to complete however long the GPU takes, for a user that must reuse what the frame used: a slow
+    /// GPU, however slow, is waited out. A wait that runs past LONG_WAIT_SECONDS is logged, once, so that a GPU that has
+    /// hung shows in the log of the report the main loop's watchdog makes of it. `stalled` as for wait().
+    void waitFinished(U32 frame, bool* stalled = nullptr);
+
+    /// How long waitFinished() waits before it logs that it is waiting.
+    static constexpr U32 LONG_WAIT_SECONDS = 10;
+
     /// Lays the open frame's fence; with `frames_ahead` above 0 waits for the frame that many before it to complete;
     /// then polls the fences of the frames ended before, oldest first, up to the first that has not signalled, and opens
     /// the next frame. Once a frame, after its last command: the viewer's is the swap. The frame it ends is shown
