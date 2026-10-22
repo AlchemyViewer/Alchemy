@@ -118,6 +118,14 @@ S32 LLImageGL::calcMipLevelCount(S32 width, S32 height)
 
 U32 LLImageGL::sFrameCount = 0;
 
+// The last content stamp handed out (LLImageGL::getContentStamp).
+static std::atomic<U64> sContentStamps{ 0 };
+
+void LLImageGL::touchContents()
+{
+    mContentStamp.store(sContentStamps.fetch_add(1, std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+}
+
 
 // texture memory accounting (for macOS)
 static LLMutex sTexMemMutex;
@@ -1112,6 +1120,7 @@ void LLImageGL::setImage(const LLImageRaw* imageraw)
 bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32 usename /* = 0 */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    touchContents();
 
     const bool is_compressed = isCompressed();
 
@@ -1550,6 +1559,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         //LL_WARNS() << "Setting subimage on image without GL texture" << LL_ENDL;
         return false;
     }
+    touchContents();
     if (datap == NULL)
     {
         // *TODO: Re-enable warning?  Ran into thread locking issues? DK 2011-02-18
@@ -1660,6 +1670,7 @@ bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_
 {
     if (gGL.getTextureSlot(0)->bind(this, false, true))
     {
+        touchContents();
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x_pos, y_pos, fb_x, fb_y, width, height);
         mGLTextureCreated = true;
         stop_glerror();

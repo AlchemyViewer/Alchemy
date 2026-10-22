@@ -1003,6 +1003,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderSpotShadowMaxResolution", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlow", handleRenderGlowChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowResolutionPow", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGlowHDR", handleRenderInputChanged);

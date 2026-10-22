@@ -51,6 +51,7 @@ struct ALRenderResourceInputs
 
     S32  mShadowDetail = 2;       ///< RenderShadowDetail: 0 none, 1 the sun's, 2 the sun's and two spot lights'
     F32  mShadowScale = 1.f;      ///< RenderShadowResolutionScale, of the main view's sun and spot shadows
+    U32  mSpotShadowMaxResolution = 2048; ///< AlchemyRenderSpotShadowMaxResolution: the spot shadows' largest edge, 0 none
     bool mShadowDepth32F = false; ///< AlchemyRenderShadowDepth32F
     bool mSSAO = true;            ///< RenderDeferredSSAO
     bool mSSAOBlurDispatched = true; ///< SSAO's blur reaches no further than a dispatch holds (ALLightMapBlur::apron of

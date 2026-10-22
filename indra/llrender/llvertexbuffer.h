@@ -264,6 +264,10 @@ public:
     U8* getMappedIndices() const            { return mMappedIndexData; }
     U32 getOffset(AttributeType type) const { return mOffsets[type]; }
 
+    // What the buffer holds, as a value no buffer has held before: taken whenever its stores are allocated, mapped for
+    // writing or written. A pass that keeps what it drew tells by it whether the geometry it drew is as it was.
+    U64 getContentStamp() const             { return mContentStamp; }
+
     // these functions assume (and assert on) the current VBO being bound
     // Detailed error checking can be enabled by setting gDebugGL to true
     void draw(U32 mode, U32 count, U32 indices_offset) const;
@@ -326,6 +330,10 @@ private:
     // add to set of mapped buffers
     void _mapBuffer();
     bool mMapped = false;
+
+    // The contents changed, or may have: a new stamp.
+    void touchContents();
+    U64 mContentStamp = 0;
 
     // Apple's path only: whether mMappedData / mMappedIndexData hold writes GL has not been
     // given. An upload sends those stores, and any GL has no buffer for yet, and no others.

@@ -32,6 +32,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <initializer_list>
 #include <set>
@@ -106,6 +107,11 @@ namespace
     IdSet sun_shadows(std::initializer_list<Pack> packs)
     {
         return in_packs(packs, { Slot::Sun0, Slot::Sun1, Slot::Sun2, Slot::Sun3 });
+    }
+
+    IdSet spot_shadows()
+    {
+        return of({ Id::SpotShadow0, Id::SpotShadow1 });
     }
 
     IdSet bloom(std::initializer_list<Pack> packs)
@@ -310,8 +316,20 @@ namespace
               [](const Plan& before) { return wanted(before, render_sized()); } },
             { "RenderResolutionDivisor", no_change, [](Inputs& in) { in.mResolutionDivisor = 2; },
               [](const Plan& before) { return wanted(before, render_sized()); } },
+            // The spot pair stays at its largest edge, which 2560 wide and 3840 wide both pass.
             { "RenderResolutionMultiplier", no_change, [](Inputs& in) { in.mResolutionMultiplier = 1.5f; },
+              [](const Plan& before) { return wanted(before, render_sized()) & ~spot_shadows(); } },
+            { "RenderResolutionMultiplier below the spot shadows' edge", no_change,
+              [](Inputs& in) { in.mResolutionMultiplier = 0.75f; },
               [](const Plan& before) { return wanted(before, render_sized()); } },
+            { "AlchemyRenderSpotShadowMaxResolution", no_change, [](Inputs& in) { in.mSpotShadowMaxResolution = 1024; },
+              [](const Plan&) { return spot_shadows(); } },
+            { "AlchemyRenderSpotShadowMaxResolution to none", no_change, [](Inputs& in) { in.mSpotShadowMaxResolution = 0; },
+              [](const Plan&) { return spot_shadows(); } },
+            { "AlchemyRenderSpotShadowMaxResolution past the render width", [](Inputs& in) { in.mSpotShadowMaxResolution = 4096; },
+              [](Inputs& in) { in.mSpotShadowMaxResolution = 8192; }, nothing },
+            { "AlchemyRenderSpotShadowMaxResolution without spot shadows", [](Inputs& in) { in.mShadowDetail = 1; },
+              [](Inputs& in) { in.mSpotShadowMaxResolution = 1024; }, nothing },
         };
     }
 
@@ -461,7 +479,7 @@ namespace
             for (Id spot : { Id::SpotShadow0, Id::SpotShadow1 })
             {
                 REQUIRE(plan.desc(spot));
-                CHECK(plan.desc(spot)->width == (U32)((F32)gbuffer.width * c.scale));
+                CHECK(plan.desc(spot)->width == std::min((U32)((F32)gbuffer.width * c.scale), in.mSpotShadowMaxResolution));
                 CHECK(plan.desc(spot)->height == plan.desc(spot)->width);
             }
 
@@ -471,6 +489,49 @@ namespace
             REQUIRE(plan.desc(Id::HeroSun0));
             CHECK(plan.desc(Id::HeroSun0)->width == blur_happy(in.mHeroResolution, 1.f));
         }
+    }
+
+    TEST_CASE("alrenderresourceplan: the spot shadows stop at their largest edge", "[alrenderresourceplan]")
+    {
+        struct Case
+        {
+            U32 width;
+            U32 largest;
+            F32 scale;
+            U32 expected;
+        };
+        const Case cases[] = {
+            { 3440, 2048, 1.f, 2048 }, { 1920, 2048, 1.f, 1920 }, { 3440, 4096, 1.f, 3440 }, { 3440, 0, 1.f, 3440 },
+            { 3440, 2048, 0.5f, 1720 }, { 1920, 2048, 1.5f, 2048 }, { 3440, 1, 1.f, 1 },     { 2048, 2048, 1.f, 2048 },
+        };
+
+        for (const Case& c : cases)
+        {
+            INFO(c.width << " wide, largest " << c.largest << ", scale " << c.scale);
+            Inputs in                   = defaults();
+            in.mWidth                   = c.width;
+            in.mHeight                  = 1440;
+            in.mSpotShadowMaxResolution = c.largest;
+            in.mShadowScale             = c.scale;
+            const Plan plan             = Plan::make(in);
+            for (Id spot : { Id::SpotShadow0, Id::SpotShadow1 })
+            {
+                REQUIRE(plan.desc(spot));
+                CHECK(plan.desc(spot)->width == c.expected);
+                CHECK(plan.desc(spot)->height == c.expected);
+            }
+            // The sun's cascades follow the render size as they did.
+            REQUIRE(plan.desc(Id::MainSun0));
+            CHECK(plan.desc(Id::MainSun0)->width == blur_happy(c.width, c.scale));
+        }
+
+        // A snapshot past the edge leaves the spot pair as the window had it.
+        Inputs window   = defaults();
+        window.mWidth   = 3440;
+        Inputs snapshot = window;
+        snapshot.mWidth  = 6000;
+        snapshot.mHeight = 4000;
+        CHECK(names(Plan::changed(Plan::make(window), Plan::make(snapshot)) & spot_shadows()) == "nothing");
     }
 
     TEST_CASE("alrenderresourceplan: every target is planned with a size, whatever the shadow scale", "[alrenderresourceplan]")

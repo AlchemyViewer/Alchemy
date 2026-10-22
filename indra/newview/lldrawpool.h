@@ -32,6 +32,8 @@
 #include "v3math.h"
 #include "llvertexbuffer.h"
 
+#include "alspotshadowcache.h"
+
 class LLFace;
 class LLViewerTexture;
 class LLViewerFetchedTexture;
@@ -110,6 +112,9 @@ public:
     virtual void endShadowPass(S32 pass);
     virtual S32 getNumShadowPasses();
     virtual void renderShadow(S32 pass = 0);
+    // What this pool's shadow passes draw, folded into `casters`. A pool that cannot say marks them changing, and a
+    // map its shadow passes draw into is drawn every frame.
+    virtual void addShadowCasters(ALSpotShadowCache::Casters& casters);
 
     virtual void render(S32 pass = 0) {};
     virtual void prerender() {};
@@ -490,6 +495,10 @@ public:
 void setup_texture_matrix(LLDrawInfo& params);
 void teardown_texture_matrix(LLDrawInfo& params);
 
+// A texture as a shadow pass samples it, folded into `draw`: which image, what it holds, at which level and size. Media
+// and a dynamic texture, whose contents change every frame they play or draw, mark `casters` changing.
+void add_shadow_texture(ALSpotShadowCache::Casters& casters, ALSpotShadowCache::Hash& draw, const LLViewerTexture* texture);
+
 class LLFacePool : public LLDrawPool
 {
 public:
@@ -517,6 +526,10 @@ public:
 
     virtual void resetDrawOrders();
     void resetAll();
+
+    // Its faces change every frame, as far as it can say: a pool whose shadow pass has faces to draw marks the
+    // casters changing.
+    virtual void addShadowCasters(ALSpotShadowCache::Casters& casters);
 
     void destroy();
 

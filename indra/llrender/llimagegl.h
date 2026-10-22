@@ -317,6 +317,9 @@ public:
 
     bool getHasGLTexture() const { return mTexName != 0; }
     LLGLuint getTexName() const { return mTexName; }
+    // What the texture holds, as a value no texture has held before: taken again by every upload into it, in place or
+    // not. A pass that keeps what it drew tells by it whether the pixels it sampled are as they were.
+    U64 getContentStamp() const { return mContentStamp.load(std::memory_order_relaxed); }
 
     bool getIsAlphaMask() const;
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
@@ -506,6 +509,9 @@ private:
 
     // Written by the upload on LLImageGLThread and by the main thread that asks for the texture.
     std::atomic<bool> mGLTextureCreated;
+    // getContentStamp, taken again by touchContents.
+    std::atomic<U64> mContentStamp{ 0 };
+    void touchContents();
     LLGLuint mTexName;
     // Whether mTexName has had its storage allocated yet. Storage is always immutable
     // (glTexStorage2D), so it can be allocated exactly once: every upload afterwards is a

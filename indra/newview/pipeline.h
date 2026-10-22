@@ -47,6 +47,7 @@
 #include "alrenderinputrequests.h"
 #include "alrenderresourceplan.h"
 #include "alshaderinputs.h"
+#include "alspotshadowcache.h"
 #include "altransienttargetpool.h"
 #include "altransienttargets.h"
 #include "alwatersurface.h"
@@ -631,8 +632,16 @@ public:
     void renderHighlight(const LLViewerObject* obj, F32 fade);
 
     // `occlusion` is the sUseOcclusion level the pass culls with: 0 for none, 2 to ask the shadow camera's own
-    // occlusion queries and draw them after the opaque casters.
+    // occlusion queries and draw them after the opaque casters. The cull and sort (sortShadow) and the draw
+    // (drawShadow), one after the other.
     void renderShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, LLCullResult& result, bool depth_clamp, bool do_cull = true, S32 occlusion = 0);
+    // What a shadow camera sees, sorted into `result` as its pass draws it: culled first unless `do_cull` is false,
+    // where `result` holds a cull made for it already.
+    void sortShadow(LLCamera& camera, LLCullResult& result, bool do_cull, S32 occlusion);
+    // The casters the last sortShadow sorted, drawn into the bound shadow map.
+    void drawShadow(const LLMatrix4a& view, const LLMatrix4a& proj, LLCamera& camera, bool depth_clamp, S32 occlusion);
+    // What the casters the last sortShadow sorted are drawn from, as drawShadow draws them, folded into `casters`.
+    void addShadowCasters(ALSpotShadowCache::Casters& casters);
     void renderSelectedFaces(const LLColor4& color);
     void renderHighlights();
     void renderDebug();
@@ -1091,6 +1100,8 @@ public:
     LLRenderTarget* mLightMap = nullptr;
 
     LLRenderTarget          mSpotShadow[2];
+    // What each spot map holds, so that one whose light and casters are as they were is not drawn again.
+    ALSpotShadowCache       mSpotShadowCache;
 
     LLRenderTarget          mPbrBrdfLut;
 

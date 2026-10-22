@@ -128,6 +128,27 @@ void LLDrawPoolTree::renderShadow(S32 pass)
     renderDeferred(pass);
 }
 
+// virtual
+void LLDrawPoolTree::addShadowCasters(ALSpotShadowCache::Casters& casters)
+{
+    // What renderDeferred draws each face from, with the texture it alpha tests by.
+    const LLViewerTexture* texture = LLPipeline::sRenderTextures ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
+    ALSpotShadowCache::Placements placements;
+    for (LLFace* face : mDrawFace)
+    {
+        const LLVertexBuffer* buffer = face->getVertexBuffer();
+        if (!buffer)
+        {
+            continue;
+        }
+        ALSpotShadowCache::Hash draw;
+        ALSpotShadowCache::foldGeometry(draw, buffer, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0,
+                                        placements.of(&face->getDrawable()->getRegion()->mRenderMatrix));
+        add_shadow_texture(casters, draw, texture);
+        casters.add(draw);
+    }
+}
+
 void LLDrawPoolTree::endShadowPass(S32 pass)
 {
     LL_PROFILE_ZONE_SCOPED;

@@ -29,6 +29,7 @@
 #include "llglheaders.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace
 {
@@ -258,11 +259,14 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
-    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale, and a texel at
-    // the least: a scale near 0 takes the shadows' detail, not the maps.
+    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale, no larger than
+    // their largest edge, and a texel at the least: a scale near 0 takes the shadows' detail, not the maps. A map covers
+    // its light's frustum whatever the window's shape, so the edge bounds what a wide window or a snapshot costs them.
     if (in.mShadowDetail > 1)
     {
-        const U32 spot = std::max((U32)((F32)width * shadow_scale), 1u);
+        // Bounded before it is made a U32, which a scale past that range would overflow.
+        const U32 largest = in.mSpotShadowMaxResolution > 0 ? in.mSpotShadowMaxResolution : std::numeric_limits<U32>::max();
+        const U32 spot    = std::max((U32)std::min((F64)width * shadow_scale, (F64)largest), 1u);
         for (Id id : { Id::SpotShadow0, Id::SpotShadow1 })
         {
             plan.at(id).mDesc = ALRenderTargetDesc{ .width = spot, .height = spot, .depth = shadow_depth };
