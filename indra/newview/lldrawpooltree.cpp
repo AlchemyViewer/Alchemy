@@ -133,6 +133,7 @@ void LLDrawPoolTree::addShadowCasters(ALSpotShadowCache::Casters& casters)
 {
     // What renderDeferred draws each face from, with the texture it alpha tests by.
     const LLViewerTexture* texture = LLPipeline::sRenderTextures ? mTexturep.get() : LLViewerFetchedTexture::sDefaultDiffuseImagep.get();
+    ALSpotShadowCache::Placements placements;
     for (LLFace* face : mDrawFace)
     {
         const LLVertexBuffer* buffer = face->getVertexBuffer();
@@ -141,8 +142,8 @@ void LLDrawPoolTree::addShadowCasters(ALSpotShadowCache::Casters& casters)
             continue;
         }
         ALSpotShadowCache::Hash draw;
-        draw.add(buffer).add(buffer->getContentStamp()).add((U64)buffer->getNumVerts()).add((U64)buffer->getNumIndices());
-        draw.add(face->getDrawable()->getRegion()->mRenderMatrix);
+        ALSpotShadowCache::foldGeometry(draw, buffer, 0, buffer->getNumVerts() - 1, buffer->getNumIndices(), 0,
+                                        placements.of(&face->getDrawable()->getRegion()->mRenderMatrix));
         add_shadow_texture(casters, draw, texture);
         casters.add(draw);
     }

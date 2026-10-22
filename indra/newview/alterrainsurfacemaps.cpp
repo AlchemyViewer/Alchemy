@@ -62,7 +62,6 @@ void ALTerrainSurfaceMaps::ensureUploaded()
     refresh();
     mDirtyWhole = false;
     mDirtyRect = Rect();
-    ++mVersion;
 }
 
 void ALTerrainSurfaceMaps::bind(S32 height_slot, S32 composition_slot)

@@ -65,6 +65,11 @@ int DebugDetailMap = 0;
 constexpr F32 TESS_DENSITY_MIN = 8.f;
 constexpr F32 TESS_DENSITY_MAX = 256.f;
 
+// How far the main camera moves before a spot light's kept shadow map takes the terrain's levels from it again. A map
+// drawn for a camera in the same metre keeps the levels it was drawn with, which are off from the receiver's by no more
+// than a metre's move changes them.
+constexpr F32 SPOT_SHADOW_CAMERA_STEP = 1.f;
+
 namespace
 {
     // How the terrain programs tessellate, as bindSurface hands it to them: the density the distance's levels come
@@ -299,27 +304,29 @@ void LLDrawPoolTerrain::addShadowCasters(ALSpotShadowCache::Casters& casters)
         return;
     }
 
-    // What bindSurface hands the shadow program: the region's heights, and levels from the distance to the main
-    // camera, so the patches tessellate again as it moves.
+    // What bindSurface hands the shadow program: the region's heights and placement, and levels from the distance to
+    // the main camera, so the patches tessellate again as it moves a metre.
     LLViewerRegion*  regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
     LLSurface&       land    = regionp->getLand();
     const TessLevels levels  = tess_levels();
+    const LLVector3& camera  = LLViewerCamera::getInstance()->getOrigin();
     ALSpotShadowCache::Hash surface;
     surface.add((U64)land.getSurfaceMaps().getVersion()).add((U64)land.hasZData());
-    surface.add(LLViewerCamera::getInstance()->getOrigin().mV, sizeof(LLVector3::mV));
-    surface.add(regionp->getOriginAgent().mV, sizeof(LLVector3::mV));
+    surface.add(regionp->mRenderMatrix);
+    for (U32 axis = 0; axis < 3; ++axis)
+    {
+        surface.add((U64)(U32)llfloor(camera.mV[axis] / SPOT_SHADOW_CAMERA_STEP));
+    }
     surface.add(levels.mDensity).add(levels.mSegment).add((U64)LLSurface::isSmoothing());
     surface.add(land.getMetersPerGrid()).add(regionp->getWidth());
     casters.add(surface);
 
     for (LLFace* facep : mDrawFace)
     {
-        const LLVertexBuffer* buffer = facep->getVertexBuffer();
         ALSpotShadowCache::Hash draw;
-        draw.add(buffer).add(buffer ? buffer->getContentStamp() : 0);
-        draw.add((U64)facep->getGeomIndex()).add((U64)facep->getGeomCount());
-        draw.add((U64)facep->getIndicesStart()).add((U64)facep->getIndicesCount());
-        draw.add(regionp->mRenderMatrix);
+        ALSpotShadowCache::foldGeometry(draw, facep->getVertexBuffer(), facep->getGeomIndex(),
+                                        facep->getGeomIndex() + facep->getGeomCount() - 1, facep->getIndicesCount(),
+                                        facep->getIndicesStart(), 0);
         casters.add(draw);
     }
 }

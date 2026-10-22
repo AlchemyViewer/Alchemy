@@ -33,6 +33,8 @@
 #include <cstdint>
 #include <optional>
 
+class LLVertexBuffer;
+
 /// Whether a spot light's shadow map must be drawn again. A map keeps what was last drawn into it, so a pass whose
 /// light and casters are what they were at its last draw can leave the map as it is. The viewer describes each pass by
 /// a Key, made from the light's matrices and from what the pass's cull handed it to draw, and asks before it draws.
@@ -42,7 +44,7 @@ public:
     /// The pair of maps the main view keeps.
     static constexpr U32 MAPS = 2;
 
-    /// Values folded in order into one 64-bit hash, every bit of each moving about half of its bits.
+    /// Values folded in order into one 64-bit hash (boost::hash_combine).
     class Hash
     {
     public:
@@ -80,6 +82,25 @@ public:
         U32  mCount    = 0;
         bool mChanging = false;
     };
+
+    /// The matrices a walk over a pass's draws has folded, so that the draws one matrix places, as a linkset's or a
+    /// bridge's are, fold its contents once. Made afresh for each walk, within which a matrix holds still.
+    class Placements
+    {
+    public:
+        /// @a matrix's contents as one value, 0 for none: a draw in world space.
+        U64 of(const LLMatrix4a* matrix);
+
+    private:
+        const LLMatrix4a* mLast = nullptr;
+        U64               mLastValue = 0;
+    };
+
+    /// A draw of @a buffer's @a count indices from @a offset, over its vertices @a start to @a end and placed by
+    /// @a placement (Placements::of), folded into @a draw: the buffer, what it holds now
+    /// (LLVertexBuffer::getContentStamp), the range and the placement.
+    static void foldGeometry(Hash& draw, const LLVertexBuffer* buffer, U32 start, U32 end, U32 count, U32 offset,
+                             U64 placement);
 
     /// What one map's pass is drawn from.
     struct Key

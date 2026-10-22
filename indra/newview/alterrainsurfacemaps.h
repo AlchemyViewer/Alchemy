@@ -76,8 +76,8 @@ public:
     void ensureUploaded();
     void bind(S32 height_slot, S32 composition_slot);
     S32  getSize() const { return mSize; }
-    // Moves whenever the maps are marked dirty or uploaded: what a pass drew from them is what they hold while it
-    // holds.
+    // Moves whenever the maps are marked dirty. With the surface's hasZData, it says what the next bind holds: the
+    // upload a dirty map takes there carries what was marked.
     U32  getVersion() const { return mVersion; }
 
     // Every grid coordinate a map holds: [-APRON, grids_per_edge + APRON).

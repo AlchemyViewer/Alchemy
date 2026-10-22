@@ -26,27 +26,19 @@
 
 #include "alspotshadowcache.h"
 
+#include "llvertexbuffer.h"
+
+#include <boost/container_hash/hash.hpp>
+
 #include <bit>
 #include <cstring>
 
-namespace
-{
-    // SplitMix64's finaliser.
-    constexpr U64 mix(U64 x)
-    {
-        x ^= x >> 30;
-        x *= 0xbf58476d1ce4e5b9ull;
-        x ^= x >> 27;
-        x *= 0x94d049bb133111ebull;
-        x ^= x >> 31;
-        return x;
-    }
-}
-
 ALSpotShadowCache::Hash& ALSpotShadowCache::Hash::add(U64 value)
 {
-    // The golden ratio's step keeps a run of zeros from folding to the same value whatever its length.
-    mValue = mix(mValue ^ (value + 0x9e3779b97f4a7c15ull));
+    // size_t and U64 are one type on some platforms and not others.
+    std::size_t seed = (std::size_t)mValue;
+    boost::hash_combine(seed, value);
+    mValue = (U64)seed;
     return *this;
 }
 
@@ -75,8 +67,31 @@ ALSpotShadowCache::Hash& ALSpotShadowCache::Hash::add(const void* bytes, size_t 
 
 void ALSpotShadowCache::Casters::add(const Hash& draw)
 {
-    mSum += mix(draw.value());
+    mSum += draw.value();
     ++mCount;
+}
+
+U64 ALSpotShadowCache::Placements::of(const LLMatrix4a* matrix)
+{
+    if (!matrix)
+    {
+        return 0;
+    }
+    if (matrix != mLast)
+    {
+        mLast      = matrix;
+        mLastValue = Hash().add(*matrix).value();
+    }
+    return mLastValue;
+}
+
+// static
+void ALSpotShadowCache::foldGeometry(Hash& draw, const LLVertexBuffer* buffer, U32 start, U32 end, U32 count, U32 offset,
+                                     U64 placement)
+{
+    draw.add(buffer).add(buffer ? buffer->getContentStamp() : 0);
+    draw.add((U64)start).add((U64)end).add((U64)count).add((U64)offset);
+    draw.add(placement);
 }
 
 bool ALSpotShadowCache::Key::sameAs(const Key& other) const

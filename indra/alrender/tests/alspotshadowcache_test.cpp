@@ -281,6 +281,46 @@ namespace
         CHECK(cache.needsDraw(1, key));
     }
 
+    TEST_CASE("alspotshadowcache: a walk folds each matrix by what it holds, once for the draws it places", "[alspotshadowcache]")
+    {
+        LLMatrix4a       a = translation(1.f, 0.f, 0.f);
+        const LLMatrix4a b = translation(2.f, 0.f, 0.f);
+
+        Cache::Placements walk;
+        const U64         placed = walk.of(&a);
+        CHECK(placed != 0);
+        CHECK(walk.of(&a) == placed);
+        CHECK(walk.of(&b) != placed);
+        // Back to the first, after another: the same matrix folds to the same value.
+        CHECK(walk.of(&a) == placed);
+        // A draw in world space.
+        CHECK(walk.of(nullptr) == 0);
+
+        // A linkset moved between walks: the next walk sees where it is now, through the same matrix.
+        a = translation(1.f, 0.5f, 0.f);
+        Cache::Placements next;
+        CHECK(next.of(&a) != placed);
+    }
+
+    TEST_CASE("alspotshadowcache: a draw's geometry folds its range and its placement", "[alspotshadowcache]")
+    {
+        const auto fold = [](U32 start, U32 end, U32 count, U32 offset, U64 placement)
+        {
+            Hash draw;
+            Cache::foldGeometry(draw, nullptr, start, end, count, offset, placement);
+            return draw.value();
+        };
+
+        const U64 held = fold(0, 23, 36, 0, 7);
+        CHECK(fold(0, 23, 36, 0, 7) == held);
+        CHECK(fold(1, 23, 36, 0, 7) != held);
+        CHECK(fold(0, 24, 36, 0, 7) != held);
+        CHECK(fold(0, 23, 33, 0, 7) != held);
+        CHECK(fold(0, 23, 36, 6, 7) != held);
+        CHECK(fold(0, 23, 36, 0, 8) != held);
+        CHECK(fold(0, 23, 36, 0, 0) != held);
+    }
+
     TEST_CASE("alspotshadowcache: a draw's hash takes every value it is given, in order", "[alspotshadowcache]")
     {
         CHECK(Hash().add((U64)1).add((U64)2).value() != Hash().add((U64)2).add((U64)1).value());

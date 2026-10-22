@@ -13092,19 +13092,10 @@ namespace
     using ShadowHash = ALSpotShadowCache::Hash;
 
     // What of its buffer a draw draws, and where it is placed.
-    void add_shadow_geometry(ShadowHash& draw, const LLDrawInfo& info)
+    void add_shadow_geometry(ShadowHash& draw, const LLDrawInfo& info, ALSpotShadowCache::Placements& placements)
     {
-        const LLVertexBuffer* buffer = info.mVertexBuffer.get();
-        draw.add(buffer).add(buffer ? buffer->getContentStamp() : 0);
-        draw.add((U64)info.mStart).add((U64)info.mEnd).add((U64)info.mCount).add((U64)info.mOffset);
-        if (info.mModelMatrix)
-        {
-            draw.add(*info.mModelMatrix);
-        }
-        else
-        {
-            draw.add((U64)0);
-        }
+        ALSpotShadowCache::foldGeometry(draw, info.mVertexBuffer.get(), info.mStart, info.mEnd, info.mCount, info.mOffset,
+                                        placements.of(info.mModelMatrix));
     }
 
     // A draw's texture animation, which moves what it alpha tests by.
@@ -13146,6 +13137,8 @@ void LLPipeline::addShadowCasters(ALSpotShadowCache::Casters& casters)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
 
+    ALSpotShadowCache::Placements placements;
+
     // A rigged caster is skinned to its avatar's pose, which moves every frame.
     const auto rigged = [&](U32 type)
     {
@@ -13162,7 +13155,7 @@ void LLPipeline::addShadowCasters(ALSpotShadowCache::Casters& casters)
         {
             const LLDrawInfo& info = **i;
             ShadowHash draw;
-            add_shadow_geometry(draw, info);
+            add_shadow_geometry(draw, info, placements);
             if (gltf)
             {
                 add_shadow_material(casters, draw, info.mGLTFMaterial.get(), false);
@@ -13183,7 +13176,7 @@ void LLPipeline::addShadowCasters(ALSpotShadowCache::Casters& casters)
                 continue;
             }
             ShadowHash draw;
-            add_shadow_geometry(draw, info);
+            add_shadow_geometry(draw, info, placements);
             draw.add(info.mAlphaMaskCutoff);
             add_shadow_texture(casters, draw, info.mTexture.get());
             add_texture_matrix(draw, info.mTextureMatrix);
@@ -14347,6 +14340,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                                    .add((U64)sRenderTextures)
                                    .value();
         U32 spot_draws = 0;
+        static LLCachedControl<bool> keep_spot_shadows(gSavedSettings, "AlchemyRenderSpotShadowCache", true);
 
         for (S32 i = 0; i < 2; i++)
         {
@@ -14444,7 +14438,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 key.mState      = spot_state;
                 addShadowCasters(key.mCasters);
 
-                if (mSpotShadowCache.needsDraw(i, key))
+                if (!keep_spot_shadows || mSpotShadowCache.needsDraw(i, key))
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_PIPELINE("spot shadow");
                     LL_PROFILE_GPU_ZONE("spot shadow");

@@ -91,6 +91,7 @@ if(AL_BUILD_TESTS)
   # The window's depth under the HUD, the water surface's draws over the
   # cells the field lays out, with the cull and the depth pyramid it reads
   # and the waves displaced by heights the bake integrates from a normal map,
+  # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
   # FXAA on an RGB10_A2 source, the transient target pool's GL objects,
   # shared depth and poison, and the previews' and bakes' targets taken from
@@ -102,6 +103,7 @@ if(AL_BUILD_TESTS)
       tests/alhuddepth_gl_test.cpp
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp
+      tests/alspotshadowcache_gl_test.cpp
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
