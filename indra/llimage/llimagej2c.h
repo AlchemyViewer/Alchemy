@@ -27,6 +27,7 @@
 #ifndef LL_LLIMAGEJ2C_H
 #define LL_LLIMAGEJ2C_H
 
+#include "alj2clayout.h"
 #include "llimage.h"
 #include "llassettype.h"
 
@@ -45,6 +46,7 @@ public:
 
     // Base class overrides
     /*virtual*/ std::string getExtension() { return std::string("j2c"); }
+    /*virtual*/ void deleteData();
     /*virtual*/ bool updateData();
     /*virtual*/ bool decode(LLImageRaw *raw_imagep, F32 decode_time);
     /*virtual*/ bool decodeChannels(LLImageRaw *raw_imagep, F32 decode_time, S32 first_channel, S32 max_channel_count);
@@ -74,6 +76,10 @@ public:
     static S32 calcHeaderSizeJ2C();
     static S32 calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 rate = DEFAULT_COMPRESSION_RATE);
 
+    // The codestream's layout, read from the data once it holds the main header and the
+    // first SOT. calcDataSize() and calcDiscardLevelBytes() follow it whenever it is valid.
+    const ALJ2CLayout& getLayout() const { return mLayout; }
+
     static std::string getEngineInfo();
 
 protected:
@@ -82,6 +88,10 @@ protected:
     friend class LLImageJ2CKDU;
     void decodeFailed();
     void updateRawDiscardLevel();
+
+    /*virtual*/ void onDataChanged();
+
+    ALJ2CLayout mLayout;
 
     S32 mMaxBytes; // Maximum number of bytes of data to use...
 

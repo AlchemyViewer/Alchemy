@@ -467,10 +467,7 @@ bool LLAppAppearanceUtility::init()
     LL_DEBUGS() << "BakeSize: " << mBakeTextureSize << LL_ENDL;
 
     // Initialize classes.
-    // Values taken from settings.xml.
-    const bool USE_TEXTURE_NEW_BYTE_RANGE=true;
-    const S32 TEXTURE_REVERSE_BYTE_RANGE=50;
-    LLImage::initClass(USE_TEXTURE_NEW_BYTE_RANGE, TEXTURE_REVERSE_BYTE_RANGE);
+    LLImage::initClass();
     const bool SKIP_ANALYZE_ALPHA=true;
 
     LLTranslationBridge::ptr_t trans = std::make_shared<LLPassthroughTranslationBridge>();
