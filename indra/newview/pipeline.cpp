@@ -9421,6 +9421,8 @@ LLRenderTarget* LLPipeline::hazeDepth(ALTransientTargets& scope)
 
     // macOS's 4.1 context may have no barrier. The screen is let go and bound again, the framebuffer change a barrier
     // stands for, with the scene's depth copied in between where the pack has a copy, so the pass reads no attachment.
+    // Where it has none, or the copy could not be built, the pass reads the scene's own past that change, as the
+    // lighting passes read it past theirs: a null return is the scene's depth made current either way.
     LLRenderTarget* copy = acquireResource(scope, ALRenderResourcePlan::inPack(renderPack(), ALRenderResourcePlan::Slot::DepthCopy));
     mRT->screen.flush();
     if (copy)

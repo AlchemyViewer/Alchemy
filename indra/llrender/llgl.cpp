@@ -2764,7 +2764,9 @@ void LLGLManager::initExtensions()
 
     // Texture barrier. Core in 4.5, and GL_ARB_texture_barrier names it without a suffix on a
     // lower context, so it is resolved here for the GL_VERSION_4_5 ladder's early-out as above.
-    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV.
+    // GL_NV_texture_barrier, which ARB's took over unchanged, names it glTextureBarrierNV. Cleared first, since a
+    // pointer outlives the context that resolved it, and mHasTextureBarrier says what this one offers.
+    glTextureBarrier = nullptr;
     if (mGLVersion >= 4.49f || mGLExtensions.contains("GL_ARB_texture_barrier"))
     {
         glTextureBarrier = (PFNGLTEXTUREBARRIERPROC)LL_GET_PROC_ADDRESS("glTextureBarrier");
