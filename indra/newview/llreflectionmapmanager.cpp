@@ -128,6 +128,7 @@ void hdri_preview()
 }
 
 extern bool gCubeSnapshot;
+extern bool gSnapshot;
 extern bool gTeleportDisplay;
 
 static U32 sUpdateCount = 0;
@@ -782,8 +783,10 @@ void LLReflectionMapManager::getReflectionMaps(std::vector<LLReflectionMap*>& ma
     // rendering from somewhere else can see. llviewerdisplay stops the queries for the duration
     // of a snapshot for exactly that reason -- "don't read or write it during cube snapshots" --
     // but only the write half was ever honoured, and this is the read. Without it every capture
-    // omits whatever the player happens not to be looking at, and bakes that into the probe.
-    const bool honor_occlusion = !gCubeSnapshot;
+    // omits whatever the player happens not to be looking at, and bakes that into the probe. A
+    // snapshot's camera may not be the main one either (a tile, another aspect, a 360 face), and
+    // queries none (LLPipeline::doOcclusion), so it shades with every probe too.
+    const bool honor_occlusion = !gCubeSnapshot && !gSnapshot;
 
     U32 count = 0;
     U32 lastIdx = 0;

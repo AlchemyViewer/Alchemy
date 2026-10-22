@@ -3649,7 +3649,10 @@ void LLPipeline::doOcclusion(LLCamera& camera)
         return;
     }
 
-    if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot)
+    // Not from a snapshot's camera: a tile of a snapshot larger than the window sees part of the view, and a probe off
+    // it would read as occluded, dropping it from the reflections of the tiles after and of the frames after the
+    // snapshot. A snapshot shades with every probe instead (LLReflectionMapManager::getReflectionMaps).
+    if (sReflectionProbesEnabled && sUseOcclusion > 1 && !LLPipeline::sShadowRender && !gCubeSnapshot && !gSnapshot)
     {
         LLGLSColorMask color_mask(false, false);
         LLGLDepthTest depth(GL_TRUE, GL_FALSE);
