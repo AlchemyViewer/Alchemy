@@ -262,8 +262,9 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // its light's frustum whatever the window's shape, so the edge bounds what a wide window or a snapshot costs them.
     if (in.mShadowDetail > 1)
     {
+        // Bounded before it is made a U32, which a scale past that range would overflow.
         const U32 largest = in.mSpotShadowMaxResolution > 0 ? in.mSpotShadowMaxResolution : std::numeric_limits<U32>::max();
-        const U32 spot    = std::clamp((U32)((F32)width * shadow_scale), 1u, largest);
+        const U32 spot    = std::max((U32)std::min((F64)width * shadow_scale, (F64)largest), 1u);
         for (Id id : { Id::SpotShadow0, Id::SpotShadow1 })
         {
             plan.at(id).mDesc = ALRenderTargetDesc{ .width = spot, .height = spot, .depth = shadow_depth };
