@@ -73,10 +73,8 @@ void calcAtmosphericVarsLinear(vec3 inPositionEye, vec3 norm, vec3 light_dir, ou
 vec3  atmosFragLightingLinear(vec3 l, vec3 additive, vec3 atten);
 
 // reflection probe interface
-void sampleReflectionProbes(inout vec3 ambenv, inout vec3 glossenv,
-    vec2 tc, vec3 pos, vec3 norm, float glossiness, bool transparent, vec3 amblit_linear);
-void sampleReflectionProbesLegacy(inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
-        vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit_linear);
+void sampleReflectionProbesEither(bool pbr, inout vec3 ambenv, inout vec3 glossenv, inout vec3 legacyenv,
+        vec2 tc, vec3 pos, vec3 norm, float glossiness, float envIntensity, bool transparent, vec3 amblit);
 void applyGlossEnv(inout vec3 color, vec3 glossenv, vec4 spec, vec3 pos, vec3 norm);
 void applyLegacyEnv(inout vec3 color, vec3 legacyenv, vec4 spec, vec3 pos, vec3 norm, float envIntensity);
 float getDepth(vec2 pos_screen);
@@ -240,19 +238,25 @@ void main()
 
     vec3  radiance  = vec3(0);
 
-    if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR))
+    // The probes for whichever lit branch below the pixel takes, in one pass ahead of them: a group of pixels holding
+    // PBR and legacy surfaces alike walks the probes once rather than once for each.
+    bool pbr = GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR);
+    vec3 irradiance = amblit_linear;
+    vec3 legacyenv = vec3(0);
+    if (pbr || !(GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS)))
+    {
+        // PBR IBL from the roughness, the legacy environment from the glossiness.
+        float glossiness = pbr ? 1.0 - unpackRoughness(spec.ga) : spec.a;
+        sampleReflectionProbesEither(pbr, irradiance, radiance, legacyenv, tc, pos.xyz, gb.normal, glossiness, envIntensity,
+                                     false, amblit_linear);
+    }
+
+    if (pbr)
     {
         vec3 orm = spec.rgb;
         float perceptualRoughness = unpackRoughness(spec.ga);
         float metallic = orm.b;
         float ao = orm.r;
-
-        vec3  irradiance = amblit_linear;
-
-        // PBR IBL
-        float gloss      = 1.0 - perceptualRoughness;
-
-        sampleReflectionProbes(irradiance, radiance, tc, pos.xyz, gb.normal, gloss, false, amblit_linear);
 
         // A normal map can aim the reflection below the surface it sits on, where the probe
         // returns radiance arriving through the geometry. The forward path tests against
@@ -290,11 +294,7 @@ void main()
 
         float da = clamp(dot(gb.normal, light_dir.xyz), 0.0, 1.0);
 
-        vec3 irradiance = amblit;
-        vec3 glossenv = vec3(0);
-        vec3 legacyenv = vec3(0);
-
-        sampleReflectionProbesLegacy(irradiance, glossenv, legacyenv, tc, pos.xyz, gb.normal, spec.a, envIntensity, false, amblit_linear);
+        vec3 glossenv = radiance;
 
         adjustIrradiance(irradiance, ambocc);
 

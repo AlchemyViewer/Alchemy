@@ -353,6 +353,29 @@ namespace ll_test
         gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, white->getTexName());
     }
 
+    // Writes `data` over level 0 of the 2D texture `texture`, `w` by `h` texels, through texture slot 0 as LLRender
+    // binds it: a bind of a test's own lands on whichever unit LLRender left active, under a texture the slot still
+    // records there, and a draw after it samples nothing. Bound to edit, not by name, which a context without direct
+    // state access cannot.
+    inline void writeTexture(U32 texture, S32 w, S32 h, GLenum format, GLenum type, const void* data)
+    {
+        ALTextureSlot* slot = gGL.getTextureSlot(0);
+        slot->unbind();
+        slot->bindManual(ALTextureSlot::TT_TEXTURE, texture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data);
+        slot->unbind();
+    }
+
+    // Level 0 of the 2D texture `texture` into `data`, bound as writeTexture binds it.
+    inline void readTexture(U32 texture, GLenum format, GLenum type, void* data)
+    {
+        ALTextureSlot* slot = gGL.getTextureSlot(0);
+        slot->unbind();
+        slot->bindManual(ALTextureSlot::TT_TEXTURE, texture);
+        glGetTexImage(GL_TEXTURE_2D, 0, format, type, data);
+        slot->unbind();
+    }
+
     // Read back the framebuffer's color buffer as RGBA8 (tightly
     // packed, row 0 = bottom of GL viewport). Tests use this to assert
     // pixel-level invariants — alignment column position, drop-shadow

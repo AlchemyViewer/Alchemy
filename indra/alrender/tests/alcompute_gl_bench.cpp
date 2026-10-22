@@ -1,6 +1,6 @@
 /**
  * @file alcompute_gl_bench.cpp
- * @brief The GPU time of each pass the session computes against the fragment passes it replaces, at 2560x1440, by GL
+ * @brief The GPU time of each pass the session computes against the fragment passes it replaces, at 3440x1369, by GL
  *        timer queries on the hidden window.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -34,8 +34,8 @@
 
 namespace
 {
-    constexpr S32 W = 2560;
-    constexpr S32 H = 1440;
+    constexpr S32 W = 3440;
+    constexpr S32 H = 1369;
 
     struct GPUTime
     {

@@ -1210,6 +1210,10 @@ ALRenderResourceInputs LLPipeline::resourceInputsFromSettings(const ALShaderInpu
     in.mShadowScale      = gSavedSettings.getF32("RenderShadowResolutionScale");
     in.mShadowDepth32F   = gSavedSettings.getBOOL("AlchemyRenderShadowDepth32F");
     in.mSSAO             = gSavedSettings.getBOOL("RenderDeferredSSAO");
+    in.mSSAOBlurDispatched =
+        ALLightMapBlur::apron(ALLightMapBlur::kernel(gSavedSettings.getVector3("RenderShadowGaussian"),
+                                                     gSavedSettings.getF32("RenderShadowBlurSize"),
+                                                     gSavedSettings.getF32("RenderShadowBlurDistFactor"))) >= 0;
     in.mSSR              = gSavedSettings.getBOOL("RenderScreenSpaceReflections");
     in.mTransparentWater = gSavedSettings.getBOOL("RenderTransparentWater");
 
