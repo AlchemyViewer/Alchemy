@@ -503,6 +503,30 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // A frame the GPU spends more than a second on is paced too: the frame's end waits it out, in tries of a second,
+    // rather than give up on it after the first.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: a paced frame's end waits out a frame longer than a second", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 slow = mFrames.frame();
+        keepBusy(3.0);
+        // A fence of the test's own behind the work, to ask the GPU itself whether the wait outlasted it.
+        GLsync witness = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        mFrames.endFrame(1);
+        const U32 waits = mFrames.getPacingWaits();
+        mFrames.endFrame(1);
+        const GLenum status = glClientWaitSync(witness, 0, 0);
+        glDeleteSync(witness);
+        {
+            INFO("waited out, past the first try");
+            CHECK((status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED));
+            CHECK(mFrames.isComplete(slow));
+            CHECK(mFrames.getPacingWaits() == waits + 1);
+        }
+        glFinish();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // waitFinished() waits a frame out however long the GPU takes over it, and says whether it had to wait.
     TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: waitFinished waits out a frame the GPU is still drawing", "[alframefences_gl]")
     {

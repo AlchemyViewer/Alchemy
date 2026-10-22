@@ -107,8 +107,9 @@ public:
 private:
     // Polls the ended frames not yet shown complete, oldest first, up to the first that has not signalled.
     void poll();
-    // Waits for the ended `frame` as a frame's end paces the CPU: one call, on that frame's fence alone, so that what
-    // the wait costs is the pacing zone's. The seconds it took; `behind` says whether the GPU was still drawing it.
+    // Waits for the ended `frame` as a frame's end paces the CPU, however long the GPU takes: on that frame's fence
+    // alone, with no poll first, so that what the wait costs is the pacing zone's. The seconds it took; `behind` says
+    // whether the GPU was still drawing it.
     F64 pace(U32 frame, bool& behind);
     // Every frame up to `frame` is complete: their fences go.
     void completeThrough(U32 frame);

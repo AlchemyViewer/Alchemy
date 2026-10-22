@@ -34,7 +34,7 @@
 
 namespace
 {
-    // How long waitFinished() waits on one try, and endFrame() at most for the frame it paces on.
+    // How long one try of waitFinished(), or of the pacing wait, lasts.
     constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
 
     bool signalled(GLenum status)
@@ -191,27 +191,33 @@ F64 ALFrameFences::pace(U32 frame, bool& behind)
     const F64 start = LLTimer::getTotalSeconds();
     // No poll before it: on a threaded driver a poll of a fence not yet signalled waits on the driver's thread as long
     // as this wait would, and outside its zone. A fence already signalled answers at once either way.
+    // In tries of a second, however long the GPU takes: a frame a slow GPU spends more than a second on is paced too.
     const U32 slot = frame % FRAMES;
-    bool finished = true;
     behind = false;
     if (mFences[slot])
     {
-        const GLenum status = glClientWaitSync((GLsync)mFences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, WAIT_NANOSECONDS);
-        ++mCalls;
-        ++mFrameCalls;
+        GLenum status = GL_TIMEOUT_EXPIRED;
+        for (U32 tries = 1; status == GL_TIMEOUT_EXPIRED; ++tries)
+        {
+            status = glClientWaitSync((GLsync)mFences[slot], GL_SYNC_FLUSH_COMMANDS_BIT, WAIT_NANOSECONDS);
+            ++mCalls;
+            ++mFrameCalls;
+            behind = behind || status == GL_CONDITION_SATISFIED || status == GL_TIMEOUT_EXPIRED;
+            if (status == GL_TIMEOUT_EXPIRED && tries == LONG_WAIT_SECONDS)
+            {
+                LL_WARNS_ONCE("FrameFences") << "The GPU has not finished a frame in " << LONG_WAIT_SECONDS
+                                             << " seconds; still waiting for it" << LL_ENDL;
+            }
+        }
         mFlushed[slot] = true;
-        if (status == GL_CONDITION_SATISFIED)
+        if (behind)
         {
             ++mPacingWaits;
         }
-        behind = status == GL_CONDITION_SATISFIED || status == GL_TIMEOUT_EXPIRED;
-        // A GPU that much behind is not paced: the frames' ends wait for it once it is FRAMES behind.
-        finished = signalled(status);
+        // Finished, or a fence that could not be waited on, which signalled() warns of: either way the frame is done.
+        (void)signalled(status);
     }
-    if (finished)
-    {
-        completeThrough(frame);
-    }
+    completeThrough(frame);
     const F64 end = LLTimer::getTotalSeconds();
     return end - start;
 }
