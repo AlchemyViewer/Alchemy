@@ -541,9 +541,12 @@ void LLRender::shutdown()
 
 void LLRender::endFrame(U32 frames_ahead)
 {
-    // The batch's results are written ahead of the fence that follows them.
+    // The batch's results are written ahead of the fence that follows them. The batches the fences have just shown
+    // finished are read here rather than before the next cull: where the results are asked of GL, a threaded driver
+    // answers only once its thread has caught up, and the fences' own calls have just caught it up.
     mQueries.endFrame();
     mFrameFences.endFrame(frames_ahead);
+    mQueries.retire();
     ALUniformBuffer::endFrame();
 }
 

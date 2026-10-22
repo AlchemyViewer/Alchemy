@@ -106,8 +106,9 @@ private:
 /// reading the batch copies them out of the map: no GL call. The writes are queued as any draw is where the context has
 /// direct state access; through the buffer binding they are calls Mesa's glthread runs only once it has caught up, each
 /// one. Asking GL for a result instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as
-/// NVIDIA's with threaded optimization, answers it only once its own thread has caught up on every command issued
-/// before it, which at the end of a frame is the whole frame. Elsewhere the batch's results are asked of GL.
+/// NVIDIA's with threaded optimization or Mesa's glthread, answers it only once its own thread has caught up on every
+/// command issued before it. Elsewhere the batch's results are asked of GL, by retire() at the frame's end, where the
+/// frame fences' own calls have just caught such a thread up.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is
@@ -180,8 +181,9 @@ public:
     /// the elapsed query of a span, which is GL's alone, may cross. Checked where asserts are.
     void checkPassBoundary() const;
 
-    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first: no GL call, the fences
-    /// being polled only at the frame's end. Once a frame, before the results are wanted.
+    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first, polling no fence.
+    /// LLRender::endFrame() runs it straight after the frame fences end the frame, so the next frame's cull finds the
+    /// results, and where they are asked of GL nothing is left for a threaded driver's thread to catch up on.
     void retire();
 
     /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only

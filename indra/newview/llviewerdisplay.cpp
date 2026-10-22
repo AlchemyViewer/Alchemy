@@ -804,9 +804,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         LLGLState::checkStates();
 
-        // The queries of the frames the frame fences have shown finished, read before the cull asks for them. No GL
-        // call: the fences are polled only at the frame's end (see ALFrameFences).
-        gGL.queries().retire();
+        // The queries of the frames the frame fences have shown finished were read at the last frame's end
+        // (LLRender::endFrame), so nothing here asks GL for a result in the middle of the frame.
         gPipeline.readAttachmentTimes();
 
         static LLCullResult result;

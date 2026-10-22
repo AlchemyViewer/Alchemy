@@ -822,6 +822,38 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // LLRender's frame end reads the batches its fences have just shown finished: the next frame's cull finds the
+    // results with nothing read in the middle of the frame, where asking GL waits for a threaded driver's thread.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: LLRender's frame end reads what its fences show finished", "[alquerypool_gl]")
+    {
+        setUp();
+        ALQueryPool& queries = gGL.queries();
+        // Every frame of the context so far finished and seen.
+        glFinish();
+        REQUIRE(gGL.frameFences().wait(gGL.frameFences().frame() - 1, 1000000000ull));
+        ALQueryTicket seen;
+        {
+            ALQueryScope scope(queries, ALQueryKind::Occlusion);
+            seen = scope.ticket();
+            draw(false);
+        }
+        REQUIRE(seen.isValid());
+        gGL.endFrame();
+        glFinish();
+        U64 value = 0;
+        {
+            INFO("not at its own frame's end");
+            CHECK(queries.result(seen, value) == ALQueryPool::Status::Pending);
+        }
+        gGL.endFrame();
+        {
+            INFO("read by the next frame's end, with retire() called by nothing else");
+            REQUIRE(queries.result(seen, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A Statistics query counts every pipeline statistic at once, on targets of its own: the occlusion and primitives
     // queries of the frame begin while it counts.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a statistics query counts its statistics and holds no other target", "[alquerypool_gl]")
