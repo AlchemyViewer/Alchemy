@@ -56,10 +56,11 @@ int blurLightMirror(int i, int size)
     return m < size ? m : period - 1 - m;
 }
 
-// The view depth of the texel the scene's clamped sampler reads for a tap at `texel`, or infinity at the sky, which no
-// tap's plane holds. A texel lies at its view depth along its ray: inv_proj's unprojection is linear in the screen
-// position over w, and w is the view depth's reciprocal, floored as getPositionWithNDC floors it. The ray is linear in
-// the texel (BlurLightPixel's plane), so a tap's position costs it no unprojection.
+// The view depth of the texel the scene's clamped sampler reads for a tap at `texel`, or -1 at the sky, which
+// blurLightDrawn and blurLightWeight turn away. A texel lies at its view depth along its ray: inv_proj's unprojection
+// is linear in the screen position over w, and w is the view depth's reciprocal, floored as getPositionWithNDC floors
+// it, so a drawn texel's is positive. The ray is linear in the texel (BlurLightPixel's plane), so a tap's position
+// costs it no unprojection.
 float blurLightViewDepth(ivec2 texel)
 {
     ivec2 size = ivec2(screen_res);
@@ -67,7 +68,7 @@ float blurLightViewDepth(ivec2 texel)
     float depth = getDepth(tc);
     if (isFarDepth(depth))
     {
-        return uintBitsToFloat(0x7F800000u);
+        return -1.0;
     }
     vec2 sc = tc * 2.0 - 1.0;
     float w = inv_proj[0].w * sc.x + inv_proj[1].w * sc.y + inv_proj[2].w * ndcZFromScreenDepth(depth) + inv_proj[3].w;
@@ -78,7 +79,7 @@ float blurLightViewDepth(ivec2 texel)
 // and the sky keeps the light map's clear.
 bool blurLightDrawn(float view_depth)
 {
-    return !isinf(view_depth);
+    return view_depth > 0.0;
 }
 
 // A pixel's taps along one axis, (1, 0) across or (0, 1) down: what blurLightTap and blurLightWeight take.
@@ -137,7 +138,8 @@ ivec2 blurLightTap(BlurLightPixel p, int i)
     return ivec2(floor(p.origin + side * blurLightKernel(step).z * p.step * 2.0));
 }
 
-// Tap `i`'s weight, at texel `texel` of view depth `view_depth`: 0 where the texel's centre lies off the pixel's plane.
+// Tap `i`'s weight, at texel `texel` of view depth `view_depth`: 0 at the sky, and where the texel's centre lies off
+// the pixel's plane.
 //
 // AO uses the y weight of the kernel. The shadow term, which used the x weight, is no longer blurred: it is a
 // Gaussian-weighted PCF (deferred/shadowUtil.glsl) that is smooth at the source, so a second screen-space blur only
@@ -147,7 +149,7 @@ float blurLightWeight(BlurLightPixel p, int i, ivec2 texel, float view_depth)
 {
     int step = i < 6 ? i + 1 : i - 5;
     float d = (p.plane.x + float(texel.x) * p.plane.y + float(texel.y) * p.plane.z) * view_depth - p.offset;
-    return d * d <= p.tolerance ? blurLightKernel(step).y : 0.0;
+    return blurLightDrawn(view_depth) && d * d <= p.tolerance ? blurLightKernel(step).y : 0.0;
 }
 
 // The twelve taps about pixel `px` along `delta`: the light map's texel each reads, and its weight. Returns the weight

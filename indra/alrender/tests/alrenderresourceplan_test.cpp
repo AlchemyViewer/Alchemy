@@ -259,6 +259,11 @@ namespace
               [](const Plan&) { return of({ Id::MainLightBlurred }); } },
             { "AlchemyRenderDisableCompute without SSAO", [](Inputs& in) { in.mSSAO = false; },
               [](Inputs& in) { in.mCompute = false; }, nothing },
+            { "RenderShadowBlurSize past a dispatch's reach", no_change,
+              [](Inputs& in) { in.mSSAOBlurDispatched = false; },
+              [](const Plan&) { return of({ Id::MainLightBlurred }); } },
+            { "RenderShadowBlurSize past a dispatch's reach without compute", [](Inputs& in) { in.mCompute = false; },
+              [](Inputs& in) { in.mSSAOBlurDispatched = false; }, nothing },
             { "RenderShadowResolutionScale", no_change, [](Inputs& in) { in.mShadowScale = 0.5f; },
               [](const Plan&) { return sun_shadows({ Pack::Main }) | of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "AlchemyRenderShadowDepth32F under reverse-Z", no_change, [](Inputs& in) { in.mShadowDepth32F = true; },
@@ -879,30 +884,36 @@ namespace
               "[alrenderresourceplan]")
     {
         // The dispatch blurs into it in place of a scratch of the light map's description; the fragment passes need
-        // the scratch instead, and nothing blurs without SSAO.
+        // the scratch instead, as they do for a kernel wider than a dispatch holds, and nothing blurs without SSAO.
         for (S32 shadow_detail : { 0, 2 })
         {
             for (bool ssao : { false, true })
             {
                 for (bool compute : { false, true })
                 {
-                    INFO("shadow detail " << shadow_detail << ", SSAO " << ssao << ", compute " << compute);
-                    Inputs in        = defaults();
-                    in.mShadowDetail = shadow_detail;
-                    in.mSSAO         = ssao;
-                    in.mCompute      = compute;
-                    const Plan plan  = Plan::make(in);
-                    REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute));
-                    if (plan.wants(Id::MainLightBlurred))
+                    for (bool dispatched : { false, true })
                     {
-                        // The light map's size, its 8 bits in two channels, no depth: an image a dispatch stores to.
-                        const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
-                        CHECK(blurred.width == plan.desc(Id::MainLight)->width);
-                        CHECK(blurred.height == plan.desc(Id::MainLight)->height);
-                        CHECK(blurred.colorCount() == 1);
-                        CHECK(blurred.color[0] == (U32)GL_RG8);
-                        CHECK(blurred.depth == Depth::None);
-                        CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
+                        INFO("shadow detail " << shadow_detail << ", SSAO " << ssao << ", compute " << compute
+                                              << ", dispatched " << dispatched);
+                        Inputs in              = defaults();
+                        in.mShadowDetail       = shadow_detail;
+                        in.mSSAO               = ssao;
+                        in.mCompute            = compute;
+                        in.mSSAOBlurDispatched = dispatched;
+                        const Plan plan        = Plan::make(in);
+                        REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute && dispatched));
+                        if (plan.wants(Id::MainLightBlurred))
+                        {
+                            // The light map's size, its 8 bits in two channels, no depth: an image a dispatch stores
+                            // to.
+                            const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
+                            CHECK(blurred.width == plan.desc(Id::MainLight)->width);
+                            CHECK(blurred.height == plan.desc(Id::MainLight)->height);
+                            CHECK(blurred.colorCount() == 1);
+                            CHECK(blurred.color[0] == (U32)GL_RG8);
+                            CHECK(blurred.depth == Depth::None);
+                            CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
+                        }
                     }
                 }
             }

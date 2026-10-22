@@ -44,11 +44,11 @@ layout(local_size_x = TILE_WIDTH, local_size_y = STEP_ROWS) in;
 uniform sampler2D lightMap;
 // The rows above and below the tile, and the columns either side of it, that its taps reach, at most MAX_APRON.
 uniform int blur_light_apron;
-// The sun's shadow and the blurred occlusion, which the soften pass reads where it would read the light map's.
+// The sun's shadow and the blurred occlusion, which the soften pass reads where it would read the light map's. Its size
+// is the map's the tiles cover, the one ALLightMapBlur::dispatch sizes the grid by and checks the mirror's bound on.
 layout(rg8) writeonly uniform image2D blurLightTarget;
 
 uniform vec3 kern[4];
-uniform vec2 screen_res;
 
 // The step's rows, from the apron's first column: the view depth of the texel a tap there reads, and its occlusion, as
 // the light map's mirrored sampler reads it.
@@ -103,7 +103,7 @@ int ringOffset(int centre, int offset)
 // is kept; one that is not has no position, so no weight, and what it reads is held to what is kept.
 float blurOcclusion(ivec2 px, float view_depth, vec2 delta, int row, int left, int apron)
 {
-    ivec2 size = ivec2(screen_res);
+    ivec2 size = imageSize(blurLightTarget);
     BlurLightPixel p = blurLightPixel(px, delta, view_depth);
 
     bool across = delta.y == 0.0;
@@ -167,7 +167,7 @@ void storeRow(int y, int last, int lx, int ly, int span, float view_depth[ROW_FE
 
 void main()
 {
-    ivec2 size = ivec2(screen_res);
+    ivec2 size = imageSize(blurLightTarget);
     ivec2 tile = ivec2(gl_WorkGroupID.xy) * ivec2(TILE_WIDTH, TILE_HEIGHT);
     int lx = int(gl_LocalInvocationID.x);
     int ly = int(gl_LocalInvocationID.y);

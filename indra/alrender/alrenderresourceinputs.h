@@ -53,6 +53,8 @@ struct ALRenderResourceInputs
     F32  mShadowScale = 1.f;      ///< RenderShadowResolutionScale, of the main view's sun and spot shadows
     bool mShadowDepth32F = false; ///< AlchemyRenderShadowDepth32F
     bool mSSAO = true;            ///< RenderDeferredSSAO
+    bool mSSAOBlurDispatched = true; ///< SSAO's blur reaches no further than a dispatch holds (ALLightMapBlur::apron of
+                                     ///< RenderShadowBlurSize's kernel): a wider one is the fragment passes'
     bool mSSR = false;            ///< RenderScreenSpaceReflections
     bool mTransparentWater = true; ///< RenderTransparentWater: the water's copies of the scene are for it alone
 

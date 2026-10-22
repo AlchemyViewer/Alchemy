@@ -1048,6 +1048,8 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderShadowDepth32F", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderProbeAllShadowCascades", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDeferredSSAO", handleRenderInputChanged);
+    // How far SSAO's blur reaches, which decides whether a dispatch blurs it into a target of its own.
+    setting_setup_signal_listener(gSavedSettings, "RenderShadowBlurSize", handleRenderInputChanged);
 // [SL:KB] - Patch: Settings-RenderResolutionMultiplier | Checked: Catznip-5.4
     setting_setup_signal_listener(gSavedSettings, "RenderResolutionMultiplier", handleRenderInputChanged);
 // [/SL:KB]

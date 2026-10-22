@@ -46,7 +46,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -284,18 +283,14 @@ namespace allightmapblur_gl
             // ALDrawnOnly then lets the fragment passes draw over sky that holds exactly the cleared value.
             LLRenderTarget staging;
             REQUIRE(staging.ensure({ .width = w, .height = h, .depth = gbuffer.depth }) == LLRenderTarget::EnsureResult::Built);
-            glBindTexture(GL_TEXTURE_2D, staging.getDepth());
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
+            // Uploads and read backs name their texture, binding none: LLRender's texture slots keep what they bound.
+            glTextureSubImage2D(staging.getDepth(), 0, 0, 0, mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
             mGBuffer.copyContents(staging, 0, 0, mW, mH, 0, 0, mW, mH, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-            glBindTexture(GL_TEXTURE_2D, mGBuffer.getTexture());
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
+            glTextureSubImage2D(mGBuffer.getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
             {
-                glBindTexture(GL_TEXTURE_2D, target->getTexture());
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+                glTextureSubImage2D(target->getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
             }
-            glBindTexture(GL_TEXTURE_2D, 0);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
             REQUIRE(mTriangle->allocateBuffer(3, 0));
@@ -389,10 +384,8 @@ namespace allightmapblur_gl
             }
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
             {
-                glBindTexture(GL_TEXTURE_2D, target->getTexture());
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+                glTextureSubImage2D(target->getTexture(), 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
             }
-            glBindTexture(GL_TEXTURE_2D, 0);
         }
 
         std::vector<F32> read(const LLRenderTarget& target) const
@@ -400,9 +393,8 @@ namespace allightmapblur_gl
             // A read back sees what the dispatch stored past this.
             gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
             std::vector<F32> texels(size_t(mW) * mH * 4);
-            glBindTexture(GL_TEXTURE_2D, target.getTexture());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, texels.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glGetTextureImage(target.getTexture(), 0, GL_RGBA, GL_FLOAT, (GLsizei)(texels.size() * sizeof(F32)),
+                              texels.data());
             return texels;
         }
 
@@ -412,9 +404,8 @@ namespace allightmapblur_gl
         std::vector<F32> reference(const ALLightMapBlur::Kernel& kernel) const
         {
             std::vector<F32> depth(size_t(mW) * mH);
-            glBindTexture(GL_TEXTURE_2D, mGBuffer.getDepth());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glGetTextureImage(mGBuffer.getDepth(), 0, GL_DEPTH_COMPONENT, GL_FLOAT, (GLsizei)(depth.size() * sizeof(F32)),
+                              depth.data());
             const std::vector<F32> normals = read(mGBuffer);
             const std::vector<F32> light = read(mComputeLight);
             const F32* m = mInvProj.getF32ptr(); // column-major, as GLSL indexes inv_proj[column]
@@ -434,7 +425,7 @@ namespace allightmapblur_gl
                 const F32 d = depth[size_t(cy) * mW + cx];
                 if (isFar(d))
                 {
-                    return std::numeric_limits<F32>::infinity();
+                    return -1.f;
                 }
                 const F32 sx = ((F32)cx + 0.5f) / (F32)mW * 2.f - 1.f;
                 const F32 sy = ((F32)cy + 0.5f) / (F32)mH * 2.f - 1.f;
@@ -469,7 +460,7 @@ namespace allightmapblur_gl
                     {
                         const size_t i = size_t(y) * mW + x;
                         const F32 t = viewDepth(x, y);
-                        if (std::isinf(t))
+                        if (t <= 0.f)
                         {
                             out[i] = keep_sky ? light[i * 4 + 1] : 1.f;
                             continue;
@@ -508,7 +499,7 @@ namespace allightmapblur_gl
                             const S32 txl = (S32)std::floor(origin[0] + side * k.mV[VZ] * step[0] * 2.f);
                             const S32 tyl = (S32)std::floor(origin[1] + side * k.mV[VZ] * step[1] * 2.f);
                             const F32 d = (plane0 + (F32)txl * across + (F32)tyl * down) * viewDepth(txl, tyl) - offset;
-                            if (d * d <= tolerance)
+                            if (viewDepth(txl, tyl) > 0.f && d * d <= tolerance)
                             {
                                 ao += in[size_t(mirror(tyl, mH)) * mW + mirror(txl, mW)] * k.mV[VY];
                                 weight_sum += k.mV[VY];
