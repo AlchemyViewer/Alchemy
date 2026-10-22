@@ -154,17 +154,18 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         // and nothing reads its alpha (waterF.glsl and underWaterF.glsl take the colour alone), so under HDR it is
         // R11F_G11F_B10F, half the screen's bandwidth, and with no depth of its own or the scene's: bloom level 0's
         // description at full scale without halation, whose target the pool hands it, bloom's pass coming after the
-        // water's. Without HDR 8 bits, the post chain's description. Opaque water reads neither (beginWaterTargets).
-        if (shape.water && in.mTransparentWater)
+        // water's. Without HDR 8 bits, the post chain's description. Water that does not refract reads neither.
+        const bool refracts = shape.water && refractsWater(pack, in.mTransparentWater);
+        if (refracts)
         {
             plan.at(inPack(pack, Slot::Water)).mDesc = ALRenderTargetDesc{
                 .width = shape.width, .height = shape.height, .color = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format }
             };
         }
-        // The depth copy serves the haze passes too where the context has no texture barrier, transparent water or
-        // not: each copies the scene's depth before it reads it (LLPipeline::hazeDepth), the draws before it in its
-        // binding having written the scene's own.
-        if (shape.water && (in.mTransparentWater || !in.mTextureBarrier))
+        // The depth copy serves the haze passes too where the context has no texture barrier, whether the water
+        // refracts or not: each copies the scene's depth before it reads it (LLPipeline::hazeDepth), the draws before it
+        // in its binding having written the scene's own.
+        if (refracts || (shape.water && !in.mTextureBarrier))
         {
             plan.at(inPack(pack, Slot::DepthCopy)).mDesc =
                 ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .depth = main_depth };
@@ -228,8 +229,9 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // asks (generateSunShadow), and has maps for those alone. Its post targets and bloom are the GLTF material preview's,
     // which the probes' captures never read, so they are there only while a preview is alive. The pack is there while
     // probes are on or a preview is alive, and the manager's own resources while probes are. Its sun shadows, light
-    // map and water copies are the captures' alone: a preview draws without the sun's shadows and draws no water
-    // (LLGLTFPreviewTexture::render).
+    // map and depth copy are the captures' alone: a preview draws without the sun's shadows and draws no water
+    // (LLGLTFPreviewTexture::render). A capture's water does not refract (refractsWater), so the copy is the haze's,
+    // without a texture barrier, and the pack has no copy of the screen.
     if (in.mProbes || in.mMaterialPreview)
     {
         const U32 probe_size     = in.mProbeResolution * in.mProbeSuperSample;
@@ -285,10 +287,11 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                    in.mSMAAStencil ? std::optional<Id>(Id::SMAAEdges) : std::nullopt };
     }
 
-    // Where the session computes, SSAO's blur writes the sun's shadow and the blurred occlusion here, which the soften
-    // pass reads in place of the light map (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's
-    // destination. The light map's 8 bits a channel, the format blurLightC.glsl stores.
-    if (in.mSSAO && in.mCompute)
+    // Where the session computes, and SSAO's kernel reaches no further than a dispatch holds, SSAO's blur writes the
+    // sun's shadow and the blurred occlusion here, which the soften pass reads in place of the light map
+    // (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's destination. The light map's 8 bits a
+    // channel, the format blurLightC.glsl stores.
+    if (in.mSSAO && in.mCompute && in.mSSAOBlurDispatched)
     {
         plan.at(Id::MainLightBlurred).mDesc = ALRenderTargetDesc{ .width = width, .height = height, .color = { GL_RG8 } };
     }

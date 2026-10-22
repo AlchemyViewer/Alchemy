@@ -2309,11 +2309,18 @@ void LLGLManager::initQueries()
     mHasPipelineStatistics    = mGLVersion >= 4.59f || mGLExtensions.contains("GL_ARB_pipeline_statistics_query");
     mHasQueryBufferObject     = mGLVersion >= 4.39f || mGLExtensions.contains("GL_ARB_query_buffer_object");
 
+    // AMD's drivers claim query buffers but cannot be trusted with a write. Windows' writes the result into whatever
+    // buffer is bound at GL_QUERY_BUFFER rather than the one glGetQueryBufferObject names, and drops it without an
+    // error when none is. radeonsi runs each write as an internal compute dispatch, behind a wait for the query and
+    // cache flushes, and from Mesa 25.3 each one also keeps a reference to the compute constant buffer bound before it
+    // (si_restore_qbo_state), which runs its 32-bit address space out within minutes and aborts the process.
+    if (mIsAMD)
+    {
+        mHasQueryBufferObject = false;
+    }
+
     // The GPU writes the results only on NVIDIA's driver, whose threaded optimization answers a glGetQueryObject only
-    // once its own thread has caught up on the frame. Elsewhere a write costs more than the ask it saves: radeonsi runs
-    // an internal compute dispatch for each, behind a wait for the query and cache flushes, and from Mesa 25.3 each one
-    // also keeps a reference to the compute constant buffer bound before it (si_restore_qbo_state), which runs its
-    // 32-bit address space out within minutes and aborts the process.
+    // once its own thread has caught up on the frame. Elsewhere asking waits on no such thread, and saves the write.
     mWritesQueryResults = mHasQueryBufferObject && mIsNVIDIA;
 
     GLint bits = 0;

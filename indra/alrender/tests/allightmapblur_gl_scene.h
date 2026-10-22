@@ -1,8 +1,9 @@
 /**
  * @file allightmapblur_gl_scene.h
- * @brief A G-buffer of planes, a step between them and sky, and a light map of noisy occlusion over it, blurred both
- *        ways the viewer blurs it: the two fragment passes through a scratch (blurLightF.glsl), and the one dispatch
- *        (blurLightC.glsl). allightmapblur_gl_test compares the two; alcompute_gl_bench times them.
+ * @brief A G-buffer of planes, a step between them, a ball and sky, and a light map of noisy occlusion over it,
+ *        blurred both ways the viewer blurs it: the two fragment passes through a scratch (blurLightF.glsl), and the
+ *        one dispatch (blurLightC.glsl). allightmapblur_gl_test compares the two, and both with the blur worked on the
+ *        CPU; alcompute_gl_bench times them.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -94,7 +95,7 @@ namespace allightmapblur_gl
             mFragment.unload();
             mCompute.unload();
             mShaders.clearShaderObjects();
-            for (LLRenderTarget* target : { &mGBuffer, &mLight, &mScratch, &mComputeLight, &mBlurred })
+            for (LLRenderTarget* target : { &mGBuffer, &mLight, &mScratch, &mFloatScratch, &mComputeLight, &mBlurred })
             {
                 target->release();
             }
@@ -120,6 +121,12 @@ namespace allightmapblur_gl
             return y >= mH - mH / 12 || (y >= mH - mH / 5 && x < mW / 5);
         }
 
+        // Where the box standing in front of the floor and the wall is.
+        bool isBox(S32 x, S32 y) const
+        {
+            return x > mW * 16 / 25 && x < mW * 9 / 10 && y > mH / 5 && y < mH * 7 / 10;
+        }
+
         // The view ray through pixel x, y, at z = -1.
         LLVector3 ray(S32 x, S32 y) const
         {
@@ -130,13 +137,28 @@ namespace allightmapblur_gl
         }
 
         // The surface under pixel x, y, in view space: a floor falling away below the middle, a wall facing the camera
-        // above it, and a box standing in front of both on the right, whose face is a step in depth the blur keeps off.
+        // above it, a box standing in front of both on the right, whose face is a step in depth the blur keeps off, and
+        // a ball on the left, whose curve leaves its taps every distance from each pixel's plane.
         void surface(S32 x, S32 y, F32& depth, LLVector3& normal) const
         {
             const LLVector3 d = ray(x, y);
             // A plane n.p = c meets the ray at t = c / n.d, at view z = -t.
             const auto meet = [&](const LLVector3& n, F32 c) { return c / (n * d); };
-            if (x > mW * 16 / 25 && x < mW * 9 / 10 && y > mH / 5 && y < mH * 7 / 10)
+            // The ball a quarter of the view wide, centred left of the middle, 8 m out.
+            const F32 across = (F32)mW / (F32)mH * TAN_HALF_FOV * 8.f;
+            const LLVector3 centre(-0.35f * across, 0.05f * TAN_HALF_FOV * 8.f, -8.f);
+            const F32 radius = 0.25f * across;
+            const F32 b = d * centre;
+            const F32 disc = b * b - (d * d) * (centre * centre - radius * radius);
+            if (disc > 0.f)
+            {
+                const F32 t = (b - std::sqrt(disc)) / (d * d);
+                normal = d * t - centre;
+                normal.normVec();
+                depth = t;
+                return;
+            }
+            if (isBox(x, y))
             {
                 normal = LLVector3(0.25f, 0.f, 1.f);
                 normal.normVec();
@@ -207,6 +229,8 @@ namespace allightmapblur_gl
             REQUIRE(mGBuffer.ensure(gbuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mScratch.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
+            REQUIRE(mFloatScratch.ensure({ .width = w, .height = h, .color = { GL_RGBA32F } }, mGBuffer) ==
+                    LLRenderTarget::EnsureResult::Built);
             REQUIRE(mComputeLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mBlurred.ensure({ .width = w, .height = h, .color = { GL_RG8 } }) == LLRenderTarget::EnsureResult::Built);
 
@@ -223,6 +247,8 @@ namespace allightmapblur_gl
             gGL.loadMatrix(proj);
             gGL.matrixMode(LLRender::MM_MODELVIEW);
             gGL.loadIdentity();
+            mInvProj.setInverse(proj);
+            mReverse = reverse;
 
             std::vector<F32> depth(size_t(mW) * mH);
             std::vector<U16> normals(size_t(mW) * mH * 4);
@@ -257,18 +283,13 @@ namespace allightmapblur_gl
             // ALDrawnOnly then lets the fragment passes draw over sky that holds exactly the cleared value.
             LLRenderTarget staging;
             REQUIRE(staging.ensure({ .width = w, .height = h, .depth = gbuffer.depth }) == LLRenderTarget::EnsureResult::Built);
-            glBindTexture(GL_TEXTURE_2D, staging.getDepth());
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
+            ll_test::writeTexture(staging.getDepth(), mW, mH, GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
             mGBuffer.copyContents(staging, 0, 0, mW, mH, 0, 0, mW, mH, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
-            glBindTexture(GL_TEXTURE_2D, mGBuffer.getTexture());
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
+            ll_test::writeTexture(mGBuffer.getTexture(), mW, mH, GL_RGBA, GL_UNSIGNED_SHORT, normals.data());
             for (LLRenderTarget* target : { &mLight, &mComputeLight })
             {
-                glBindTexture(GL_TEXTURE_2D, target->getTexture());
-                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+                ll_test::writeTexture(target->getTexture(), mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
             }
-            glBindTexture(GL_TEXTURE_2D, 0);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
             REQUIRE(mTriangle->allocateBuffer(3, 0));
@@ -299,12 +320,14 @@ namespace allightmapblur_gl
         }
 
         // renderDeferredLighting's two passes: across into the scratch, cleared white as the sun pass clears the map,
-        // and down from it back into the map, each over geometry alone.
-        void blurFragment(const ALLightMapBlur::Kernel& kernel)
+        // and down from it back into the map, each over geometry alone. Through a single-precision scratch, the
+        // fragment passes keep between the axes what the dispatch keeps in shared memory.
+        void blurFragment(const ALLightMapBlur::Kernel& kernel, bool float_scratch = false)
         {
-            mScratch.bindTarget();
+            LLRenderTarget& scratch = float_scratch ? mFloatScratch : mScratch;
+            scratch.bindTarget();
             gGL.setClearColor(LLColor4::white);
-            mScratch.clear(GL_COLOR_BUFFER_BIT);
+            scratch.clear(GL_COLOR_BUFFER_BIT);
             gGL.setClearColor(LLColor4::transparent);
             bindDeferred(mFragment, mLight, kernel);
             mFragment.uniform2f(LLShaderMgr::DELTA, 1.f, 0.f);
@@ -314,9 +337,9 @@ namespace allightmapblur_gl
                 mTriangle->setBuffer();
                 mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
-            mScratch.flush();
+            scratch.flush();
 
-            bindDeferred(mFragment, mScratch, kernel);
+            bindDeferred(mFragment, scratch, kernel);
             mLight.bindTarget();
             mFragment.uniform2f(LLShaderMgr::DELTA, 0.f, 1.f);
             {
@@ -348,15 +371,152 @@ namespace allightmapblur_gl
             return dispatched;
         }
 
-        std::vector<F32> read(LLRenderTarget& target) const
+        // The occlusion `box` on the box and `elsewhere` everywhere else, in both light maps.
+        void layOcclusion(F32 box, F32 elsewhere)
+        {
+            for (S32 y = 0; y < mH; ++y)
+            {
+                for (S32 x = 0; x < mW; ++x)
+                {
+                    mSource[(size_t(y) * mW + x) * 4 + 1] = isBox(x, y) ? box : elsewhere;
+                }
+            }
+            for (LLRenderTarget* target : { &mLight, &mComputeLight })
+            {
+                ll_test::writeTexture(target->getTexture(), mW, mH, GL_RGBA, GL_FLOAT, mSource.data());
+            }
+        }
+
+        std::vector<F32> read(const LLRenderTarget& target) const
         {
             // A read back sees what the dispatch stored past this.
             gGL.memoryBarrier(LLRender::BARRIER_TEXTURE_UPDATE);
             std::vector<F32> texels(size_t(mW) * mH * 4);
-            glBindTexture(GL_TEXTURE_2D, target.getTexture());
-            glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_FLOAT, texels.data());
-            glBindTexture(GL_TEXTURE_2D, 0);
+            ll_test::readTexture(target.getTexture(), GL_RGBA, GL_FLOAT, texels.data());
             return texels;
+        }
+
+        // The blurred occlusion as blurLightUtil.glsl defines the blur, on the CPU, from what the GPU reads: the depth,
+        // the normals and the light map read back, and inv_proj as LLRender inverts the projection. The sky keeps the
+        // light map's own.
+        std::vector<F32> reference(const ALLightMapBlur::Kernel& kernel) const
+        {
+            std::vector<F32> depth(size_t(mW) * mH);
+            ll_test::readTexture(mGBuffer.getDepth(), GL_DEPTH_COMPONENT, GL_FLOAT, depth.data());
+            const std::vector<F32> normals = read(mGBuffer);
+            const std::vector<F32> light = read(mComputeLight);
+            const F32* m = mInvProj.getF32ptr(); // column-major, as GLSL indexes inv_proj[column]
+
+            const auto clampTexel = [](S32 i, S32 size) { return llclamp(i, 0, size - 1); };
+            const auto mirror = [](S32 i, S32 size)
+            {
+                const S32 period = 2 * size;
+                const S32 r = (i < 0 ? -1 - i : i) % period;
+                return r < size ? r : period - 1 - r;
+            };
+            const auto isFar = [&](F32 d) { return mReverse ? d <= 0.f : d >= 1.f; };
+            const auto viewDepth = [&](S32 x, S32 y)
+            {
+                const S32 cx = clampTexel(x, mW);
+                const S32 cy = clampTexel(y, mH);
+                const F32 d = depth[size_t(cy) * mW + cx];
+                if (isFar(d))
+                {
+                    return -1.f;
+                }
+                const F32 sx = ((F32)cx + 0.5f) / (F32)mW * 2.f - 1.f;
+                const F32 sy = ((F32)cy + 0.5f) / (F32)mH * 2.f - 1.f;
+                const F32 w = m[3] * sx + m[7] * sy + m[11] * (mReverse ? d : 2.f * d - 1.f) + m[15];
+                return 1.f / llmax(w, 0.000001f);
+            };
+            const auto normal = [&](S32 x, S32 y)
+            {
+                const size_t i = (size_t(y) * mW + x) * 4;
+                F32 fx = normals[i] * 2.f - 1.f;
+                F32 fy = normals[i + 1] * 2.f - 1.f;
+                LLVector3 n(fx, fy, 1.f - std::fabs(fx) - std::fabs(fy));
+                const F32 t = llclamp(-n.mV[2], 0.f, 1.f);
+                n.mV[0] += n.mV[0] >= 0.f ? -t : t;
+                n.mV[1] += n.mV[1] >= 0.f ? -t : t;
+                n.normVec();
+                return n;
+            };
+            const auto kern = [&](S32 step)
+            {
+                const S32 i = step >> 1;
+                return (step & 1) == 0 ? kernel.mTaps[i] : (kernel.mTaps[i] + kernel.mTaps[i + 1]) * 0.5f;
+            };
+
+            // One axis over `in`, the occlusion each tap reads, mirrored. The sky keeps the light map's occlusion down,
+            // and across the clear of the fragment passes' scratch.
+            const auto pass = [&](const std::vector<F32>& in, S32 dx, S32 dy, std::vector<F32>& out, bool keep_sky)
+            {
+                for (S32 y = 0; y < mH; ++y)
+                {
+                    for (S32 x = 0; x < mW; ++x)
+                    {
+                        const size_t i = size_t(y) * mW + x;
+                        const F32 t = viewDepth(x, y);
+                        if (t <= 0.f)
+                        {
+                            out[i] = keep_sky ? light[i * 4 + 1] : 1.f;
+                            continue;
+                        }
+                        const LLVector3 n = normal(x, y);
+                        const F32 tx = 2.f / (F32)mW;
+                        const F32 ty = 2.f / (F32)mH;
+                        const LLVector3 m0(m[0], m[1], m[2]);
+                        const LLVector3 m1(m[4], m[5], m[6]);
+                        const LLVector3 m3(m[12], m[13], m[14]);
+                        const F32 across = (n * m0) * tx;
+                        const F32 down = (n * m1) * ty;
+                        const F32 plane0 = n * m3 + (across + down) * 0.5f - n * (m0 + m1);
+                        const F32 sx = ((F32)x + 0.5f) / (F32)mW * 2.f - 1.f;
+                        const F32 sy = ((F32)y + 0.5f) / (F32)mH * 2.f - 1.f;
+                        const LLVector3 pos = (m0 * sx + m1 * sy + m3) * t;
+                        const F32 offset = (plane0 + (F32)x * across + (F32)y * down) * t;
+
+                        F32 step[2] = { kernel.mScale * (F32)dx / (1.f + n.mV[0] * n.mV[0]),
+                                        kernel.mScale * (F32)dy / (1.f + n.mV[1] * n.mV[1]) };
+                        const F32 shorten = llmax(-pos.mV[2] * kernel.mDistFactor, 1.f);
+                        step[0] /= shorten;
+                        step[1] /= shorten;
+                        const F32 tolerance = pos.mV[2] * pos.mV[2] * 0.00005f;
+                        const F32 tc_mod = (F32)((x + y + 1) & 1);
+                        const F32 origin[2] = { (F32)x + 0.5f + (tc_mod - 0.5f) * kernel.mTaps[1].mV[VZ] * step[0] * 0.5f,
+                                                (F32)y + 0.5f + (tc_mod - 0.5f) * kernel.mTaps[1].mV[VZ] * step[1] * 0.5f };
+
+                        F32 weight_sum = kernel.mTaps[0].mV[VY];
+                        F32 ao = weight_sum * in[i];
+                        for (S32 tap = 0; tap < 12; ++tap)
+                        {
+                            const S32 s = tap < 6 ? tap + 1 : tap - 5;
+                            const F32 side = tap < 6 ? 1.f : -1.f;
+                            const LLVector3 k = kern(s);
+                            const S32 txl = (S32)std::floor(origin[0] + side * k.mV[VZ] * step[0] * 2.f);
+                            const S32 tyl = (S32)std::floor(origin[1] + side * k.mV[VZ] * step[1] * 2.f);
+                            const F32 d = (plane0 + (F32)txl * across + (F32)tyl * down) * viewDepth(txl, tyl) - offset;
+                            if (viewDepth(txl, tyl) > 0.f && d * d <= tolerance)
+                            {
+                                ao += in[size_t(mirror(tyl, mH)) * mW + mirror(txl, mW)] * k.mV[VY];
+                                weight_sum += k.mV[VY];
+                            }
+                        }
+                        out[i] = llmax(ao / weight_sum, 0.f);
+                    }
+                }
+            };
+
+            std::vector<F32> occlusion(size_t(mW) * mH);
+            for (size_t i = 0; i < occlusion.size(); ++i)
+            {
+                occlusion[i] = light[i * 4 + 1];
+            }
+            std::vector<F32> across(occlusion.size());
+            std::vector<F32> blurred(occlusion.size());
+            pass(occlusion, 1, 0, across, false);
+            pass(across, 0, 1, blurred, true);
+            return blurred;
         }
 
         ll_test::SharedGLScope    mGL;
@@ -366,10 +526,13 @@ namespace allightmapblur_gl
         LLRenderTarget            mGBuffer;
         LLRenderTarget            mLight;
         LLRenderTarget            mScratch;
+        LLRenderTarget            mFloatScratch;
         LLRenderTarget            mComputeLight;
         LLRenderTarget            mBlurred;
         LLPointer<LLVertexBuffer> mTriangle;
         std::vector<F32>          mSource;
+        LLMatrix4a                mInvProj;
+        bool                      mReverse = false;
         S32                       mW = 0;
         S32                       mH = 0;
     };

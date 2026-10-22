@@ -114,6 +114,8 @@ LLGLSLShader        gObjectAlphaMaskNoColorProgram;
 //environment shaders
 LLGLSLShader        gWaterProgram;
 LLGLSLShader        gUnderWaterProgram;
+LLGLSLShader        gWaterOpaqueProgram;
+LLGLSLShader        gUnderWaterOpaqueProgram;
 LLGLSLShader        gWaterWavesProgram;
 LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
@@ -1067,6 +1069,8 @@ void LLViewerShaderMgr::loadShadersWater()
     {
         gWaterProgram.unload();
         gUnderWaterProgram.unload();
+        gWaterOpaqueProgram.unload();
+        gUnderWaterOpaqueProgram.unload();
         gWaterWavesProgram.unload();
         gUnderWaterWavesProgram.unload();
         gWaterExclusionProgram.unload();
@@ -1077,10 +1081,12 @@ void LLViewerShaderMgr::loadShadersWater()
     {
         // The surface seen from above and from below, each flat (the cells and rings, from waterV) and, where
         // tessellation is, waved (the patches within the reach: waterPatchV, waterTC, waterTE). The two share the
-        // fragment stage and what it takes (waterVaryingsV, written once for the stage before it).
-        const auto setup = [&](LLGLSLShader& shader, bool under, bool waves)
+        // fragment stage and what it takes (waterVaryingsV, written once for the stage before it). Opaque beside them,
+        // the flat field without TRANSPARENT_WATER, for the views whose water does not refract while the rest does.
+        const auto setup = [&](LLGLSLShader& shader, bool under, bool waves, bool opaque_beside)
         {
-            shader.mName = std::string(under ? "Underwater" : "Water") + (waves ? " Waves Shader" : " Shader");
+            shader.mName = std::string(under ? "Underwater" : "Water") + (waves ? " Waves" : "") +
+                           (opaque_beside ? " Opaque" : "") + " Shader";
             shader.mFeatures.calculatesAtmospherics = true;
             shader.mFeatures.hasAtmospherics = true;
             shader.mFeatures.hasWaterSurface = true;
@@ -1110,7 +1116,7 @@ void LLViewerShaderMgr::loadShadersWater()
             shader.mShaderLevel = mShaderLevel[SHADER_WATER];
             shader.mShaderGroup = LLGLSLShader::SG_WATER;
             shader.clearPermutations();
-            if (mInputs.mLocal.mTransparentWater)
+            if (mInputs.mLocal.mTransparentWater && !opaque_beside)
             {
                 shader.addPermutation("TRANSPARENT_WATER", "1");
             }
@@ -1121,17 +1127,26 @@ void LLViewerShaderMgr::loadShadersWater()
             // Read by waterSurface.glsl, a shared object, through the global define; the program's copy keeps its
             // hash honest.
             shader.addPermutation("WATER_HEXTILE", std::to_string(mInputs.mGlobal.mWaterHextile));
-            return shader.createShader((under ? 0 : LLGLSLShader::VARIANT_CLASSIC) | mirror_variant());
+            // A mirror's water refracts: the programs beside are never bound in its pass.
+            const U32 mirror = opaque_beside ? 0u : mirror_variant();
+            return shader.createShader((under ? 0 : LLGLSLShader::VARIANT_CLASSIC) | mirror);
         };
 
-        built(setup(gWaterProgram, false, false), gWaterProgram);
-        built(setup(gUnderWaterProgram, true, false), gUnderWaterProgram);
+        built(setup(gWaterProgram, false, false, false), gWaterProgram);
+        built(setup(gUnderWaterProgram, true, false, false), gUnderWaterProgram);
+        // A probe's faces (ALRenderResourcePlan::refractsWater), which draw the field flat. With the setting off the
+        // programs above are opaque already, and the load unloads these.
+        if (mInputs.mLocal.mTransparentWater)
+        {
+            built(setup(gWaterOpaqueProgram, false, false, true), gWaterOpaqueProgram);
+            built(setup(gUnderWaterOpaqueProgram, true, false, true), gUnderWaterOpaqueProgram);
+        }
         // The waves are optional: built only where they are wanted, and their failing leaves them off, the water flat,
         // rather than the water or any shader after it. Where they are not wanted the load unloads them, asking nothing
         // of them.
         if (mInputs.mLocal.mWaterWaves)
         {
-            if (!setup(gWaterWavesProgram, false, true) || !setup(gUnderWaterWavesProgram, true, true))
+            if (!setup(gWaterWavesProgram, false, true, false) || !setup(gUnderWaterWavesProgram, true, true, false))
             {
                 LL_WARNS("Shader") << "The water waves' programs did not build; the water is drawn flat" << LL_ENDL;
                 gWaterWavesProgram.unload();

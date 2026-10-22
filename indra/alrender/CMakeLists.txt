@@ -93,7 +93,8 @@ if(AL_BUILD_TESTS)
   # and the waves displaced by heights the bake integrates from a normal map,
   # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
-  # FXAA on an RGB10_A2 source, the transient target pool's GL objects,
+  # FXAA on an RGB10_A2 source, the reflection probes' taps in one pass over
+  # them against their list, the transient target pool's GL objects,
   # shared depth and poison, and the previews' and bakes' targets taken from
   # it only when one draws, on llrender's shared hidden window.
   al_add_test_binary(
@@ -107,10 +108,12 @@ if(AL_BUILD_TESTS)
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
+      tests/reflectionprobe_gl_test.cpp
     BENCH_SOURCES
       tests/alcompute_gl_bench.cpp
       tests/alondemandtarget_bench.cpp
       tests/alwatertargets_bench.cpp
+      tests/reflectionprobe_gl_bench.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${alrender_shader_dir}

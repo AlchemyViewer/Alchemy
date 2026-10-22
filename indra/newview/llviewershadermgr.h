@@ -155,6 +155,10 @@ extern LLGLSLShader     gObjectAlphaMaskNoColorProgram;
 //environment shaders
 extern LLGLSLShader         gWaterProgram;
 extern LLGLSLShader         gUnderWaterProgram;
+// The flat field without TRANSPARENT_WATER, for the views whose water does not refract while the main view's does
+// (ALRenderResourcePlan::refractsWater); built while RenderTransparentWater is on.
+extern LLGLSLShader         gWaterOpaqueProgram;
+extern LLGLSLShader         gUnderWaterOpaqueProgram;
 // The patches within the tessellation reach, displaced by the waves; built while they are wanted (ALWaterSurface::wavesWanted).
 extern LLGLSLShader         gWaterWavesProgram;
 extern LLGLSLShader         gUnderWaterWavesProgram;

@@ -170,13 +170,14 @@ namespace
 
         return {
             { "RenderTransparentWater", no_change, [](Inputs& in) { in.mTransparentWater = false; },
-              [](const Plan& before)
-              { return wanted(before, in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Water, Slot::DepthCopy })); } },
+              [](const Plan&) { return in_packs({ Pack::Main, Pack::Hero }, { Slot::Water, Slot::DepthCopy }); } },
             // Without a texture barrier the haze passes read the depth copy, so opaque water keeps it.
             { "RenderTransparentWater without a texture barrier", [](Inputs& in) { in.mTextureBarrier = false; },
               [](Inputs& in) { in.mTransparentWater = false; },
-              [](const Plan& before) { return wanted(before, in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::Water })); } },
-            { "a context without a texture barrier", no_change, [](Inputs& in) { in.mTextureBarrier = false; }, nothing },
+              [](const Plan&) { return in_packs({ Pack::Main, Pack::Hero }, { Slot::Water }); } },
+            // A probe's water refracts nothing, so its pack takes the copy only for the haze.
+            { "a context without a texture barrier", no_change, [](Inputs& in) { in.mTextureBarrier = false; },
+              [](const Plan&) { return of({ Id::ProbeDepthCopy }); } },
             { "a context without a texture barrier under opaque water", [](Inputs& in) { in.mTransparentWater = false; },
               [](Inputs& in) { in.mTextureBarrier = false; },
               [](const Plan&) { return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::DepthCopy }); } },
@@ -213,7 +214,8 @@ namespace
             { "RenderHDREnabled", no_change, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Water }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer }) |
+                         in_packs({ Pack::Main, Pack::Hero }, { Slot::Water }) |
                          in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
@@ -221,7 +223,8 @@ namespace
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
               {
-                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer, Slot::Water }) |
+                  return in_packs({ Pack::Main, Pack::Probe, Pack::Hero }, { Slot::GBuffer }) |
+                         in_packs({ Pack::Main, Pack::Hero }, { Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
                          of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
@@ -236,15 +239,15 @@ namespace
               [](const Plan& before)
               {
                   return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SpotShadow0, Id::SpotShadow1,
-                              Id::MainDepthCopy, Id::ProbeDepthCopy, Id::HeroDepthCopy, Id::Preview }) |
+                              Id::MainDepthCopy, Id::HeroDepthCopy, Id::Preview }) |
                          wanted(before, sun_shadows({ Pack::Main, Pack::Probe, Pack::Hero }));
               } },
             { "AlchemyRenderReverseZ over 32-bit shadows", [](Inputs& in) { in.mShadowDepth32F = true; },
               [](Inputs& in) { in.mReverseZ = false; },
               [](const Plan&)
               {
-                  return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::MainDepthCopy, Id::ProbeDepthCopy,
-                              Id::HeroDepthCopy, Id::Preview });
+                  return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::MainDepthCopy, Id::HeroDepthCopy,
+                              Id::Preview });
               } },
             { "RenderShadowDetail 2 to 1", no_change, [](Inputs& in) { in.mShadowDetail = 1; },
               [](const Plan&) { return of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
@@ -265,6 +268,11 @@ namespace
               [](const Plan&) { return of({ Id::MainLightBlurred }); } },
             { "AlchemyRenderDisableCompute without SSAO", [](Inputs& in) { in.mSSAO = false; },
               [](Inputs& in) { in.mCompute = false; }, nothing },
+            { "RenderShadowBlurSize past a dispatch's reach", no_change,
+              [](Inputs& in) { in.mSSAOBlurDispatched = false; },
+              [](const Plan&) { return of({ Id::MainLightBlurred }); } },
+            { "RenderShadowBlurSize past a dispatch's reach without compute", [](Inputs& in) { in.mCompute = false; },
+              [](Inputs& in) { in.mSSAOBlurDispatched = false; }, nothing },
             { "RenderShadowResolutionScale", no_change, [](Inputs& in) { in.mShadowScale = 0.5f; },
               [](const Plan&) { return sun_shadows({ Pack::Main }) | of({ Id::SpotShadow0, Id::SpotShadow1 }); } },
             { "AlchemyRenderShadowDepth32F under reverse-Z", no_change, [](Inputs& in) { in.mShadowDepth32F = true; },
@@ -849,13 +857,12 @@ namespace
         }
     }
 
-    TEST_CASE("alrenderresourceplan: a capture's water copies the scene at its own pack's size", "[alrenderresourceplan]")
+    TEST_CASE("alrenderresourceplan: a mirror's water copies the scene at its own pack's size", "[alrenderresourceplan]")
     {
-        Inputs in            = defaults();
-        in.mProbeSuperSample = 2;
-        in.mHeroResolution   = 512;
-        const Plan plan      = Plan::make(in);
-        for (Pack pack : { Pack::Main, Pack::Probe, Pack::Hero })
+        Inputs in          = defaults();
+        in.mHeroResolution = 512;
+        const Plan plan    = Plan::make(in);
+        for (Pack pack : { Pack::Main, Pack::Hero })
         {
             INFO("pack " << (U32)pack);
             const Plan::Resource& gbuffer = plan[Plan::inPack(pack, Slot::GBuffer)];
@@ -876,8 +883,51 @@ namespace
             CHECK(water.mDesc->depth == Depth::None);
             CHECK(!water.mDepthFrom);
         }
-        CHECK(plan.desc(Id::ProbeWater)->width == in.mProbeResolution * 2);
         CHECK(plan.desc(Id::HeroWater)->width == 512);
+    }
+
+    // A probe's face clips the scene at the water (LLPipeline::isWaterClip), so its water draws opaque and copies
+    // nothing; the main view and a mirror's face refract where the setting asks.
+    TEST_CASE("alrenderresourceplan: only the packs whose water refracts have the water's copies", "[alrenderresourceplan]")
+    {
+        for (bool transparent : { true, false })
+        {
+            INFO("RenderTransparentWater " << transparent);
+            CHECK(Plan::refractsWater(Pack::Main, transparent) == transparent);
+            CHECK(Plan::refractsWater(Pack::Hero, transparent) == transparent);
+            CHECK_FALSE(Plan::refractsWater(Pack::Probe, transparent));
+
+            for (bool barrier : { true, false })
+            {
+                for (bool previewed : { false, true })
+                {
+                    INFO("texture barrier " << barrier << ", material preview " << previewed);
+                    Inputs in            = defaults();
+                    in.mTransparentWater = transparent;
+                    in.mTextureBarrier   = barrier;
+                    in.mMaterialPreview  = previewed;
+                    const Plan plan      = Plan::make(in);
+                    for (Pack pack : { Pack::Main, Pack::Probe, Pack::Hero })
+                    {
+                        INFO("pack " << (U32)pack);
+                        const bool refracts = Plan::refractsWater(pack, transparent);
+                        REQUIRE(plan.wants(Plan::inPack(pack, Slot::GBuffer)));
+                        CHECK(plan.wants(Plan::inPack(pack, Slot::Water)) == refracts);
+                        UNSCOPED_INFO("without a barrier every pack that draws the water copies the depth for its haze");
+                        CHECK(plan.wants(Plan::inPack(pack, Slot::DepthCopy)) == (refracts || !barrier));
+                    }
+                }
+            }
+        }
+
+        // A pack there for a material preview alone draws no water, nor its haze.
+        Inputs preview           = defaults();
+        preview.mProbes          = false;
+        preview.mMaterialPreview = true;
+        preview.mTextureBarrier  = false;
+        const Plan plan          = Plan::make(preview);
+        REQUIRE(plan.wants(Id::ProbeGBuffer));
+        CHECK(names(wanted(plan, of({ Id::ProbeWater, Id::ProbeDepthCopy }))) == "nothing");
     }
 
     // The water's copy of the screen takes another pass's target: bloom level 0's under HDR, at full scale without
@@ -940,30 +990,36 @@ namespace
               "[alrenderresourceplan]")
     {
         // The dispatch blurs into it in place of a scratch of the light map's description; the fragment passes need
-        // the scratch instead, and nothing blurs without SSAO.
+        // the scratch instead, as they do for a kernel wider than a dispatch holds, and nothing blurs without SSAO.
         for (S32 shadow_detail : { 0, 2 })
         {
             for (bool ssao : { false, true })
             {
                 for (bool compute : { false, true })
                 {
-                    INFO("shadow detail " << shadow_detail << ", SSAO " << ssao << ", compute " << compute);
-                    Inputs in        = defaults();
-                    in.mShadowDetail = shadow_detail;
-                    in.mSSAO         = ssao;
-                    in.mCompute      = compute;
-                    const Plan plan  = Plan::make(in);
-                    REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute));
-                    if (plan.wants(Id::MainLightBlurred))
+                    for (bool dispatched : { false, true })
                     {
-                        // The light map's size, its 8 bits in two channels, no depth: an image a dispatch stores to.
-                        const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
-                        CHECK(blurred.width == plan.desc(Id::MainLight)->width);
-                        CHECK(blurred.height == plan.desc(Id::MainLight)->height);
-                        CHECK(blurred.colorCount() == 1);
-                        CHECK(blurred.color[0] == (U32)GL_RG8);
-                        CHECK(blurred.depth == Depth::None);
-                        CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
+                        INFO("shadow detail " << shadow_detail << ", SSAO " << ssao << ", compute " << compute
+                                              << ", dispatched " << dispatched);
+                        Inputs in              = defaults();
+                        in.mShadowDetail       = shadow_detail;
+                        in.mSSAO               = ssao;
+                        in.mCompute            = compute;
+                        in.mSSAOBlurDispatched = dispatched;
+                        const Plan plan        = Plan::make(in);
+                        REQUIRE(plan.wants(Id::MainLightBlurred) == (ssao && compute && dispatched));
+                        if (plan.wants(Id::MainLightBlurred))
+                        {
+                            // The light map's size, its 8 bits in two channels, no depth: an image a dispatch stores
+                            // to.
+                            const ALRenderTargetDesc& blurred = *plan.desc(Id::MainLightBlurred);
+                            CHECK(blurred.width == plan.desc(Id::MainLight)->width);
+                            CHECK(blurred.height == plan.desc(Id::MainLight)->height);
+                            CHECK(blurred.colorCount() == 1);
+                            CHECK(blurred.color[0] == (U32)GL_RG8);
+                            CHECK(blurred.depth == Depth::None);
+                            CHECK(!plan[Id::MainLightBlurred].mDepthFrom);
+                        }
                     }
                 }
             }
