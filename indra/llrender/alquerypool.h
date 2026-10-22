@@ -97,9 +97,11 @@ private:
 /// closes the batch, and retire() reads every result of a batch at once when the frame fences show its frame finished
 /// (ALFrameFences), so that reading a result never waits on the GPU, never polls one query and lays no fence of its own.
 /// FRAMES batches of names are in flight, and a batch's names are begun again only once it has been read, so none is
-/// begun while its last result is pending. The results are kept apart from the names, for RESULT_FRAMES frames after
-/// their own: a user that reads its queries only every few frames, as the object cache's cull does while the camera
-/// rests (LLVOCachePartition::cull), still finds them. Past that a ticket has expired.
+/// begun while its last result is pending. A batch opens with names for the busiest frame so far and half again, made
+/// at the frame's end, so that a frame makes names only when it climbs past that. The results are kept apart from the
+/// names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames, as the object
+/// cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a ticket has
+/// expired.
 ///
 /// Where the session has the GPU write the results (gGLManager.mWritesQueryResults: query buffers, on NVIDIA's driver),
 /// endFrame() has it write the batch's results into a mapped buffer of the batch's own, ahead of the frame's fence, and
@@ -247,6 +249,8 @@ private:
 
     bool          isFree(U32 kind) const;
     ALQueryTicket take(U32 kind);
+    // Gives the batch names for at least `slots` slots of `kind`, in whole SLOTS_AT_ONCE.
+    void          makeSlots(Batch& batch, U32 kind, U32 slots);
     ALQueryTicket open(U32 kind);
     ALQueryTicket timestamp();
     // The results of `count` names from the ticket's first, read now or found kept.
@@ -271,6 +275,7 @@ private:
     bool          mWriteFailed = false;
     U32           mStalls = 0;
     U32           mAskedReads = 0;
+    U32           mPeak[KINDS] = {}; // the most slots of each kind one frame has used
 };
 
 /// begin() for the scope, end() as it goes. ticket() is what began: no query where the pool refused.

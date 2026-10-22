@@ -302,19 +302,31 @@ ALQueryTicket ALQueryPool::take(U32 kind)
     Batch& open = batch(mSerial);
     // The first batch, and the first after release(), are opened by their first query.
     open.mSerial = mSerial;
-    std::vector<U32>& names = open.mNames[kind];
-    const U32 per = namesPer(kind);
-    if ((open.mUsed[kind] + 1) * per > names.size())
+    if ((open.mUsed[kind] + 1) * namesPer(kind) > open.mNames[kind].size())
     {
-        const size_t had = names.size();
-        names.resize(had + SLOTS_AT_ONCE * per);
-        glGenQueries(GLsizei(SLOTS_AT_ONCE * per), names.data() + had);
+        // Past the room the batch opened with (endFrame()): doubled, so that a frame climbing far past the busiest one
+        // before it makes names a few times, not every SLOTS_AT_ONCE queries.
+        makeSlots(open, kind, std::max(open.mUsed[kind] * 2, open.mUsed[kind] + SLOTS_AT_ONCE));
     }
     ALQueryTicket ticket;
     ticket.mSerial = mSerial;
     ticket.mSlot   = open.mUsed[kind]++;
     ticket.mKind   = kind;
     return ticket;
+}
+
+void ALQueryPool::makeSlots(Batch& batch, U32 kind, U32 slots)
+{
+    slots = (slots + SLOTS_AT_ONCE - 1) / SLOTS_AT_ONCE * SLOTS_AT_ONCE;
+    std::vector<U32>& names = batch.mNames[kind];
+    const size_t had = names.size();
+    const size_t want = size_t(slots) * namesPer(kind);
+    if (want <= had)
+    {
+        return;
+    }
+    names.resize(want);
+    glGenQueries(GLsizei(want - had), names.data() + had);
 }
 
 const ALQueryPool::Batch* ALQueryPool::find(const ALQueryTicket& ticket) const
@@ -649,6 +661,7 @@ void ALQueryPool::endFrame()
     for (U32 k = 0; k < KINDS; ++k)
     {
         used += closing.mUsed[k];
+        mPeak[k] = std::max(mPeak[k], closing.mUsed[k]);
     }
     if (used > 0)
     {
@@ -682,6 +695,13 @@ void ALQueryPool::endFrame()
     for (U32 k = 0; k < KINDS; ++k)
     {
         reused.mUsed[k] = 0;
+        // Room for the busiest frame so far and half again, made here at the frame's end rather than by a query in the
+        // middle of the next frame: glGenQueries returns names, and a threaded driver answers it only once its own
+        // thread has caught up.
+        if (mPeak[k] > 0)
+        {
+            makeSlots(reused, k, mPeak[k] + mPeak[k] / 2);
+        }
     }
 
     LL_PROFILE_PLOT("GL queries", (int64_t)used);

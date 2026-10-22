@@ -854,6 +854,37 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // A batch opens with names for the busiest frame so far and half again, made at a frame's end: a frame that uses no
+    // more makes no name in its middle, where glGenQueries waits for a threaded driver's thread to catch up.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch opens with room for the busiest frame so far, and half again", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 BUSIEST = 100;
+        const auto issue = [this](U32 count)
+        {
+            for (U32 i = 0; i < count; ++i)
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+                REQUIRE(scope.ticket().isValid());
+            }
+        };
+        issue(BUSIEST);
+        // Every batch opened again since, each at a frame's end.
+        for (U32 frame = 0; frame <= ALQueryPool::FRAMES; ++frame)
+        {
+            endFrame();
+            glFinish();
+        }
+        const U32 names = mPool.getNameCount();
+        issue(BUSIEST + BUSIEST / 2);
+        {
+            INFO("no name made in the middle of the frame");
+            CHECK(mPool.getNameCount() == names);
+        }
+        endFrame();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A Statistics query counts every pipeline statistic at once, on targets of its own: the occlusion and primitives
     // queries of the frame begin while it counts.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a statistics query counts its statistics and holds no other target", "[alquerypool_gl]")
