@@ -762,6 +762,7 @@ void main()
             copy(root / "class3" / "deferred" / "reflectionProbeF.glsl", "deferred/reflectionProbeF.glsl");
             copy(root / "class1" / "deferred" / "deferredUtil.glsl", "deferred/deferredUtil.glsl");
             copy(root / "class1" / "deferred" / "globalF.glsl", "deferred/globalF.glsl");
+            copy(root / "class1" / "environment" / "srgbF.glsl", "environment/srgbF.glsl");
             for (const auto& entry : std::filesystem::directory_iterator(root / "class1" / "deferred"))
             {
                 const std::string name = entry.path().filename().string();
@@ -786,10 +787,11 @@ void main()
             program.mShaderFiles.push_back(std::make_pair(main, GL_FRAGMENT_SHADER));
             program.mShaderFiles.push_back(std::make_pair("test/probeTestInputsF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderFiles.push_back(std::make_pair("deferred/reflectionProbeF.glsl", GL_FRAGMENT_SHADER));
-            // deferredUtil.glsl calls what globalF.glsl defines, and Mesa links no program with a call left unresolved,
-            // made or not.
+            // deferredUtil.glsl calls what globalF.glsl and, under the classic sky, srgbF.glsl define, and Mesa links
+            // no program with a call left unresolved, made or not.
             program.mShaderFiles.push_back(std::make_pair("deferred/deferredUtil.glsl", GL_FRAGMENT_SHADER));
             program.mShaderFiles.push_back(std::make_pair("deferred/globalF.glsl", GL_FRAGMENT_SHADER));
+            program.mShaderFiles.push_back(std::make_pair("environment/srgbF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
             program.addPermutation("REFMAP_LEVEL", std::to_string(level));
             program.addPermutation("REF_SAMPLE_COUNT", std::to_string(count));
