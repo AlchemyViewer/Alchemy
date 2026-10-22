@@ -100,19 +100,14 @@ typedef enum e_image_codec
 class LLImage
 {
 public:
-    static void initClass(bool use_new_byte_range = false, S32 minimal_reverse_byte_range_percent = 75);
+    static void initClass();
     static void cleanupClass();
 
     static const std::string& getLastThreadError();
     static void setLastError(const std::string& message);
 
-    static bool useNewByteRange() { return sUseNewByteRange; }
-    static S32  getReverseByteRangePercent() { return sMinimalReverseByteRangePercent; }
-
 protected:
     static thread_local std::string sLastThreadErrorMessage;
-    static bool sUseNewByteRange;
-    static S32  sMinimalReverseByteRangePercent;
 };
 
 //============================================================================
@@ -474,6 +469,9 @@ public:
 
 protected:
     bool copyData(U8 *data, S32 size); // calls updateData()
+
+    // Called with the data lock held once setData or appendData has changed the data.
+    virtual void onDataChanged() {}
 
 protected:
     S8 mCodec;

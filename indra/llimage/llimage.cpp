@@ -588,14 +588,10 @@ static void bilinear_scale(const U8 *src, U32 srcW, U32 srcH, U32 srcCh, U32 src
 
 //static
 thread_local std::string LLImage::sLastThreadErrorMessage;
-bool LLImage::sUseNewByteRange = false;
-S32  LLImage::sMinimalReverseByteRangePercent = 75;
 
 //static
-void LLImage::initClass(bool use_new_byte_range, S32 minimal_reverse_byte_range_percent)
+void LLImage::initClass()
 {
-    sUseNewByteRange = use_new_byte_range;
-    sMinimalReverseByteRangePercent = minimal_reverse_byte_range_percent;
 }
 
 //static
@@ -2503,6 +2499,7 @@ void LLImageFormatted::setData(U8 *data, S32 size)
         setDataAndSize(data, size); // Access private LLImageBase members
 
         sGlobalFormattedMemory += getDataSize();
+        onDataChanged();
     }
 }
 
@@ -2523,6 +2520,7 @@ void LLImageFormatted::appendData(U8 *data, S32 size)
             reallocateData(newsize);
             memcpy(getData() + cursize, data, size);
             ll_aligned_free_16(data);
+            onDataChanged();
         }
     }
 }

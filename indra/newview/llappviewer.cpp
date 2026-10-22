@@ -2333,7 +2333,7 @@ bool LLAppViewer::initThreads()
 
     static const bool enable_threads = true;
 
-    LLImage::initClass(gSavedSettings.getBOOL("TextureNewByteRange"),gSavedSettings.getS32("TextureReverseByteRange"));
+    LLImage::initClass();
 
     LLLFSThread::initClass(enable_threads && true); // TODO: fix crashes associated with this shutdo
 

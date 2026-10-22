@@ -5,6 +5,7 @@ add_library(llimage STATIC)
 target_sources(
   llimage
   PRIVATE
+    alj2clayout.cpp
     llimagebmp.cpp
     llimage.cpp
     llimagedimensionsinfo.cpp
@@ -25,6 +26,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alj2clayout.h
         llimage.h
         llimagebmp.h
         llimagedimensionsinfo.h
@@ -67,6 +69,12 @@ if(AL_BUILD_TESTS)
     LIBRARIES llmath llcommon
   )
 
-  # The locks images are read and written under, over the library itself.
-  al_add_test_binary(llimage_tests PROJECT llimage SOURCES tests/llimage_test.cpp LIBRARIES llimage)
+  # The library itself: the locks images are read and written under, and the
+  # J2C codestream layout and the byte targets it gives.
+  al_add_test_binary(
+    llimage_tests
+    PROJECT llimage
+    SOURCES tests/llimage_test.cpp tests/alj2clayout_test.cpp
+    LIBRARIES llimage ll::openjpeg
+  )
 endif()

@@ -2555,10 +2555,6 @@
   <string>Se TRUE, sempre carregar texturas em resolução total (discard = 0).</string>
   <key>TextureLoggingThreshold</key>
   <string>Especifica o limiar em bytes a partir do qual os dados de download de textura devem ser enviados ao sim.</string>
-  <key>TextureNewByteRange</key>
-  <string>Usar o novo cálculo de faixa de bytes mais preciso para os níveis de descarte j2c.</string>
-  <key>TextureReverseByteRange</key>
-  <string>Percentual mínimo da faixa de bytes ótima permitido para renderizar um dado nível de descarte.</string>
   <key>TextureSaveLocation</key>
   <string>Localização atual para salvar texturas em massa no disco.</string>
   <key>TextureScaleMaxAreaFactor</key>
