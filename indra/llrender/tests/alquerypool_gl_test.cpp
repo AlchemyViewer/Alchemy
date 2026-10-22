@@ -869,10 +869,11 @@ namespace
             }
         };
         issue(BUSIEST);
-        // Every batch opened again since, each at a frame's end.
+        // Every batch opened again since, each given room at a frame's end, after its fences, as LLRender does.
         for (U32 frame = 0; frame <= ALQueryPool::FRAMES; ++frame)
         {
             endFrame();
+            mPool.makeRoom();
             glFinish();
         }
         const U32 names = mPool.getNameCount();
@@ -882,6 +883,38 @@ namespace
             CHECK(mPool.getNameCount() == names);
         }
         endFrame();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Once the busiest frame is long past, a batch lets go of the names past twice the room the frames of late need.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch lets go of names once its busiest frame is long past", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 BUSIEST = 2000;
+        for (U32 i = 0; i < BUSIEST; ++i)
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            REQUIRE(scope.ticket().isValid());
+        }
+        endFrame();
+        mPool.makeRoom();
+        glFinish();
+        const U32 busy = mPool.getNameCount();
+        REQUIRE(busy >= BUSIEST);
+        // Quiet frames, long enough for that peak to fade away.
+        for (U32 frame = 0; frame < 1000; ++frame)
+        {
+            endFrame();
+            mPool.makeRoom();
+            if (frame % ALQueryPool::FRAMES == 0)
+            {
+                glFinish();
+            }
+        }
+        {
+            INFO("held " << busy << " names when busy, " << mPool.getNameCount() << " now");
+            CHECK(mPool.getNameCount() * 4 < busy);
+        }
         CHECK(glGetError() == GL_NO_ERROR);
     }
 

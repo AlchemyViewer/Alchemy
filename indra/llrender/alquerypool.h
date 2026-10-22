@@ -97,11 +97,11 @@ private:
 /// closes the batch, and retire() reads every result of a batch at once when the frame fences show its frame finished
 /// (ALFrameFences), so that reading a result never waits on the GPU, never polls one query and lays no fence of its own.
 /// FRAMES batches of names are in flight, and a batch's names are begun again only once it has been read, so none is
-/// begun while its last result is pending. A batch opens with names for the busiest frame so far and half again, made
-/// at the frame's end, so that a frame makes names only when it climbs past that. The results are kept apart from the
-/// names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames, as the object
-/// cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a ticket has
-/// expired.
+/// begun while its last result is pending. A batch opens with names for the busiest frame of late and half again, made
+/// at the frame's end (makeRoom()), so that a frame makes names only when it climbs past that. The results are kept
+/// apart from the names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames,
+/// as the object cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a
+/// ticket has expired.
 ///
 /// Where the session has the GPU write the results (gGLManager.mWritesQueryResults: query buffers, on NVIDIA's driver),
 /// endFrame() has it write the batch's results into a mapped buffer of the batch's own, ahead of the frame's fence, and
@@ -187,6 +187,11 @@ public:
     /// LLRender::endFrame() runs it straight after the frame fences end the frame, so the next frame's cull finds the
     /// results, and where they are asked of GL nothing is left for a threaded driver's thread to catch up on.
     void retire();
+
+    /// Gives the batch the frame just opened names for the busiest frame of late and half again, and lets go of
+    /// names past twice that. LLRender::endFrame() runs it after the frame fences end the frame, where glGenQueries,
+    /// which returns names, finds a threaded driver's thread caught up.
+    void makeRoom();
 
     /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only
     /// when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame(), before the frame fences end it.
@@ -275,7 +280,7 @@ private:
     bool          mWriteFailed = false;
     U32           mStalls = 0;
     U32           mAskedReads = 0;
-    U32           mPeak[KINDS] = {}; // the most slots of each kind one frame has used
+    U32           mPeak[KINDS] = {}; // the most slots of each kind a frame has used of late (makeRoom())
 };
 
 /// begin() for the scope, end() as it goes. ticket() is what began: no query where the pool refused.

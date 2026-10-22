@@ -55,6 +55,9 @@ namespace
     // Slots are made this many at a time.
     constexpr U32 SLOTS_AT_ONCE = 32;
 
+    // A kind's busiest frame fades by 1/PEAK_FADE a frame, so a batch's names follow what frames have used of late.
+    constexpr U32 PEAK_FADE = 256;
+
     // The query buffer writes name their buffer where the context has direct state access. Through the binding they
     // pass a pointer, which Mesa's glthread cannot queue: it runs each such call only once it has caught up.
     bool writes_named()
@@ -327,6 +330,33 @@ void ALQueryPool::makeSlots(Batch& batch, U32 kind, U32 slots)
     }
     names.resize(want);
     glGenQueries(GLsizei(want - had), names.data() + had);
+}
+
+void ALQueryPool::makeRoom()
+{
+    Batch& open = batch(mSerial);
+    for (U32 k = 0; k < KINDS; ++k)
+    {
+        if (open.mUsed[k] != 0)
+        {
+            continue;
+        }
+        const U32 room = mPeak[k] + mPeak[k] / 2;
+        if (room > 0)
+        {
+            makeSlots(open, k, room);
+        }
+        // Names past twice the room go, as frames have needed none of them for a while. The batch was read before it
+        // opened, so none of them is in flight.
+        const U32 slots = std::max(2 * room, SLOTS_AT_ONCE);
+        const size_t keep = size_t((slots + SLOTS_AT_ONCE - 1) / SLOTS_AT_ONCE * SLOTS_AT_ONCE) * namesPer(k);
+        std::vector<U32>& names = open.mNames[k];
+        if (names.size() > keep)
+        {
+            glDeleteQueries(GLsizei(names.size() - keep), names.data() + keep);
+            names.resize(keep);
+        }
+    }
 }
 
 const ALQueryPool::Batch* ALQueryPool::find(const ALQueryTicket& ticket) const
@@ -661,7 +691,10 @@ void ALQueryPool::endFrame()
     for (U32 k = 0; k < KINDS; ++k)
     {
         used += closing.mUsed[k];
-        mPeak[k] = std::max(mPeak[k], closing.mUsed[k]);
+        // The busiest frame of late: a peak fades by 1/PEAK_FADE a frame, and by one at the least, unless a frame meets
+        // it.
+        const U32 fade = std::max(1u, mPeak[k] / PEAK_FADE);
+        mPeak[k] = std::max(closing.mUsed[k], mPeak[k] > fade ? mPeak[k] - fade : 0u);
     }
     if (used > 0)
     {
@@ -695,13 +728,6 @@ void ALQueryPool::endFrame()
     for (U32 k = 0; k < KINDS; ++k)
     {
         reused.mUsed[k] = 0;
-        // Room for the busiest frame so far and half again, made here at the frame's end rather than by a query in the
-        // middle of the next frame: glGenQueries returns names, and a threaded driver answers it only once its own
-        // thread has caught up.
-        if (mPeak[k] > 0)
-        {
-            makeSlots(reused, k, mPeak[k] + mPeak[k] / 2);
-        }
     }
 
     LL_PROFILE_PLOT("GL queries", (int64_t)used);
@@ -770,8 +796,9 @@ void ALQueryPool::release()
         mOpen[t]     = {};
         mReserved[t] = false;
     }
-    // The next context may map what this one could not.
+    // The next context may map what this one could not, and needs no names for this one's busiest frame.
     mWriteFailed = false;
+    std::fill(std::begin(mPeak), std::end(mPeak), 0u);
     // Tickets taken before stay expired.
     ++mSerial;
     mFirstSerial = mSerial;
