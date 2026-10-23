@@ -130,8 +130,8 @@ namespace
     {
         ++item.mDrawn;
         CHECK(LLRenderTarget::getCurrentBoundTarget() == &target);
-        glViewport(0, 0, item.mWidth, item.mHeight);
-        glClear(GL_DEPTH_BUFFER_BIT);
+        gGL.setViewport(0, 0, item.mWidth, item.mHeight);
+        gGL.clear(GL_DEPTH_BUFFER_BIT);
         draw(target);
         REQUIRE(item.mImage->setSubImageFromFrameBuffer(0, 0, 0, 0, item.mWidth, item.mHeight));
     }

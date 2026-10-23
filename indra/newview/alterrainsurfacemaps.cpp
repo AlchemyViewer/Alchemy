@@ -44,11 +44,13 @@ ALTerrainSurfaceMaps::~ALTerrainSurfaceMaps() = default;
 void ALTerrainSurfaceMaps::markDirty()
 {
     mDirtyWhole = true;
+    ++mVersion;
 }
 
 void ALTerrainSurfaceMaps::markDirty(const Rect& rect)
 {
     mDirtyRect = merge(mDirtyRect, intersect(rect, wholeMap(mSurface.getGridsPerEdge())));
+    ++mVersion;
 }
 
 void ALTerrainSurfaceMaps::ensureUploaded()

@@ -34,8 +34,6 @@ bool isFarDepth(float d);             // deferredUtil.glsl -- depth-convention a
 
 vec4 getWaterFogView(vec3 pos);
 
-uniform int above_water;
-
 // Void water has no floor. The sky behind it keeps the cleared far depth, which an infinite projection
 // reconstructs a thousand km out and a finite one at its far plane, wherever that falls relative to the surface;
 // it is fogged instead as water this deep past where the ray enters, at any distance.
@@ -45,28 +43,8 @@ uniform vec4 waterPlane;
 void main()
 {
     vec2  tc           = vary_fragcoord.xy/vary_fragcoord.w*0.5+0.5;
+    // From above, the hardware depth test (LLPipeline::doWaterHaze) keeps the field off what lies in front of it.
     float depth        = getDepth(tc.xy);
-    if (above_water > 0)
-    {
-        // we want to depth test when the camera is above water, but some GPUs have a hard time
-        // with depth testing against render targets that are bound for sampling in the same shader
-        // so we do it manually here
-
-        // The matching hardware LLGLDepthTest in pipeline.cpp auto-translates its func under
-        // reverse-Z; keep this in sync. Under reverse-Z clip.z/clip.w is already the [0,1]
-        // ndc z (no *0.5+0.5), and "fragment behind stored geometry" is the smaller depth.
-#ifdef REVERSE_Z
-        float cur_depth = vary_fragcoord.z/vary_fragcoord.w;
-        if (cur_depth < depth)
-#else
-        float cur_depth = vary_fragcoord.z/vary_fragcoord.w*0.5+0.5;
-        if (cur_depth > depth)
-#endif
-        {
-            discard;
-        }
-
-    }
 
     vec4  pos          = getPositionWithDepth(tc, depth);
 

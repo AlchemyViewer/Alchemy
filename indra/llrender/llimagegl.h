@@ -78,9 +78,18 @@ public:
     static void updateClass();
 
     // Main thread: publish every off-thread upload whose fence has signalled (syncTexName,
-    // then its afterPublish callbacks). Returns how many are still waiting on the GPU.
-    // updateClass does this; a loop waiting on texture creation can call it too.
-    static U32 publishUploads();
+    // then its afterPublish callbacks). Returns how many are still waiting on the GPU. With
+    // `poll` it polls the fences no frame's end has seen signalled; without, it asks GL
+    // nothing and publishes what pollUploads saw. updateClass publishes without polling; a
+    // loop waiting on texture creation polls.
+    static U32 publishUploads(bool poll = true);
+
+    // Main thread, at the frame's end (LLRender::endFrame): poll the fences of the uploads
+    // handed over, oldest first, for updateClass to publish the signalled ones. A poll is a
+    // call that returns a value, which a threaded driver answers only once its own thread has
+    // caught up: in the middle of a frame that is most of the frame, where at its end the
+    // frame fences' calls have just caught it up.
+    static void pollUploads();
 
     // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
     // second at most in all, and publish them, since nothing will poll again. What has not
@@ -308,6 +317,9 @@ public:
 
     bool getHasGLTexture() const { return mTexName != 0; }
     LLGLuint getTexName() const { return mTexName; }
+    // What the texture holds, as a value no texture has held before: taken again by every upload into it, in place or
+    // not. A pass that keeps what it drew tells by it whether the pixels it sampled are as they were.
+    U64 getContentStamp() const { return mContentStamp.load(std::memory_order_relaxed); }
 
     bool getIsAlphaMask() const;
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
@@ -497,6 +509,9 @@ private:
 
     // Written by the upload on LLImageGLThread and by the main thread that asks for the texture.
     std::atomic<bool> mGLTextureCreated;
+    // getContentStamp, taken again by touchContents.
+    std::atomic<U64> mContentStamp{ 0 };
+    void touchContents();
     LLGLuint mTexName;
     // Whether mTexName has had its storage allocated yet. Storage is always immutable
     // (glTexStorage2D), so it can be allocated exactly once: every upload afterwards is a

@@ -36,23 +36,25 @@ uniform vec3 sun_dir;
 
 vec4 getNorm(vec2 pos_screen);
 vec4 getPosition(vec2 pos_screen);
+vec3 getGeoNorm(vec2 pos_screen);
 
 // The sun pass's entry points (shadowUtil.glsl): they skip the filter where no reader of the
-// light map uses it.
-float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen);
-float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen);
+// light map uses it, and take the receiver's slope only along the surface geo_norm faces.
+float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen);
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, vec3 geo_norm, int index, vec2 pos_screen);
 
 void main()
 {
     vec2 pos_screen = vary_fragcoord.xy;
     vec4 pos        = getPosition(pos_screen);
     vec4 norm       = getNorm(pos_screen);
+    vec3 geo_norm   = getGeoNorm(pos_screen);
 
     vec4 col;
-    col.r = sampleDirectionalShadowFacing(pos.xyz, norm.xyz, pos_screen);
+    col.r = sampleDirectionalShadowFacing(pos.xyz, norm.xyz, geo_norm, pos_screen);
     col.g = 1.0f;
-    col.b = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, 0, pos_screen);
-    col.a = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, 1, pos_screen);
+    col.b = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, geo_norm, 0, pos_screen);
+    col.a = sampleSpotShadowInFrustum(pos.xyz, norm.xyz, geo_norm, 1, pos_screen);
 
     frag_color = clamp(col, vec4(0), vec4(1));
 }

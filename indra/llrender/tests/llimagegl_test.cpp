@@ -182,6 +182,37 @@ namespace
         CHECK((S32)bound_after == (S32)img->getTexName());
     }
 
+    // A pass that keeps what it drew compares stamps to tell whether the pixels it sampled are as they were: every
+    // upload moves the stamp, an upload in place under the same name among them, and a bind does not.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the content stamp moves with every upload and holds through binds", "[LLImageGL]")
+    {
+        LLPointer<LLImageRaw> raw   = makeRaw(16, 16, 4, /*fill=*/0x80);
+        LLPointer<LLImageGL>  img   = new LLImageGL(/*usemipmaps=*/false);
+        LLPointer<LLImageGL>  other = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, raw.get()));
+        REQUIRE(other->createGLTexture(0, raw.get()));
+        CHECK(img->getContentStamp() != 0);
+        CHECK(img->getContentStamp() != other->getContentStamp());
+
+        U64 stamp = img->getContentStamp();
+        gGL.getTextureSlot(0)->bind(img.get());
+        gGL.getTextureSlot(0)->unbind();
+        CHECK(img->getContentStamp() == stamp);
+
+        // The same level at the same size: written in place, under the name it had.
+        const LLGLuint        name  = img->getTexName();
+        LLPointer<LLImageRaw> again = makeRaw(16, 16, 4, /*fill=*/0x20);
+        REQUIRE(img->createGLTexture(0, again.get()));
+        CHECK(img->getTexName() == name);
+        CHECK(img->getContentStamp() != stamp);
+        stamp = img->getContentStamp();
+
+        LLPointer<LLImageRaw> patch = makeRaw(16, 16, 4, /*fill=*/0xFF);
+        REQUIRE(img->setSubImage(patch.get(), /*x_pos=*/4, /*y_pos=*/4, /*width=*/8, /*height=*/8,
+                                 /*force_fast_update=*/true, 0, true));
+        CHECK(img->getContentStamp() != stamp);
+    }
+
     // Regression for 444c29b161 — setExplicitFormat used to leave
     // mFormatPrimary holding deprecated names (GL_LUMINANCE_ALPHA,
     // GL_LUMINANCE, GL_ALPHA) which then leaked into setSubImage /
@@ -982,6 +1013,67 @@ namespace
         CHECK(img->getWidth() == 32);
         UNSCOPED_INFO("holding the upload's pixels");
         CHECK(readTexelRGBA(img, 5, 5) == 0x55555555u);
+    }
+
+    // The frame's idle publishes only the uploads a frame's end has seen signalled: their
+    // fences are polled at the end of the frame (LLRender::endFrame), never in the middle of
+    // one, where a threaded driver answers a poll only once its own thread has caught up.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload's fence is polled at the frame's end, and published in idle", "[LLImageGL]")
+    {
+        LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        LLImageGLThread::createInstance(gl->window());
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
+
+        img->beginUpload();
+        LLImageGLThread::instance().post(
+            [img, raw, &worker_done]()
+            {
+                img->createGLTexture(0, raw.get());
+                worker_done = true;
+            });
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!worker_done && std::chrono::steady_clock::now() < deadline)
+        {
+            mainloop.runPending();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        mainloop.runPending();
+        REQUIRE(worker_done.load());
+
+        bool completed = false;
+        img->afterPublish([&]() { completed = true; });
+
+        // Long enough for the GPU to have finished the upload: idle alone still publishes nothing.
+        const auto idle_until = std::chrono::steady_clock::now() + std::chrono::milliseconds(100);
+        while (std::chrono::steady_clock::now() < idle_until)
+        {
+            LLImageGL::updateClass();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        UNSCOPED_INFO("idle polls no fence, so nothing is published without a frame's end");
+        CHECK_FALSE(completed);
+
+        while (!completed && std::chrono::steady_clock::now() < deadline)
+        {
+            gGL.endFrame();
+            LLImageGL::updateClass();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        LLImageGLThread::deleteSingleton();
+
+        UNSCOPED_INFO("published by idle once a frame's end saw its fence signalled");
+        CHECK(completed);
+        UNSCOPED_INFO("at the new size");
+        CHECK(img->getWidth() == 32);
     }
 
     // And the rest of what LLRender's setters cache. A polygon offset or patch

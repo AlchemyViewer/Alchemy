@@ -3,10 +3,10 @@
 # Render infrastructure over llrender that holds no viewer state: what the
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
-# the depth pyramid, the light map's blur, the depth under the HUD and
-# snapshot cutouts; and the pool that lends the frame's short-lived render
-# targets by description. Whatever reads settings or the scene hands these
-# their inputs as values.
+# the depth pyramid, the light map's blur, the depth under the HUD,
+# snapshot cutouts and whether a spot light's shadow map is drawn again; and
+# the pool that lends the frame's short-lived render targets by description.
+# Whatever reads settings or the scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
@@ -18,6 +18,7 @@ set(
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
+  alspotshadowcache.cpp
   altransienttargetpool.cpp
   altransienttargets.cpp
   alwaterfield.cpp
@@ -29,6 +30,7 @@ set(
   alcutoutimage.h
   aldepthpyramid.h
   alfarplane.h
+  alframeend.h
   alhexlattice.h
   alhuddepth.h
   allightmapblur.h
@@ -37,6 +39,7 @@ set(
   alrenderresourceinputs.h
   alrenderresourceplan.h
   alshaderinputs.h
+  alspotshadowcache.h
   altransienttargetpool.h
   altransienttargets.h
   alwaterfield.h
@@ -66,16 +69,19 @@ if(AL_BUILD_TESTS)
   # The suites that need no GL: the render resources' plan and the changes
   # that ask for it again, the transient target pool's policy, what the programs are built from, the far plane
   # and the constants its shaders share, the water's field and the wave
-  # heights a normal map's slopes integrate to, and snapshot cutouts.
+  # heights a normal map's slopes integrate to, snapshot cutouts, the spot
+  # shadows' cache, and how a display pass ends its frame.
   al_add_test_binary(
     alrender_tests
     PROJECT alrender
     SOURCES
       tests/alcutoutimage_test.cpp
       tests/alfarplane_test.cpp
+      tests/alframeend_test.cpp
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp
+      tests/alspotshadowcache_test.cpp
       tests/altransienttargetpool_test.cpp
       tests/alwaterfield_test.cpp
       tests/alwaterheightbake_test.cpp
@@ -87,8 +93,10 @@ if(AL_BUILD_TESTS)
   # The window's depth under the HUD, the water surface's draws over the
   # cells the field lays out, with the cull and the depth pyramid it reads
   # and the waves displaced by heights the bake integrates from a normal map,
+  # a spot shadow draw's geometry from a real vertex buffer,
   # the light map's blur by one dispatch against its two fragment passes,
-  # FXAA on an RGB10_A2 source, the transient target pool's GL objects,
+  # FXAA on an RGB10_A2 source, the reflection probes' taps in one pass over
+  # them against their list, the transient target pool's GL objects,
   # shared depth and poison, and the previews' and bakes' targets taken from
   # it only when one draws, on llrender's shared hidden window.
   al_add_test_binary(
@@ -98,10 +106,16 @@ if(AL_BUILD_TESTS)
       tests/alhuddepth_gl_test.cpp
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp
+      tests/alspotshadowcache_gl_test.cpp
       tests/altransienttargetpool_gl_test.cpp
       tests/alwatersurface_gl_test.cpp
       tests/fxaa_gl_test.cpp
-    BENCH_SOURCES tests/alcompute_gl_bench.cpp tests/alondemandtarget_bench.cpp tests/alwatertargets_bench.cpp
+      tests/reflectionprobe_gl_test.cpp
+    BENCH_SOURCES
+      tests/alcompute_gl_bench.cpp
+      tests/alondemandtarget_bench.cpp
+      tests/alwatertargets_bench.cpp
+      tests/reflectionprobe_gl_bench.cpp
     LIBRARIES alrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${alrender_shader_dir}

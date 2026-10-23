@@ -55,8 +55,8 @@ namespace
     // Slots are made this many at a time.
     constexpr U32 SLOTS_AT_ONCE = 32;
 
-    // How long endFrame() waits on one try for a batch the GPU has not finished.
-    constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
+    // A kind's busiest frame fades by 1/PEAK_FADE a frame, so a batch's names follow what frames have used of late.
+    constexpr U32 PEAK_FADE = 256;
 
     // The query buffer writes name their buffer where the context has direct state access. Through the binding they
     // pass a pointer, which Mesa's glthread cannot queue: it runs each such call only once it has caught up.
@@ -305,19 +305,58 @@ ALQueryTicket ALQueryPool::take(U32 kind)
     Batch& open = batch(mSerial);
     // The first batch, and the first after release(), are opened by their first query.
     open.mSerial = mSerial;
-    std::vector<U32>& names = open.mNames[kind];
-    const U32 per = namesPer(kind);
-    if ((open.mUsed[kind] + 1) * per > names.size())
+    if ((open.mUsed[kind] + 1) * namesPer(kind) > open.mNames[kind].size())
     {
-        const size_t had = names.size();
-        names.resize(had + SLOTS_AT_ONCE * per);
-        glGenQueries(GLsizei(SLOTS_AT_ONCE * per), names.data() + had);
+        // Past the room the batch opened with (endFrame()): doubled, so that a frame climbing far past the busiest one
+        // before it makes names a few times, not every SLOTS_AT_ONCE queries.
+        makeSlots(open, kind, std::max(open.mUsed[kind] * 2, open.mUsed[kind] + SLOTS_AT_ONCE));
     }
     ALQueryTicket ticket;
     ticket.mSerial = mSerial;
     ticket.mSlot   = open.mUsed[kind]++;
     ticket.mKind   = kind;
     return ticket;
+}
+
+void ALQueryPool::makeSlots(Batch& batch, U32 kind, U32 slots)
+{
+    slots = (slots + SLOTS_AT_ONCE - 1) / SLOTS_AT_ONCE * SLOTS_AT_ONCE;
+    std::vector<U32>& names = batch.mNames[kind];
+    const size_t had = names.size();
+    const size_t want = size_t(slots) * namesPer(kind);
+    if (want <= had)
+    {
+        return;
+    }
+    names.resize(want);
+    glGenQueries(GLsizei(want - had), names.data() + had);
+}
+
+void ALQueryPool::makeRoom()
+{
+    Batch& open = batch(mSerial);
+    for (U32 k = 0; k < KINDS; ++k)
+    {
+        if (open.mUsed[k] != 0)
+        {
+            continue;
+        }
+        const U32 room = mPeak[k] + mPeak[k] / 2;
+        if (room > 0)
+        {
+            makeSlots(open, k, room);
+        }
+        // Names past twice the room go, as frames have needed none of them for a while. The batch was read before it
+        // opened, so none of them is in flight.
+        const U32 slots = std::max(2 * room, SLOTS_AT_ONCE);
+        const size_t keep = size_t((slots + SLOTS_AT_ONCE - 1) / SLOTS_AT_ONCE * SLOTS_AT_ONCE) * namesPer(k);
+        std::vector<U32>& names = open.mNames[k];
+        if (names.size() > keep)
+        {
+            glDeleteQueries(GLsizei(names.size() - keep), names.data() + keep);
+            names.resize(keep);
+        }
+    }
 }
 
 const ALQueryPool::Batch* ALQueryPool::find(const ALQueryTicket& ticket) const
@@ -513,7 +552,7 @@ bool ALQueryPool::isOpenIn(U32 serial) const
 void ALQueryPool::write(Batch& batch)
 {
     batch.mWritten = false;
-    if (!gGLManager.mHasQueryBufferObject || mWriteFailed)
+    if (!gGLManager.mWritesQueryResults || mWriteFailed)
     {
         return;
     }
@@ -652,6 +691,10 @@ void ALQueryPool::endFrame()
     for (U32 k = 0; k < KINDS; ++k)
     {
         used += closing.mUsed[k];
+        // The busiest frame of late: a peak fades by 1/PEAK_FADE a frame, and by one at the least, unless a frame meets
+        // it.
+        const U32 fade = std::max(1u, mPeak[k] / PEAK_FADE);
+        mPeak[k] = std::max(closing.mUsed[k], mPeak[k] > fade ? mPeak[k] - fade : 0u);
     }
     if (used > 0)
     {
@@ -670,16 +713,7 @@ void ALQueryPool::endFrame()
     bool stalled = false;
     if (reused.mSerial != 0 && reused.mClosed && !reused.mRead && !isOpenIn(reused.mSerial))
     {
-        for (;;)
-        {
-            bool waited = false;
-            const bool finished = mFrames.wait(reused.mFrame, WAIT_NANOSECONDS, &waited);
-            stalled = stalled || waited;
-            if (finished)
-            {
-                break;
-            }
-        }
+        mFrames.waitFinished(reused.mFrame, &stalled);
         if (stalled)
         {
             ++mStalls;
@@ -762,8 +796,9 @@ void ALQueryPool::release()
         mOpen[t]     = {};
         mReserved[t] = false;
     }
-    // The next context may map what this one could not.
+    // The next context may map what this one could not, and needs no names for this one's busiest frame.
     mWriteFailed = false;
+    std::fill(std::begin(mPeak), std::end(mPeak), 0u);
     // Tickets taken before stay expired.
     ++mSerial;
     mFirstSerial = mSerial;

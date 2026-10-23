@@ -221,18 +221,16 @@ public:
     {
         llassert(sOpen == 0);
         ++sOpen;
-        gGL.flush();
-        glStencilFunc(func, ref, read_mask);
-        glStencilOp(fail, depth_fail, pass);
-        glStencilMask(write_mask);
+        gGL.setStencilFunc(func, ref, read_mask);
+        gGL.setStencilOp(fail, depth_fail, pass);
+        gGL.setStencilMask(write_mask);
     }
 
     ~ALGLStencil()
     {
-        gGL.flush();
-        glStencilFunc(GL_ALWAYS, 0, ~0u);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
-        glStencilMask(~0u);
+        gGL.setStencilFunc(GL_ALWAYS, 0, ~0u);
+        gGL.setStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+        gGL.setStencilMask(~0u);
         --sOpen;
     }
 

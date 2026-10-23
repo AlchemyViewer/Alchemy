@@ -50,6 +50,7 @@
 #include "lldrawpoolwlsky.h"
 #include "llglslshader.h"
 #include "llglcommonfunc.h"
+#include "llimagegl.h"
 #include "llvoavatar.h"
 #include "llviewershadermgr.h"
 #include "llfetchedgltfmaterial.h"
@@ -242,6 +243,12 @@ void LLDrawPool::renderShadow(S32 pass)
 
 }
 
+//virtual
+void LLDrawPool::addShadowCasters(ALSpotShadowCache::Casters& casters)
+{
+    casters.markChanging();
+}
+
 //=============================
 // Face Pool Implementation
 //=============================
@@ -294,6 +301,15 @@ bool LLFacePool::removeFace(LLFace *facep)
 void LLFacePool::resetDrawOrders()
 {
     mDrawFace.resize(0);
+}
+
+// virtual
+void LLFacePool::addShadowCasters(ALSpotShadowCache::Casters& casters)
+{
+    if (!mDrawFace.empty())
+    {
+        casters.markChanging();
+    }
 }
 
 LLViewerTexture *LLFacePool::getTexture()
@@ -928,6 +944,32 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
     }
 
     return !skipLastSkin;
+}
+
+void add_shadow_texture(ALSpotShadowCache::Casters& casters, ALSpotShadowCache::Hash& draw, const LLViewerTexture* texture)
+{
+    draw.add(texture);
+    if (!texture)
+    {
+        return;
+    }
+
+    const S8 type = texture->getType();
+    if (type == LLViewerTexture::MEDIA_TEXTURE || type == LLViewerTexture::DYNAMIC_TEXTURE)
+    {
+        casters.markChanging();
+    }
+
+    const LLImageGL* image = texture->getGLTexture();
+    draw.add(image);
+    if (image)
+    {
+        draw.add((U64)image->getTexName())
+            .add(image->getContentStamp())
+            .add((U64)(U32)image->getDiscardLevel())
+            .add((U64)(U32)image->getCurrentWidth())
+            .add((U64)(U32)image->getCurrentHeight());
+    }
 }
 
 void setup_texture_matrix(LLDrawInfo& params)

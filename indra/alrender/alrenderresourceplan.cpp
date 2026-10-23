@@ -29,6 +29,7 @@
 #include "llglheaders.h"
 
 #include <algorithm>
+#include <limits>
 
 namespace
 {
@@ -153,12 +154,19 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         // and nothing reads its alpha (waterF.glsl and underWaterF.glsl take the colour alone), so under HDR it is
         // R11F_G11F_B10F, half the screen's bandwidth, and with no depth of its own or the scene's: bloom level 0's
         // description at full scale without halation, whose target the pool hands it, bloom's pass coming after the
-        // water's. Without HDR 8 bits, the post chain's description. Opaque water reads neither (beginWaterTargets).
-        if (shape.water && in.mTransparentWater)
+        // water's. Without HDR 8 bits, the post chain's description. Water that does not refract reads neither.
+        const bool refracts = shape.water && refractsWater(pack, in.mTransparentWater);
+        if (refracts)
         {
             plan.at(inPack(pack, Slot::Water)).mDesc = ALRenderTargetDesc{
                 .width = shape.width, .height = shape.height, .color = { hdr ? (U32)GL_R11F_G11F_B10F : screen_format }
             };
+        }
+        // The depth copy serves the haze passes too where the context has no texture barrier, whether the water
+        // refracts or not: each copies the scene's depth before it reads it (LLPipeline::hazeDepth), the draws before it
+        // in its binding having written the scene's own.
+        if (refracts || (shape.water && !in.mTextureBarrier))
+        {
             plan.at(inPack(pack, Slot::DepthCopy)).mDesc =
                 ALRenderTargetDesc{ .width = shape.width, .height = shape.height, .depth = main_depth };
         }
@@ -221,8 +229,9 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // asks (generateSunShadow), and has maps for those alone. Its post targets and bloom are the GLTF material preview's,
     // which the probes' captures never read, so they are there only while a preview is alive. The pack is there while
     // probes are on or a preview is alive, and the manager's own resources while probes are. Its sun shadows, light
-    // map and water copies are the captures' alone: a preview draws without the sun's shadows and draws no water
-    // (LLGLTFPreviewTexture::render).
+    // map and depth copy are the captures' alone: a preview draws without the sun's shadows and draws no water
+    // (LLGLTFPreviewTexture::render). A capture's water does not refract (refractsWater), so the copy is the haze's,
+    // without a texture barrier, and the pack has no copy of the screen.
     if (in.mProbes || in.mMaterialPreview)
     {
         const U32 probe_size     = in.mProbeResolution * in.mProbeSuperSample;
@@ -250,11 +259,14 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
         plan.mHeroProbes = ProbeManager{ .mResolution = hero_size, .mSuperSample = 1, .mHDR = hdr };
     }
 
-    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale, and a texel at
-    // the least: a scale near 0 takes the shadows' detail, not the maps.
+    // The spot lights' shadows are the main view's alone, square at its width times the shadow scale, no larger than
+    // their largest edge, and a texel at the least: a scale near 0 takes the shadows' detail, not the maps. A map covers
+    // its light's frustum whatever the window's shape, so the edge bounds what a wide window or a snapshot costs them.
     if (in.mShadowDetail > 1)
     {
-        const U32 spot = std::max((U32)((F32)width * shadow_scale), 1u);
+        // Bounded before it is made a U32, which a scale past that range would overflow.
+        const U32 largest = in.mSpotShadowMaxResolution > 0 ? in.mSpotShadowMaxResolution : std::numeric_limits<U32>::max();
+        const U32 spot    = std::max((U32)std::min((F64)width * shadow_scale, (F64)largest), 1u);
         for (Id id : { Id::SpotShadow0, Id::SpotShadow1 })
         {
             plan.at(id).mDesc = ALRenderTargetDesc{ .width = spot, .height = spot, .depth = shadow_depth };
@@ -275,10 +287,11 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                    in.mSMAAStencil ? std::optional<Id>(Id::SMAAEdges) : std::nullopt };
     }
 
-    // Where the session computes, SSAO's blur writes the sun's shadow and the blurred occlusion here, which the soften
-    // pass reads in place of the light map (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's
-    // destination. The light map's 8 bits a channel, the format blurLightC.glsl stores.
-    if (in.mSSAO && in.mCompute)
+    // Where the session computes, and SSAO's kernel reaches no further than a dispatch holds, SSAO's blur writes the
+    // sun's shadow and the blurred occlusion here, which the soften pass reads in place of the light map
+    // (ALLightMapBlur): it takes no scratch, and no depth, as a dispatch's destination. The light map's 8 bits a
+    // channel, the format blurLightC.glsl stores.
+    if (in.mSSAO && in.mCompute && in.mSSAOBlurDispatched)
     {
         plan.at(Id::MainLightBlurred).mDesc = ALRenderTargetDesc{ .width = width, .height = height, .color = { GL_RG8 } };
     }

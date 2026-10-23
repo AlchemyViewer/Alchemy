@@ -7,10 +7,12 @@ set(
   algpubuffer.cpp
   algputimer.cpp
   alimageslot.cpp
+  alpacingslack.cpp
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
   altexture3d.cpp
+  altextureblit.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
   alfontface.cpp
@@ -47,11 +49,13 @@ set(
   algpubuffer.h
   algputimer.h
   alimageslot.h
+  alpacingslack.h
   alprimitiveplot.h
   alquerypool.h
   alrendertargetdesc.h
   alsamplerstate.h
   altexture3d.h
+  altextureblit.h
   altextureslot.h
   alfontcolrv1.h
   alfontface.h
@@ -161,6 +165,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alfontcolrv1_test.cpp
       tests/alfontshaping_test.cpp
+      tests/alpacingslack_test.cpp
       tests/alrendertargetdesc_test.cpp
       tests/llfontbitmapcache_test.cpp
       tests/llfontfreetype_test.cpp
@@ -207,7 +212,9 @@ if(AL_BUILD_TESTS)
   # - which fragment output reaches a render target's colour attachment,
   #   integer attachments cleared and drawn, targets kept, built again and
   #   re-pointed at a shared depth by their descriptions, and their labels;
-  # - LLRender's cached clear colour and scissor box, and LLGLSScissor;
+  # - LLRender's cached clear colour, scissor box, viewport and raster state,
+  #   LLGLSScissor and ALGLStencil, and a copy from one texture into another
+  #   (ALTextureBlit);
   # - LLGLSLShader's cache key, its uniform value cache, the compute path
   #   (programs built through the shader manager, their images, storage
   #   blocks and dispatches), integer textures through reserved samplers,
@@ -222,9 +229,9 @@ if(AL_BUILD_TESTS)
   #   ring's segments reused once the frame each was left in has finished;
   # - ALGPUTimer: one span timed at a time, as timestamps and as Elapsed
   #   queries;
-  # - ALFrameFences: one fence a frame, polled at the frame's end under
-  #   Mesa's glthread and where its user asks elsewhere, and waits that stall
-  #   only on frames the GPU has not finished;
+  # - ALFrameFences: one fence a frame, polled at the frame's end, waits that
+  #   stall only on frames the GPU has not finished, and the frame's end's
+  #   pacing wait for the frame a given number before it, and no later one;
   # - ALQueryPool: each kind's names kept to its target, a held target
   #   refused, results read once their frame has ended, spans, release and
   #   conditional draws;
@@ -248,6 +255,7 @@ if(AL_BUILD_TESTS)
       tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
       tests/altessellation_gl_test.cpp
+      tests/altextureblit_gl_test.cpp
       tests/aluniformbuffer_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp

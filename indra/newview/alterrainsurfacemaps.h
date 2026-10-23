@@ -76,6 +76,9 @@ public:
     void ensureUploaded();
     void bind(S32 height_slot, S32 composition_slot);
     S32  getSize() const { return mSize; }
+    // Moves whenever the maps are marked dirty. With the surface's hasZData, it says what the next bind holds: the
+    // upload a dirty map takes there carries what was marked.
+    U32  getVersion() const { return mVersion; }
 
     // Every grid coordinate a map holds: [-APRON, grids_per_edge + APRON).
     static Rect wholeMap(S32 grids_per_edge);
@@ -195,6 +198,7 @@ private:
     // upload always is, or the texels of mDirtyRect, none when it is empty.
     bool                 mDirtyWhole = true;
     Rect                 mDirtyRect;
+    U32                  mVersion = 0;
 };
 
 inline ALTerrainSurfaceMaps::Rect ALTerrainSurfaceMaps::wholeMap(S32 grids_per_edge)

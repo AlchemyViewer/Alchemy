@@ -95,15 +95,14 @@ namespace
             LLGLDisable    no_scissor(GL_SCISSOR_TEST);
             LLGLSColorMask colour_mask(true, true);
             LLGLDepthTest  depth_mask(GL_TRUE, GL_TRUE, GL_ALWAYS);
-            GLint          stencil_mask  = 0xff;
             GLint          clear_stencil = 0;
             GLfloat        clear_depth   = 1.f;
-            glGetIntegerv(GL_STENCIL_WRITEMASK, &stencil_mask);
             glGetIntegerv(GL_STENCIL_CLEAR_VALUE, &clear_stencil);
             glGetFloatv(GL_DEPTH_CLEAR_VALUE, &clear_depth);
             const LLColor4 clear_colour = gGL.getClearColor();
+            const U32      stencil_mask = gGL.getStencilMask();
 
-            glStencilMask(0xff);
+            gGL.setStencilMask(0xff);
             glClearDepth(Pool::POISON_DEPTH);
             glClearStencil(Pool::POISON_STENCIL);
             gGL.setClearColor(POISON_COLOUR);
@@ -114,7 +113,7 @@ namespace
             gGL.setClearColor(clear_colour);
             glClearStencil(clear_stencil);
             glClearDepth(clear_depth);
-            glStencilMask((GLuint)stencil_mask);
+            gGL.setStencilMask(stencil_mask);
         }
 
         void free(LLRenderTarget& target) override { target.release(); }

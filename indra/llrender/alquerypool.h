@@ -97,17 +97,20 @@ private:
 /// closes the batch, and retire() reads every result of a batch at once when the frame fences show its frame finished
 /// (ALFrameFences), so that reading a result never waits on the GPU, never polls one query and lays no fence of its own.
 /// FRAMES batches of names are in flight, and a batch's names are begun again only once it has been read, so none is
-/// begun while its last result is pending. The results are kept apart from the names, for RESULT_FRAMES frames after
-/// their own: a user that reads its queries only every few frames, as the object cache's cull does while the camera
-/// rests (LLVOCachePartition::cull), still finds them. Past that a ticket has expired.
+/// begun while its last result is pending. A batch opens with names for the busiest frame of late and half again, made
+/// at the frame's end (makeRoom()), so that a frame makes names only when it climbs past that. The results are kept
+/// apart from the names, for RESULT_FRAMES frames after their own: a user that reads its queries only every few frames,
+/// as the object cache's cull does while the camera rests (LLVOCachePartition::cull), still finds them. Past that a
+/// ticket has expired.
 ///
-/// Where the context has query buffers (gGLManager.mHasQueryBufferObject), endFrame() has the GPU write the batch's
-/// results into a mapped buffer of the batch's own, ahead of the frame's fence, and reading the batch copies them out
-/// of the map: no GL call. The writes are queued as any draw is where the context has direct state access; through the
-/// buffer binding they are calls Mesa's glthread runs only once it has caught up, each one. Asking GL for a result
-/// instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as NVIDIA's with threaded
-/// optimization, answers it only once its own thread has caught up on every command issued before it, which at the end
-/// of a frame is the whole frame.
+/// Where the session has the GPU write the results (gGLManager.mWritesQueryResults: query buffers, on NVIDIA's driver),
+/// endFrame() has it write the batch's results into a mapped buffer of the batch's own, ahead of the frame's fence, and
+/// reading the batch copies them out of the map: no GL call. The writes are queued as any draw is where the context has
+/// direct state access; through the buffer binding they are calls Mesa's glthread runs only once it has caught up, each
+/// one. Asking GL for a result instead (glGetQueryObject) waits on more than the GPU: a threaded driver, such as
+/// NVIDIA's with threaded optimization or Mesa's glthread, answers it only once its own thread has caught up on every
+/// command issued before it. Elsewhere the batch's results are asked of GL, by retire() at the frame's end, where the
+/// frame fences' own calls have just caught such a thread up.
 ///
 /// One query may be open per exclusive target: GL counts SAMPLES_PASSED and the two ANY_SAMPLES_PASSED targets as one,
 /// and the pipeline statistics are kept as one, as the explicit APIs keep them. begin() refuses a query whose target is
@@ -180,9 +183,15 @@ public:
     /// the elapsed query of a span, which is GL's alone, may cross. Checked where asserts are.
     void checkPassBoundary() const;
 
-    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first: no GL call, the fences
-    /// being polled only at the frame's end. Once a frame, before the results are wanted.
+    /// Reads every closed batch whose frame the frame fences have shown finished, oldest first, polling no fence.
+    /// LLRender::endFrame() runs it straight after the frame fences end the frame, so the next frame's cull finds the
+    /// results, and where they are asked of GL nothing is left for a threaded driver's thread to catch up on.
     void retire();
+
+    /// Gives the batch the frame just opened names for the busiest frame of late and half again, and lets go of
+    /// names past twice that. LLRender::endFrame() runs it after the frame fences end the frame, where glGenQueries,
+    /// which returns names, finds a threaded driver's thread caught up.
+    void makeRoom();
 
     /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only
     /// when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame(), before the frame fences end it.
@@ -245,6 +254,8 @@ private:
 
     bool          isFree(U32 kind) const;
     ALQueryTicket take(U32 kind);
+    // Gives the batch names for at least `slots` slots of `kind`, in whole SLOTS_AT_ONCE.
+    void          makeSlots(Batch& batch, U32 kind, U32 slots);
     ALQueryTicket open(U32 kind);
     ALQueryTicket timestamp();
     // The results of `count` names from the ticket's first, read now or found kept.
@@ -269,6 +280,7 @@ private:
     bool          mWriteFailed = false;
     U32           mStalls = 0;
     U32           mAskedReads = 0;
+    U32           mPeak[KINDS] = {}; // the most slots of each kind a frame has used of late (makeRoom())
 };
 
 /// begin() for the scope, end() as it goes. ticket() is what began: no query where the pool refused.

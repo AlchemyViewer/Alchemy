@@ -2075,8 +2075,6 @@
   <string>Fração da distância de desenho a partir da qual não usar shader em partículas.</string>
   <key>RenderShadowBias</key>
   <string>Valor de viés para sombras (previne shadow acne).</string>
-  <key>RenderShadowBiasError</key>
-  <string>Escala de erro para o viés de sombra (com base na altitude).</string>
   <key>RenderShadowBlurDistFactor</key>
   <string>Escalar de distância para o desfoque de sombra.</string>
   <key>RenderShadowBlurSamples</key>
@@ -2095,16 +2093,12 @@
   <string>Magnitude do ruído nas amostras de sombra.</string>
   <key>RenderShadowOffset</key>
   <string>Valor de deslocamento para sombras (previne shadow acne).</string>
-  <key>RenderShadowOffsetError</key>
-  <string>Escala de erro para o deslocamento de sombra (com base na altitude).</string>
   <key>RenderShadowProjExponent</key>
   <string>Expoente aplicado à transição entre projeções de sombra ortográfica e em perspectiva com base no ângulo de visão e no vetor de luz.</string>
   <key>RenderShadowProjOffset</key>
   <string>Quanto escalar a distância até a origem virtual da projeção em perspectiva da sombra.</string>
   <key>RenderShadowResolutionScale</key>
   <string>Escala da resolução do mapa de sombra vs. resolução da tela (apenas valores positivos são permitidos).</string>
-  <key>RenderShadowSlopeThreshold</key>
-  <string>Valor de inclinação de corte para pontos que afetam a geração de sombra em perspectiva.</string>
   <key>RenderShadowSplitExponent</key>
   <string>Distâncias de divisão do plano de near clip para os frusta do mapa de sombra (x=perspectiva, y=ortográfica, z=taxa de transição).</string>
   <key>RenderShadowSplits</key>
@@ -2555,10 +2549,6 @@
   <string>Se TRUE, sempre carregar texturas em resolução total (discard = 0).</string>
   <key>TextureLoggingThreshold</key>
   <string>Especifica o limiar em bytes a partir do qual os dados de download de textura devem ser enviados ao sim.</string>
-  <key>TextureNewByteRange</key>
-  <string>Usar o novo cálculo de faixa de bytes mais preciso para os níveis de descarte j2c.</string>
-  <key>TextureReverseByteRange</key>
-  <string>Percentual mínimo da faixa de bytes ótima permitido para renderizar um dado nível de descarte.</string>
   <key>TextureSaveLocation</key>
   <string>Localização atual para salvar texturas em massa no disco.</string>
   <key>TextureScaleMaxAreaFactor</key>

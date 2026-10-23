@@ -178,6 +178,16 @@ public:
         return cascades;
     }
 
+    /// Whether the water drawn into @a pack refracts the scene beneath its surface through the copies its pass makes of
+    /// the screen and the depth (Slot::Water, Slot::DepthCopy), drawn with the TRANSPARENT_WATER programs: where
+    /// RenderTransparentWater asks for it, in the main view and a mirror's face. A probe's face clips the scene at the
+    /// water and culls what lies beyond it (LLPipeline::isWaterClip), so a copy would hold nothing under the surface:
+    /// its water is opaque, the fog of the water behind the surface, as everywhere with the setting off.
+    static constexpr bool refractsWater(Pack pack, bool transparent_water)
+    {
+        return transparent_water && pack != Pack::Probe;
+    }
+
     /// The reflection probes' manager's resources, or nothing where they are not wanted and are freed.
     const std::optional<ProbeManager>& reflectionProbes() const { return mReflectionProbes; }
     /// The mirrors' (LLHeroProbeManager's), likewise.

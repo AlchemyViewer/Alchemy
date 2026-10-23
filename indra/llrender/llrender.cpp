@@ -443,6 +443,25 @@ bool LLRender::init(bool needs_vertex_buffer)
     mScissor[1] = 0;
     mScissor[2] = -1;
     mScissor[3] = -1;
+    mViewport[0] = 0;
+    mViewport[1] = 0;
+    mViewport[2] = -1;
+    mViewport[3] = -1;
+
+    // The rest goes to GL's initial values and is issued, for the same reason as the clear colour.
+    mPolygonMode        = GL_FILL;
+    mCullFace           = GL_BACK;
+    mPointSize          = 1.f;
+    mStencilFunc        = GL_ALWAYS;
+    mStencilRef         = 0;
+    mStencilReadMask    = ~0u;
+    mStencilFail        = GL_KEEP;
+    mStencilDepthFail   = GL_KEEP;
+    mStencilPass        = GL_KEEP;
+    mStencilWriteMask   = ~0u;
+    mBlendEquationRGB   = GL_FUNC_ADD;
+    mBlendEquationAlpha = GL_FUNC_ADD;
+    issueRasterState();
 
     // Build this context's sampler objects before anything can ask for one.
     mSamplerCache.warmup();
@@ -450,8 +469,6 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
     gGL.setAmbientLightColor(LLColor4::black);
-
-    glCullFace(GL_BACK);
 
     // necessary for reflection maps
     glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
@@ -539,11 +556,18 @@ void LLRender::shutdown()
     mFrameFences.release();
 }
 
-void LLRender::endFrame()
+void LLRender::endFrame(U32 frames_ahead)
 {
-    // The batch's results are written ahead of the fence that follows them.
+    // The batch's results are written ahead of the fence that follows them. The batches the fences have just shown
+    // finished are read here rather than before the next cull, the next batch's names are made here rather than by its
+    // queries, and the fences of the uploads handed over by other contexts are polled here rather than in the next
+    // idle: a threaded driver answers a call that returns a value only once its thread has caught up, and the fences'
+    // own calls have just caught it up.
     mQueries.endFrame();
-    mFrameFences.endFrame();
+    mFrameFences.endFrame(frames_ahead);
+    mQueries.retire();
+    mQueries.makeRoom();
+    LLImageGL::pollUploads();
     ALUniformBuffer::endFrame();
 }
 
@@ -617,12 +641,18 @@ void LLRender::refreshState(void)
 
     rebasePolygonOffset();
 
-    // The same for the clear colour and a scissor box that was ever set.
+    // The same for the clear colour and a scissor box and viewport that were ever set.
     glClearColor(mClearColor.mV[VRED], mClearColor.mV[VGREEN], mClearColor.mV[VBLUE], mClearColor.mV[VALPHA]);
     if (mScissor[2] >= 0)
     {
         glScissor(mScissor[0], mScissor[1], mScissor[2], mScissor[3]);
     }
+    if (mViewport[2] >= 0)
+    {
+        glViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
+    }
+
+    issueRasterState();
 
     flush();
 
@@ -1898,6 +1928,125 @@ void LLRender::clear(U32 mask)
     glClear(mask);
 }
 
+void LLRender::setPolygonMode(U32 mode)
+{
+    llassert(mode == GL_FILL || mode == GL_LINE || mode == GL_POINT);
+    if (mPolygonMode != mode)
+    {
+        flush();
+        mPolygonMode = mode;
+        glPolygonMode(GL_FRONT_AND_BACK, mode);
+    }
+}
+
+void LLRender::setCullFace(U32 face)
+{
+    llassert(face == GL_BACK || face == GL_FRONT || face == GL_FRONT_AND_BACK);
+    if (mCullFace != face)
+    {
+        flush();
+        mCullFace = face;
+        glCullFace(face);
+    }
+}
+
+void LLRender::setPointSize(F32 size)
+{
+    llassert(size > 0.f);
+    if (mPointSize != size)
+    {
+        flush();
+        mPointSize = size;
+        glPointSize(size);
+    }
+}
+
+void LLRender::setStencilFunc(U32 func, S32 ref, U32 mask)
+{
+    if (mStencilFunc != func || mStencilRef != ref || mStencilReadMask != mask)
+    {
+        flush();
+        mStencilFunc     = func;
+        mStencilRef      = ref;
+        mStencilReadMask = mask;
+        glStencilFunc(func, ref, mask);
+    }
+}
+
+void LLRender::setStencilOp(U32 stencil_fail, U32 depth_fail, U32 pass)
+{
+    if (mStencilFail != stencil_fail || mStencilDepthFail != depth_fail || mStencilPass != pass)
+    {
+        flush();
+        mStencilFail      = stencil_fail;
+        mStencilDepthFail = depth_fail;
+        mStencilPass      = pass;
+        glStencilOp(stencil_fail, depth_fail, pass);
+    }
+}
+
+void LLRender::setStencilMask(U32 mask)
+{
+    if (mStencilWriteMask != mask)
+    {
+        flush();
+        mStencilWriteMask = mask;
+        glStencilMask(mask);
+    }
+}
+
+void LLRender::setBlendEquation(U32 rgb, U32 alpha)
+{
+    if (mBlendEquationRGB != rgb || mBlendEquationAlpha != alpha)
+    {
+        flush();
+        mBlendEquationRGB   = rgb;
+        mBlendEquationAlpha = alpha;
+        glBlendEquationSeparate(rgb, alpha);
+    }
+}
+
+void LLRender::setViewport(S32 x, S32 y, S32 width, S32 height)
+{
+    llassert(width >= 0 && height >= 0);
+    if (mViewport[0] != x || mViewport[1] != y || mViewport[2] != width || mViewport[3] != height)
+    {
+        flush();
+        mViewport[0] = x;
+        mViewport[1] = y;
+        mViewport[2] = width;
+        mViewport[3] = height;
+        glViewport(x, y, width, height);
+    }
+}
+
+void LLRender::issueRasterState() const
+{
+    glPolygonMode(GL_FRONT_AND_BACK, mPolygonMode);
+    glCullFace(mCullFace);
+    glPointSize(mPointSize);
+    glStencilFunc(mStencilFunc, mStencilRef, mStencilReadMask);
+    glStencilOp(mStencilFail, mStencilDepthFail, mStencilPass);
+    glStencilMask(mStencilWriteMask);
+    glBlendEquationSeparate(mBlendEquationRGB, mBlendEquationAlpha);
+}
+
+// static
+void LLRender::applyDepthConvention()
+{
+    if (gGLManager.mHasClipControl)
+    {
+        glClipControl(GL_LOWER_LEFT, sReverseZ ? GL_ZERO_TO_ONE : GL_NEGATIVE_ONE_TO_ONE);
+    }
+    glClearDepth(sReverseZ ? 0.0 : 1.0);
+}
+
+void LLRender::readPixels(S32 x, S32 y, S32 width, S32 height, U32 format, U32 type, void* data)
+{
+    flush();
+    glReadPixels(x, y, width, height, format, type, data);
+}
+
 void LLRender::drawArraysInstanced(eGeomModes mode, U32 first, U32 count, U32 instances)
 {
     // An input left in the program would read whatever buffer the last vertex buffer left on its array.
@@ -1931,6 +2080,18 @@ void LLRender::drawArraysIndirect(eGeomModes mode, const ALGPUBuffer& buffer, si
     glDrawArraysIndirect(LLVertexBuffer::sGLMode[mode], reinterpret_cast<const void*>(offset));
     STOP_GLERROR;
     ++sDrawCalls; // its count is the GPU's to know
+}
+
+void LLRender::textureBarrier()
+{
+    llassert(gGLManager.mHasTextureBarrier);
+    if (!gGLManager.mHasTextureBarrier)
+    {
+        return;
+    }
+    // The barrier orders what was issued before it, which includes what is batched.
+    flush();
+    glTextureBarrier();
 }
 
 void LLRender::memoryBarrier(U32 barriers)

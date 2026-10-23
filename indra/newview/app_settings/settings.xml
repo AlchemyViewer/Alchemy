@@ -7947,17 +7947,6 @@
     <key>Value</key>
     <real>2.0</real>
   </map>
-  <key>RenderShadowSlopeThreshold</key>
-  <map>
-    <key>Comment</key>
-    <string>Cutoff slope value for points to affect perspective shadow generation</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.0</real>
-  </map>
   <key>RenderShadowProjExponent</key>
   <map>
     <key>Comment</key>
@@ -8573,28 +8562,6 @@
     <string>F32</string>
     <key>Value</key>
     <real>0.01</real>
-  </map>
-  <key>RenderShadowBiasError</key>
-  <map>
-    <key>Comment</key>
-    <string>Error scale for shadow bias (based on altitude).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>-0.007</real>
-  </map>
-  <key>RenderShadowOffsetError</key>
-  <map>
-    <key>Comment</key>
-    <string>Error scale for shadow offset (based on altitude).</string>
-    <key>Persist</key>
-    <integer>1</integer>
-    <key>Type</key>
-    <string>F32</string>
-    <key>Value</key>
-    <real>0.0</real>
   </map>
 
   <key>RenderDepthPrePass</key>
@@ -12246,28 +12213,6 @@
       <string>Boolean</string>
       <key>Value</key>
       <integer>0</integer>
-    </map>
-    <key>TextureNewByteRange</key>
-    <map>
-      <key>Comment</key>
-      <string>Use the new more accurate byte range computation for j2c discard levels</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Boolean</string>
-      <key>Value</key>
-      <integer>1</integer>
-    </map>
-    <key>TextureReverseByteRange</key>
-    <map>
-      <key>Comment</key>
-      <string>Minimal percent of the optimal byte range allowed to render a given discard level</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>S32</string>
-      <key>Value</key>
-      <integer>50</integer>
     </map>
     <key>TextureSaveLocation</key>
     <map>

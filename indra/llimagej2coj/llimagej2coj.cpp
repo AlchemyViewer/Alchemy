@@ -305,8 +305,7 @@ public:
         U32 dataSize,
         S32& widthOut,
         S32& heightOut,
-        S32& components,
-        S32& discard_level)
+        S32& components)
     {
         parameters.flags |= OPJ_DPARAMETERS_DUMP_FLAG;
 
@@ -371,21 +370,6 @@ public:
         widthOut = S32(tilesW * tileDimX);
         heightOut = S32(tilesH * tileDimY);
         components = codestream_info->nbcomps;
-
-        // The maximum discard level is bounded by the codestream's resolution
-        // count (you can't ask OpenJPEG to reduce below the lowest encoded
-        // resolution). Prior versions of this code derived it from log2(tile
-        // count), which returns 0 for single-tile codestreams — the common
-        // case for SL textures — and effectively disabled progressive decode.
-        discard_level = 0;
-        if (codestream_info->m_default_tile_info.tccp_info)
-        {
-            U32 numres = codestream_info->m_default_tile_info.tccp_info[0].numresolutions;
-            if (numres > 0)
-            {
-                discard_level = llclamp<S32>(S32(numres) - 1, 0, MAX_DISCARD_LEVEL);
-            }
-        }
 
         return true;
     }
@@ -1104,11 +1088,10 @@ bool LLImageJ2COJ::getMetadata(LLImageJ2C &base)
     S32 width = 0;
     S32 height = 0;
     S32 components = 0;
-    S32 discard_level = 0;
 
     U32 dataSize = base.getDataSize();
     U8* data = base.getData();
-    bool header_read = decode.readHeader(data, dataSize, width, height, components, discard_level);
+    bool header_read = decode.readHeader(data, dataSize, width, height, components);
     if (!header_read)
     {
         std::string opj_err = decode.getLastError();
@@ -1116,60 +1099,7 @@ bool LLImageJ2COJ::getMetadata(LLImageJ2C &base)
         return false;
     }
 
-    base.mDiscardLevel = discard_level;
     base.setSize(width, height, components);
-
-    // Override the synthetic byte-budget estimate with actual codestream
-    // tile-part boundaries when we can parse them. Our patched OpenJPEG
-    // tolerates truncated tile-parts (see indra/vcpkg/ports/openjpeg/), so
-    // seeding from a *partial* walk is now safe: the fetcher triggers
-    // decode earlier, OJ produces whatever pixels it can from the available
-    // bytes, and the texture refines as more data arrives.
-    //
-    // Mapping: discard 0 (highest quality) gets the end of the last walked
-    // tile-part; discard MAX_DISCARD_LEVEL gets the end of the first. Single
-    // tile-part files (typical OJ-encoded uploads) collapse to one value
-    // across every discard.
-    // Up-front cap on tile-part-ends. SL textures rarely exceed ~6 tile-parts
-    // (one per resolution); a 64-entry buffer is comfortably oversized and
-    // matches MAX_NB_LAYERS. The OJ walker fills out_num_ends with the
-    // actual count.
-    constexpr OPJ_UINT32 MAX_TILE_PART_ENDS = 64;
-    OPJ_SIZE_T tile_part_ends[MAX_TILE_PART_ENDS];
-    OPJ_UINT32 num_tile_part_ends = 0;
-    OPJ_BOOL complete = OPJ_FALSE;
-    bool walked = opj_j2k_walk_tile_part_ends(data, (OPJ_SIZE_T)dataSize,
-                                              tile_part_ends,
-                                              &num_tile_part_ends,
-                                              MAX_TILE_PART_ENDS,
-                                              &complete) == OPJ_TRUE;
-    if (walked && num_tile_part_ends > 0)
-    {
-        S32 n = (S32)num_tile_part_ends;
-        for (S32 d = 0; d <= MAX_DISCARD_LEVEL; d++)
-        {
-            S32 idx = llclamp(n - 1 - d, 0, n - 1);
-            base.mDataSizes[d] = (S32)tile_part_ends[idx];
-        }
-        // Mark the cache valid so calcDataSize() returns our values rather
-        // than recomputing via calcDataSizeJ2C.
-        base.mAreaUsedForDataSizeCalcs = base.getHeight() * base.getWidth();
-
-        LL_DEBUGS("Texture") << "LLImageJ2COJ: SOT walker seeded mDataSizes from "
-                             << n << " tile-part(s) ("
-                             << (complete ? "complete" : "partial")
-                             << "); buf=" << dataSize
-                             << " last_tp_end=" << tile_part_ends[n - 1]
-                             << " d0=" << base.mDataSizes[0]
-                             << " d5=" << base.mDataSizes[MAX_DISCARD_LEVEL]
-                             << LL_ENDL;
-    }
-    else
-    {
-        LL_DEBUGS("Texture") << "LLImageJ2COJ: SOT walker failed (buf=" << dataSize
-                             << "), falling back to calcDataSizeJ2C estimate"
-                             << LL_ENDL;
-    }
 
     return true;
 }

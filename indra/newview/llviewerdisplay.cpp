@@ -30,6 +30,7 @@
 
 #include "alfarplane.h"
 #include "alfloaterprogressview.h"
+#include "alframeend.h"
 #include "alhuddepth.h"
 #include "aluniformbuffer.h"
 #include "fsyspath.h"
@@ -114,6 +115,7 @@ bool gForceRenderLandFence = false;
 bool gDisplaySwapBuffers = false;
 bool gDepthDirty = false;
 bool gSnapshot = false;
+bool gSnapshotOffMainView = false;
 bool gCubeSnapshot = false;
 bool gSnapshotNoPost = false;
 bool gShaderProfileFrame = false;
@@ -179,7 +181,7 @@ void display_startup()
 
     LLGLState::checkStates();
 
-    glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
     LLGLSUIDefault gls_ui;
     gPipeline.disableLights();
 
@@ -438,6 +440,63 @@ static void update_tp_display(bool minimized)
     }
 }
 
+bool display_window_hidden()
+{
+    return !gViewerWindow->getActive()
+        || !gViewerWindow->getWindow()->getVisible()
+        || gViewerWindow->getWindow()->getMinimized()
+        || gNonInteractive;
+}
+
+// The frames ahead of a frame display() showed and left for the main loop to end (display_end_frame), 0 for none.
+static U32 sFrameEndOwed = 0;
+
+// Runs the main loop's queued work in the time the frame's end is about to wait for the GPU, as much as the frames'
+// ends before show there is to spare (ALPacingSlack). After the swap and before the frame's fence, so that the frame's
+// end waits only for what is left, and with no poll between the items, since on a threaded driver a poll is that wait.
+// Out of display(), whose scope the work was never written for: it is what idle() runs, posted for the main thread.
+static void fill_pacing_slack()
+{
+    ALPacingSlack& slack = gGL.frameFences().slack();
+    const F64 budget = slack.budget();
+    F64 worked = 0.0;
+    if (gPipeline.pacingSlackWork() && budget > slack.reserve())
+    {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("frame pacing slack work");
+        // The main thread is the queue's one consumer: work it sees queued is there for it to run.
+        worked = slack.fill(
+            []
+            {
+                if (gMainloopWork.size() == 0)
+                {
+                    return false;
+                }
+                gMainloopWork.runOne();
+                return true;
+            },
+            []() -> F64 { return LLTimer::getTotalSeconds(); });
+    }
+    LL_PROFILE_PLOT("frame pacing slack budget ms", budget * 1000.0);
+    LL_PROFILE_PLOT("frame pacing slack work ms", worked * 1000.0);
+}
+
+void display_end_frame()
+{
+    const U32 frames_ahead = sFrameEndOwed;
+    if (frames_ahead == 0)
+    {
+        return;
+    }
+    sFrameEndOwed = 0;
+    LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("End Frame");
+    {
+        LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_IDLE);
+        fill_pacing_slack();
+    }
+    LLPerfStats::RecordSceneTime T(LLPerfStats::StatType_t::RENDER_DISPLAY);
+    gGL.endFrame(frames_ahead);
+}
+
 // Paint the display!
 void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 {
@@ -446,14 +505,21 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     LLPerfStats::RecordSceneTime T (LLPerfStats::StatType_t::RENDER_DISPLAY); // render time capture - This is the main stat for overall rendering.
 
+    // The frame the last pass showed is the main loop's to end (display_end_frame); one left unended ends here, unpaced.
+    llassert(sFrameEndOwed == 0);
+    if (sFrameEndOwed != 0)
+    {
+        sFrameEndOwed = 0;
+        gGL.endFrame();
+    }
+
     // What the settings and the window changed since the last frame, applied once, here, whatever the frame goes on to
     // draw: the login screen's frames apply them as the world's do.
     if (gPipeline.windowResizePending())
     { //skip render on frames where window has been resized
         LL_DEBUGS("Window") << "Resizing window" << LL_ENDL;
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("Resize Window");
-        gGL.flush();
-        glClear(GL_COLOR_BUFFER_BIT);
+        gGL.clear(GL_COLOR_BUFFER_BIT);
         gViewerWindow->getWindow()->swapBuffers();
         gGL.endFrame();
         gPipeline.applyRenderInputs();
@@ -480,10 +546,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // Don't draw if the window is hidden or minimized.
     // In fact, must explicitly check the minimized state before drawing.
     // Attempting to draw into a minimized window causes a GL error. JC
-    if (   !gViewerWindow->getActive()
-        || !gViewerWindow->getWindow()->getVisible()
-        || gViewerWindow->getWindow()->getMinimized()
-        || gNonInteractive)
+    if (display_window_hidden())
     {
         // Clean up memory the pools may have allocated
         if (rebuild)
@@ -536,6 +599,12 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
                 // remove dead gltf materials
                 gGLTFMaterialList.flushMaterials();
             }
+
+            // A pass that draws nothing still ends a frame, unpaced (ALFrameEnd): the uploads other contexts hand over
+            // publish, the queries are read, and what the GPU used is reused, as on any frame. A session without a
+            // window has no GL to end one in.
+            const ALFrameEnd end = ALFrameEnd::make(true, false, gPipeline.maxFramesAhead());
+            gGL.endFrame(end.mFramesAhead);
         }
         return;
     }
@@ -712,7 +781,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (LLViewerDynamicTexture::updateAllInstances())
         {
             gGL.setColorMask(true, true);
-            glClear(GL_DEPTH_BUFFER_BIT);
+            gGL.clear(GL_DEPTH_BUFFER_BIT);
         }
     }
 
@@ -720,6 +789,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     gPipeline.resetFrameStats();    // Reset per-frame statistics.
 
+    // Whether the world's frame reaches the screen: a capture holds its swap back, and a viewer on its way out draws
+    // no world.
+    bool presented = false;
     if (!gDisconnected && !LLApp::isExiting())
     {
         // The water's field around the main camera, before the mirrors, the shadow fit and the probes read it.
@@ -801,9 +873,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
         LLGLState::checkStates();
 
-        // The queries of the frames the frame fences have shown finished, read before the cull asks for them. No GL
-        // call: the fences are polled only at the frame's end (see ALFrameFences).
-        gGL.queries().retire();
+        // The queries of the frames the frame fences have shown finished were read at the last frame's end
+        // (LLRender::endFrame), so nothing here asks GL for a result in the middle of the frame.
         gPipeline.readAttachmentTimes();
 
         static LLCullResult result;
@@ -848,7 +919,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
                 LLGLState::checkStates();
             }
-            glClear(GL_DEPTH_BUFFER_BIT);
+            gGL.clear(GL_DEPTH_BUFFER_BIT);
         }
 
         //////////////////////////////////////
@@ -931,7 +1002,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if(gUseWireframe)
         {
             gGL.setClearColor(LLColor4(0.5f, 0.5f, 0.5f, 0.f));
-            glClear(GL_COLOR_BUFFER_BIT);
+            gGL.clear(GL_COLOR_BUFFER_BIT);
         }
 
         LLAppViewer::instance()->pingMainloopTimeout("Display:RenderStart");
@@ -1060,6 +1131,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (!for_snapshot)
         {
             render_ui();
+            presented = gDisplaySwapBuffers;
             swap();
         }
 
@@ -1072,14 +1144,26 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
 
     stop_glerror();
 
-    // Close the frame's queries, poll the frame fences and lay this frame's, and close out the UBO
+    // Close the frame's queries, lay this frame's fence and poll the frames before, and close out the UBO
     // streaming rings' per-frame counters (slices, wraps, GPU stalls) and let them resize. Straight
     // after the swap: the frame's one poll waits on a threaded driver's own thread here, if
     // anywhere, which is behind the swap already (see ALFrameFences). And here rather than in
     // resetFrameStats(): a resize deletes and remaps a ring and invalidates every outstanding slice,
     // which must land past this frame's draws, not before its heaviest passes. See
-    // ALUniformBuffer::endFrame.
-    gGL.endFrame();
+    // ALUniformBuffer::endFrame. A frame that reached the screen also waits for the one
+    // AlchemyRenderMaxFramesAhead before it, every frame, so the CPU keeps an even pace that far
+    // ahead of the GPU, with the main loop's work in that wait first; that end is the main loop's,
+    // straight after display() returns (display_end_frame, ALFrameEnd). A capture's frames, and
+    // every frame with pacing off, end here unpaced.
+    const ALFrameEnd end = ALFrameEnd::make(false, presented, gPipeline.maxFramesAhead());
+    if (end.mAfterDisplay)
+    {
+        sFrameEndOwed = end.mFramesAhead;
+    }
+    else
+    {
+        gGL.endFrame(end.mFramesAhead);
+    }
 
     display_stats();
 
@@ -1228,7 +1312,7 @@ void display_cube_face()
     gGL.setClearColor(LLColor4::transparent);
     gPipeline.generateSunShadow(*LLViewerCamera::getInstance());
 
-    glClear(GL_DEPTH_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
+    gGL.clear(GL_DEPTH_BUFFER_BIT); // | GL_STENCIL_BUFFER_BIT);
 
     {
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;
@@ -1795,7 +1879,7 @@ void render_ui_2d()
     // Render 2D UI elements that overlay the world (no z compare)
 
     //  Disable wireframe mode below here, as this is HUD/menus
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    gGL.setPolygonMode(GL_FILL);
 
     //  Menu overlays, HUD, etc
     gViewerWindow->setup2DRender();

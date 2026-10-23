@@ -353,6 +353,29 @@ namespace ll_test
         gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, white->getTexName());
     }
 
+    // Writes `data` over level 0 of the 2D texture `texture`, `w` by `h` texels, through texture slot 0 as LLRender
+    // binds it: a bind of a test's own lands on whichever unit LLRender left active, under a texture the slot still
+    // records there, and a draw after it samples nothing. Bound to edit, not by name, which a context without direct
+    // state access cannot.
+    inline void writeTexture(U32 texture, S32 w, S32 h, GLenum format, GLenum type, const void* data)
+    {
+        ALTextureSlot* slot = gGL.getTextureSlot(0);
+        slot->unbind();
+        slot->bindManual(ALTextureSlot::TT_TEXTURE, texture);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, format, type, data);
+        slot->unbind();
+    }
+
+    // Level 0 of the 2D texture `texture` into `data`, bound as writeTexture binds it.
+    inline void readTexture(U32 texture, GLenum format, GLenum type, void* data)
+    {
+        ALTextureSlot* slot = gGL.getTextureSlot(0);
+        slot->unbind();
+        slot->bindManual(ALTextureSlot::TT_TEXTURE, texture);
+        glGetTexImage(GL_TEXTURE_2D, 0, format, type, data);
+        slot->unbind();
+    }
+
     // Read back the framebuffer's color buffer as RGBA8 (tightly
     // packed, row 0 = bottom of GL viewport). Tests use this to assert
     // pixel-level invariants — alignment column position, drop-shadow
@@ -608,6 +631,13 @@ namespace ll_test
                 glGetIntegerv(GL_CLIP_DEPTH_MODE, &mClipDepthMode);
             }
             mClearColor = gGL.getClearColor();
+            mPolygonMode = gGL.getPolygonMode();
+            mCullFace = gGL.getCullFace();
+            mPointSize = gGL.getPointSize();
+            gGL.getStencilFunc(mStencilFunc, mStencilRef, mStencilReadMask);
+            gGL.getStencilOp(mStencilFail, mStencilDepthFail, mStencilPass);
+            mStencilWriteMask = gGL.getStencilMask();
+            gGL.getBlendEquation(mBlendEquationRGB, mBlendEquationAlpha);
             mReverseZ = LLRender::sReverseZ;
             mCompute = LLRender::sCompute;
             mMatrixMode = gGL.getMatrixMode();
@@ -637,6 +667,12 @@ namespace ll_test
 
             glBindFramebuffer(GL_DRAW_FRAMEBUFFER, mDrawFramebuffer);
             glBindFramebuffer(GL_READ_FRAMEBUFFER, mReadFramebuffer);
+            S32 viewport[4];
+            gGL.getViewport(viewport);
+            if (viewport[2] >= 0)
+            {
+                gGL.setViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
+            }
             glViewport(mViewport[0], mViewport[1], mViewport[2], mViewport[3]);
 
             S32 scissor[4];
@@ -661,6 +697,13 @@ namespace ll_test
             LLRender::sCompute = mCompute;
 
             gGL.setClearColor(mClearColor);
+            gGL.setPolygonMode(mPolygonMode);
+            gGL.setCullFace(mCullFace);
+            gGL.setPointSize(mPointSize);
+            gGL.setStencilFunc(mStencilFunc, mStencilRef, mStencilReadMask);
+            gGL.setStencilOp(mStencilFail, mStencilDepthFail, mStencilPass);
+            gGL.setStencilMask(mStencilWriteMask);
+            gGL.setBlendEquation(mBlendEquationRGB, mBlendEquationAlpha);
             gGL.matrixMode(LLRender::MM_TEXTURE0);
             gGL.loadIdentity();
             gGL.matrixMode(LLRender::MM_PROJECTION);
@@ -707,6 +750,18 @@ namespace ll_test
         GLint mClipOrigin = GL_LOWER_LEFT;
         GLint mClipDepthMode = GL_NEGATIVE_ONE_TO_ONE;
         LLColor4 mClearColor;
+        U32 mPolygonMode = GL_FILL;
+        U32 mCullFace = GL_BACK;
+        F32 mPointSize = 1.f;
+        U32 mStencilFunc = GL_ALWAYS;
+        S32 mStencilRef = 0;
+        U32 mStencilReadMask = ~0u;
+        U32 mStencilFail = GL_KEEP;
+        U32 mStencilDepthFail = GL_KEEP;
+        U32 mStencilPass = GL_KEEP;
+        U32 mStencilWriteMask = ~0u;
+        U32 mBlendEquationRGB = GL_FUNC_ADD;
+        U32 mBlendEquationAlpha = GL_FUNC_ADD;
         bool mReverseZ = false;
         bool mCompute = false;
         LLRender::eMatrixMode mMatrixMode = LLRender::MM_MODELVIEW;

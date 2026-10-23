@@ -2,7 +2,7 @@
  * @file alframefences_gl_test.cpp
  * @brief ALFrameFences on the hidden window: a frame complete only once a later frame's end has seen it finished, one
  *        poll a frame and none of the frame just ended, waits on a pending frame and on the open one, the ring of
- *        fences kept whole, and release.
+ *        fences kept whole, release, and the pacing wait for the frame a given number before each frame's end.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -34,6 +34,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <chrono>
+#include <cmath>
+
 namespace
 {
     constexpr U64 SECOND = 1000000000ull;
@@ -52,6 +56,175 @@ namespace
 
         ll_test::SharedGLScope mGL;
         ALFrameFences mFrames;
+    };
+
+    // A triangle over the whole viewport whose every fragment runs a loop as long as `iterations` says.
+    const char* kBusyVertex =
+        "#version 400\n"
+        "void main()\n"
+        "{\n"
+        "    vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2) * 2.0 - 1.0;\n"
+        "    gl_Position = vec4(p, 0.0, 1.0);\n"
+        "}\n";
+
+    const char* kBusyFragment =
+        "#version 400\n"
+        "uniform int iterations;\n"
+        "out vec4 frag_color;\n"
+        "void main()\n"
+        "{\n"
+        "    float x = fract(gl_FragCoord.x * 0.0137 + gl_FragCoord.y * 0.0071);\n"
+        "    for (int i = 0; i < iterations; ++i)\n"
+        "    {\n"
+        "        x = fract(sin(x * 12.9898 + 78.233) * 43758.5453);\n"
+        "    }\n"
+        "    frag_color = vec4(x, 0.0, 0.0, 1.0);\n"
+        "}\n";
+
+    // Frames whose commands the GPU takes a while over, for the pacing wait: it is seen to wait for a frame only where
+    // the GPU is still drawing that frame when the wait begins. The work is draws of a loop over a small target, each
+    // calibrated to take about DRAW_SECONDS, far short of a driver's watchdog, as many as a span asks.
+    struct alframefences_paced_data : alframefences_data
+    {
+        static constexpr S32 SIZE = 256;
+        static constexpr F64 DRAW_SECONDS = 0.01;
+        // What one frame's work takes the GPU at the least: the cases' checks come within a millisecond of it, and the
+        // pacing wait gives up after a second, which leaves room for other processes' work on the GPU.
+        static constexpr F64 BUSY_SECONDS = 0.08;
+        static constexpr S32 MAX_ITERATIONS = 1 << 24;
+
+        ~alframefences_paced_data()
+        {
+            glFinish();
+            if (mFBO)
+            {
+                glDeleteFramebuffers(1, &mFBO);
+            }
+            if (mColor)
+            {
+                glDeleteRenderbuffers(1, &mColor);
+            }
+            if (mVAO)
+            {
+                glDeleteVertexArrays(1, &mVAO);
+            }
+            if (mProgram)
+            {
+                glDeleteProgram(mProgram);
+            }
+        }
+
+        void setUp()
+        {
+            const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kBusyVertex);
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBusyFragment);
+            {
+                INFO("shaders compile");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
+            mProgram = glCreateProgram();
+            glAttachShader(mProgram, vs);
+            glAttachShader(mProgram, fs);
+            glLinkProgram(mProgram);
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            GLint linked = GL_FALSE;
+            glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
+            REQUIRE(linked == GL_TRUE);
+            mIterationsLocation = glGetUniformLocation(mProgram, "iterations");
+            REQUIRE(mIterationsLocation >= 0);
+
+            glGenVertexArrays(1, &mVAO);
+            glGenRenderbuffers(1, &mColor);
+            glBindRenderbuffer(GL_RENDERBUFFER, mColor);
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, SIZE, SIZE);
+            glBindRenderbuffer(GL_RENDERBUFFER, 0);
+            glGenFramebuffers(1, &mFBO);
+            glBindFramebuffer(GL_FRAMEBUFFER, mFBO);
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, mColor);
+            REQUIRE((U32)glCheckFramebufferStatus(GL_FRAMEBUFFER) == (U32)GL_FRAMEBUFFER_COMPLETE);
+            glViewport(0, 0, SIZE, SIZE);
+            glDisable(GL_SCISSOR_TEST);
+            glDisable(GL_DEPTH_TEST);
+
+            // The loop's own time, as what doubling it adds: a draw's fixed cost, a wait for the GPU behind another
+            // process's work among it, is the same at any length. Doubled until that is long enough to time, then
+            // scaled to the draw's length. The first draw, which may finish building the program, is not timed.
+            timeDraw(1);
+            S32 iterations = 256;
+            F64 shorter = timeDraw(iterations);
+            F64 added = 0.0;
+            while (iterations < MAX_ITERATIONS / 2)
+            {
+                const F64 longer = timeDraw(iterations * 2);
+                added = longer - shorter;
+                if (added >= 0.005)
+                {
+                    break;
+                }
+                iterations *= 2;
+                shorter = longer;
+            }
+            {
+                INFO("the GPU can be kept busy: doubling " << iterations << " iterations adds " << added << " s");
+                REQUIRE(added >= 0.005);
+            }
+            mIterations = (S32)std::clamp((F64)iterations * DRAW_SECONDS / added, 1.0, (F64)MAX_ITERATIONS);
+            mDrawSeconds = added * mIterations / iterations;
+
+            // The frames before the case's are finished and shown so.
+            glFinish();
+            mFrames.endFrame();
+            glFinish();
+            REQUIRE(mFrames.wait(mFrames.frame() - 1, SECOND));
+            while (glGetError() != GL_NO_ERROR)
+            {
+            }
+        }
+
+        // Work the GPU takes `seconds` over at the least, as calibrated, issued in the open frame.
+        void keepBusy(F64 seconds = BUSY_SECONDS)
+        {
+            const S32 draws = std::max(1, (S32)std::ceil(seconds / mDrawSeconds));
+            for (S32 i = 0; i < draws; ++i)
+            {
+                draw(mIterations);
+            }
+        }
+
+        void draw(S32 iterations)
+        {
+            glUseProgram(mProgram);
+            glUniform1i(mIterationsLocation, iterations);
+            glBindVertexArray(mVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        }
+
+        // One draw of `iterations` to its end on the GPU, the least of three: other processes' work only adds to it.
+        F64 timeDraw(S32 iterations)
+        {
+            F64 least = 0.0;
+            for (S32 i = 0; i < 3; ++i)
+            {
+                glFinish();
+                const auto start = std::chrono::steady_clock::now();
+                draw(iterations);
+                glFinish();
+                const F64 seconds = std::chrono::duration<F64>(std::chrono::steady_clock::now() - start).count();
+                least = i == 0 ? seconds : std::min(least, seconds);
+            }
+            return least;
+        }
+
+        GLuint mProgram = 0;
+        GLint  mIterationsLocation = -1;
+        GLuint mVAO = 0;
+        GLuint mColor = 0;
+        GLuint mFBO = 0;
+        S32    mIterations = 1;
+        F64    mDrawSeconds = DRAW_SECONDS;
     };
 
 
@@ -206,6 +379,175 @@ namespace
         {
             INFO("frames end again after it");
             CHECK(mFrames.isComplete(next));
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A frame's end paced one frame ahead waits, every frame, for the frame before it, which the GPU is still drawing:
+    // a pacing wait, not a stall. The frame it ends stays open to the GPU.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: a paced frame's end waits every frame for the frame that many before it", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 stalls = mFrames.getStalls();
+        const U32 waits  = mFrames.getPacingWaits();
+        const U32 calls  = mFrames.getCalls();
+        for (U32 i = 0; i < 3; ++i)
+        {
+            const U32 busy = mFrames.frame();
+            keepBusy();
+            mFrames.endFrame(1);
+            INFO("frame " << i << " of three, each the GPU's for a while");
+            CHECK(mFrames.isComplete(busy - 1));
+            CHECK_FALSE(mFrames.isComplete(busy));
+        }
+        {
+            INFO("the second and third frames' ends waited for the GPU, and neither stalled");
+            CHECK(mFrames.getPacingWaits() == waits + 2);
+            CHECK(mFrames.getStalls() == stalls);
+        }
+        {
+            INFO("a fence each, and one wait each for the frame before the second and third, with no poll before it");
+            CHECK(mFrames.getCalls() == calls + 5);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Paced two frames ahead, a frame's end waits for the frame two before it and no later one: the frame between, which
+    // the GPU is still drawing, is left to it.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: a paced frame's end waits for no frame after that one", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 before = mFrames.frame();
+        mFrames.endFrame(2);
+        const U32 busy = mFrames.frame();
+        keepBusy();
+        mFrames.endFrame(2);
+        mFrames.endFrame(2);
+        {
+            INFO("the frame two before the last frame's end, and not the busy one after it");
+            CHECK(mFrames.isComplete(before));
+            CHECK_FALSE(mFrames.isComplete(busy));
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Unpaced, a frame's end waits for no frame the GPU is still drawing, as before pacing was asked for.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: an unpaced frame's end waits for no ended frame", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 waits = mFrames.getPacingWaits();
+        const U32 busy  = mFrames.frame();
+        keepBusy();
+        mFrames.endFrame();
+        mFrames.endFrame();
+        {
+            INFO("the busy frame is left to the GPU, and nothing waited");
+            CHECK_FALSE(mFrames.isComplete(busy));
+            CHECK(mFrames.getPacingWaits() == waits);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // The frames' ends note their pacing waits in the slack: frames the GPU is behind on give work a budget past the
+    // reserve. A wait that finds the GPU done after work shows none, and a frame's end that paces nothing, or a release,
+    // takes it away. The budget is not held to the busy frames' calibrated length: calibrated on an idle GPU, the draws
+    // can run faster once its clocks rise.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: paced frames the GPU is behind on give work a budget", "[alframefences_gl]")
+    {
+        setUp();
+        ALPacingSlack& slack = mFrames.slack();
+        // The first frame's end finds the frame before it finished, and shows no slack: FRAMES more wait for the GPU.
+        const auto behind = [this]
+        {
+            for (U32 i = 0; i <= ALPacingSlack::FRAMES; ++i)
+            {
+                keepBusy(BUSY_SECONDS / 4.0);
+                mFrames.endFrame(1);
+            }
+        };
+        behind();
+        {
+            INFO("the budget is " << slack.budget() << " s");
+            CHECK(slack.budget() > slack.reserve());
+        }
+        {
+            // Work as long as the budget allows, on a clock of its own, then a wait for a frame the GPU has finished.
+            F64 clock = 0.0;
+            const F64 worked = slack.fill(
+                [&clock]
+                {
+                    clock += 0.0001;
+                    return true;
+                },
+                [&clock] { return clock; });
+            REQUIRE(worked > 0.0);
+            glFinish();
+            mFrames.endFrame(1);
+            INFO("a wait that found the GPU done shows no slack, whatever work came before it");
+            CHECK(slack.budget() == 0.0);
+        }
+        behind();
+        REQUIRE(slack.budget() > 0.0);
+        mFrames.endFrame();
+        {
+            INFO("an unpaced frame's end forgets it");
+            CHECK(slack.budget() == 0.0);
+        }
+        behind();
+        REQUIRE(slack.budget() > 0.0);
+        mFrames.release();
+        {
+            INFO("and so does a release");
+            CHECK(slack.budget() == 0.0);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A frame the GPU spends more than a second on is paced too: the frame's end waits it out, in tries of a second,
+    // rather than give up on it after the first.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: a paced frame's end waits out a frame longer than a second", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 slow = mFrames.frame();
+        keepBusy(3.0);
+        // A fence of the test's own behind the work, to ask the GPU itself whether the wait outlasted it.
+        GLsync witness = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+        mFrames.endFrame(1);
+        const U32 waits = mFrames.getPacingWaits();
+        mFrames.endFrame(1);
+        const GLenum status = glClientWaitSync(witness, 0, 0);
+        glDeleteSync(witness);
+        {
+            INFO("waited out, past the first try");
+            CHECK((status == GL_ALREADY_SIGNALED || status == GL_CONDITION_SATISFIED));
+            CHECK(mFrames.isComplete(slow));
+            CHECK(mFrames.getPacingWaits() == waits + 1);
+        }
+        glFinish();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // waitFinished() waits a frame out however long the GPU takes over it, and says whether it had to wait.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: waitFinished waits out a frame the GPU is still drawing", "[alframefences_gl]")
+    {
+        setUp();
+        const U32 busy = mFrames.frame();
+        keepBusy();
+        mFrames.endFrame();
+        const U32 stalls = mFrames.getStalls();
+        bool stalled = false;
+        mFrames.waitFinished(busy, &stalled);
+        {
+            INFO("waited out, the wait counted as a stall");
+            CHECK(mFrames.isComplete(busy));
+            CHECK(stalled);
+            CHECK(mFrames.getStalls() == stalls + 1);
+        }
+        {
+            INFO("a frame already finished is not waited for again");
+            stalled = true;
+            mFrames.waitFinished(busy, &stalled);
+            CHECK_FALSE(stalled);
         }
         CHECK(glGetError() == GL_NO_ERROR);
     }

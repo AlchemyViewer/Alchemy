@@ -613,7 +613,7 @@ bool LLGLTFPreviewTexture::render()
 
     // Final render
     // Nested post-processing targets restore the full preview target's viewport.
-    glViewport(mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight);
+    gGL.setViewport(mOrigin.mX, mOrigin.mY, mFullWidth, mFullHeight);
     gDeferredPostNoDoFProgram.bind();
 
     // From LLPipeline::renderFinalize: "Whatever is last in the above post processing chain should _always_ be rendered directly here.  If not, expect problems."

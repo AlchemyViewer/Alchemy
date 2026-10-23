@@ -147,6 +147,10 @@ public:
     // GL_EXT_depth_bounds_test: passing a fragment only where the depth already stored under it lies in a range.
     // Never core. Only true once glDepthBoundsEXT has resolved, so callers may trust it directly. See ALDepthBounds.
     bool mHasDepthBoundsTest = false;
+    // glTextureBarrier: core in 4.5, also GL_ARB_texture_barrier and GL_NV_texture_barrier, which macOS's 4.1 context
+    // may lack. Only true once the entry point has resolved, so callers may trust it directly. See
+    // LLRender::textureBarrier.
+    bool mHasTextureBarrier = false;
     // GL_ANY_SAMPLES_PASSED_CONSERVATIVE: core in 4.3, also GL_ARB_ES3_compatibility.
     bool mHasConservativeOcclusion = false;
     // GL_TIMESTAMP counts time: its GL_QUERY_COUNTER_BITS are not 0, which on Apple silicon they are.
@@ -154,8 +158,13 @@ public:
     // GL_ARB_pipeline_statistics_query's counters, such as GL_FRAGMENT_SHADER_INVOCATIONS: core in 4.6.
     bool mHasPipelineStatistics = false;
     // GL_QUERY_BUFFER: glGetQueryObject writes a result into the buffer bound there, by the GPU, rather than returning
-    // it to the CPU. Core in 4.4, also GL_ARB_query_buffer_object.
+    // it to the CPU. Core in 4.4, also GL_ARB_query_buffer_object. False on AMD's drivers: Windows' writes the results
+    // into the wrong buffer, and radeonsi leaks with each write (LLGLManager::initQueries).
     bool mHasQueryBufferObject = false;
+    // Whether the query pool has the GPU write its results through GL_QUERY_BUFFER, rather than asking GL for them: on
+    // NVIDIA's driver alone, where asking waits on its threaded optimization (ALQueryPool). What the session does, not
+    // what the context can.
+    bool mWritesQueryResults = false;
     // Compute shaders, shader storage buffers, image load/store and indirect dispatch: core in 4.3.
     // Only true once every entry point the compute path calls has resolved (glDispatchCompute,
     // glDispatchComputeIndirect, glMemoryBarrier, glBindImageTexture, glShaderStorageBlockBinding,
@@ -228,6 +237,10 @@ public:
 
     // In ALL CAPS
     std::string mGLRenderer;
+
+    // GL_VENDOR and GL_RENDERER in the driver's own case, as mGLVersionString is GL_VERSION.
+    std::string mGLVendorString;
+    std::string mGLRendererString;
 
     // GL_VENDOR, GL_RENDERER and GL_VERSION as reported, less the kernel's DRM version and
     // release radeonsi and r600 put in the renderer on Linux. Keys what a driver update must

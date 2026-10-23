@@ -1,0 +1,3 @@
+# Raw gl* calls each file under indra/newview may make; checked by check_raw_gl.py
+indra/newview/llappviewer.cpp 1
+indra/newview/llcefaccelinterop.cpp 1

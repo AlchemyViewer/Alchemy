@@ -2461,6 +2461,7 @@ if(AL_BUILD_TESTS)
     llappearance
     llprimitive
     lllogin
+    alrender
   )
   set(test_project ${AL_VIEWER_BINARY_NAME})
   get_property(newview_includes TARGET ${test_project} PROPERTY INTERFACE_INCLUDE_DIRECTORIES)

@@ -47,6 +47,16 @@
 
 extern bool gCubeSnapshot;
 
+// Whether the water of the view drawn now refracts the scene under its surface (ALRenderResourcePlan::refractsWater):
+// its pass copies the screen and the depth, and it draws with the TRANSPARENT_WATER programs. Not in a probe's face,
+// which clips the scene at the water (LLPipeline::isWaterClip), so that a copy would hold nothing beneath it.
+static bool water_refracts()
+{
+    const bool refracts = ALRenderResourcePlan::refractsWater(gPipeline.renderPack(), LLPipeline::sRenderTransparentWater);
+    llassert(refracts == (LLPipeline::sRenderTransparentWater && !LLPipeline::isWaterClip()));
+    return refracts;
+}
+
 LLDrawPoolWater::LLDrawPoolWater() : LLDrawPool(POOL_WATER)
 {
 }
@@ -85,7 +95,7 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
     LL_PROFILE_GPU_ZONE("water beginPostDeferredPass")
     gGL.setColorMask(true, true);
 
-    if (LLPipeline::sRenderTransparentWater)
+    if (water_refracts())
     {
         // copy framebuffer contents so far to a texture to be used for
         // reflections and refractions, and the depth under them
@@ -95,7 +105,10 @@ void LLDrawPoolWater::beginPostDeferredPass(S32 pass)
 
 void LLDrawPoolWater::endPostDeferredPass(S32 pass)
 {
-    gPipeline.endWaterTargets();
+    if (water_refracts())
+    {
+        gPipeline.endWaterTargets();
+    }
 }
 
 void LLDrawPoolWater::renderPostDeferred(S32 pass)
@@ -123,8 +136,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     if (glint_glow)
     {
         gGL.blendFunc(LLRender::BF_ONE, LLRender::BF_ZERO, LLRender::BF_ONE, LLRender::BF_ONE);
-        gGL.flush();
-        glBlendEquationSeparate(GL_FUNC_ADD, GL_MAX);
+        gGL.setBlendEquation(GL_FUNC_ADD, GL_MAX);
     }
     gGL.setColorMask(true, glint_glow);
 
@@ -215,8 +227,13 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
     static LLCachedControl<S32> tonemap_type_setting(gSavedSettings, "AlchemyRenderTonemapType", 0U);
 
     // Everything one of the water's programs takes, the flat field's or the waves' patches'.
+    const bool refracts = water_refracts();
     const auto setup = [&](LLGLSLShader* shader, bool patches)
     {
+        // Water that does not refract reads neither copy, nor the scene's depth, which bindDeferredShader binds where
+        // it is given no copy and which this pass writes over.
+        llassert(refracts || (shader->getTextureChannel(LLShaderMgr::WATER_SCREENTEX) < 0 &&
+                              shader->getTextureChannel(LLShaderMgr::DEFERRED_DEPTH) < 0));
         gPipeline.bindDeferredShader(*shader, nullptr, gPipeline.waterDepthCopy());
 
         if (bound_a)
@@ -329,7 +346,12 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
         gPipeline.mWaterPrimitives.begin();
     }
 
-    LLGLSLShader* flat = underwater ? gUnderWaterProgram.selectVariant() : gWaterProgram.selectVariant();
+    // The opaque programs beside the transparent ones where this view's water does not refract; with the setting off
+    // the water's programs are opaque already.
+    const bool opaque_beside = LLPipeline::sRenderTransparentWater && !refracts;
+    LLGLSLShader& flat_program = underwater ? (opaque_beside ? gUnderWaterOpaqueProgram : gUnderWaterProgram)
+                                            : (opaque_beside ? gWaterOpaqueProgram : gWaterProgram);
+    LLGLSLShader* flat = flat_program.selectVariant();
     setup(flat, false);
     draw(flat, false);
     gPipeline.unbindDeferredShader(*flat);
@@ -341,8 +363,7 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     if (glint_glow)
     {
-        gGL.flush();
-        glBlendEquationSeparate(GL_FUNC_ADD, GL_FUNC_ADD);
+        gGL.setBlendEquation(GL_FUNC_ADD, GL_FUNC_ADD);
         gGL.setSceneBlendType(LLRender::BT_ALPHA);
     }
     gGL.setColorMask(true, false);

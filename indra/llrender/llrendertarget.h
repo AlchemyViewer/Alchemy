@@ -301,6 +301,11 @@ public:
     // The scissor does not clip it, and what is bound stays bound.
     void copyFromBound(S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0, S32 dstX1, S32 dstY1, U32 filter);
 
+    // Copies the `width` x `height` rect at (x, y) of the window's framebuffer, the one drawn into with no target
+    // bound, into colour attachment 0 at its origin, one to one, whatever is bound now. What is bound stays bound, and
+    // texture slot 0 is left holding the attachment.
+    void copyFromWindow(S32 x, S32 y, S32 width, S32 height);
+
     //Returns TRUE if target is ready to be rendered into.
     //That is, if the target has been allocated with at least
     //one renderable attachment (i.e. color buffer, depth buffer).

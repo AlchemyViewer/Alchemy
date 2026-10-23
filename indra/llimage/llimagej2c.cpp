@@ -85,6 +85,24 @@ S8  LLImageJ2C::getRawDiscardLevel()
     return mRawDiscardLevel;
 }
 
+// virtual
+void LLImageJ2C::deleteData()
+{
+    LLImageDataLock lock(this);
+
+    mLayout = {};
+    LLImageFormatted::deleteData();
+}
+
+// virtual
+void LLImageJ2C::onDataChanged()
+{
+    if (!mLayout.isValid())
+    {
+        mLayout = ALJ2CLayout::parse(getData(), getDataSize());
+    }
+}
+
 bool LLImageJ2C::updateData()
 {
     bool res = true;
@@ -100,6 +118,7 @@ bool LLImageJ2C::updateData()
     }
     else
     {
+        mLayout = ALJ2CLayout::parse(getData(), getDataSize());
         res = mImpl->getMetadata(*this);
     }
 
@@ -223,7 +242,8 @@ S32 LLImageJ2C::calcHeaderSizeJ2C()
 S32 LLImageJ2C::calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 rate)
 {
     // Estimates the byte budget needed to decode at `discard_level`. Smaller
-    // discards (higher quality) take more bytes.
+    // discards (higher quality) take more bytes. It sizes a codestream whose
+    // headers are not in hand; ALJ2CLayout sizes one whose headers are.
     //
     // This is the historical sqrt-based "Byte Range Study" formula from the
     // THX1138 KDU work (see
@@ -234,8 +254,7 @@ S32 LLImageJ2C::calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 r
     // indra/vcpkg/ports/openjpeg/, OJ tolerates truncation natively and the
     // inflated curve only delays progressive previews unnecessarily.
     //
-    // Two estimators are computed and the smaller picked when
-    // `LLImage::useNewByteRange()` is on (default true):
+    // Two estimators are computed and the smaller picked:
     //   * `new_bytes` = sqrt(w*h) * comp * rate * 1000 / layer_factor
     //     — KDU-derived approximation tracking the rate-distortion curve.
     //   * `old_bytes` = w * h * comp * rate
@@ -271,16 +290,9 @@ S32 LLImageJ2C::calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 r
 
     S32 new_bytes = (S32)(sqrt((F32)(w * h)) * (F32)components * rate * 1000.f / layer_factor);
     S32 old_bytes = (S32)((F32)(w * h * components) * rate);
-    S32 bytes = (LLImage::useNewByteRange() && (new_bytes < old_bytes)) ? new_bytes : old_bytes;
-    // Floor at MIN_LAYER_SIZE rather than calcHeaderSizeJ2C() (== FIRST_PACKET_SIZE,
-    // 600). At a 50% reverse-byte-range threshold, the old floor triggered
-    // decode at ~300 bytes — past the main header but before any packet
-    // body data was present. With OpenJPEG patched to tolerate truncated
-    // tile-parts, the empty decode no longer errors out but still produces
-    // mid-grey via the DC level shift on zero coefficients (until the
-    // openjpeg tcd.c overlay patch lands too). MIN_LAYER_SIZE (2000) gives
-    // a 1000-byte threshold, which is enough for the main header plus at
-    // least one packet body of low-resolution coefficient data.
+    S32 bytes = llmin(new_bytes, old_bytes);
+    // MIN_LAYER_SIZE holds the main header and at least one packet body of
+    // low-resolution coefficient data.
     bytes = llmax(bytes, MIN_LAYER_SIZE);
     return bytes;
 }
@@ -293,6 +305,11 @@ S32 LLImageJ2C::calcHeaderSize()
 // calcDataSize() returns how many bytes to read to load discard_level (including header)
 S32 LLImageJ2C::calcDataSize(S32 discard_level)
 {
+    if (mLayout.isValid())
+    {
+        return mLayout.calcDataSize(discard_level);
+    }
+
     discard_level = llclamp(discard_level, 0, MAX_DISCARD_LEVEL);
     if ( mAreaUsedForDataSizeCalcs != (getHeight() * getWidth())
         || (mDataSizes[0] == 0))
@@ -312,6 +329,11 @@ S32 LLImageJ2C::calcDataSize(S32 discard_level)
 S32 LLImageJ2C::calcDiscardLevelBytes(S32 bytes)
 {
     llassert(bytes >= 0);
+    if (mLayout.isValid())
+    {
+        return mLayout.calcDiscardLevelBytes(bytes);
+    }
+
     S32 discard_level = 0;
     if (bytes == 0)
     {
@@ -319,9 +341,7 @@ S32 LLImageJ2C::calcDiscardLevelBytes(S32 bytes)
     }
     while (1)
     {
-        S32 bytes_needed = calcDataSize(discard_level);
-        // Use TextureReverseByteRange percent (see settings.xml) of the optimal size to qualify as correct rendering for the given discard level
-        if (bytes >= (bytes_needed*LLImage::getReverseByteRangePercent()/100))
+        if (bytes >= calcDataSize(discard_level))
         {
             break;
         }

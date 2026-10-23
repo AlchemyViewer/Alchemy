@@ -74,10 +74,29 @@ namespace
     struct PendingPublish
     {
         LLPointer<LLImageGL> mImage;
-        GLsync               mFence = nullptr;
+        GLsync               mFence = nullptr; // null once seen signalled
         LLGLuint             mName  = 0;
     };
     std::vector<PendingPublish> sPendingPublishes;
+
+    // Whether the upload's fence has signalled, polled now; once it has, the fence goes.
+    bool poll_signalled(PendingPublish& pending)
+    {
+        const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
+        if (res == GL_TIMEOUT_EXPIRED)
+        {
+            return false;
+        }
+        if (res == GL_WAIT_FAILED)
+        {
+            // Not a valid sync object: there is no completion guarantee to offer, so say so
+            // rather than hand over a texture that may not be ready without a word.
+            LL_WARNS_ONCE("LLImageGL") << "glClientWaitSync failed on a texture upload fence." << LL_ENDL;
+        }
+        glDeleteSync(pending.mFence);
+        pending.mFence = nullptr;
+        return true;
+    }
 }
 
 // Number of mip levels in a full pyramid for the given level-0 dimensions, counting
@@ -98,6 +117,14 @@ S32 LLImageGL::calcMipLevelCount(S32 width, S32 height)
 
 
 U32 LLImageGL::sFrameCount = 0;
+
+// The last content stamp handed out (LLImageGL::getContentStamp).
+static std::atomic<U64> sContentStamps{ 0 };
+
+void LLImageGL::touchContents()
+{
+    mContentStamp.store(sContentStamps.fetch_add(1, std::memory_order_relaxed) + 1, std::memory_order_relaxed);
+}
 
 
 // texture memory accounting (for macOS)
@@ -338,7 +365,10 @@ void LLImageGL::cleanupClass()
         pending.mImage->endUpload();
         if (gl_alive)
         {
-            glDeleteSync(pending.mFence);
+            if (pending.mFence)
+            {
+                glDeleteSync(pending.mFence);
+            }
             deleteTextures(1, &pending.mName);
         }
         else
@@ -1090,6 +1120,7 @@ void LLImageGL::setImage(const LLImageRaw* imageraw)
 bool LLImageGL::setImage(const U8* data_in, bool data_hasmips /* = false */, S32 usename /* = 0 */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    touchContents();
 
     const bool is_compressed = isCompressed();
 
@@ -1528,6 +1559,7 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         //LL_WARNS() << "Setting subimage on image without GL texture" << LL_ENDL;
         return false;
     }
+    touchContents();
     if (datap == NULL)
     {
         // *TODO: Re-enable warning?  Ran into thread locking issues? DK 2011-02-18
@@ -1638,6 +1670,7 @@ bool LLImageGL::setSubImageFromFrameBuffer(S32 fb_x, S32 fb_y, S32 x_pos, S32 y_
 {
     if (gGL.getTextureSlot(0)->bind(this, false, true))
     {
+        touchContents();
         glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x_pos, y_pos, fb_x, fb_y, width, height);
         mGLTextureCreated = true;
         stop_glerror();
@@ -1708,7 +1741,8 @@ void LLImageGL::updateClass()
         sFreeList[idx].resize(0);
     }
 
-    publishUploads();
+    // What the last frame's end saw signalled (pollUploads): no poll here, in the middle of the frame.
+    publishUploads(false);
 }
 
 // static
@@ -2198,7 +2232,28 @@ void LLImageGL::finishUploads()
     }
 }
 
-U32 LLImageGL::publishUploads()
+// static
+void LLImageGL::pollUploads()
+{
+    if (sPendingPublishes.empty())
+    {
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+
+    // Oldest first, up to the first not yet signalled, as publishUploads walks them.
+    for (PendingPublish& pending : sPendingPublishes)
+    {
+        if (pending.mFence && !poll_signalled(pending))
+        {
+            break;
+        }
+    }
+}
+
+U32 LLImageGL::publishUploads(bool poll)
 {
     if (sPendingPublishes.empty())
     {
@@ -2211,25 +2266,15 @@ U32 LLImageGL::publishUploads()
     // Fences of one context signal in the order they were issued, and every one here is the
     // LLImageGL thread's, queued in the order it laid them: walking oldest first publishes an
     // image's uploads in order, and the first still pending leaves every later one pending
-    // too, so the walk stops there. Each poll is a call that returns a value, which a threaded
-    // driver such as Mesa's glthread answers only once its own thread has caught up. The ready
-    // ones are taken out before any is published: publishing runs the callers' callbacks,
-    // which must find the list settled.
+    // too, so the walk stops there. The ready ones are taken out before any is published:
+    // publishing runs the callers' callbacks, which must find the list settled.
     std::vector<PendingPublish> ready;
     for (PendingPublish& pending : sPendingPublishes)
     {
-        const GLenum res = glClientWaitSync(pending.mFence, 0, 0);
-        if (res == GL_TIMEOUT_EXPIRED)
+        if (pending.mFence && !(poll && poll_signalled(pending)))
         {
             break;
         }
-        if (res == GL_WAIT_FAILED)
-        {
-            // Not a valid sync object: there is no completion guarantee to offer, so say so
-            // rather than hand over a texture that may not be ready without a word.
-            LL_WARNS_ONCE("LLImageGL") << "glClientWaitSync failed on a texture upload fence." << LL_ENDL;
-        }
-        glDeleteSync(pending.mFence);
         ready.push_back(std::move(pending));
     }
     sPendingPublishes.erase(sPendingPublishes.begin(), sPendingPublishes.begin() + ready.size());
@@ -3498,7 +3543,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
 
     if (use_fbo)
     { // use an FBO to downscale the texture
-        glViewport(0, 0, desired_width, desired_height);
+        gGL.setViewport(0, 0, desired_width, desired_height);
 
         // draw a full screen triangle, sampling the old (larger) texture
         if (gGL.getTextureSlot(0)->bind(this, true, true))

@@ -2278,6 +2278,28 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderMaxFramesAhead</key>
+        <map>
+            <key>Comment</key>
+            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 3, the default, keeps a GPU-bound frame's CPU work and the driver's under the GPU's: at 1 a GPU-bound scene that runs at 150 fps can fall to 50. Past 3 the frame rings, four deep (the uniform blocks' segments, the queries' batches), can wait inside a frame for a GPU that far behind. 1 is the least latency. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>3</integer>
+        </map>
+        <key>AlchemyRenderPacingSlackWork</key>
+        <map>
+            <key>Comment</key>
+            <string>While AlchemyRenderMaxFramesAhead paces the frames and the GPU is the slower, run the main loop's queued work (textures, meshes and replies arriving from other threads) in the time each frame's end would otherwise wait for the GPU, for half as long as the shortest of the last eight frames' waits shows there is. Off, that work runs only in its millisecond a frame (MainWorkTime). Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderDepthBoundsTest</key>
         <map>
             <key>Comment</key>
@@ -2377,6 +2399,28 @@
             <key>Value</key>
             <real>200.0</real>
         </map>
+        <key>AlchemyRenderSpotShadowCache</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw a projector (spot light) shadow map only when its light or what it casts has changed, and keep it otherwise. Off draws both maps every frame, which tells a map kept stale from a shadow drawn wrong.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderSpotShadowMaxResolution</key>
+        <map>
+            <key>Comment</key>
+            <string>Largest edge of the two projector (spot light) shadow maps, in texels. They are square at the render width times RenderShadowResolutionScale up to this edge. 0 takes the render width alone. Reallocates the spot shadow maps.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>2048</integer>
+        </map>
         <key>AlchemyRenderTerrainHexTiling</key>
         <map>
             <key>Comment</key>
@@ -2402,13 +2446,13 @@
         <key>AlchemyRenderTerrainTessDensity</key>
         <map>
             <key>Comment</key>
-            <string>Base density of the terrain tessellation: metres of patch edge per level, divided by the distance to the camera, so at 64 a 16 m patch is split 64 ways (25 cm) within 16 m of the camera, 16 ways (1 m) at 64 m and not at all past 1 km. The terrain detail slider multiplies it. Triangle count grows with the square; clamped to 8 to 256.</string>
+            <string>Base density of the terrain tessellation: metres of patch edge per level, divided by the distance to the camera, so at 48 a 16 m patch is split 48 ways (33 cm) within 16 m of the camera, 12 ways (1.3 m) at 64 m and not at all past 768 m. The terrain detail slider multiplies it. Triangle count grows with the square; clamped to 8 to 256.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>F32</string>
             <key>Value</key>
-            <real>64</real>
+            <real>48</real>
         </map>
         <key>AlchemyRenderTerrainTessRasterSegment</key>
         <map>
@@ -2765,13 +2809,13 @@
         <key>AlchemyRenderUBOUpdateMode</key>
         <map>
             <key>Comment</key>
-            <string>Upload strategy for the engine's shared uniform blocks: 0 = direct sub-updates per write, 1 = orphan and re-upload whole block per draw, 2 = stream through a shared ring buffer (unsynchronized map/unmap), 3 = stream through a persistently-mapped coherent ring (no per-draw map/orphan; falls back to 1 if buffer-storage is unavailable), 4 = persistently-mapped NON-coherent ring with explicit flush (often faster than 3 where coherent mappings are write-combined). Applies live; 2-4 avoid GPU sync stalls on drivers where buffer sub-updates are expensive (macOS).</string>
+            <string>Upload strategy for the engine's shared uniform blocks: 0 = direct sub-updates per write, 1 = orphan and re-upload whole block per draw, 2 = stream through a shared ring buffer (unsynchronized map/unmap), 3 = stream through a persistently-mapped coherent ring (no per-draw map/orphan; falls back to 1 if buffer-storage is unavailable), 4 = persistently-mapped NON-coherent ring with explicit flush (often faster than 3 where coherent mappings are write-combined; falls back to 1 likewise), the default. Applies live; 2-4 avoid GPU sync stalls on drivers where buffer sub-updates are expensive (macOS). The feature tables hold Intel's drivers short of OpenGL 4.6 at 1, and give macOS 2.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
             <string>S32</string>
             <key>Value</key>
-            <integer>1</integer>
+            <integer>4</integer>
         </map>
         <key>AlchemyRevokeObjectPerms</key>
         <map>

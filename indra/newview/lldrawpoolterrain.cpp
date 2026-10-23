@@ -65,6 +65,37 @@ int DebugDetailMap = 0;
 constexpr F32 TESS_DENSITY_MIN = 8.f;
 constexpr F32 TESS_DENSITY_MAX = 256.f;
 
+// How far the main camera moves before a spot light's kept shadow map takes the terrain's levels from it again. A map
+// drawn for a camera in the same metre keeps the levels it was drawn with, which are off from the receiver's by no more
+// than a metre's move changes them.
+constexpr F32 SPOT_SHADOW_CAMERA_STEP = 1.f;
+
+namespace
+{
+    // How the terrain programs tessellate, as bindSurface hands it to them: the density the distance's levels come
+    // from, 0 where the programs were built to pin the levels to the grid's, and the texels or pixels of a shadow map's
+    // or capture's raster a segment may span, 0 for no cap.
+    struct TessLevels
+    {
+        F32 mDensity;
+        F32 mSegment;
+    };
+
+    TessLevels tess_levels()
+    {
+        // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
+        // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
+        // above 0 otherwise whatever a debug RenderTerrainLODFactor says.
+        static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 48.f);
+        static LLCachedControl<F32> raster_segment(gSavedSettings, "AlchemyRenderTerrainTessRasterSegment", 8.f);
+        const F32 density = gPipeline.shaderInputs().mLocal.mTerrainTessPinned
+            ? 0.f
+            : llmax(llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * LLDrawPoolTerrain::sLODFactor,
+                    F_APPROXIMATELY_ZERO);
+        return { density, (F32)raster_segment };
+    }
+}
+
 S32 LLDrawPoolTerrain::sPBRDetailMode = 0;
 F32 LLDrawPoolTerrain::sDetailScale = DETAIL_SCALE;
 F32 LLDrawPoolTerrain::sPBRDetailScale = DETAIL_SCALE;
@@ -133,13 +164,8 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     const LLVector3& camera_origin = LLViewerCamera::getInstance()->getOrigin();
     const LLVector3 origin = camera_origin - regionp->getOriginAgent();
     shader->uniform3fv(LLShaderMgr::TERRAIN_TESS_ORIGIN, 1, origin.mV);
-    // Pinned (density 0, which terrainTC reads as the grid's level) exactly when the programs were built with the
-    // spacing that cuts the grid's level into its segments (TERRAIN_TESS_PINNED), from the same latched input, and
-    // above 0 otherwise whatever a debug RenderTerrainLODFactor says.
-    static LLCachedControl<F32> tess_density(gSavedSettings, "AlchemyRenderTerrainTessDensity", 64.f);
-    const F32 density = gPipeline.shaderInputs().mLocal.mTerrainTessPinned
-        ? 0.f
-        : llmax(llclamp((F32)tess_density, TESS_DENSITY_MIN, TESS_DENSITY_MAX) * sLODFactor, F_APPROXIMATELY_ZERO);
+    const TessLevels levels = tess_levels();
+    const F32        density = levels.mDensity;
     shader->uniform1f(LLShaderMgr::TERRAIN_TESS_DENSITY, density);
 
     // A shadow map or a capture also holds each edge to the segments its own raster resolves (terrainTC.glsl), from
@@ -148,8 +174,7 @@ void LLDrawPoolTerrain::bindSurface(LLGLSLShader* shader)
     // main view's nearest sun cascade: the terrain it casts lies under the camera, where a caster that strays from the
     // lit surface shows most, and only a small shadow map would give the cap anything to cut there. A capture's nearest
     // cascade keeps the cap, or it would tessellate around the probe finer than the capture itself.
-    static LLCachedControl<F32> raster_segment(gSavedSettings, "AlchemyRenderTerrainTessRasterSegment", 8.f);
-    const F32 segment = raster_segment;
+    const F32 segment = levels.mSegment;
     const bool near_cascade = !gCubeSnapshot && LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_SUN_SHADOW0;
     if ((LLPipeline::sShadowRender || gCubeSnapshot) && !near_cascade && segment > 0.f && density > 0.f)
     {
@@ -270,6 +295,41 @@ void LLDrawPoolTerrain::renderShadow(S32 pass)
     unbindSurface(&gDeferredTerrainShadowProgram);
 }
 
+
+// virtual
+void LLDrawPoolTerrain::addShadowCasters(ALSpotShadowCache::Casters& casters)
+{
+    if (mDrawFace.empty())
+    {
+        return;
+    }
+
+    // What bindSurface hands the shadow program: the region's heights and placement, and levels from the distance to
+    // the main camera, so the patches tessellate again as it moves a metre.
+    LLViewerRegion*  regionp = mDrawFace[0]->getDrawable()->getVObj()->getRegion();
+    LLSurface&       land    = regionp->getLand();
+    const TessLevels levels  = tess_levels();
+    const LLVector3& camera  = LLViewerCamera::getInstance()->getOrigin();
+    ALSpotShadowCache::Hash surface;
+    surface.add((U64)land.getSurfaceMaps().getVersion()).add((U64)land.hasZData());
+    surface.add(regionp->mRenderMatrix);
+    for (U32 axis = 0; axis < 3; ++axis)
+    {
+        surface.add((U64)(U32)llfloor(camera.mV[axis] / SPOT_SHADOW_CAMERA_STEP));
+    }
+    surface.add(levels.mDensity).add(levels.mSegment).add((U64)LLSurface::isSmoothing());
+    surface.add(land.getMetersPerGrid()).add(regionp->getWidth());
+    casters.add(surface);
+
+    for (LLFace* facep : mDrawFace)
+    {
+        ALSpotShadowCache::Hash draw;
+        ALSpotShadowCache::foldGeometry(draw, facep->getVertexBuffer(), facep->getGeomIndex(),
+                                        facep->getGeomIndex() + facep->getGeomCount() - 1, facep->getIndicesCount(),
+                                        facep->getIndicesStart(), 0);
+        casters.add(draw);
+    }
+}
 
 void LLDrawPoolTerrain::drawLoop()
 {
