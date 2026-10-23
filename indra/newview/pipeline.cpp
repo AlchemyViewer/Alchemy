@@ -217,8 +217,6 @@ F32 LLPipeline::RenderSSAOScale;
 U32 LLPipeline::RenderSSAOMaxScale;
 F32 LLPipeline::RenderSSAOFactor;
 LLVector3 LLPipeline::RenderSSAOEffect;
-F32 LLPipeline::RenderShadowOffsetError;
-F32 LLPipeline::RenderShadowBiasError;
 F32 LLPipeline::RenderShadowOffset;
 F32 LLPipeline::RenderShadowBias;
 F32 LLPipeline::RenderSpotShadowOffset;
@@ -620,8 +618,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderSSAOMaxScale");
     connectRefreshCachedSettingsSafe("RenderSSAOFactor");
     connectRefreshCachedSettingsSafe("RenderSSAOEffect");
-    connectRefreshCachedSettingsSafe("RenderShadowOffsetError");
-    connectRefreshCachedSettingsSafe("RenderShadowBiasError");
     connectRefreshCachedSettingsSafe("RenderShadowOffset");
     connectRefreshCachedSettingsSafe("RenderShadowBias");
     connectRefreshCachedSettingsSafe("RenderSpotShadowOffset");
@@ -1493,8 +1489,6 @@ void LLPipeline::refreshCachedSettings()
     RenderSSAOMaxScale = gSavedSettings.getU32("RenderSSAOMaxScale");
     RenderSSAOFactor = gSavedSettings.getF32("RenderSSAOFactor");
     RenderSSAOEffect = gSavedSettings.getVector3("RenderSSAOEffect");
-    RenderShadowOffsetError = gSavedSettings.getF32("RenderShadowOffsetError");
-    RenderShadowBiasError = gSavedSettings.getF32("RenderShadowBiasError");
     RenderShadowOffset = gSavedSettings.getF32("RenderShadowOffset");
     RenderShadowBias = gSavedSettings.getF32("RenderShadowBias");
     RenderSpotShadowOffset = gSavedSettings.getF32("RenderSpotShadowOffset");
@@ -11381,11 +11375,11 @@ void LLPipeline::packDeferredUBO()
     d.proj_shadow_res[1] = (F32)spot_map->getHeight();
 
     // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
-    // reference is pushed the other way: negate the bias (incl. the camera-error term) at
-    // this single assembly site. shadowUtil.glsl stays byte-identical. Offsets keep sign.
-    const F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]) / 3000.f;
-    const F32 bias_sign         = LLRender::sReverseZ ? -1.f : 1.f;
-    d.shadow_bias        = bias_sign * (RenderShadowBias + shadow_bias_error);
+    // reference is pushed the other way: negate the bias at this single assembly site.
+    // Offsets keep sign. The bias does not grow with altitude: the receivers are in eye space
+    // and every light view is centred on the camera, so no precision is lost to it.
+    const F32 bias_sign  = LLRender::sReverseZ ? -1.f : 1.f;
+    d.shadow_bias        = bias_sign * RenderShadowBias;
     d.shadow_offset      = RenderShadowOffset;
     d.spot_shadow_bias   = bias_sign * RenderSpotShadowBias;
     d.spot_shadow_offset = RenderSpotShadowOffset;
@@ -14026,6 +14020,18 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 }
             }
 
+            // Casters nearer the light than every receiver are drawn clamped onto the near plane (drawShadow's depth
+            // clamp), and a receiver's compare reference moves toward lit by the constant bias (twice RenderShadowBias,
+            // directionalShadow) and at most half a texel of its capped slope on each axis (SHADOW_RPDB_MAXBIAS 0.01,
+            // filterShadowGather). A receiver that close to the near plane read lit against all of them: the topmost
+            // surface in view lost the shadow of anything above the view, a roof out of frame, until the view took the
+            // roof in and the near plane rose past it. Each fit keeps twice that reach of its depth range, in normalized
+            // depth, clear between the near plane and the receivers nearest the light: the ortho fit by moving its near
+            // plane out, the perspective fit by narrowing its depth scale (fz), which clears the same share at every
+            // distance from its origin. At most a quarter of the range, however large a bias is asked for.
+            const F32 near_free = llmin(2.f * (2.f * fabsf(RenderShadowBias) + 0.01f), 0.25f);
+            const F32 near_z = max.mV[2] + (max.mV[2] - min.mV[2]) * near_free / (1.f - near_free);
+
             // Construct a perspective transform with perspective along y-axis that contains
             // points in wpf
             //Known:
@@ -14119,7 +14125,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     origin.clearVec();
                     proj[j] = al_ortho(min.mV[0], max.mV[0],
                                         min.mV[1], max.mV[1],
-                                        -max.mV[2], -min.mV[2]);
+                                        -near_z, -min.mV[2]);
                 }
                 else
                 {
@@ -14210,7 +14216,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         mShadowError.mV[j] = -1.f;
                         proj[j] = al_ortho(min.mV[0], max.mV[0],
                                 min.mV[1], max.mV[1],
-                                -max.mV[2], -min.mV[2]);
+                                -near_z, -min.mV[2]);
                     }
                     else
                     {
@@ -14232,8 +14238,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         view[j] = LLMatrix4a::lookDir(origin_agent, LLVector4a(lightDir.mV[0], lightDir.mV[1], lightDir.mV[2]), LLVector4a(-up.mV[0], -up.mV[1], -up.mV[2]));
 
                         F32 fx = 1.f/tanf(fovx);
-                        // MIN_SHADOW_DEPTH across at yfar, at least; also where the field of view came out NaN.
-                        F32 fz = 1.f/tanf(llmax(fovz, atanf(MIN_SHADOW_DEPTH * 0.5f / yfar)));
+                        // MIN_SHADOW_DEPTH across at yfar, at least; also where the field of view came out NaN. The
+                        // receivers then span normalized depth [0, 1]: narrowed to keep near_free clear at either end.
+                        F32 fz = (1.f - 2.f * near_free) / tanf(llmax(fovz, atanf(MIN_SHADOW_DEPTH * 0.5f / yfar)));
 
                         proj[j].mMatrix[0].set(-fx, 0.f, 0.f, 0.f);
                         proj[j].mMatrix[1].set(0.f, (yfar + ynear) / (ynear - yfar), 0.f, -1.f);

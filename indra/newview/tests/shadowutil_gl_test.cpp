@@ -2,7 +2,8 @@
  * @file shadowutil_gl_test.cpp
  * @brief shadowUtil.glsl's samplers on the hidden window, with a map on every shadow unit that shadows every receiver:
  *        a map the pass has none of (unbuilt_shadow_maps) reads lit, at its cascade's weight, and the rest as their
- *        maps say, under the compare and the PCSS samplers alike.
+ *        maps say, under the compare and the PCSS samplers alike. And a receiver lying on the plane its map holds,
+ *        magnified so that a texel spans many pixels, reads lit under both: the receiver-plane bias follows the plane.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -105,8 +106,10 @@ namespace
         F32 ssao_max_radius;
         F32 ssao_factor;
         F32 ssao_factor_inv;
+        F32 shadow_pcss_scale;
+        F32 specular_exponent;
     };
-    static_assert(sizeof(DeferredBlock) == 496);
+    static_assert(sizeof(DeferredBlock) == 512);
 
     struct shadowutil_data
     {
@@ -251,9 +254,243 @@ namespace
         S32 mChannels[MAPS] = { -1, -1, -1, -1, -1, -1 };
         std::vector<F32> mPixels;
     };
+
+    // A map PLANE_RES texels square, and an output PLANE_OUT pixels square showing PLANE_SPAN of its texels about its
+    // centre: a texel spans 32 pixels, and a pixel steps 1/16384 across the map, which squared is under the 1e-8 a
+    // fixed floor on the receiver-plane solve's determinant would hold it to.
+    constexpr S32 PLANE_RES  = 512;
+    constexpr S32 PLANE_OUT  = 128;
+    constexpr F32 PLANE_SPAN = 4.f;
+
+    // The constant bias directionalShadow takes from shadow_bias, twice this.
+    constexpr F32 PLANE_BIAS = 0.002f;
+
+    // The plane's depth steps a texel along the map's v.
+    // - Shallow, under the constant bias: a texel compared against a ref taken within a texel of its centre reads lit,
+    //   and over two thirds of it, so a receiver whose bias does not follow its plane is shadowed by the compare tier's
+    //   taps a texel and a half out.
+    // - Steep, over the constant bias in half a texel: a texel compared against a ref taken anywhere but its own centre,
+    //   as a 2x2 gather's one ref is taken half a texel off each of its texels, is shadowed by its own plane.
+    constexpr F32 PLANE_STEP_SHALLOW = 0.003f;
+    constexpr F32 PLANE_STEP_STEEP   = 0.009f;
+
+    // The defines the plane's programs read, at a depth step of `step` a texel.
+    std::string planeDefines(F32 step)
+    {
+        return "#version 400\n"
+               "#define PLANE_RES " + std::to_string(PLANE_RES) + ".0\n"
+               "#define PLANE_OUT " + std::to_string(PLANE_OUT) + ".0\n"
+               "#define PLANE_SPAN " + std::to_string(PLANE_SPAN) + "\n"
+               "#define PLANE_STEP " + std::to_string(step) + "\n";
+    }
+
+    // The plane's depth at each texel's centre: 0.5 at the map's middle row, PLANE_STEP more each row up.
+    const char* kPlaneDepth =
+        "void main() { gl_FragDepth = 0.5 + PLANE_STEP * (gl_FragCoord.y - 0.5 * PLANE_RES); }\n";
+
+    // The receiver on that plane under each pixel, in an eye space the shadow matrix takes to the map as it is: x and y
+    // about its centre, and the depth about 0.5.
+    const char* kPlaneReceiver =
+        "out vec4 frag_color;\n"
+        "float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);\n"
+        "void main()\n"
+        "{\n"
+        "    vec2 uv = (0.5 * PLANE_RES + (gl_FragCoord.xy / PLANE_OUT - 0.5) * PLANE_SPAN) / PLANE_RES;\n"
+        "    vec3 pos = vec3(uv - 0.5, PLANE_STEP * PLANE_RES * (uv.y - 0.5));\n"
+        "    frag_color = vec4(sampleDirectionalShadow(pos, vec3(0.0, 0.0, 1.0), gl_FragCoord.xy / PLANE_OUT), 0.0, 0.0, 1.0);\n"
+        "}\n";
+
+    // A silhouette across the plane, as the sun pass sees one: the receivers from SILHOUETTE_COLUMN on lie 0.2 behind
+    // it, so the quad holding columns 64 and 65 spans the step and column 64's derivatives reach across it.
+    constexpr S32 SILHOUETTE_COLUMN = 65;
+    const char* kSilhouetteReceiver =
+        "out vec4 frag_color;\n"
+        "float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen);\n"
+        "void main()\n"
+        "{\n"
+        "    vec2 uv = (0.5 * PLANE_RES + (gl_FragCoord.xy / PLANE_OUT - 0.5) * PLANE_SPAN) / PLANE_RES;\n"
+        "    float behind = gl_FragCoord.x > 65.0 ? 0.2 : 0.0;\n"
+        "    vec3 pos = vec3(uv - 0.5, PLANE_STEP * PLANE_RES * (uv.y - 0.5) + behind);\n"
+        "    vec3 n = vec3(0.0, 0.0, 1.0);\n"
+        "    frag_color = vec4(sampleDirectionalShadowFacing(pos, n, n, gl_FragCoord.xy / PLANE_OUT), 0.0, 0.0, 1.0);\n"
+        "}\n";
+
+    struct shadowutil_plane_data
+    {
+        shadowutil_plane_data()
+        : mShaders(std::string(AL_TEST_SHADER_DIR) + "/class")
+        {
+        }
+
+        ~shadowutil_plane_data()
+        {
+            for (S32 channel : mChannels)
+            {
+                if (channel > -1)
+                {
+                    gGL.getTextureSlot(channel)->unbind();
+                    gGL.getTextureSlot(channel)->bindSampler(0);
+                }
+            }
+            LLGLSLShader::unbind();
+            mDepth.unload();
+            mProgram.unload();
+            mShaders.clearShaderObjects();
+            mBlock.release();
+            mMap.release();
+            mOut.release();
+            mTriangle = nullptr;
+        }
+
+        // A program of the full-screen vertex stage and `fragment`, with `util` beside it where it is not 0.
+        void link(LLGLSLShader& program, const char* name, const std::string& fragment, GLuint util)
+        {
+            const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
+            const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, fragment.c_str());
+            {
+                INFO(name << " compiles");
+                REQUIRE(vs);
+                REQUIRE(fs);
+            }
+            program.mProgramObject = glCreateProgram();
+            program.mName = name;
+            program.attachObject(vs);
+            program.attachObject(fs);
+            if (util)
+            {
+                program.attachObject(util);
+            }
+            UNSCOPED_INFO(name << " links");
+            REQUIRE(program.mapAttributes());
+            glDeleteShader(vs);
+            glDeleteShader(fs);
+            UNSCOPED_INFO(name << " maps");
+            REQUIRE(program.mapUniforms());
+        }
+
+        // The sun's samplers at the compare tier or PCSS's, its cascades all one map holding the plane of depth step
+        // `step` a texel, read through the sampler the tier declares them for by `receiver`.
+        void setUp(bool pcss, F32 step, const char* receiver = kPlaneReceiver)
+        {
+            std::map<std::string, std::string> defines = { { "SUN_SHADOW", "1" }, { "SHADOW_PCSS", pcss ? "1" : "0" } };
+            S32 level = 1;
+            const GLuint util = mShaders.loadShaderFile("deferred/shadowUtil.glsl", level, GL_FRAGMENT_SHADER, &defines);
+            {
+                INFO("shadowUtil compiles");
+                REQUIRE(util != 0);
+            }
+            link(mDepth, "plane depth (test)", planeDefines(step) + kPlaneDepth, 0);
+            link(mProgram, "plane receiver (test)", planeDefines(step) + receiver, util);
+
+            mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
+            REQUIRE(mTriangle->allocateBuffer(3, 0));
+            LLStrider<LLVector3> vert;
+            mTriangle->getVertexStrider(vert);
+            vert[0].set(-1.f, 1.f, 0.f);
+            vert[1].set(-1.f, -3.f, 0.f);
+            vert[2].set(3.f, 1.f, 0.f);
+            mTriangle->unmapBuffer();
+
+            REQUIRE(mMap.allocate(PLANE_RES, PLANE_RES, 0, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE,
+                                  LLRender::sReverseZ ? LLRenderTarget::DEPTH_FMT_32F : LLRenderTarget::DEPTH_FMT_24));
+            mMap.bindTarget();
+            mDepth.bind();
+            {
+                LLGLDepthTest depth_test(GL_TRUE, GL_TRUE, GL_ALWAYS);
+                mTriangle->setBuffer();
+                mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+            mDepth.unbind();
+            mMap.flush();
+
+            // Eye space to the map's, as it is but for the offset to its middle. The bias toward lit under either
+            // depth convention, as LLPipeline::packDeferredUBO signs it.
+            DeferredBlock block{};
+            for (U32 i = 0; i < 4; ++i)
+            {
+                F32* matrix = block.shadow_matrix[i];
+                matrix[0] = matrix[5] = matrix[10] = matrix[15] = 1.f;
+                matrix[12] = matrix[13] = matrix[14] = 0.5f;
+            }
+            std::copy(std::begin(SHADOW_CLIP), std::end(SHADOW_CLIP), block.shadow_clip);
+            block.shadow_res[0] = block.shadow_res[1] = (F32)PLANE_RES;
+            block.shadow_bias = LLRender::sReverseZ ? PLANE_BIAS : -PLANE_BIAS;
+            block.shadow_pcss_scale = 200.f;
+            mBlock.update(&block, sizeof(block));
+
+            REQUIRE(mOut.allocate(PLANE_OUT, PLANE_OUT, GL_RGBA16F));
+
+            mProgram.bind();
+            const U32 sampler = gGL.getSampler(pcss ? ALSamplers::PointClamp : ALSamplers::ShadowCompare);
+            for (U32 i = 0; i < 4; ++i)
+            {
+                mChannels[i] = mProgram.enableTexture(LLShaderMgr::DEFERRED_SHADOW0 + i);
+                CAPTURE(i);
+                REQUIRE(mChannels[i] > -1);
+                gGL.getTextureSlot(mChannels[i])->bind(&mMap, true, sampler);
+            }
+            mProgram.uniform3f(LLShaderMgr::DEFERRED_SUN_DIR, 0.f, 0.f, 1.f);
+            mProgram.uniform3f(LLShaderMgr::DEFERRED_MOON_DIR, 0.f, 0.f, 1.f);
+            mProgram.uniform1i(LLShaderMgr::SUN_UP_FACTOR, 1);
+            mProgram.uniform1i(LLShaderMgr::CUBE_SNAPSHOT, 0);
+            mProgram.uniform1i(LLShaderMgr::SUN_SHADOW_CASCADES, 4);
+            mProgram.uniform1i(LLShaderMgr::UNBUILT_SHADOW_MAPS, 0);
+            mProgram.uniform2f(LLShaderMgr::DEFERRED_SCREEN_RES, (F32)PLANE_OUT, (F32)PLANE_OUT);
+            mProgram.unbind();
+        }
+
+        // Every receiver's sun shadow.
+        void run()
+        {
+            mOut.bindTarget();
+            mProgram.bind();
+            mBlock.bind(LLGLSLShader::UB_DEFERRED);
+            {
+                LLGLDepthTest depth_test(GL_FALSE);
+                mTriangle->setBuffer();
+                mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
+            }
+            mProgram.unbind();
+
+            mPixels.assign(size_t(PLANE_OUT) * PLANE_OUT * 4, 0.f);
+            glReadPixels(0, 0, PLANE_OUT, PLANE_OUT, GL_RGBA, GL_FLOAT, mPixels.data());
+            mOut.flush();
+        }
+
+        // The darkest sun shadow among the output's first `columns` columns, and where it is.
+        F32 darkest(S32 columns, S32& at_x, S32& at_y) const
+        {
+            F32 sun = 1.f;
+            for (S32 y = 0; y < PLANE_OUT; ++y)
+            {
+                for (S32 x = 0; x < columns; ++x)
+                {
+                    const F32 value = mPixels[(size_t(y) * PLANE_OUT + x) * 4];
+                    if (value < sun)
+                    {
+                        sun = value;
+                        at_x = x;
+                        at_y = y;
+                    }
+                }
+            }
+            return sun;
+        }
+
+        ll_test::SharedGLScope mGL;
+        ll_test::TestShaderMgr mShaders;
+        LLGLSLShader mDepth;
+        LLGLSLShader mProgram;
+        ALUniformBuffer mBlock;
+        LLRenderTarget mMap;
+        LLRenderTarget mOut;
+        LLPointer<LLVertexBuffer> mTriangle;
+        S32 mChannels[4] = { -1, -1, -1, -1 };
+        std::vector<F32> mPixels;
+    };
 }
 
-TEST_CASE_METHOD(shadowutil_data, "shadowutil_gl: a map the pass has none of reads lit, and the rest as their maps say", "[shadowutil_gl]")
+TEST_CASE_METHOD(shadowutil_data, "shadowutil_gl: a map the pass has none of reads lit and the rest as their maps say", "[shadowutil_gl]")
 {
     const bool pcss = GENERATE(false, true);
     CAPTURE(pcss);
@@ -281,4 +518,38 @@ TEST_CASE_METHOD(shadowutil_data, "shadowutil_gl: a map the pass has none of rea
             }
         }
     }
+}
+
+TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: a receiver on its map's plane reads lit however magnified or steep the plane",
+                 "[shadowutil_gl]")
+{
+    const bool pcss = GENERATE(false, true);
+    const F32 step = GENERATE(PLANE_STEP_SHALLOW, PLANE_STEP_STEEP);
+    CAPTURE(pcss, step);
+    setUp(pcss, step);
+    run();
+
+    // A receiver the bias does not follow reads its own plane's acne, in steps a texel tall, and a texel compared off its
+    // own plane shadows a part of every gather.
+    S32 at_x = -1;
+    S32 at_y = -1;
+    const F32 sun = darkest(PLANE_OUT, at_x, at_y);
+    CAPTURE(at_x, at_y);
+    CHECK(sun > 0.999f);
+}
+
+TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: the sun pass takes no slope across a silhouette", "[shadowutil_gl]")
+{
+    const bool pcss = GENERATE(false, true);
+    CAPTURE(pcss);
+    setUp(pcss, 0.f, kSilhouetteReceiver);
+    run();
+
+    // The plane in front, on a map holding it flat, reads lit up to the silhouette: column 64 too, whose derivatives
+    // reach the receiver behind it, and whose taps a slope solved across the step would tilt off the plane.
+    S32 at_x = -1;
+    S32 at_y = -1;
+    const F32 sun = darkest(SILHOUETTE_COLUMN, at_x, at_y);
+    CAPTURE(at_x, at_y);
+    CHECK(sun > 0.999f);
 }
