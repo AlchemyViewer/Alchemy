@@ -938,6 +938,13 @@ public:
     void optimize(F32 angle_cutoff = 2.f);
     bool cacheOptimize(bool gen_tangents = false);
 
+    // Normals made from the face's shape: smooth across an edge whose two
+    // triangles meet at less than crease_angle radians and hard across one
+    // where they meet at more, evened out over their neighbours by smoothing
+    // passes. Returns false, leaving the face as it was, where it has no
+    // triangle or would need more vertices than 16-bit indices reach.
+    bool generateNormals(F32 crease_angle, F32 smoothing);
+
     void createOctree(F32 scaler = 0.25f, const LLVector4a& center = LLVector4a(0,0,0), const LLVector4a& size = LLVector4a(0.5f,0.5f,0.5f));
     void destroyOctree();
     // Get a reference to the octree, which may be null
