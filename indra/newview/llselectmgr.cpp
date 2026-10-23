@@ -7127,7 +7127,9 @@ void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
                 mTextureScaleRatios.push_back(v);
             }
 
-            LLGLTFMaterial* material = tep->getGLTFMaterialOverride();
+            // The render material is the base with the override applied, so a
+            // transform that lives only in the base is kept.
+            const LLGLTFMaterial* material = tep->getGLTFRenderMaterial();
             LLVector3 material_v;
             F32 scale_x = 1;
             F32 scale_y = 1;
@@ -7138,7 +7140,7 @@ void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
             {
                 if (material)
                 {
-                    LLGLTFMaterial::TextureTransform& transform = material->mTextureTransform[i];
+                    const LLGLTFMaterial::TextureTransform& transform = material->mTextureTransform[i];
                     scale_x = transform.mScale[VX];
                     scale_y = transform.mScale[VY];
                     material_scales_vec.push_back(transform.mScale);
@@ -7146,7 +7148,6 @@ void LLSelectNode::saveTextureScaleRatios(LLRender::eTexIndex index_to_query)
                 }
                 else
                 {
-                    // Not having an override doesn't mean that there is no material
                     scale_x = 1;
                     scale_y = 1;
                     material_scales_vec.emplace_back(scale_x, scale_y);
