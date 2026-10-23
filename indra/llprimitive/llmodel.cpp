@@ -597,207 +597,21 @@ void LLModel::addFace(const LLVolumeFace& face)
 }
 
 
+namespace
+{
+    // Passes of meshoptimizer's normal smoothing after the crease angle has
+    // joined each smooth region's corners.
+    constexpr F32 NORMAL_SMOOTHING = 0.f;
+}
+
 void LLModel::generateNormals(F32 angle_cutoff)
 {
-    //generate normals for all faces by:
-    // 1 - Create faceted copy of face with no texture coordinates
-    // 2 - Weld vertices in faceted copy that are shared between triangles with less than "angle_cutoff" difference between normals
-    // 3 - Generate smoothed set of normals based on welding results
-    // 4 - Create faceted copy of face with texture coordinates
-    // 5 - Copy smoothed normals to faceted copy, using closest normal to triangle normal where more than one normal exists for a given position
-    // 6 - Remove redundant vertices from new faceted (now smooth) copy
-
-    angle_cutoff = cosf(angle_cutoff);
-    for (U32 j = 0; j < mVolumeFaces.size(); ++j)
+    for (LLVolumeFace& face : mVolumeFaces)
     {
-        LLVolumeFace& vol_face = mVolumeFaces[j];
-
-        if (vol_face.mNumIndices > 65535)
+        if (face.mNumIndices >= 3 && !face.generateNormals(angle_cutoff, NORMAL_SMOOTHING))
         {
-            LL_WARNS("MESHSKININFO") << "Too many vertices for normal generation to work." << LL_ENDL;
-            continue;
+            LL_WARNS("MESHSKININFO") << "Kept the normals of a face of " << mLabel << " that normal generation could not make" << LL_ENDL;
         }
-
-        //create faceted copy of current face with no texture coordinates (step 1)
-        LLVolumeFace faceted;
-
-        LLVector4a* src_pos = (LLVector4a*) vol_face.mPositions;
-        //LLVector4a* src_norm = (LLVector4a*) vol_face.mNormals;
-
-
-        faceted.resizeVertices(vol_face.mNumIndices);
-        faceted.resizeIndices(vol_face.mNumIndices);
-        //bake out triangles into temporary face, clearing texture coordinates
-        for (S32 i = 0; i < vol_face.mNumIndices; ++i)
-        {
-            U32 idx = vol_face.mIndices[i];
-
-            faceted.mPositions[i] = src_pos[idx];
-            faceted.mTexCoords[i] = LLVector2(0,0);
-            faceted.mIndices[i] = i;
-        }
-
-        //generate normals for temporary face
-        for (S32 i = 0; i < faceted.mNumIndices; i += 3)
-        { //for each triangle
-            U16 i0 = faceted.mIndices[i+0];
-            U16 i1 = faceted.mIndices[i+1];
-            U16 i2 = faceted.mIndices[i+2];
-
-            LLVector4a& p0 = faceted.mPositions[i0];
-            LLVector4a& p1 = faceted.mPositions[i1];
-            LLVector4a& p2 = faceted.mPositions[i2];
-
-            LLVector4a& n0 = faceted.mNormals[i0];
-            LLVector4a& n1 = faceted.mNormals[i1];
-            LLVector4a& n2 = faceted.mNormals[i2];
-
-            LLVector4a lhs, rhs;
-            lhs.setSub(p1, p0);
-            rhs.setSub(p2, p0);
-
-            n0.setCross3(lhs, rhs);
-            n0.normalize3();
-            n1 = n0;
-            n2 = n0;
-        }
-
-        //weld vertices in temporary face, respecting angle_cutoff (step 2)
-        faceted.optimize(angle_cutoff);
-
-        //generate normals for welded face based on new topology (step 3)
-
-        for (S32 i = 0; i < faceted.mNumVertices; i++)
-        {
-            faceted.mNormals[i].clear();
-        }
-
-        for (S32 i = 0; i < faceted.mNumIndices; i += 3)
-        { //for each triangle
-            U16 i0 = faceted.mIndices[i+0];
-            U16 i1 = faceted.mIndices[i+1];
-            U16 i2 = faceted.mIndices[i+2];
-
-            LLVector4a& p0 = faceted.mPositions[i0];
-            LLVector4a& p1 = faceted.mPositions[i1];
-            LLVector4a& p2 = faceted.mPositions[i2];
-
-            LLVector4a& n0 = faceted.mNormals[i0];
-            LLVector4a& n1 = faceted.mNormals[i1];
-            LLVector4a& n2 = faceted.mNormals[i2];
-
-            LLVector4a lhs, rhs;
-            lhs.setSub(p1, p0);
-            rhs.setSub(p2, p0);
-
-            LLVector4a n;
-            n.setCross3(lhs, rhs);
-
-            n0.add(n);
-            n1.add(n);
-            n2.add(n);
-        }
-
-        //normalize normals and build point map
-        LLVolumeFace::VertexMapData::PointMap point_map;
-
-        for (S32 i = 0; i < faceted.mNumVertices; ++i)
-        {
-            faceted.mNormals[i].normalize3();
-
-            LLVolumeFace::VertexMapData v;
-            v.setPosition(faceted.mPositions[i]);
-            v.setNormal(faceted.mNormals[i]);
-
-            point_map[LLVector3(v.getPosition().getF32ptr())].push_back(v);
-        }
-
-        //create faceted copy of current face with texture coordinates (step 4)
-        LLVolumeFace new_face;
-
-        //bake out triangles into new face
-        new_face.resizeIndices(vol_face.mNumIndices);
-        new_face.resizeVertices(vol_face.mNumIndices);
-
-        for (S32 i = 0; i < vol_face.mNumIndices; ++i)
-        {
-            U32 idx = vol_face.mIndices[i];
-            LLVolumeFace::VertexData v;
-            new_face.mPositions[i] = vol_face.mPositions[idx];
-            new_face.mNormals[i].clear();
-            new_face.mIndices[i] = i;
-        }
-
-        if (vol_face.mTexCoords)
-        {
-            for (S32 i = 0; i < vol_face.mNumIndices; i++)
-            {
-                U32 idx = vol_face.mIndices[i];
-                new_face.mTexCoords[i] = vol_face.mTexCoords[idx];
-            }
-        }
-        else
-        {
-            //ll_aligned_free_16(new_face.mTexCoords);
-            new_face.mTexCoords = NULL;
-        }
-
-        //generate normals for new face
-        for (S32 i = 0; i < new_face.mNumIndices; i += 3)
-        { //for each triangle
-            U16 i0 = new_face.mIndices[i+0];
-            U16 i1 = new_face.mIndices[i+1];
-            U16 i2 = new_face.mIndices[i+2];
-
-            LLVector4a& p0 = new_face.mPositions[i0];
-            LLVector4a& p1 = new_face.mPositions[i1];
-            LLVector4a& p2 = new_face.mPositions[i2];
-
-            LLVector4a& n0 = new_face.mNormals[i0];
-            LLVector4a& n1 = new_face.mNormals[i1];
-            LLVector4a& n2 = new_face.mNormals[i2];
-
-            LLVector4a lhs, rhs;
-            lhs.setSub(p1, p0);
-            rhs.setSub(p2, p0);
-
-            n0.setCross3(lhs, rhs);
-            n0.normalize3();
-            n1 = n0;
-            n2 = n0;
-        }
-
-        //swap out normals in new_face with best match from point map (step 5)
-        for (S32 i = 0; i < new_face.mNumVertices; ++i)
-        {
-            //LLVolumeFace::VertexData v = new_face.mVertices[i];
-
-            LLVector4a ref_norm = new_face.mNormals[i];
-
-            LLVolumeFace::VertexMapData::PointMap::iterator iter = point_map.find(LLVector3(new_face.mPositions[i].getF32ptr()));
-
-            if (iter != point_map.end())
-            {
-                F32 best = -2.f;
-                for (U32 k = 0; k < iter->second.size(); ++k)
-                {
-                    LLVector4a& n = iter->second[k].getNormal();
-
-                    F32 cur = n.dot3(ref_norm).getF32();
-
-                    if (cur > best)
-                    {
-                        best = cur;
-                        new_face.mNormals[i] = n;
-                    }
-                }
-            }
-        }
-
-        //remove redundant vertices from new face (step 6)
-        new_face.optimize();
-
-        mVolumeFaces[j] = new_face;
     }
 }
 
