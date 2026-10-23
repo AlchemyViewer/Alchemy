@@ -746,30 +746,16 @@ void sampleProbeTaps(vec3 pos, ProbeTaps t, inout vec3 ambenv, inout vec3 glosse
             neighbor = 0;
         }
     }
-
-    if (automatic && count < REF_SAMPLE_COUNT)
-    { // probe at index 0 is a special probe for smoothing out automatic probes
-        probeTap(0, pos, probeBoxPos(0, pos), t, s);
-        ++count;
-    }
-#else
-    // Water takes probe 0 below.
-    if (!t.water)
-    {
-        probeTap(0, pos, probeBoxPos(0, pos), t, s);
-        ++count;
-    }
 #endif
 
-    if (t.water)
+    // Probe 0 is a special probe for smoothing out automatic probes, and water always includes it, where the list has
+    // room, mixing it in as an automatic probe. One tap serves both: given a tap of its own under water's condition,
+    // AMD's driver read the probe's irradiance as zero across a wave whose first pixel's list was full.
+    if ((automatic || t.water) && count < REF_SAMPLE_COUNT)
     {
-        // always include void probe on water
-        automatic = true;
-        if (count < REF_SAMPLE_COUNT)
-        {
-            probeTap(0, pos, probeBoxPos(0, pos), t, s);
-        }
+        probeTap(0, pos, probeBoxPos(0, pos), t, s);
     }
+    automatic = automatic || t.water;
 
     if (t.ambient)
     {
