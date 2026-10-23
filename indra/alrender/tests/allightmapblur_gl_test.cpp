@@ -134,15 +134,18 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: one dispatch blurs texel for texel a
     poisonBlurred();
     REQUIRE(blurCompute(kernel));
 
-    const std::vector<F32> fragment = read(mLight);
+    // The dispatch's store holds the 8 bits nearest the fragment passes' single precision, or at a tie, which their
+    // value lies within a rounding of at a few texels, either of the two.
+    const std::vector<F32> fragment = read(mFloatLight);
     const std::vector<F32> compute = read(mBlurred);
+    const auto nearest = [](F32 stored, F32 value) { return std::fabs(stored - value) * 255.f <= 0.5f + 1e-4f; };
     S32 differ = 0;
     for (S32 y = 0; y < H; ++y)
     {
         for (S32 x = 0; x < W; ++x)
         {
             const size_t i = (size_t(y) * W + x) * 4;
-            if (compute[i] != fragment[i] || compute[i + 1] != fragment[i + 1])
+            if (!nearest(compute[i], fragment[i]) || !nearest(compute[i + 1], fragment[i + 1]))
             {
                 if (++differ <= 8)
                 {
