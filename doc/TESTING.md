@@ -105,7 +105,7 @@ A binary is a link set. Its files share their libraries, their fakes and their d
 
 - **`UNIT`** compiles the library's own files into the binary in place of linking the library, for a test that stubs what they call. Such a test is a binary of its own.
 - **`SUPPORT`** names object libraries linked whole: fakes and checks. A case or listener in a static archive would be dropped by the linker.
-- **`GL`** labels the entries `gl` and registers them disabled with `-DAL_ENABLE_GL_TESTS=OFF`. **`PYTHON`** gives them the interpreter, and registers them disabled without one that has `llsd`.
+- **`GL`** labels the entries `gl`, registers them disabled with `-DAL_ENABLE_GL_TESTS=OFF`, and holds Mesa's llvmpipe to AVX2 (`GALLIUM_OVERRIDE_CPU_CAPS=avx`): llvmpipe compiles the shaders for the host's CPU, and LLVM 21's AVX-512 code for AMD's Zen 4 leaves a NaN in `reflectionprobe_gl`'s screen-space reflection. A GL binary run by hand on llvmpipe wants the same. **`PYTHON`** gives them the interpreter, and registers them disabled without one that has `llsd`.
 - **`ISA_TIER`** builds the binary at an x86-64 tier, and it skips on a host below it.
 - **`RERUN`** runs some files a second time with more environment. alscript's SLua tests run again under Luau's new solver, as `alscript_tests_newsolver/<file stem>`, with `AL_TEST_LUAU_SOLVER=new`.
 - **`<binary>/stray_cases`** fails when a case belongs to no file's entry, such as one written in a header.
