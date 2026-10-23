@@ -217,8 +217,6 @@ F32 LLPipeline::RenderSSAOScale;
 U32 LLPipeline::RenderSSAOMaxScale;
 F32 LLPipeline::RenderSSAOFactor;
 LLVector3 LLPipeline::RenderSSAOEffect;
-F32 LLPipeline::RenderShadowOffsetError;
-F32 LLPipeline::RenderShadowBiasError;
 F32 LLPipeline::RenderShadowOffset;
 F32 LLPipeline::RenderShadowBias;
 F32 LLPipeline::RenderSpotShadowOffset;
@@ -620,8 +618,6 @@ void LLPipeline::init()
     connectRefreshCachedSettingsSafe("RenderSSAOMaxScale");
     connectRefreshCachedSettingsSafe("RenderSSAOFactor");
     connectRefreshCachedSettingsSafe("RenderSSAOEffect");
-    connectRefreshCachedSettingsSafe("RenderShadowOffsetError");
-    connectRefreshCachedSettingsSafe("RenderShadowBiasError");
     connectRefreshCachedSettingsSafe("RenderShadowOffset");
     connectRefreshCachedSettingsSafe("RenderShadowBias");
     connectRefreshCachedSettingsSafe("RenderSpotShadowOffset");
@@ -1493,8 +1489,6 @@ void LLPipeline::refreshCachedSettings()
     RenderSSAOMaxScale = gSavedSettings.getU32("RenderSSAOMaxScale");
     RenderSSAOFactor = gSavedSettings.getF32("RenderSSAOFactor");
     RenderSSAOEffect = gSavedSettings.getVector3("RenderSSAOEffect");
-    RenderShadowOffsetError = gSavedSettings.getF32("RenderShadowOffsetError");
-    RenderShadowBiasError = gSavedSettings.getF32("RenderShadowBiasError");
     RenderShadowOffset = gSavedSettings.getF32("RenderShadowOffset");
     RenderShadowBias = gSavedSettings.getF32("RenderShadowBias");
     RenderSpotShadowOffset = gSavedSettings.getF32("RenderSpotShadowOffset");
@@ -11381,11 +11375,11 @@ void LLPipeline::packDeferredUBO()
     d.proj_shadow_res[1] = (F32)spot_map->getHeight();
 
     // Reverse-Z shadow maps store reversed depth and sample with GEQUAL, so the receiver
-    // reference is pushed the other way: negate the bias (incl. the camera-error term) at
-    // this single assembly site. shadowUtil.glsl stays byte-identical. Offsets keep sign.
-    const F32 shadow_bias_error = RenderShadowBiasError * fabsf(LLViewerCamera::getInstance()->getOrigin().mV[2]) / 3000.f;
-    const F32 bias_sign         = LLRender::sReverseZ ? -1.f : 1.f;
-    d.shadow_bias        = bias_sign * (RenderShadowBias + shadow_bias_error);
+    // reference is pushed the other way: negate the bias at this single assembly site.
+    // Offsets keep sign. The bias does not grow with altitude: the receivers are in eye space
+    // and every light view is centred on the camera, so no precision is lost to it.
+    const F32 bias_sign  = LLRender::sReverseZ ? -1.f : 1.f;
+    d.shadow_bias        = bias_sign * RenderShadowBias;
     d.shadow_offset      = RenderShadowOffset;
     d.spot_shadow_bias   = bias_sign * RenderSpotShadowBias;
     d.spot_shadow_offset = RenderSpotShadowOffset;
