@@ -14026,6 +14026,18 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                 }
             }
 
+            // Casters nearer the light than every receiver are drawn clamped onto the near plane (drawShadow's depth
+            // clamp), and a receiver's compare reference moves toward lit by the constant bias (twice RenderShadowBias,
+            // directionalShadow) and at most half a texel of its capped slope on each axis (SHADOW_RPDB_MAXBIAS 0.01,
+            // filterShadowGather). A receiver that close to the near plane read lit against all of them: the topmost
+            // surface in view lost the shadow of anything above the view, a roof out of frame, until the view took the
+            // roof in and the near plane rose past it. Each fit keeps twice that reach of its depth range, in normalized
+            // depth, clear between the near plane and the receivers nearest the light: the ortho fit by moving its near
+            // plane out, the perspective fit by narrowing its depth scale (fz), which clears the same share at every
+            // distance from its origin. At most a quarter of the range, however large a bias is asked for.
+            const F32 near_free = llmin(2.f * (2.f * fabsf(RenderShadowBias) + 0.01f), 0.25f);
+            const F32 near_z = max.mV[2] + (max.mV[2] - min.mV[2]) * near_free / (1.f - near_free);
+
             // Construct a perspective transform with perspective along y-axis that contains
             // points in wpf
             //Known:
@@ -14119,7 +14131,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                     origin.clearVec();
                     proj[j] = al_ortho(min.mV[0], max.mV[0],
                                         min.mV[1], max.mV[1],
-                                        -max.mV[2], -min.mV[2]);
+                                        -near_z, -min.mV[2]);
                 }
                 else
                 {
@@ -14210,7 +14222,7 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         mShadowError.mV[j] = -1.f;
                         proj[j] = al_ortho(min.mV[0], max.mV[0],
                                 min.mV[1], max.mV[1],
-                                -max.mV[2], -min.mV[2]);
+                                -near_z, -min.mV[2]);
                     }
                     else
                     {
@@ -14232,8 +14244,9 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
                         view[j] = LLMatrix4a::lookDir(origin_agent, LLVector4a(lightDir.mV[0], lightDir.mV[1], lightDir.mV[2]), LLVector4a(-up.mV[0], -up.mV[1], -up.mV[2]));
 
                         F32 fx = 1.f/tanf(fovx);
-                        // MIN_SHADOW_DEPTH across at yfar, at least; also where the field of view came out NaN.
-                        F32 fz = 1.f/tanf(llmax(fovz, atanf(MIN_SHADOW_DEPTH * 0.5f / yfar)));
+                        // MIN_SHADOW_DEPTH across at yfar, at least; also where the field of view came out NaN. The
+                        // receivers then span normalized depth [0, 1]: narrowed to keep near_free clear at either end.
+                        F32 fz = (1.f - 2.f * near_free) / tanf(llmax(fovz, atanf(MIN_SHADOW_DEPTH * 0.5f / yfar)));
 
                         proj[j].mMatrix[0].set(-fx, 0.f, 0.f, 0.f);
                         proj[j].mMatrix[1].set(0.f, (yfar + ynear) / (ynear - yfar), 0.f, -1.f);
