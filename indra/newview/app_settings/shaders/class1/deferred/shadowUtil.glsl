@@ -60,7 +60,9 @@
  * shadow_clip) is view-space and convention-independent, and RPDB's dz_texel is measured in
  * whichever z space shadow_matrix produced, so it follows automatically. Only PCSS, which
  * reads raw depth and does its own comparisons, has to branch: see compareDepth4,
- * findBlockerDepth and the penumbra-radius gap below.
+ * findBlockerDepth and the penumbra-radius gap below. The hardware-compare paths branch once,
+ * for the half texel of slope a compare shares between texels it does not centre on, which they
+ * move toward lit by SHADOW_TOWARD_LIT.
  */
 
 // ---- filter configuration (override from the global defines to retune without editing) ----
@@ -103,6 +105,13 @@
 #define AL_SHADOW_SAMPLER sampler2D        // raw depth; compared in-shader
 #else
 #define AL_SHADOW_SAMPLER sampler2DShadow  // hardware depth compare
+#endif
+
+// The way a compare reference moves toward lit: to smaller depths forward, larger under reverse-Z.
+#ifdef REVERSE_Z
+#define SHADOW_TOWARD_LIT 1.0
+#else
+#define SHADOW_TOWARD_LIT -1.0
 #endif
 
 uniform sampler2D   normalMap;
@@ -157,7 +166,10 @@ vec2 receiverPlaneDepthBias(vec2 duvdx, vec2 duvdy, float dzdx, float dzdy, vec2
     // [ du/dy  dv/dy ] (dz/dv) = (dz/dy)
     float det = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
     vec2 dz_duv = vec2(0.0, 0.0);
-    if (abs(det) > 1e-8)
+    // Singular only where the pixel's two steps land on one line of the map, as for a receiver the light meets edge
+    // on: the sine between them, not det, which shrinks with the square of a step's length. Where a texel spans several
+    // pixels, which is where its acne shows, det is far below any fixed floor.
+    if (abs(det) > 1e-3 * length(duvdx) * length(duvdy))
     {
         float inv = 1.0 / det;
         dz_duv.x = ( duvdy.y * dzdx - duvdx.y * dzdy) * inv;
@@ -214,13 +226,29 @@ float pcssRotation(vec2 pos_screen)
 // justify this by the fixed-point hardware clamp: reverse-Z forces DEPTH_FMT_32F, where the
 // hardware compare does not clamp at all. The saturation is symmetric under both conventions
 // (forward pushes ref past 1 near the far plane, reverse-Z past 0), so the two tiers agree.
-vec4 compareDepth4(vec4 depth, float ref)
+vec4 compareDepth4(vec4 depth, vec4 ref)
 {
 #ifdef REVERSE_Z
-    return step(depth, vec4(clamp(ref, 0.0, 1.0)));
+    return step(depth, clamp(ref, 0.0, 1.0));
 #else
-    return step(vec4(clamp(ref, 0.0, 1.0)), depth);
+    return step(clamp(ref, 0.0, 1.0), depth);
 #endif
+}
+
+vec4 compareDepth4(vec4 depth, float ref)
+{
+    return compareDepth4(depth, vec4(ref));
+}
+
+// The compare reference of each texel textureGather reads at `at`: the receiver's depth carried along its plane to the
+// texel's centre, in the gather's order (.x (0,1), .y (1,1), .z (1,0), .w (0,0) from the lower-left texel). Those
+// centres lie up to a texel from `at` on each axis, so one reference for all four would leave a texel a texel's slope
+// off its plane, and a slope steeper than the constant bias shadow the receiver by itself.
+vec4 gatherRefs(vec3 uvz, vec2 res, vec2 at, vec2 dz_texel)
+{
+    vec2  lower_left = floor(at * res - 0.5) + 0.5 - uvz.xy * res;
+    float ref        = uvz.z + dot(lower_left, dz_texel);
+    return vec4(ref + dz_texel.y, ref + dz_texel.x + dz_texel.y, ref + dz_texel.x, ref);
 }
 
 // Rotate a disc offset by the per-pixel angle. cs = (cos phi, sin phi).
@@ -232,7 +260,7 @@ vec2 pcssRotate(vec2 v, vec2 cs)
 // Blocker search: mean depth of the texels nearer the light than the receiver. Returns a
 // negative value when nothing occludes this pixel, which the caller treats as fully lit --
 // the early-out that keeps PCSS affordable over open ground.
-float findBlockerDepth(sampler2D shadowMap, vec3 uvz, vec2 texel, vec2 dz_texel, vec2 cs)
+float findBlockerDepth(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, vec2 cs)
 {
     float sum   = 0.0;
     float count = 0.0;
@@ -240,17 +268,18 @@ float findBlockerDepth(sampler2D shadowMap, vec3 uvz, vec2 texel, vec2 dz_texel,
     for (int i = 0; i < 8; ++i)
     {
         vec2 off = pcssRotate(kPCSSBlockerDisc[i], cs) * SHADOW_PCSS_SEARCH;
-        vec4 d   = textureGather(shadowMap, uvz.xy + off * texel, 0);
-        // Follow the receiver plane out to the tap, exactly as the filter does, so a sloped
+        vec2 at  = uvz.xy + off / res;
+        vec4 d   = textureGather(shadowMap, at, 0);
+        // Follow the receiver plane out to each texel, exactly as the filter does, so a sloped
         // receiver is not mistaken for its own blocker.
-        float ref = uvz.z + dot(off, dz_texel);
+        vec4 ref = gatherRefs(uvz, res, at, dz_texel);
 
         // 1 where the texel is closer to the light: smaller depth forward, larger under
         // reverse-Z (near=1, far=0).
 #ifdef REVERSE_Z
-        vec4 isBlocker = step(vec4(ref), d);
+        vec4 isBlocker = step(ref, d);
 #else
-        vec4 isBlocker = step(d, vec4(ref));
+        vec4 isBlocker = step(d, ref);
 #endif
         sum   += dot(d, isBlocker);
         count += dot(isBlocker, vec4(1.0));
@@ -269,7 +298,7 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     float phi = pcssRotation(pos_screen);
     vec2  cs  = vec2(cos(phi), sin(phi));
 
-    float blocker = findBlockerDepth(shadowMap, uvz, texel, dz_texel, cs);
+    float blocker = findBlockerDepth(shadowMap, uvz, res, dz_texel, cs);
     if (blocker < 0.0)
     {
         return 1.0; // no occluder found -- fully lit
@@ -294,8 +323,9 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     {
         vec2 unit = kPCSSFilterDisc[i];
         vec2 off  = pcssRotate(unit, cs) * radius;
-        vec4 d    = textureGather(shadowMap, uvz.xy + off * texel, 0);
-        float ref = uvz.z + dot(off, dz_texel);
+        vec2 at   = uvz.xy + off * texel;
+        vec4 d    = textureGather(shadowMap, at, 0);
+        vec4 ref  = gatherRefs(uvz, res, at, dz_texel);
 
         // Smooth radial falloff, zero at the disc edge. The Vogel points are area-uniform, so
         // this is the whole kernel shape -- and because it reaches zero, a tap does not pop in
@@ -342,6 +372,11 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
         wy[i] = max(0.0, exp(-dy * dy * inv2s2) - pedestal);
     }
 
+    // The hardware compares a block's four texels against one ref, the plane's depth at the block's centre, which each
+    // texel's centre lies half a texel off on both axes: moved toward lit by the most that leaves one, so a slope steeper
+    // than the constant bias does not shadow half of every block.
+    float block_slope = SHADOW_TOWARD_LIT * 0.5 * (abs(dz_texel.x) + abs(dz_texel.y));
+
     float shadow = 0.0;
     float wsum   = 0.0;
     for (int by = 0; by < K; by += 2)
@@ -353,7 +388,7 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
             vec2 P = (base + vec2(float(bx), float(by)) + 1.0) * texel;
             // One compare ref per block, RPDB-shifted by the block centre's texel offset.
             vec2 blockOff = (base + vec2(float(bx), float(by)) + 1.0) - c;
-            float ref = uvz.z + dot(blockOff, dz_texel);
+            float ref = uvz.z + dot(blockOff, dz_texel) + block_slope;
             vec4 g = textureGather(shadowMap, P, ref);
             // textureGather order: .x=(0,1) .y=(1,1) .z=(1,0) .w=(0,0), relative to the block.
             shadow += g.w * (wx[bx]     * wy[by]);
@@ -369,10 +404,13 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
 #else // !SHADOW_PCF_GATHER
 
 // Depth-compare tap with the receiver-plane bias folded into the compare ref. off is the
-// tap's texel offset from the receiver.
+// tap's texel offset from the receiver. The hardware filters the four texels about the tap
+// against that one ref, each up to a texel off it on both axes, so the ref moves toward lit
+// by that texel's slope.
 float cmpTap(sampler2DShadow shadowMap, vec2 uv, float z, vec2 off, vec2 dz_texel)
 {
-    return texture(shadowMap, vec3(uv, z + dot(off, dz_texel)));
+    float slope = SHADOW_TOWARD_LIT * (abs(dz_texel.x) + abs(dz_texel.y));
+    return texture(shadowMap, vec3(uv, z + dot(off, dz_texel) + slope));
 }
 
 // Optimized bilinear PCF (Castano/MJP): fixed compare taps whose hardware 2x2 footprints
@@ -683,22 +721,44 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 }
 
 // The sun pass's (sunLightF, sunLightSSAOF), which fills the light map the deferred lights read:
-// each takes its derivatives as the shared samplers do, then leaves out the filter where no
-// reader of the map uses what it would give. The forward passes read the directional shadow's
-// raw value (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no
-// pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
+// each takes its derivatives as the shared samplers do, but only along the surface the pixel
+// shows (surfaceDerivatives), then leaves out the filter where no reader of the map uses what it
+// would give. The forward passes read the directional shadow's raw value
+// (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no pass
+// reads sampleSpotShadow's now, which shadowutil_gl_test checks.
 
 // Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
 // No spot light reads the other's channel.
 uniform vec2 spot_shadow_live;
 
+// The derivatives of a position the G-buffer's depth gave, where they lie along the surface the
+// pixel shows. Beside a silhouette a pixel shares its quad with one on another surface, and the
+// receiver-plane bias solved from the plane through the two tilts the taps by a slope the surface
+// does not have: an outline, dark where it shadows the surface by itself, bright where it lets a
+// shadow through. Where that plane lies more than 60 degrees from geo_norm, the surface's own,
+// they are zero, and the pixel keeps the constant bias alone. A forward pass's position is
+// interpolated across one triangle, so its derivatives span no edge.
+void surfaceDerivatives(vec3 pos, vec3 geo_norm, out vec3 dpos_dx, out vec3 dpos_dy)
+{
+    dpos_dx = dFdx(pos);
+    dpos_dy = dFdy(pos);
+    vec3  plane = cross(dpos_dx, dpos_dy);
+    float along = dot(plane, geo_norm);
+    if (along * along < 0.25 * dot(plane, plane) * dot(geo_norm, geo_norm))
+    {
+        dpos_dx = vec3(0.0);
+        dpos_dy = vec3(0.0);
+    }
+}
+
 // A surface turned from the light (by the shading normal softenLightF lights it with) receives
 // none of it there whatever its shadow, so it takes 0 unfiltered.
-float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
+float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen)
 {
 #if defined(SUN_SHADOW)
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
+    vec3 dpos_dx;
+    vec3 dpos_dy;
+    surfaceDerivatives(pos, geo_norm, dpos_dx, dpos_dy);
 
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
     if (dot(norm, light_dir) <= 0.0)
@@ -715,14 +775,17 @@ float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
 // the cookie's (setupSpotLight builds both from one origin, field of view and aspect), outside
 // which spotLightF lights nothing but a legacy surface's reflection of the projector; that is left
 // unshadowed there, where the map holds nothing for it and the filter read its clamped edge.
-float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, vec3 geo_norm, int index, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
     if (spot_shadow_live[index] <= 0.0)
     {
         return 1.0;
     }
-    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), true);
+    vec3 dpos_dx;
+    vec3 dpos_dy;
+    surfaceDerivatives(pos, geo_norm, dpos_dx, dpos_dy);
+    return spotShadow(pos, norm, index, pos_screen, dpos_dx, dpos_dy, true);
 #else
     return 1.0;
 #endif
