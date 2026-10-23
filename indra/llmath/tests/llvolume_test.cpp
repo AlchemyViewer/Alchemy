@@ -2821,6 +2821,111 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // Each triangle of a face, turned to start at its least index with its
+    // winding kept, sorted.
+    std::vector<std::array<U32, 3>> sortedTriangles(const std::vector<std::array<U32, 3>>& in)
+    {
+        std::vector<std::array<U32, 3>> out;
+        for (std::array<U32, 3> t : in)
+        {
+            while (t[0] > t[1] || t[0] > t[2])
+            {
+                t = { t[1], t[2], t[0] };
+            }
+            out.push_back(t);
+        }
+        std::sort(out.begin(), out.end());
+        return out;
+    }
+
+    bool samePoint(const LLVector4a& a, const LLVector4a& b)
+    {
+        return a[0] == b[0] && a[1] == b[1] && a[2] == b[2];
+    }
+
+    // A sculpt on a shared volume keeps each of its grid's triangles but
+    // those two of whose corners are one point, once each, whatever its
+    // stitching, map and flags. A unique volume, as a flexible sculpt's is,
+    // keeps every one. Normals come from the grid's quads either way.
+    TEST_CASE("llvolume: a sculpt leaves out the triangles two of whose corners are one point", "[llvolume]")
+    {
+        Report report;
+        S32 left_out = 0;
+        const auto check = [&](U8 type, const SculptMap& map, S32 lod, const std::string& name)
+        {
+            LLPointer<LLVolume> shared = buildSculpt(type, map, lod);
+            LLVolumeParams p = shared->getParams();
+            LLPointer<LLVolume> unique = new LLVolume(p, LOD_DETAIL[lod], false, true);
+            unique->sculpt(map.width, map.height, 3, map.rgb.data(), 0, true);
+            REQUIRE(shared->getNumVolumeFaces() == 1);
+            REQUIRE(unique->getNumVolumeFaces() == 1);
+            const LLVolumeFace& face = shared->getVolumeFace(0);
+            const LLVolumeFace& whole = unique->getVolumeFace(0);
+            REQUIRE(isGrid(face));
+            std::vector<std::array<U32, 3>> grid, kept;
+            for (S32 t = 0; t + 1 < face.mNumT; ++t)
+            {
+                for (S32 s = 0; s + 1 < face.mNumS; ++s)
+                {
+                    const U32 bl = gridIndex(face, s, t), br = bl + 1, tl = bl + face.mNumS, tr = tl + 1;
+                    for (const std::array<U32, 3>& tri : { std::array<U32, 3>{ bl, tr, tl }, std::array<U32, 3>{ bl, br, tr } })
+                    {
+                        grid.push_back(tri);
+                        const LLVector4a* pos = face.mPositions;
+                        if (!samePoint(pos[tri[0]], pos[tri[1]]) && !samePoint(pos[tri[1]], pos[tri[2]]) && !samePoint(pos[tri[0]], pos[tri[2]]))
+                        {
+                            kept.push_back(tri);
+                        }
+                    }
+                }
+            }
+            if (kept.empty())
+            {
+                kept = grid;
+            }
+            std::vector<std::array<U32, 3>> got, all;
+            for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+            {
+                got.push_back({ face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2] });
+            }
+            for (S32 i = 0; i + 2 < whole.mNumIndices; i += 3)
+            {
+                all.push_back({ whole.mIndices[i], whole.mIndices[i + 1], whole.mIndices[i + 2] });
+            }
+            if (sortedTriangles(got) != sortedTriangles(kept))
+            {
+                report.fail(fmt::format("{}: {} triangles where {} of the grid's {} have three corners apart", name, got.size(), kept.size(), grid.size()));
+            }
+            if (sortedTriangles(all) != sortedTriangles(grid))
+            {
+                report.fail(fmt::format("{}: the unique volume has {} triangles of the grid's {}", name, all.size(), grid.size()));
+            }
+            if (whole.mNumVertices != face.mNumVertices || farthest(whole.mPositions, face.mPositions, face.mNumVertices) != 0.f ||
+                farthest(whole.mNormals, face.mNormals, face.mNumVertices) != 0.f)
+            {
+                report.fail(fmt::format("{}: the unique volume's points or normals differ", name));
+            }
+            left_out += (S32)(grid.size() - got.size());
+        };
+        const U8 flags[] = { 0, LL_SCULPT_FLAG_MIRROR, LL_SCULPT_FLAG_INVERT };
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            for (U8 flag : flags)
+            {
+                check((U8)(LL_SCULPT_TYPE_PLANE | flag), pinchedMap(), lod, fmt::format("pinched plane, flags {}, LOD {}", flag, lod));
+                check((U8)(LL_SCULPT_TYPE_PLANE | flag), foldedMap(), lod, fmt::format("folded plane, flags {}, LOD {}", flag, lod));
+                for (U8 stitching : STITCHINGS)
+                {
+                    check((U8)(stitching | flag), mapFor(stitching, 64, 64), lod, fmt::format("{}, flags {}, LOD {}", stitchingName(stitching), flag, lod));
+                }
+            }
+        }
+        INFO(fmt::format("{} triangles left out", left_out));
+        INFO(report.text());
+        CHECK(left_out > 0);
+        CHECK(report.failures == 0);
+    }
+
     TEST_CASE("llvolume: a sculpt's copied row is a hard edge", "[llvolume]")
     {
         LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_PLANE, foldedMap(), 3);
@@ -3107,18 +3212,21 @@ namespace
         struct Bound
         {
             const char* name;
-            F64 acmr[LOD_COUNT];
+            F64 transformed[LOD_COUNT];
             F64 overfetch[LOD_COUNT];
         };
-        // Vertices transformed a triangle with a 16-entry FIFO cache, and
-        // bytes fetched over the buffer's, per LOD.
+        // Vertices transformed with a 16-entry FIFO cache over all the
+        // class's faces, and bytes fetched over the buffer's, per LOD. The
+        // vertices, not the vertices a triangle: a triangle left out for
+        // having no area takes no vertex, and must not count against the
+        // order of the rest.
         const Bound bounds[] = {
-            { "box", { 2.0000, 2.0000, 2.0000, 2.0000 }, { 1.2000, 1.2000, 1.2000, 1.2000 } },
-            { "cylinder", { 1.2500, 1.1667, 1.1000, 1.0833 }, { 1.0133, 1.0286, 1.0182, 1.0353 } },
-            { "sphere", { 1.0833, 0.8889, 0.7000, 0.6572 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
-            { "torus", { 0.6806, 0.6667, 0.6356, 0.6050 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
-            { "sculpt sphere", { 0.6806, 0.6875, 0.6270, 0.5977 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
-            { "sculpt plane", { 0.6806, 0.6875, 0.6270, 0.5977 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
+            { "box", { 24, 24, 24, 24 }, { 1.2000, 1.2000, 1.2000, 1.2000 } },
+            { "cylinder", { 30, 42, 66, 104 }, { 1.0133, 1.0286, 1.0182, 1.0353 } },
+            { "sphere", { 26, 48, 126, 347 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
+            { "torus", { 49, 108, 286, 697 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
+            { "sculpt sphere", { 47, 85, 317, 1242 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
+            { "sculpt plane", { 49, 88, 321, 1249 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
         };
         const Shape shapes[] = { box(), cylinder(), sphere(), torus() };
         for (const Bound& bound : bounds)
@@ -3140,8 +3248,9 @@ namespace
                     const Shape* s = std::find_if(std::begin(shapes), std::end(shapes), [&](const Shape& x) { return x.name == name; });
                     figures.add(*build(*s, lod));
                 }
-                INFO(fmt::format("{} at LOD {}: {:.4f} transformed a triangle, overfetch {:.4f}", name, lod, figures.acmr(), figures.overfetch()));
-                CHECK(figures.acmr() <= bound.acmr[lod] + 1e-4);
+                INFO(fmt::format("{} at LOD {}: {:.0f} transformed for {:.0f} triangles, overfetch {:.4f}", name, lod, figures.transformed,
+                                 figures.triangles, figures.overfetch()));
+                CHECK(figures.transformed <= bound.transformed[lod]);
                 CHECK(figures.overfetch() <= bound.overfetch[lod] + 1e-4);
             }
         }

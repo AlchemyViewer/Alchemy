@@ -453,17 +453,19 @@ namespace
         }
     }
 
-    // Bands of at most BAND quads across, as near equal as the quads
-    // divide, each band row by row and every other band back up: a band's
-    // row reuses the vertices the row before it loaded, two rows of a band
-    // fit a 16-entry cache, and a band starts where the last one ended.
-    constexpr U32 BAND = 7;
+    // One band up to LONE_BAND quads across, else bands of at most BAND
+    // quads across, as near equal as the quads divide, each band row by row
+    // and every other band back up: a band's row reuses the vertices the row
+    // before it loaded, two rows of a band fit a 16-entry cache with two to
+    // spare, and a band starts where the last one ended.
+    constexpr U32 LONE_BAND = 7;
+    constexpr U32 BAND = 6;
 
     void inBands(std::vector<U32>& out, U32 columns, U32 rows)
     {
         out.clear();
         const U32 quads = columns - 1;
-        const U32 bands = (quads + BAND - 1) / BAND;
+        const U32 bands = quads <= LONE_BAND ? 1 : (quads + BAND - 1) / BAND;
         U32 first = 0;
         for (U32 band = 0; band < bands; ++band)
         {

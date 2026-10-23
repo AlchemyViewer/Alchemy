@@ -71,6 +71,20 @@ void transform_texcoords(const F32* src, F32* dst, size_t n,
 // be aligned.
 void offset_indices_u16(const U16* src, U16* dst, size_t n, U16 offset);
 
+// Each point's x, y and z from [-0.5, 0.5] to the nearest of the 256
+// steps across it, packed x | y << 8 | z << 16, w left out; a coordinate
+// outside the cube clamps to its end. Points that are the same get one
+// code, and a sculpt's points, eight bits an axis, get a code each.
+void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst);
+
+// The triangles of a grid of columns by rows vertices, vertex
+// s + columns * t, that have two corners of one code. The quad at column s
+// and row t is bottom left, top right, top left, flagged in bit s % 64 of
+// upper[t * words + s / 64], and bottom left, bottom right, top right, in
+// lower; words is at least (columns + 62) / 64. codes is read up to eight
+// past its columns * rows. Returns how many rows of quads have a flag.
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words);
+
 // Three little-endian 16-bit values per vertex, six bytes apart, to
 // {x, y, z, 0} * scale + bias; the fourth lane of scale is ignored, so w
 // comes out as bias's.

@@ -387,6 +387,129 @@ namespace
         }
     }
 
+    // Codes of points in the unit cube: a sculpt's points, eight bits an
+    // axis and mirrored or not, come out as their bytes; others round to
+    // the nearest step and clamp at the cube's ends; w never counts; every
+    // width bit for bit, unaligned, at every count, writing nothing past it.
+    TEST_CASE("alsimdkernels: unit_cube_codes gives a sculpt's points their bytes and rounds and clamps the rest", "[alsimdkernels]")
+    {
+        std::mt19937 rng(14);
+        std::uniform_int_distribution<int> byte(0, 255);
+        std::uniform_real_distribution<F32> near_cube(-0.7f, 0.7f);
+        const U32 UNWRITTEN = 0xDEADBEEFu;
+        for (size_t n : COUNTS)
+        {
+            std::vector<LLVector4a> points(n + 1);
+            std::vector<U32> expected(n + 2, UNWRITTEN);
+            for (size_t i = 0; i < n; ++i)
+            {
+                const F32 w = near_cube(rng) * 1000.f;
+                if (i % 3 == 2)
+                {
+                    LLVector4a p(near_cube(rng), near_cube(rng), near_cube(rng), w);
+                    points[i] = p;
+                    U32 code = 0;
+                    for (int axis = 0; axis < 3; ++axis)
+                    {
+                        const F32 scaled = (p[axis] + 0.5f) * 255.f;
+                        code |= (U32)llclamp((S32)std::nearbyint(scaled), 0, 255) << (8 * axis);
+                    }
+                    expected[1 + i] = code;
+                }
+                else
+                {
+                    // as LLVolume::sculpt makes them, mirrored in x on every
+                    // other point
+                    const int r = byte(rng), g = byte(rng), b = byte(rng);
+                    LLVector4a p((F32)r, (F32)g, (F32)b);
+                    p.mul(1.f / 255.f);
+                    p.sub(LLVector4a(0.5f, 0.5f, 0.5f));
+                    const bool mirrored = i % 3 == 1;
+                    if (mirrored)
+                    {
+                        p.mul(LLVector4a(-1.f, 1.f, 1.f, 1.f));
+                    }
+                    p.getF32ptr()[3] = w;
+                    points[i] = p;
+                    expected[1 + i] = (U32)(mirrored ? 255 - r : r) | ((U32)g << 8) | ((U32)b << 16);
+                }
+            }
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<U32> codes(n + 2, UNWRITTEN);
+                unit_cube_codes_impl<W>(points.data(), n, codes.data() + 1);
+                for (size_t i = 0; i < n + 2; ++i)
+                {
+                    CAPTURE(width, n, i);
+                    REQUIRE(codes[i] == expected[i]);
+                }
+            });
+        }
+    }
+
+    // A grid's triangles with two corners of one code, against every
+    // pair of every quad's corners: codes from a few values so that many
+    // corners match, rows of quads across one, two and three words, the
+    // flags past the row's last quad and in the words past it clear, and
+    // the rows counted. The codes past the grid are what the kernel may
+    // read and must not flag from.
+    TEST_CASE("alsimdkernels: grid_coincident_triangles flags every triangle with two corners of one code and no other", "[alsimdkernels]")
+    {
+        std::mt19937 rng(15);
+        const size_t columns_tried[] = {2, 3, 4, 5, 8, 9, 16, 17, 33, 64, 65, 66, 70, 129, 130};
+        const size_t rows_tried[] = {2, 3, 8};
+        for (size_t columns : columns_tried)
+        {
+            for (size_t rows : rows_tried)
+            {
+                for (int few : {3, 50})
+                {
+                    std::uniform_int_distribution<int> value(0, few);
+                    std::vector<U32> codes(columns * rows + 8);
+                    for (U32& c : codes)
+                    {
+                        c = (U32)value(rng);
+                    }
+                    const size_t quads = columns - 1;
+                    const size_t words = (columns + 62) / 64 + 1;
+                    std::vector<U64> want_upper(words * rows, 0), want_lower(words * rows, 0);
+                    size_t want_rows = 0;
+                    for (size_t t = 0; t + 1 < rows; ++t)
+                    {
+                        bool any = false;
+                        for (size_t s = 0; s < quads; ++s)
+                        {
+                            const U32 bl = codes[s + columns * t], br = codes[s + 1 + columns * t];
+                            const U32 tl = codes[s + columns * (t + 1)], tr = codes[s + 1 + columns * (t + 1)];
+                            const bool upper = bl == tr || tl == tr || bl == tl;
+                            const bool lower = bl == br || br == tr || bl == tr;
+                            want_upper[words * t + s / 64] |= U64(upper) << (s % 64);
+                            want_lower[words * t + s / 64] |= U64(lower) << (s % 64);
+                            any = any || upper || lower;
+                        }
+                        want_rows += any ? 1 : 0;
+                    }
+                    for_each_width([&]<class W>(const char* width)
+                    {
+                        std::vector<U64> upper(words * rows, ~U64(0)), lower(words * rows, ~U64(0));
+                        const size_t got_rows = grid_coincident_triangles_impl<W>(codes.data(), columns, rows, upper.data(), lower.data(), words);
+                        CAPTURE(width, columns, rows, few);
+                        CHECK(got_rows == want_rows);
+                        for (size_t t = 0; t + 1 < rows; ++t)
+                        {
+                            for (size_t w = 0; w < words; ++w)
+                            {
+                                CAPTURE(t, w);
+                                REQUIRE(upper[words * t + w] == want_upper[words * t + w]);
+                                REQUIRE(lower[words * t + w] == want_lower[words * t + w]);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     // Three 16-bit values per vertex: every value and count, the double
     // reference within the two roundings a tier without FMA takes, w from
     // bias, the last vertex read without its neighbour, every width bit
