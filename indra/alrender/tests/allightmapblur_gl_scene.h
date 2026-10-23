@@ -95,7 +95,7 @@ namespace allightmapblur_gl
             mFragment.unload();
             mCompute.unload();
             mShaders.clearShaderObjects();
-            for (LLRenderTarget* target : { &mGBuffer, &mLight, &mScratch, &mFloatScratch, &mComputeLight, &mBlurred })
+            for (LLRenderTarget* target : { &mGBuffer, &mLight, &mScratch, &mFloatScratch, &mFloatLight, &mComputeLight, &mBlurred })
             {
                 target->release();
             }
@@ -229,8 +229,9 @@ namespace allightmapblur_gl
             REQUIRE(mGBuffer.ensure(gbuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mScratch.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
-            REQUIRE(mFloatScratch.ensure({ .width = w, .height = h, .color = { GL_RGBA32F } }, mGBuffer) ==
-                    LLRenderTarget::EnsureResult::Built);
+            const ALRenderTargetDesc single{ .width = w, .height = h, .color = { GL_RGBA32F } };
+            REQUIRE(mFloatScratch.ensure(single, mGBuffer) == LLRenderTarget::EnsureResult::Built);
+            REQUIRE(mFloatLight.ensure(single, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mComputeLight.ensure(light, mGBuffer) == LLRenderTarget::EnsureResult::Built);
             REQUIRE(mBlurred.ensure({ .width = w, .height = h, .color = { GL_RG8 } }) == LLRenderTarget::EnsureResult::Built);
 
@@ -320,11 +321,20 @@ namespace allightmapblur_gl
         }
 
         // renderDeferredLighting's two passes: across into the scratch, cleared white as the sun pass clears the map,
-        // and down from it back into the map, each over geometry alone. Through a single-precision scratch, the
-        // fragment passes keep between the axes what the dispatch keeps in shared memory.
-        void blurFragment(const ALLightMapBlur::Kernel& kernel, bool float_scratch = false)
+        // and down from it back into the map, each over geometry alone. In single precision, through a scratch and
+        // into a copy of the light map (mFloatLight), the fragment passes keep between the axes what the dispatch keeps
+        // in shared memory, and leave unrounded what its store rounds to 8 bits: an 8-bit target need not round as the
+        // store does, and AMD's driver hands one the colour at half precision, rounded toward zero, so about one texel
+        // in twenty comes out a step lower.
+        void blurFragment(const ALLightMapBlur::Kernel& kernel, bool in_float = false)
         {
-            LLRenderTarget& scratch = float_scratch ? mFloatScratch : mScratch;
+            LLRenderTarget& scratch = in_float ? mFloatScratch : mScratch;
+            LLRenderTarget& light = in_float ? mFloatLight : mLight;
+            if (in_float)
+            {
+                // The sky keeps the light map's texels.
+                ll_test::writeTexture(mFloatLight.getTexture(), mW, mH, GL_RGBA, GL_FLOAT, read(mLight).data());
+            }
             scratch.bindTarget();
             gGL.setClearColor(LLColor4::white);
             scratch.clear(GL_COLOR_BUFFER_BIT);
@@ -340,7 +350,7 @@ namespace allightmapblur_gl
             scratch.flush();
 
             bindDeferred(mFragment, scratch, kernel);
-            mLight.bindTarget();
+            light.bindTarget();
             mFragment.uniform2f(LLShaderMgr::DELTA, 0.f, 1.f);
             {
                 LLGLDisable blend(GL_BLEND);
@@ -348,7 +358,7 @@ namespace allightmapblur_gl
                 mTriangle->setBuffer();
                 mTriangle->drawArrays(LLRender::TRIANGLES, 0, 3);
             }
-            mLight.flush();
+            light.flush();
             mFragment.unbind();
         }
 
@@ -527,6 +537,7 @@ namespace allightmapblur_gl
         LLRenderTarget            mLight;
         LLRenderTarget            mScratch;
         LLRenderTarget            mFloatScratch;
+        LLRenderTarget            mFloatLight;
         LLRenderTarget            mComputeLight;
         LLRenderTarget            mBlurred;
         LLPointer<LLVertexBuffer> mTriangle;

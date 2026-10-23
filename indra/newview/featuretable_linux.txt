@@ -439,6 +439,7 @@ RenderGLMultiThreadedMedia 0 0
 RenderDisableVintageMode           0   0
 RenderReflectionProbeCount  0   0
 AlchemyRenderWaterWaves     0   0
+AlchemyRenderUBOUpdateMode  0   1
 
 list TexUnit16orLess
 RenderTerrainPBRDetail      1   -1
