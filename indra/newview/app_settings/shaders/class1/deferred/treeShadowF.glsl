@@ -38,7 +38,10 @@ void main()
 {
     float alpha = texture(diffuseMap, vary_texcoord0.xy).a;
 
-    if (alpha < minimum_alpha)
+    // As the masked passes that draw them compare it: a material's cutoff is an 8-bit value, and
+    // compared as floats with a texel of that value, the texel is dropped or kept by how each rounded.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (alpha < minimum_alpha - bias)
     {
         discard;
     }
