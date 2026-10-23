@@ -262,26 +262,35 @@ namespace
     constexpr S32 PLANE_OUT  = 128;
     constexpr F32 PLANE_SPAN = 4.f;
 
-    // The plane's depth step a texel along the map's v. The constant bias directionalShadow takes from shadow_bias is
-    // twice PLANE_BIAS: more than a step, which a texel of a gather lies off the plane at the gather's point, so a
-    // receiver whose bias follows its plane reads lit; less than a step and a half, which the compare tier's outer taps
-    // lie off the receiver's own depth, so one whose bias does not reads shadowed there.
-    constexpr F32 PLANE_STEP = 0.003f;
+    // The constant bias directionalShadow takes from shadow_bias, twice this.
     constexpr F32 PLANE_BIAS = 0.002f;
 
-    const std::string kPlaneDefines = "#version 400\n"
-                                      "#define PLANE_RES " + std::to_string(PLANE_RES) + ".0\n"
-                                      "#define PLANE_OUT " + std::to_string(PLANE_OUT) + ".0\n"
-                                      "#define PLANE_SPAN " + std::to_string(PLANE_SPAN) + "\n"
-                                      "#define PLANE_STEP " + std::to_string(PLANE_STEP) + "\n";
+    // The plane's depth steps a texel along the map's v.
+    // - Shallow, under the constant bias: a texel compared against a ref taken within a texel of its centre reads lit,
+    //   and over two thirds of it, so a receiver whose bias does not follow its plane is shadowed by the compare tier's
+    //   taps a texel and a half out.
+    // - Steep, over the constant bias in half a texel: a texel compared against a ref taken anywhere but its own centre,
+    //   as a 2x2 gather's one ref is taken half a texel off each of its texels, is shadowed by its own plane.
+    constexpr F32 PLANE_STEP_SHALLOW = 0.003f;
+    constexpr F32 PLANE_STEP_STEEP   = 0.009f;
+
+    // The defines the plane's programs read, at a depth step of `step` a texel.
+    std::string planeDefines(F32 step)
+    {
+        return "#version 400\n"
+               "#define PLANE_RES " + std::to_string(PLANE_RES) + ".0\n"
+               "#define PLANE_OUT " + std::to_string(PLANE_OUT) + ".0\n"
+               "#define PLANE_SPAN " + std::to_string(PLANE_SPAN) + "\n"
+               "#define PLANE_STEP " + std::to_string(step) + "\n";
+    }
 
     // The plane's depth at each texel's centre: 0.5 at the map's middle row, PLANE_STEP more each row up.
-    const std::string kPlaneDepth = kPlaneDefines +
+    const char* kPlaneDepth =
         "void main() { gl_FragDepth = 0.5 + PLANE_STEP * (gl_FragCoord.y - 0.5 * PLANE_RES); }\n";
 
     // The receiver on that plane under each pixel, in an eye space the shadow matrix takes to the map as it is: x and y
     // about its centre, and the depth about 0.5.
-    const std::string kPlaneReceiver = kPlaneDefines +
+    const char* kPlaneReceiver =
         "out vec4 frag_color;\n"
         "float sampleDirectionalShadow(vec3 pos, vec3 norm, vec2 pos_screen);\n"
         "void main()\n"
@@ -344,9 +353,9 @@ namespace
             REQUIRE(program.mapUniforms());
         }
 
-        // The sun's samplers at the compare tier or PCSS's, its cascades all one map holding the plane, read through
-        // the sampler the tier declares them for.
-        void setUp(bool pcss)
+        // The sun's samplers at the compare tier or PCSS's, its cascades all one map holding the plane of depth step
+        // `step` a texel, read through the sampler the tier declares them for.
+        void setUp(bool pcss, F32 step)
         {
             std::map<std::string, std::string> defines = { { "SUN_SHADOW", "1" }, { "SHADOW_PCSS", pcss ? "1" : "0" } };
             S32 level = 1;
@@ -355,8 +364,8 @@ namespace
                 INFO("shadowUtil compiles");
                 REQUIRE(util != 0);
             }
-            link(mDepth, "plane depth (test)", kPlaneDepth, 0);
-            link(mProgram, "plane receiver (test)", kPlaneReceiver, util);
+            link(mDepth, "plane depth (test)", planeDefines(step) + kPlaneDepth, 0);
+            link(mProgram, "plane receiver (test)", planeDefines(step) + kPlaneReceiver, util);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
             REQUIRE(mTriangle->allocateBuffer(3, 0));
@@ -476,16 +485,17 @@ TEST_CASE_METHOD(shadowutil_data, "shadowutil_gl: a map the pass has none of rea
     }
 }
 
-TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: a receiver on its map's plane reads lit however large a texel is on screen",
+TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: a receiver on its map's plane reads lit however magnified or steep the plane",
                  "[shadowutil_gl]")
 {
     const bool pcss = GENERATE(false, true);
-    CAPTURE(pcss);
-    setUp(pcss);
+    const F32 step = GENERATE(PLANE_STEP_SHALLOW, PLANE_STEP_STEEP);
+    CAPTURE(pcss, step);
+    setUp(pcss, step);
     run();
 
     // The darkest receiver, and where: a receiver the bias does not follow reads its own plane's acne, in steps a texel
-    // tall.
+    // tall, and a texel compared off its own plane shadows a part of every gather.
     F32 darkest = 1.f;
     S32 at_x = -1;
     S32 at_y = -1;
