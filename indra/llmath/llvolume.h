@@ -48,6 +48,11 @@ namespace ll_test
     struct VolumeProbe;
 }
 
+namespace alsimd
+{
+    struct TexTransform;
+}
+
 #include "lluuid.h"
 #include "v4color.h"
 #include "v2math.h"
@@ -938,6 +943,47 @@ public:
     // Get a reference to the octree, which may be null
     const LLVolumeOctree* getOctree() const;
 
+    // Planar texture generation projects a point, in the face's volume
+    // space at its object's scale, along a normal, by
+    // alsimd::planar_texcoords: the binormal is y where the normal's x is
+    // at least PLANAR_SWITCH_X in size and x where it is not.
+    //
+    // A face whose vertex normals all lie within 60 degrees of its planar
+    // normal is projected along that normal at every point, as one plane.
+    // Any other face is projected along the normal at each point, where an
+    // x within PLANAR_TIE below the switch counts as reaching it, so that
+    // the normals a round prim puts on the switch go one way on every row
+    // and at every LOD.
+    static constexpr F32 PLANAR_SWITCH_X = 0.5f;
+    static constexpr F32 PLANAR_TIE = 1e-4f;
+    static constexpr F32 PLANAR_CONE_COS = 0.5f;
+
+    // The planar normal: in xyz the vertices' one normal where they all
+    // have the same, and otherwise the sum of the triangles' normals
+    // weighted by their areas, normalized; in w 1 where the face is
+    // projected as one plane and -1 where it is not. Made on the first call
+    // and kept until a build other than a flexible prim's partial one: its
+    // frames keep their first build's planar texture coordinates. Main
+    // thread only.
+    LLVector4a getPlanarNormal() const
+    {
+        LLVector4a planar;
+        planar.loadua(mPlanarNormal);
+        return planar[3] != 0.f ? planar : makePlanarNormal();
+    }
+
+    // Every vertex's planar texture coordinate, the positions taken at
+    // scale, through transform where one is given: two floats a vertex.
+    void getPlanarTexCoords(const LLVector4a& scale, const alsimd::TexTransform* transform, F32* dst) const;
+
+    // The planar texture coordinate of a point of the face, in volume space
+    // at its object's scale, whose normal is normal.
+    LLVector2 getPlanarTexCoord(const LLVector4a& position, const LLVector4a& normal, const alsimd::TexTransform* transform = nullptr) const;
+
+    // The binormal planar texgen takes along normal with the switch at
+    // switch_x, and the tangent, binormal x normal.
+    static void getPlanarBasis(const LLVector4a& normal, F32 switch_x, LLVector4a& binormal, LLVector4a& tangent);
+
     enum
     {
         SINGLE_MASK =   0x0001,
@@ -1034,6 +1080,10 @@ private:
     // The tangents were made for positions a partial build has since moved:
     // createTangents makes them again, in the buffer they have.
     bool mTangentsStale = false;
+
+    // getPlanarNormal's, w 0 until it is made.
+    mutable F32 mPlanarNormal[4] = { 0.f, 0.f, 0.f, 0.f };
+    LLVector4a makePlanarNormal() const;
 
     bool createUnCutCubeCap(LLVolume* volume, bool partial_build = false);
     bool createCap(LLVolume* volume, bool partial_build = false);

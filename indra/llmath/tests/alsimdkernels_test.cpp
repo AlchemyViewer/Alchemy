@@ -933,6 +933,140 @@ namespace
 #endif
     }
 
+    // ------------------------------------------------------------------
+    // Planar texture coordinates
+
+    // Every lane width bit for bit against the
+    // narrowest, nothing written past the count, the per-point form along
+    // one normal the same as the one-plane form along it, and both against
+    // the projection in double within their roundings. Some normals put x
+    // on the switch exactly and some just inside the tie below it.
+    TEST_CASE("alsimdkernels: planar texture coordinates at every width and count", "[alsimdkernels]")
+    {
+        const LLVector4a scale(0.37f, 2.5f, 11.f, 1.f);
+        const TexTransform turned{ cosf(0.3f), sinf(0.3f), 2.f, 0.75f, 0.1f, -0.2f };
+        const F32 tie = 0.5f - 1e-4f;
+        std::mt19937 rng(9);
+        std::uniform_real_distribution<F32> spread(-1.f, 1.f);
+
+        auto basis = [](const LLVector4a& n, F32 switch_x, LLVector4a& b, LLVector4a& t)
+        {
+            const F32 d = n[0];
+            if (d >= switch_x || d <= -switch_x)
+            {
+                b.set(0.f, d < 0.f ? -1.f : 1.f, 0.f);
+            }
+            else
+            {
+                b.set(n[1] > 0.f ? -1.f : 1.f, 0.f, 0.f);
+            }
+            t.setCross3(b, n);
+        };
+
+        for (size_t n : COUNTS)
+        {
+            std::vector<LLVector4a> positions(n + 1), normals(n + 1);
+            for (size_t i = 0; i < n; ++i)
+            {
+                positions[i].set(spread(rng), spread(rng), spread(rng), spread(rng));
+                switch (i % 4)
+                {
+                    case 0: normals[i].set(0.5f, 0.8660254f, 0.f); break;
+                    case 1: normals[i].set(-0.49995f, 0.2f, 0.8f); break;
+                    default: normals[i].set(spread(rng), spread(rng), spread(rng)); break;
+                }
+                normals[i].normalize3();
+            }
+
+            for (const TexTransform* transform : { (const TexTransform*)nullptr, &turned })
+            {
+                CAPTURE(n, transform != nullptr);
+                auto run = [&]<class W>(bool per_point, const LLVector4a& b, const LLVector4a& t, F32 switch_x)
+                {
+                    std::vector<F32> out(2 * n + 2, 1234.f);
+                    const kernels::PlanarArgs a{ scale.getF32ptr(), b.getF32ptr(), t.getF32ptr(), switch_x, transform };
+                    if (per_point && transform)
+                    {
+                        kernels::planar_texcoords_impl<W, true, true>(positions.data(), normals.data(), n, a, out.data());
+                    }
+                    else if (per_point)
+                    {
+                        kernels::planar_texcoords_impl<W, true, false>(positions.data(), normals.data(), n, a, out.data());
+                    }
+                    else if (transform)
+                    {
+                        kernels::planar_texcoords_impl<W, false, true>(positions.data(), nullptr, n, a, out.data());
+                    }
+                    else
+                    {
+                        kernels::planar_texcoords_impl<W, false, false>(positions.data(), nullptr, n, a, out.data());
+                    }
+                    REQUIRE(out[2 * n] == 1234.f);
+                    REQUIRE(out[2 * n + 1] == 1234.f);
+                    return out;
+                };
+
+                const LLVector4a none(0.f);
+                const std::vector<F32> narrow = run.template operator()<ALSimd4>(true, none, none, tie);
+                for (size_t i = 0; i < n; ++i)
+                {
+                    LLVector4a b, t;
+                    basis(normals[i], tie, b, t);
+                    double db = 0.0, dt = 0.0;
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        db += 2.0 * b[k] * ((double)positions[i][k] * scale[k]);
+                        dt += 2.0 * t[k] * ((double)positions[i][k] * scale[k]);
+                    }
+                    double s = db + 0.5, u = 0.5 - dt;
+                    if (transform)
+                    {
+                        const double rs = db * transform->cos_ang - dt * transform->sin_ang;
+                        const double rt = -dt * transform->cos_ang - db * transform->sin_ang;
+                        s = rs * transform->scale_s + transform->offset_s + 0.5;
+                        u = rt * transform->scale_t + transform->offset_t + 0.5;
+                    }
+                    CAPTURE(i);
+                    require_close("planar s", narrow[2 * i], s, 1e-6, 50.0);
+                    require_close("planar t", narrow[2 * i + 1], u, 1e-6, 50.0);
+
+                    // The one-plane form along this normal gives this point
+                    // the same bits.
+                    const std::vector<LLVector4a> one = { positions[i] };
+                    std::vector<F32> along(4, 1234.f);
+                    const kernels::PlanarArgs a{ scale.getF32ptr(), b.getF32ptr(), t.getF32ptr(), 0.f, transform };
+                    if (transform)
+                    {
+                        kernels::planar_texcoords_impl<ALSimd4, false, true>(one.data(), nullptr, 1, a, along.data());
+                    }
+                    else
+                    {
+                        kernels::planar_texcoords_impl<ALSimd4, false, false>(one.data(), nullptr, 1, a, along.data());
+                    }
+                    REQUIRE(std::bit_cast<U32>(along[0]) == std::bit_cast<U32>(narrow[2 * i]));
+                    REQUIRE(std::bit_cast<U32>(along[1]) == std::bit_cast<U32>(narrow[2 * i + 1]));
+                    REQUIRE(along[2] == 1234.f);
+                }
+
+                LLVector4a plane(0.3f, 0.8f, 0.5f), plane_b, plane_t;
+                plane.normalize3();
+                basis(plane, 0.5f, plane_b, plane_t);
+                const std::vector<F32> narrow_plane = run.template operator()<ALSimd4>(false, plane_b, plane_t, 0.f);
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    const std::vector<F32> wide = run.template operator()<W>(true, none, none, tie);
+                    const std::vector<F32> wide_plane = run.template operator()<W>(false, plane_b, plane_t, 0.f);
+                    for (size_t i = 0; i < 2 * n; ++i)
+                    {
+                        CAPTURE(width, i);
+                        REQUIRE(std::bit_cast<U32>(wide[i]) == std::bit_cast<U32>(narrow[i]));
+                        REQUIRE(std::bit_cast<U32>(wide_plane[i]) == std::bit_cast<U32>(narrow_plane[i]));
+                    }
+                });
+            }
+        }
+    }
+
     // A grid of columns by rows over a wavy sheet, with the sheet's normals
     // and the grid's UVs, indexed as createSide indexes one. Column 2 lies
     // on column 1 and row 2 has row 1's UVs, so that some quads are lines

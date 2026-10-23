@@ -4776,6 +4776,7 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
     mReversed = src.mReversed;
     mFlexible = src.mFlexible;
     std::copy(std::begin(src.mCapTangent), std::end(src.mCapTangent), mCapTangent);
+    std::copy(std::begin(src.mPlanarNormal), std::end(src.mPlanarNormal), mPlanarNormal);
 
     mExtents[0] = src.mExtents[0];
     mExtents[1] = src.mExtents[1];
@@ -4913,6 +4914,12 @@ bool LLVolumeFace::create(LLVolume* volume, bool partial_build)
     // buffer; a full build frees it.
     mTangentsStale = partial_build;
     mFlexible = volume->getParams().getPathParams().getCurveType() == LL_PCODE_PATH_FLEXIBLE;
+    // A flexible prim's frames, its partial builds, keep the planar normal
+    // of its first build.
+    if (!partial_build)
+    {
+        mPlanarNormal[3] = 0.f;
+    }
 
     bool ret = false ;
     if (mTypeMask & CAP_MASK)
@@ -5782,6 +5789,116 @@ const LLVolumeOctree* LLVolumeFace::getOctree() const
     return mOctree;
 }
 
+LLVector4a LLVolumeFace::makePlanarNormal() const
+{
+    LLVector4a planar(0.f, 0.f, 0.f, -1.f);
+    if (mPositions && mNormals && mNumVertices > 0)
+    {
+        auto same_normal = [&](S32 v) { return std::memcmp(mNormals[v].getF32ptr(), mNormals[0].getF32ptr(), 3 * sizeof(F32)) == 0; };
+        bool one_normal = true;
+        for (S32 v = 1; v < mNumVertices && one_normal; ++v)
+        {
+            one_normal = same_normal(v);
+        }
+
+        if (one_normal)
+        {
+            planar = mNormals[0];
+            planar.getF32ptr()[3] = 1.f;
+        }
+        else
+        {
+            LLVector4a sum;
+            sum.clear();
+            for (S32 i = 0; i + 2 < mNumIndices; i += 3)
+            {
+                const LLVector4a& a = mPositions[mIndices[i]];
+                LLVector4a ab, ac, area;
+                ab.setSub(mPositions[mIndices[i + 1]], a);
+                ac.setSub(mPositions[mIndices[i + 2]], a);
+                area.setCross3(ab, ac);
+                sum.add(area);
+            }
+
+            const F32 length2 = sum.dot3(sum).getF32();
+            if (length2 > 0.f && std::isfinite(length2))
+            {
+                sum.mul(1.f / sqrtf(length2));
+                bool within = true;
+                for (S32 v = 0; v < mNumVertices && within; ++v)
+                {
+                    const F32 along = mNormals[v].dot3(sum).getF32();
+                    within = along > 0.f && along * along >= PLANAR_CONE_COS * PLANAR_CONE_COS * mNormals[v].dot3(mNormals[v]).getF32();
+                }
+                planar = sum;
+                planar.getF32ptr()[3] = within ? 1.f : -1.f;
+            }
+        }
+    }
+
+    std::memcpy(mPlanarNormal, planar.getF32ptr(), sizeof(mPlanarNormal));
+    return planar;
+}
+
+void LLVolumeFace::getPlanarBasis(const LLVector4a& normal, F32 switch_x, LLVector4a& binormal, LLVector4a& tangent)
+{
+    const F32 d = normal[0];
+    if (d >= switch_x || d <= -switch_x)
+    {
+        binormal.set(0.f, d < 0.f ? -1.f : 1.f, 0.f);
+    }
+    else
+    {
+        binormal.set(normal[1] > 0.f ? -1.f : 1.f, 0.f, 0.f);
+    }
+    tangent.setCross3(binormal, normal);
+}
+
+void LLVolumeFace::getPlanarTexCoords(const LLVector4a& scale, const alsimd::TexTransform* transform, F32* dst) const
+{
+    // read back from the member, whole: a vector rebuilt from its parts
+    // waits on their stores
+    if (mPlanarNormal[3] == 0.f)
+    {
+        makePlanarNormal();
+    }
+    LLVector4a planar;
+    planar.loadua(mPlanarNormal);
+    if (planar[3] > 0.f)
+    {
+        LLVector4a binormal, tangent;
+        getPlanarBasis(planar, PLANAR_SWITCH_X, binormal, tangent);
+        alsimd::planar_texcoords(mPositions, mNumVertices, scale, binormal, tangent, transform, dst);
+    }
+    else
+    {
+        alsimd::planar_texcoords(mPositions, mNormals, mNumVertices, scale, PLANAR_SWITCH_X - PLANAR_TIE, transform, dst);
+    }
+}
+
+LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVector4a& normal, const alsimd::TexTransform* transform) const
+{
+    if (mPlanarNormal[3] == 0.f)
+    {
+        makePlanarNormal();
+    }
+    LLVector4a planar;
+    planar.loadua(mPlanarNormal);
+    const LLVector4a unscaled(1.f);
+    LLVector2 tc;
+    if (planar[3] > 0.f)
+    {
+        LLVector4a binormal, tangent;
+        getPlanarBasis(planar, PLANAR_SWITCH_X, binormal, tangent);
+        alsimd::planar_texcoords(&position, 1, unscaled, binormal, tangent, transform, tc.mV);
+    }
+    else
+    {
+        alsimd::planar_texcoords(&position, &normal, 1, unscaled, PLANAR_SWITCH_X - PLANAR_TIE, transform, tc.mV);
+    }
+    return tc;
+}
+
 
 void LLVolumeFace::swapData(LLVolumeFace& rhs)
 {
@@ -5793,6 +5910,7 @@ void LLVolumeFace::swapData(LLVolumeFace& rhs)
     llswap(rhs.mIndices,mIndices);
     llswap(rhs.mNumVertices, mNumVertices);
     llswap(rhs.mNumIndices, mNumIndices);
+    std::swap(rhs.mPlanarNormal, mPlanarNormal);
 }
 
 namespace
@@ -7268,6 +7386,7 @@ void LLVolumeFace::resizeVertices(S32 num_verts)
     ll_aligned_free_16(mTangents);
 
     mTangents = NULL;
+    mPlanarNormal[3] = 0.f;
 
     if (num_verts)
     {

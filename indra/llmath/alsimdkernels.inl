@@ -151,6 +151,48 @@ struct ALSimd4
         u = alsimd::shuffle2<0, 2, 0, 2>(a, b);
         v = alsimd::shuffle2<1, 3, 1, 3>(a, b);
     }
+
+    // The lanes of u and v as float pairs from p, <u0, v0, u1, v1, ...>;
+    // p needs only float alignment.
+    static AL_SIMD_INLINE void store_pairs(F32* p, reg u, reg v)
+    {
+        alsimd::storeu(p, alsimd::unpacklo(u, v));
+        alsimd::storeu(p + 4, alsimd::unpackhi(u, v));
+    }
+
+    // The first count of them, one to four.
+    static AL_SIMD_INLINE void store_pairs(F32* p, reg u, reg v, size_t count)
+    {
+        const reg low = alsimd::unpacklo(u, v);
+        const reg high = alsimd::unpackhi(u, v);
+        if (count >= 4)
+        {
+            alsimd::storeu(p, low);
+            alsimd::storeu(p + 4, high);
+            return;
+        }
+#if AL_SIMD_NEON
+        vst1_f32(p, vget_low_f32(low));
+        if (count > 1)
+        {
+            vst1_f32(p + 2, vget_high_f32(low));
+        }
+        if (count > 2)
+        {
+            vst1_f32(p + 4, vget_low_f32(high));
+        }
+#else
+        _mm_storel_pi(reinterpret_cast<__m64*>(p), low);
+        if (count > 1)
+        {
+            _mm_storeh_pi(reinterpret_cast<__m64*>(p + 2), low);
+        }
+        if (count > 2)
+        {
+            _mm_storel_pi(reinterpret_cast<__m64*>(p + 4), high);
+        }
+#endif
+    }
 };
 
 #if AL_SIMD_AVX
@@ -278,6 +320,16 @@ struct ALSimd8
         const reg bd = _mm256_insertf128_ps(_mm256_castps128_ps256(b), d, 1);
         u = _mm256_shuffle_ps(ac, bd, _MM_SHUFFLE(2, 0, 2, 0));
         v = _mm256_shuffle_ps(ac, bd, _MM_SHUFFLE(3, 1, 3, 1));
+    }
+
+    // Lanes 0 to 3 through the low halves of the unpacks, 4 to 7 through
+    // the high.
+    static AL_SIMD_INLINE void store_pairs(F32* p, reg u, reg v)
+    {
+        const reg low = _mm256_unpacklo_ps(u, v);
+        const reg high = _mm256_unpackhi_ps(u, v);
+        _mm256_storeu_ps(p, _mm256_permute2f128_ps(low, high, 0x20));
+        _mm256_storeu_ps(p + 8, _mm256_permute2f128_ps(low, high, 0x31));
     }
 };
 #endif
@@ -1596,6 +1648,232 @@ bool normalize3_or_mark_impl(LLVector4a* v, size_t n)
     }
     return W::any(marked);
 }
+
+////////////////////////////////////
+// Planar texture coordinates
+////////////////////////////////////
+
+// Every step rounds where it is written: MSVC's /fp:fast would otherwise
+// fuse a product into the sum it feeds, as it chooses at each place the
+// kernel is built.
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma float_control(precise, on, push)
+#endif
+
+// planar_texcoords' arguments, as pointers to plain floats: nothing built
+// outside this region is inlined into it, LLVector4a's accessors included.
+// transform is read only by the forms that take one.
+struct PlanarArgs
+{
+    const F32* scale;
+    const F32* binormal;
+    const F32* tangent;
+    F32 switch_x;
+    const TexTransform* transform;
+};
+
+template <class W>
+AL_SIMD_INLINE Lanes3<W> planar_splat(const F32* v)
+{
+    return { W::set1(v[0]), W::set1(v[1]), W::set1(v[2]) };
+}
+
+// The arguments each in every lane, made once for a run of groups.
+template <class W>
+class PlanarConstants
+{
+public:
+    using reg = typename W::reg;
+
+    explicit PlanarConstants(const PlanarArgs& a)
+        : mScale(planar_splat<W>(a.scale)),
+          mBinormal(planar_splat<W>(a.binormal)),
+          mTangent(planar_splat<W>(a.tangent)),
+          mSwitchX(W::set1(a.switch_x)),
+          mCos(W::set1(a.transform ? a.transform->cos_ang : 1.f)),
+          mSin(W::set1(a.transform ? a.transform->sin_ang : 0.f)),
+          mScaleS(W::set1(a.transform ? a.transform->scale_s : 1.f)),
+          mScaleT(W::set1(a.transform ? a.transform->scale_t : 1.f)),
+          mOffsetS(W::set1(a.transform ? a.transform->offset_s : 0.f)),
+          mOffsetT(W::set1(a.transform ? a.transform->offset_t : 0.f)),
+          mHalf(W::set1(0.5f))
+    {
+    }
+
+    Lanes3<W> scale() const { return mScale; }
+    Lanes3<W> binormal() const { return mBinormal; }
+    Lanes3<W> tangent() const { return mTangent; }
+    reg switch_x() const { return mSwitchX; }
+    reg cos_ang() const { return mCos; }
+    reg sin_ang() const { return mSin; }
+    reg scale_s() const { return mScaleS; }
+    reg scale_t() const { return mScaleT; }
+    reg offset_s() const { return mOffsetS; }
+    reg offset_t() const { return mOffsetT; }
+    reg half() const { return mHalf; }
+
+private:
+    Lanes3<W> mScale;
+    Lanes3<W> mBinormal;
+    Lanes3<W> mTangent;
+    reg mSwitchX;
+    reg mCos, mSin, mScaleS, mScaleT, mOffsetS, mOffsetT;
+    reg mHalf;
+};
+
+// The arguments splatted where each is used, for a single group, so that
+// none is held in a register past its use.
+template <class W>
+class PlanarSplats
+{
+public:
+    using reg = typename W::reg;
+
+    explicit PlanarSplats(const PlanarArgs& a) : mArgs(a) {}
+
+    Lanes3<W> scale() const { return planar_splat<W>(mArgs.scale); }
+    Lanes3<W> binormal() const { return planar_splat<W>(mArgs.binormal); }
+    Lanes3<W> tangent() const { return planar_splat<W>(mArgs.tangent); }
+    reg switch_x() const { return W::set1(mArgs.switch_x); }
+    reg cos_ang() const { return W::set1(mArgs.transform->cos_ang); }
+    reg sin_ang() const { return W::set1(mArgs.transform->sin_ang); }
+    reg scale_s() const { return W::set1(mArgs.transform->scale_s); }
+    reg scale_t() const { return W::set1(mArgs.transform->scale_t); }
+    reg offset_s() const { return W::set1(mArgs.transform->offset_s); }
+    reg offset_t() const { return W::set1(mArgs.transform->offset_t); }
+    reg half() const { return W::set1(0.5f); }
+
+private:
+    const PlanarArgs& mArgs;
+};
+
+// Each lane's binormal and tangent from its normal, as the per-point
+// planar_texcoords takes them. A binormal is 0 or +/-1 in each component,
+// so every product here is exact.
+template <class W>
+AL_SIMD_INLINE void planar_basis(const Lanes3<W>& n, typename W::reg switch_x, Lanes3<W>& b, Lanes3<W>& t)
+{
+    using reg = typename W::reg;
+    const reg zero = W::zero();
+    const reg one = W::set1(1.f);
+    const reg minus_one = W::set1(-1.f);
+    const typename W::mask along_y = W::cmple(switch_x, W::abs(n.x));
+    b.x = W::select(along_y, zero, W::select(W::cmpgt(n.y, zero), minus_one, one));
+    b.y = W::select(along_y, W::select(W::cmplt(n.x, zero), minus_one, one), zero);
+    b.z = zero;
+    t.x = W::fnmadd(b.z, n.y, W::mul(b.y, n.z));
+    t.y = W::fnmadd(b.x, n.z, W::mul(b.z, n.x));
+    t.z = W::fnmadd(b.y, n.x, W::mul(b.x, n.y));
+}
+
+template <class W>
+AL_SIMD_INLINE typename W::reg planar_dot(const Lanes3<W>& a, const Lanes3<W>& p)
+{
+    return W::add(W::add(W::mul(a.x, p.x), W::mul(a.y, p.y)), W::mul(a.z, p.z));
+}
+
+// The coordinates of the W::floats points at(0) to at(W::floats - 1), as s
+// and t lanes, with the arguments from c.
+template <class W, bool PER_POINT, bool TRANSFORM, class C, class At>
+AL_SIMD_INLINE void planar_points(const C& c, const LLVector4a* positions, const LLVector4a* normals, At at, typename W::reg& s,
+                                  typename W::reg& t)
+{
+    using reg = typename W::reg;
+    const auto floats = [](const LLVector4a* v) { return reinterpret_cast<const F32*>(v); };
+    Lanes3<W> p;
+    reg w;
+    W::load_columns([&](int i) { return floats(positions + at(i)); }, p.x, p.y, p.z, w);
+    const Lanes3<W> scale = c.scale();
+    p = { W::mul(p.x, scale.x), W::mul(p.y, scale.y), W::mul(p.z, scale.z) };
+
+    Lanes3<W> binormal, tangent;
+    if constexpr (PER_POINT)
+    {
+        Lanes3<W> normal;
+        W::load_columns([&](int i) { return floats(normals + at(i)); }, normal.x, normal.y, normal.z, w);
+        planar_basis<W>(normal, c.switch_x(), binormal, tangent);
+    }
+    else
+    {
+        binormal = c.binormal();
+        tangent = c.tangent();
+    }
+
+    const reg b_half = planar_dot<W>(binormal, p);
+    const reg t_half = planar_dot<W>(tangent, p);
+    const reg db = W::add(b_half, b_half);
+    const reg dt = W::add(t_half, t_half);
+    if constexpr (TRANSFORM)
+    {
+        const reg turned_s = W::fmadd(db, c.cos_ang(), W::neg(W::mul(dt, c.sin_ang())));
+        const reg turned_t = W::fnmadd(c.cos_ang(), dt, W::neg(W::mul(c.sin_ang(), db)));
+        s = W::add(W::add(W::mul(turned_s, c.scale_s()), c.offset_s()), c.half());
+        t = W::add(W::add(W::mul(turned_t, c.scale_t()), c.offset_t()), c.half());
+    }
+    else
+    {
+        s = W::add(db, c.half());
+        t = W::sub(c.half(), dt);
+    }
+}
+
+// One to four points four wide, the lanes past the count reading the last
+// point again and their coordinates dropped: one group, its arguments
+// splatted where they are used.
+template <bool PER_POINT, bool TRANSFORM>
+AL_SIMD_INLINE void planar_texcoords_few(const LLVector4a* positions, const LLVector4a* normals, size_t n, const PlanarArgs& a, F32* dst)
+{
+    ALSimd4::reg s, t;
+    if (n == 4)
+    {
+        planar_points<ALSimd4, PER_POINT, TRANSFORM>(PlanarSplats<ALSimd4>(a), positions, normals, [](int i) { return (size_t)i; }, s, t);
+        ALSimd4::store_pairs(dst, s, t);
+        return;
+    }
+    const size_t last = n - 1;
+    planar_points<ALSimd4, PER_POINT, TRANSFORM>(PlanarSplats<ALSimd4>(a), positions, normals,
+                                                 [&](int i) { return (size_t)i < last ? (size_t)i : last; }, s, t);
+    ALSimd4::store_pairs(dst, s, t, n);
+}
+
+// Whole groups at W's width, then groups of four, then the last one to
+// three points as planar_texcoords_few takes them.
+template <class W, bool PER_POINT, bool TRANSFORM>
+void planar_texcoords_impl(const LLVector4a* positions, const LLVector4a* normals, size_t n, const PlanarArgs& a, F32* dst)
+{
+    size_t first = 0;
+    if constexpr (W::floats > 4)
+    {
+        if (n >= W::floats)
+        {
+            const PlanarConstants<W> c(a);
+            for (; first + W::floats <= n; first += W::floats)
+            {
+                typename W::reg s, t;
+                planar_points<W, PER_POINT, TRANSFORM>(c, positions, normals, [&](int i) { return first + i; }, s, t);
+                W::store_pairs(dst + 2 * first, s, t);
+            }
+        }
+    }
+    if (first + 4 <= n)
+    {
+        const PlanarConstants<ALSimd4> c(a);
+        for (; first + 4 <= n; first += 4)
+        {
+            ALSimd4::reg s, t;
+            planar_points<ALSimd4, PER_POINT, TRANSFORM>(c, positions, normals, [&](int i) { return first + i; }, s, t);
+            ALSimd4::store_pairs(dst + 2 * first, s, t);
+        }
+    }
+    if (first < n)
+    {
+        planar_texcoords_few<PER_POINT, TRANSFORM>(positions + first, PER_POINT ? normals + first : nullptr, n - first, a, dst + 2 * first);
+    }
+}
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma float_control(pop)
+#endif
 
 } // namespace kernels
 } // namespace alsimd

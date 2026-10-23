@@ -39,6 +39,7 @@
 
 #include "llvolume.h"
 #include "alscratcharena.h"
+#include "alsimdkernels.h"
 #include "llmath.h"
 #include "llmeshoptimizer.h"
 #include "llquaternion.h"
@@ -729,6 +730,124 @@ namespace
     // the weld, the cache order and the fetch order, its scratch and
     // meshoptimizer's from the thread's arena. Each call takes a fresh copy
     // of the decoded face, made outside the measurement.
+    // LLFace's planar projection and texture transform as its vertex loops
+    // ran them, a vertex at a time along its own normal.
+    void perVertexProjection(LLVector2& tc, const LLVector4a& normal, const LLVector4a& vec)
+    {
+        LLVector4a binormal;
+        F32 d = normal[0];
+
+        if (d >= 0.5f || d <= -0.5f)
+        {
+            if (d < 0)
+            {
+                binormal.set(0,-1,0);
+            }
+            else
+            {
+                binormal.set(0, 1, 0);
+            }
+        }
+        else
+        {
+            if (normal[1] > 0)
+            {
+                binormal.set(-1,0,0);
+            }
+            else
+            {
+                binormal.set(1,0,0);
+            }
+        }
+        LLVector4a tangent;
+        tangent.setCross3(binormal,normal);
+
+        tc.mV[1] = -((tangent.dot3(vec).getF32())*2 - 0.5f);
+        tc.mV[0] = 1.0f+((binormal.dot3(vec).getF32())*2 - 0.5f);
+    }
+
+    void perVertexXform(LLVector2 &tex_coord, F32 cosAng, F32 sinAng, F32 offS, F32 offT, F32 magS, F32 magT)
+    {
+        F32 s = tex_coord.mV[0];
+        F32 t = tex_coord.mV[1];
+        s -= 0.5;
+        t -= 0.5;
+        F32 temp = s;
+        s  = s     * cosAng + t * sinAng;
+        t  = -temp * sinAng + t * cosAng;
+        s *= magS;
+        t *= magT;
+        s += offS + 0.5f;
+        t += offT + 0.5f;
+        tex_coord.mV[0] = s;
+        tex_coord.mV[1] = t;
+    }
+
+    // One face's planar texture coordinates, with no transform and through
+    // the texture entry's: a vertex at a time along each vertex's normal,
+    // as LLFace's loops ran, and through the kernel, along the face's planar
+    // normal or each vertex's by what it is. And the planar normal itself,
+    // made on a face's first planar use.
+    TEST_CASE("llvolume_bench: one face's planar texture coordinates", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        std::vector<FaceClass> classes = faceClasses();
+        LLVolumeParams quarter = primParams(LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE);
+        quarter.setBeginAndEndS(0.375f, 0.625f);
+        LLPointer<LLVolume> quarter_volume = new LLVolume(quarter, LOD_DETAIL[3]);
+        for (S32 i = 0; i < quarter_volume->getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = quarter_volume->getVolumeFace(i);
+            if ((face.mTypeMask & LLVolumeFace::OUTER_MASK) && !(face.mTypeMask & LLVolumeFace::FLAT_MASK))
+            {
+                classes.push_back({ fmt::format("quarter cylinder side at LOD 3, {} vertices", face.mNumVertices), quarter_volume, i });
+            }
+        }
+
+        const LLVector4a scale(0.37f, 2.5f, 11.f);
+        const alsimd::TexTransform turned{ cosf(0.3f), sinf(0.3f), 2.f, 0.75f, 0.1f, -0.2f };
+        for (const FaceClass& face_class : classes)
+        {
+            const LLVolumeFace& face = face_class.volume->getVolumeFace(face_class.face);
+            const LLVolumeFace pristine(face);
+            BENCHMARK_ADVANCED(fmt::format("planar normal, {}", face_class.name))(Catch::Benchmark::Chronometer meter)
+            {
+                std::vector<LLVolumeFace> faces(meter.runs(), pristine);
+                meter.measure([&](int i) { return faces[i].getPlanarNormal()[3]; });
+            };
+
+            const char* kind = face.getPlanarNormal()[3] > 0.f ? "one plane" : "per vertex";
+            std::vector<LLVector2> out(face.mNumVertices);
+            for (const alsimd::TexTransform* transform : { (const alsimd::TexTransform*)nullptr, &turned })
+            {
+                const char* through = transform ? "turned" : "no transform";
+                BENCHMARK(fmt::format("a vertex at a time, {}, {}", through, face_class.name))
+                {
+                    LLVector2* tex_coords0 = out.data();
+                    for (S32 i = 0; i < face.mNumVertices; i++)
+                    {
+                        LLVector2 tc(face.mTexCoords[i]);
+                        LLVector4a vec = face.mPositions[i];
+                        vec.mul(scale);
+                        perVertexProjection(tc, face.mNormals[i], vec);
+                        if (transform)
+                        {
+                            perVertexXform(tc, transform->cos_ang, transform->sin_ang, transform->offset_s, transform->offset_t,
+                                           transform->scale_s, transform->scale_t);
+                        }
+                        *tex_coords0++ = tc;
+                    }
+                    return out[0].mV[0];
+                };
+                BENCHMARK(fmt::format("kernel, {}, {}, {}", kind, through, face_class.name))
+                {
+                    face.getPlanarTexCoords(scale, transform, out[0].mV);
+                    return out[0].mV[0];
+                };
+            }
+        }
+    }
+
     TEST_CASE("llvolume_bench: cacheOptimize over the mesh corpus", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
