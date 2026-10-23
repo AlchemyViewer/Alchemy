@@ -3115,10 +3115,10 @@ namespace
         const Bound bounds[] = {
             { "box", { 2.0000, 2.0000, 2.0000, 2.0000 }, { 1.2000, 1.2000, 1.2000, 1.2000 } },
             { "cylinder", { 1.2500, 1.1667, 1.1000, 1.0833 }, { 1.0133, 1.0286, 1.0182, 1.0353 } },
-            { "sphere", { 1.0833, 0.8889, 0.7000, 1.0909 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
-            { "torus", { 0.6806, 1.1111, 1.0667, 1.0417 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
-            { "sculpt sphere", { 0.6806, 1.1250, 1.0625, 1.0312 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
-            { "sculpt plane", { 0.6806, 1.1250, 1.0625, 1.0312 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
+            { "sphere", { 1.0833, 0.8889, 0.7000, 0.6572 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
+            { "torus", { 0.6806, 0.6667, 0.6356, 0.6050 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
+            { "sculpt sphere", { 0.6806, 0.6875, 0.6270, 0.5977 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
+            { "sculpt plane", { 0.6806, 0.6875, 0.6270, 0.5977 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
         };
         const Shape shapes[] = { box(), cylinder(), sphere(), torus() };
         for (const Bound& bound : bounds)
@@ -3179,6 +3179,85 @@ namespace
             CHECK(figures.acmr() <= bound->acmr + 1e-4);
             CHECK(figures.overfetch() <= bound->overfetch + 1e-4);
         }
+    }
+
+    // createSide builds its index order where meshoptimizer would compute
+    // one: every side of the sweep, of the flexible prims and of the
+    // sculpts transforms at most five percent more vertices a triangle than
+    // meshoptimizer's cache order of the same triangles.
+    TEST_CASE("llvolume: every side's index order is within five percent of meshoptimizer's", "[llvolume]")
+    {
+        Report report;
+        S32 sides = 0;
+        F64 worst = 0;
+        std::string worst_at;
+        const auto check = [&](const LLVolume& volume, const std::string& name)
+        {
+            for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+            {
+                const LLVolumeFace& face = volume.getVolumeFace(i);
+                if (isCap(face) || face.mNumIndices == 0)
+                {
+                    continue;
+                }
+                const std::vector<U32> own(face.mIndices, face.mIndices + face.mNumIndices);
+                std::vector<U32> optimized(own.size());
+                meshopt_optimizeVertexCache(optimized.data(), own.data(), own.size(), face.mNumVertices);
+                const F64 ours = meshopt_analyzeVertexCache(own.data(), own.size(), face.mNumVertices, 16, 0, 0).acmr;
+                const F64 theirs = meshopt_analyzeVertexCache(optimized.data(), optimized.size(), face.mNumVertices, 16, 0, 0).acmr;
+                ++sides;
+                if (ours / theirs > worst)
+                {
+                    worst = ours / theirs;
+                    worst_at = fmt::format("{}: {}, {} by {}", name, faceName(face), face.mNumS, face.mNumT);
+                }
+                if (ours > theirs * 1.05 + 1e-6)
+                {
+                    report.fail(fmt::format("{}: {}, {} by {}: {:.3f} vertices a triangle against meshoptimizer's {:.3f}", name, faceName(face), face.mNumS,
+                                            face.mNumT, ours, theirs));
+                }
+            }
+        };
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                check(*build(s, lod), lodName(s, lod));
+            }
+        }
+        for (const Shape& base : sweepShapes())
+        {
+            if (base.path != LL_PCODE_PATH_LINE || (base.name.find(", plain") == std::string::npos && base.name.find(", profile cut") == std::string::npos))
+            {
+                continue;
+            }
+            for (S32 sections : { 4, 16 })
+            {
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    LLPointer<LLVolume> volume = flexiVolume(base, lod);
+                    bendPath(*volume, sections, 1.1f);
+                    volume->regen();
+                    check(*volume, fmt::format("flexible {}, {} sections at LOD {}", base.name, sections, lod));
+                }
+            }
+        }
+        const std::array<U16, 2> sizes[] = { { 64, 64 }, { 128, 32 }, { 32, 128 }, { 64, 16 } };
+        for (U8 stitching : STITCHINGS)
+        {
+            for (const auto& size : sizes)
+            {
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    check(*buildSculpt(stitching, mapFor(stitching, size[0], size[1]), lod),
+                          fmt::format("{} sculpt from a {} by {} map at LOD {}", stitchingName(stitching), size[0], size[1], lod));
+                }
+            }
+        }
+        INFO(fmt::format("{} sides; the most against meshoptimizer {:.3f}, {}", sides, worst, worst_at));
+        INFO(report.text());
+        CHECK(sides > 0);
+        CHECK(report.failures == 0);
     }
 
     TEST_CASE("llvolume: resizePath builds the flexible volume again in full", "[llvolume]")

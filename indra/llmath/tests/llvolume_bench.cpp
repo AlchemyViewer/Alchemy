@@ -425,7 +425,7 @@ namespace
         out.push_back(s + 1 + columns * (t + 1));
     }
 
-    // createSide's order: every quad of a row, row after row.
+    // The grid's own order: every quad of a row, row after row.
     void rowMajor(std::vector<U32>& out, U32 columns, U32 rows)
     {
         out.clear();
@@ -438,24 +438,58 @@ namespace
         }
     }
 
-    // Bands of BAND quads across, each band row by row before the next: a
-    // band's row reuses the BAND + 1 vertices the row before it loaded,
-    // and two rows of a band fit a 16-entry cache.
-    constexpr U32 BAND = 7;
-
-    void banded(std::vector<U32>& out, U32 columns, U32 rows)
+    // Every quad of a column, column after column: a column's right edge
+    // is still cached when the next column takes it, while a column of
+    // vertices fits the cache.
+    void byColumn(std::vector<U32>& out, U32 columns, U32 rows)
     {
         out.clear();
-        for (U32 first = 0; first + 1 < columns; first += BAND)
+        for (U32 s = 0; s + 1 < columns; ++s)
         {
-            const U32 last = llmin(first + BAND, columns - 1);
             for (U32 t = 0; t + 1 < rows; ++t)
             {
-                for (U32 s = first; s < last; ++s)
+                emitQuad(out, columns, s, t);
+            }
+        }
+    }
+
+    // Bands of at most BAND quads across, as near equal as the quads
+    // divide, each band row by row and every other band back up: a band's
+    // row reuses the vertices the row before it loaded, two rows of a band
+    // fit a 16-entry cache, and a band starts where the last one ended.
+    constexpr U32 BAND = 7;
+
+    void inBands(std::vector<U32>& out, U32 columns, U32 rows)
+    {
+        out.clear();
+        const U32 quads = columns - 1;
+        const U32 bands = (quads + BAND - 1) / BAND;
+        U32 first = 0;
+        for (U32 band = 0; band < bands; ++band)
+        {
+            const U32 end = first + quads / bands + (band < quads % bands ? 1 : 0);
+            for (U32 row = 0; row + 1 < rows; ++row)
+            {
+                const U32 t = (band & 1) ? rows - 2 - row : row;
+                for (U32 s = first; s < end; ++s)
                 {
                     emitQuad(out, columns, s, t);
                 }
             }
+            first = end;
+        }
+    }
+
+    // createSide's order: by column up to seven rows, in bands above.
+    void sideOrder(std::vector<U32>& out, U32 columns, U32 rows)
+    {
+        if (rows <= 7)
+        {
+            byColumn(out, columns, rows);
+        }
+        else
+        {
+            inBands(out, columns, rows);
         }
     }
 
@@ -471,8 +505,22 @@ namespace
         U32 rows;
     };
 
-    // The sweep's grids of more than two rows, from the prims and sculpts
-    // that have them.
+    // The first side of more than two rows, if the volume has one.
+    const LLVolumeFace* tallSide(const LLVolume& volume)
+    {
+        for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = volume.getVolumeFace(i);
+            if (!(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumT > 2)
+            {
+                return &face;
+            }
+        }
+        return nullptr;
+    }
+
+    // The sweep's grids of more than two rows, from the prims, flexible
+    // prims and sculpts that have them.
     std::vector<Grid> sweepGrids()
     {
         std::vector<Grid> out;
@@ -481,16 +529,22 @@ namespace
             for (S32 lod = 2; lod < LOD_COUNT; ++lod)
             {
                 LLPointer<LLVolume> volume = new LLVolume(prim.params, LOD_DETAIL[lod]);
-                for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+                if (const LLVolumeFace* face = tallSide(*volume))
                 {
-                    const LLVolumeFace& face = volume->getVolumeFace(i);
-                    if (!(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumT > 2)
-                    {
-                        out.push_back({ fmt::format("{} side at LOD {}, {} by {}", prim.name, lod, face.mNumS, face.mNumT), (U32)face.mNumS,
-                                        (U32)face.mNumT });
-                        break;
-                    }
+                    out.push_back({ fmt::format("{} side at LOD {}, {} by {}", prim.name, lod, face->mNumS, face->mNumT), (U32)face->mNumS,
+                                    (U32)face->mNumT });
                 }
+            }
+        }
+        for (S32 sections : { 4, 16 })
+        {
+            LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_CIRCLE, 3);
+            bendPath(*volume, sections, 0.4f);
+            volume->regen();
+            if (const LLVolumeFace* face = tallSide(*volume))
+            {
+                out.push_back({ fmt::format("flexible cylinder side, {} sections, LOD 3, {} by {}", sections, face->mNumS, face->mNumT), (U32)face->mNumS,
+                                (U32)face->mNumT });
             }
         }
         LLPointer<LLVolume> sculpted = sculptVolume(LL_SCULPT_TYPE_SPHERE, 3);
@@ -770,24 +824,29 @@ namespace
         std::fflush(stdout);
     }
 
-    // Each grid's index order three ways: createSide's rows, bands of seven
-    // columns made the same way, and meshoptimizer's cache order over the
+    // Each grid's index order: row by row, by column, in bands, createSide's
+    // choice of the last two, and meshoptimizer's cache order over the
     // rows. The vertices each transforms a triangle in a 16-entry cache are
     // printed first.
     TEST_CASE("llvolume_bench: a grid's index order", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
         const std::vector<Grid> grids = sweepGrids();
-        std::printf("vertices transformed a triangle, 16-entry cache\n  %-40s %10s %10s %13s\n", "grid", "row-major", "banded", "meshoptimizer");
+        std::printf("vertices transformed a triangle, 16-entry cache\n  %-56s %8s %8s %8s %10s %13s\n", "grid", "rows", "columns", "bands",
+                    "createSide", "meshoptimizer");
         for (const Grid& grid : grids)
         {
-            std::vector<U32> rows, bands, optimized;
+            const U32 vertices = grid.columns * grid.rows;
+            std::vector<U32> rows, columns, bands, side, optimized;
             rowMajor(rows, grid.columns, grid.rows);
-            banded(bands, grid.columns, grid.rows);
+            byColumn(columns, grid.columns, grid.rows);
+            inBands(bands, grid.columns, grid.rows);
+            sideOrder(side, grid.columns, grid.rows);
             optimized.resize(rows.size());
-            meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), grid.columns * grid.rows);
-            std::printf("  %-40s %10.3f %10.3f %13.3f\n", grid.name.c_str(), transformedPerTriangle(rows, grid.columns * grid.rows),
-                        transformedPerTriangle(bands, grid.columns * grid.rows), transformedPerTriangle(optimized, grid.columns * grid.rows));
+            meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), vertices);
+            std::printf("  %-56s %8.3f %8.3f %8.3f %10.3f %13.3f\n", grid.name.c_str(), transformedPerTriangle(rows, vertices),
+                        transformedPerTriangle(columns, vertices), transformedPerTriangle(bands, vertices), transformedPerTriangle(side, vertices),
+                        transformedPerTriangle(optimized, vertices));
         }
         std::fflush(stdout);
 
@@ -795,20 +854,20 @@ namespace
         {
             std::vector<U32> out;
             out.reserve((grid.columns - 1) * (grid.rows - 1) * 6);
-            BENCHMARK(fmt::format("row-major, {}", grid.name))
+            BENCHMARK(fmt::format("row by row, {}", grid.name))
             {
                 rowMajor(out, grid.columns, grid.rows);
                 return out.back();
             };
-            BENCHMARK(fmt::format("banded, {}", grid.name))
+            BENCHMARK(fmt::format("createSide's order, {}", grid.name))
             {
-                banded(out, grid.columns, grid.rows);
+                sideOrder(out, grid.columns, grid.rows);
                 return out.back();
             };
             std::vector<U32> rows;
             rowMajor(rows, grid.columns, grid.rows);
             std::vector<U32> optimized(rows.size());
-            BENCHMARK(fmt::format("meshoptimizer over row-major, {}", grid.name))
+            BENCHMARK(fmt::format("meshoptimizer over row by row, {}", grid.name))
             {
                 meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), grid.columns * grid.rows);
                 return optimized.back();
