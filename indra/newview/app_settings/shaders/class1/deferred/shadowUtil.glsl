@@ -721,22 +721,44 @@ float sampleSpotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen)
 }
 
 // The sun pass's (sunLightF, sunLightSSAOF), which fills the light map the deferred lights read:
-// each takes its derivatives as the shared samplers do, then leaves out the filter where no
-// reader of the map uses what it would give. The forward passes read the directional shadow's
-// raw value (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no
-// pass reads sampleSpotShadow's now, which shadowutil_gl_test checks.
+// each takes its derivatives as the shared samplers do, but only along the surface the pixel
+// shows (surfaceDerivatives), then leaves out the filter where no reader of the map uses what it
+// would give. The forward passes read the directional shadow's raw value
+// (sampleDirectionalShadowGrad, or sampleDirectionalShadow on the water) and keep it; no pass
+// reads sampleSpotShadow's now, which shadowutil_gl_test checks.
 
 // Set by the sun pass: 1 for each spot shadow map a shadowing spot light (mShadowSpotLight) owns.
 // No spot light reads the other's channel.
 uniform vec2 spot_shadow_live;
 
+// The derivatives of a position the G-buffer's depth gave, where they lie along the surface the
+// pixel shows. Beside a silhouette a pixel shares its quad with one on another surface, and the
+// receiver-plane bias solved from the plane through the two tilts the taps by a slope the surface
+// does not have: an outline, dark where it shadows the surface by itself, bright where it lets a
+// shadow through. Where that plane lies more than 60 degrees from geo_norm, the surface's own,
+// they are zero, and the pixel keeps the constant bias alone. A forward pass's position is
+// interpolated across one triangle, so its derivatives span no edge.
+void surfaceDerivatives(vec3 pos, vec3 geo_norm, out vec3 dpos_dx, out vec3 dpos_dy)
+{
+    dpos_dx = dFdx(pos);
+    dpos_dy = dFdy(pos);
+    vec3  plane = cross(dpos_dx, dpos_dy);
+    float along = dot(plane, geo_norm);
+    if (along * along < 0.25 * dot(plane, plane) * dot(geo_norm, geo_norm))
+    {
+        dpos_dx = vec3(0.0);
+        dpos_dy = vec3(0.0);
+    }
+}
+
 // A surface turned from the light (by the shading normal softenLightF lights it with) receives
 // none of it there whatever its shadow, so it takes 0 unfiltered.
-float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
+float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen)
 {
 #if defined(SUN_SHADOW)
-    vec3 dpos_dx = dFdx(pos);
-    vec3 dpos_dy = dFdy(pos);
+    vec3 dpos_dx;
+    vec3 dpos_dy;
+    surfaceDerivatives(pos, geo_norm, dpos_dx, dpos_dy);
 
     vec3 light_dir = (sun_up_factor == 1) ? sun_dir : moon_dir;
     if (dot(norm, light_dir) <= 0.0)
@@ -753,14 +775,17 @@ float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec2 pos_screen)
 // the cookie's (setupSpotLight builds both from one origin, field of view and aspect), outside
 // which spotLightF lights nothing but a legacy surface's reflection of the projector; that is left
 // unshadowed there, where the map holds nothing for it and the filter read its clamped edge.
-float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, int index, vec2 pos_screen)
+float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, vec3 geo_norm, int index, vec2 pos_screen)
 {
 #if defined(SPOT_SHADOW)
     if (spot_shadow_live[index] <= 0.0)
     {
         return 1.0;
     }
-    return spotShadow(pos, norm, index, pos_screen, dFdx(pos), dFdy(pos), true);
+    vec3 dpos_dx;
+    vec3 dpos_dy;
+    surfaceDerivatives(pos, geo_norm, dpos_dx, dpos_dy);
+    return spotShadow(pos, norm, index, pos_screen, dpos_dx, dpos_dy, true);
 #else
     return 1.0;
 #endif

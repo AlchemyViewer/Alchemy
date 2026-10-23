@@ -300,6 +300,21 @@ namespace
         "    frag_color = vec4(sampleDirectionalShadow(pos, vec3(0.0, 0.0, 1.0), gl_FragCoord.xy / PLANE_OUT), 0.0, 0.0, 1.0);\n"
         "}\n";
 
+    // A silhouette across the plane, as the sun pass sees one: the receivers from SILHOUETTE_COLUMN on lie 0.2 behind
+    // it, so the quad holding columns 64 and 65 spans the step and column 64's derivatives reach across it.
+    constexpr S32 SILHOUETTE_COLUMN = 65;
+    const char* kSilhouetteReceiver =
+        "out vec4 frag_color;\n"
+        "float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen);\n"
+        "void main()\n"
+        "{\n"
+        "    vec2 uv = (0.5 * PLANE_RES + (gl_FragCoord.xy / PLANE_OUT - 0.5) * PLANE_SPAN) / PLANE_RES;\n"
+        "    float behind = gl_FragCoord.x > 65.0 ? 0.2 : 0.0;\n"
+        "    vec3 pos = vec3(uv - 0.5, PLANE_STEP * PLANE_RES * (uv.y - 0.5) + behind);\n"
+        "    vec3 n = vec3(0.0, 0.0, 1.0);\n"
+        "    frag_color = vec4(sampleDirectionalShadowFacing(pos, n, n, gl_FragCoord.xy / PLANE_OUT), 0.0, 0.0, 1.0);\n"
+        "}\n";
+
     struct shadowutil_plane_data
     {
         shadowutil_plane_data()
@@ -354,8 +369,8 @@ namespace
         }
 
         // The sun's samplers at the compare tier or PCSS's, its cascades all one map holding the plane of depth step
-        // `step` a texel, read through the sampler the tier declares them for.
-        void setUp(bool pcss, F32 step)
+        // `step` a texel, read through the sampler the tier declares them for by `receiver`.
+        void setUp(bool pcss, F32 step, const char* receiver = kPlaneReceiver)
         {
             std::map<std::string, std::string> defines = { { "SUN_SHADOW", "1" }, { "SHADOW_PCSS", pcss ? "1" : "0" } };
             S32 level = 1;
@@ -365,7 +380,7 @@ namespace
                 REQUIRE(util != 0);
             }
             link(mDepth, "plane depth (test)", planeDefines(step) + kPlaneDepth, 0);
-            link(mProgram, "plane receiver (test)", planeDefines(step) + kPlaneReceiver, util);
+            link(mProgram, "plane receiver (test)", planeDefines(step) + receiver, util);
 
             mTriangle = new LLVertexBuffer(LLVertexBuffer::MAP_VERTEX);
             REQUIRE(mTriangle->allocateBuffer(3, 0));
@@ -442,6 +457,26 @@ namespace
             mOut.flush();
         }
 
+        // The darkest sun shadow among the output's first `columns` columns, and where it is.
+        F32 darkest(S32 columns, S32& at_x, S32& at_y) const
+        {
+            F32 sun = 1.f;
+            for (S32 y = 0; y < PLANE_OUT; ++y)
+            {
+                for (S32 x = 0; x < columns; ++x)
+                {
+                    const F32 value = mPixels[(size_t(y) * PLANE_OUT + x) * 4];
+                    if (value < sun)
+                    {
+                        sun = value;
+                        at_x = x;
+                        at_y = y;
+                    }
+                }
+            }
+            return sun;
+        }
+
         ll_test::SharedGLScope mGL;
         ll_test::TestShaderMgr mShaders;
         LLGLSLShader mDepth;
@@ -494,24 +529,27 @@ TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: a receiver on its map's 
     setUp(pcss, step);
     run();
 
-    // The darkest receiver, and where: a receiver the bias does not follow reads its own plane's acne, in steps a texel
-    // tall, and a texel compared off its own plane shadows a part of every gather.
-    F32 darkest = 1.f;
+    // A receiver the bias does not follow reads its own plane's acne, in steps a texel tall, and a texel compared off its
+    // own plane shadows a part of every gather.
     S32 at_x = -1;
     S32 at_y = -1;
-    for (S32 y = 0; y < PLANE_OUT; ++y)
-    {
-        for (S32 x = 0; x < PLANE_OUT; ++x)
-        {
-            const F32 sun = mPixels[(size_t(y) * PLANE_OUT + x) * 4];
-            if (sun < darkest)
-            {
-                darkest = sun;
-                at_x = x;
-                at_y = y;
-            }
-        }
-    }
+    const F32 sun = darkest(PLANE_OUT, at_x, at_y);
     CAPTURE(at_x, at_y);
-    CHECK(darkest > 0.999f);
+    CHECK(sun > 0.999f);
+}
+
+TEST_CASE_METHOD(shadowutil_plane_data, "shadowutil_gl: the sun pass takes no slope across a silhouette", "[shadowutil_gl]")
+{
+    const bool pcss = GENERATE(false, true);
+    CAPTURE(pcss);
+    setUp(pcss, 0.f, kSilhouetteReceiver);
+    run();
+
+    // The plane in front, on a map holding it flat, reads lit up to the silhouette: column 64 too, whose derivatives
+    // reach the receiver behind it, and whose taps a slope solved across the step would tilt off the plane.
+    S32 at_x = -1;
+    S32 at_y = -1;
+    const F32 sun = darkest(SILHOUETTE_COLUMN, at_x, at_y);
+    CAPTURE(at_x, at_y);
+    CHECK(sun > 0.999f);
 }
