@@ -1165,7 +1165,7 @@ namespace
     struct TangentAgreement
     {
         S32 compared = 0; // vertices it gives one tangent with a length
-        S32 split = 0;    // vertices whose corners it gives more than one
+        S32 split = 0;    // vertices whose corners it gives more than one, or sums with another vertex's
         S32 lone = 0;     // vertices it gives no tangent
         S32 unsure = 0;   // vertices whose tangent rounding decides
         F64 widest = 0.0; // degrees between the two, at most
@@ -1367,6 +1367,30 @@ namespace
         const std::vector<F64> rounding = tangentRoundingDegrees(face);
         std::vector<S32> first(face.mNumVertices, -1);
         std::vector<bool> split(face.mNumVertices, false);
+        // meshoptimizer welds vertices whose positions, normals and UVs
+        // compare equal and sums all their corners, where createTangents
+        // sums each vertex's own. A flat inner side's copied columns share a
+        // position and a UV, and where their normals come out equal to the
+        // last bit, as rounding decides on one platform and not another, it
+        // gives each the sum of both: such a vertex is not held to it.
+        std::map<std::array<U32, 8>, U32> places;
+        for (U32 v : indices)
+        {
+            std::array<U32, 8> key;
+            std::memcpy(key.data(), face.mPositions[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(key.data() + 3, face.mNormals[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(key.data() + 6, face.mTexCoords[v].mV, 2 * sizeof(F32));
+            for (U32& bits : key)
+            {
+                bits = bits == 0x80000000u ? 0u : bits; // -0 is 0, as meshoptimizer compares them
+            }
+            const auto [place, fresh] = places.emplace(key, v);
+            if (!fresh && place->second != v)
+            {
+                split[v] = true;
+                split[place->second] = true;
+            }
+        }
         for (size_t c = 0; c < indices.size(); ++c)
         {
             const U32 v = indices[c];
