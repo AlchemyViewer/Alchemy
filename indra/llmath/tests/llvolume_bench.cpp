@@ -787,7 +787,7 @@ namespace
     // the texture entry's: a vertex at a time along each vertex's normal,
     // as LLFace's loops ran, and through the kernel, along the face's planar
     // normal or each vertex's by what it is. And the planar normal itself,
-    // made on a face's first planar use.
+    // made on a face's first planar use, and the coordinates' tangents.
     TEST_CASE("llvolume_bench: one face's planar texture coordinates", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
@@ -817,6 +817,12 @@ namespace
             };
 
             const char* kind = face.getPlanarNormal()[3] > 0.f ? "one plane" : "per vertex";
+            std::vector<LLVector4a> tangents(face.mNumVertices);
+            BENCHMARK(fmt::format("tangents, {}, {}", kind, face_class.name))
+            {
+                face.getPlanarTangents(scale, tangents.data());
+                return tangents[0][0];
+            };
             std::vector<LLVector2> out(face.mNumVertices);
             for (const alsimd::TexTransform* transform : { (const alsimd::TexTransform*)nullptr, &turned })
             {

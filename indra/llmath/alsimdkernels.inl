@@ -1871,6 +1871,72 @@ void planar_texcoords_impl(const LLVector4a* positions, const LLVector4a* normal
     }
 }
 
+template <class W>
+AL_SIMD_INLINE Lanes3<W> planar_cross(const Lanes3<W>& a, const Lanes3<W>& b)
+{
+    return { W::fnmadd(a.z, b.y, W::mul(a.y, b.z)), W::fnmadd(a.x, b.z, W::mul(a.z, b.x)), W::fnmadd(a.y, b.x, W::mul(a.x, b.y)) };
+}
+
+template <class W>
+AL_SIMD_INLINE Lanes3<W> planar_scaled(const Lanes3<W>& v, typename W::reg k)
+{
+    return { W::mul(v.x, k), W::mul(v.y, k), W::mul(v.z, k) };
+}
+
+// The tangents of W::floats points' planar coordinates at the normals
+// at(0) to at(W::floats - 1), as planar_tangents gives them.
+template <class W, bool PER_POINT, class At>
+AL_SIMD_INLINE void planar_tangent_points(const PlanarConstants<W>& c, const LLVector4a* normals, At at, Lanes3<W>& tangent,
+                                          typename W::reg& w)
+{
+    using reg = typename W::reg;
+    Lanes3<W> n;
+    reg unused;
+    W::load_columns([&](int i) { return reinterpret_cast<const F32*>(normals + at(i)); }, n.x, n.y, n.z, unused);
+
+    Lanes3<W> b = c.binormal();
+    Lanes3<W> t = c.tangent();
+    if constexpr (PER_POINT)
+    {
+        planar_basis<W>(n, c.switch_x(), b, t);
+    }
+    const Lanes3<W> scale = c.scale();
+    const Lanes3<W> gs = { W::mul(b.x, scale.x), W::mul(b.y, scale.y), W::mul(b.z, scale.z) };
+    const Lanes3<W> gt = { W::neg(W::mul(t.x, scale.x)), W::neg(W::mul(t.y, scale.y)), W::neg(W::mul(t.z, scale.z)) };
+
+    const reg zero = W::zero();
+    const reg one = W::set1(1.f);
+    w = W::select(W::cmplt(planar_dot<W>(n, planar_cross<W>(gs, gt)), zero), W::neg(one), one);
+
+    // Along s, unless gt lies along the normal: then gs in the normal's
+    // plane.
+    const reg n2 = planar_dot<W>(n, n);
+    const Lanes3<W> along = planar_scaled<W>(planar_cross<W>(gt, n), w);
+    const reg along2 = planar_dot<W>(along, along);
+    const reg toward = W::div(planar_dot<W>(n, gs), W::max(n2, W::set1(FLT_MIN)));
+    const Lanes3<W> flat = { W::fnmadd(n.x, toward, gs.x), W::fnmadd(n.y, toward, gs.y), W::fnmadd(n.z, toward, gs.z) };
+    const typename W::mask edge_on = W::cmple(along2, W::mul(W::set1(1e-10f), W::mul(planar_dot<W>(gt, gt), n2)));
+    const Lanes3<W> chosen = { W::select(edge_on, flat.x, along.x), W::select(edge_on, flat.y, along.y), W::select(edge_on, flat.z, along.z) };
+    tangent = planar_scaled<W>(chosen, W::rsqrt(W::max(planar_dot<W>(chosen, chosen), W::set1(FLT_MIN))));
+}
+
+template <class W, bool PER_POINT>
+void planar_tangents_impl(const LLVector4a* normals, size_t n, const PlanarArgs& a, LLVector4a* dst)
+{
+    const PlanarConstants<W> c(a);
+    alignas(16) F32 spill[4];
+    for (size_t first = 0; first < n; first += W::floats)
+    {
+        const size_t last = n - 1;
+        const auto at = [&](int i) { return first + i < last ? first + i : last; };
+        Lanes3<W> tangent;
+        typename W::reg w;
+        planar_tangent_points<W, PER_POINT>(c, normals, at, tangent, w);
+        W::store_columns(tangent.x, tangent.y, tangent.z, w,
+                         [&](int i) { return first + i < n ? reinterpret_cast<F32*>(dst + first + i) : spill; });
+    }
+}
+
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma float_control(pop)
 #endif

@@ -5899,6 +5899,48 @@ LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVe
     return tc;
 }
 
+void LLVolumeFace::getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) const
+{
+    if (mPlanarNormal[3] == 0.f)
+    {
+        makePlanarNormal();
+    }
+    LLVector4a planar;
+    planar.loadua(mPlanarNormal);
+    if (planar[3] > 0.f)
+    {
+        LLVector4a binormal, tangent;
+        getPlanarBasis(planar, PLANAR_SWITCH_X, binormal, tangent);
+        alsimd::planar_tangents(mNormals, mNumVertices, scale, binormal, tangent, dst);
+    }
+    else
+    {
+        alsimd::planar_tangents(mNormals, mNumVertices, scale, PLANAR_SWITCH_X - PLANAR_TIE, dst);
+    }
+}
+
+LLVector4a LLVolumeFace::getPlanarTangent(const LLVector4a& normal, const LLVector4a& scale) const
+{
+    if (mPlanarNormal[3] == 0.f)
+    {
+        makePlanarNormal();
+    }
+    LLVector4a planar;
+    planar.loadua(mPlanarNormal);
+    LLVector4a out;
+    if (planar[3] > 0.f)
+    {
+        LLVector4a binormal, tangent;
+        getPlanarBasis(planar, PLANAR_SWITCH_X, binormal, tangent);
+        alsimd::planar_tangents(&normal, 1, scale, binormal, tangent, &out);
+    }
+    else
+    {
+        alsimd::planar_tangents(&normal, 1, scale, PLANAR_SWITCH_X - PLANAR_TIE, &out);
+    }
+    return out;
+}
+
 
 void LLVolumeFace::swapData(LLVolumeFace& rhs)
 {

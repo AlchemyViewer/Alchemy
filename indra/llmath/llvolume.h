@@ -980,6 +980,15 @@ public:
     // at its object's scale, whose normal is normal.
     LLVector2 getPlanarTexCoord(const LLVector4a& position, const LLVector4a& normal, const alsimd::TexTransform* transform = nullptr) const;
 
+    // Every vertex's tangent for those coordinates, in volume space, by
+    // alsimd::planar_tangents: what the tangent generators give for UVs that
+    // are the planar coordinates, so that a normal map planar texgen lays
+    // out shades by its own frame. One vector a vertex, 16-byte aligned.
+    void getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) const;
+
+    // The same where normal is, for a point of the face.
+    LLVector4a getPlanarTangent(const LLVector4a& normal, const LLVector4a& scale) const;
+
     // The binormal planar texgen takes along normal with the switch at
     // switch_x, and the tangent, binormal x normal.
     static void getPlanarBasis(const LLVector4a& normal, F32 switch_x, LLVector4a& binormal, LLVector4a& tangent);

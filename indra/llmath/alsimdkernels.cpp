@@ -106,6 +106,20 @@ void planar_texcoords(const LLVector4a* positions, const LLVector4a* normals, si
     }
 }
 
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, const LLVector4a& binormal, const LLVector4a& tangent,
+                     LLVector4a* dst)
+{
+    const kernels::PlanarArgs a{ scale.getF32ptr(), binormal.getF32ptr(), tangent.getF32ptr(), 0.f, nullptr };
+    n <= 4 ? kernels::planar_tangents_impl<ALSimd4, false>(normals, n, a, dst) : kernels::planar_tangents_impl<ALSimdLanes, false>(normals, n, a, dst);
+}
+
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x, LLVector4a* dst)
+{
+    const LLVector4a none(0.f);
+    const kernels::PlanarArgs a{ scale.getF32ptr(), none.getF32ptr(), none.getF32ptr(), switch_x, nullptr };
+    n <= 4 ? kernels::planar_tangents_impl<ALSimd4, true>(normals, n, a, dst) : kernels::planar_tangents_impl<ALSimdLanes, true>(normals, n, a, dst);
+}
+
 void offset_indices_u16(const U16* src, U16* dst, size_t n, U16 offset)
 {
     kernels::offset_indices_u16_impl<ALSimdWide>(src, dst, n, offset);

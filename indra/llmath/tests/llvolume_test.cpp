@@ -5619,6 +5619,158 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A normal map planar texgen lays out shades by the frame of its own
+    // coordinates. Where a face is projected as one plane those are affine
+    // in position, and its planar tangents are the ones its own tangent
+    // generator makes for UVs that are the planar coordinates. They have
+    // the same handedness wherever a vertex normal leans less than 45
+    // degrees from each of its triangles: a folded face has triangles
+    // nearly edge on to their normals, whose winding in UV flips. They have
+    // the same direction to rounding on a face with one normal; on a curved
+    // one the generator puts each triangle's way of constant t in the
+    // vertex normal's plane, which turns it by up to about twice the angle
+    // between that normal and the triangle's, within the cone. That holds
+    // at an even scale. A scale that stretches one axis far past the others
+    // can lay t's gradient nearly along a curved face's normals, where the
+    // generator's sum swings and the vertex's own frame does not. There,
+    // and where a face is projected per vertex, each tangent lies in its
+    // normal's plane and runs the way s does and t does not, by the frame
+    // the vertex is projected with.
+    struct TangentFit
+    {
+        S64 compared = 0;
+        F32 worst_flat = 0.f;
+        F32 worst_curved = 0.f; // against the bound
+    };
+
+    void checkPlanarTangents(const LLVolumeFace& face, const std::string& where, Report& report, TangentFit& fit)
+    {
+        const LLVector4a planar = face.getPlanarNormal();
+        const bool flat = oneNormal(face);
+        const std::vector<Triangle> triangles = trianglesOf(face);
+        const std::vector<bool> lone = loneVertices(face, triangles);
+        // How far each vertex normal leans from its triangles'.
+        std::vector<F32> lean(face.mNumVertices, 0.f);
+        for (const Triangle& tri : triangles)
+        {
+            if (!tri.degenerate)
+            {
+                for (U32 v : tri.v)
+                {
+                    lean[v] = llmax(lean[v], degreesBetween(v3(face.mNormals[v]), tri.normal));
+                }
+            }
+        }
+        for (const LLVector4a& scale : PLANAR_SCALES)
+        {
+            std::vector<LLVector4a> tangents(face.mNumVertices + 1, LLVector4a(1234.f));
+            face.getPlanarTangents(scale, tangents.data());
+            if (bitsOf(tangents.back()) != bitsOf(LLVector4a(1234.f)))
+            {
+                report.fail(where + ": written past the vertices");
+                return;
+            }
+
+            const bool even = scale[0] == scale[1] && scale[1] == scale[2];
+            if (planar[3] > 0.f && (flat || even))
+            {
+                LLVolumeFace planar_uvs(face);
+                const std::vector<LLVector2> uvs = planarTexCoords(face, scale, nullptr);
+                std::copy(uvs.begin(), uvs.end(), planar_uvs.mTexCoords);
+                ll_aligned_free_16(planar_uvs.mTangents);
+                planar_uvs.mTangents = nullptr;
+                planar_uvs.createTangents();
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    if (lone[v])
+                    {
+                        continue;
+                    }
+                    ++fit.compared;
+                    const LLVector4a& made = planar_uvs.mTangents[v];
+                    const F32 off = degreesBetween(v3(made), v3(tangents[v]));
+                    const F32 bound = flat ? 0.05f : 0.5f + 2.f * lean[v];
+                    if (flat)
+                    {
+                        fit.worst_flat = llmax(fit.worst_flat, off);
+                    }
+                    else
+                    {
+                        fit.worst_curved = llmax(fit.worst_curved, off / bound);
+                    }
+                    if ((made[3] != tangents[v][3] && lean[v] < 45.f) || off > bound)
+                    {
+                        report.fail(fmt::format("{}: vertex {} planar tangent {} {} {} w {}, the generator's {} {} {} w {}, {:.3f} degrees apart, normal {:.1f} "
+                                                "degrees from its triangles'",
+                                                where, v, tangents[v][0], tangents[v][1], tangents[v][2], tangents[v][3], made[0], made[1], made[2], made[3],
+                                                off, lean[v]));
+                        return;
+                    }
+                }
+                continue;
+            }
+
+            for (S32 v = 0; v < face.mNumVertices; ++v)
+            {
+                LLVector4a b, t;
+                if (planar[3] > 0.f)
+                {
+                    LLVolumeFace::getPlanarBasis(planar, LLVolumeFace::PLANAR_SWITCH_X, b, t);
+                }
+                else
+                {
+                    LLVolumeFace::getPlanarBasis(face.mNormals[v], LLVolumeFace::PLANAR_SWITCH_X - LLVolumeFace::PLANAR_TIE, b, t);
+                }
+                LLVector3 gs, gt;
+                for (S32 k = 0; k < 3; ++k)
+                {
+                    gs.mV[k] = b[k] * scale[k];
+                    gt.mV[k] = -t[k] * scale[k];
+                }
+                const LLVector3 tangent = v3(tangents[v]);
+                LLVector3 n = v3(face.mNormals[v]);
+                n.normalize();
+                const LLVector3 bitangent = (n % tangent) * tangents[v][3];
+                if (fabsf(tangent.length() - 1.f) > 1e-5f || fabsf(tangent * n) > 1e-5f || !(tangent * gs > 0.f) ||
+                    fabsf(tangent * gt) > 1e-5f * gt.length() || !(bitangent * gt > 0.f))
+                {
+                    report.fail(fmt::format("{}: vertex {} planar tangent {} {} {} w {} against s {} {} {} and t {} {} {}", where, v, tangent.mV[0],
+                                            tangent.mV[1], tangent.mV[2], tangents[v][3], gs.mV[0], gs.mV[1], gs.mV[2], gt.mV[0], gt.mV[1], gt.mV[2]));
+                    return;
+                }
+            }
+        }
+    }
+
+    TEST_CASE("llvolume: planar tangents are the generator's for the planar coordinates", "[llvolume]")
+    {
+        Report report;
+        TangentFit fit;
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    checkPlanarTangents(face, fmt::format("{}: {}", lodName(s, lod), faceName(face)), report, fit);
+                }
+            }
+        }
+        for (const CorpusMesh& mesh : corpus())
+        {
+            LLVolumeFace face = mesh.face();
+            REQUIRE(face.cacheOptimize(true));
+            checkPlanarTangents(face, mesh.name, report, fit);
+        }
+        INFO(fmt::format("{} tangents compared with the generator's: worst {:.4f} degrees on faces with one normal, {:.3f} of the bound on curved ones",
+                         fit.compared, fit.worst_flat, fit.worst_curved));
+        INFO(report.text());
+        CHECK(fit.compared > 0);
+        CHECK(report.failures == 0);
+    }
+
     // The planar normal is made once and kept: a copy takes it, a flexible
     // prim's partial build keeps its first build's, and a full build of the
     // face makes it again from what was built, as a new sculpt map does.

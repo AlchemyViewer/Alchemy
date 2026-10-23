@@ -58,6 +58,7 @@
 #include "llmeshrepository.h"
 #include "llskinningutil.h"
 #include "alsimdkernels.h"
+#include "alscratcharena.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -805,30 +806,19 @@ void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_po
 {
     const LLMatrix4 vol_mat = getWorldMatrix().toMatrix4();
     const LLVolumeFace& vf = getViewerObject()->getVolume()->getVolumeFace(mTEOffset);
+    if (!vf.mNormals)
+    {
+        return;
+    }
+    // the face's planar normal where it is projected as one plane, and its
+    // first vertex's where it is not; the binormal is the way planar
+    // texgen's t runs there
     const LLVector4a planar = vf.getPlanarNormal();
-    LLVector4a normal4a;
+    const LLVector4a normal4a = planar[3] > 0.f ? planar : *vf.mNormals;
+    const LLVector4a tangent = vf.getPlanarTangent(normal4a, LLVector4a(1.f, 1.f, 1.f));
     LLVector4a binormal4a;
-    if (planar[3] > 0.f)
-    {
-        // a face projected as one plane: its normal, and the way its t runs
-        LLVector4a axis, tangent;
-        LLVolumeFace::getPlanarBasis(planar, LLVolumeFace::PLANAR_SWITCH_X, axis, tangent);
-        normal4a = planar;
-        binormal4a = tangent;
-        binormal4a.negate();
-        binormal4a.normalize3();
-    }
-    else
-    {
-        if (! (vf.mNormals && vf.mTangents))
-        {
-            return;
-        }
-        normal4a = *vf.mNormals;
-        const LLVector4a& tangent = *vf.mTangents;
-        binormal4a.setCross3(normal4a, tangent);
-        binormal4a.mul(tangent.getF32ptr()[3]);
-    }
+    binormal4a.setCross3(normal4a, tangent);
+    binormal4a.mul(tangent.getF32ptr()[3]);
 
     LLVector2 projected_binormal = vf.getPlanarTexCoord(binormal4a, normal4a);
     projected_binormal -= LLVector2(0.5f, 0.5f); // this normally happens in xform()
@@ -1495,10 +1485,6 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
             const LLTextureEntry* tep = getTextureEntry();
             U8 texgen = tep ? tep->getTexGen() : LLTextureEntry::TEX_GEN_DEFAULT;
-            if (rebuild_tcoord && texgen != LLTextureEntry::TEX_GEN_DEFAULT)
-            { //planar texgen needs binormals
-                mVObjp->getVolume()->genTangents(face_index);
-            }
 
             U8 tex_mode = 0;
 
@@ -1733,11 +1719,23 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                     LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("tgd - do bump");
                     mVertexBuffer->getTexCoord1Strider(tex_coords1, mGeomIndex, mGeomCount);
 
-                    mVObjp->getVolume()->genTangents(face_index);
+                    ALScratchArena::Scope scratch;
+                    const LLVector4a* tangents = nullptr;
+                    if (texgen == LLTextureEntry::TEX_GEN_PLANAR)
+                    {
+                        LLVector4a* planar_tangents = scratch.allocate<LLVector4a>(num_vertices);
+                        vf.getPlanarTangents(scalea, planar_tangents);
+                        tangents = planar_tangents;
+                    }
+                    else
+                    {
+                        mVObjp->getVolume()->genTangents(face_index);
+                        tangents = vf.mTangents;
+                    }
 
                     for (S32 i = 0; i < num_vertices; i++)
                     {
-                        LLVector4a tangent = vf.mTangents[i];
+                        LLVector4a tangent = tangents[i];
 
                         LLVector4a binorm;
                         binorm.setCross3(vf.mNormals[i], tangent);
@@ -1807,13 +1805,24 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("getGeometryVolume - tangent");
             mVertexBuffer->getTangentStrider(tangent, mGeomIndex, mGeomCount);
-
-            mVObjp->getVolume()->genTangents(face_index);
+            LLVector4a* tangents = (LLVector4a*) tangent.get();
 
             // A tangent lies in the surface, so it goes through the vertex matrix as the surface does; the
             // normal's inverse transpose would turn it off the surface under a non-uniform scale. The
-            // handedness rides in w and is not transformed.
-            alsimd::transform_directions_keep_w(mat_vert, vf.mTangents, (LLVector4a*) tangent.get(), num_vertices);
+            // handedness rides in w and is not transformed. Planar texgen's coordinates have a frame of
+            // their own, made here in volume space and turned in place.
+            if (tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR)
+            {
+                LLVector4a scalea;
+                scalea.load3(scale.mV);
+                vf.getPlanarTangents(scalea, tangents);
+                alsimd::transform_directions_keep_w(mat_vert, tangents, tangents, num_vertices);
+            }
+            else
+            {
+                mVObjp->getVolume()->genTangents(face_index);
+                alsimd::transform_directions_keep_w(mat_vert, vf.mTangents, tangents, num_vertices);
+            }
         }
 
         if (rebuild_weights && vf.mWeights)

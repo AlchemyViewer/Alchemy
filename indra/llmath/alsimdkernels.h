@@ -100,6 +100,19 @@ void planar_texcoords(const LLVector4a* positions, size_t n, const LLVector4a& s
 void planar_texcoords(const LLVector4a* positions, const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x,
                       const TexTransform* transform, F32* dst);
 
+// The tangents of those coordinates, before any transform, one a normal:
+// the way s runs along the surface where that normal is, unit, with w 1
+// where w (normal x tangent) runs the way t does and -1 where it runs
+// against it, as the tangent generators give w. With s's gradient
+// gs = scale * b and t's gt = -(scale * t), w is the sign of
+// normal . (gs x gt) and the tangent is w (gt x normal) normalized; where
+// gt lies along the normal it is gs put in the normal's plane instead.
+// The normals need not be unit length. The one-plane and per-point forms
+// take b and t as planar_texcoords' do.
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, const LLVector4a& binormal, const LLVector4a& tangent,
+                     LLVector4a* dst);
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x, LLVector4a* dst);
+
 // dst[i] = src[i] + offset, wrapping at sixteen bits. Neither array need
 // be aligned.
 void offset_indices_u16(const U16* src, U16* dst, size_t n, U16 offset);

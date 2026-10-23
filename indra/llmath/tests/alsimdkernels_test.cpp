@@ -1067,6 +1067,117 @@ namespace
         }
     }
 
+    // Planar tangents: every lane width bit for bit against the narrowest,
+    // nothing written past the count, and each the formula's in double:
+    // w the sign of n . (gs x gt), the tangent w (gt x n) normalized, in
+    // the normal's plane and running the way s does.
+    TEST_CASE("alsimdkernels: planar tangents at every width and count", "[alsimdkernels]")
+    {
+        const LLVector4a scale(0.37f, 2.5f, 11.f, 1.f);
+        const F32 tie = 0.5f - 1e-4f;
+        std::mt19937 rng(10);
+        std::uniform_real_distribution<F32> spread(-1.f, 1.f);
+        auto basis = [](const LLVector4a& n, F32 switch_x, LLVector4a& b, LLVector4a& t)
+        {
+            const F32 d = n[0];
+            if (d >= switch_x || d <= -switch_x)
+            {
+                b.set(0.f, d < 0.f ? -1.f : 1.f, 0.f);
+            }
+            else
+            {
+                b.set(n[1] > 0.f ? -1.f : 1.f, 0.f, 0.f);
+            }
+            t.setCross3(b, n);
+        };
+        LLVector4a plane(0.3f, 0.8f, 0.5f), plane_b, plane_t;
+        plane.normalize3();
+        basis(plane, 0.5f, plane_b, plane_t);
+        const LLVector4a none(0.f);
+
+        for (size_t n : COUNTS)
+        {
+            std::vector<LLVector4a> normals(n + 1);
+            for (size_t i = 0; i < n; ++i)
+            {
+                switch (i % 4)
+                {
+                    case 0: normals[i].set(0.5f, 0.8660254f, 0.f); break;
+                    case 1: normals[i].set(-0.49995f, 0.2f, 0.8f); break;
+                    default: normals[i].set(spread(rng), spread(rng), spread(rng)); break;
+                }
+                // within 60 degrees of the plane's normal for the one-plane
+                // form, and of any length
+                normals[i].add(plane);
+                normals[i].mul(0.5f + (F32)(i % 3));
+            }
+
+            auto run = [&]<class W>(bool per_point)
+            {
+                std::vector<LLVector4a> out(n + 1, SENTINEL);
+                const kernels::PlanarArgs a{ scale.getF32ptr(), (per_point ? none : plane_b).getF32ptr(), (per_point ? none : plane_t).getF32ptr(),
+                                             tie, nullptr };
+                if (per_point)
+                {
+                    kernels::planar_tangents_impl<W, true>(normals.data(), n, a, out.data());
+                }
+                else
+                {
+                    kernels::planar_tangents_impl<W, false>(normals.data(), n, a, out.data());
+                }
+                require_same_bits("planar tangents write within n", out[n], SENTINEL);
+                return out;
+            };
+
+            for (bool per_point : { false, true })
+            {
+                CAPTURE(n, per_point);
+                const std::vector<LLVector4a> narrow = run.template operator()<ALSimd4>(per_point);
+                for (size_t i = 0; i < n; ++i)
+                {
+                    LLVector4a b = plane_b, t = plane_t;
+                    if (per_point)
+                    {
+                        basis(normals[i], tie, b, t);
+                    }
+                    double gs[3], gt[3], nn[3];
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        gs[k] = (double)b[k] * scale[k];
+                        gt[k] = -(double)t[k] * scale[k];
+                        nn[k] = normals[i][k];
+                    }
+                    auto cross = [](const double* x, const double* y, double* r)
+                    {
+                        r[0] = x[1] * y[2] - x[2] * y[1];
+                        r[1] = x[2] * y[0] - x[0] * y[2];
+                        r[2] = x[0] * y[1] - x[1] * y[0];
+                    };
+                    double gsgt[3], along[3];
+                    cross(gs, gt, gsgt);
+                    const double w = nn[0] * gsgt[0] + nn[1] * gsgt[1] + nn[2] * gsgt[2] < 0.0 ? -1.0 : 1.0;
+                    cross(gt, nn, along);
+                    const double length = std::sqrt(along[0] * along[0] + along[1] * along[1] + along[2] * along[2]);
+                    CAPTURE(i);
+                    REQUIRE(narrow[i][3] == (F32)w);
+                    for (int k = 0; k < 3; ++k)
+                    {
+                        require_close("planar tangent", narrow[i][k], w * along[k] / length, 1e-5);
+                    }
+                }
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    const std::vector<LLVector4a> wide = run.template operator()<W>(per_point);
+                    for (size_t i = 0; i < n; ++i)
+                    {
+                        CAPTURE(width, i);
+                        require_same_bits("planar tangents", wide[i], narrow[i]);
+                    }
+                });
+            }
+        }
+    }
+
     // A grid of columns by rows over a wavy sheet, with the sheet's normals
     // and the grid's UVs, indexed as createSide indexes one. Column 2 lies
     // on column 1 and row 2 has row 1's UVs, so that some quads are lines
