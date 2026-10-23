@@ -157,7 +157,10 @@ vec2 receiverPlaneDepthBias(vec2 duvdx, vec2 duvdy, float dzdx, float dzdy, vec2
     // [ du/dy  dv/dy ] (dz/dv) = (dz/dy)
     float det = duvdx.x * duvdy.y - duvdx.y * duvdy.x;
     vec2 dz_duv = vec2(0.0, 0.0);
-    if (abs(det) > 1e-8)
+    // Singular only where the pixel's two steps land on one line of the map, as for a receiver the light meets edge
+    // on: the sine between them, not det, which shrinks with the square of a step's length. Where a texel spans several
+    // pixels, which is where its acne shows, det is far below any fixed floor.
+    if (abs(det) > 1e-3 * length(duvdx) * length(duvdy))
     {
         float inv = 1.0 / det;
         dz_duv.x = ( duvdy.y * dzdx - duvdx.y * dzdy) * inv;
