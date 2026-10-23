@@ -39,6 +39,7 @@
 #include "llvolume.h"
 #include "llendianswizzle.h"
 
+#include <meshoptimizer.h>
 
 #define HEADER_ASCII "Linden Mesh 1.0"
 #define HEADER_BINARY "Linden Binary Mesh 1.0"
@@ -557,6 +558,22 @@ bool LLPolyMeshSharedData::loadMesh( const std::string& fileName )
 //                      }
 
                         numTris++;
+                }
+
+                // The triangles in an order a vertex cache reuses, once for
+                // the file and every avatar that shares it. Morphs and skin
+                // weights address vertices, which keep their order, and an
+                // LOD's faces are its own.
+                const U32 vertex_count = (U32)mNumVertices;
+                bool in_range = numFaces > 0;
+                for (i = 0; i < (U32)numFaces * 3 && in_range; i++)
+                {
+                        in_range = (U32)mFaces[i / 3][i % 3] < vertex_count;
+                }
+                if (in_range)
+                {
+                        unsigned int* indices = reinterpret_cast<unsigned int*>(mFaces);
+                        meshopt_optimizeVertexCache(indices, indices, (size_t)numFaces * 3, vertex_count);
                 }
 
                 LL_DEBUGS() << "verts: " << numVertices
