@@ -562,6 +562,12 @@ public:
     // segments' frames kept by endFrame().
     ALStagingRing& stagingRing() { return mStagingRing; }
 
+    // Whether this context reads an upload's rows tight, at an unpack alignment of 1, which init() sets: before it a
+    // context reads them at GL's default of 4, padding every row to a multiple of four bytes. The rows the staging ring
+    // packs are tight, so no upload is staged before init(): the fonts made before it (LLViewerWindow::initFonts) would
+    // read every glyph whose rows are not a multiple of four bytes askew.
+    bool unpacksTightRows() const { return mUnpacksTightRows; }
+
     // The buffers the main thread's texture readbacks are read into and collected from once the GPU has written them
     // (LLImageGL::requestReadBack), their reads expired and their buffers trimmed by endFrame().
     ALTextureReadback& textureReadback() { return mTextureReadback; }
@@ -732,6 +738,7 @@ private:
     ALFrameFences mFrameFences;
     ALQueryPool   mQueries{ mFrameFences };
     ALStagingRing mStagingRing{ mFrameFences };
+    bool          mUnpacksTightRows = false;
     ALTextureReadback mTextureReadback{ mFrameFences };
 
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.

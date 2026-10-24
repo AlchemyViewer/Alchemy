@@ -531,6 +531,11 @@ namespace
             SKIP("the context maps no buffer persistently");
         }
         ALStagingRing& ring = gGL.stagingRing();
+        // The ring packs rows tight, which is how the context reads them once LLRender::init has set the alignment.
+        REQUIRE(gGL.unpacksTightRows());
+        GLint alignment = 0;
+        glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+        REQUIRE(alignment == 1);
         const auto unpackState = []()
         {
             GLint row_length = -1;
@@ -601,6 +606,64 @@ namespace
         readTexture(big, GL_RGBA, GL_UNSIGNED_BYTE, big_got.data());
         UNSCOPED_INFO("the level sent from client memory");
         CHECK(std::memcmp(big_got.data(), ld, big_got.size()) == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Before LLRender::init has set the unpack alignment to 1 -- LLViewerWindow::initFonts rasterizes its ASCII glyphs
+    // then -- the context reads rows at GL's default of 4, and the ring, which packs a rectangle's rows tight, stages
+    // nothing. A glyph two bytes a pixel and an odd number wide goes from client memory, strided by its atlas's rows,
+    // which keep to four bytes; from the ring its rows, tight at 14 bytes, would each be read two bytes askew.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload before LLRender::init reads client memory and not the ring", "[LLImageGL]")
+    {
+        if (!ALGPUBuffer::canMapPersistently())
+        {
+            SKIP("the context maps no buffer persistently");
+        }
+        // The atlas, 16 wide at two bytes a pixel: rows of 32 bytes, which keep to any alignment.
+        constexpr U16 W = 16, H = 8;
+        LLPointer<LLImageRaw> atlas = new LLImageRaw(W, H, 2);
+        U8* ad = atlas->getData();
+        for (size_t i = 0; i < (size_t)W * H * 2; ++i)
+            ad[i] = (U8)(i * 3 + 1);
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, atlas.get()));
+
+        // The context as it is before init: gGL takes it to read no tight rows, and GL reads at its default alignment.
+        gGL.shutdown();
+        struct InitAgain
+        {
+            ~InitAgain() { gGL.init(true); }
+        } init_again;
+        REQUIRE_FALSE(gGL.unpacksTightRows());
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+
+        LLPointer<LLImageRaw> glyph = new LLImageRaw(W, H, 2);
+        U8* gd = glyph->getData();
+        for (size_t i = 0; i < (size_t)W * H * 2; ++i)
+            gd[i] = (U8)(0xFF - i * 5);
+        ALStagingRing& ring = gGL.stagingRing();
+        const U64 taken = ring.getTaken();
+        // Seven wide: 14 bytes a row.
+        CHECK(img->setSubImage(glyph.get(), /*x_pos=*/3, /*y_pos=*/2, /*width=*/7, /*height=*/4,
+                               /*force_fast_update=*/true));
+        UNSCOPED_INFO("nothing staged before init");
+        CHECK(ring.getTaken() == taken);
+
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        std::vector<U8> got((size_t)W * H * 2);
+        readTexture(img, GL_RG, GL_UNSIGNED_BYTE, got.data());
+        bool match = true;
+        for (U32 y = 0; y < H && match; ++y)
+        {
+            for (U32 x = 0; x < W && match; ++x)
+            {
+                const bool in_glyph = x >= 3 && x < 10 && y >= 2 && y < 6;
+                const size_t at = ((size_t)y * W + x) * 2;
+                match = std::memcmp(got.data() + at, (in_glyph ? gd : ad) + at, 2) == 0;
+            }
+        }
+        UNSCOPED_INFO("the glyph lands where it was asked, its rows unskewed");
+        CHECK(match);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

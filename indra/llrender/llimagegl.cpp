@@ -1607,13 +1607,14 @@ static U32 staged_pixel_bytes(U32 pixformat, U32 pixtype)
 // rows, `stride` pixels apart from `src`, copied tight into room the ring gives, and one glTexSubImage2D from the bound
 // pixel buffer, which a threaded driver queues as it would a draw. From client memory NVIDIA's threaded optimization
 // copies the rows on this thread first, and Mesa's glthread waits for its own thread to catch up before it runs the
-// upload. False, and nothing uploaded, off the main thread, for a format the ring does not take, or where it gives no
-// room (ALStagingRing::take), for the caller to send the rows from client memory instead. GL_UNPACK_ROW_LENGTH, which
-// strides client memory by `stride`, is set aside for the call, the rows being tight.
+// upload. False, and nothing uploaded, off the main thread, before the context reads rows tight (LLRender::init), for
+// a format the ring does not take, or where it gives no room (ALStagingRing::take), for the caller to send the rows from
+// client memory instead. The rows are tight, which GL_UNPACK_ROW_LENGTH reads them as: it is 0 but around an upload
+// from client memory (upload_rows).
 static bool upload_staged(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 height, U32 pixformat, U32 pixtype,
                           const U8* src, S32 stride)
 {
-    if (!on_main_thread() || width <= 0 || height <= 0 || !src)
+    if (!on_main_thread() || !gGL.unpacksTightRows() || width <= 0 || height <= 0 || !src)
     {
         return false;
     }
@@ -1641,28 +1642,27 @@ static bool upload_staged(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32
         {
             memcpy(room.mData + size_t(r) * row, src + size_t(r) * source_row, row);
         }
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, room.mBuffer);
     glTexSubImage2D(target, miplevel, x, y, width, height, pixformat, pixtype,
                     reinterpret_cast<const void*>(static_cast<uintptr_t>(room.mOffset)));
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    if (stride != width)
-    {
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride);
-    }
     return true;
 }
 
-// The rows of the rectangle at (x, y) of level `miplevel` of the bound `target`, `stride` pixels apart from `src`, as
-// GL_UNPACK_ROW_LENGTH strides them: staged where the ring gives room (upload_staged), from client memory otherwise, in
-// slices where should_stagger_image_set says.
+// The rows of the rectangle at (x, y) of level `miplevel` of the bound `target`, `stride` pixels apart from `src`: staged
+// where the ring gives room (upload_staged), copied tight, or from client memory, in slices where
+// should_stagger_image_set says, GL_UNPACK_ROW_LENGTH striding them for that upload alone and 0 again after it.
 static void upload_rows(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 height, U32 pixformat, U32 pixtype,
                         const U8* src, S32 stride, bool compressed)
 {
     if (!compressed && upload_staged(target, miplevel, x, y, width, height, pixformat, pixtype, src, stride))
     {
         return;
+    }
+    if (stride != width)
+    {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride);
     }
     if (should_stagger_image_set(compressed))
     {
@@ -1671,6 +1671,10 @@ static void upload_rows(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 h
     else
     {
         glTexSubImage2D(target, miplevel, x, y, width, height, pixformat, pixtype, src);
+    }
+    if (stride != width)
+    {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     }
 }
 
@@ -1742,9 +1746,6 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         }
 
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, data_width);
-        stop_glerror();
-
         if(mFormatSwapBytes)
         {
             glPixelStorei(GL_UNPACK_SWAP_BYTES, 1);
@@ -1774,8 +1775,6 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
             stop_glerror();
         }
 
-        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-        stop_glerror();
         mGLTextureCreated = true;
     }
     return true;

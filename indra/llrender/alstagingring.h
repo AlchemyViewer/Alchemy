@@ -40,11 +40,19 @@ class ALFrameFences;
 ///
 /// One store, mapped persistently for writing, in SEGMENTS segments. take() hands out room in the open segment, moving
 /// to the next where the open one has too little, and a segment once left is entered again only once the frame it was
-/// left in has finished (ALFrameFences), so nothing the GPU has yet to read is written over. take() never waits: where
+/// left in has finished (ALFrameFences), so nothing the GPU has yet to read is written over. Where the frames' ends
+/// stamp their frames rather than lay fences (ALFrameFences::willStamp, NVIDIA's driver), the ring lays a fence of its
+/// own as it leaves a segment, and enters it again only once that fence has signalled too: GL says a persistently
+/// mapped store is no longer read by the commands before it only through a sync object, and a stamp is a query, not
+/// one. A fence laid and polled is a call that returns a value each, once a segment a lap; it is polled at the frame's
+/// end, once the frame it was laid in has finished, and take() makes no call that returns a value. take() never waits: where
 /// the next segment is still the GPU's, or the bytes asked for are more than a segment holds, it gives no room, and the
 /// caller sends its bytes from client memory as it would without the ring. endFrame() sizes the ring to the traffic of
-/// late, between MIN_BYTES and MAX_BYTES, its segments each as large as the largest take of late: it grows at the frame's
-/// end after a frame that asked for more, and shrinks once a window of frames has asked for less than half. A store
+/// late, between MIN_BYTES and MAX_BYTES: what the last SLACK_FRAMES frames asked for together, a burst held once rather
+/// than as though every frame asked as much, and its segments each as large as a take too large for one that two frames
+/// of the window have asked for, a one-off going from client memory and leaving the ring as it was. It grows at the
+/// frame's end after a frame that asked for more, and shrinks once a window of frames has asked for less than half, the
+/// new store made there and not by the next take. A take is counted at the room it holds, a whole ALIGNMENT at least. A store
 /// a new size replaces is kept until the frame it was replaced in has finished, and only then deleted: the uploads
 /// issued from it may not have read it yet, and a driver may give a persistently mapped store's memory to the next
 /// store as soon as the first is deleted. Where buffers cannot be mapped persistently (macOS's 4.1) it gives no room at
@@ -57,7 +65,8 @@ public:
     static constexpr U32    SEGMENTS  = 4;
     static constexpr size_t MIN_BYTES = 1u << 20;
     static constexpr size_t MAX_BYTES = 64u << 20;
-    /// Where room begins: a multiple of every pixel's size an upload reads.
+    /// Where room begins: a multiple of the size of every type an upload reads its pixels in, which is what GL asks of an
+    /// unpack buffer's offset (a 12-byte RGB32F pixel is three 4-byte floats).
     static constexpr size_t ALIGNMENT = 256;
     /// The frames the bytes a frame asks for are kept for: a segment, a quarter of the ring, comes round after the
     /// other three are filled, and must find its frame finished at the pacing depth (AlchemyRenderMaxFramesAhead, 3)
@@ -99,8 +108,9 @@ public:
     U64 getTaken() const { return mTaken; }
     U64 getBusy() const { return mBusy; }
     U64 getTooLarge() const { return mTooLarge; }
-    /// The stores replaced and not yet deleted.
+    /// The stores replaced and not yet deleted, and the fences laid and not yet seen signalled.
     U32 getRetired() const { return (U32)mRetired.size(); }
+    U32 getFences() const;
 
 private:
     // A store replaced, and the frame it was replaced in, after which it may go.
@@ -108,12 +118,15 @@ private:
     {
         ALGPUBuffer mStore;
         U32         mFrame = 0;
+        void*       mFence = nullptr; // laid behind its uploads where the frames' ends stamp, the GLsync
     };
 
     bool ready();
     void resize(size_t bytes);
     // The store, kept until the open frame has finished; the head back at the start.
     void retire();
+    // A fence behind every command so far, where the frames' ends stamp rather than lay fences; null elsewhere.
+    void* layFence() const;
 
     ALFrameFences& mFrames;
     ALGPUBuffer    mStore;
@@ -121,14 +134,18 @@ private:
     size_t         mHead  = 0;               // where the next room begins
     U32            mSegment = 0;             // the open segment
     U32            mLeftIn[SEGMENTS] = {};   // the frame each segment was left in, 0 for none
+    void*          mSegmentFences[SEGMENTS] = {}; // the GLsync laid as each was left, while stamping
     bool           mUnavailable = false;     // no persistent maps, or no store could be made: no room until release()
     bool           mEnabled = true;
     std::vector<Retired> mRetired;
 
-    size_t mFrameAsked   = 0;  // bytes asked for this frame, given room or not
+    size_t mFrameAsked   = 0;  // bytes asked for this frame that a segment holds, given room or not
     size_t mFrameLargest = 0;  // the largest take asked for this frame
-    size_t mWindowAsked  = 0;  // the most of mFrameAsked in the window
-    size_t mWindowLargest = 0; // the most of mFrameLargest in the window
+    size_t mRecentAsked[SLACK_FRAMES] = {}; // mFrameAsked of the last SLACK_FRAMES frames
+    U32    mRecentAt      = 0;  // where the next frame's goes
+    size_t mWindowTraffic = 0;  // the most the last SLACK_FRAMES frames asked for together, in the window
+    size_t mWindowLargest = 0;  // the most of mFrameLargest in the window
+    size_t mWindowRecurring = 0; // the largest take two frames of the window asked as much as
     U32    mWindowFrames = 0;
 
     U64 mTaken    = 0;

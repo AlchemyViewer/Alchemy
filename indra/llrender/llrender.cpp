@@ -392,6 +392,7 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    mUnpacksTightRows = true;
 
     // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES/UB_PROJECTION_MATRICES yet, whatever a previous one had,
     // nor a scratch slice. The scratch ring's record of its binding is the main context's alone, and not a worker's to
@@ -563,7 +564,9 @@ void LLRender::shutdown()
     }
     mMatricesUBOBound = false;
 
-    // Its queries, fences, staging store and readback buffers, which it deletes only while the context is up.
+    // Its queries, fences, staging store and readback buffers, which it deletes only while the context is up. A context
+    // made after this reads rows at GL's default alignment until init() runs on it.
+    mUnpacksTightRows = false;
     mQueries.release();
     mStagingRing.release();
     mTextureReadback.release();
