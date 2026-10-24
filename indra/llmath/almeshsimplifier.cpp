@@ -654,22 +654,29 @@ F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target&
     }
     else
     {
-        // A face that meets another keeps its border, which the other's
-        // simplification keeps as well, and all of its parts, as a part of
-        // one face may be joined to another face's.
+        // A face that meets another keeps its vertices where it meets it,
+        // which the other's simplification keeps as well, and all of its
+        // parts, as a part of one face may be joined to another face's. Its
+        // borders that meet no face are free.
         const bool meets = std::any_of(mesh.shared.begin() + first, mesh.shared.begin() + first + vertex_count,
                                        [](U8 shared) { return shared != 0; });
-        U32 options = seamOptions(seams, goal);
-        if (meets)
-        {
-            options |= meshopt_SimplifyLockBorder;
-        }
         std::vector<U8> locks;
         if (seams != Seams::ALL)
         {
             protect(mesh, seams, first, vertex_count, locks);
         }
-        count = simplifyMesh(mesh, first, vertex_count, indices.data(), index_count, target_count, error, options, locks,
+        if (meets)
+        {
+            locks.resize(vertex_count, 0);
+            for (U32 v = 0; v < vertex_count; ++v)
+            {
+                if (mesh.shared[first + v])
+                {
+                    locks[v] |= (U8)meshopt_SimplifyVertex_Lock;
+                }
+            }
+        }
+        count = simplifyMesh(mesh, first, vertex_count, indices.data(), index_count, target_count, error, seamOptions(seams, goal), locks,
                              goal.distant && !meets, simplified.data(), result_error);
     }
     if (count < 3)

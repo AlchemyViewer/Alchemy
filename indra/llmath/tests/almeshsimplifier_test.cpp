@@ -726,8 +726,9 @@ namespace
     }
 
     // A face that meets no other is free at its border, where one that
-    // meets another is held: the held square keeps the 128 edges of its
-    // border, more than a hundredth of its triangles can make.
+    // meets another is held where it meets it: the held square keeps the
+    // 32 edges along the side it shares, and is free along its other
+    // three, which it simplifies as the square on its own does.
     TEST_CASE("almeshsimplifier: a face is held at its border only where it meets another", "[almeshsimplifier]")
     {
         ArenaInstalled installed;
@@ -744,8 +745,18 @@ namespace
         LLPointer<LLVolume> pair_target = targetFor(*pair);
         const F32 pair_ratio = ALMeshSimplifier(*pair).simplifyFace(0, pair_target->getVolumeFace(0), toCount(decimator), Seams::ALL);
         INFO(fmt::format("beside another: a ratio of {}", pair_ratio));
-        CHECK(pair_ratio * ALLOWED_DRIFT < decimator);
-        CHECK(borderOf(pair_target->getVolumeFace(0)).size() == 4 * 32);
+        CHECK(pair_ratio > 0.f);
+        const std::set<PositionKey> shared = sharedPositions(*pair);
+        REQUIRE(shared.size() == 33);
+        const std::set<EdgeKey> border = borderOf(pair_target->getVolumeFace(0));
+        S32 held = 0;
+        for (const EdgeKey& edge : border)
+        {
+            held += shared.count(edge.first) && shared.count(edge.second);
+        }
+        CHECK(held == 32);
+        // Fewer triangles than a border of 128 edges, all held, would need.
+        CHECK(pair_target->getVolumeFace(0).mNumIndices / 3 < 4 * 32);
     }
 
     // ------------------------------------------------------------------

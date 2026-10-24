@@ -94,11 +94,11 @@ public:
     F32 simplifyModel(LLVolume& target, const Target& goal, Seams seams) const;
 
     // Simplifies base's face on its own into target. A face that shares a
-    // position with any other face of base keeps its border where it is, so
-    // that no gap opens between the two, and keeps all of its parts; only
-    // one that shares none may lose its small detached parts. Returns as
-    // simplifyModel does; where no triangle is left, target is the face of
-    // three indices to a vertex at the origin.
+    // position with any other face of base keeps its vertices at those
+    // positions where they are, so that no gap opens between the two, and
+    // keeps all of its parts; only one that shares none may lose its small
+    // detached parts. Returns as simplifyModel does; where no triangle is
+    // left, target is the face of three indices to a vertex at the origin.
     F32 simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const;
 
     // The face of base's face's layout that the given triangles make: the
