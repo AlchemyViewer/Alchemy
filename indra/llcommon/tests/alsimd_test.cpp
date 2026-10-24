@@ -122,10 +122,13 @@ namespace
     }
 #endif
 
-    // Four int32 lanes, built from their bits.
+    // Four int32 lanes, loaded as integers: built through floats, a lane of
+    // the sign bit alone is -0, whose sign /fp:fast need not keep, and
+    // MSVC's arm64 build makes it +0.
     i32x4 ints(S32 x, S32 y, S32 z, S32 w)
     {
-        return as_i32(set(std::bit_cast<F32>(x), std::bit_cast<F32>(y), std::bit_cast<F32>(z), std::bit_cast<F32>(w)));
+        const int32_t values[4] = { x, y, z, w };
+        return loadu_i32(values);
     }
 
     void require_lanes(const std::string& what, f32x4 got, F32 x, F32 y, F32 z, F32 w)
