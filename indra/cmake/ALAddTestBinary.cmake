@@ -118,9 +118,10 @@ endif()
 # the environment and labels a file's entry would have.
 #
 # ENVIRONMENT sets variables for the runs, VAR=value each. GL, PYTHON and
-# ISA_TIER mean what they mean to al_add_test: a GL binary is labelled gl and
-# registered disabled without AL_ENABLE_GL_TESTS, a PYTHON binary is given the
-# interpreter and registered disabled without one that has llsd, and an
+# ISA_TIER mean what they mean to al_add_test: a GL binary is labelled gl,
+# registered disabled without AL_ENABLE_GL_TESTS and run with Mesa's llvmpipe
+# held to AVX2, a PYTHON binary is given the interpreter and registered
+# disabled without one that has llsd, and an
 # ISA_TIER binary is built at that x86-64 tier, named <name>_<tier>, labelled
 # isa, and skips on a host below it -- or below the tree's own tier, since it
 # links the tree's libraries, built at that one. RESOURCE_LOCK names what the binary's
@@ -283,6 +284,14 @@ function(al_add_test_binary name)
     if(NOT AL_ENABLE_GL_TESTS)
       set(disabled TRUE)
     endif()
+    # Mesa's llvmpipe, the Linux runners' GL, compiles the shaders for the
+    # host's CPU, and LLVM 21's AVX-512 code for AMD's Zen 4 (znver4) leaves
+    # a NaN in the green of reflectionprobe_gl's screen-space reflection. Its
+    # AVX2 code for the same CPU does not, nor its code for Zen 3 or for
+    # Intel's AVX-512 CPUs. Clearing AVX-512 from what Mesa sees of the CPU
+    # holds llvmpipe to AVX2 on every host; a driver that compiles for a GPU
+    # draws nothing differently.
+    list(APPEND environment "GALLIUM_OVERRIDE_CPU_CAPS=avx")
   endif()
   math(EXPR timeout "${timeout} * ${AL_TEST_TIMEOUT_SCALE}")
 
