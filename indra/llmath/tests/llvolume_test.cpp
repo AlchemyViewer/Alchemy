@@ -3110,6 +3110,58 @@ namespace
         CHECK(volume->getSculptPixels() == 0);
     }
 
+    // An oblong map as Second Life's 512x8 sculpts are made: each ring of a tube on a pair of identical columns, and
+    // every eighth column collapsed to the tube's axis. The coarser details sample every eighth or thirty-second
+    // column, all collapsed, so the map as it is has no area there; it builds from the map averaged down instead of the
+    // sphere, and the finest detail, whose samples have their area, builds from the map as it is.
+    TEST_CASE("llvolume: an oblong sculpt map whose coarse samples have no area builds from it averaged down", "[llvolume]")
+    {
+        const SculptMap tube = sculptMap(512, 8, [](U16 x, U16 y)
+        {
+            if (x % 8 == 0)
+            {
+                return LLVector3(0.f, 0.f, (F32)x / 512 - 0.5f);
+            }
+            const F32 a = F_TWO_PI * (F32)y / 8;
+            return LLVector3(0.2f * cosf(a), 0.2f * sinf(a), (F32)(x / 2 * 2) / 512 - 0.5f);
+        });
+        // From LOD 1: LOD 0's detail tests no area (SCULPT_MIN_AREA_DETAIL), and builds whatever the samples make.
+        for (S32 lod = 1; lod < LOD_COUNT; ++lod)
+        {
+            INFO("LOD " << lod);
+            LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_TORUS, tube, lod);
+            CHECK_FALSE(volume->isSculptSpherePlaceholder());
+            CHECK(volume->getSculptPixels() == 512 * 8);
+        }
+        // As it is: 257 samples along its 512 columns, which an averaged map would not have the pixels for.
+        LLPointer<LLVolume> finest = buildSculpt(LL_SCULPT_TYPE_TORUS, tube, LOD_COUNT - 1);
+        CHECK(finest->getProfile().mProfile.size() == 257);
+    }
+
+    // A map of noise, whose samples have more surface than a sculpt may: it builds the sphere, as it always has and as
+    // other viewers show it, rather than from the map averaged down until the noise has smoothed into bounds.
+    TEST_CASE("llvolume: a sculpt map of noise has too much surface and builds the sphere", "[llvolume]")
+    {
+        const auto hash = [](U32 v)
+        {
+            v ^= v >> 16;
+            v *= 0x7feb352du;
+            v ^= v >> 15;
+            v *= 0x846ca68bu;
+            return v ^ (v >> 16);
+        };
+        // Each pixel a corner of the cube at random.
+        const SculptMap noise = sculptMap(128, 128, [&](U16 x, U16 y)
+        {
+            const U32 h = hash(U32(y) * 128u + x);
+            return LLVector3((h & 1) ? 0.5f : -0.5f, (h & 2) ? 0.5f : -0.5f, (h & 4) ? 0.5f : -0.5f);
+        });
+        LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_PLANE, noise, LOD_COUNT - 1);
+        INFO("area " << volume->getSurfaceArea());
+        CHECK(volume->getSurfaceArea() > 384.f);
+        CHECK(volume->isSculptSpherePlaceholder());
+    }
+
     // Mirror reverses the sampling of each row and reflects x; invert
     // reverses the sampling alone, turning the surface inside out. Each
     // flips the tangent frame's handedness, and both together leave it.
