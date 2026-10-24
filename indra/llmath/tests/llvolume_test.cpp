@@ -3087,6 +3087,29 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A long, thin map builds its surface at its own proportions, and the volume records the pixels it was given. The
+    // same map with every row alike, as a decode with none of the detail across its short side comes out, has no area
+    // and builds the sphere.
+    TEST_CASE("llvolume: a long, thin sculpt map builds its surface, and one with its rows alike the sphere", "[llvolume]")
+    {
+        const S32 lod = LOD_COUNT - 1;
+        LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_CYLINDER, cylinderMap(512, 8), lod);
+        CHECK_FALSE(volume->isSculptSpherePlaceholder());
+        CHECK(volume->getSculptPixels() == 512 * 8);
+
+        const SculptMap rows_alike = sculptMap(512, 8, [](U16 x, U16)
+        {
+            const F32 u = (F32)x / 512;
+            return LLVector3(0.4f * cosf(F_TWO_PI * u), -0.4f * sinf(F_TWO_PI * u), -0.5f);
+        });
+        volume = buildSculpt(LL_SCULPT_TYPE_CYLINDER, rows_alike, lod);
+        CHECK(volume->isSculptSpherePlaceholder());
+        CHECK(volume->getSculptPixels() == 512 * 8);
+
+        volume = buildSculpt(LL_SCULPT_TYPE_CYLINDER, SculptMap(), lod);
+        CHECK(volume->getSculptPixels() == 0);
+    }
+
     // Mirror reverses the sampling of each row and reflects x; invert
     // reverses the sampling alone, turning the surface inside out. Each
     // flips the tangent frame's handedness, and both together leave it.

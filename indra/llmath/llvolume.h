@@ -1173,6 +1173,8 @@ public:
     // or has no area, which is laid out and stitched as a sphere sculpt is,
     // whatever its own stitching.
     bool isSculptSpherePlaceholder() const                  { return mSculptSpherePlaceholder; }
+    // The pixels of the map the last sculpt() was given: 0 where it had none.
+    S32 getSculptPixels() const                             { return mSculptPixels; }
 
 
     static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
@@ -1245,6 +1247,7 @@ public:
     F32 mDetail;
     S32 mSculptLevel;
     bool mSculptSpherePlaceholder = false;
+    S32 mSculptPixels = 0;
     F32 mSurfaceArea; //unscaled surface area
     bool mIsMeshAssetLoaded;
     bool mIsMeshAssetUnavaliable;
