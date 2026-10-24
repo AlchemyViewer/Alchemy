@@ -6231,10 +6231,19 @@ namespace
     // two of a triangle's corners in one place, an edge there has no length
     // and the product is exactly zero, fused multiply-add or not. A quad
     // between a copied row or column adds nothing, so the edge there stays
-    // hard.
+    // hard. A quad whose diagonal has no length, as a sculpt can fold one,
+    // has no area on either side of it and adds nothing either: the edges
+    // at its corners off the diagonal are each other's reverse, whose
+    // product a fused multiply-add leaves as the rounding of one of its
+    // terms.
     inline void add_quad_to_normals(LLVector4a* norm, S32 bl, S32 br, S32 tl, S32 tr, const LLVector4a& bottom, const LLVector4a& right,
-                                    const LLVector4a& top, const LLVector4a& left)
+                                    const LLVector4a& top, const LLVector4a& left, const LLVector4a& diagonal)
     {
+        if (diagonal.equals3(LLVector4a::getZero(), SAME_PLACE))
+        {
+            return;
+        }
+
         LLVector4a lower, upper;
         lower.setCross3(bottom, right);
         upper.setCross3(top, left);
@@ -8128,14 +8137,15 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         {
             const S32 bl = row + s;
             const S32 tl = bl + mNumS;
-            LLVector4a bottom, right, top;
+            LLVector4a bottom, right, top, diagonal;
             bottom.setSub(pos[bl + 1], pos[bl]);
             right.setSub(pos[tl + 1], pos[bl + 1]);
             top.setSub(pos[tl + 1], pos[tl]);
+            diagonal.setSub(pos[tl + 1], pos[bl]);
             drop_rounding(bottom);
             drop_rounding(right);
             drop_rounding(top);
-            add_quad_to_normals(norm, bl, bl + 1, tl, tl + 1, bottom, right, top, left);
+            add_quad_to_normals(norm, bl, bl + 1, tl, tl + 1, bottom, right, top, left, diagonal);
             left = right;
         }
     }

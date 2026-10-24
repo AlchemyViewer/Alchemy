@@ -2977,6 +2977,65 @@ namespace
         }
     }
 
+    // A plane whose mesh vertex (10, 10) has a quad of no area at each of
+    // its corners, each folded so that its diagonal's ends are one place:
+    // vertices (9, 9), (10, 10) and (11, 11) are one point, and so are
+    // (9, 10) and (10, 11), and (10, 9) and (11, 10). Vertex (c, r) reads
+    // pixel (2c, 2r).
+    SculptMap pinwheelMap()
+    {
+        auto surface = [](S32 x, S32 y)
+        {
+            const F32 u = (F32)x / (PINCH_MAP - 1);
+            const F32 v = (F32)y / (PINCH_MAP - 1);
+            return LLVector3(u - 0.5f, v - 0.5f, 0.2f * sinf(F_TWO_PI * u) * cosf(F_PI * v));
+        };
+        return sculptMap(PINCH_MAP, PINCH_MAP, [&](U16 x, U16 y)
+        {
+            if (x % 2 == 0 && y % 2 == 0)
+            {
+                const S32 dc = x / 2 - 10;
+                const S32 dr = y / 2 - 10;
+                if (dc == dr && dc >= -1 && dc <= 1)
+                {
+                    return surface(20, 20);
+                }
+                if ((dc == -1 && dr == 0) || (dc == 0 && dr == 1))
+                {
+                    return surface(18, 20);
+                }
+                if ((dc == 0 && dr == -1) || (dc == 1 && dr == 0))
+                {
+                    return surface(20, 18);
+                }
+            }
+            return surface(x, y);
+        });
+    }
+
+    // A vertex whose quads all have no area has no normal of its own, and
+    // takes the nearest one down or up its column. Under fused multiply-add
+    // the corners off a folded quad's diagonal would take the rounding of
+    // an edge crossed with its own reverse for one.
+    TEST_CASE("llvolume: a vertex among quads folded along their diagonals takes a neighbour's normal", "[llvolume]")
+    {
+        LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_PLANE, pinwheelMap(), 3);
+        REQUIRE(volume->getNumVolumeFaces() == 1);
+        const LLVolumeFace& face = volume->getVolumeFace(0);
+        REQUIRE(isGrid(face));
+        auto at = [&](S32 c, S32 r) { return gridIndex(face, c, r); };
+        REQUIRE(coincide(face.mPositions[at(9, 9)], face.mPositions[at(10, 10)]));
+        REQUIRE(coincide(face.mPositions[at(11, 11)], face.mPositions[at(10, 10)]));
+        REQUIRE(coincide(face.mPositions[at(9, 10)], face.mPositions[at(10, 11)]));
+        REQUIRE(coincide(face.mPositions[at(10, 9)], face.mPositions[at(11, 10)]));
+        REQUIRE(!coincide(face.mPositions[at(10, 10)], face.mPositions[at(10, 9)]));
+
+        const LLVector4a& normal = face.mNormals[at(10, 10)];
+        const LLVector4a& below = face.mNormals[at(10, 9)];
+        INFO(fmt::format("({}, {}, {}) against ({}, {}, {}) below it", normal[0], normal[1], normal[2], below[0], below[1], below[2]));
+        CHECK(std::memcmp(normal.getF32ptr(), below.getF32ptr(), 3 * sizeof(F32)) == 0);
+    }
+
     // A map whose every pixel is one colour has no area, and makes the
     // sphere above LOD 0, where the area is tested.
     SculptMap oneColourMap()
