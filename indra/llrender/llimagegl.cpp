@@ -1495,8 +1495,12 @@ static bool should_stagger_image_set(bool compressed)
 #endif
 }
 
-// Equivalent to calling glSetSubImage2D(target, miplevel, x_offset, y_offset, width, height, pixformat, pixtype, src), assuming the total width of the image is data_width
-// However, instead there are multiple calls to glSetSubImage2D on smaller slices of the image
+// Equivalent to calling glTexSubImage2D(target, miplevel, x_offset, y_offset, width, height, pixformat, pixtype, src),
+// the source's rows data_width apart, as GL_UNPACK_ROW_LENGTH has them where data_width is not width. Instead the rows go
+// up in slices of at most SUB_IMAGE_SLICE_BYTES, one row at the least, a call each: the most a large level's slice
+// carried when the slices were 8, 16 or 32 rows by width. A level or rectangle no larger than a slice goes up in one
+// call, where the row counts sent each row of one up alone -- the 16x16 to 1x1 mips of every texture, whose heights are
+// no multiple of 32, and any rectangle narrower than its source, a glyph among them.
 static void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset, S32 width, S32 height, U32 pixformat, U32 pixtype, const U8* src, S32 data_width)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1504,45 +1508,16 @@ static void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset
     LL_PROFILE_ZONE_NUM(width);
     LL_PROFILE_ZONE_NUM(height);
 
-    const U32 line_width = data_width * pixel_bytes(pixformat, pixtype);
-    const U32 y_offset_end = y_offset + height;
+    constexpr U32 SUB_IMAGE_SLICE_BYTES = 64 * 1024;
+    const U32 pixel_size = pixel_bytes(pixformat, pixtype);
+    const U32 line_width = data_width * pixel_size;
+    const U32 rows       = llmax(1u, SUB_IMAGE_SLICE_BYTES / llmax(1u, (U32)width * pixel_size));
 
-    if (width == data_width && height % 32 == 0)
+    for (S32 y = 0; y < height; y += (S32)rows)
     {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("subimage - batched lines");
-
-        // full width, batch multiple lines at a time
-        // set batch size based on width
-        U32 batch_size = 32;
-
-        if (width > 1024)
-        {
-            batch_size = 8;
-        }
-        else if (width > 512)
-        {
-            batch_size = 16;
-        }
-
-        // full width texture, do 32 lines at a time
-        for (U32 y_pos = y_offset; y_pos < y_offset_end; y_pos += batch_size)
-        {
-            // If this keeps crashing, pass down data_size, looks like it is using
-            // imageraw->getData(); for data, but goes way over allocated size limit
-            glTexSubImage2D(target, miplevel, x_offset, y_pos, width, batch_size, pixformat, pixtype, src);
-            src += line_width * batch_size;
-        }
-    }
-    else
-    {
-        // partial width or strange height
-        for (U32 y_pos = y_offset; y_pos < y_offset_end; y_pos += 1)
-        {
-            // If this keeps crashing, pass down data_size, looks like it is using
-            // imageraw->getData(); for data, but goes way over allocated size limit
-            glTexSubImage2D(target, miplevel, x_offset, y_pos, width, 1, pixformat, pixtype, src);
-            src += line_width;
-        }
+        const S32 slice = llmin((S32)rows, height - y);
+        glTexSubImage2D(target, miplevel, x_offset, y_offset + y, width, slice, pixformat, pixtype, src);
+        src += line_width * slice;
     }
 }
 
