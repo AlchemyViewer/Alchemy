@@ -7,8 +7,8 @@
  * core texture lifecycle, the setSubImage bind-preservation
  * invariant, the deprecated-format resolution path, downscaling,
  * the published view of an upload in flight, the bind state
- * edits rely on, the integer formats, and uploads read from the
- * staging ring.
+ * edits rely on, the integer formats, uploads read from the
+ * staging ring, and the levels a readback reads.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -389,6 +389,43 @@ namespace
         CHECK(std::memcmp(src->getData(), dst->getData(),
                                   (size_t)W * H * C) ==
                       0);
+    }
+
+    // readBackRaw knows the levels a texture holds without asking GL, reads only those, and
+    // counts each read it makes, and the time it took, for the frame's plot; the frame's
+    // stats start both again.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: readBackRaw reads only the levels a texture holds, and counts each read", "[LLImageGL]")
+    {
+        constexpr U16 W = 8, H = 8;
+        LLPointer<LLImageRaw> src = makeRaw(W, H, 4, /*fill=*/0x40);
+        LLPointer<LLImageGL> flat = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(flat->createGLTexture(0, src.get()));
+        LLPointer<LLImageGL> mipped = new LLImageGL(/*usemipmaps=*/true);
+        REQUIRE(mipped->createGLTexture(0, src.get()));
+
+        LLImageGL::sReadbacks = 0;
+        LLImageGL::sReadbackSeconds = 0.0;
+        LLPointer<LLImageRaw> dst = new LLImageRaw();
+        CHECK(flat->readBackRaw(0, dst.get(), /*compressed_ok=*/false));
+        CHECK((S32)dst->getWidth() == (S32)W);
+        UNSCOPED_INFO("a texture without mips holds no level 1");
+        CHECK_FALSE(flat->readBackRaw(1, dst.get(), /*compressed_ok=*/false));
+
+        CHECK(mipped->readBackRaw(1, dst.get(), /*compressed_ok=*/false));
+        CHECK((S32)dst->getWidth() == (S32)W / 2);
+        CHECK((S32)dst->getHeight() == (S32)H / 2);
+        CHECK(mipped->readBackRaw(3, dst.get(), /*compressed_ok=*/false));
+        CHECK((S32)dst->getWidth() == 1);
+        CHECK((S32)dst->getHeight() == 1);
+        UNSCOPED_INFO("its smallest level is the colour it was given");
+        CHECK(dst->getData()[0] == 0x40);
+
+        CHECK(LLImageGL::sReadbacks == 3);
+        CHECK(LLImageGL::sReadbackSeconds >= 0.0);
+        LLImageGL::updateStats(LLImageGL::sLastFrameTime);
+        CHECK(LLImageGL::sReadbacks == 0);
+        CHECK(LLImageGL::sReadbackSeconds == 0.0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // A packed pixel type is one value a pixel, whatever the format's component

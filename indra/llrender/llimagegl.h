@@ -284,7 +284,7 @@ public:
 
     // While an off-thread upload is in flight the members below describe the texture
     // being built, not the one mTexName still names. Consumers pair these getters with
-    // getTexName() -- LLVOVolume::sculpt reads back from GL at getWidth() -- so they must
+    // getTexName() -- readBackRaw reads mTexName back at getWidth() -- so they must
     // report what mTexName actually holds until both flip together in syncTexName.
     S32  getDiscardLevel() const        { return mUploadInFlight ? mPublished.mCurrentDiscardLevel : mCurrentDiscardLevel; }
     S32  getMaxDiscardLevel() const     { return mUploadInFlight ? mPublished.mMaxDiscardLevel : mMaxDiscardLevel; }
@@ -485,6 +485,7 @@ private:
         S8  mComponents = 0;
         S8  mCurrentDiscardLevel = -1;
         S8  mMaxDiscardLevel = 0;
+        S32 mMipLevels = 0;
         // The format, which createGLTexture works out again from mComponents for every
         // upload of an image without an explicit one.
         LLGLenum mFormatPrimary = 0;
@@ -574,6 +575,8 @@ public:
     // Global memory statistics
     static U32 sBindCount;                  // Tracks number of texture binds for current frame
     static U32 sUniqueCount;                // Tracks number of unique texture binds for current frame
+    static U32 sReadbacks;                  // Textures read back from GL for current frame (readBackRaw)
+    static F64 sReadbackSeconds;            // What those reads waited for the GPU, for current frame
     static LLImageGL* sDefaultGLTexture ;
     static bool sAutomatedTest;
 #if DEBUG_MISS
