@@ -29,7 +29,6 @@
 #include "asset.h"
 #include "buffer_util.h"
 #include "../llviewershadermgr.h"
-#include "alscratcharena.h"
 
 #include <meshoptimizer.h>
 
@@ -284,59 +283,6 @@ struct MikktMesh
 };
 
 
-// An attribute's values in the order remap gives them, and only those it
-// keeps.
-template <typename T>
-static void remap_attribute(std::vector<T>& attribute, const U32* remap, size_t kept)
-{
-    if (!attribute.empty())
-    {
-        meshopt_remapVertexBuffer(attribute.data(), attribute.data(), attribute.size(), sizeof(T), remap);
-        attribute.resize(kept);
-    }
-}
-
-// A triangle list's triangles in an order a vertex cache reuses, then its
-// vertices in the order those triangles first take them, every attribute
-// moved alike; a vertex no triangle takes is dropped. The remap and
-// meshoptimizer's scratch come from the thread's arena. A primitive whose
-// attributes are not one value a vertex, or whose indices are not whole
-// triangles, is left as it is.
-static void order_for_vertex_cache(Primitive& prim)
-{
-    const size_t index_count = prim.mIndexArray.size();
-    const size_t vertex_count = prim.mPositions.size();
-    if (prim.mGLMode != LLRender::TRIANGLES || index_count < 3 || index_count % 3 != 0 || vertex_count == 0)
-    {
-        return;
-    }
-    for (size_t size : { prim.mNormals.size(), prim.mTangents.size(), prim.mTexCoords0.size(), prim.mTexCoords1.size(), prim.mColors.size(),
-                         prim.mWeights.size(), prim.mJoints.size() })
-    {
-        if (size != 0 && size != vertex_count)
-        {
-            return;
-        }
-    }
-
-    U32* indices = prim.mIndexArray.data();
-    meshopt_optimizeVertexCache(indices, indices, index_count, vertex_count);
-
-    ALScratchArena::Scope scratch;
-    U32* remap = scratch.allocate<U32>(vertex_count);
-    const size_t kept = meshopt_optimizeVertexFetchRemap(remap, indices, index_count, vertex_count);
-    meshopt_remapIndexBuffer(indices, indices, index_count, remap);
-
-    remap_attribute(prim.mPositions, remap, kept);
-    remap_attribute(prim.mNormals, remap, kept);
-    remap_attribute(prim.mTangents, remap, kept);
-    remap_attribute(prim.mTexCoords0, remap, kept);
-    remap_attribute(prim.mTexCoords1, remap, kept);
-    remap_attribute(prim.mColors, remap, kept);
-    remap_attribute(prim.mWeights, remap, kept);
-    remap_attribute(prim.mJoints, remap, kept);
-}
-
 static void vertical_flip(std::vector<LLVector2>& texcoords)
 {
     for (auto& tc : texcoords)
@@ -521,8 +467,6 @@ bool Primitive::prep(Asset& asset)
             data.write(this);
         }
     }
-
-    order_for_vertex_cache(*this);
 
     if (!mNormals.empty())
     {
