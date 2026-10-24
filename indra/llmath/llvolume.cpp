@@ -8201,26 +8201,28 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     }
 
     // On a sphere's side, a column that is one place in every row is a pole
-    // on the axis the half circle sweeps about, and takes the axis. A cut
-    // end of a hollow sphere lies on the axis, and has no area. A flat inner
-    // side is a cone at a pole, and its ends keep the normals of the strips
-    // they end.
+    // on the axis the half circle sweeps about, and takes the axis: away
+    // from the sphere's centre on an outer side, toward it on an inner one.
+    // Which end of the axis a column's pole is at follows the twist, which
+    // turns the half circle about its centre. A cut end of a hollow sphere
+    // lies on the axis, and has no area. A flat inner side is a cone at a
+    // pole, and its ends keep the normals of the strips they end.
     if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && !doubled && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
         ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
     {
-        if (column_is_point(pos, mNumS, mNumT, 0))
-        { //all lower S have same normal
-            for (S32 i = 0; i < mNumT; i++)
+        const bool outer = !(mTypeMask & INNER_MASK);
+        for (S32 column : { 0, mNumS - 1 })
+        {
+            if (column_is_point(pos, mNumS, mNumT, column))
             {
-                norm[mNumS*i].set(1,0,0);
-            }
-        }
-
-        if (column_is_point(pos, mNumS, mNumT, mNumS - 1))
-        { //all upper S have same normal
-            for (S32 i = 0; i < mNumT; i++)
-            {
-                norm[mNumS*i+mNumS-1].set(-1,0,0);
+                // A pole at the centre, of a sphere with no size, takes the
+                // side it has untwisted.
+                const F32 at = pos[column][0];
+                const F32 x = at == 0.f ? (column == 0 ? 1.f : -1.f) : ((at > 0.f) == outer ? 1.f : -1.f);
+                for (S32 i = 0; i < mNumT; i++)
+                {
+                    norm[mNumS * i + column].set(x, 0.f, 0.f);
+                }
             }
         }
     }

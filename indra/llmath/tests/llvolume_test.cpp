@@ -4425,6 +4425,68 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A sphere's poles are where its half circle touches the axis it sweeps
+    // about, and their normals lie along that axis: out of the sphere on its
+    // outer side, into it on a hollow sphere's inner side. A twist of a half
+    // turn at both ends puts each pole at the other end of the axis.
+    TEST_CASE("llvolume: a sphere's pole normals face out of it at any half turn of twist", "[llvolume]")
+    {
+        Report report;
+        S32 poles = 0;
+        for (F32 twist : { 0.f, 0.5f, -0.5f, 1.f })
+        {
+            for (F32 hollow : { 0.f, 0.5f })
+            {
+                Shape s = sphere();
+                s.twist_begin = s.twist_end = twist;
+                s.hollow = hollow;
+                s.name = fmt::format("sphere twisted {} hollow {}", twist, hollow);
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    LLPointer<LLVolume> volume = build(s, lod);
+                    for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                    {
+                        const LLVolumeFace& face = volume->getVolumeFace(f);
+                        if (!(face.mTypeMask & LLVolumeFace::SIDE_MASK) || face.mNumS * face.mNumT != face.mNumVertices)
+                        {
+                            continue;
+                        }
+                        const F32 inward = (face.mTypeMask & LLVolumeFace::INNER_MASK) ? -1.f : 1.f;
+                        for (S32 column : { 0, face.mNumS - 1 })
+                        {
+                            bool pole = true;
+                            for (S32 t = 1; t < face.mNumT && pole; ++t)
+                            {
+                                pole = face.mPositions[column + face.mNumS * t].equals3(face.mPositions[column], 1e-6f);
+                            }
+                            if (!pole)
+                            {
+                                continue;
+                            }
+                            ++poles;
+                            for (S32 t = 0; t < face.mNumT; ++t)
+                            {
+                                const S32 v = column + face.mNumS * t;
+                                const F32 out = inward * face.mNormals[v].dot3(face.mPositions[v]).getF32();
+                                if (!(out > 0.f))
+                                {
+                                    report.fail(fmt::format("{}: {}'s pole at column {} has normal ({}, {}, {}) at ({}, {}, {})",
+                                                            lodName(s, lod), faceName(face), column, face.mNormals[v][0],
+                                                            face.mNormals[v][1], face.mNormals[v][2], face.mPositions[v][0],
+                                                            face.mPositions[v][1], face.mPositions[v][2]));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(poles > 0);
+        CHECK(report.failures == 0);
+    }
+
     // The sphere placeholder gets a sphere sculpt's normal stitching, so it
     // must run as a sphere sculpt's map does, around along the profile and
     // pole to pole along the path. The other way round, the poles' average
