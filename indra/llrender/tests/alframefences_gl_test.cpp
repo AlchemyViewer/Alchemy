@@ -2,7 +2,8 @@
  * @file alframefences_gl_test.cpp
  * @brief ALFrameFences on the hidden window: a frame complete only once a later frame's end has seen it finished, one
  *        poll a frame and none of the frame just ended, waits on a pending frame and on the open one, the ring of
- *        fences kept whole, release, and the pacing wait for the frame a given number before each frame's end.
+ *        fences kept whole, release, the pacing wait for the frame a given number before each frame's end, and frames
+ *        stamped by the GPU in place of fences, with no call.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -549,6 +550,164 @@ namespace
             mFrames.waitFinished(busy, &stalled);
             CHECK_FALSE(stalled);
         }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Stamped, a frame's end lays no fence and polls none: it asks the GPU to stamp the frame, and reads the stamps of
+    // the frames before. A frame is complete once a later frame's end has read its stamp, as a fenced one is once a
+    // later end has seen its fence signalled.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: a stamped frame is complete once a later frame's end has read its stamp, with no call", "[alframefences_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("no query buffers, timestamps or persistent maps on this context");
+        }
+        mFrames.setStamps(true);
+        const U32 frame = mFrames.frame();
+        const U32 calls = mFrames.getCalls();
+        mFrames.endFrame();
+        {
+            INFO("the first stamped frame's end makes the stamps' store");
+            REQUIRE(mFrames.isStamping());
+        }
+        glFinish();
+        {
+            INFO("not at its own end, however long the GPU has had");
+            CHECK_FALSE(mFrames.isComplete(frame));
+        }
+        mFrames.endFrame();
+        {
+            INFO("complete once the next frame's end has read its stamp");
+            CHECK(mFrames.isComplete(frame));
+            CHECK_FALSE(mFrames.isComplete(frame + 1));
+        }
+        {
+            INFO("neither end laid a fence or polled one");
+            CHECK(mFrames.getCalls() == calls);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Stamped frames ended faster than the GPU finishes them are waited out to make room, as fenced ones are. A wait for
+    // an ended stamped frame reads its stamp, with no call; one for the open frame lays a fence of its own.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: stamped frames keep the ring whole, and are waited on by their stamps", "[alframefences_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("no query buffers, timestamps or persistent maps on this context");
+        }
+        mFrames.setStamps(true);
+        const U32 first = mFrames.frame();
+        for (U32 i = 0; i < ALFrameFences::FRAMES * 2; ++i)
+        {
+            mFrames.endFrame();
+        }
+        {
+            INFO("each frame FRAMES behind the open one was read or waited out to make room");
+            CHECK(mFrames.isComplete(first + ALFrameFences::FRAMES - 1));
+            CHECK(mFrames.isComplete(mFrames.frame() - 1 - ALFrameFences::FRAMES));
+        }
+        const U32 ended = mFrames.frame() - 1;
+        const U32 calls = mFrames.getCalls();
+        {
+            INFO("an ended frame, by its stamp");
+            CHECK(mFrames.wait(ended, SECOND));
+            CHECK(mFrames.isComplete(ended));
+            CHECK(mFrames.getCalls() == calls);
+        }
+        mFrames.endFrame();
+        const U32 open = mFrames.frame();
+        {
+            INFO("the open frame: a fence of its own, and every frame before it finished");
+            CHECK(mFrames.wait(open, SECOND));
+            CHECK(mFrames.getCalls() >= calls + 2);
+            CHECK(mFrames.isComplete(open - 1));
+            CHECK_FALSE(mFrames.isComplete(open));
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // No longer asked for, the stamps go at the next frame's end, which waits out the frames stamped and lays a fence;
+    // asked for again, they come again. release() lets the store go, and the next frame's end makes it again.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: stamps go back to fences and come again", "[alframefences_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("no query buffers, timestamps or persistent maps on this context");
+        }
+        mFrames.setStamps(true);
+        mFrames.endFrame();
+        const U32 stamped = mFrames.frame();
+        mFrames.endFrame();
+        REQUIRE(mFrames.isStamping());
+
+        mFrames.setStamps(false);
+        const U32 fenced = mFrames.frame();
+        const U32 calls  = mFrames.getCalls();
+        mFrames.endFrame();
+        {
+            INFO("the stamped frames waited out, and a fence laid");
+            CHECK_FALSE(mFrames.isStamping());
+            CHECK(mFrames.isComplete(stamped));
+            CHECK(mFrames.getCalls() > calls);
+        }
+        glFinish();
+        mFrames.endFrame();
+        {
+            INFO("the fenced frame complete once the next frame's end has polled its fence");
+            CHECK(mFrames.isComplete(fenced));
+        }
+
+        mFrames.setStamps(true);
+        mFrames.endFrame();
+        CHECK(mFrames.isStamping());
+        mFrames.release();
+        {
+            INFO("release lets the store go");
+            CHECK_FALSE(mFrames.isStamping());
+        }
+        const U32 next = mFrames.frame();
+        mFrames.endFrame();
+        {
+            INFO("the next frame's end makes it again");
+            CHECK(mFrames.isStamping());
+        }
+        glFinish();
+        mFrames.endFrame();
+        {
+            INFO("and frames are read complete by their stamps after it");
+            CHECK(mFrames.isComplete(next));
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // Stamped and paced one frame ahead, a frame's end leaves the frame before it complete and its own open, whether the
+    // GPU was still drawing the frame before or had finished it, and lays no fence or polls one on the way.
+    TEST_CASE_METHOD(alframefences_paced_data, "alframefences_gl: a paced stamped frame's end waits for the frame before it, with no call", "[alframefences_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("no query buffers, timestamps or persistent maps on this context");
+        }
+        setUp();
+        mFrames.setStamps(true);
+        const U32 stalls = mFrames.getStalls();
+        const U32 calls  = mFrames.getCalls();
+        for (U32 i = 0; i < 3; ++i)
+        {
+            const U32 busy = mFrames.frame();
+            keepBusy();
+            mFrames.endFrame(1);
+            INFO("frame " << i << " of three, each the GPU's for a while");
+            CHECK(mFrames.isComplete(busy - 1));
+            CHECK_FALSE(mFrames.isComplete(busy));
+        }
+        {
+            INFO("no stall, and no call");
+            CHECK(mFrames.getStalls() == stalls);
+            CHECK(mFrames.getCalls() == calls);
+        }
+        glFinish();
         CHECK(glGetError() == GL_NO_ERROR);
     }
 }

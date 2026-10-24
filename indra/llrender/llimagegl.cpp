@@ -76,6 +76,7 @@ namespace
         LLPointer<LLImageGL> mImage;
         GLsync               mFence = nullptr; // null once seen signalled
         LLGLuint             mName  = 0;
+        U32                  mHandedIn = 0;    // the main context's frame it was handed over in
     };
     std::vector<PendingPublish> sPendingPublishes;
 
@@ -2187,7 +2188,7 @@ void LLImageGL::queuePublish(LLGLuint name, GLsync fence)
 {
     llassert(on_main_thread());
     ++mPublishesPending;
-    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name });
+    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name, gGL.frameFences().frame() });
 }
 
 void LLImageGL::finishPublish(LLGLuint name)
@@ -2243,10 +2244,18 @@ void LLImageGL::pollUploads()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(on_main_thread());
 
+    // Where the frames' ends stamp their frames, a frame's end need not wait on a threaded driver's own thread, and a
+    // poll of a fence not yet signalled would: NVIDIA's answers it only once its thread has caught up. An upload
+    // is polled there only once the main context's frame it was handed over in has finished, which the upload's own
+    // commands, flushed before they were handed over, have all but surely finished before; a poll of a fence that has
+    // signalled answers at once.
+    const ALFrameFences& frames   = gGL.frameFences();
+    const bool           stamping = frames.isStamping();
+
     // Oldest first, up to the first not yet signalled, as publishUploads walks them.
     for (PendingPublish& pending : sPendingPublishes)
     {
-        if (pending.mFence && !poll_signalled(pending))
+        if (pending.mFence && ((stamping && !frames.isComplete(pending.mHandedIn)) || !poll_signalled(pending)))
         {
             break;
         }
