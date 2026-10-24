@@ -43,6 +43,11 @@ class LLVolume;
 class LLVolumeTriangle;
 class LLVolumeOctree;
 
+namespace ll_test
+{
+    struct VolumeProbe;
+}
+
 #include "lluuid.h"
 #include "v4color.h"
 #include "v2math.h"
@@ -1038,6 +1043,7 @@ private:
 class LLVolume : public LLRefCount
 {
     friend class LLVolumeLODGroup;
+    friend struct ll_test::VolumeProbe;
 
 protected:
     virtual ~LLVolume(); // use unref
@@ -1127,8 +1133,9 @@ public:
     void copyFacesTo(std::vector<LLVolumeFace> &faces) const;
     void copyFacesFrom(const std::vector<LLVolumeFace> &faces);
 
-    // use meshoptimizer to optimize index buffer for vertex shader cache
-    //  gen_tangents - if true, generate MikkTSpace tangents if needed before optimizing index buffer
+    // Each face's vertices and triangles in the order a vertex cache and a
+    // fetch take them best, with MikkTSpace tangents where gen_tangents is
+    // set; see LLVolumeFace::cacheOptimize.
     bool cacheOptimize(bool gen_tangents = false);
 
 private:
@@ -1145,6 +1152,8 @@ public:
     bool unpackVolumeFaces(U8* in_data, S32 size);
 private:
     bool unpackVolumeFacesInternal(const LLSD& mdl);
+    // A LOD block's faces as it holds them, before cacheOptimize.
+    bool decodeVolumeFaces(const LLSD& mdl);
 
 public:
     virtual void setMeshAssetLoaded(bool loaded);
@@ -1178,8 +1187,6 @@ public:
 };
 
 std::ostream& operator<<(std::ostream &s, const LLVolumeParams &volume_params);
-
-void LLCalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LLVector4a *normal, const LLVector2 *texcoord, U32 triangleCount, const U16* index_array, LLVector4a *tangent);
 
 bool LLLineSegmentBoxIntersect(const F32* start, const F32* end, const F32* center, const F32* size);
 bool LLLineSegmentBoxIntersect(const LLVector3& start, const LLVector3& end, const LLVector3& center, const LLVector3& size);

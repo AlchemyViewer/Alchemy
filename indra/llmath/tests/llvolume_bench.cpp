@@ -2,7 +2,7 @@
  * @file llvolume_bench.cpp
  * @brief What generating a prim or sculpt, its tangents, a flexible frame,
  *        a mesh LOD's cacheOptimize and each index order cost, and how many
- *        blocks meshoptimizer allocates a call.
+ *        blocks meshoptimizer takes a call from the arena and the heap.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -29,8 +29,8 @@
 // face's tangents, one flexible frame, one LOD's cacheOptimize, one face's
 // index order. A row differs from the row beside it in one thing. The
 // figures that are not times, an index order's vertices transformed a
-// triangle and meshoptimizer's allocations a call, are printed as a table
-// by the case that measures them.
+// triangle and meshoptimizer's blocks a call, are printed as a table by the
+// case that measures them.
 //
 // The output is a table, not a verdict; a number is read against the row
 // next to it from the same run on the same quiet machine.
@@ -38,7 +38,9 @@
 #include "linden_common.h"
 
 #include "llvolume.h"
+#include "alscratcharena.h"
 #include "llmath.h"
+#include "llmeshoptimizer.h"
 #include "llquaternion.h"
 #include "m3math.h"
 #include "v2math.h"
@@ -46,10 +48,13 @@
 #include "llvector4a.h"
 
 #include "altestbenchmark.h"
+#include "almeshcorpus.h"
 
 #include <fmt/format.h>
 #include <meshoptimizer.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -368,21 +373,6 @@ namespace
         }
     };
 
-    // A face's tangents by Lengyel's generator, into a buffer of their
-    // own, allocated and cleared as createTangents did.
-    F32 lengyel(const LLVolumeFace& face)
-    {
-        LLVector4a* tangents = (LLVector4a*)ll_aligned_malloc_16(face.mNumVertices * sizeof(LLVector4a));
-        for (S32 v = 0; v < face.mNumVertices; ++v)
-        {
-            tangents[v].clear();
-        }
-        LLCalculateTangentArray(face.mNumVertices, face.mPositions, face.mNormals, face.mTexCoords, face.mNumIndices / 3, face.mIndices, tangents);
-        const F32 first = tangents[0][0];
-        ll_aligned_free_16(tangents);
-        return first;
-    }
-
     struct FaceClass
     {
         std::string name;
@@ -512,58 +502,34 @@ namespace
     }
 
     // ------------------------------------------------------------------
-    // meshoptimizer's allocations, counted through its allocator hook.
+    // meshoptimizer on the thread's arena, as the viewer runs it, while it
+    // lives, and on its own default, operator new and delete, after.
 
-    struct Allocations
+    struct ArenaInstalled
     {
-        static inline size_t blocks = 0;
-        static inline size_t bytes = 0;
+        static void* MESHOPTIMIZER_ALLOC_CALLCONV newBlock(size_t bytes) { return ::operator new(bytes); }
+        static void MESHOPTIMIZER_ALLOC_CALLCONV deleteBlock(void* block) { ::operator delete(block); }
 
-        static void* MESHOPTIMIZER_ALLOC_CALLCONV allocate(size_t size)
-        {
-            ++blocks;
-            bytes += size;
-            return ::operator new(size);
-        }
-
-        static void MESHOPTIMIZER_ALLOC_CALLCONV deallocate(void* p)
-        {
-            ::operator delete(p);
-        }
-
-        // meshoptimizer's own default: operator new and operator delete.
-        static void* MESHOPTIMIZER_ALLOC_CALLCONV defaultAllocate(size_t size)
-        {
-            return ::operator new(size);
-        }
-
-        static void MESHOPTIMIZER_ALLOC_CALLCONV defaultDeallocate(void* p)
-        {
-            ::operator delete(p);
-        }
+        ArenaInstalled() { LLMeshOptimizer::initClass(); }
+        ~ArenaInstalled() { meshopt_setAllocator(newBlock, deleteBlock); }
     };
 
-    // Counts while it lives, and puts meshoptimizer's default back however
-    // the case ends.
+    // The blocks a call takes from the arena and from the heap, counted by
+    // the arena, and the most of the arena it holds at once.
     struct CountAllocations
     {
-        CountAllocations()
-        {
-            meshopt_setAllocator(Allocations::allocate, Allocations::deallocate);
-        }
-
-        ~CountAllocations()
-        {
-            meshopt_setAllocator(Allocations::defaultAllocate, Allocations::defaultDeallocate);
-        }
+        ArenaInstalled installed;
+        size_t arena_blocks = 0;
 
         template <typename F>
         void row(const std::string& name, F&& call)
         {
-            Allocations::blocks = 0;
-            Allocations::bytes = 0;
+            ALScratchArena::resetCounters();
             call();
-            std::printf("  %-72s %4zu blocks %9zu bytes\n", name.c_str(), Allocations::blocks, Allocations::bytes);
+            const ALScratchArena::Counters counters = ALScratchArena::counters();
+            arena_blocks += counters.arena_blocks;
+            std::printf("  %-72s %4zu arena %4zu heap %9zu bytes at most\n", name.c_str(), counters.arena_blocks, counters.heap_blocks,
+                        counters.peak);
         }
     };
 
@@ -621,12 +587,11 @@ namespace
     }
 
     // createTangents sums meshoptimizer's default weighting a vertex at a
-    // time, over the grid on a side and over the indices elsewhere; Lengyel
-    // is the generator a face cacheOptimize has taken keeps, and the one
-    // createTangents was. meshoptimizer's default mode weights by angle
-    // times the edges' lengths a corner at a time, its compatible mode by
-    // angle alone, as MikkTSpace does. Each row makes one face's tangents a
-    // vertex, the allocation included where the generator makes one.
+    // time, over the grid on a side and over the indices elsewhere.
+    // meshoptimizer's default mode weights by angle times the edges'
+    // lengths a corner at a time, its compatible mode by angle alone, as
+    // MikkTSpace does. Each row makes one face's tangents a vertex, the
+    // allocation included where the generator makes one.
     TEST_CASE("llvolume_bench: one face's tangents from each generator", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
@@ -639,10 +604,6 @@ namespace
                 face.mTangents = nullptr;
                 face.createTangents();
                 return face.mTangents[0][0];
-            };
-            BENCHMARK(fmt::format("Lengyel, {}", face_class.name))
-            {
-                return lengyel(face);
             };
             TangentInputs inputs(face);
             BENCHMARK(fmt::format("meshoptimizer default, {}", face_class.name))
@@ -664,10 +625,6 @@ namespace
                 face.mTangents = nullptr;
                 face.createTangents();
                 return face.mTangents[0][0];
-            };
-            BENCHMARK(fmt::format("Lengyel, {}", name))
-            {
-                return lengyel(face);
             };
             TangentInputs inputs(face);
             BENCHMARK(fmt::format("meshoptimizer default, {}", name))
@@ -713,11 +670,13 @@ namespace
     }
 
     // cacheOptimize as a mesh thread runs it on each decoded LOD: tangents,
-    // the weld, and the cache order. Each call takes a fresh copy of the
-    // decoded face, made outside the measurement.
+    // the weld, the cache order and the fetch order, its scratch and
+    // meshoptimizer's from the thread's arena. Each call takes a fresh copy
+    // of the decoded face, made outside the measurement.
     TEST_CASE("llvolume_bench: cacheOptimize over the mesh corpus", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
+        ArenaInstalled installed;
         std::vector<LLVolumeFace> all;
         for (const CorpusMesh& mesh : corpus())
         {
@@ -744,6 +703,71 @@ namespace
                     return ok;
                 });
         };
+    }
+
+    // cacheOptimize over the real mesh corpus (almeshcorpus.h), where
+    // AL_MESH_CORPUS_DIR names one: every face of every LOD of the sample,
+    // one call each on a fresh copy, as a mesh thread makes it. Printed as
+    // a table: the time a face and a vertex, the arena's high-water marks
+    // against its size, and the vertex cache and fetch figures it leaves.
+    TEST_CASE("llvolume_bench: cacheOptimize over the real mesh corpus", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        std::optional<ALMeshCorpus> real = ALMeshCorpus::fromEnvironment();
+        if (!real)
+        {
+            SKIP("AL_MESH_CORPUS_DIR names no mesh cache");
+        }
+        ArenaInstalled installed;
+        std::vector<F64> face_ns, peaks, acmr, overfetch;
+        F64 total_ns = 0;
+        size_t vertices = 0, over_arena = 0;
+        constexpr size_t VERTEX_BYTES = 2 * sizeof(LLVector4a) + sizeof(LLVector2);
+        real->forEachLOD(
+            [&](const CorpusLOD& lod)
+            {
+                for (S32 f = 0; f < lod.volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& decoded = lod.volume->getVolumeFace(f);
+                    if (decoded.mNumVertices <= 0 || decoded.mNumIndices <= 0)
+                    {
+                        continue;
+                    }
+                    LLVolumeFace face = decoded;
+                    ALScratchArena::resetCounters();
+                    const auto start = std::chrono::steady_clock::now();
+                    const bool optimized = face.cacheOptimize(true);
+                    const F64 ns = (F64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+                    if (!optimized)
+                    {
+                        continue;
+                    }
+                    const ALScratchArena::Counters counters = ALScratchArena::counters();
+                    face_ns.push_back(ns);
+                    total_ns += ns;
+                    vertices += decoded.mNumVertices;
+                    peaks.push_back((F64)counters.peak);
+                    over_arena += counters.heap_blocks > 0;
+                    const std::vector<U32> indices(face.mIndices, face.mIndices + face.mNumIndices);
+                    acmr.push_back(meshopt_analyzeVertexCache(indices.data(), indices.size(), face.mNumVertices, 16, 0, 0).acmr);
+                    overfetch.push_back((F64)meshopt_analyzeVertexFetch(indices.data(), indices.size(), face.mNumVertices, VERTEX_BYTES).bytes_fetched /
+                                        ((F64)face.mNumVertices * VERTEX_BYTES));
+                }
+            });
+        REQUIRE(!face_ns.empty());
+        auto quantile = [](std::vector<F64> values, F64 q)
+        {
+            std::sort(values.begin(), values.end());
+            return values[std::min(values.size() - 1, (size_t)(q * (F64)(values.size() - 1) + 0.5))];
+        };
+        std::printf("cacheOptimize over the real mesh corpus: %s\n", real->describe().c_str());
+        std::printf("  %zu faces, %zu decoded vertices: %.0f ns a face (median %.0f, 99th percentile %.0f), %.1f ns a decoded vertex\n", face_ns.size(),
+                    vertices, total_ns / face_ns.size(), quantile(face_ns, 0.5), quantile(face_ns, 0.99), total_ns / vertices);
+        std::printf("  arena high-water mark: median %.0f, 99th percentile %.0f, most %.0f bytes of %zu; %zu faces larger than the arena\n",
+                    quantile(peaks, 0.5), quantile(peaks, 0.99), quantile(peaks, 1.0), ALScratchArena::CAPACITY, over_arena);
+        std::printf("  vertices transformed a triangle: median %.3f, 90th percentile %.3f; overfetch: median %.4f, 90th percentile %.4f\n",
+                    quantile(acmr, 0.5), quantile(acmr, 0.9), quantile(overfetch, 0.5), quantile(overfetch, 0.9));
+        std::fflush(stdout);
     }
 
     // Each grid's index order three ways: createSide's rows, bands of seven
@@ -792,13 +816,12 @@ namespace
         }
     }
 
-    // The blocks each meshoptimizer call takes from its allocator, counted
-    // through meshopt_setAllocator, and what cacheOptimize's calls take
-    // together.
+    // The blocks each meshoptimizer call takes, and what a cacheOptimize
+    // takes with its own scratch, from the arena and from the heap.
     TEST_CASE("llvolume_bench: meshoptimizer's allocations a call", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
-        std::printf("meshoptimizer allocations a call\n");
+        std::printf("meshoptimizer blocks a call\n");
         size_t blocks = 0;
         {
             CountAllocations count;
@@ -823,8 +846,8 @@ namespace
             {
                 LLVolumeFace face = mesh.face();
                 count.row(fmt::format("cacheOptimize, {}, {} vertices", mesh.name, face.mNumVertices), [&] { face.cacheOptimize(true); });
-                blocks += Allocations::blocks;
             }
+            blocks = count.arena_blocks;
         }
         std::fflush(stdout);
         CHECK(blocks > 0);

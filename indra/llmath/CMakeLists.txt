@@ -98,7 +98,7 @@ target_sources(
         xform.h
 )
 
-target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::mikktspace ll::meshoptimizer)
+target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::meshoptimizer)
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
 
 # Add tests
@@ -117,6 +117,7 @@ if(AL_BUILD_TESTS)
       tests/llbboxlocal_test.cpp
       tests/llmatrix3a_test.cpp
       tests/llmatrix4a_test.cpp
+      tests/llmeshoptimizer_test.cpp
       tests/llmodularmath_test.cpp
       tests/lloctree_test.cpp
       tests/llquaternion2_test.cpp

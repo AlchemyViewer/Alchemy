@@ -50,7 +50,11 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llvector4a.h"
+#include "alscratcharena.h"
 #include "alsimdkernels.h"
+#include "llmeshoptimizer.h"
+#include "almeshcorpus.h"
+#include "altestfatal.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
@@ -2002,9 +2006,95 @@ namespace
         return mesh;
     }
 
+    // A curved grid whose vertices are each held twice, the same in every
+    // attribute: each quad's first triangle takes the first copies and its
+    // second the others.
+    CorpusMesh duplicatedGrid()
+    {
+        CorpusMesh mesh;
+        mesh.name = "grid of vertices held twice";
+        constexpr S32 size = 6;
+        for (S32 copy = 0; copy < 2; ++copy)
+        {
+            for (S32 r = 0; r <= size; ++r)
+            {
+                for (S32 c = 0; c <= size; ++c)
+                {
+                    const F32 x = (F32)c / size - 0.5f;
+                    mesh.positions.emplace_back(x, (F32)r / size - 0.5f, 0.25f * x * x);
+                    LLVector3 n(-0.5f * x, 0.f, 1.f);
+                    n.normalize();
+                    mesh.normals.push_back(n);
+                    mesh.uvs.emplace_back((F32)c / size, (F32)r / size);
+                }
+            }
+        }
+        const U16 copy = (U16)((size + 1) * (size + 1));
+        for (S32 r = 0; r < size; ++r)
+        {
+            for (S32 c = 0; c < size; ++c)
+            {
+                const U16 a = (U16)(c + r * (size + 1));
+                mesh.indices.insert(mesh.indices.end(), { a, (U16)(a + 1), (U16)(a + size + 2) });
+                mesh.indices.insert(mesh.indices.end(), { (U16)(a + copy), (U16)(a + size + 2 + copy), (U16)(a + size + 1 + copy) });
+            }
+        }
+        return mesh;
+    }
+
     std::vector<CorpusMesh> corpus()
     {
-        return { uvSphere(24, 12), splitCube(), mirroredStrip(), riggedSphere(), degenerateGrid(), uvSphere(64, 32) };
+        return { uvSphere(24, 12), splitCube(), mirroredStrip(), riggedSphere(), degenerateGrid(), duplicatedGrid(), uvSphere(64, 32) };
+    }
+
+    // A strip of 32,760 columns by two rows whose U runs back and forth, a
+    // mirror seam at every column, gently curved: each vertex's corners take
+    // two tangents, which would split it into more vertices than 16-bit
+    // indices reach. Its last 16 vertices are copies of others, which its
+    // triangles take in place of them.
+    constexpr S32 ZIGZAG_COPIES = 16;
+    CorpusMesh zigzagStrip()
+    {
+        CorpusMesh mesh;
+        mesh.name = "strip of 32,760 mirrored columns";
+        constexpr S32 columns = 32760;
+        for (S32 r = 0; r < 2; ++r)
+        {
+            for (S32 c = 0; c < columns; ++c)
+            {
+                const F32 x = c * 0.01f;
+                mesh.positions.emplace_back(x, (F32)r, 0.1f * sinf(x));
+                LLVector3 n(-0.1f * cosf(x), 0.f, 1.f);
+                n.normalize();
+                mesh.normals.push_back(n);
+                mesh.uvs.emplace_back((F32)(c % 2), (F32)r);
+            }
+        }
+        for (S32 c = 0; c + 1 < columns; ++c)
+        {
+            const U16 a = (U16)c;
+            const U16 b = (U16)(c + 1);
+            const U16 d = (U16)(c + columns);
+            const U16 e = (U16)(d + 1);
+            mesh.indices.insert(mesh.indices.end(), { a, b, e, a, e, d });
+        }
+        for (S32 k = 0; k < ZIGZAG_COPIES; ++k)
+        {
+            const U16 original = (U16)(k * 997 + 3);
+            const U16 copy = (U16)mesh.positions.size();
+            mesh.positions.push_back(mesh.positions[original]);
+            mesh.normals.push_back(mesh.normals[original]);
+            mesh.uvs.push_back(mesh.uvs[original]);
+            for (size_t i = (size_t)k * 6; i < mesh.indices.size(); ++i)
+            {
+                if (mesh.indices[i] == original)
+                {
+                    mesh.indices[i] = copy;
+                    break;
+                }
+            }
+        }
+        return mesh;
     }
 
     // A triangle by its corners' positions, rotated to start at the least,
@@ -2033,10 +2123,120 @@ namespace
         return { corners[start], corners[(start + 1) % 3], corners[(start + 2) % 3] };
     }
 
+    LLVector3 unitOrZero(LLVector3 v)
+    {
+        if (v.lengthSquared() > 0.f)
+        {
+            v.normalize();
+        }
+        return v;
+    }
+
+    // Whether an optimized corner keeps a decoded one's normal at unit
+    // length, UV and weights.
+    bool sameCorner(const LLVolumeFace& before, U16 i, const LLVolumeFace& after, U16 o)
+    {
+        if ((v3(after.mNormals[o]) - unitOrZero(v3(before.mNormals[i]))).length() > 1e-5f || !(after.mTexCoords[o] == before.mTexCoords[i]))
+        {
+            return false;
+        }
+        return !before.mWeights ||
+               (after.mWeights && v3(after.mWeights[o]) == v3(before.mWeights[i]) && after.mWeights[o][3] == before.mWeights[i][3]);
+    }
+
+    // Whether no two vertices of a face are the same in every attribute,
+    // the tangent among them where with_tangent says.
+    bool verticesDistinct(const LLVolumeFace& face, bool with_tangent)
+    {
+        using Key = std::array<U32, 16>;
+        std::vector<Key> keys(face.mNumVertices);
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            Key& key = keys[v];
+            key.fill(0);
+            std::memcpy(&key[0], face.mPositions[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(&key[3], face.mNormals[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(&key[6], face.mTexCoords[v].mV, 2 * sizeof(F32));
+            if (with_tangent && face.mTangents)
+            {
+                std::memcpy(&key[8], face.mTangents[v].getF32ptr(), 4 * sizeof(F32));
+            }
+            if (face.mWeights)
+            {
+                std::memcpy(&key[12], face.mWeights[v].getF32ptr(), 4 * sizeof(F32));
+            }
+        }
+        std::sort(keys.begin(), keys.end());
+        return std::adjacent_find(keys.begin(), keys.end()) == keys.end();
+    }
+
+#if defined(_MSC_VER) || defined(__clang__)
+#pragma float_control(precise, on, push)
+#elif defined(__GNUC__)
+#pragma GCC push_options
+#pragma GCC optimize("fp-contract=off", "no-associative-math", "no-reciprocal-math")
+#endif
+    // Whether MikkTSpace takes a triangle of a decoded face as one with a
+    // tangent space of its own, by its own float arithmetic over the face as
+    // authored, the positions scaled out of the unit cube: distinct corners,
+    // a UV area, and a tangent and bitangent whose lengths over that area
+    // exceed FLT_MIN. A triangle that is not takes its orientation from the
+    // triangles about it. This compiles precise, as meshoptimizer does, so
+    // that the squares and products round as there.
+    bool mikkGood(const LLVolumeFace& face, S32 t)
+    {
+        const LLVector3& scale = face.mNormalizedScale;
+        F32 p[3][3];
+        F32 uv[3][2];
+        for (S32 k = 0; k < 3; ++k)
+        {
+            const U16 v = face.mIndices[t * 3 + k];
+            for (S32 i = 0; i < 3; ++i)
+            {
+                p[k][i] = face.mPositions[v][i] * scale.mV[i];
+            }
+            uv[k][0] = face.mTexCoords[v].mV[0];
+            uv[k][1] = face.mTexCoords[v].mV[1];
+        }
+        for (S32 a = 0; a < 3; ++a)
+        {
+            const S32 b = (a + 1) % 3;
+            if (p[a][0] == p[b][0] && p[a][1] == p[b][1] && p[a][2] == p[b][2])
+            {
+                return false;
+            }
+        }
+        const F32 t21x = uv[1][0] - uv[0][0], t21y = uv[1][1] - uv[0][1];
+        const F32 t31x = uv[2][0] - uv[0][0], t31y = uv[2][1] - uv[0][1];
+        const F32 area = fabsf(t21x * t31y - t21y * t31x);
+        if (!(area > FLT_MIN))
+        {
+            return false;
+        }
+        F32 os[3], ot[3];
+        for (S32 i = 0; i < 3; ++i)
+        {
+            const F32 d1 = p[1][i] - p[0][i], d2 = p[2][i] - p[0][i];
+            os[i] = t31y * d1 - t21y * d2;
+            ot[i] = -t31x * d1 + t21x * d2;
+        }
+        const F32 los = sqrtf(os[0] * os[0] + os[1] * os[1] + os[2] * os[2]);
+        const F32 lot = sqrtf(ot[0] * ot[0] + ot[1] * ot[1] + ot[2] * ot[2]);
+        return los / area > FLT_MIN && lot / area > FLT_MIN;
+    }
+#if defined(_MSC_VER) || defined(__clang__)
+#pragma float_control(pop)
+#elif defined(__GNUC__)
+#pragma GCC pop_options
+#endif
+
     // cacheOptimize keeps every triangle, and every corner's position,
-    // normal, UV and weights, while it welds and reorders; it gives every
-    // vertex a unit tangent orthogonal to its normal, whose w follows the
-    // UV winding of each triangle the vertex is in.
+    // normal at unit length, UV and weights, while it welds and reorders;
+    // it gives every vertex a unit tangent orthogonal to its normal, whose
+    // w follows the UV winding of each triangle the vertex is in, as
+    // MikkTSpace's handedness does. A face decoded with a normal of no
+    // length keeps it so. Triangles are matched by their corners'
+    // positions, and among those of the same positions by the rest.
     void checkOptimized(const LLVolumeFace& before, const LLVolumeFace& after, Report& report, const std::string& where)
     {
         if (after.mNumIndices != before.mNumIndices)
@@ -2079,6 +2279,13 @@ namespace
             return;
         }
 
+        // A face too large for its weld, with one of each vertex, gives each
+        // its first corner's tangent, so that a vertex of triangles winding
+        // both ways, or whose first triangle's UVs have no winding, follows
+        // only some of them: all but a hundredth of its vertices follow one.
+        const bool unsplit = before.mNumIndices >= 65535 && verticesDistinct(after, false);
+        std::vector<U8> windings(after.mNumVertices, 0);
+
         for (S32 t = 0; t < (S32)out.size(); ++t)
         {
             if (out[t].degenerate)
@@ -2087,38 +2294,55 @@ namespace
             }
             S32 out_first = 0;
             const TriangleKey key = keyOf(after, t, &out_first);
-            const S32 source = by_key.find(key)->second;
-            S32 in_first = 0;
-            keyOf(before, source, &in_first);
+            bool kept = false;
+            S32 source = -1;
+            for (auto [it, end] = by_key.equal_range(key); it != end && !kept; ++it)
+            {
+                S32 in_first = 0;
+                keyOf(before, it->second, &in_first);
+                kept = true;
+                for (S32 k = 0; k < 3 && kept; ++k)
+                {
+                    kept = sameCorner(before, before.mIndices[it->second * 3 + (in_first + k) % 3], after, after.mIndices[t * 3 + (out_first + k) % 3]);
+                }
+                source = kept ? it->second : -1;
+            }
+            if (!kept)
+            {
+                report.fail(fmt::format("{}: triangle {} lost a corner's normal, UV or weights", where, t));
+                return;
+            }
             const LLVector2 uv0 = after.mTexCoords[after.mIndices[t * 3]];
             const LLVector2 uv1 = after.mTexCoords[after.mIndices[t * 3 + 1]];
             const LLVector2 uv2 = after.mTexCoords[after.mIndices[t * 3 + 2]];
-            const F32 uv_area = (uv1.mV[0] - uv0.mV[0]) * (uv2.mV[1] - uv0.mV[1]) - (uv2.mV[0] - uv0.mV[0]) * (uv1.mV[1] - uv0.mV[1]);
-            for (S32 k = 0; k < 3; ++k)
-            {
-                const U16 o = after.mIndices[t * 3 + (out_first + k) % 3];
-                const U16 i = before.mIndices[source * 3 + (in_first + k) % 3];
-                if ((v3(after.mNormals[o]) - v3(before.mNormals[i])).length() > 1e-5f || !(after.mTexCoords[o] == before.mTexCoords[i]))
-                {
-                    report.fail(fmt::format("{}: triangle {} corner {} lost its normal or UV", where, t, k));
-                    return;
-                }
-                if (before.mWeights && !(after.mWeights && v3(after.mWeights[o]) == v3(before.mWeights[i]) && after.mWeights[o][3] == before.mWeights[i][3]))
-                {
-                    report.fail(fmt::format("{}: triangle {} corner {} lost its weights", where, t, k));
-                    return;
-                }
-            }
             if (!after.mTangents)
             {
                 report.fail(fmt::format("{}: no tangents", where));
                 return;
             }
-            const F32 geometric = out[t].normal * v3(after.mNormals[after.mIndices[t * 3]]);
-            const F32 expected_w = (uv_area > 0.f) == (geometric > 0.f) ? 1.f : -1.f;
-            for (S32 k = 0; k < 3 && fabsf(uv_area) > 1e-6f; ++k)
+            // The UVs' winding from their differences at a float, as
+            // meshoptimizer takes them, and their products exact. A triangle
+            // whose UVs are all but in a line, against their size, wind by
+            // less than MikkTSpace's least area, or have products past a
+            // float's range, has no winding to follow, nor has one that
+            // MikkTSpace, taking the triangle as it was decoded, gives no
+            // tangent space of its own.
+            const F32 d1u = uv1.mV[0] - uv0.mV[0], d1v = uv1.mV[1] - uv0.mV[1];
+            const F32 d2u = uv2.mV[0] - uv0.mV[0], d2v = uv2.mV[1] - uv0.mV[1];
+            const F64 along = (F64)d1u * d2v, across = (F64)d2u * d1v;
+            const F64 uv_area = along - across;
+            const F64 edges = sqrt(((F64)d1u * d1u + (F64)d1v * d1v) * ((F64)d2u * d2u + (F64)d2v * d2v));
+            const F32 expected_w = uv_area > 0. ? 1.f : -1.f;
+            const bool winds = fabs(along) <= FLT_MAX && fabs(across) <= FLT_MAX && fabs(uv_area) > llmax(1e-5 * edges, (F64)FLT_MIN) &&
+                               mikkGood(before, source);
+            for (S32 k = 0; k < 3 && winds; ++k)
             {
                 const U16 o = after.mIndices[t * 3 + k];
+                if (unsplit)
+                {
+                    windings[o] |= expected_w > 0.f ? 1 : 2;
+                    continue;
+                }
                 if (after.mTangents[o][3] != expected_w)
                 {
                     report.fail(fmt::format("{}: triangle {}'s UVs wind for w = {} but vertex {} has {}", where, t, expected_w, o, after.mTangents[o][3]));
@@ -2127,19 +2351,174 @@ namespace
             }
         }
 
+        if (unsplit)
+        {
+            S32 against = 0;
+            for (S32 v = 0; v < after.mNumVertices; ++v)
+            {
+                against += windings[v] && !(windings[v] & (after.mTangents[v][3] > 0.f ? 1 : 2));
+            }
+            if (against * 100 > after.mNumVertices)
+            {
+                report.fail(fmt::format("{}: {} of {} vertices have a w none of their triangles' UVs wind for", where, against, after.mNumVertices));
+                return;
+            }
+        }
+
+        bool zero_in = false;
+        for (S32 v = 0; v < before.mNumVertices; ++v)
+        {
+            zero_in |= v3(before.mNormals[v]).lengthSquared() == 0.f;
+        }
         for (S32 v = 0; v < after.mNumVertices; ++v)
         {
             const LLVector3 n = v3(after.mNormals[v]);
             const LLVector3 t = after.mTangents ? v3(after.mTangents[v]) : LLVector3::zero;
             const F32 w = after.mTangents ? after.mTangents[v][3] : 0.f;
-            if (!(fabsf(n.length() - 1.f) <= UNIT_TOLERANCE) || !(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE) || !(w == 1.f || w == -1.f) ||
-                !(fabsf(n * t) <= 2e-3f))
+            const bool unit_n = fabsf(n.length() - 1.f) <= UNIT_TOLERANCE || (zero_in && n.lengthSquared() == 0.f);
+            if (!unit_n || !(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE) || !(w == 1.f || w == -1.f) || !(fabsf(n * t) <= 2e-3f))
             {
                 report.fail(fmt::format("{}: vertex {} has normal length {}, tangent length {}, w {} and n.t {}", where, v, n.length(), t.length(), w, n * t));
                 return;
             }
         }
     }
+
+    // The tangent cacheOptimize gives each corner of a decoded face:
+    // meshoptimizer's compatible one over the face as it was authored, its
+    // positions scaled out of the unit cube and its unit normals by the
+    // inverse, taken back into the face's frame as a direction along its
+    // surface. A corner that gives no direction is (0, 0, 0, w).
+    std::vector<LLVector4a> expectedTangents(const LLVolumeFace& face)
+    {
+        const LLVector3& scale = face.mNormalizedScale;
+        const LLVector3 inv_scale(1.f / scale.mV[0], 1.f / scale.mV[1], 1.f / scale.mV[2]);
+        std::vector<LLVector4a> positions(face.mNumVertices), normals(face.mNumVertices);
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            LLVector3 p = v3(face.mPositions[v]);
+            p.scaleVec(scale);
+            positions[v].load3(p.mV);
+            LLVector3 n = v3(face.mNormals[v]);
+            n.normalize();
+            n.scaleVec(inv_scale);
+            n.normalize();
+            normals[v].load3(n.mV);
+        }
+        const std::vector<U32> indices(face.mIndices, face.mIndices + face.mNumIndices);
+        std::vector<F32> corners(indices.size() * 4);
+        meshopt_generateTangents(corners.data(), indices.data(), indices.size(), positions[0].getF32ptr(), positions.size(), sizeof(LLVector4a),
+                                 normals[0].getF32ptr(), sizeof(LLVector4a), face.mTexCoords[0].mV, sizeof(LLVector2),
+                                 meshopt_TangentCompatible | meshopt_TangentZeroFallback);
+        std::vector<LLVector4a> out(indices.size());
+        for (size_t c = 0; c < indices.size(); ++c)
+        {
+            LLVector3 t(&corners[c * 4]);
+            t.scaleVec(inv_scale);
+            if (t.lengthSquared() > 0.f)
+            {
+                t.normalize();
+            }
+            out[c].set(t.mV[0], t.mV[1], t.mV[2], corners[c * 4 + 3]);
+        }
+        return out;
+    }
+
+    // The optimized face's tangents against expectedTangents, corner for
+    // corner over its real triangles, each matched to the decoded triangle
+    // of the same corners. A corner that gives no direction takes one of
+    // unit length in the plane of its normal.
+    void checkTangentsExpected(const LLVolumeFace& before, const LLVolumeFace& after, Report& report, const std::string& where)
+    {
+        const std::vector<LLVector4a> expected = expectedTangents(before);
+        const std::vector<Triangle> in = trianglesOf(before);
+        const std::vector<Triangle> out = trianglesOf(after);
+        std::multimap<TriangleKey, S32> by_key;
+        for (S32 t = 0; t < (S32)in.size(); ++t)
+        {
+            if (!in[t].degenerate)
+            {
+                by_key.emplace(keyOf(before, t), t);
+            }
+        }
+        F32 worst = 0.f;
+        for (S32 t = 0; t < (S32)out.size(); ++t)
+        {
+            if (out[t].degenerate)
+            {
+                continue;
+            }
+            S32 out_first = 0;
+            const auto found = by_key.find(keyOf(after, t, &out_first));
+            if (found == by_key.end())
+            {
+                report.fail(fmt::format("{}: triangle {} is no triangle of the decoded face", where, t));
+                return;
+            }
+            S32 in_first = 0;
+            keyOf(before, found->second, &in_first);
+            for (S32 k = 0; k < 3; ++k)
+            {
+                const U16 o = after.mIndices[t * 3 + (out_first + k) % 3];
+                const LLVector4a& want = expected[found->second * 3 + (in_first + k) % 3];
+                const LLVector3 got = v3(after.mTangents[o]);
+                if (after.mTangents[o][3] != want[3])
+                {
+                    report.fail(fmt::format("{}: vertex {} has w {} where its corner's is {}", where, o, after.mTangents[o][3], want[3]));
+                    return;
+                }
+                if (v3(want).lengthSquared() == 0.f)
+                {
+                    if (!(fabsf(got.length() - 1.f) <= UNIT_TOLERANCE) || !(fabsf(got * v3(after.mNormals[o])) <= 2e-3f))
+                    {
+                        report.fail(fmt::format("{}: vertex {}, of a corner with no direction, has tangent length {} and n.t {}", where, o,
+                                                got.length(), got * v3(after.mNormals[o])));
+                        return;
+                    }
+                    continue;
+                }
+                // By the sine as well as the cosine: acos alone cannot tell
+                // apart directions a float's rounding apart.
+                const LLVector3 w3 = v3(want);
+                worst = llmax(worst, atan2f((got % w3).length(), got * w3) * RAD_TO_DEG);
+            }
+        }
+        if (!(worst <= 0.01f))
+        {
+            report.fail(fmt::format("{}: a tangent is {:.4f} degrees from meshoptimizer's", where, worst));
+        }
+    }
+
+    // No two vertices of an optimized face are the same in every attribute,
+    // so a weld of position, normal, UV, weights and tangent together would
+    // leave as many.
+    void checkWeldedOnce(const LLVolumeFace& face, Report& report, const std::string& where)
+    {
+        if (!verticesDistinct(face, true))
+        {
+            report.fail(fmt::format("{}: two vertices are the same in every attribute", where));
+        }
+    }
+
+    // A face as a mesh LOD whose authored shape is the corpus mesh's
+    // positions times scale, with that shape's normals.
+    LLVolumeFace scaledFace(const CorpusMesh& mesh, const LLVector3& scale)
+    {
+        LLVolumeFace face = mesh.face();
+        face.mNormalizedScale = scale;
+        return face;
+    }
+
+    // meshoptimizer on the thread's arena while it lives, and on its own
+    // default, operator new and delete, after.
+    struct ArenaInstalled
+    {
+        static void* MESHOPTIMIZER_ALLOC_CALLCONV newBlock(size_t bytes) { return ::operator new(bytes); }
+        static void MESHOPTIMIZER_ALLOC_CALLCONV deleteBlock(void* block) { ::operator delete(block); }
+
+        ArenaInstalled() { LLMeshOptimizer::initClass(); }
+        ~ArenaInstalled() { meshopt_setAllocator(newBlock, deleteBlock); }
+    };
 
     // ------------------------------------------------------------------
     // Vertex cache and fetch figures, as meshoptimizer models them: a
@@ -2588,6 +2967,7 @@ namespace
             REQUIRE(after.cacheOptimize(true));
             Report report;
             checkOptimized(before, after, report, mesh.name);
+            checkWeldedOnce(after, report, mesh.name);
             INFO(report.text());
             CHECK(report.failures == 0);
         }
@@ -2601,6 +2981,147 @@ namespace
         // The centre column, shared by both halves, takes a vertex of each
         // handedness.
         CHECK(face.mNumVertices == (S32)mesh.positions.size() + 7);
+    }
+
+    // Each mesh scaled unevenly out of its unit cube, as most authored
+    // meshes are: its tangents are taken in the authored shape and stored
+    // as directions in the face's frame, where they lie in the plane of the
+    // face's own normals.
+    std::vector<LLVector3> unevenScales()
+    {
+        return { LLVector3(2.f, 0.5f, 1.f), LLVector3(0.25f, 3.f, 1.5f), LLVector3(1.f, 1.f, 4.f) };
+    }
+
+    std::string scaledName(const CorpusMesh& mesh, const LLVector3& scale)
+    {
+        return fmt::format("{} scaled {} by {} by {}", mesh.name, scale.mV[0], scale.mV[1], scale.mV[2]);
+    }
+
+    TEST_CASE("llvolume: cacheOptimize keeps every triangle and corner of a mesh scaled unevenly", "[llvolume]")
+    {
+        for (const CorpusMesh& mesh : corpus())
+        {
+            for (const LLVector3& scale : unevenScales())
+            {
+                const LLVolumeFace before = scaledFace(mesh, scale);
+                LLVolumeFace after = before;
+                REQUIRE(after.cacheOptimize(true));
+                Report report;
+                checkOptimized(before, after, report, scaledName(mesh, scale));
+                INFO(report.text());
+                CHECK(report.failures == 0);
+            }
+        }
+    }
+
+    TEST_CASE("llvolume: cacheOptimize's tangents are meshoptimizer's MikkTSpace-compatible ones", "[llvolume]")
+    {
+        for (const CorpusMesh& mesh : corpus())
+        {
+            std::vector<LLVector3> scales = unevenScales();
+            scales.emplace_back(1.f, 1.f, 1.f);
+            for (const LLVector3& scale : scales)
+            {
+                const LLVolumeFace before = scaledFace(mesh, scale);
+                LLVolumeFace after = before;
+                REQUIRE(after.cacheOptimize(true));
+                Report report;
+                checkTangentsExpected(before, after, report, scaledName(mesh, scale));
+                INFO(report.text());
+                CHECK(report.failures == 0);
+            }
+        }
+    }
+
+    // A weld of every attribute of every corner, tangent included, as
+    // cacheOptimize made before it welded each vertex by its copies and its
+    // tangents: the vertices that gave the corpus. A vertex the face holds
+    // twice is one either way.
+    TEST_CASE("llvolume: cacheOptimize makes no more vertices than a weld of every attribute", "[llvolume]")
+    {
+        struct Count
+        {
+            const char* name;
+            S32 vertices;
+        };
+        const Count counts[] = {
+            { "UV sphere 24 by 12", 323 },       { "cube with split normals", 24 },        { "strip with mirrored UVs", 98 },
+            { "rigged UV sphere", 151 },         { "grid with degenerate triangles", 58 }, { "grid of vertices held twice", 49 },
+            { "UV sphere 64 by 32", 2143 },
+        };
+        for (const CorpusMesh& mesh : corpus())
+        {
+            LLVolumeFace face = mesh.face();
+            REQUIRE(face.cacheOptimize(true));
+            const Count* count = std::find_if(std::begin(counts), std::end(counts), [&](const Count& c) { return mesh.name == c.name; });
+            REQUIRE(count != std::end(counts));
+            INFO(fmt::format("{}: {} vertices", mesh.name, face.mNumVertices));
+            CHECK(face.mNumVertices <= count->vertices);
+        }
+    }
+
+    // Too many vertices once split for 16-bit indices: the face keeps one of
+    // each vertex it has, its copies welded, each with the tangent of its
+    // first corner, and every triangle. Its scratch is larger than the
+    // arena, which hands its largest blocks to the heap.
+    TEST_CASE("llvolume: a face too large for its weld keeps one of each vertex and gets a tangent at each", "[llvolume]")
+    {
+        ArenaInstalled installed;
+        const CorpusMesh mesh = zigzagStrip();
+        const LLVolumeFace before = mesh.face();
+        LLVolumeFace after = before;
+        ALScratchArena::resetCounters();
+        REQUIRE(after.cacheOptimize(true));
+        const ALScratchArena::Counters counters = ALScratchArena::counters();
+        CHECK(counters.heap_blocks > 0);
+
+        CHECK(after.mNumVertices == before.mNumVertices - ZIGZAG_COPIES);
+        REQUIRE(after.mNumIndices == before.mNumIndices);
+        REQUIRE(after.mTangents);
+        std::vector<TriangleKey> in_keys, out_keys;
+        for (S32 t = 0; t < before.mNumIndices / 3; ++t)
+        {
+            in_keys.push_back(keyOf(before, t));
+            out_keys.push_back(keyOf(after, t));
+        }
+        std::sort(in_keys.begin(), in_keys.end());
+        std::sort(out_keys.begin(), out_keys.end());
+        CHECK(in_keys == out_keys);
+
+        Report report;
+        for (S32 v = 0; v < after.mNumVertices; ++v)
+        {
+            const LLVector3 n = v3(after.mNormals[v]);
+            const LLVector3 t = v3(after.mTangents[v]);
+            const F32 w = after.mTangents[v][3];
+            if (!(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE) || !(fabsf(n * t) <= 2e-3f) || !(w == 1.f || w == -1.f))
+            {
+                report.fail(fmt::format("vertex {} has tangent length {}, n.t {} and w {}", v, t.length(), n * t, w));
+            }
+        }
+        checkWeldedOnce(after, report, mesh.name);
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // The corpus, the largest of it 8,385 vertices, through cacheOptimize
+    // with meshoptimizer on the arena: everything from the arena.
+    TEST_CASE("llvolume: cacheOptimize takes nothing from the heap for a face its arena holds", "[llvolume]")
+    {
+        ArenaInstalled installed;
+        std::vector<CorpusMesh> meshes = corpus();
+        meshes.push_back(uvSphere(128, 64));
+        for (const CorpusMesh& mesh : meshes)
+        {
+            LLVolumeFace face = mesh.face();
+            ALScratchArena::resetCounters();
+            REQUIRE(face.cacheOptimize(true));
+            const ALScratchArena::Counters counters = ALScratchArena::counters();
+            INFO(fmt::format("{}: {} blocks from the arena, {} from the heap, {} bytes at most", mesh.name, counters.arena_blocks,
+                             counters.heap_blocks, counters.peak));
+            CHECK(counters.arena_blocks > 0);
+            CHECK(counters.heap_blocks == 0);
+        }
     }
 
     // Today's figures for each class, so that no later change orders a
@@ -2660,10 +3181,17 @@ namespace
             { "cube with split normals", 2.0000, 1.0000 },
             { "strip with mirrored UVs", 0.7361, 1.0122 },
             { "rigged UV sphere", 0.7366, 1.0066 },
+            // Its degenerate triangles' tangents group as the compiler that
+            // built meshoptimizer rounds its tests of them: MSVC's build gives
+            // 0.7763 and 1.0182, GCC's and Clang's on ARM 0.8158 and 1.0207.
             { "grid with degenerate triangles", 0.8158, 1.0207 },
+            { "grid of vertices held twice", 0.7361, 1.0122 },
             { "UV sphere 64 by 32", 0.6557, 1.0005 },
+            { "UV sphere 128 by 64", 0.6425, 1.0001 },
         };
-        for (const CorpusMesh& mesh : corpus())
+        std::vector<CorpusMesh> meshes = corpus();
+        meshes.push_back(uvSphere(128, 64));
+        for (const CorpusMesh& mesh : meshes)
         {
             LLVolumeFace face = mesh.face();
             REQUIRE(face.cacheOptimize(true));
@@ -2824,6 +3352,71 @@ namespace
             CHECK(fabsf(w) == 1.f);
             CHECK(bitangent * dp_dv > 0.f);
         }
+    }
+
+    // The real mesh corpus (almeshcorpus.h), where AL_MESH_CORPUS_DIR names
+    // one: every face of every LOD of the sample through cacheOptimize, with
+    // meshoptimizer on the arena, keeps every triangle and corner and makes
+    // no vertex twice, and nothing it is handed fails but what its guards
+    // refuse, which are counted by what they refused.
+    TEST_CASE("llvolume: cacheOptimize keeps every triangle and corner of the real mesh corpus", "[llvolume][corpus][.]")
+    {
+        std::optional<ALMeshCorpus> real = ALMeshCorpus::fromEnvironment();
+        if (!real)
+        {
+            SKIP("AL_MESH_CORPUS_DIR names no mesh cache");
+        }
+        ArenaInstalled installed;
+        Report report;
+        size_t faces = 0, rigged = 0, past_vertices = 0, no_scale = 0, refused = 0, fatal = 0, over_arena = 0;
+        real->forEachLOD(
+            [&](const CorpusLOD& lod)
+            {
+                for (S32 f = 0; f < lod.volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& before = lod.volume->getVolumeFace(f);
+                    if (before.mNumVertices <= 0 || before.mNumIndices <= 0)
+                    {
+                        continue;
+                    }
+                    ++faces;
+                    rigged += before.mWeights != nullptr;
+                    const std::string where = fmt::format("mesh {} LOD {} face {}", lod.mesh, lod.lod, f);
+                    LLVolumeFace after = before;
+                    ALScratchArena::resetCounters();
+                    bool optimized = false;
+                    try
+                    {
+                        optimized = after.cacheOptimize(true);
+                    }
+                    catch (const ll_test::FatalError& error)
+                    {
+                        ++fatal;
+                        report.fail(fmt::format("{}: {}", where, error.what()));
+                        continue;
+                    }
+                    over_arena += ALScratchArena::counters().heap_blocks > 0;
+                    if (!optimized)
+                    {
+                        const bool past = std::any_of(before.mIndices, before.mIndices + before.mNumIndices,
+                                                      [&](U16 index) { return index >= before.mNumVertices; });
+                        const LLVector3& scale = before.mNormalizedScale;
+                        const bool flat = scale.mV[0] == 0.f || scale.mV[1] == 0.f || scale.mV[2] == 0.f;
+                        ++(past ? past_vertices : (flat ? no_scale : refused));
+                        continue;
+                    }
+                    checkOptimized(before, after, report, where);
+                    checkWeldedOnce(after, report, where);
+                }
+            });
+        INFO(real->describe());
+        INFO(fmt::format("{} faces, {} of them rigged; refused: {} for an index past their vertices, {} for a scale of no size, {} "
+                         "otherwise; {} fatal; {} faces larger than the arena",
+                         faces, rigged, past_vertices, no_scale, refused, fatal, over_arena));
+        INFO(report.text());
+        CHECK(faces > 0);
+        CHECK(refused == 0);
+        CHECK(report.failures == 0);
     }
 
     // ------------------------------------------------------------------
@@ -3209,36 +3802,60 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Lengyel's tangents, which a mesh LOD too large for meshoptimizer's
-    // weld still takes, give a vertex no triangle gives a direction an axis
+    // A card drawn both ways, the one triangle twice sharing two vertices,
+    // its third corner mirrored in U a hair off true, and turned off the
+    // axes: at the shared vertices the two triangles' tangents all but
+    // cancel, and what MikkTSpace's sum leaves of them is rounding, off the
+    // normal's plane. The tangent cacheOptimize keeps is in the plane.
+    TEST_CASE("llvolume: a mesh tangent whose triangles all but cancel lies in its normal's plane", "[llvolume]")
+    {
+        const LLQuaternion turn(0.7f, LLVector3(0.3f, -0.5f, 0.8f));
+        for (F32 hair : { 1e-6f, 3e-6f, 1e-5f, 3e-5f, 1e-4f })
+        {
+            CorpusMesh mesh;
+            for (const LLVector3& corner : { LLVector3(0.f, 0.f, 0.f), LLVector3(1.f, 0.f, 0.f), LLVector3(0.f, 1.f, 0.f), LLVector3(0.f, 0.f, 0.f) })
+            {
+                mesh.positions.push_back(corner * turn);
+                mesh.normals.push_back(LLVector3(0.f, 0.f, 1.f) * turn);
+            }
+            mesh.uvs = { { 0.f, 0.f }, { 1.f, 0.f }, { 0.f, 1.f }, { 2.f, hair } };
+            mesh.indices = { 0, 1, 2, 2, 1, 3 };
+            const LLVolumeFace before = mesh.face();
+            LLVolumeFace after = before;
+            REQUIRE(after.cacheOptimize(true));
+            Report report;
+            checkOptimized(before, after, report, fmt::format("card a hair of {} off its mirror", hair));
+            INFO(report.text());
+            CHECK(report.failures == 0);
+        }
+    }
+
+    // A mesh vertex no triangle gives a tangent direction takes an axis
     // put in the plane of its normal: unit length and orthogonal to it,
     // whichever way the normal points.
-    TEST_CASE("llvolume: Lengyel's tangent with no direction lies in the plane of its normal", "[llvolume]")
+    TEST_CASE("llvolume: a mesh tangent with no direction lies in the plane of its normal", "[llvolume]")
     {
         // Two triangles whose UVs are one point, so that neither gives a
         // tangent, with a normal along each axis and between them.
-        const LLVector3 positions[] = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
-        const LLVector2 uvs[] = { { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f } };
-        const U16 indices[] = { 0, 1, 2, 2, 1, 3 };
         const LLVector3 normals[] = { { 0, 0, 1 }, { 1, 0, 0 }, { 0, 1, 0 }, { 0.6f, 0.f, 0.8f }, { 0.8f, -0.6f, 0.f } };
         for (const LLVector3& normal : normals)
         {
-            LLVector4a positions4[4], normals4[4], tangents[4];
-            for (S32 v = 0; v < 4; ++v)
+            CorpusMesh mesh;
+            mesh.positions = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
+            mesh.normals.assign(4, normal);
+            mesh.uvs.assign(4, LLVector2(0.5f, 0.5f));
+            mesh.indices = { 0, 1, 2, 2, 1, 3 };
+            LLVolumeFace face = mesh.face();
+            REQUIRE(face.cacheOptimize(true));
+            REQUIRE(face.mTangents);
+            for (S32 v = 0; v < face.mNumVertices; ++v)
             {
-                positions4[v].load3(positions[v].mV);
-                normals4[v].load3(normal.mV);
-                tangents[v].clear();
-            }
-            LLCalculateTangentArray(4, positions4, normals4, uvs, 2, indices, tangents);
-            for (S32 v = 0; v < 4; ++v)
-            {
-                const LLVector3 t = v3(tangents[v]);
+                const LLVector3 t = v3(face.mTangents[v]);
                 INFO(fmt::format("normal ({}, {}, {}): vertex {} has the tangent ({}, {}, {}, {})", normal.mV[0], normal.mV[1], normal.mV[2], v,
-                                 t.mV[0], t.mV[1], t.mV[2], tangents[v][3]));
+                                 t.mV[0], t.mV[1], t.mV[2], face.mTangents[v][3]));
                 CHECK(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE);
                 CHECK(fabsf(t * normal) <= 2e-3f);
-                CHECK((tangents[v][3] == 1.f || tangents[v][3] == -1.f));
+                CHECK((face.mTangents[v][3] == 1.f || face.mTangents[v][3] == -1.f));
             }
         }
     }

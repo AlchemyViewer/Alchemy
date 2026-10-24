@@ -101,7 +101,6 @@ al_import(ll::glext        HEADER GL/glcorearb.h)
 al_import(ll::pocketfft    HEADER pocketfft_hdronly.h DEFINES POCKETFFT_NO_MULTITHREADING)
 al_import(ll::tinygltf     HEADER tiny_gltf.h)
 al_import(ll::vhacd        HEADER VHACD.h)
-al_import(ll::mikktspace   INCLUDE ${INDRA_SOURCE_DIR}/externals/mikktspace/)
 
 # Per platform, and per option. The target is empty where the condition is
 # false, so the option gates sources at the consumer and nothing else.

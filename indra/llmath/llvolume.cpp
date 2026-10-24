@@ -49,13 +49,12 @@
 #include "llsdserialize.h"
 #include "llvector4a.h"
 #include "llmatrix4a.h"
+#include "alscratcharena.h"
 #include "alsimdkernels.h"
 #include "llmeshoptimizer.h"
 #include "lltimer.h"
 #include "llvolumeoctree.h"
 #include "workqueue.h"
-
-#include "mikktspace/mikktspace.hh"
 
 #include <meshoptimizer.h>
 
@@ -2563,6 +2562,27 @@ bool LLVolume::unpackVolumeFaces(U8* in_data, S32 size)
 bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+    if (!decodeVolumeFaces(mdl))
+    {
+        return false;
+    }
+
+    if (!cacheOptimize(true))
+    {
+        // Out of memory?
+        LL_WARNS() << "Failed to optimize!" << LL_ENDL;
+        mVolumeFaces.clear();
+        return false;
+    }
+
+    mSculptLevel = 0;  // success!
+
+    return true;
+}
+
+bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
     {
         auto face_count = mdl.size();
 
@@ -2948,16 +2968,6 @@ bool LLVolume::unpackVolumeFacesInternal(const LLSD& mdl)
             }
         }
     }
-
-    if (!cacheOptimize(true))
-    {
-        // Out of memory?
-        LL_WARNS() << "Failed to optimize!" << LL_ENDL;
-        mVolumeFaces.clear();
-        return false;
-    }
-
-    mSculptLevel = 0;  // success!
 
     return true;
 }
@@ -5377,298 +5387,306 @@ public:
     }
 };
 
-// data structures for tangent generation
-
-struct MikktData
+namespace
 {
-    LLVolumeFace* face;
-    std::vector<LLVector3> p;
-    std::vector<LLVector3> n;
-    std::vector<LLVector2> tc;
-    std::vector<LLVector4> w;
-    std::vector<LLVector4> t;
+    LLVector4a plane_axis(const LLVector4a& normal);
 
-    MikktData(LLVolumeFace* f)
-        : face(f)
+    // v at unit length in x, y and z, or nothing where it has no length.
+    LL_FORCE_INLINE void unit3_or_zero(LLVector4a& v)
     {
-        U32 count = face->mNumIndices;
-
-        try
-        {
-            p.resize(count);
-            n.resize(count);
-            tc.resize(count);
-            t.resize(count);
-
-            if (face->mWeights)
-            {
-                w.resize(count);
-            }
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLCoros") << "Bad memory allocation in MikktData, elements count: " << count << LL_ENDL;
-        }
-
-
-        LLVector3 inv_scale(1.f / face->mNormalizedScale.mV[0], 1.f / face->mNormalizedScale.mV[1], 1.f / face->mNormalizedScale.mV[2]);
-
-
-        for (S32 i = 0; i < face->mNumIndices; ++i)
-        {
-            U32 idx = face->mIndices[i];
-
-            p[i].set(face->mPositions[idx].getF32ptr());
-            p[i].scaleVec(face->mNormalizedScale); //put mesh in original coordinate frame when reconstructing tangents
-            n[i].set(face->mNormals[idx].getF32ptr());
-            n[i].scaleVec(inv_scale);
-            n[i].normalize();
-            tc[i].set(face->mTexCoords[idx]);
-
-            if (face->mWeights)
-            {
-                w[i].set(face->mWeights[idx].getF32ptr());
-            }
-        }
+        LLVector4a length2;
+        length2.setAllDot3(v, v);
+        LLVector4a unit = v;
+        unit.normalize3();
+        v.setSelectWithMask(length2.greaterThan(LLVector4a(FLT_MIN)), unit, LLVector4a::getZero());
     }
+} // namespace
 
-    uint32_t GetNumFaces()
-    {
-        return uint32_t(face->mNumIndices / 3);
-    }
-
-    uint32_t GetNumVerticesOfFace(const uint32_t face_num)
-    {
-        return 3;
-    }
-
-    mikk::float3 GetPosition(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* v = p[face_num * 3 + vert_num].mV;
-        return mikk::float3(v);
-    }
-
-    mikk::float3 GetTexCoord(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* uv = tc[face_num * 3 + vert_num].mV;
-        return mikk::float3(uv[0], uv[1], 1.0f);
-    }
-
-    mikk::float3 GetNormal(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* normal = n[face_num * 3 + vert_num].mV;
-        return mikk::float3(normal);
-    }
-
-    void SetTangentSpace(const uint32_t face_num, const uint32_t vert_num, mikk::float3 T, bool orientation)
-    {
-        S32 i = face_num * 3 + vert_num;
-        t[i].set(T.x, T.y, T.z, orientation ? 1.0f : -1.0f);
-    }
-};
-
+// A decoded mesh LOD face made ready to draw: MikkTSpace's tangents, as
+// meshoptimizer's compatible mode computes them, and the vertices and
+// triangles in the order a vertex cache and a fetch take them best.
+//
+// The tangents are taken in the shape the mesh was authored in, its
+// positions scaled back out of the unit cube by mNormalizedScale and its
+// normals by the inverse, and they come back as directions in the face's
+// own frame, which the vertex matrix takes as it takes the positions, each
+// in its normal's plane. A vertex whose corners take different tangents, as
+// on a mirrored UV seam, becomes one vertex for each, and copies of a vertex
+// the same in every attribute become one. Every attribute is written once a
+// vertex, in its final place, from the face's own arrays, and all the
+// scratch is the thread's arena. A face that would need more vertices than
+// 16-bit indices reach keeps one of each vertex it has, each with its first
+// corner's tangent.
 bool LLVolumeFace::cacheOptimize(bool gen_tangents)
-{ //optimize for vertex cache according to Forsyth method:
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
     llassert(!mOptimized);
     mOptimized = true;
 
-    if (gen_tangents && mNormals && mTexCoords)
+    const bool tangents = gen_tangents && mNormals && mTexCoords;
+    if (!mPositions || !mIndices || mNumVertices <= 0 || mNumIndices <= 0)
     {
-        if (!mPositions || !mIndices || mNumVertices <= 0 || mNumIndices <= 0)
+        if (!tangents)
         {
-            LL_WARNS_ONCE("LLVolume") << "Invalid volume face data for tangent generation: "
-                << "mPositions=" << (void*)mPositions
-                << ", mIndices=" << (void*)mIndices
-                << ", mNumVertices=" << mNumVertices
-                << ", mNumIndices=" << mNumIndices << LL_ENDL;
-            return false;
+            // Nothing to order.
+            return true;
         }
-
-        if (mNumIndices % 3 != 0)
-        {
-            LL_WARNS_ONCE("LLVolume") << "Non-triangulated mesh, mNumIndices=" << mNumIndices << LL_ENDL;
-            return false;
-        }
-
-        for (S32 i = 0; i < mNumIndices; ++i)
-        {
-            if (mIndices[i] >= mNumVertices)
-            {
-                LL_WARNS_ONCE("LLVolume") << "Out of bounds index detected: mIndices[" << i << "]="
-                    << mIndices[i] << " >= mNumVertices=" << mNumVertices << LL_ENDL;
-                return false;
-            }
-        }
-
-        if (mNormalizedScale.mV[0] == 0.0f || mNormalizedScale.mV[1] == 0.0f || mNormalizedScale.mV[2] == 0.0f)
-        {
-            LL_WARNS_ONCE("LLVolume") << "Invalid normalized scale: " << mNormalizedScale << LL_ENDL;
-            return false;
-        }
-
-        // generate mikkt space tangents before cache optimizing since the index buffer may change
-        // a bit of a hack to do this here, but this function gets called exactly once for the lifetime of a mesh
-        // and is executed on a background thread
-        MikktData data(this);
-        mikk::Mikktspace ctx(data);
-        try
-        {
-            ctx.genTangSpace();
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLVolume") << "Bad memory allocation in MikktData::genTangSpace" << LL_ENDL;
-        }
-        catch (...)
-        {
-            LL_WARNS_ONCE("LLVolume") << "Mikktspace::genTangSpace() failed" << LL_ENDL;
-            return false;
-        }
-
-
-        //re-weld
-        meshopt_Stream mos[] =
-        {
-            { &data.p[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.n[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &data.t[0], sizeof(LLVector4), sizeof(LLVector4) },
-            { &data.tc[0], sizeof(LLVector2), sizeof(LLVector2) },
-            { data.w.empty() ? nullptr : &data.w[0], sizeof(LLVector4), sizeof(LLVector4) }
-        };
-
-        std::vector<U32> remap;
-        try
-        {
-            remap.resize(data.p.size());
-        }
-        catch (std::bad_alloc&)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLVOLUME") << "Failed to allocate memory for remap: " << (S32)data.p.size() << LL_ENDL;
-        }
-
-        U32 stream_count = data.w.empty() ? 4 : 5;
-
-        S32 vert_count = 0;
-        if (!data.p.empty())
-        {
-            try
-            {
-                // providing mIndices should help avoid unused vertices
-                // but those should have been filtered out on upload
-                vert_count = static_cast<S32>(meshopt_generateVertexRemapMulti(&remap[0], nullptr, data.p.size(), data.p.size(), mos, stream_count));
-            }
-            catch (std::bad_alloc&)
-            {
-                LLError::LLUserWarningMsg::showOutOfMemory();
-                LL_ERRS("LLVolume") << "Failed to allocate memory for VertexRemap: " << (S32)data.p.size() << LL_ENDL;
-            }
-        }
-
-        // Probably should be using meshopt_remapVertexBuffer instead of remaping manually
-        if (vert_count < 65535 && vert_count > 0)
-        {
-            //copy results back into volume
-            resizeVertices(vert_count);
-            if (mNumVertices == 0)
-            {
-                LLError::LLUserWarningMsg::showOutOfMemory();
-                LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << vert_count << ")" << LL_ENDL;
-            }
-
-            if (!data.w.empty())
-            {
-                allocateWeights(vert_count);
-            }
-
-            allocateTangents(mNumVertices);
-
-            for (S32 i = 0; i < mNumIndices; ++i)
-            {
-                U32 src_idx = i;
-                U32 dst_idx = remap[i];
-                if (dst_idx == U32_MAX)
-                {
-                    // Unused indices? Probably need to resize mIndices
-                    dst_idx = mNumVertices - 1;
-                    llassert(false);
-                    LL_DEBUGS_ONCE("LLVOLUME") << "U32_MAX destination index, substituting" << LL_ENDL;
-                }
-                else if (dst_idx >= (U32)mNumVertices)
-                {
-                    dst_idx = mNumVertices - 1;
-                    // Shouldn't happen, figure out what gets returned in remap and why.
-                    llassert(false);
-                    LL_DEBUGS_ONCE("LLVOLUME") << "Invalid destination index, substituting" << LL_ENDL;
-                }
-                if (src_idx >= (U32)data.p.size())
-                {
-                    // data.p.size() is supposed to be equal to mNumIndices
-                    src_idx = (U32)(data.p.size() - 1);
-                    llassert(false);
-                    LL_DEBUGS_ONCE("LLVOLUME") << "Invalid source index, substituting" << LL_ENDL;
-                }
-                mIndices[i] = dst_idx;
-
-                mPositions[dst_idx].load3(data.p[src_idx].mV);
-                mNormals[dst_idx].load3(data.n[src_idx].mV);
-                mTexCoords[dst_idx] = data.tc[src_idx];
-
-                mTangents[dst_idx].loadua(data.t[src_idx].mV);
-
-                if (mWeights)
-                {
-                    mWeights[dst_idx].loadua(data.w[src_idx].mV);
-                }
-            }
-
-            // put back in normalized coordinate frame: tangents lie in the surface and scale as positions do,
-            // normals take the inverse transpose
-            LLVector4a inv_scale(1.f/mNormalizedScale.mV[0], 1.f / mNormalizedScale.mV[1], 1.f / mNormalizedScale.mV[2]);
-            LLVector4a scale;
-            scale.load3(mNormalizedScale.mV);
-            scale.getF32ptr()[3] = 1.f;
-
-            for (S32 i = 0; i < mNumVertices; ++i)
-            {
-                mPositions[i].mul(inv_scale);
-                mNormals[i].mul(scale);
-                mNormals[i].normalize3();
-                F32 w = mTangents[i].getF32ptr()[3];
-                mTangents[i].mul(inv_scale);
-                mTangents[i].normalize3();
-                mTangents[i].getF32ptr()[3] = w;
-            }
-        }
-        else
-        {
-            if (vert_count <= 0)
-            {
-                LL_WARNS_ONCE("LLVOLUME") << "meshopt_generateVertexRemapMulti failed to process a model or model was invalid" << LL_ENDL;
-            }
-            // blew past the max vertex size limit, use legacy tangent generation which never adds verts;
-            // it takes unit normals, as the bump map and planar projection code do
-            for (S32 i = 0; i < mNumVertices; i++)
-            {
-                mNormals[i].normalize3fast();
-            }
-            createTangents();
-        }
+        LL_WARNS_ONCE("LLVolume") << "Invalid volume face data for tangent generation: "
+            << "mPositions=" << (void*)mPositions
+            << ", mIndices=" << (void*)mIndices
+            << ", mNumVertices=" << mNumVertices
+            << ", mNumIndices=" << mNumIndices << LL_ENDL;
+        return false;
     }
 
-    // cache optimize index buffer
+    if (mNumIndices % 3 != 0)
+    {
+        LL_WARNS_ONCE("LLVolume") << "Non-triangulated mesh, mNumIndices=" << mNumIndices << LL_ENDL;
+        return false;
+    }
 
-    // meshopt needs scratch space, do some pointer shuffling to avoid an extra index buffer copy
-    U16* src_indices = mIndices;
-    mIndices = nullptr;
-    resizeIndices(mNumIndices);
+    if (tangents && (mNormalizedScale.mV[0] == 0.0f || mNormalizedScale.mV[1] == 0.0f || mNormalizedScale.mV[2] == 0.0f))
+    {
+        LL_WARNS_ONCE("LLVolume") << "Invalid normalized scale: " << mNormalizedScale << LL_ENDL;
+        return false;
+    }
 
-    meshopt_optimizeVertexCache<U16>(mIndices, src_indices, mNumIndices, mNumVertices);
+    const size_t index_count = mNumIndices;
+    const size_t vertex_count = mNumVertices;
 
-    ll_aligned_free_16(src_indices);
+    try
+    {
+        ALScratchArena::Scope scratch;
+
+        // The indices at 32 bits, as meshoptimizer takes them, checked as
+        // they go.
+        U32* indices = scratch.allocate<U32>(index_count);
+        U32 highest = 0;
+        for (size_t i = 0; i < index_count; ++i)
+        {
+            indices[i] = mIndices[i];
+            highest = llmax(highest, indices[i]);
+        }
+        if (highest >= vertex_count)
+        {
+            const U16* bad = std::find_if(mIndices, mIndices + index_count, [&](U16 index) { return index >= vertex_count; });
+            LL_WARNS_ONCE("LLVolume") << "Out of bounds index detected: mIndices[" << (bad - mIndices) << "]="
+                << *bad << " >= mNumVertices=" << mNumVertices << LL_ENDL;
+            return false;
+        }
+
+        const LLVector4a inv_scale(1.f / mNormalizedScale.mV[0], 1.f / mNormalizedScale.mV[1], 1.f / mNormalizedScale.mV[2], 1.f);
+
+        // Each corner's tangent, four floats a corner.
+        F32* corner_tangents = nullptr;
+        if (tangents)
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - tangents");
+            corner_tangents = scratch.allocate<F32>(index_count * 4);
+
+            const LLVector4a scale(mNormalizedScale.mV[0], mNormalizedScale.mV[1], mNormalizedScale.mV[2], 1.f);
+            LLVector4Logical xyz;
+            xyz.clear();
+            xyz.setElement<0>();
+            xyz.setElement<1>();
+            xyz.setElement<2>();
+
+            ALScratchArena::Scope inputs;
+            LLVector4a* positions = inputs.allocate<LLVector4a>(vertex_count);
+            LLVector4a* normals = inputs.allocate<LLVector4a>(vertex_count);
+            for (size_t v = 0; v < vertex_count; ++v)
+            {
+                positions[v].setMul(mPositions[v], scale);
+                // The face keeps its normals at unit length.
+                LLVector4a normal;
+                normal.setSelectWithMask(xyz, mNormals[v], LLVector4a::getZero());
+                unit3_or_zero(normal);
+                mNormals[v] = normal;
+                normals[v].setMul(normal, inv_scale);
+                unit3_or_zero(normals[v]);
+            }
+            meshopt_generateTangents(corner_tangents, indices, index_count, positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a),
+                                     normals[0].getF32ptr(), sizeof(LLVector4a), mTexCoords[0].mV, sizeof(LLVector2),
+                                     meshopt_TangentCompatible | meshopt_TangentZeroFallback);
+        }
+
+        if (tangents)
+        {
+            // Each corner's tangent as the face keeps it, before the weld
+            // compares them: back in the face's frame, in which a direction
+            // along the surface is the authored one over the scale, put in
+            // its normal's plane and normalized. Where the plane leaves it
+            // nothing, as at a corner of triangles with no area or whose
+            // tangents cancel or run along the normal, it is an axis in the
+            // plane, as the prims' take it. w stays the corner's.
+            for (size_t c = 0; c < index_count; ++c)
+            {
+                F32* stored = corner_tangents + c * 4;
+                const F32 w = stored[3];
+                LLVector4a tangent;
+                tangent.load4a(stored);
+                tangent.mul(inv_scale);
+                const LLVector4a& normal = mNormals[indices[c]];
+                LLVector4a along;
+                along.setAllDot3(normal, tangent);
+                along.mul(normal);
+                LLVector4a in_plane;
+                in_plane.setSub(tangent, along);
+                LLVector4a left, whole;
+                left.setAllDot3(in_plane, in_plane);
+                whole.setAllDot3(tangent, tangent);
+                if (left[0] > 1e-6f * whole[0])
+                {
+                    in_plane.normalize3();
+                }
+                else
+                {
+                    in_plane = plane_axis(normal);
+                }
+                in_plane.getF32ptr()[3] = w;
+                in_plane.store4a(stored);
+            }
+        }
+
+        // The vertices the triangles are to take, and for each the corner
+        // its tangent is taken from. With tangents they are welded from the
+        // corners, one for each of a vertex's tangents, in the order the
+        // corners first use them, or, where that would need more than
+        // 16-bit indices reach, one for each vertex; without, they are the
+        // face's own.
+        const U32* welded_indices = indices;
+        size_t welded_count = vertex_count;
+        U32* first_corner = nullptr;
+        if (tangents)
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - weld");
+
+            // A vertex the face holds more than once, the same in every
+            // attribute, is one vertex: each corner names its vertex by a
+            // number all the copies share.
+            U32* canonical = scratch.allocate<U32>(vertex_count);
+            const meshopt_Stream attributes[] = {
+                { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) },
+                { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) },
+                { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) },
+                { mWeights, sizeof(LLVector4a), sizeof(LLVector4a) },
+            };
+            const size_t distinct = meshopt_generateVertexRemapMulti(canonical, indices, index_count, vertex_count, attributes, mWeights ? 4 : 3);
+            U32* corner_vertices = scratch.allocate<U32>(index_count);
+            for (size_t c = 0; c < index_count; ++c)
+            {
+                corner_vertices[c] = canonical[indices[c]];
+            }
+
+            U32* remap = scratch.allocate<U32>(index_count);
+            const meshopt_Stream streams[] = {
+                { corner_vertices, sizeof(U32), sizeof(U32) },
+                { corner_tangents, sizeof(F32) * 4, sizeof(F32) * 4 },
+            };
+            const size_t unique = meshopt_generateVertexRemapMulti(remap, nullptr, index_count, index_count, streams,
+                                                                   sizeof(streams) / sizeof(streams[0]));
+            if (unique < 65535)
+            {
+                welded_indices = remap;
+                welded_count = unique;
+            }
+            else
+            {
+                welded_indices = corner_vertices;
+                welded_count = distinct;
+            }
+            first_corner = scratch.allocate<U32>(welded_count);
+            for (size_t c = index_count; c-- > 0;)
+            {
+                first_corner[welded_indices[c]] = (U32)c;
+            }
+        }
+
+        U32* ordered = scratch.allocate<U32>(index_count);
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - cache order");
+            meshopt_optimizeVertexCache(ordered, welded_indices, index_count, welded_count);
+        }
+
+        // Each vertex's final place, in the order the reordered triangles
+        // first take it; one no triangle takes has none.
+        U32* place = scratch.allocate<U32>(welded_count);
+        size_t kept = 0;
+        {
+            LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - fetch order");
+            kept = meshopt_optimizeVertexFetchRemap(place, ordered, index_count, welded_count);
+        }
+
+        LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - write");
+        LLVector4a* old_positions = mPositions;
+        const LLVector4a* old_normals = mNormals;
+        const LLVector2* old_tex_coords = mTexCoords;
+        LLVector4a* old_weights = mWeights;
+        LLVector4a* old_tangents = tangents ? nullptr : mTangents;
+        mPositions = nullptr;
+        mWeights = nullptr;
+        if (old_tangents)
+        {
+            mTangents = nullptr;
+        }
+
+        resizeVertices((S32)kept);
+        if (!mPositions)
+        {
+            LLError::LLUserWarningMsg::showOutOfMemory();
+            LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << kept << ")" << LL_ENDL;
+        }
+        if (old_weights)
+        {
+            allocateWeights((S32)kept);
+        }
+        if (tangents || old_tangents)
+        {
+            allocateTangents((S32)kept);
+        }
+
+        for (size_t u = 0; u < welded_count; ++u)
+        {
+            const U32 to = place[u];
+            if (to == U32_MAX)
+            {
+                continue;
+            }
+            const U32 corner = first_corner ? first_corner[u] : U32_MAX;
+            const U32 from = first_corner ? indices[corner] : (U32)u;
+
+            mPositions[to] = old_positions[from];
+            mNormals[to] = old_normals[from];
+            mTexCoords[to] = old_tex_coords[from];
+            if (old_weights)
+            {
+                mWeights[to] = old_weights[from];
+            }
+
+            if (tangents)
+            {
+                mTangents[to].load4a(corner_tangents + (size_t)corner * 4);
+            }
+            else if (old_tangents)
+            {
+                mTangents[to] = old_tangents[from];
+            }
+        }
+
+        for (size_t i = 0; i < index_count; ++i)
+        {
+            mIndices[i] = (U16)place[ordered[i]];
+        }
+
+        ll_aligned_free<64>(old_positions);
+        ll_aligned_free_16(old_weights);
+        ll_aligned_free_16(old_tangents);
+    }
+    catch (std::bad_alloc&)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLVolume") << "Bad memory allocation in cacheOptimize, " << vertex_count << " vertices, " << index_count << " indices" << LL_ENDL;
+    }
 
     return true;
 }
@@ -6846,22 +6864,7 @@ void LLVolumeFace::createTangents()
         }
         mTangentsStale = false;
 
-        if (mOptimized)
-        {
-            // A face cacheOptimize has taken is a mesh LOD's, too large
-            // for its weld or not welded at all: Lengyel's tangents, which
-            // add no vertices.
-            LLVector4a* ptr = (LLVector4a*)mTangents;
-
-            LLVector4a* end = mTangents + mNumVertices;
-            while (ptr < end)
-            {
-                (*ptr++).clear();
-            }
-
-            LLCalculateTangentArray(mNumVertices, mPositions, mNormals, mTexCoords, mNumIndices / 3, mIndices, mTangents);
-        }
-        else if (mFlexible && (mTypeMask & CAP_MASK))
+        if (mFlexible && (mTypeMask & CAP_MASK))
         {
             LLVector4a tangent;
             tangent.loadua(mCapTangent);
@@ -7494,113 +7497,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     normalize_grid_normals(norm, mNumS, mNumT);
 
     return true;
-}
-
-//adapted from Lengyel, Eric. "Computing Tangent Space Basis Vectors for an Arbitrary Mesh". Terathon Software 3D Graphics Library, 2001. http://www.terathon.com/code/tangent.html
-void LLCalculateTangentArray(U32 vertexCount, const LLVector4a *vertex, const LLVector4a *normal,
-        const LLVector2 *texcoord, U32 triangleCount, const U16* index_array, LLVector4a *tangent)
-{
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
-
-    //LLVector4a *tan1 = new LLVector4a[vertexCount * 2];
-    LLVector4a* tan1 = (LLVector4a*) ll_aligned_malloc_16(vertexCount*2*sizeof(LLVector4a));
-    // new(tan1) LLVector4a;
-
-    LLVector4a* tan2 = tan1 + vertexCount;
-
-    U32 count = vertexCount * 2;
-    for (U32 i = 0; i < count; i++)
-    {
-        tan1[i].clear();
-    }
-
-    for (U32 a = 0; a < triangleCount; a++)
-    {
-        U32 i1 = *index_array++;
-        U32 i2 = *index_array++;
-        U32 i3 = *index_array++;
-
-        const LLVector4a& v1 = vertex[i1];
-        const LLVector4a& v2 = vertex[i2];
-        const LLVector4a& v3 = vertex[i3];
-
-        const LLVector2& w1 = texcoord[i1];
-        const LLVector2& w2 = texcoord[i2];
-        const LLVector2& w3 = texcoord[i3];
-
-        const F32* v1ptr = v1.getF32ptr();
-        const F32* v2ptr = v2.getF32ptr();
-        const F32* v3ptr = v3.getF32ptr();
-
-        float x1 = v2ptr[0] - v1ptr[0];
-        float x2 = v3ptr[0] - v1ptr[0];
-        float y1 = v2ptr[1] - v1ptr[1];
-        float y2 = v3ptr[1] - v1ptr[1];
-        float z1 = v2ptr[2] - v1ptr[2];
-        float z2 = v3ptr[2] - v1ptr[2];
-
-        float s1 = w2.mV[0] - w1.mV[0];
-        float s2 = w3.mV[0] - w1.mV[0];
-        float t1 = w2.mV[1] - w1.mV[1];
-        float t2 = w3.mV[1] - w1.mV[1];
-
-        F32 rd = s1*t2-s2*t1;
-
-        float r = ((rd*rd) > FLT_EPSILON) ? (1.0f / rd)
-                                                     : ((rd > 0.0f) ? 1024.f : -1024.f); //some made up large ratio for division by zero
-
-        llassert(llfinite(r));
-        llassert(!llisnan(r));
-
-        LLVector4a sdir((t2 * x1 - t1 * x2) * r, (t2 * y1 - t1 * y2) * r,
-                (t2 * z1 - t1 * z2) * r);
-        LLVector4a tdir((s1 * x2 - s2 * x1) * r, (s1 * y2 - s2 * y1) * r,
-                (s1 * z2 - s2 * z1) * r);
-
-        tan1[i1].add(sdir);
-        tan1[i2].add(sdir);
-        tan1[i3].add(sdir);
-
-        tan2[i1].add(tdir);
-        tan2[i2].add(tdir);
-        tan2[i3].add(tdir);
-    }
-
-    for (U32 a = 0; a < vertexCount; a++)
-    {
-        LLVector4a n = normal[a];
-
-        const LLVector4a& t = tan1[a];
-
-        LLVector4a ncrosst;
-        ncrosst.setCross3(n,t);
-
-        // Gram-Schmidt orthogonalize
-        n.mul(n.dot3(t).getF32());
-
-        LLVector4a tsubn;
-        tsubn.setSub(t,n);
-
-        if (tsubn.dot3(tsubn).getF32() > F_APPROXIMATELY_ZERO)
-        {
-            tsubn.normalize3fast();
-
-            // Calculate handedness
-            F32 handedness = ncrosst.dot3(tan2[a]).getF32() < 0.f ? -1.f : 1.f;
-
-            tsubn.getF32ptr()[3] = handedness;
-
-            tangent[a] = tsubn;
-        }
-        else
-        {
-            // Nothing gives the tangent a direction: an axis in the plane
-            // of the normal, as the prims' tangents take it.
-            tangent[a] = plane_axis(normal[a]);
-        }
-    }
-
-    ll_aligned_free_16(tan1);
 }
 
 
