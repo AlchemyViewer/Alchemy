@@ -2289,6 +2289,17 @@
             <key>Value</key>
             <integer>3</integer>
         </map>
+        <key>AlchemyObjectCreationTime</key>
+        <map>
+            <key>Comment</key>
+            <string>The most milliseconds a frame spends making objects from the regions' object caches, every region's together, past the first few (NewObjectCreationThrottle still caps each region's count). A camera moving fast into a crowd of cached objects would otherwise make the count's worth in one frame and build their geometry in the next; under the limit they come in over a few frames instead. Not while the login or teleport screen is up, nor for NewObjectCreationThrottleDelayTime after. 0 for no limit but the count. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
         <key>AlchemyRenderFrameStamps</key>
         <map>
             <key>Comment</key>
