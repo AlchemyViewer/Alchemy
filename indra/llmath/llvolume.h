@@ -721,6 +721,17 @@ public:
         bool      mCap;
         bool      mFlat;
         LLFaceID  mFaceID;
+        // A flat hole's corners, where its side folds: of its points between
+        // its two ends, mFirstCorner and every mCornerStep-th after it. The
+        // rest are split points, on the straight edge between two corners.
+        // A step of 0 marks none.
+        S32       mFirstCorner = 0;
+        S32       mCornerStep = 0;
+
+        bool isCorner(S32 point) const
+        {
+            return mCornerStep > 0 && point > 0 && point + 1 < mCount && point >= mFirstCorner && (point - mFirstCorner) % mCornerStep == 0;
+        }
     };
 
     LLAlignedArray<LLVector4a, 64> mProfile;
@@ -736,7 +747,9 @@ protected:
     ~LLProfile();
 
     static S32 getNumNGonPoints(const LLProfileParams& params, S32 sides, F32 offset=0.0f, F32 bevel = 0.0f, F32 ang_scale = 1.f, S32 split = 0);
-    void genNGon(const LLProfileParams& params, S32 sides, F32 offset=0.0f, F32 bevel = 0.0f, F32 ang_scale = 1.f, S32 split = 0);
+    // Returns whether it began with the point of the begin cut, which it
+    // leaves out where the cut falls just short of a step.
+    bool genNGon(const LLProfileParams& params, S32 sides, F32 offset=0.0f, F32 bevel = 0.0f, F32 ang_scale = 1.f, S32 split = 0);
 
     Face* addHole(const LLProfileParams& params, bool flat, F32 sides, F32 offset, F32 box_hollow, F32 ang_scale, S32 split = 0);
     Face* addCap (S16 faceID);

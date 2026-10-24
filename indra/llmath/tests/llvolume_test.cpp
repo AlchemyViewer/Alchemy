@@ -151,8 +151,8 @@ namespace
         return face.mTypeMask & LLVolumeFace::CAP_MASK;
     }
 
-    // A flat inner side copies every profile point, so that each is a hard
-    // edge: the quad between a point and its copy has no width.
+    // A flat inner side copies each of its hole's corners, so that each is a
+    // hard edge: the quad between a corner and its copy has no width.
     bool isDoubled(const LLVolumeFace& face)
     {
         return (face.mTypeMask & LLVolumeFace::INNER_MASK) && (face.mTypeMask & LLVolumeFace::FLAT_MASK) && face.mNumS > 2;
@@ -666,10 +666,43 @@ namespace
             if (face.mNumVertices != face.mNumS * face.mNumT)
             {
                 fail(fmt::format("{} vertices for a grid of {} by {}", face.mNumVertices, face.mNumS, face.mNumT));
+                return true;
             }
-            if (face.mNumIndices != (face.mNumS - 1) * (face.mNumT - 1) * 6)
+            // Each triangle is one of the grid's, bottom left, top right,
+            // top left or bottom left, bottom right, top right, a quad, and
+            // none twice; a triangle of the grid's left out has no area.
+            std::map<std::array<U32, 3>, bool> grid;
+            for (S32 t = 0; t + 1 < face.mNumT; ++t)
             {
-                fail(fmt::format("{} indices for a grid of {} by {}", face.mNumIndices, face.mNumS, face.mNumT));
+                for (S32 s = 0; s + 1 < face.mNumS; ++s)
+                {
+                    const U32 bl = gridIndex(face, s, t), br = bl + 1, tl = gridIndex(face, s, t + 1), tr = tl + 1;
+                    grid[{ bl, tr, tl }] = false;
+                    grid[{ bl, br, tr }] = false;
+                }
+            }
+            for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+            {
+                const auto found = grid.find({ face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2] });
+                if (found == grid.end() || found->second)
+                {
+                    fail(fmt::format("triangle {} ({}, {}, {}) is {} of the grid's", i / 3, face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2],
+                                     found == grid.end() ? "none" : "a second"));
+                    return true;
+                }
+                found->second = true;
+            }
+            for (const auto& [corners, used] : grid)
+            {
+                const LLVector3 a = v3(face.mPositions[corners[0]]);
+                const LLVector3 b = v3(face.mPositions[corners[1]]);
+                const LLVector3 c = v3(face.mPositions[corners[2]]);
+                const F32 scale = (b - a).lengthSquared() + (c - a).lengthSquared() + (c - b).lengthSquared();
+                if (!used && ((b - a) % (c - a)).length() > 1e-5f * scale)
+                {
+                    fail(fmt::format("the grid's triangle ({}, {}, {}), which has area, is left out", corners[0], corners[1], corners[2]));
+                    return true;
+                }
             }
         }
         return true;
@@ -928,10 +961,22 @@ namespace
                 incident[groups[v]].push_back((U32)t);
             }
         }
+        // The oracle gives a normal only to a vertex a triangle uses: of the
+        // vertices at a point the parameters collapse, as an apex's or a
+        // pole's, the triangles of no area are left out, and some vertices
+        // with them.
+        std::vector<bool> used(face.mNumVertices, false);
+        for (const Triangle& tri : triangles)
+        {
+            for (U32 v : tri.v)
+            {
+                used[v] = true;
+            }
+        }
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const std::vector<U32>& around = incident[groups[v]];
-            if (around.empty() || std::any_of(around.begin(), around.end(), [&](U32 t) { return triangles[t].degenerate; }))
+            if (!used[v] || around.empty() || std::any_of(around.begin(), around.end(), [&](U32 t) { return triangles[t].degenerate; }))
             {
                 continue;
             }
@@ -1001,17 +1046,27 @@ namespace
         }
     }
 
-    // A flat inner side is hard at every point. Its columns run p0, then
-    // each later point twice, then p0 again (or the last point, where the
-    // profile is cut), so the quads after even columns are the real ones
-    // and the quads after odd columns have no width: a vertex takes its
-    // normal from the one strip of real quads beside it, up and down the
-    // path, and from no other strip at its point. A vertex in no triangle
-    // with area, as the copies that close the side or an apex's copies,
-    // is beside no strip.
-    S32 stripOf(S32 column)
+    // A flat inner side is hard at every corner. Its columns run along its
+    // points, each corner twice, the copy one place with the corner in every
+    // row and with its UVs: the quad between them has no width. Each run of
+    // columns between copies is a strip, a facet along the path, and a
+    // vertex takes its normal from the triangles of its own strip at its
+    // point, and from no other strip there. A vertex in no triangle with
+    // area, as an apex's, is in no strip.
+    std::vector<S32> stripsOf(const LLVolumeFace& face)
     {
-        return column % 2 == 0 ? column : column - 1;
+        std::vector<S32> strip(face.mNumS, 0);
+        for (S32 s = 1; s < face.mNumS; ++s)
+        {
+            bool copy = true;
+            for (S32 t = 0; t < face.mNumT && copy; ++t)
+            {
+                copy = bitsOf(face.mPositions[gridIndex(face, s, t)]) == bitsOf(face.mPositions[gridIndex(face, s - 1, t)]) &&
+                       face.mTexCoords[gridIndex(face, s, t)] == face.mTexCoords[gridIndex(face, s - 1, t)];
+            }
+            strip[s] = strip[s - 1] + (copy ? 1 : 0);
+        }
+        return strip;
     }
 
     void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
@@ -1023,6 +1078,7 @@ namespace
         }
         const std::vector<bool> lone = loneVertices(face, triangles);
         const std::vector<U32> groups = weldGroups(face);
+        const std::vector<S32> strips = stripsOf(face);
         std::map<std::pair<U32, S32>, std::vector<U32>> in_strip;
         for (size_t t = 0; t < triangles.size(); ++t)
         {
@@ -1030,14 +1086,14 @@ namespace
             {
                 continue;
             }
-            S32 strip = face.mNumS;
+            S32 column = face.mNumS;
             for (U32 v : triangles[t].v)
             {
-                strip = llmin(strip, (S32)(v % face.mNumS));
+                column = llmin(column, (S32)(v % face.mNumS));
             }
             for (U32 v : triangles[t].v)
             {
-                in_strip[{ groups[v], strip }].push_back((U32)t);
+                in_strip[{ groups[v], strips[column] }].push_back((U32)t);
             }
         }
         for (S32 v = 0; v < face.mNumVertices; ++v)
@@ -1047,7 +1103,7 @@ namespace
             {
                 continue;
             }
-            const auto found = in_strip.find({ groups[v], stripOf(column) });
+            const auto found = in_strip.find({ groups[v], strips[column] });
             if (found == in_strip.end())
             {
                 continue;
@@ -2559,9 +2615,9 @@ namespace
         // Vertices transformed a triangle with a 16-entry FIFO cache, and
         // bytes fetched over the buffer's, per LOD.
         const Bound bounds[] = {
-            { "box", { 2.0000, 2.0000, 1.1250, 0.8889 }, { 1.2000, 1.2000, 1.0667, 1.0000 } },
-            { "cylinder", { 1.2500, 1.1667, 1.0889, 1.0625 }, { 1.0133, 1.0286, 1.0146, 1.0211 } },
-            { "sphere", { 0.7778, 0.6944, 0.6429, 1.0833 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
+            { "box", { 2.0000, 2.0000, 2.0000, 2.0000 }, { 1.2000, 1.2000, 1.2000, 1.2000 } },
+            { "cylinder", { 1.2500, 1.1667, 1.1000, 1.0833 }, { 1.0133, 1.0286, 1.0182, 1.0353 } },
+            { "sphere", { 1.0833, 0.8889, 0.7000, 1.0909 }, { 1.0286, 1.0240, 1.0000, 1.0043 } },
             { "torus", { 0.6806, 1.1111, 1.0667, 1.0417 }, { 1.0122, 1.0080, 1.0000, 1.0010 } },
             { "sculpt sphere", { 0.6806, 1.1250, 1.0625, 1.0312 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
             { "sculpt plane", { 0.6806, 1.1250, 1.0625, 1.0312 }, { 1.0122, 1.0074, 1.0021, 1.0006 } },
@@ -3527,6 +3583,441 @@ namespace
             inspect(*empty, fmt::format("empty placeholder at LOD {}", lod), how, report);
         }
         INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // ------------------------------------------------------------------
+    // Vertex and triangle counts
+
+    struct Counts
+    {
+        S32 vertices = 0;
+        S32 triangles = 0;
+
+        bool operator==(const Counts& other) const { return vertices == other.vertices && triangles == other.triangles; }
+    };
+
+    Counts countsOf(const LLVolume& volume)
+    {
+        Counts counts;
+        counts.triangles = volume.getNumTriangles(&counts.vertices);
+        return counts;
+    }
+
+    struct ExpectedCounts
+    {
+        Shape shape;
+        Counts lods[LOD_COUNT];
+    };
+
+    void checkCounts(const ExpectedCounts& expected)
+    {
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            LLPointer<LLVolume> volume = build(expected.shape, lod);
+            const Counts counts = countsOf(*volume);
+            INFO(fmt::format("{}: {} vertices and {} triangles, where {} and {} are expected", lodName(expected.shape, lod), counts.vertices,
+                             counts.triangles, expected.lods[lod].vertices, expected.lods[lod].triangles));
+            CHECK(counts == expected.lods[lod]);
+        }
+    }
+
+    // A straight path that neither twists nor tapers sweeps every profile
+    // edge into a parallelogram, which two triangles map exactly: a flat
+    // side is one quad, an uncut box's cap is one, and the path has its two
+    // ends alone. A path that twists or tapers, a circle and a flexible path
+    // keep the points they lay out.
+    TEST_CASE("llvolume: a straight path that neither twists nor tapers is one quad a profile edge", "[llvolume]")
+    {
+        Shape twisted = box();
+        twisted.name = "twisted box";
+        twisted.twist_begin = -0.5f;
+        twisted.twist_end = 0.5f;
+        Shape tapered = cylinder();
+        tapered.name = "tapered cylinder";
+        tapered.scale_x = tapered.scale_y = 0.5f;
+        const ExpectedCounts table[] = {
+            { box(), { { 24, 12 }, { 24, 12 }, { 24, 12 }, { 24, 12 } } },
+            { cylinder(), { { 30, 24 }, { 42, 36 }, { 66, 60 }, { 102, 96 } } },
+            { twisted, { { 32, 20 }, { 48, 36 }, { 126, 144 }, { 256, 348 } } },
+            { tapered, { { 30, 24 }, { 42, 36 }, { 82, 90 }, { 152, 192 } } },
+            { torus(), { { 49, 72 }, { 100, 162 }, { 256, 450 }, { 625, 1152 } } },
+        };
+        for (const ExpectedCounts& expected : table)
+        {
+            checkCounts(expected);
+        }
+
+        Report report;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.path != LL_PCODE_PATH_LINE || s.twist_begin != s.twist_end || s.scale_x != 1.f || s.scale_y != 1.f)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                const std::string name = lodName(s, lod);
+                if (volume->getPath().getPathLength() != 2)
+                {
+                    report.fail(fmt::format("{}: {} path points", name, volume->getPath().getPathLength()));
+                    continue;
+                }
+                // A hole drawn in to its wall is not straight between its
+                // corners, and keeps its split points; its outer sides
+                // keep theirs with it.
+                const bool drawn_in = volume->getProfile().holeTouchesWall();
+                for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(i);
+                    const LLProfile::Face& outline = volume->getProfile().mFaces[i];
+                    const bool flat_outer = (face.mTypeMask & LLVolumeFace::OUTER_MASK) && (face.mTypeMask & LLVolumeFace::FLAT_MASK);
+                    if (flat_outer && !drawn_in && outline.mCount != 2)
+                    {
+                        report.fail(fmt::format("{}: {} has {} profile points", name, faceName(face), outline.mCount));
+                    }
+                    if (isCap(face) && !(face.mTypeMask & (LLVolumeFace::HOLLOW_MASK | LLVolumeFace::OPEN_MASK)) && s.profile == LL_PCODE_PROFILE_SQUARE &&
+                        s.path_begin == 0.f && s.path_end == 1.f && face.mNumVertices != 4)
+                    {
+                        report.fail(fmt::format("{}: {} has {} vertices", name, faceName(face), face.mNumVertices));
+                    }
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+
+        // A square hole in a cylinder: its corners alone where it stays clear
+        // of the wall, and every split point where it is drawn in to it.
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            const S32 split = (S32)(LOD_DETAIL[lod] * 0.66f);
+            for (F32 hollow : { 0.5f, 0.85f })
+            {
+                Shape s = cylinder();
+                s.hole = LL_PCODE_HOLE_SQUARE;
+                s.hollow = hollow;
+                s.name = fmt::format("cylinder with a square hole at {}", hollow);
+                LLPointer<LLVolume> volume = build(s, lod);
+                const LLProfile& outline = volume->getProfile();
+                const S32 hole = outline.getTotal() - outline.getTotalOut();
+                INFO(fmt::format("{}: {} hole points", lodName(s, lod), hole));
+                CHECK(outline.holeTouchesWall() == (hollow > 0.75f));
+                CHECK(hole == (outline.holeTouchesWall() ? 4 * (split + 1) + 1 : 5));
+                CHECK(volume->getPath().getPathLength() == 2);
+            }
+        }
+    }
+
+
+    // A flat inner side's columns, against its hole's points: a column for
+    // each, and a copy after each corner, a point where the hole turns, or
+    // after every point between the ends where the hole is drawn in to its
+    // wall; no copy of an end or of a split point; and no triangle in the
+    // quad between a corner and its copy.
+    void checkCorners(const LLVolume& volume, const std::string& name, Report& report)
+    {
+        const LLProfile& outline = volume.getProfile();
+        for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = volume.getVolumeFace(i);
+            if (!isDoubled(face) || !isGrid(face))
+            {
+                continue;
+            }
+            const std::string where = fmt::format("{}: {}", name, faceName(face));
+            const S32 points = outline.mFaces[i].mCount;
+            const std::vector<S32> strips = stripsOf(face);
+            std::vector<S32> copies(points, 0);
+            S32 point = 0;
+            for (S32 s = 1; s < face.mNumS; ++s)
+            {
+                if (strips[s] != strips[s - 1])
+                {
+                    ++copies[point];
+                }
+                else
+                {
+                    ++point;
+                }
+            }
+            if (point != points - 1)
+            {
+                report.fail(fmt::format("{}: {} columns for {} points", where, face.mNumS, points));
+                continue;
+            }
+            for (S32 k = 0; k < points; ++k)
+            {
+                bool corner = false;
+                if (k > 0 && k + 1 < points)
+                {
+                    const LLVector4a& a = outline.mProfile[face.mBeginS + k - 1];
+                    const LLVector4a& b = outline.mProfile[face.mBeginS + k];
+                    const LLVector4a& c = outline.mProfile[face.mBeginS + k + 1];
+                    const F32 e1x = b[0] - a[0], e1y = b[1] - a[1], e2x = c[0] - b[0], e2y = c[1] - b[1];
+                    corner = fabsf(e1x * e2y - e1y * e2x) > 1e-4f * sqrtf((e1x * e1x + e1y * e1y) * (e2x * e2x + e2y * e2y)) || outline.holeTouchesWall();
+                }
+                if (copies[k] != (corner ? 1 : 0))
+                {
+                    report.fail(fmt::format("{}: point {} of {}, {}, has {} copies", where, k, points, corner ? "a corner" : "no corner", copies[k]));
+                    break;
+                }
+            }
+            for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+            {
+                S32 low = face.mNumS, high = 0;
+                for (S32 k = 0; k < 3; ++k)
+                {
+                    low = llmin(low, (S32)(face.mIndices[t + k] % face.mNumS));
+                    high = llmax(high, (S32)(face.mIndices[t + k] % face.mNumS));
+                }
+                if (strips[low] != strips[high])
+                {
+                    report.fail(fmt::format("{}: triangle {} spans a corner and its copy", where, t / 3));
+                    break;
+                }
+            }
+        }
+    }
+
+    // A flat inner side copies its hole's corners, where its normals turn,
+    // and no point between them, so that it is smooth from corner to corner
+    // as an outer side is; it has no triangles between a corner and its
+    // copy. A hollow box's inner side is one quad a side of its hole.
+    TEST_CASE("llvolume: a flat inner side copies its corners and nothing else", "[llvolume]")
+    {
+        Shape hollow_box = box();
+        hollow_box.name = "hollow box";
+        hollow_box.hole = LL_PCODE_HOLE_SQUARE;
+        hollow_box.hollow = 0.5f;
+        Shape hollow_prism = prism();
+        hollow_prism.name = "hollow prism";
+        hollow_prism.hollow = 0.5f;
+        Shape twisted = hollow_box;
+        twisted.name = "twisted hollow box";
+        twisted.twist_begin = -0.5f;
+        twisted.twist_end = 0.5f;
+        Shape tube_hole = tube();
+        tube_hole.name = "tube with a square hole";
+        tube_hole.hole = LL_PCODE_HOLE_SQUARE;
+        tube_hole.hollow = 0.5f;
+        checkCounts({ hollow_box, { { 52, 32 }, { 52, 32 }, { 52, 32 }, { 52, 32 } } });
+        checkCounts({ hollow_prism, { { 40, 24 }, { 40, 24 }, { 40, 24 }, { 40, 24 } } });
+        checkCounts({ twisted, { { 68, 48 }, { 100, 80 }, { 252, 288 }, { 500, 672 } } });
+        checkCounts({ tube_hole, { { 112, 96 }, { 160, 144 }, { 384, 480 }, { 800, 1152 } } });
+
+        // A flexible hollow box, as a frame lays it out: its path's sections
+        // keep their split points, and its inner side copies only corners.
+        struct Flexi
+        {
+            S32 sections;
+            S32 lod;
+            Counts counts;
+        };
+        for (const Flexi& expected : { Flexi{ 4, 1, { 100, 80 } }, Flexi{ 4, 3, { 212, 240 } }, Flexi{ 16, 1, { 292, 272 } }, Flexi{ 16, 3, { 596, 816 } } })
+        {
+            LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SQUARE, 0.5f, expected.lod);
+            bendPath(*volume, expected.sections, 1.1f);
+            volume->regen();
+            const Counts counts = countsOf(*volume);
+            INFO(fmt::format("flexible hollow box, {} sections, LOD {}: {} vertices and {} triangles, where {} and {} are expected", expected.sections,
+                             expected.lod, counts.vertices, counts.triangles, expected.counts.vertices, expected.counts.triangles));
+            CHECK(counts == expected.counts);
+        }
+
+        Report report;
+        S32 volumes = 0;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.hole != LL_PCODE_HOLE_SQUARE && s.hole != LL_PCODE_HOLE_TRIANGLE && !(s.hole == LL_PCODE_HOLE_SAME && s.profile != LL_PCODE_PROFILE_CIRCLE &&
+                                                                                     s.profile != LL_PCODE_PROFILE_CIRCLE_HALF))
+            {
+                continue;
+            }
+            if (s.hollow <= 0.f)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                checkCorners(*volume, lodName(s, lod), report);
+                ++volumes;
+            }
+        }
+        for (S32 sections : { 4, 16 })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SQUARE, 0.5f, lod);
+                bendPath(*volume, sections, 1.1f);
+                volume->regen();
+                checkCorners(*volume, fmt::format("flexible hollow box, {} sections, LOD {}", sections, lod), report);
+            }
+        }
+        // A hollow sphere's flat inner side runs from pole to pole, a cone
+        // at each: both its ends take the normals the strips they end give
+        // them, not the axis.
+        for (U8 hole : { LL_PCODE_HOLE_SQUARE, LL_PCODE_HOLE_TRIANGLE })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                Shape s = sphere();
+                s.hole = hole;
+                s.hollow = 0.75f;
+                s.name = hole == LL_PCODE_HOLE_SQUARE ? "sphere with a square hole" : "sphere with a triangle hole";
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(i);
+                    if (!isDoubled(face) || !isGrid(face))
+                    {
+                        continue;
+                    }
+                    for (S32 column : { 0, face.mNumS - 1 })
+                    {
+                        for (S32 t = 0; t < face.mNumT; ++t)
+                        {
+                            const LLVector3 n = v3(face.mNormals[gridIndex(face, column, t)]);
+                            if (degreesBetween(n, LLVector3(1.f, 0.f, 0.f)) < 1.f || degreesBetween(n, LLVector3(-1.f, 0.f, 0.f)) < 1.f)
+                            {
+                                report.fail(fmt::format("{}: {} column {} row {} takes the axis", lodName(s, lod), faceName(face), column, t));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        INFO(fmt::format("{} volumes", volumes));
+        INFO(report.text());
+        CHECK(volumes > 0);
+        CHECK(report.failures == 0);
+    }
+
+
+    // A shared volume's faces against its unique twin's: the same vertices,
+    // and the same triangles but for some of no area, which it leaves out.
+    // Returns how many it left out.
+    S32 checkAgainstUnique(const Shape& s, S32 lod, Report& report)
+    {
+        LLPointer<LLVolume> shared = build(s, lod);
+        LLPointer<LLVolume> unique = build(s, lod, true);
+        const std::string name = lodName(s, lod);
+        if (shared->getNumVolumeFaces() != unique->getNumVolumeFaces())
+        {
+            report.fail(fmt::format("{}: {} faces against {}", name, shared->getNumVolumeFaces(), unique->getNumVolumeFaces()));
+            return 0;
+        }
+        S32 left_out = 0;
+        for (S32 i = 0; i < shared->getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& a = shared->getVolumeFace(i);
+            const LLVolumeFace& b = unique->getVolumeFace(i);
+            const std::string where = fmt::format("{}: {}", name, faceName(a));
+            if (a.mNumVertices != b.mNumVertices || std::memcmp(a.mPositions, b.mPositions, sizeof(LLVector4a) * a.mNumVertices) != 0 ||
+                std::memcmp(a.mTexCoords, b.mTexCoords, sizeof(LLVector2) * a.mNumVertices) != 0)
+            {
+                report.fail(fmt::format("{}: its vertices are not its unique twin's", where));
+                continue;
+            }
+            std::map<std::array<U16, 3>, S32> kept;
+            for (S32 k = 0; k + 2 < a.mNumIndices; k += 3)
+            {
+                ++kept[{ a.mIndices[k], a.mIndices[k + 1], a.mIndices[k + 2] }];
+            }
+            const std::vector<Triangle> triangles = trianglesOf(b);
+            for (const Triangle& tri : triangles)
+            {
+                const auto found = kept.find({ (U16)tri.v[0], (U16)tri.v[1], (U16)tri.v[2] });
+                if (found != kept.end() && found->second > 0)
+                {
+                    --found->second;
+                    continue;
+                }
+                ++left_out;
+                if (!tri.degenerate)
+                {
+                    report.fail(fmt::format("{}: triangle ({}, {}, {}), which has area, is left out", where, tri.v[0], tri.v[1], tri.v[2]));
+                    return left_out;
+                }
+            }
+            // Every triangle it kept is one of the twin's.
+            for (const auto& [corners, count] : kept)
+            {
+                if (count != 0)
+                {
+                    report.fail(fmt::format("{}: triangle ({}, {}, {}) is not its unique twin's", where, corners[0], corners[1], corners[2]));
+                    return left_out;
+                }
+            }
+        }
+        return left_out;
+    }
+
+    // On a shared volume, a row or column its parameters take to one point,
+    // the apex of a taper to a point or a sphere's pole, has no triangles:
+    // those with two corners there have no area. It keeps its vertices,
+    // each with its own UV and normal. The parameters decide it, so a
+    // unique volume, whose path a rebuild may move, keeps every triangle,
+    // and so does a sphere whose twist turns its poles off the axis.
+    TEST_CASE("llvolume: a shared volume has no triangles where its parameters collapse a row or column", "[llvolume]")
+    {
+        Shape pyramid = box();
+        pyramid.name = "pyramid";
+        pyramid.scale_x = pyramid.scale_y = 0.f;
+        Shape inverted = box();
+        inverted.name = "box tapered to a point at its base";
+        inverted.scale_x = inverted.scale_y = 2.f;
+        Shape cone = cylinder();
+        cone.name = "cone";
+        cone.scale_x = cone.scale_y = 0.f;
+        Shape half_turned = sphere();
+        half_turned.name = "sphere turned half a turn";
+        half_turned.twist_begin = half_turned.twist_end = 0.5f;
+        checkCounts({ sphere(), { { 28, 24 }, { 50, 54 }, { 128, 180 }, { 325, 528 } } });
+        checkCounts({ half_turned, { { 28, 24 }, { 50, 54 }, { 128, 180 }, { 325, 528 } } });
+        checkCounts({ pyramid, { { 24, 8 }, { 24, 8 }, { 24, 8 }, { 24, 8 } } });
+        checkCounts({ inverted, { { 24, 8 }, { 24, 8 }, { 24, 8 }, { 24, 8 } } });
+        checkCounts({ cone, { { 30, 18 }, { 42, 27 }, { 82, 75 }, { 152, 168 } } });
+
+        Report report;
+        Shape twisted = sphere();
+        twisted.name = "twisted sphere";
+        twisted.twist_begin = -0.5f;
+        twisted.twist_end = 0.75f;
+        Shape quarter_turned = sphere();
+        quarter_turned.name = "sphere turned a quarter turn";
+        quarter_turned.twist_begin = quarter_turned.twist_end = 0.25f;
+        for (const Shape& s : { twisted, quarter_turned })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                if (checkAgainstUnique(s, lod, report) != 0)
+                {
+                    report.fail(fmt::format("{}: triangles left out where the poles leave the axis", lodName(s, lod)));
+                }
+            }
+        }
+        S32 left_out = 0;
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                left_out += checkAgainstUnique(s, lod, report);
+            }
+        }
+        for (const Shape& s : { pyramid, inverted, cone, half_turned })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                left_out += checkAgainstUnique(s, lod, report);
+            }
+        }
+        INFO(fmt::format("{} triangles left out", left_out));
+        INFO(report.text());
+        CHECK(left_out > 0);
         CHECK(report.failures == 0);
     }
 }
