@@ -459,8 +459,10 @@ void LLPipeline::init()
     mScopeSample.setLabel("scopes.sample");
     mReferenceStill.setLabel("reference.still");
 
-    gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
-    gOctreeMinSize = gSavedSettings.getF32("OctreeMinimumNodeSize");
+    // A node takes an element at the least, and stops splitting at a size above none: at 0 either, an insert of elements
+    // crowded together never stops descending.
+    gOctreeMaxCapacity = llmax(gSavedSettings.getU32("OctreeMaxNodeCapacity"), 1u);
+    gOctreeMinSize = llmax(gSavedSettings.getF32("OctreeMinimumNodeSize"), 0.001f);
     sDynamicLOD = gSavedSettings.getBOOL("RenderDynamicLOD");
     sRenderAttachedLights = gSavedSettings.getBOOL("RenderAttachedLights");
     sRenderAttachedParticles = gSavedSettings.getBOOL("RenderAttachedParticles");

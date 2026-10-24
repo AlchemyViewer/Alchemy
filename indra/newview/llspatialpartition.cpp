@@ -238,10 +238,13 @@ bool LLSpatialGroup::updateInGroup(LLDrawable *drawablep, bool immediate)
 
     OctreeNode* parent = mOctreeNode->getOctParent();
 
+    // Where LLOctreeNode::insert would leave it: its own size's node, or a node below a full one with room, which here
+    // counts the drawable itself.
     if (mOctreeNode->isInside(drawablep->getPositionGroup()) &&
         (mOctreeNode->contains(drawablep->getEntry()) ||
          (drawablep->getBinRadius() > mOctreeNode->getSize()[0] &&
-                parent && parent->getElementCount() >= gOctreeMaxCapacity)))
+                parent && parent->getElementCount() >= gOctreeMaxCapacity &&
+                (mOctreeNode->getElementCount() <= gOctreeMaxCapacity || mOctreeNode->getSize()[0] <= gOctreeMinSize))))
     {
         unbound();
         setState(OBJECT_DIRTY);
