@@ -1302,6 +1302,19 @@ bool LLViewerFetchedTexture::isForSculptOnly() const
     return mForSculpt && !mNeedsGLTexture;
 }
 
+void LLViewerFetchedTexture::rebuildSculptVolumes()
+{
+    for (U32 i = 0; i < mNumVolumes[LLRender::SCULPT_TEX]; ++i)
+    {
+        LLVOVolume* volume = mVolumeList[LLRender::SCULPT_TEX][i];
+        if (volume)
+        {
+            volume->mSculptChanged = true;
+            gPipeline.markRebuild(volume->mDrawable);
+        }
+    }
+}
+
 bool LLViewerFetchedTexture::isDeleted()
 {
     return mTextureState == DELETED;
@@ -1384,17 +1397,30 @@ void LLViewerFetchedTexture::addToCreateTexture()
         mSavedRawImage = NULL;
     }
 
+    // Neither of the first two makes a texture, so postCreateTexture does not tell the volumes this texture sculpts
+    // that it has more pixels: a better copy saved here is told them here. Among them is the decode setForSculpt asks
+    // for when a sculpt starts using a texture already on screen at that level, which the sculpt waits for rather than
+    // reading the texture back from GL.
+    const auto destroy_raw_and_tell_sculpts = [this]()
+    {
+        const S32 saved = mSavedRawDiscardLevel;
+        destroyRawImage();
+        if (mSavedRawDiscardLevel != saved)
+        {
+            rebuildSculptVolumes();
+        }
+    };
     if(isForSculptOnly())
     {
         //just update some variables, not to create a real GL texture.
         createGLTexture(mRawDiscardLevel, mRawImage, 0, false);
         mNeedsCreateTexture = false;
-        destroyRawImage();
+        destroy_raw_and_tell_sculpts();
     }
     else if(!force_update && getDiscardLevel() > -1 && getDiscardLevel() <= mRawDiscardLevel)
     {
         mNeedsCreateTexture = false;
-        destroyRawImage();
+        destroy_raw_and_tell_sculpts();
     }
     else
     {
@@ -1586,15 +1612,7 @@ void LLViewerFetchedTexture::postCreateTexture()
     setActive();
 
     // rebuild any volumes that are using this texture for sculpts in case their LoD has changed
-    for (U32 i = 0; i < mNumVolumes[LLRender::SCULPT_TEX]; ++i)
-    {
-        LLVOVolume* volume = mVolumeList[LLRender::SCULPT_TEX][i];
-        if (volume)
-        {
-            volume->mSculptChanged = true;
-            gPipeline.markRebuild(volume->mDrawable);
-        }
-    }
+    rebuildSculptVolumes();
 
     if (!needsToSaveRawImage())
     {
