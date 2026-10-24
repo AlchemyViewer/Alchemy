@@ -18,7 +18,7 @@ ctest --test-dir build-<OS>-<preset> --output-on-failure -LE manual
 - **In another order:** `--order rand --rng-seed <n>`. Cases run in declared order by default.
 - **Every case in a process of its own:** configure with `-DAL_TEST_PER_CASE=ON`. Each case is then its own entry, found when CTest runs. It is for chasing a case that passes alone and fails with the others.
 - **The log:** `LOGTEST=DEBUG` logs everything at that level as it happens. `LOGFAIL=DEBUG` keeps it and prints a failing case's log only. `--al-log` also writes the log to `<binary>.<pid>.log`.
-- **Real mesh assets:** llmath's hidden `[corpus]` case and its corpus benchmark read the meshes of a viewer's cache from the directory `AL_MESH_CORPUS_DIR` names, a seeded sample of them (`indra/llmath/tests/almeshcorpus.h` says how to size and split it), and skip where it is not set: `llmath_tests "[corpus]"`. The assets are other people's, so nothing from them goes into the tree.
+- **Real mesh assets:** llmath's hidden `[corpus]` case and its corpus benchmark read the meshes of a viewer's cache from the directory `AL_MESH_CORPUS_DIR` names, a seeded sample of them (`indra/llmath/tests/almeshcorpus.h` says how to size and split it), skip where it is not set, and fail where the directory is there but its walk meets an error: `llmath_tests "[corpus]"`. The assets are other people's, so nothing from them goes into the tree.
 
 ## Writing a test
 
