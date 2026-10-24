@@ -1287,9 +1287,14 @@ void LLViewerFetchedTexture::setForSculpt()
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
+    // A read of the texture the sculpts asked for, once the GPU has written it.
+    updateSculptReadback();
     // Not while a texture is being created for it: on the LLImageGL thread that would
     // publish its texture after this destroyed the old one. destroyTexture holds off too.
-    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture)
+    // Nor while the sculpts' read of it is on its way: the texture is all that holds what
+    // their copy lacks until the read lands.
+    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture &&
+       !(mGLTexturep.notNull() && mGLTexturep->isReadBackRequested()))
     {
         destroyGLTexture(); //sculpt image does not need gl texture.
         mTextureState = ACTIVE;
@@ -1397,30 +1402,17 @@ void LLViewerFetchedTexture::addToCreateTexture()
         mSavedRawImage = NULL;
     }
 
-    // Neither of the first two makes a texture, so postCreateTexture does not tell the volumes this texture sculpts
-    // that it has more pixels: a better copy saved here is told them here. Among them is the decode setForSculpt asks
-    // for when a sculpt starts using a texture already on screen at that level, which the sculpt waits for rather than
-    // reading the texture back from GL.
-    const auto destroy_raw_and_tell_sculpts = [this]()
-    {
-        const S32 saved = mSavedRawDiscardLevel;
-        destroyRawImage();
-        if (mSavedRawDiscardLevel != saved)
-        {
-            rebuildSculptVolumes();
-        }
-    };
     if(isForSculptOnly())
     {
         //just update some variables, not to create a real GL texture.
         createGLTexture(mRawDiscardLevel, mRawImage, 0, false);
         mNeedsCreateTexture = false;
-        destroy_raw_and_tell_sculpts();
+        destroyRawImage();
     }
     else if(!force_update && getDiscardLevel() > -1 && getDiscardLevel() <= mRawDiscardLevel)
     {
         mNeedsCreateTexture = false;
-        destroy_raw_and_tell_sculpts();
+        destroyRawImage();
     }
     else
     {
@@ -2000,8 +1992,9 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
             && (mRawDiscardLevel < 0 || mRawDiscardLevel == INVALID_DISCARD_LEVEL)
             && mFetchState > 1) // 1 - initial, make sure fetcher did at least something
         {
-            // We finished but received no data
-            if (getDiscardLevel() < 0)
+            // We finished but received no data. A texture whose GL texture went (a sculpt-only map's) still has the
+            // copy saved of it, and is not missing.
+            if (getDiscardLevel() < 0 && mSavedRawImage.isNull())
             {
                 if (getFTType() != FTT_MAP_TILE)
                 {
@@ -2950,6 +2943,49 @@ void LLViewerFetchedTexture::saveRawImage()
     }
 
     mLastReferencedSavedRawImageTime = sCurrentTime;
+
+    // The volumes this texture sculpts build from the copy: a better one is theirs to build from, whichever path saved
+    // it -- a texture made, a level the texture on screen already had, a sculpt-only map's decode, a callback's read.
+    rebuildSculptVolumes();
+}
+
+bool LLViewerFetchedTexture::requestSculptReadback()
+{
+    if (mGLTexturep.isNull() || mGLTexturep->getTexName() == 0 || mNeedsCreateTexture)
+    {
+        return false;
+    }
+    return mGLTexturep->isReadBackRequested() || mGLTexturep->requestReadBack(-1);
+}
+
+void LLViewerFetchedTexture::updateSculptReadback()
+{
+    if (mGLTexturep.isNull() || !mGLTexturep->isReadBackRequested())
+    {
+        return;
+    }
+    LLPointer<LLImageRaw> raw = new LLImageRaw();
+    S32 discard = INVALID_DISCARD_LEVEL;
+    if (mGLTexturep->collectReadBack(raw, discard) != LLImageGL::READBACK_READY)
+    {
+        return;
+    }
+    // The decode may have brought as much first.
+    if (mSavedRawImage.notNull() && mSavedRawImage->getWidth() >= raw->getWidth() &&
+        mSavedRawImage->getHeight() >= raw->getHeight())
+    {
+        return;
+    }
+    // Kept at the size it was read: the sculpts build from as much as the texture on screen holds, as they did when
+    // they read it back themselves.
+    mSavedRawImage        = raw;
+    mSavedRawDiscardLevel = discard;
+    if (mForceToSaveRawImage && mSavedRawDiscardLevel <= mDesiredSavedRawDiscardLevel)
+    {
+        mForceToSaveRawImage = false;
+    }
+    mLastReferencedSavedRawImageTime = sCurrentTime;
+    rebuildSculptVolumes();
 }
 
 //force to refetch the texture to the discard level
