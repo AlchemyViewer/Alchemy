@@ -4118,6 +4118,49 @@ namespace
         }
     }
 
+    // A mesh face's vertex count is its positions'. A normal or texture
+    // coordinate array that falls short of it is taken as none, its zeroes
+    // in their place, rather than read past its end.
+    TEST_CASE("llvolume: a mesh face whose normals or texture coordinates fall short of its positions decodes without them", "[llvolume]")
+    {
+        auto binary = [](std::initializer_list<U16> values)
+        {
+            LLSD::Binary bytes;
+            for (U16 value : values)
+            {
+                bytes.push_back((U8)(value & 0xff));
+                bytes.push_back((U8)(value >> 8));
+            }
+            return LLSD(bytes);
+        };
+        LLSD face;
+        face["Position"] = binary({ 0, 0, 0, 65535, 0, 0, 0, 65535, 0 });
+        face["Normal"] = binary({ 32768, 32768, 65535 });
+        face["TexCoord0"] = binary({ 65535, 65535 });
+        face["TriangleList"] = binary({ 0, 1, 2 });
+        face["PositionDomain"]["Min"] = LLVector3(-0.5f, -0.5f, -0.5f).getValue();
+        face["PositionDomain"]["Max"] = LLVector3(0.5f, 0.5f, 0.5f).getValue();
+        face["TexCoord0Domain"]["Min"] = LLVector2(0.f, 0.f).getValue();
+        face["TexCoord0Domain"]["Max"] = LLVector2(1.f, 1.f).getValue();
+        LLSD mdl = LLSD::emptyArray();
+        mdl.append(face);
+
+        LLVolumeParams params;
+        params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000a"), LL_SCULPT_TYPE_MESH);
+        LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
+        REQUIRE(ll_test::VolumeProbe::decode(*volume, mdl));
+        REQUIRE(volume->getNumVolumeFaces() == 1);
+        const LLVolumeFace& decoded = volume->getVolumeFace(0);
+        REQUIRE(decoded.mNumVertices == 3);
+        for (S32 v = 0; v < decoded.mNumVertices; ++v)
+        {
+            CAPTURE(v);
+            CHECK(decoded.mNormals[v].equals3(LLVector4a::getZero()));
+            CHECK(decoded.mTexCoords[v] == LLVector2(0.f, 0.f));
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two

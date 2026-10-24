@@ -2740,7 +2740,8 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - normals");
-                if (!norm.empty())
+                // An array short of the positions' count is taken as none.
+                if (norm.size() >= (size_t)num_verts * 3 * sizeof(U16))
                 {
                     // from sixteen bits to -1..1
                     alsimd::dequantize_u16x3(norm.data(), num_verts, LLVector4a(2.f / 65535.f), LLVector4a(-1.f), face.mNormals);
@@ -2787,7 +2788,7 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
 
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("unpackVolumeFaces - texcoords");
-                if (!tc.empty())
+                if (tc.size() >= (size_t)num_verts * 2 * sizeof(U16))
                 {
                     LLVector4a tc_scale;
                     tc_scale.setMul(tc_range, u16_step);
