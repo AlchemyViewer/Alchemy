@@ -423,6 +423,9 @@ public:
     virtual void rebuildMesh(LLSpatialGroup* group);
 
     bool visibleObjectsInFrustum(LLCamera& camera);
+    // Grows [min, max] by the bounds of what the octree holds, its root rebounded first as a cull rebounds it: false,
+    // and nothing grown, where it holds nothing.
+    bool addRootBounds(LLVector4a& min, LLVector4a& max);
     /*virtual*/ S32 cull(LLCamera &camera, bool do_occlusion=false); // Cull on arbitrary frustum
     S32 cull(LLCamera &camera, std::vector<LLDrawable *>* results, bool for_select); // Cull on arbitrary frustum
 

@@ -3525,14 +3525,40 @@ void LLPipeline::updateCull(LLCamera& camera, LLCullResult& result)
     {
         LLViewerRegion* region = *iter;
 
+        // A region whose partitions hold nothing in the camera's frustum, its far plane aside, has none of them culled.
+        // No partition's cull tests its root less strictly than that test of every root's bounds together, so each
+        // would find its root outside; and a frame culls every region's NUM_PARTITIONS for each camera it draws from,
+        // the main view's, the shadows', a probe's faces. The object cache's cull is not a frustum's: it picks the
+        // cached objects behind the camera too.
+        LLSpatialPartition* parts[LLViewerRegion::NUM_PARTITIONS];
+        U32 count = 0;
+        bool holds = false;
+        LLVector4a lo;
+        LLVector4a hi;
+        lo.splat(F32_MAX);
+        hi.splat(-F32_MAX);
         for (U32 i = 0; i < LLViewerRegion::NUM_PARTITIONS; i++)
         {
             LLSpatialPartition* part = region->getSpatialPartition(i);
-            if (part)
+            if (part && hasRenderType(part->mDrawableType))
             {
-                if (hasRenderType(part->mDrawableType))
+                parts[count++] = part;
+                holds = part->addRootBounds(lo, hi) || holds;
+            }
+        }
+        if (holds)
+        {
+            LLVector4a centre;
+            LLVector4a half;
+            centre.setAdd(lo, hi);
+            centre.mul(0.5f);
+            half.setSub(hi, lo);
+            half.mul(0.5f);
+            if (camera.AABBInFrustumNoFarClip(centre, half))
+            {
+                for (U32 i = 0; i < count; ++i)
                 {
-                    part->cull(camera);
+                    parts[i]->cull(camera);
                 }
             }
         }
