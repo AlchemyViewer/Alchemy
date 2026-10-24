@@ -56,6 +56,7 @@
 #include "v3color.h"
 #include "llui.h"
 #include "llglheaders.h"
+#include "alcompact.h"
 #include "aldepthbounds.h"
 #include "allightmapblur.h"
 #include "alrenderisolation.h"
@@ -2770,15 +2771,9 @@ void LLPipeline::unlinkDrawable(LLDrawable *drawable)
 
     LLPointer<LLDrawable> drawablep = drawable; // make sure this doesn't get deleted before we are done
 
-    // Based on flags, remove the drawable from the queues that it's on.
-    if (drawablep->isState(LLDrawable::ON_MOVE_LIST))
-    {
-        LLDrawable::drawable_vector_t::iterator iter = std::find(mMovedList.begin(), mMovedList.end(), drawablep);
-        if (iter != mMovedList.end())
-        {
-            mMovedList.erase(iter);
-        }
-    }
+    // Based on flags, remove the drawable from the queues that it's on. Not the moved list: finding it there and erasing
+    // it is a walk of the list, for each drawable unlinked, and an unlink can come in the middle of the list's own walk
+    // (updateMovedList), which drops it, dead, in its turn.
 
     if (drawablep->getSpatialGroup())
     {
@@ -3000,42 +2995,49 @@ void LLPipeline::updateMoveNormalAsync(LLDrawable* drawablep)
 void LLPipeline::updateMovedList(LLDrawable::drawable_vector_t& moved_list)
 {
     LL_PROFILE_ZONE_SCOPED;
-    for (LLDrawable::drawable_vector_t::iterator iter = moved_list.begin();
-         iter != moved_list.end(); )
+    // In one pass, keeping what is still moving: erasing each drawable done from the middle of the list took time
+    // growing with the square of the drawables moving. A move can mark others moved, appending to the list as it is
+    // walked, which al_compact walks in turn. A drawable unlinked since it was listed is left in the list
+    // (unlinkDrawable) and dropped here.
+    al_compact(moved_list, [this](const LLPointer<LLDrawable>& drawablep)
     {
-        LLDrawable::drawable_vector_t::iterator curiter = iter++;
-        LLDrawable *drawablep = *curiter;
         if (!drawablep)
         {
-            iter = moved_list.erase(curiter);
-            continue;
+            return false;
+        }
+        if (drawablep->isDead())
+        {
+            drawablep->clearState(LLDrawable::EARLY_MOVE | LLDrawable::MOVE_UNDAMPED | LLDrawable::ON_MOVE_LIST |
+                                  LLDrawable::ANIMATED_CHILD);
+            return false;
         }
         bool done = true;
-        if (!drawablep->isDead() && (!drawablep->isState(LLDrawable::EARLY_MOVE)))
+        if (!drawablep->isState(LLDrawable::EARLY_MOVE))
         {
             done = drawablep->updateMove();
         }
         drawablep->clearState(LLDrawable::EARLY_MOVE | LLDrawable::MOVE_UNDAMPED);
-        if (done)
+        if (!done)
         {
-            if (drawablep->isRoot() && !drawablep->isState(LLDrawable::ACTIVE))
-            {
-                drawablep->makeStatic();
-            }
-            drawablep->clearState(LLDrawable::ON_MOVE_LIST);
-            if (drawablep->isState(LLDrawable::ANIMATED_CHILD))
-            { //will likely not receive any future world matrix updates
-                // -- this keeps attachments from getting stuck in space and falling off your avatar
-                drawablep->clearState(LLDrawable::ANIMATED_CHILD);
-                markRebuild(drawablep, LLDrawable::REBUILD_VOLUME);
-                if (drawablep->getVObj())
-                {
-                    drawablep->getVObj()->dirtySpatialGroup();
-                }
-            }
-            iter = moved_list.erase(curiter);
+            return true;
         }
-    }
+        if (drawablep->isRoot() && !drawablep->isState(LLDrawable::ACTIVE))
+        {
+            drawablep->makeStatic();
+        }
+        drawablep->clearState(LLDrawable::ON_MOVE_LIST);
+        if (drawablep->isState(LLDrawable::ANIMATED_CHILD))
+        { //will likely not receive any future world matrix updates
+            // -- this keeps attachments from getting stuck in space and falling off your avatar
+            drawablep->clearState(LLDrawable::ANIMATED_CHILD);
+            markRebuild(drawablep, LLDrawable::REBUILD_VOLUME);
+            if (drawablep->getVObj())
+            {
+                drawablep->getVObj()->dirtySpatialGroup();
+            }
+        }
+        return false;
+    });
 }
 
 void LLPipeline::updateMove()

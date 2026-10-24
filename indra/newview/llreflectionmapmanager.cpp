@@ -372,18 +372,6 @@ void LLReflectionMapManager::update()
     LLVector4a camera_pos;
     camera_pos.load3(LLViewerCamera::instance().getOrigin().mV);
 
-    // process kill list
-    for (auto& probe : mKillList)
-    {
-        auto const & iter = std::find(mProbes.begin(), mProbes.end(), probe);
-        if (iter != mProbes.end())
-        {
-            deleteProbe((U32)(iter - mProbes.begin()));
-        }
-    }
-
-    mKillList.clear();
-
     // process create list
     for (auto& probe : mCreateList)
     {
@@ -391,6 +379,9 @@ void LLReflectionMapManager::update()
     }
 
     mCreateList.clear();
+
+    // Before the sort, so that a probe gone takes no eclipse test, face render or cube slot.
+    deleteUnreferencedProbes();
 
     if (mProbes.empty())
     {
@@ -582,13 +573,6 @@ void LLReflectionMapManager::update()
     for (unsigned int i = 0; i < mProbes.size(); ++i)
     {
         LLReflectionMap* probe = mProbes[i];
-        if (probe->getNumRefs() == 1)
-        { // no references held outside manager, delete this probe
-            deleteProbe(i);
-            --i;
-            continue;
-        }
-
         if (probe != mDefaultProbe &&
             (!probe->isRelevant() || mPaused))
         { // skip irrelevant probes (or all non-default probes if paused)
@@ -900,11 +884,34 @@ S32 LLReflectionMapManager::allocateCubeIndex()
     return -1;
 }
 
-void LLReflectionMapManager::deleteProbe(U32 i)
+void LLReflectionMapManager::deleteUnreferencedProbes()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    LLReflectionMap* probe = mProbes[i];
+    // Probes grow with the regions: a 64-probe grid for each region's terrain, and one for each 16 m node of its
+    // volumes. Erasing each probe gone from the middle of the list took time growing with the square of them, when a
+    // region left took its probes all at once. Now each is released and let go of where it stands, and the list is
+    // closed up once, keeping the rest in their distance order.
+    bool any = false;
+    for (U32 i = 1; i < mProbes.size(); ++i)
+    {
+        LLPointer<LLReflectionMap>& probe = mProbes[i];
+        if (probe->getNumRefs() == 1)
+        { // no references held outside manager, delete this probe
+            releaseProbe(probe);
+            probe = nullptr;
+            any = true;
+        }
+    }
+    if (any)
+    {
+        mProbes.erase(std::remove_if(mProbes.begin() + 1, mProbes.end(),
+                                     [](const LLPointer<LLReflectionMap>& probe) { return probe.isNull(); }),
+                      mProbes.end());
+    }
+}
 
+void LLReflectionMapManager::releaseProbe(LLReflectionMap* probe)
+{
     llassert(probe != mDefaultProbe);
 
     if (probe->mCubeIndex != -1)
@@ -923,9 +930,6 @@ void LLReflectionMapManager::deleteProbe(U32 i)
         llassert(iter != other->mNeighbors.end());
         other->mNeighbors.erase(iter);
     }
-
-    // Probes are distance sorted, order matters.
-    mProbes.erase(mProbes.begin() + i);
 }
 
 void LLReflectionMapManager::abandonProbeUpdate()
@@ -1909,7 +1913,6 @@ void LLReflectionMapManager::cleanup()
     mSHPartial.release();
 
     mProbes.clear();
-    mKillList.clear();
     mCreateList.clear();
 
     mReflectionMaps.clear();
