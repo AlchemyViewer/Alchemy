@@ -28,6 +28,7 @@
 #include "stdtypes.h"
 
 #include <cstddef>
+#include <vector>
 
 class ALFrameFences;
 
@@ -43,8 +44,11 @@ class ALFrameFences;
 /// the next segment is still the GPU's, or the bytes asked for are more than a segment holds, it gives no room, and the
 /// caller sends its bytes from client memory as it would without the ring. endFrame() sizes the ring to the traffic of
 /// late, between MIN_BYTES and MAX_BYTES, its segments each as large as the largest take of late: it grows at the frame's
-/// end after a frame that asked for more, and shrinks once a window of frames has asked for less than half. Where
-/// buffers cannot be mapped persistently (macOS's 4.1) it gives no room at all.
+/// end after a frame that asked for more, and shrinks once a window of frames has asked for less than half. A store
+/// a new size replaces is kept until the frame it was replaced in has finished, and only then deleted: the uploads
+/// issued from it may not have read it yet, and a driver may give a persistently mapped store's memory to the next
+/// store as soon as the first is deleted. Where buffers cannot be mapped persistently (macOS's 4.1) it gives no room at
+/// all, and setEnabled(false) has it give none anywhere, every upload reading client memory.
 ///
 /// The context of the frame fences it is given must be current. Non-copyable.
 class ALStagingRing
@@ -84,6 +88,10 @@ public:
     /// Lets the store go, while the context is current; the next take() makes it again.
     void release();
 
+    /// Whether take() gives room at all (AlchemyRenderStagedUploads). Off, the store goes once its frame has finished.
+    void setEnabled(bool enabled) { mEnabled = enabled; }
+    bool isEnabled() const { return mEnabled; }
+
     /// The ring's size, made or to be made.
     size_t size() const { return mBytes; }
     bool   isAllocated() const { return mStore.isAllocated(); }
@@ -91,10 +99,21 @@ public:
     U64 getTaken() const { return mTaken; }
     U64 getBusy() const { return mBusy; }
     U64 getTooLarge() const { return mTooLarge; }
+    /// The stores replaced and not yet deleted.
+    U32 getRetired() const { return (U32)mRetired.size(); }
 
 private:
+    // A store replaced, and the frame it was replaced in, after which it may go.
+    struct Retired
+    {
+        ALGPUBuffer mStore;
+        U32         mFrame = 0;
+    };
+
     bool ready();
     void resize(size_t bytes);
+    // The store, kept until the open frame has finished; the head back at the start.
+    void retire();
 
     ALFrameFences& mFrames;
     ALGPUBuffer    mStore;
@@ -103,6 +122,8 @@ private:
     U32            mSegment = 0;             // the open segment
     U32            mLeftIn[SEGMENTS] = {};   // the frame each segment was left in, 0 for none
     bool           mUnavailable = false;     // no persistent maps, or no store could be made: no room until release()
+    bool           mEnabled = true;
+    std::vector<Retired> mRetired;
 
     size_t mFrameAsked   = 0;  // bytes asked for this frame, given room or not
     size_t mFrameLargest = 0;  // the largest take asked for this frame

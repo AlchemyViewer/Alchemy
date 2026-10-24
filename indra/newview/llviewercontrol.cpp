@@ -992,6 +992,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMaxFramesAhead", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderPacingSlackWork", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderFrameStamps", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderStagedUploads", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderLightingMaxLevel", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReservedTextureIndices", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);

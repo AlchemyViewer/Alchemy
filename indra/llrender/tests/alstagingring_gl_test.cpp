@@ -2,8 +2,9 @@
  * @file alstagingring_gl_test.cpp
  * @brief ALStagingRing on the hidden window: room aligned and apart in one mapped store, a segment entered again only
  *        once the frame it was left in has finished and never waited for, a take too large for a segment refused and
- *        the ring grown for it at the frame's end and shrunk again after a window, a texture upload read from the
- *        ring's store, and release.
+ *        the ring grown for it at the frame's end and shrunk again after a window, the store a new size replaces kept
+ *        until its frame has finished, the ring switched off, a texture upload read from the ring's store, and
+ *        release.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -38,6 +39,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <vector>
@@ -215,6 +217,80 @@ namespace
         }
         CHECK(mRing.size() == ALStagingRing::MIN_BYTES);
         CHECK(mRing.getBusy() == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A store a new size replaces is kept, undeleted, until the frame it was replaced in has been shown finished: the
+    // uploads issued from it read it when the GPU gets to them, and a driver may hand a deleted store's memory to the
+    // next. An upload issued from the old store before the growth holds its own bytes, whatever the new store holds.
+    TEST_CASE_METHOD(alstagingring_data, "alstagingring_gl: a store replaced is kept until the frame it was replaced in has finished", "[alstagingring_gl]")
+    {
+        requireMaps();
+        constexpr S32 W = 8;
+        constexpr S32 H = 4;
+        constexpr size_t BYTES = size_t(W) * H * 4;
+
+        glGenTextures(1, &mTexture);
+        glBindTexture(GL_TEXTURE_2D, mTexture);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, W, H * 2);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        const auto upload = [&](U8 value, S32 y)
+        {
+            const ALStagingRing::Span room = mRing.take(BYTES);
+            REQUIRE(room.isValid());
+            std::memset(room.mData, value, BYTES);
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, room.mBuffer);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, y, W, H, GL_RGBA, GL_UNSIGNED_BYTE,
+                            reinterpret_cast<const void*>(static_cast<uintptr_t>(room.mOffset)));
+            glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        };
+
+        upload(0x11, 0);
+        CHECK_FALSE(mRing.take(SEGMENT + 1).isValid());
+        endFrame();
+        REQUIRE(mRing.size() > ALStagingRing::MIN_BYTES);
+        CHECK(mRing.getRetired() == 1);
+        CHECK_FALSE(mRing.isAllocated());
+
+        upload(0x22, H);
+        endFrame();
+        UNSCOPED_INFO("the frame it was replaced in has ended, and is not yet shown finished");
+        CHECK(mRing.getRetired() == 1);
+        glFinish();
+        endFrame();
+        CHECK(mRing.getRetired() == 0);
+
+        std::vector<U8> got(BYTES * 2, 0);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, got.data());
+        glBindTexture(GL_TEXTURE_2D, 0);
+        gGL.getTextureSlot(0)->unbind();
+        CHECK(std::all_of(got.begin(), got.begin() + BYTES, [](U8 b) { return b == 0x11; }));
+        CHECK(std::all_of(got.begin() + BYTES, got.end(), [](U8 b) { return b == 0x22; }));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Off (AlchemyRenderStagedUploads), the ring gives no room, and its store goes as a replaced one does; on again, it
+    // makes one.
+    TEST_CASE_METHOD(alstagingring_data, "alstagingring_gl: off, the ring gives no room and lets its store go", "[alstagingring_gl]")
+    {
+        requireMaps();
+        REQUIRE(mRing.take(ALStagingRing::ALIGNMENT).isValid());
+        mRing.setEnabled(false);
+        CHECK_FALSE(mRing.isEnabled());
+        CHECK_FALSE(mRing.take(ALStagingRing::ALIGNMENT).isValid());
+        endFrame();
+        CHECK_FALSE(mRing.isAllocated());
+        CHECK(mRing.getRetired() == 1);
+        endFrame();
+        glFinish();
+        endFrame();
+        CHECK(mRing.getRetired() == 0);
+
+        mRing.setEnabled(true);
+        const ALStagingRing::Span room = mRing.take(ALStagingRing::ALIGNMENT);
+        REQUIRE(room.isValid());
+        CHECK(room.mOffset == 0);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
