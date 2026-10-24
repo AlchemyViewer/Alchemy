@@ -5,6 +5,7 @@ add_library(llmath STATIC)
 target_sources(
   llmath
   PRIVATE
+    almeshsimplifier.cpp
     alplaneset.cpp
     alprojection.cpp
     alsimdkernels.cpp
@@ -47,6 +48,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        almeshsimplifier.h
         alplaneset.h
         alprojection.h
         alsimdkernels.h
@@ -127,6 +129,7 @@ if(AL_BUILD_TESTS)
     PROJECT llmath
     SOURCES
       tests/alignment_test.cpp
+      tests/almeshsimplifier_test.cpp
       tests/alplaneset_test.cpp
       tests/alsimdkernels_test.cpp
       tests/llbbox_test.cpp

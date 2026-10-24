@@ -5700,6 +5700,188 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
     return true;
 }
 
+// meshoptimizer's normals, which join two triangles' corners across the edge
+// they share where their own normals are within the crease angle, weighting
+// each by its angle and the lengths of its two edges. They are made in the
+// shape the mesh was authored in, its positions scaled back out of the unit
+// cube by mNormalizedScale, so that the crease angle is the one a user sees,
+// and come back as the face's normals, the authored ones times the scale.
+// A corner of triangles with no area takes the normal of another corner of
+// its vertex, or the vertex's own where it has none, and then the axis
+// along z. A vertex whose corners take different normals becomes one vertex
+// for each, and vertices then the same in every attribute become one; every
+// vertex keeps its position, texture coordinate and weights. The tangents go,
+// as they no longer fit the normals.
+bool LLVolumeFace::generateNormals(F32 crease_angle, F32 smoothing)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+
+    if (!mPositions || !mIndices || mNumVertices <= 0 || mNumIndices < 3 || mNumIndices % 3 != 0)
+    {
+        return false;
+    }
+
+    const size_t index_count = mNumIndices;
+    const size_t vertex_count = mNumVertices;
+    std::vector<U32> indices(index_count);
+    for (size_t i = 0; i < index_count; ++i)
+    {
+        indices[i] = mIndices[i];
+        if (indices[i] >= vertex_count)
+        {
+            LL_WARNS_ONCE("LLVolume") << "Out of bounds index detected: mIndices[" << i << "]=" << indices[i]
+                << " >= mNumVertices=" << mNumVertices << LL_ENDL;
+            return false;
+        }
+    }
+
+    const LLVector4a scale(mNormalizedScale.mV[0] != 0.f ? mNormalizedScale.mV[0] : 1.f,
+                           mNormalizedScale.mV[1] != 0.f ? mNormalizedScale.mV[1] : 1.f,
+                           mNormalizedScale.mV[2] != 0.f ? mNormalizedScale.mV[2] : 1.f, 1.f);
+    std::vector<LLVector4a> positions(vertex_count);
+    for (size_t v = 0; v < vertex_count; ++v)
+    {
+        positions[v].setMul(mPositions[v], scale);
+    }
+
+    std::vector<F32> generated(index_count * 3);
+    meshopt_generateNormals(generated.data(), indices.data(), index_count, positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a),
+                            llclamp(crease_angle, 0.f, F_PI), llmax(smoothing, 0.f));
+
+    // Each corner's normal in the face's frame, and for each vertex the
+    // first of its corners to have one.
+    std::vector<LLVector4a> corner_normals(index_count);
+    std::vector<U32> first_corner(vertex_count, U32_MAX);
+    for (size_t c = 0; c < index_count; ++c)
+    {
+        LLVector4a& normal = corner_normals[c];
+        normal.set(generated[c * 3 + 0], generated[c * 3 + 1], generated[c * 3 + 2], 0.f);
+        normal.mul(scale);
+        unit3_or_zero(normal);
+        normal.getF32ptr()[3] = 0.f;
+        if (first_corner[indices[c]] == U32_MAX && normal.dot3(normal).getF32() > 0.f)
+        {
+            first_corner[indices[c]] = (U32)c;
+        }
+    }
+    for (size_t c = 0; c < index_count; ++c)
+    {
+        LLVector4a& normal = corner_normals[c];
+        if (normal.dot3(normal).getF32() > 0.f)
+        {
+            continue;
+        }
+        const U32 v = indices[c];
+        if (first_corner[v] != U32_MAX)
+        {
+            normal = corner_normals[first_corner[v]];
+            continue;
+        }
+        if (mNormals)
+        {
+            normal.set(mNormals[v][0], mNormals[v][1], mNormals[v][2], 0.f);
+            unit3_or_zero(normal);
+        }
+        if (normal.dot3(normal).getF32() == 0.f)
+        {
+            normal.set(0.f, 0.f, 1.f, 0.f);
+        }
+    }
+
+    // A vertex the face holds more than once, the same in all but its
+    // normal, is one vertex; then each corner is that vertex with its own
+    // normal, and corners the same in both are one.
+    std::vector<U32> canonical(vertex_count);
+    const meshopt_Stream attributes[] = {
+        { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) },
+        { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) },
+        { mWeights, sizeof(LLVector4a), sizeof(LLVector4a) },
+    };
+    meshopt_Stream used[3];
+    size_t used_count = 0;
+    for (const meshopt_Stream& stream : attributes)
+    {
+        if (stream.data)
+        {
+            used[used_count++] = stream;
+        }
+    }
+    meshopt_generateVertexRemapMulti(canonical.data(), indices.data(), index_count, vertex_count, used, used_count);
+    std::vector<U32> corner_vertices(index_count);
+    for (size_t c = 0; c < index_count; ++c)
+    {
+        corner_vertices[c] = canonical[indices[c]];
+    }
+    std::vector<U32> remap(index_count);
+    const meshopt_Stream corners[] = {
+        { corner_vertices.data(), sizeof(U32), sizeof(U32) },
+        { corner_normals.data(), sizeof(F32) * 3, sizeof(LLVector4a) },
+    };
+    const size_t unique =
+        meshopt_generateVertexRemapMulti(remap.data(), nullptr, index_count, index_count, corners, sizeof(corners) / sizeof(corners[0]));
+    if (unique > U16_MAX)
+    {
+        LL_WARNS("LLVolume") << "Normals for a face of " << mNumVertices << " vertices and " << index_count / 3
+            << " triangles take more vertices than 16-bit indices reach; keeping its own" << LL_ENDL;
+        return false;
+    }
+
+    // Each new vertex from the first corner that names it.
+    std::vector<U32> from_corner(unique);
+    for (size_t c = index_count; c-- > 0;)
+    {
+        from_corner[remap[c]] = (U32)c;
+    }
+
+    LLVector4a* old_positions = mPositions;
+    const LLVector2* old_tex_coords = mTexCoords;
+    LLVector4a* old_weights = mWeights;
+    mPositions = nullptr;
+    mWeights = nullptr;
+    resizeVertices((S32)unique);
+    if (!mPositions)
+    {
+        LLError::LLUserWarningMsg::showOutOfMemory();
+        LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << unique << ")" << LL_ENDL;
+    }
+    if (old_weights)
+    {
+        allocateWeights((S32)unique);
+    }
+    for (size_t u = 0; u < unique; ++u)
+    {
+        const U32 corner = from_corner[u];
+        const U32 from = indices[corner];
+        mPositions[u] = old_positions[from];
+        mNormals[u] = corner_normals[corner];
+        if (old_tex_coords)
+        {
+            mTexCoords[u] = old_tex_coords[from];
+        }
+        else
+        {
+            mTexCoords[u].setZero();
+        }
+        if (old_weights)
+        {
+            mWeights[u] = old_weights[from];
+        }
+    }
+    for (size_t i = 0; i < index_count; ++i)
+    {
+        mIndices[i] = (U16)remap[i];
+    }
+    if (!old_tex_coords)
+    {
+        mTexCoords = nullptr;
+    }
+    mOptimized = false;
+
+    ll_aligned_free<64>(old_positions);
+    ll_aligned_free_16(old_weights);
+    return true;
+}
+
 void LLVolumeFace::createOctree(F32 scaler, const LLVector4a& center, const LLVector4a& size)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
