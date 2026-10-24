@@ -26,6 +26,7 @@
 #include "linden_common.h"
 
 #include "alscratcharena.h"
+#include "altestsanitizer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -122,6 +123,10 @@ namespace
     // its size would overflow, so that the heap refuses it.
     TEST_CASE("alscratcharena: a size no arena could hold is the heap's to refuse", "[alscratcharena]")
     {
+        if constexpr (ll_test::SANITIZER_ALLOCATOR)
+        {
+            SKIP("a sanitizer's operator new ends the process rather than throw");
+        }
         CHECK_THROWS_AS(ALScratchArena::allocate(size_t(-1)), std::bad_alloc);
         void* p = ALScratchArena::allocate(32);
         void* q = ALScratchArena::allocate(32);

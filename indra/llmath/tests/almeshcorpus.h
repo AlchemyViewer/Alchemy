@@ -54,6 +54,7 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <system_error>
 #include <vector>
 
 namespace ll_test
@@ -103,14 +104,32 @@ namespace
             ALMeshCorpus corpus;
             corpus.mSample = number("AL_MESH_CORPUS_SAMPLE", DEFAULT_SAMPLE);
             const U32 seed = (U32)number("AL_MESH_CORPUS_SEED", 1);
+            // A directory that is there is read in full: an error in the walk
+            // fails the case rather than leave it a part of the corpus. A
+            // viewer running on the cache may evict a file between the walk
+            // listing it and its status being read, and that file is passed
+            // over.
             std::error_code ec;
             for (std::filesystem::recursive_directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
             {
                 const std::string name = it->path().filename().string();
-                if (it->is_regular_file(ec) && name.rfind("sl_cache_", 0) == 0 && name.size() > 17 && name.compare(name.size() - 8, 8, "_0.asset") == 0)
+                if (name.rfind("sl_cache_", 0) != 0 || name.size() <= 17 || name.compare(name.size() - 8, 8, "_0.asset") != 0)
+                {
+                    continue;
+                }
+                std::error_code status;
+                if (it->is_regular_file(status))
                 {
                     corpus.mFiles.push_back(it->path());
                 }
+                else if (status && status != std::errc::no_such_file_or_directory)
+                {
+                    throw std::filesystem::filesystem_error("AL_MESH_CORPUS_DIR", it->path(), status);
+                }
+            }
+            if (ec)
+            {
+                throw std::filesystem::filesystem_error("AL_MESH_CORPUS_DIR", dir, ec);
             }
             // Sorted, then shuffled by the seed's own sequence, so that the
             // order is the standard engine's and no library's shuffle.
