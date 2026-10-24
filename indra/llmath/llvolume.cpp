@@ -8055,13 +8055,15 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             end_index = doubled ? grid_indices<true>(mIndices, limit, mNumS, mNumT, lefts, quads, kept)
                                 : grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, kept);
         }
-        else if (sculpt_stitching != LL_SCULPT_TYPE_NONE && !volume->isUnique() && quads > 0 && rows > 0)
+        else if (sculpt_stitching != LL_SCULPT_TYPE_NONE && !volume->isUnique() && !doubled && quads > 0 && rows > 0)
         {
             // A sculpt's triangles two of whose corners are one point have
             // no area, and are left out: the points' codes find them and the
             // points confirm them. A flexible sculpt's points move after its
             // full build, and it keeps them. A face keeps at least one
-            // triangle.
+            // triangle. The flat inner side of a sculpt whose parameters
+            // carry a square or triangle hole has its corners doubled, and
+            // keeps all of its quads.
             ALScratchArena::Scope scratch;
             U32* codes = scratch.allocate<U32>(num_vertices + 8);
             alsimd::unit_cube_codes(pos, num_vertices, codes);
