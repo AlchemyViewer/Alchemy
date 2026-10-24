@@ -258,6 +258,9 @@ private:
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap> > mProbes;
 
+    // The placed probes that may evict automatic ones, as the eclipse pass reads them, kept for its room.
+    ALProbeEclipse mEclipse;
+
     // list of reflection maps to create
     std::vector<LLPointer<LLReflectionMap> > mCreateList;
 
