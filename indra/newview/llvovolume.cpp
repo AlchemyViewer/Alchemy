@@ -32,9 +32,11 @@
 
 #include <set>
 #include <sstream>
+#include <tuple>
 
 #include "llviewercontrol.h"
 #include "lldir.h"
+#include "llimagepng.h"
 #include "llflexibleobject.h"
 #include "llfloatertools.h"
 #include "llmaterialid.h"
@@ -1399,6 +1401,7 @@ void LLVOVolume::notifySkinInfoUnavailable()
     mSkinInfo = nullptr;
 }
 
+#ifndef LL_RELEASE_FOR_DOWNLOAD
 // How a sculpt map's positions vary, for the log: a map whose pixels, rows or columns are all alike has little or no
 // surface, as a decode with none of the detail in its short side comes out.
 static std::string describe_sculpt_pixels(const U8* data, S32 width, S32 height, S32 components)
@@ -1435,6 +1438,46 @@ static std::string describe_sculpt_pixels(const U8* data, S32 width, S32 height,
         << (S32)high[2];
     return out.str();
 }
+
+// What a sculpt was laid out on, for the log: the mesh the map was sampled into, how many points of it are apart, and
+// the prim's path and profile.
+static std::string describe_sculpt_mesh(const LLVolume& volume)
+{
+    const S32 rows = (S32)volume.getPath().mPath.size();
+    const S32 columns = (S32)volume.getProfile().mProfile.size();
+    std::set<std::tuple<F32, F32, F32>> apart;
+    const auto& mesh = volume.getMesh();
+    for (S32 i = 0; i < (S32)mesh.size() && apart.size() < 16; ++i)
+    {
+        const F32* p = mesh[i].getF32ptr();
+        apart.emplace(p[0], p[1], p[2]);
+    }
+    const LLVolumeParams& params = volume.getParams();
+    const LLPathParams& path = params.getPathParams();
+    const LLProfileParams& profile = params.getProfileParams();
+    std::ostringstream out;
+    out << "mesh " << rows << "x" << columns << " at detail " << volume.getDetail() << " with "
+        << (apart.size() < 16 ? std::to_string(apart.size()) : std::string("16 or more")) << " points apart, sculpt type "
+        << (S32)params.getSculptType() << ", path 0x" << std::hex << (S32)path.getCurveType() << std::dec << " " << path.getBegin()
+        << "-" << path.getEnd() << " revolutions " << path.getRevolutions() << ", profile 0x" << std::hex
+        << (S32)profile.getCurveType() << std::dec << " " << profile.getBegin() << "-" << profile.getEnd() << " hollow "
+        << profile.getHollow();
+    return out.str();
+}
+
+// The map a sculpt built its sphere from, saved once a map beside the log as it was given (rows bottom up).
+static std::string save_sculpt_map(const LLUUID& id, const U8* data, S32 width, S32 height, S32 components)
+{
+    if (!data || width <= 0 || height <= 0 || components < 1 || components > 4)
+    {
+        return "nothing to save";
+    }
+    LLPointer<LLImageRaw> raw = new LLImageRaw(data, (U16)width, (U16)height, (S8)components);
+    LLPointer<LLImagePNG> png = new LLImagePNG();
+    const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sculpt_" + id.asString() + ".png");
+    return png->encode(raw, 0.f) && png->save(path) ? "saved to " + path : "not saved";
+}
+#endif
 
 // sculpt replaces generate() for sculpted surfaces
 void LLVOVolume::sculpt()
@@ -1543,31 +1586,63 @@ void LLVOVolume::sculpt()
 
         getVolume()->sculpt(sculpt_width, sculpt_height, sculpt_components, sculpt_data, discard_level, mSculptTexture->isMissingAsset());
 
-        // Once a map until it builds its shape: why a sculpt shows its sphere, what it had to build from and how that
-        // varies, and when the shape comes after all.
+        // Once a map until it builds its shape: why a sculpt shows its sphere, what it had to build from, and when the
+        // shape comes after all. Outside builds for download, also how the map varies and what it laid that out on, the
+        // map saved beside the log; and once a map and detail, a long, thin map's build, and a build from nothing of a
+        // map the texture has a level of.
         static std::set<LLUUID> told;
+        const LLUUID& map_id = mSculptTexture->getID();
+        const auto source = [&]() -> const char*
+        {
+            return !raw_image ? "nothing" : raw_image == mSculptTexture->getRawImage() ? "the raw image" : "the saved copy";
+        };
         if (getVolume()->isSculptSpherePlaceholder())
         {
-            if (told.insert(mSculptTexture->getID()).second)
+            if (told.insert(map_id).second)
             {
-                LL_INFOS("Sculpt") << "Sculpt map " << mSculptTexture->getID() << " builds the placeholder: "
+                LL_INFOS("Sculpt") << "Sculpt map " << map_id << " builds the placeholder: "
                                    << (mSculptTexture->isMissingAsset() ? "the map is missing" : "its surface is out of bounds")
                                    << ", area " << getVolume()->getSurfaceArea() << ", built from " << sculpt_width << "x"
                                    << sculpt_height << "x" << (S32)sculpt_components << " at discard " << discard_level
-                                   << " (" << (!raw_image ? "nothing" : raw_image == mSculptTexture->getRawImage() ? "the raw image" : "the saved copy")
-                                   << ", " << describe_sculpt_pixels(sculpt_data, sculpt_width, sculpt_height, sculpt_components)
-                                   << "), the texture " << mSculptTexture->getWidth() << "x" << mSculptTexture->getHeight()
-                                   << " at discard " << mSculptTexture->getDiscardLevel() << " of " << mSculptTexture->getMaxDiscardLevel()
-                                   << " with " << (mSculptTexture->hasGLTexture() ? "a GL texture" : "no GL texture")
-                                   << ", the saved copy at discard " << mSculptTexture->getSavedRawImageLevel() << LL_ENDL;
+                                   << " (" << source() << "), the texture " << mSculptTexture->getWidth()
+                                   << "x" << mSculptTexture->getHeight() << " at discard " << mSculptTexture->getDiscardLevel() << " of "
+                                   << mSculptTexture->getMaxDiscardLevel() << " with "
+                                   << (mSculptTexture->hasGLTexture() ? "a GL texture" : "no GL texture") << ", the saved copy at discard "
+                                   << mSculptTexture->getSavedRawImageLevel() << LL_ENDL;
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+                LL_INFOS("Sculpt") << "Sculpt map " << map_id << " holds "
+                                   << describe_sculpt_pixels(sculpt_data, sculpt_width, sculpt_height, sculpt_components)
+                                   << ", laid out on " << describe_sculpt_mesh(*getVolume()) << "; the map "
+                                   << save_sculpt_map(map_id, sculpt_data, sculpt_width, sculpt_height, sculpt_components) << LL_ENDL;
+#endif
             }
         }
-        else if (sculpt_data && told.erase(mSculptTexture->getID()))
+        else if (sculpt_data && told.erase(map_id))
         {
-            LL_INFOS("Sculpt") << "Sculpt map " << mSculptTexture->getID() << " builds its shape after the placeholder, from "
-                               << sculpt_width << "x" << sculpt_height << "x" << (S32)sculpt_components << " at discard "
-                               << discard_level << LL_ENDL;
+            LL_INFOS("Sculpt") << "Sculpt map " << map_id << " builds its shape after the placeholder, area "
+                               << getVolume()->getSurfaceArea() << ", from " << sculpt_width << "x" << sculpt_height << "x"
+                               << (S32)sculpt_components << " at discard " << discard_level << " (" << source() << ")" << LL_ENDL;
         }
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+        static std::set<std::pair<LLUUID, F32>> told_thin;
+        static std::set<LLUUID> told_empty;
+        const bool thin = sculpt_data && llmax(sculpt_width, sculpt_height) >= 8 * llmin(sculpt_width, sculpt_height);
+        if (thin && told_thin.emplace(map_id, getVolume()->getDetail()).second)
+        {
+            LL_INFOS("Sculpt") << "Sculpt map " << map_id << " builds "
+                               << (getVolume()->isSculptSpherePlaceholder() ? "the placeholder" : "its shape") << ", area "
+                               << getVolume()->getSurfaceArea() << ", from " << sculpt_width << "x" << sculpt_height << "x"
+                               << (S32)sculpt_components << " at discard " << discard_level << " (" << source() << "), "
+                               << describe_sculpt_mesh(*getVolume()) << LL_ENDL;
+        }
+        if (!sculpt_data && (mSculptTexture->getDiscardLevel() >= 0 || mSculptTexture->getSavedRawImageLevel() >= 0) &&
+            told_empty.insert(map_id).second)
+        {
+            LL_INFOS("Sculpt") << "Sculpt map " << map_id << " builds nothing at discard " << discard_level
+                               << " though the texture is at discard " << mSculptTexture->getDiscardLevel()
+                               << " and the saved copy at " << mSculptTexture->getSavedRawImageLevel() << LL_ENDL;
+        }
+#endif
     }
 }
 
