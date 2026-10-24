@@ -36,6 +36,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
+#include <vector>
 
 namespace
 {
@@ -395,5 +396,75 @@ namespace
             CHECK(other->getContentStamp() > latest);
             latest = other->getContentStamp();
         }
+    }
+
+    // The pool hands a buffer freed in a frame the GPU may still be drawing to the next allocation of its size with a
+    // new store under its name, so writing it waits for nothing; one freed in a frame shown finished it hands back as
+    // it is. Either way the buffer draws what is written into it.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: the pool gives a buffer freed this frame a new store", "[llvertexbuffer_gl]")
+    {
+        if (gGLManager.mIsApple)
+        {
+            SKIP("Apple's GPUs pool no buffers");
+        }
+        setUp();
+        // A size no other case makes, so that the pool's entries of it are this case's.
+        constexpr U32 QUADS = 37;
+        constexpr U32 COUNT = 32;
+        auto make_all = [](std::vector<LLPointer<LLVertexBuffer>>& buffers)
+        {
+            buffers.clear();
+            for (U32 i = 0; i < COUNT; ++i)
+            {
+                buffers.push_back(makeBuffer(4 * QUADS, 6 * QUADS));
+            }
+        };
+
+        std::vector<LLPointer<LLVertexBuffer>> buffers;
+        make_all(buffers);
+        // Freed now, in the open frame.
+        buffers.clear();
+
+        const LLVertexBuffer::PoolStats before = LLVertexBuffer::getPoolStats();
+        make_all(buffers);
+        const LLVertexBuffer::PoolStats again = LLVertexBuffer::getPoolStats();
+        {
+            INFO("each vertex and index store came back from the pool, under a new store");
+            CHECK(again.mHits - before.mHits == 2 * COUNT);
+            CHECK(again.mOrphans - before.mOrphans == 2 * COUNT);
+            CHECK(again.mMisses == before.mMisses);
+        }
+
+        const LLColor4U red(255, 0, 0, 255);
+        writeQuad(*buffers.front(), 0, -1.f, 1.f, red);
+        writeIndices(*buffers.front(), 0, 0);
+        uploadAndDrawFromScratch(*buffers.front());
+        {
+            INFO("a buffer given a new store draws what was written into it");
+            CHECK(at(LEFT) == packed(red));
+            CHECK(at(RIGHT) == packed(red));
+        }
+
+        // Freed in a frame that then ends and is shown finished.
+        buffers.clear();
+        ALFrameFences& frames = gGL.frameFences();
+        gGL.endFrame();
+        frames.waitFinished(frames.frame() - 1);
+        const LLVertexBuffer::PoolStats finished = LLVertexBuffer::getPoolStats();
+        make_all(buffers);
+        const LLVertexBuffer::PoolStats after = LLVertexBuffer::getPoolStats();
+        {
+            INFO("freed in a finished frame, each is handed back as it is");
+            CHECK(after.mHits - finished.mHits == 2 * COUNT);
+            CHECK(after.mOrphans == finished.mOrphans);
+        }
+
+        const LLColor4U green(0, 255, 0, 255);
+        mTarget.clear();
+        writeQuad(*buffers.back(), 0, -1.f, 1.f, green);
+        writeIndices(*buffers.back(), 0, 0);
+        uploadAndDrawFromScratch(*buffers.back());
+        CHECK(at(LEFT) == packed(green));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }
