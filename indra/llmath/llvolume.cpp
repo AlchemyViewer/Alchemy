@@ -2039,6 +2039,7 @@ LLVolume::LLVolume(const LLVolumeParams &params, const F32 detail, const bool ge
     : mParams(params)
 {
     mUnique = is_unique;
+    mLODInvariant = false;
     mFaceMask = 0x0;
     mDetail = detail;
     mSculptLevel = -2;
@@ -2108,6 +2109,120 @@ LLVolume::~LLVolume()
     mHullIndices = NULL;
 }
 
+namespace
+{
+    // Which details split a prim's profile edges.
+    enum class ProfileSplit
+    {
+        // Every detail splits them as it asks.
+        BY_DETAIL,
+        // None does.
+        NONE,
+        // None does unless the profile's hole is drawn in to its wall, which
+        // takes the split its detail asks for.
+        NONE_UNLESS_HOLE_TOUCHES_WALL,
+    };
+
+    ProfileSplit profile_split(const LLVolumeParams& params)
+    {
+        const LLPathParams& path_params = params.getPathParams();
+        if (path_params.getCurveType() != LL_PCODE_PATH_LINE)
+        {
+            return ProfileSplit::BY_DETAIL;
+        }
+
+        // A straight path tapering a square or a triangle whose hole type is
+        // the default, the profile's own shape.
+        const U8 profile_curve = params.getProfileParams().getCurveType();
+        const bool tapered = path_params.getScale().mV[0] != 1.0f || path_params.getScale().mV[1] != 1.0f;
+        if (tapered)
+        {
+            return profile_curve == LL_PCODE_PROFILE_SQUARE || profile_curve == LL_PCODE_PROFILE_ISOTRI ||
+                           profile_curve == LL_PCODE_PROFILE_EQUALTRI || profile_curve == LL_PCODE_PROFILE_RIGHTTRI
+                       ? ProfileSplit::NONE
+                       : ProfileSplit::BY_DETAIL;
+        }
+
+        // A straight path that neither twists nor tapers sweeps every profile
+        // edge into a parallelogram, and every face is flat or ruled straight
+        // along the path: positions and UVs are affine over each quad, and the
+        // split points and the rings between the ends lie on the triangles the
+        // ends make. A hole drawn in to its wall is the exception: the wall
+        // draws in some of its points and not others, its edges no longer run
+        // straight between its corners, and its split points shape it.
+        return path_params.getTwistBegin() == path_params.getTwist() ? ProfileSplit::NONE_UNLESS_HOLE_TOUCHES_WALL : ProfileSplit::BY_DETAIL;
+    }
+
+    // Whether a prim's parameters build it the same at every detail, as far
+    // as they say without laying its profile out.
+    enum class LODInvariance
+    {
+        NONE,
+        INVARIANT,
+        INVARIANT_UNLESS_HOLE_TOUCHES_WALL,
+    };
+
+    LODInvariance lod_invariance(const LLVolumeParams& params)
+    {
+        // A sculpt or a mesh has a resolution of its own.
+        if (params.getSculptType() != LL_SCULPT_TYPE_NONE || params.getSculptID().notNull())
+        {
+            return LODInvariance::NONE;
+        }
+
+        // The profile must take no split at any detail, and the path its two
+        // ends alone, which a line path does where it does not twist.
+        const ProfileSplit split = profile_split(params);
+        const LLPathParams& path_params = params.getPathParams();
+        if (split == ProfileSplit::BY_DETAIL || path_params.getTwistBegin() != path_params.getTwist())
+        {
+            return LODInvariance::NONE;
+        }
+
+        // Unsplit, a square or a triangle has the same points at every
+        // detail, and so does a hole of straight sides; a round hole has as
+        // many sides as its detail asks for.
+        const LLProfileParams& profile_params = params.getProfileParams();
+        const U8 profile_curve = profile_params.getCurveType() & LL_PCODE_PROFILE_MASK;
+        if (profile_curve != LL_PCODE_PROFILE_SQUARE && profile_curve != LL_PCODE_PROFILE_ISOTRI && profile_curve != LL_PCODE_PROFILE_EQUALTRI &&
+            profile_curve != LL_PCODE_PROFILE_RIGHTTRI)
+        {
+            return LODInvariance::NONE;
+        }
+        if (profile_params.getHollow() == 0.f)
+        {
+            return LODInvariance::INVARIANT;
+        }
+        if ((profile_params.getCurveType() & LL_PCODE_HOLE_MASK) == LL_PCODE_HOLE_CIRCLE)
+        {
+            return LODInvariance::NONE;
+        }
+        return split == ProfileSplit::NONE ? LODInvariance::INVARIANT : LODInvariance::INVARIANT_UNLESS_HOLE_TOUCHES_WALL;
+    }
+
+    // Whether a prim is LOD-invariant, from what its parameters say and its
+    // profile as LLVolume::generate first lays it out, without split points.
+    bool keeps_lod_invariance(LODInvariance invariance, const LLProfile& profile)
+    {
+        return invariance == LODInvariance::INVARIANT || (invariance == LODInvariance::INVARIANT_UNLESS_HOLE_TOUCHES_WALL && !profile.holeTouchesWall());
+    }
+}
+
+// static
+bool LLVolume::isLODInvariant(const LLVolumeParams& params)
+{
+    const LODInvariance invariance = lod_invariance(params);
+    if (invariance == LODInvariance::NONE)
+    {
+        return false;
+    }
+
+    // The profile as generate() first lays it out.
+    thread_local LLProfile profile;
+    profile.setDirty();
+    return profile.generate(params.getProfileParams(), true) && keeps_lod_invariance(invariance, profile);
+}
+
 bool LLVolume::generate()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
@@ -2120,27 +2235,9 @@ bool LLVolume::generate()
     // stretched due to twisting or scaling on the path.
     S32 split = (S32) ((mDetail)*0.66f);
 
-    const LLPathParams& path_params = mParams.getPathParams();
-    const bool tapered = path_params.getScale().mV[0] != 1.0f || path_params.getScale().mV[1] != 1.0f;
-    if (path_params.getCurveType() == LL_PCODE_PATH_LINE &&
-        tapered &&
-        (mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_SQUARE ||
-         mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_ISOTRI ||
-         mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_EQUALTRI ||
-         mParams.getProfileParams().getCurveType() == LL_PCODE_PROFILE_RIGHTTRI))
-    {
-        split = 0;
-    }
-
-    // A straight path that neither twists nor tapers sweeps every profile
-    // edge into a parallelogram, and every face is flat or ruled straight
-    // along the path: positions and UVs are affine over each quad, and the
-    // split points and the rings between the ends lie on the triangles the
-    // ends make. A hole drawn in to its wall is the exception: the wall
-    // draws in some of its points and not others, its edges no longer run
-    // straight between its corners, and its split points shape it.
-    const S32 lighting_split = split;
-    if (path_params.getCurveType() == LL_PCODE_PATH_LINE && !tapered && path_params.getTwistBegin() == path_params.getTwist())
+    const ProfileSplit split_rule = profile_split(mParams);
+    const S32 lighting_split = split_rule == ProfileSplit::NONE ? 0 : split;
+    if (split_rule != ProfileSplit::BY_DETAIL)
     {
         split = 0;
     }
@@ -2167,6 +2264,10 @@ bool LLVolume::generate()
 
     bool regenPath = mPathp->generate(mParams.getPathParams(), path_detail, split);
     bool regenProf = mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(),profile_detail, split);
+    if (regenProf)
+    {
+        mLODInvariant = !mUnique && !mGenerateSingleFace && keeps_lod_invariance(lod_invariance(mParams), *mProfilep);
+    }
     if (regenProf && split < lighting_split && mProfilep->holeTouchesWall())
     {
         mProfilep->setDirty();

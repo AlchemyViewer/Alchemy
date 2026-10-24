@@ -1081,6 +1081,12 @@ public:
     bool isFlat(S32 face);
     bool isUnique() const                                   { return mUnique; }
 
+    // Whether generate() builds the same profile, path and faces from these
+    // parameters at every detail, so that one volume serves every LOD.
+    static bool isLODInvariant(const LLVolumeParams& params);
+    // Whether this volume is shared and its parameters are LOD-invariant.
+    bool isLODInvariant() const                             { return mLODInvariant; }
+
     S32 getSculptLevel() const                              { return mSculptLevel; }
     void setSculptLevel(S32 level)                          { mSculptLevel = level; }
 
@@ -1148,6 +1154,7 @@ public:
 
  protected:
     bool mUnique;
+    bool mLODInvariant;
     F32 mDetail;
     S32 mSculptLevel;
     F32 mSurfaceArea; //unscaled surface area
