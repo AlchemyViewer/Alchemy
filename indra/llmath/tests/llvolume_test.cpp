@@ -5254,13 +5254,13 @@ namespace
     // MSVC's rounding of the per-vertex code is what the kernel takes, so
     // there the two agree bit for bit. Another compiler fuses and
     // reassociates that code as it chooses, and agrees to within a few
-    // units in the last place.
-    bool sameTexCoord(const LLVector2& a, const LLVector2& b)
+    // units in the last place of the sums it is made from, of size sums.
+    bool sameTexCoord(const LLVector2& a, const LLVector2& b, F32 sums)
     {
 #if defined(_MSC_VER) && !defined(__clang__)
         return std::memcmp(a.mV, b.mV, sizeof(a.mV)) == 0;
 #else
-        auto close = [](F32 x, F32 y) { return fabsf(x - y) <= 4.f * FLT_EPSILON * llmax(1.f, fabsf(x), fabsf(y)); };
+        auto close = [&](F32 x, F32 y) { return fabsf(x - y) <= 4.f * FLT_EPSILON * llmax(sums, fabsf(x), fabsf(y)); };
         return close(a.mV[0], b.mV[0]) && close(a.mV[1], b.mV[1]);
 #endif
     }
@@ -5329,7 +5329,7 @@ namespace
                                 const F32 sums = llmax(1.f, 2.f * sqrtf(at.dot3(at).getF32()) * (tr ? llmax(fabsf(tr->scale_s), fabsf(tr->scale_t)) : 1.f));
                                 worst_source = llmax(worst_source, llmax(fabsf(got[v].mV[0] - source[v].mV[0]), fabsf(got[v].mV[1] - source[v].mV[1])) /
                                                                        (sums * FLT_EPSILON));
-                                if (!sameTexCoord(got[v], built[v]) || (!tr && !sameTexCoord(got[v], source[v])) ||
+                                if (!sameTexCoord(got[v], built[v], sums) || (!tr && !sameTexCoord(got[v], source[v], sums)) ||
                                     std::memcmp(point.mV, got[v].mV, sizeof(point.mV)) != 0)
                                 {
                                     report.fail(fmt::format("{}, {}: vertex {} at {} {} {}: kernel {:.9g} {:.9g}, as built {:.9g} {:.9g}, source {:.9g} {:.9g}, "
@@ -5499,7 +5499,8 @@ namespace
                     const std::vector<LLVector2> expected = perVertexTexCoords(face, face.mNormals, LLVector4a(1.f, 1.f, 1.f), nullptr, tie);
                     for (S32 v = 0; v < face.mNumVertices; ++v)
                     {
-                        if (!sameTexCoord(got[v], expected[v]))
+                        const F32 sums = llmax(1.f, 2.f * sqrtf(face.mPositions[v].dot3(face.mPositions[v]).getF32()));
+                        if (!sameTexCoord(got[v], expected[v], sums))
                         {
                             report.fail(fmt::format("{}: vertex {} maps to {:.9g} {:.9g} and along its tie's binormal to {:.9g} {:.9g}", where, v,
                                                     got[v].mV[0], got[v].mV[1], expected[v].mV[0], expected[v].mV[1]));
