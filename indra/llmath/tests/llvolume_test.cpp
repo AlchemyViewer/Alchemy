@@ -3997,6 +3997,69 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // The grid form takes every quad the index buffer would, at widths
+    // whose lines a division by a rounded reciprocal of the width would
+    // count a lane short at their first quad: a rippled grid, its UVs
+    // rippled too, so that each quad's tangent differs from its
+    // neighbours' and a quad left out moves its corners' sums. The two
+    // add the same shares in different orders, and agree to within that.
+    TEST_CASE("llvolume: a grid's tangents take every quad at widths a reciprocal rounds", "[llvolume]")
+    {
+        Report report;
+        for (size_t columns : { 41, 47, 55, 61, 97, 107 })
+        {
+            const size_t rows = 6;
+            const size_t count = columns * rows;
+            std::vector<LLVector4a> positions(count), normals(count);
+            std::vector<LLVector2> uvs(count);
+            for (size_t t = 0; t < rows; ++t)
+            {
+                for (size_t s = 0; s < columns; ++s)
+                {
+                    const F32 x = 0.1f * (F32)s;
+                    const F32 y = 0.1f * (F32)t;
+                    const F32 phase = 0.37f * (F32)s + 0.21f * (F32)t;
+                    const size_t v = s + columns * t;
+                    positions[v].set(x, y, 0.05f * sinf(phase), 0.f);
+                    // The surface's normal: (-dz/dx, -dz/dy, 1), normalized.
+                    normals[v].set(-0.05f * 3.7f * cosf(phase), -0.05f * 2.1f * cosf(phase), 1.f, 0.f);
+                    normals[v].normalize3fast();
+                    uvs[v].set((F32)s / (F32)(columns - 1) + 0.03f * sinf(0.5f * (F32)t + (F32)s),
+                               (F32)t / (F32)(rows - 1) + 0.02f * cosf(0.7f * (F32)s));
+                }
+            }
+            std::vector<U16> indices;
+            for (size_t t = 0; t + 1 < rows; ++t)
+            {
+                for (size_t s = 0; s + 1 < columns; ++s)
+                {
+                    const U16 bl = (U16)(s + columns * t);
+                    const U16 br = (U16)(bl + 1);
+                    const U16 tl = (U16)(bl + columns);
+                    const U16 tr = (U16)(tl + 1);
+                    indices.insert(indices.end(), { bl, tr, tl, bl, br, tr });
+                }
+            }
+
+            std::vector<LLVector4a> grid(count), indexed(count);
+            alsimd::grid_tangents(positions.data(), normals.data(), uvs.data(), columns, rows, grid.data());
+            alsimd::indexed_tangents(positions.data(), normals.data(), uvs.data(), count, indices.data(), indices.size(), indexed.data());
+            for (size_t v = 0; v < count; ++v)
+            {
+                const F64 apart = degreesApart(v3(grid[v]), v3(indexed[v]));
+                if (!(apart <= 1e-3) || grid[v][3] != indexed[v][3])
+                {
+                    report.fail(fmt::format("{} columns: vertex {} (column {}, row {}) is {} degrees from the indexed tangent, "
+                                            "w {} against {}",
+                                            columns, v, v % columns, v / columns, apart, grid[v][3], indexed[v][3]));
+                    break;
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // A card drawn both ways, the one triangle twice sharing two vertices,
     // its third corner mirrored in U a hair off true, and turned off the
     // axes: at the shared vertices the two triangles' tangents all but

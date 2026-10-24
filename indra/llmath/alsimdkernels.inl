@@ -1295,8 +1295,11 @@ struct TangentLanes
 // left, top right, top left, and its corners' shares go to its four
 // vertices' sums. A lane holds a quad where it is before the last line
 // and not at the end of its own: where its place, its lane less whole
-// lines, is short of the last. winding is -1 where the grid is walked
-// down its columns.
+// lines, is short of the last. The whole lines are counted from the
+// middle of the lane, half a lane clear of a line's ends, so that a
+// division the compiler makes a multiply by a rounded reciprocal still
+// counts a line's first lane in its own line. winding is -1 where the
+// grid is walked down its columns.
 template <class K>
 AL_SIMD_INLINE void grid_quads(const TangentLanes& lanes, size_t q, size_t across, size_t quads, F32 winding, typename K::reg& total)
 {
@@ -1307,7 +1310,8 @@ AL_SIMD_INLINE void grid_quads(const TangentLanes& lanes, size_t q, size_t acros
     const size_t tl_at = q + across;
     const size_t tr_at = q + across + 1;
     const reg lane = K::add(K::ramp(), K::set1(F32(q)));
-    const reg lane_place = K::fnmadd(K::floor(K::div(lane, across_f)), across_f, lane);
+    const reg lines = K::floor(K::div(K::add(lane, K::set1(0.5f)), across_f));
+    const reg lane_place = K::fnmadd(lines, across_f, lane);
     const reg real = K::select(K::and_(K::cmplt(lane_place, K::set1(F32(across - 1))), K::cmplt(lane, K::set1(F32(quads)))), K::set1(1.f),
                                K::zero());
     const Lanes3<K> bl = load_lanes3<K>(lanes.position, bl_at);
