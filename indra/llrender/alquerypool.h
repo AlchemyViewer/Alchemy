@@ -117,8 +117,8 @@ private:
 /// held -- by another query open on it, or by reserve() -- and the draws run uncounted. Its user takes the missing
 /// result as it would an expired one. A query is begun and ended within one render pass (checkPassBoundary()).
 ///
-/// All operations require the GL context the pool's queries were made in to be current, and `frames` to be ended after
-/// the pool each frame. Non-copyable.
+/// All operations require the GL context the pool's queries were made in to be current, and `frames` to be ended once a
+/// frame, between the pool's closeFrame() and openFrame() (or after its endFrame()). Non-copyable.
 class ALQueryPool
 {
 public:
@@ -193,8 +193,18 @@ public:
     /// which returns names, finds a threaded driver's thread caught up.
     void makeRoom();
 
-    /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only
-    /// when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame(), before the frame fences end it.
+    /// Closes the frame's batch, its results written ahead of the fence that follows. Once a frame, by
+    /// LLRender::endFrame(), before the frame fences end it. No query is begun or ended until openFrame().
+    void closeFrame();
+
+    /// Opens the next batch in the oldest one's place, reading that first: waiting for it only when the GPU is FRAMES
+    /// frames behind once the frame fences have ended the frame. LLRender::endFrame() runs it after the fences' end and
+    /// retire(), so that a frame end that paces the CPU has already waited for the batch it reuses, in the pacing wait,
+    /// and retire() has read it: opened before the pacing wait, a batch FRAMES frames old would be waited for first,
+    /// and the pacing would find its frame done and keep no slack.
+    void openFrame();
+
+    /// closeFrame() then openFrame(), for a user that ends no frame fences between them.
     void endFrame();
 
     /// Deletes every query, while the context is current. Every ticket expires.
@@ -276,6 +286,9 @@ private:
     ALQueryTicket mOpen[TARGETS];
     bool          mReserved[TARGETS] = {};
     bool          mConditional = false;
+    // Between closeFrame() and openFrame(): the closed batch is still the open serial's, and a query begun or ended
+    // now would be counted in it.
+    bool          mBetweenFrames = false;
     // A batch's results buffer could not be made: every batch asks GL, until release().
     bool          mWriteFailed = false;
     U32           mStalls = 0;

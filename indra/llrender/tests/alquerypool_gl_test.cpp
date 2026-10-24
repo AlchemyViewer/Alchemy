@@ -38,6 +38,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
 #include <vector>
 
 namespace
@@ -58,6 +59,21 @@ namespace
             "#version 400\n"
             "out vec4 frag_color;\n"
             "void main() { frag_color = vec4(1.0); }\n";
+
+        // Every fragment of the triangle runs a loop as long as `iterations` says, so that a draw keeps the GPU busy.
+        const char* kBusyFragment =
+            "#version 400\n"
+            "uniform int iterations;\n"
+            "out vec4 frag_color;\n"
+            "void main()\n"
+            "{\n"
+            "    float x = fract(gl_FragCoord.x * 0.0137 + gl_FragCoord.y * 0.0071);\n"
+            "    for (int i = 0; i < iterations; ++i)\n"
+            "    {\n"
+            "        x = fract(sin(x * 12.9898 + 78.233) * 43758.5453);\n"
+            "    }\n"
+            "    frag_color = vec4(x, 0.0, 0.0, 1.0);\n"
+            "}\n";
 
         // Puts the timestamps flag back however the case leaves.
         struct TimestampFlag
@@ -851,6 +867,119 @@ namespace
             REQUIRE(queries.result(seen, value) == ALQueryPool::Status::Ready);
             CHECK(value == 1);
         }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // A frame end that paces the CPU FRAMES - 1 frames deep waits, in its pacing wait, for the frame whose batch the
+    // next frame reuses, and retire() reads that batch before it is opened: opening it waits for nothing, so the pacing
+    // wait is the frame end's only wait and keeps its slack.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a paced frame end reads the batch it reuses before opening it", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 DEPTH = ALQueryPool::FRAMES - 1;
+        std::vector<ALQueryTicket> tickets;
+        const U32 stalls = mPool.getStalls();
+        for (U32 frame = 0; frame < 3 * ALQueryPool::FRAMES; ++frame)
+        {
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+                tickets.push_back(scope.ticket());
+                draw(false);
+            }
+            REQUIRE(tickets.back().isValid());
+            mPool.closeFrame();
+            mFrames.endFrame(DEPTH);
+            mPool.retire();
+            if (tickets.size() > DEPTH)
+            {
+                // The batch openFrame() is about to reuse is the one DEPTH frames back.
+                U64 value = 0;
+                INFO("frame " << frame << ": the batch about to be reused was read by retire()");
+                CHECK(mPool.result(tickets[tickets.size() - 1 - DEPTH], value) == ALQueryPool::Status::Ready);
+                CHECK(value == 1);
+            }
+            mPool.openFrame();
+        }
+        {
+            INFO("opening a batch never waited");
+            CHECK(mPool.getStalls() == stalls);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // LLRender's frame end, paced as the viewer paces it by default, never waits for a query batch: its pacing wait
+    // has done that. The frames are the GPU's for a while each, so that the frame whose batch the next one reuses is
+    // still being drawn as the frame ends: a batch opened before the pacing wait would wait for it.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: LLRender's paced frame end never waits to open a batch", "[alquerypool_gl]")
+    {
+        setUp();
+        const GLuint vs = ll_test::compileTestShader(GL_VERTEX_SHADER, kVertex);
+        const GLuint fs = ll_test::compileTestShader(GL_FRAGMENT_SHADER, kBusyFragment);
+        REQUIRE(vs);
+        REQUIRE(fs);
+        const GLuint busy = glCreateProgram();
+        glAttachShader(busy, vs);
+        glAttachShader(busy, fs);
+        glLinkProgram(busy);
+        glDeleteShader(vs);
+        glDeleteShader(fs);
+        struct ProgramEnd
+        {
+            GLuint mName;
+            ~ProgramEnd() { glDeleteProgram(mName); }
+        } busy_end{ busy };
+        GLint linked = GL_FALSE;
+        glGetProgramiv(busy, GL_LINK_STATUS, &linked);
+        REQUIRE(linked == GL_TRUE);
+        const GLint iterations_at = glGetUniformLocation(busy, "iterations");
+        const GLint hidden_at     = glGetUniformLocation(busy, "hidden");
+        const auto draw_busy = [&](GLint iterations)
+        {
+            glUseProgram(busy);
+            glUniform1i(iterations_at, iterations);
+            glUniform1i(hidden_at, 0);
+            glBindVertexArray(mVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+        };
+        // Doubled until a draw takes the GPU a few milliseconds.
+        constexpr F64 DRAW_SECONDS = 0.003;
+        GLint iterations = 1024;
+        F64 took = 0.0;
+        for (; iterations < (1 << 24); iterations *= 2)
+        {
+            glFinish();
+            const auto start = std::chrono::steady_clock::now();
+            draw_busy(iterations);
+            glFinish();
+            took = std::chrono::duration<F64>(std::chrono::steady_clock::now() - start).count();
+            if (took >= DRAW_SECONDS)
+            {
+                break;
+            }
+        }
+        if (took < DRAW_SECONDS)
+        {
+            SKIP("the GPU could not be kept busy");
+        }
+
+        ALQueryPool& queries = gGL.queries();
+        const U32 stalls = queries.getStalls();
+        for (U32 frame = 0; frame < 3 * ALQueryPool::FRAMES; ++frame)
+        {
+            {
+                ALQueryScope scope(queries, ALQueryKind::Occlusion);
+                REQUIRE(scope.ticket().isValid());
+                draw(false);
+            }
+            for (U32 i = 0; i < 3; ++i)
+            {
+                draw_busy(iterations);
+            }
+            gGL.endFrame(ALQueryPool::FRAMES - 1);
+        }
+        CHECK(queries.getStalls() == stalls);
+        glFinish();
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
