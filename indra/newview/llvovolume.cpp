@@ -2643,22 +2643,20 @@ bool LLVOVolume::hasMedia() const
 LLVector3 LLVOVolume::getApproximateFaceNormal(U8 face_id)
 {
     LLVolume* volume = getVolume();
-    LLVector4a result;
-    result.clear();
-
     LLVector3 ret;
 
+    // A face that faces one way, as planar texgen takes it, faces along its
+    // planar normal. One that wraps around faces no one way, and the zero
+    // returned leaves the caller to look along the camera.
     if (volume && face_id < volume->getNumVolumeFaces())
     {
-        const LLVolumeFace& face = volume->getVolumeFace(face_id);
-        for (S32 i = 0; i < (S32)face.mNumVertices; ++i)
+        const LLVector4a planar = volume->getVolumeFace(face_id).getPlanarNormal();
+        if (planar[3] > 0.f)
         {
-            result.add(face.mNormals[i]);
+            ret.set(planar.getF32ptr());
+            ret = volumeDirectionToAgent(ret);
+            ret.normVec();
         }
-
-        ret.set(result.getF32ptr());
-        ret = volumeDirectionToAgent(ret);
-        ret.normVec();
     }
 
     return ret;
