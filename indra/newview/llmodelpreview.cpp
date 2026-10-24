@@ -1600,18 +1600,25 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
 
             if (model_meshopt_mode == MESH_OPTIMIZER_AUTO)
             {
-                // Remove progressively more data if we can't reach the target.
+                // Remove progressively more data if we can't reach the target,
+                // keeping the closest a mode came: target_model holds the
+                // last mode's.
                 F32 allowed_ratio_drift = 1.8f;
-                F32 precise_ratio = simplify_model(indices_decimator, ALMeshSimplifier::Seams::ALL);
-
-                if (precise_ratio < 0 || (precise_ratio * allowed_ratio_drift < indices_decimator))
+                using Seams = ALMeshSimplifier::Seams;
+                F32 precise_ratio = -1.f;
+                Seams precise_seams = Seams::ALL;
+                for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE })
                 {
-                    precise_ratio = simplify_model(indices_decimator, ALMeshSimplifier::Seams::UV);
-                }
-
-                if (precise_ratio < 0 || (precise_ratio * allowed_ratio_drift < indices_decimator))
-                {
-                    precise_ratio = simplify_model(indices_decimator, ALMeshSimplifier::Seams::NONE);
+                    const F32 ratio = simplify_model(indices_decimator, seams);
+                    if (ratio > precise_ratio)
+                    {
+                        precise_ratio = ratio;
+                        precise_seams = seams;
+                    }
+                    if (ratio >= 0 && ratio * allowed_ratio_drift >= indices_decimator)
+                    {
+                        break;
+                    }
                 }
 
                 if (precise_ratio < 0 || (precise_ratio * allowed_ratio_drift < indices_decimator))
@@ -1636,10 +1643,10 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                     }
 
                     // Sloppy has a tendecy to error into lower side, so a request for 100
-                    // triangles turns into ~70, so check for significant difference from target decimation
+                    // triangles turns into ~70, so check for significant difference from target decimation.
+                    // A sloppy pass that failed has no ratio to correct by; smaller decimators are tried below.
                     F32 sloppy_ratio_drift = 1.4f;
-                    if (lod_mode == LIMIT_TRIANGLES
-                        && (sloppy_ratio > indices_decimator * sloppy_ratio_drift || sloppy_ratio < 0))
+                    if (lod_mode == LIMIT_TRIANGLES && sloppy_ratio > indices_decimator * sloppy_ratio_drift)
                     {
                         // Apply a correction to compensate.
 
@@ -1689,8 +1696,8 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                         }
                         else
                         {
-                            // Fallback to normal method
-                            precise_ratio = simplify_model(indices_decimator, ALMeshSimplifier::Seams::ALL);
+                            // Fallback to normal method, in the mode that came closest
+                            precise_ratio = simplify_model(indices_decimator, precise_seams);
                         }
 
                         LL_DEBUGS("Upload") << "Model " << target_model->getName()
