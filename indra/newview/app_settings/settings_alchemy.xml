@@ -2311,6 +2311,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyRenderStagedUploads</key>
+        <map>
+            <key>Comment</key>
+            <string>The main thread's texture uploads (glyphs, UI images, media) copy their pixels into a persistently mapped buffer and upload from it, which a threaded driver (NVIDIA's threaded optimization, Mesa's glthread) queues like a draw, rather than from the viewer's own memory, which it copies on the main thread first or waits for its own thread to catch up before reading. Off uploads from the viewer's memory. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderPacingSlackWork</key>
         <map>
             <key>Comment</key>

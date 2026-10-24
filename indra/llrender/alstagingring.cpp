@@ -82,7 +82,7 @@ ALStagingRing::Span ALStagingRing::take(size_t bytes)
         ++mTooLarge;
         return {};
     }
-    if (!ready())
+    if (!mEnabled || !ready())
     {
         return {};
     }
@@ -140,19 +140,49 @@ bool ALStagingRing::ready()
     return true;
 }
 
-void ALStagingRing::resize(size_t bytes)
+void ALStagingRing::retire()
 {
-    // The store goes at once: the commands already issued keep reading it, as GL keeps a store in use.
-    mStore.release();
-    mBytes   = bytes;
+    if (mStore.isAllocated())
+    {
+        Retired retired;
+        retired.mStore = std::move(mStore);
+        retired.mFrame = mFrames.frame();
+        mRetired.push_back(std::move(retired));
+    }
     mHead    = 0;
     mSegment = 0;
     std::fill(std::begin(mLeftIn), std::end(mLeftIn), 0u);
 }
 
+void ALStagingRing::resize(size_t bytes)
+{
+    retire();
+    mBytes = bytes;
+}
+
 void ALStagingRing::endFrame()
 {
     LL_PROFILE_PLOT("pixel staging KB", (int64_t)(mFrameAsked >> 10));
+
+    // The stores replaced go once the frame they were replaced in has finished, and with it every upload from them.
+    // Deleted at once, GL would keep them for those uploads, but a driver may hand a persistently mapped store's memory
+    // to the next store first, and the uploads not yet read would read what is written there next.
+    for (size_t i = 0; i < mRetired.size();)
+    {
+        if (mFrames.isComplete(mRetired[i].mFrame))
+        {
+            mRetired[i].mStore.release();
+            mRetired.erase(mRetired.begin() + i);
+        }
+        else
+        {
+            ++i;
+        }
+    }
+    if (!mEnabled && mStore.isAllocated())
+    {
+        retire();
+    }
     mWindowAsked   = std::max(mWindowAsked, mFrameAsked);
     mWindowLargest = std::max(mWindowLargest, mFrameLargest);
 
@@ -186,6 +216,12 @@ void ALStagingRing::endFrame()
 
 void ALStagingRing::release()
 {
+    // The context is going, and its commands with it.
+    for (Retired& retired : mRetired)
+    {
+        retired.mStore.release();
+    }
+    mRetired.clear();
     mStore.release();
     mUnavailable   = false;
     mBytes         = MIN_BYTES;

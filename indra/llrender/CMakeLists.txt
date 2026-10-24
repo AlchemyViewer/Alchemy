@@ -241,8 +241,9 @@ if(AL_BUILD_TESTS)
   #   it, and integer images;
   # - ALStagingRing: room aligned and apart, a segment entered again only once
   #   the frame it was left in has finished, a take too large for a segment
-  #   refused and the ring grown for it at the frame's end, a texture upload
-  #   read from the ring, and release;
+  #   refused and the ring grown for it at the frame's end, the store a new
+  #   size replaces kept until its frame has finished, the ring switched off,
+  #   a texture upload read from the ring, and release;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
