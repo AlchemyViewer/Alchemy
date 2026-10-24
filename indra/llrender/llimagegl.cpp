@@ -218,6 +218,8 @@ U64 LLImageGL::getTextureBytesAllocated()
 
 U32 LLImageGL::sUniqueCount             = 0;
 U32 LLImageGL::sBindCount               = 0;
+U32 LLImageGL::sReadbacks               = 0;
+F64 LLImageGL::sReadbackSeconds         = 0.0;
 S32 LLImageGL::sCount                   = 0;
 
 F64 LLImageGL::sLastFrameTime           = 0.0;
@@ -772,6 +774,13 @@ void LLImageGL::updateStats(F64 current_time)
     // the HUD, but went years without this reset -- they were lifetime totals.
     sBindCount   = 0;
     sUniqueCount = 0;
+
+    // A read back from GL waits for the GPU to finish everything queued ahead of it, a frame
+    // or more of work on a GPU-bound frame: what the frame just ended read, and waited.
+    LL_PROFILE_PLOT("texture readbacks", (int64_t)sReadbacks);
+    LL_PROFILE_PLOT("texture readback ms", sReadbackSeconds * 1000.0);
+    sReadbacks       = 0;
+    sReadbackSeconds = 0.0;
 
     ALTextureSlot::sSamplerBinds = 0;
     ALTextureSlot::sSamplerSkips = 0;
@@ -2419,6 +2428,7 @@ void LLImageGL::beginUpload()
     mPublished.mComponents          = mComponents;
     mPublished.mCurrentDiscardLevel = mCurrentDiscardLevel;
     mPublished.mMaxDiscardLevel     = mMaxDiscardLevel;
+    mPublished.mMipLevels           = mMipLevels;
     mPublished.mFormatPrimary          = mFormatPrimary;
     mPublished.mDeprecatedSourceFormat = mDeprecatedSourceFormat;
     mPublished.mTextureMemory          = mTextureMemory;
@@ -2588,14 +2598,6 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     //debug code, leave it there commented.
     //checkTexSize() ;
 
-    LLGLint glwidth = 0;
-    glGetTexLevelParameteriv(mTarget, gl_discard, GL_TEXTURE_WIDTH, (GLint*)&glwidth);
-    if (glwidth == 0)
-    {
-        // No mip data smaller than current discard level
-        return false;
-    }
-
     S32 width = getWidth(discard_level);
     S32 height = getHeight(discard_level);
     S32 ncomponents = getComponents();
@@ -2603,12 +2605,33 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     {
         return false;
     }
-    if(width < glwidth)
+
+    // The levels mTexName holds, and so whether it has this one, are known here, as are their
+    // sizes; asking GL is a call that returns a value, which a threaded driver answers only
+    // once its own thread has caught up. GL is asked where the levels are not known (a name
+    // whose storage someone else allocated) and, to catch the two disagreeing, under debug GL.
+    const S32 levels = mUploadInFlight ? mPublished.mMipLevels : mMipLevels;
+    if (levels > 0 && gl_discard >= levels)
     {
-        LL_WARNS() << "texture size is smaller than it should be." << LL_ENDL ;
-        LL_WARNS() << "width: " << width << " glwidth: " << glwidth << " mWidth: " << mWidth <<
-            " current discard: " << cur_discard << " discard_level: " << (S32)discard_level << LL_ENDL ;
-        return false ;
+        // No mip data smaller than current discard level
+        return false;
+    }
+    if (levels <= 0 || gDebugGL)
+    {
+        LLGLint glwidth = 0;
+        glGetTexLevelParameteriv(mTarget, gl_discard, GL_TEXTURE_WIDTH, (GLint*)&glwidth);
+        if (glwidth == 0)
+        {
+            // No mip data smaller than current discard level
+            return false;
+        }
+        if(width < glwidth)
+        {
+            LL_WARNS() << "texture size is smaller than it should be." << LL_ENDL ;
+            LL_WARNS() << "width: " << width << " glwidth: " << glwidth << " mWidth: " << mWidth <<
+                " current discard: " << cur_discard << " discard_level: " << (S32)discard_level << LL_ENDL ;
+            return false ;
+        }
     }
 
     if (width <= 0 || width > 2048 || height <= 0 || height > 2048 || ncomponents < 1 || ncomponents > 4)
@@ -2622,13 +2645,15 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
         glGetTexLevelParameteriv(mTarget, gl_discard, GL_TEXTURE_COMPRESSED, (GLint*)&is_compressed);
     }
 
-    //-----------------------------------------------------------------------------------------------
+    // The errors around the read are asked for under debug GL only, each a call that returns a value.
     GLenum error ;
-    while((error = glGetError()) != GL_NO_ERROR)
+    if (gDebugGL)
     {
-        LL_WARNS() << "GL Error happens before reading back texture. Error code: " << error << LL_ENDL ;
+        while((error = glGetError()) != GL_NO_ERROR)
+        {
+            LL_WARNS() << "GL Error happens before reading back texture. Error code: " << error << LL_ENDL ;
+        }
     }
-    //-----------------------------------------------------------------------------------------------
 
     LLImageDataLock lock(imageraw);
 
@@ -2652,7 +2677,10 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
             return false ;
         }
 
+        const auto began = std::chrono::steady_clock::now();
         glGetCompressedTexImage(mTarget, gl_discard, (GLvoid*)(imageraw->getData()));
+        ++sReadbacks;
+        sReadbackSeconds += std::chrono::duration<F64>(std::chrono::steady_clock::now() - began).count();
         //stop_glerror();
     }
     else
@@ -2683,12 +2711,15 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
             return false ;
         }
 
+        const auto began = std::chrono::steady_clock::now();
         glGetTexImage(GL_TEXTURE_2D, gl_discard, mFormatPrimary, mFormatType, (GLvoid*)(imageraw->getData()));
+        ++sReadbacks;
+        sReadbackSeconds += std::chrono::duration<F64>(std::chrono::steady_clock::now() - began).count();
         //stop_glerror();
     }
 
     //-----------------------------------------------------------------------------------------------
-    if((error = glGetError()) != GL_NO_ERROR)
+    if(gDebugGL && (error = glGetError()) != GL_NO_ERROR)
     {
         LL_WARNS() << "GL Error happens after reading back texture. Error code: " << error << LL_ENDL ;
         imageraw->deleteData() ;
