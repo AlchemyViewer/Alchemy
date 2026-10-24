@@ -419,10 +419,12 @@ void LLReflectionMapManager::update()
     //
     // An automatic probe is a fallback for space nobody placed a probe in. Where a placed probe
     // has swallowed its whole influence volume it can no longer change a single pixel -- see
-    // eclipses() for what "swallowed" has to mean for that to be true of each volume shape --
+    // ALProbeEclipse for what "swallowed" has to mean for that to be true of each volume shape --
     // so the cube slot and the place in the update queue it holds are pure waste. Only probes
     // that are actually rendering get to evict anything, or a probe still generating would
-    // leave a hole where the one it displaced used to be.
+    // leave a hole where the one it displaced used to be. Every automatic probe is asked of
+    // every placed one, each placed probe's shape worked out once a frame, and a pair whose
+    // centres lie farther apart than the placed probe could swallow across is turned away first.
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_DISPLAY("rmmu - manual eclipse");
 
@@ -431,7 +433,7 @@ void LLReflectionMapManager::update()
         // each flip costs it a full twelve-pass regeneration.
         const F32 ECLIPSE_HYSTERESIS = 0.5f;
 
-        std::vector<LLReflectionMap*> manual_probes;
+        mEclipse.clear(ECLIPSE_HYSTERESIS);
 
         for (auto& probe : mProbes)
         {
@@ -440,7 +442,7 @@ void LLReflectionMapManager::update()
             if (probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
                 probe->mCubeIndex != -1 && probe->mFadeIn >= 1.f && probe->isRelevant())
             {
-                manual_probes.push_back(probe);
+                probe->addEclipser(mEclipse);
             }
         }
 
@@ -452,18 +454,8 @@ void LLReflectionMapManager::update()
             }
 
             F32 margin = probe->mInsideManualProbe ? ECLIPSE_HYSTERESIS : -ECLIPSE_HYSTERESIS;
-
-            bool eclipsed = false;
-            for (auto* manual : manual_probes)
-            {
-                if (manual->eclipses(probe, margin))
-                {
-                    eclipsed = true;
-                    break;
-                }
-            }
-
-            probe->mInsideManualProbe = eclipsed;
+            probe->mInsideManualProbe = mEclipse.size() > 0 &&
+                mEclipse.eclipses(LLVector3(probe->mOrigin.getF32ptr()), probe->mRadius, margin);
         }
     }
 

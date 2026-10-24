@@ -4,7 +4,7 @@
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
 # the depth pyramid and the boxes tested against it, the light map's blur,
-# the depth under the HUD,
+# the depth under the HUD, which placed reflection probes swallow automatic ones,
 # snapshot cutouts and whether a spot light's shadow map is drawn again; and
 # the pool that lends the frame's short-lived render targets by description.
 # Whatever reads settings or the scene hands these their inputs as values.
@@ -17,6 +17,7 @@ set(
   alfarplane.cpp
   allightmapblur.cpp
   alondemandtarget.cpp
+  alprobeeclipse.cpp
   alrenderinputrequests.cpp
   alrenderresourceplan.cpp
   alshaderinputs.cpp
@@ -38,6 +39,7 @@ set(
   alhuddepth.h
   allightmapblur.h
   alondemandtarget.h
+  alprobeeclipse.h
   alrenderinputrequests.h
   alrenderresourceinputs.h
   alrenderresourceplan.h
@@ -81,6 +83,7 @@ if(AL_BUILD_TESTS)
       tests/alcutoutimage_test.cpp
       tests/alfarplane_test.cpp
       tests/alframeend_test.cpp
+      tests/alprobeeclipse_test.cpp
       tests/alrenderinputrequests_test.cpp
       tests/alrenderresourceplan_test.cpp
       tests/alshaderinputs_test.cpp

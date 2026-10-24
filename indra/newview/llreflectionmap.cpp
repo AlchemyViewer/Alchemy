@@ -220,47 +220,24 @@ void LLReflectionMap::orphan()
     mPriority = 0;
 }
 
-bool LLReflectionMap::eclipses(const LLReflectionMap* other, F32 margin) const
+bool LLReflectionMap::addEclipser(ALProbeEclipse& eclipse) const
 {
-    if (!other || other == this || !mViewerObject || mViewerObject->isDead())
+    if (!mViewerObject || mViewerObject->isDead())
     {
         return false;
     }
 
-    LLVector4a delta;
-    delta.setSub(other->mOrigin, mOrigin);
-
-    bool is_box = mViewerObject->getVolumeConst()
-               && ((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox();
-
-    if (is_box)
+    LLVector3 origin(mOrigin.getF32ptr());
+    if (mViewerObject->getVolumeConst() && ((LLVOVolume*)mViewerObject.get())->getReflectionProbeIsBox())
     {
-        // A box probe's own influence volume is what the shader tests against, and inside it
-        // the shader refuses to sample automatic probes at all. So containment in the box is
-        // the whole condition -- anything inside contributes exactly nothing.
-        //
-        // Measured in the probe object's frame, where the volume is an axis-aligned box of its
-        // half-scale, so the other probe's bounding sphere has to clear all three axes.
-        LLVector3 half = mViewerObject->getScale() * 0.5f;
-        LLVector3 local(delta.getF32ptr());
-        local.rotVec(~mViewerObject->getRenderRotation());
-
-        return fabsf(local.mV[0]) + other->mRadius <= half.mV[0] + margin
-            && fabsf(local.mV[1]) + other->mRadius <= half.mV[1] + margin
-            && fabsf(local.mV[2]) + other->mRadius <= half.mV[2] + margin;
+        // The influence volume is the object's box, an axis-aligned box of its half-scale in its own frame.
+        eclipse.addBox(origin, mViewerObject->getRenderRotation(), mViewerObject->getScale() * 0.5f);
     }
-
-    // A sphere probe does not exclude automatics -- it blends against them, weighted by
-    // sphereWeight's dw. That weight saturates the blend to fully manual everywhere inside
-    // half the radius, which is where its attenuation ramp begins (r1 = r * 0.5 in
-    // class3/deferred/reflectionProbeF.glsl; the two have to agree or this culls a probe that
-    // was still contributing). Containment in that inner half is therefore the condition under
-    // which dropping the automatic provably cannot change a pixel; plain containment is not.
-    const F32 SPHERE_FULL_WEIGHT_FRACTION = 0.5f;
-
-    F32 dist = delta.getLength3().getF32();
-
-    return dist + other->mRadius <= mRadius * SPHERE_FULL_WEIGHT_FRACTION + margin;
+    else
+    {
+        eclipse.addSphere(origin, mRadius);
+    }
+    return true;
 }
 
 bool LLReflectionMap::neighborsAreStale() const
@@ -402,7 +379,7 @@ bool LLReflectionMap::isRelevant() const
     }
 
     if (mInsideManualProbe)
-    { // a manual probe already covers everything this one could, see eclipses()
+    { // a manual probe already covers everything this one could, see ALProbeEclipse
         return false;
     }
 
