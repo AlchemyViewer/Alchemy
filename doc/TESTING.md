@@ -90,7 +90,7 @@ The **state guard** compares a set of process facts after every case with what t
 - **An `LL_ERRS`** throws `ll_test::FatalError` in a test, so `REQUIRE_THROWS_AS(..., ll_test::FatalError)` checks one.
 - **A child process of the test's own making:** register it with `AL_TEST_HELPER(name)`, and launch the binary with `ll_test::Helper::argument(name)`. The main then runs only that helper.
 - **The running case's name:** `ll_test::currentTestName()`.
-- **Built with ThreadSanitizer:** `ll_test::THREAD_SANITIZER` (`altestsanitizer.h`). Its own call stack holds `THREAD_SANITIZER_FRAMES` frames, past which a process falls over with no report, so a case that recurses deeper on purpose is passed over under it.
+- **Built with ThreadSanitizer:** `ll_test::THREAD_SANITIZER` (`altestsanitizer.h`). Its own call stack holds `THREAD_SANITIZER_FRAMES` frames, past which a process falls over with no report, so a case that recurses deeper on purpose is passed over under it. `ll_test::SANITIZER_ALLOCATOR` says `operator new` is AddressSanitizer's or ThreadSanitizer's, which ends the process on a size it cannot serve where the standard's throws `std::bad_alloc`, so a case that checks for the throw is passed over under them.
 
 ## Binaries
 
