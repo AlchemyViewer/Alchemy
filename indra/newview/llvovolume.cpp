@@ -5887,6 +5887,19 @@ void LLVolumeGeometryManager::getGeometry(LLSpatialGroup* group)
 
 }
 
+// A face past MAX_FACE_COUNT in a group's list is not drawn: said once a session, without the counts, which would make
+// every message a new one to LL_WARNS_ONCE.
+static void warn_face_dropped()
+{
+    static bool warned = false;
+    if (!warned)
+    {
+        warned = true;
+        LL_WARNS("SpatialPartition") << "A spatial group holds more faces than one rebuild draws; the faces past "
+                                     << MAX_FACE_COUNT << " are not drawn" << LL_ENDL;
+    }
+}
+
 // add a face pointer to a list of face pointers without going over MAX_COUNT faces
 template<typename T>
 static inline void add_face(T*** list, U32* count, T* face)
@@ -5898,6 +5911,10 @@ static inline void add_face(T*** list, U32* count, T* face)
             face->setDrawOrderIndex(count[1]);
             list[1][count[1]++] = face;
         }
+        else
+        {
+            warn_face_dropped();
+        }
     }
     else
     {
@@ -5905,6 +5922,10 @@ static inline void add_face(T*** list, U32* count, T* face)
         {
             face->setDrawOrderIndex(count[0]);
             list[0][count[0]++] = face;
+        }
+        else
+        {
+            warn_face_dropped();
         }
     }
 }
