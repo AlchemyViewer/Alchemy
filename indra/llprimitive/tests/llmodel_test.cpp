@@ -125,7 +125,7 @@ namespace
             lod->setNumVolumeFaces(1);
             ALMeshSimplifier::Target goal;
             goal.decimator = 9.f;
-            REQUIRE(ALMeshSimplifier::simplifyModel(*model, *lod, goal, seams) > 0.f);
+            REQUIRE(ALMeshSimplifier(*model).simplifyModel(*lod, goal, seams) > 0.f);
             lod->mSkinWeights = model->mSkinWeights;
             CHECK(weightsFound(*lod));
         }

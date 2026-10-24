@@ -521,7 +521,7 @@ namespace
                 {
                     INFO(fmt::format("{}, a {}th of {} triangles, {}", name, decimator, base_triangles, nameOf(seams)));
                     LLPointer<LLVolume> target = targetFor(*base);
-                    const F32 ratio = ALMeshSimplifier::simplifyModel(*base, *target, toCount(decimator), seams);
+                    const F32 ratio = ALMeshSimplifier(*base).simplifyModel(*target, toCount(decimator), seams);
                     REQUIRE(ratio > 0.f);
                     REQUIRE(wellFormed(target->getVolumeFace(0)));
                     CHECK(fromBase(target->getVolumeFace(0), *base));
@@ -551,14 +551,14 @@ namespace
         const F32 decimator = 9.f;
 
         LLPointer<LLVolume> held = targetFor(*base);
-        const F32 held_ratio = ALMeshSimplifier::simplifyModel(*base, *held, toCount(decimator), Seams::ALL);
+        const F32 held_ratio = ALMeshSimplifier(*base).simplifyModel(*held, toCount(decimator), Seams::ALL);
         INFO(fmt::format("every seam held: a ratio of {}", held_ratio));
         CHECK(held_ratio * ALLOWED_DRIFT < decimator);
 
         for (Seams seams : { Seams::UV, Seams::NONE })
         {
             LLPointer<LLVolume> free = targetFor(*base);
-            const F32 ratio = ALMeshSimplifier::simplifyModel(*base, *free, toCount(decimator), seams);
+            const F32 ratio = ALMeshSimplifier(*base).simplifyModel(*free, toCount(decimator), seams);
             INFO(fmt::format("{}: a ratio of {}", nameOf(seams), ratio));
             REQUIRE(ratio > 0.f);
             REQUIRE(wellFormed(free->getVolumeFace(0)));
@@ -582,7 +582,7 @@ namespace
             ALMeshSimplifier::Target goal;
             goal.error = error;
             LLPointer<LLVolume> target = targetFor(*base);
-            const F32 ratio = ALMeshSimplifier::simplifyModel(*base, *target, goal, Seams::ALL);
+            const F32 ratio = ALMeshSimplifier(*base).simplifyModel(*target, goal, Seams::ALL);
             const F32 measured = deviation(*base, *target);
             const S32 triangles = triangleCount(*target);
             INFO(fmt::format("an error of {}: {} of {} triangles, a ratio of {}, {} measured", error, triangles, triangleCount(*base),
@@ -686,7 +686,7 @@ namespace
                 LLPointer<LLVolume> target = targetFor(*base);
                 for (S32 f = 0; f < 2; ++f)
                 {
-                    CHECK(ALMeshSimplifier::simplifyFace(*base, f, target->getVolumeFace(f), toCount(decimator), seams) > 0.f);
+                    CHECK(ALMeshSimplifier(*base).simplifyFace(f, target->getVolumeFace(f), toCount(decimator), seams) > 0.f);
                     REQUIRE(wellFormed(target->getVolumeFace(f)));
                     CHECK(fromBase(target->getVolumeFace(f), *base));
                 }
@@ -710,7 +710,7 @@ namespace
                     INFO(fmt::format("{} halves, a {}th, {}", flat_unmapped ? "flat shaded, unmapped" : "smooth", decimator,
                                      nameOf(seams)));
                     LLPointer<LLVolume> target = targetFor(*base);
-                    REQUIRE(ALMeshSimplifier::simplifyModel(*base, *target, toCount(decimator), seams) > 0.f);
+                    REQUIRE(ALMeshSimplifier(*base).simplifyModel(*target, toCount(decimator), seams) > 0.f);
                     for (S32 f = 0; f < 2; ++f)
                     {
                         const LLVolumeFace& face = target->getVolumeFace(f);
@@ -735,14 +735,14 @@ namespace
 
         LLPointer<LLVolume> alone = volumeOf({ plane(32) });
         LLPointer<LLVolume> alone_target = targetFor(*alone);
-        const F32 alone_ratio = ALMeshSimplifier::simplifyFace(*alone, 0, alone_target->getVolumeFace(0), toCount(decimator), Seams::ALL);
+        const F32 alone_ratio = ALMeshSimplifier(*alone).simplifyFace(0, alone_target->getVolumeFace(0), toCount(decimator), Seams::ALL);
         INFO(fmt::format("on its own: a ratio of {}", alone_ratio));
         CHECK(alone_ratio * ALLOWED_DRIFT >= decimator);
 
         // The same square beside another, which it meets along x = 0.5.
         LLPointer<LLVolume> pair = volumeOf({ plane(32), plane(32, 0.5f) });
         LLPointer<LLVolume> pair_target = targetFor(*pair);
-        const F32 pair_ratio = ALMeshSimplifier::simplifyFace(*pair, 0, pair_target->getVolumeFace(0), toCount(decimator), Seams::ALL);
+        const F32 pair_ratio = ALMeshSimplifier(*pair).simplifyFace(0, pair_target->getVolumeFace(0), toCount(decimator), Seams::ALL);
         INFO(fmt::format("beside another: a ratio of {}", pair_ratio));
         CHECK(pair_ratio * ALLOWED_DRIFT < decimator);
         CHECK(borderOf(pair_target->getVolumeFace(0)).size() == 4 * 32);
@@ -763,7 +763,7 @@ namespace
             {
                 INFO(fmt::format("a {}th, {}", decimator, nameOf(seams)));
                 LLPointer<LLVolume> target = targetFor(*base);
-                REQUIRE(ALMeshSimplifier::simplifyModel(*base, *target, toCount(decimator), seams) > 0.f);
+                REQUIRE(ALMeshSimplifier(*base).simplifyModel(*target, toCount(decimator), seams) > 0.f);
                 const LLVolumeFace& face = target->getVolumeFace(0);
                 REQUIRE(wellFormed(face));
                 size_t across = 0;
@@ -827,11 +827,11 @@ namespace
             for (Seams seams : { Seams::ALL, Seams::UV })
             {
                 LLPointer<LLVolume> held = targetFor(*base);
-                REQUIRE(ALMeshSimplifier::simplifyModel(*base, *held, toCount(decimator), seams) > 0.f);
+                REQUIRE(ALMeshSimplifier(*base).simplifyModel(*held, toCount(decimator), seams) > 0.f);
                 CHECK(spanning(held->getVolumeFace(0)) == 0);
             }
             LLPointer<LLVolume> free = targetFor(*base);
-            REQUIRE(ALMeshSimplifier::simplifyModel(*base, *free, toCount(decimator), Seams::NONE) > 0.f);
+            REQUIRE(ALMeshSimplifier(*base).simplifyModel(*free, toCount(decimator), Seams::NONE) > 0.f);
             CHECK(spanning(free->getVolumeFace(0)) > 0);
         }
     }
@@ -857,14 +857,14 @@ namespace
         {
             INFO(fmt::format("a {}th", decimator));
             LLPointer<LLVolume> held = targetFor(*base);
-            REQUIRE(ALMeshSimplifier::simplifyModel(*base, *held, toCount(decimator), Seams::ALL) > 0.f);
+            REQUIRE(ALMeshSimplifier(*base).simplifyModel(*held, toCount(decimator), Seams::ALL) > 0.f);
             CHECK(mixed(held->getVolumeFace(0)) == 0);
         }
 
         // Free to cross them, at a level of detail the held one cannot
         // reach, it does.
         LLPointer<LLVolume> free = targetFor(*base);
-        REQUIRE(ALMeshSimplifier::simplifyModel(*base, *free, toCount(100.f), Seams::UV) > 0.f);
+        REQUIRE(ALMeshSimplifier(*base).simplifyModel(*free, toCount(100.f), Seams::UV) > 0.f);
         CHECK(mixed(free->getVolumeFace(0)) > 0);
     }
 
@@ -900,7 +900,7 @@ namespace
         LLPointer<LLVolume> target = targetFor(*base);
         ALMeshSimplifier::Target goal = toCount(9.f);
         goal.distant = true;
-        REQUIRE(ALMeshSimplifier::simplifyModel(*base, *target, goal, Seams::ALL) > 0.f);
+        REQUIRE(ALMeshSimplifier(*base).simplifyModel(*target, goal, Seams::ALL) > 0.f);
         const LLVolumeFace& face = target->getVolumeFace(0);
         REQUIRE(wellFormed(face));
         S32 bolt_vertices = 0;
@@ -915,7 +915,7 @@ namespace
 
         // A level of detail seen from near keeps them, short of its target.
         LLPointer<LLVolume> near_target = targetFor(*base);
-        REQUIRE(ALMeshSimplifier::simplifyModel(*base, *near_target, toCount(9.f), Seams::ALL) > 0.f);
+        REQUIRE(ALMeshSimplifier(*base).simplifyModel(*near_target, toCount(9.f), Seams::ALL) > 0.f);
         CHECK(triangleCount(*near_target) > target_triangles);
     }
 
@@ -1197,7 +1197,7 @@ namespace
                     {
                         Tally& tally = tallies[{ (S32)seams, decimator }];
                         LLPointer<LLVolume> target = targetFor(base);
-                        const F32 ratio = ALMeshSimplifier::simplifyModel(base, *target, toCount(decimator), seams);
+                        const F32 ratio = ALMeshSimplifier(base).simplifyModel(*target, toCount(decimator), seams);
                         if (ratio < 0.f)
                         {
                             ++tally.failed;

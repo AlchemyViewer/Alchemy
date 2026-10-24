@@ -37,8 +37,32 @@
 #include <cmath>
 #include <vector>
 
+// base's faces as meshoptimizer takes them, their vertices and indices
+// numbered face after face.
+struct ALMeshSimplifier::Mesh
+{
+    std::vector<U32> first;            // each face's first vertex, then the vertex count
+    std::vector<U32> first_index;      // each face's first index, then the index count
+    std::vector<U32> indices;          // each face's triangles, those of its indices that name its vertices
+    std::vector<LLVector4a> positions; // in the authored shape
+    std::vector<F32> attributes;       // ATTRIBUTE_COUNT a vertex
+    std::vector<U8> shared;            // at a position another face has a vertex at too
+    std::vector<U8> uv_seam;           // at a position its face has a vertex with another texture coordinate at
+    F32 extent = 0.f;                  // the largest extent of the positions
+
+    size_t vertexCount() const { return first.back(); }
+    size_t indexCount() const { return first_index.back(); }
+
+    S32 faceOf(U32 vertex) const
+    {
+        return (S32)(std::upper_bound(first.begin(), first.end(), vertex) - first.begin()) - 1;
+    }
+};
+
 namespace
 {
+    using Mesh = ALMeshSimplifier::Mesh;
+
     // What the simplifier weighs at a vertex besides its position: its
     // normal, as a direction in the authored shape, and its texture
     // coordinate over its face's density.
@@ -57,28 +81,6 @@ namespace
     constexpr F32 UV_WEIGHT = 0.1f;
 
     constexpr F32 ATTRIBUTE_WEIGHTS[ATTRIBUTE_COUNT] = { NORMAL_WEIGHT, NORMAL_WEIGHT, NORMAL_WEIGHT, UV_WEIGHT, UV_WEIGHT };
-
-    // base's faces as meshoptimizer takes them, their vertices and indices
-    // numbered face after face.
-    struct Mesh
-    {
-        std::vector<U32> first;            // each face's first vertex, then the vertex count
-        std::vector<U32> first_index;      // each face's first index, then the index count
-        std::vector<U32> indices;          // each face's triangles, those of its indices that name its vertices
-        std::vector<LLVector4a> positions; // in the authored shape
-        std::vector<F32> attributes;       // ATTRIBUTE_COUNT a vertex
-        std::vector<U8> shared;            // at a position another face has a vertex at too
-        std::vector<U8> uv_seam;           // at a position its face has a vertex with another texture coordinate at
-        F32 extent = 0.f;                  // the largest extent of the positions
-
-        size_t vertexCount() const { return first.back(); }
-        size_t indexCount() const { return first_index.back(); }
-
-        S32 faceOf(U32 vertex) const
-        {
-            return (S32)(std::upper_bound(first.begin(), first.end(), vertex) - first.begin()) - 1;
-        }
-    };
 
     LLVector4a unscale(const LLVector3& normalized_scale)
     {
@@ -521,11 +523,20 @@ bool ALMeshSimplifier::compact(const LLVolume& base, S32 face, const U32* indice
     return true;
 }
 
-// static
-F32 ALMeshSimplifier::simplifyModel(const LLVolume& base, LLVolume& target, const Target& goal, Seams seams)
+ALMeshSimplifier::ALMeshSimplifier(const LLVolume& base)
+    : mBase(base)
 {
-    Mesh mesh;
-    prepare(base, mesh);
+    auto mesh = std::make_unique<Mesh>();
+    prepare(base, *mesh);
+    mMesh = std::move(mesh);
+}
+
+ALMeshSimplifier::~ALMeshSimplifier() = default;
+
+F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams seams) const
+{
+    const LLVolume& base = mBase;
+    const Mesh& mesh = *mMesh;
     const size_t index_count = mesh.indices.size();
     if (index_count < 3)
     {
@@ -581,7 +592,7 @@ F32 ALMeshSimplifier::simplifyModel(const LLVolume& base, LLVolume& target, cons
             S32 kept = 0;
             for (S32 g = 0; g < faces; ++g)
             {
-                if (simplifyFace(base, g, target.getVolumeFace(g), goal, seams) > 0.f)
+                if (simplifyFace(g, target.getVolumeFace(g), goal, seams) > 0.f)
                 {
                     face_count += target.getVolumeFace(g).mNumIndices;
                     ++kept;
@@ -600,11 +611,10 @@ F32 ALMeshSimplifier::simplifyModel(const LLVolume& base, LLVolume& target, cons
     return (F32)index_count / (F32)count;
 }
 
-// static
-F32 ALMeshSimplifier::simplifyFace(const LLVolume& base, S32 face, LLVolumeFace& target, const Target& goal, Seams seams)
+F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const
 {
-    Mesh mesh;
-    prepare(base, mesh);
+    const LLVolume& base = mBase;
+    const Mesh& mesh = *mMesh;
     const U32 first = mesh.first[face];
     const U32 vertex_count = mesh.first[face + 1] - first;
     const size_t index_count = mesh.first_index[face + 1] - mesh.first_index[face];

@@ -1539,15 +1539,16 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             goal.decimator = indices_decimator;
             goal.error = lod_error_threshold;
             goal.distant = lod <= LLModel::LOD_LOW;
+            const ALMeshSimplifier simplifier(*base);
             auto simplify_model = [&](F32 decimator, ALMeshSimplifier::Seams seams)
             {
                 ALMeshSimplifier::Target at = goal;
                 at.decimator = decimator;
-                return ALMeshSimplifier::simplifyModel(*base, *target_model, at, seams);
+                return simplifier.simplifyModel(*target_model, at, seams);
             };
             auto simplify_face = [&](S32 face_idx, ALMeshSimplifier::Seams seams)
             {
-                return ALMeshSimplifier::simplifyFace(*base, face_idx, target_model->getVolumeFace(face_idx), goal, seams);
+                return simplifier.simplifyFace(face_idx, target_model->getVolumeFace(face_idx), goal, seams);
             };
 
             // Ideally this should run not per model,
