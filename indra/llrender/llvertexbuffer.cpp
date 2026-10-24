@@ -299,7 +299,9 @@ static GLuint gen_buffer()
         }
         sIndex = pool_size;
 #if !LL_DARWIN
-        if (!gGLManager.mIsAMD)
+        // AMD's own drivers are given the names one at a time. Mesa's radeonsi, which mIsAMD takes in on Linux too, is
+        // not: under glthread each call is one the application waits on, so the pool would refill in pool_size waits.
+        if (!gGLManager.mIsAMD || gGLManager.mIsMesa)
         {
             glGenBuffers(pool_size, sNamePool.get());
         }
