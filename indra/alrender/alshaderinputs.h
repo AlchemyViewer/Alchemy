@@ -72,6 +72,7 @@ struct ALShaderSettings
     bool mDynamicLOD             = true;  ///< RenderDynamicLOD
     U32  mWaterHextile           = 1;     ///< AlchemyRenderWaterHextile
     bool mWaterWaves             = true;  ///< AlchemyRenderWaterWaves
+    bool mGPUOcclusion           = true;  ///< AlchemyRenderGPUOcclusion
     bool mDisableCompute         = false; ///< AlchemyRenderDisableCompute
     bool mTransparentWater       = true;  ///< RenderTransparentWater
     bool mSSAO                   = true;  ///< RenderDeferredSSAO
@@ -136,6 +137,7 @@ struct ALShaderInputs
         bool mTerrainTessPinned = false; ///< the terrain tessellation programs' TERRAIN_TESS_PINNED, without dynamic LOD
         bool mWaterWaves       = true;  ///< the water waves' programs and the three objects only they attach
         bool mCompute          = true;  ///< the compute programs, where the context has compute and it is not switched off
+        bool mGPUOcclusion     = true;  ///< the group occlusion program, and the depth pyramid's, where the session computes
         S32  mIndexedGLTFChannels = 4;  ///< the indexed material programs' GLTF_INDEXED_CHANNELS, 0 for none
         U32  mTerrainPaintBitDepth = 0; ///< the local terrain paint's bake program, its precision 1 to 8, 0 for none
 

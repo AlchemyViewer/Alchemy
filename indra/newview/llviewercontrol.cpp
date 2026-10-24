@@ -987,6 +987,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderTerrainHexTiling", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterHextile", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderWaterWaves", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderGPUOcclusion", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMaxFramesAhead", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderPacingSlackWork", handleRenderInputChanged);

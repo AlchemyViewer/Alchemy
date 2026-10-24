@@ -915,7 +915,7 @@ void LLOcclusionCullingGroup::setOcclusionState(U32 state, S32 mode /* = STATE_M
         mOcclusionState[LLViewerCamera::sCurCameraID] |= state;
         if (state & DISCARD_QUERY)
         {
-            mOcclusionQuery[LLViewerCamera::sCurCameraID] = {};
+            forgetQuery(LLViewerCamera::sCurCameraID);
         }
         break;
 
@@ -942,7 +942,7 @@ void LLOcclusionCullingGroup::setOcclusionState(U32 state, S32 mode /* = STATE_M
 
             if (state & DISCARD_QUERY)
             {
-                mOcclusionQuery[i] = {};
+                forgetQuery(i);
             }
         }
         break;
@@ -1010,6 +1010,15 @@ public:
         }
     }
 };
+
+void LLOcclusionCullingGroup::forgetQuery(U32 camera)
+{
+    mOcclusionQuery[camera] = {};
+    if (camera == LLViewerCamera::CAMERA_WORLD)
+    {
+        mBoxQuery = {};
+    }
+}
 
 void LLOcclusionCullingGroup::discardStaleQueriesBelow()
 {
@@ -1122,7 +1131,7 @@ bool LLOcclusionCullingGroup::checkOcclusion()
     if (mOcclusionIssued[camera] < sOcclusionForgotten[camera]
         && isOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY))
     {   // what this camera found before forgetOcclusion() is let go: seen, and nothing out
-        mOcclusionQuery[camera] = {};
+        forgetQuery(camera);
         clearOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY);
         return false;
     }
@@ -1134,12 +1143,13 @@ bool LLOcclusionCullingGroup::checkOcclusion()
         return false;
     }
 
-    ALQueryTicket& query = mOcclusionQuery[LLViewerCamera::sCurCameraID];
-    if (query.isValid() && isOcclusionState(QUERY_PENDING))
+    ALQueryTicket& query = mOcclusionQuery[camera];
+    const bool box = camera == LLViewerCamera::CAMERA_WORLD && mBoxQuery.isValid();
+    if ((query.isValid() || box) && isOcclusionState(QUERY_PENDING))
     {
         if (isOcclusionState(DISCARD_QUERY))
         {   // drop the query unread
-            query = {};
+            forgetQuery(camera);
             // mark non-occluded
             discardStaleQueriesBelow();
             clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
@@ -1151,14 +1161,25 @@ bool LLOcclusionCullingGroup::checkOcclusion()
             // frame only once the GPU is ALQueryPool::FRAMES frames behind, which bounds how old the state kept here is.
             U64 passed = 0;
             ALQueryPool::Status status;
+            if (query.isValid())
             {
                 LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query result");
                 status = gGL.queries().result(query, passed);
             }
+            else
+            {   // the box's answer, from the depth pyramid, read as a query's would be
+                switch (gPipeline.mBoxOcclusion.result(mBoxQuery))
+                {
+                case ALBoxOcclusion::Status::Pending: status = ALQueryPool::Status::Pending; break;
+                case ALBoxOcclusion::Status::Seen:    status = ALQueryPool::Status::Ready; passed = 1; break;
+                case ALBoxOcclusion::Status::Hidden:  status = ALQueryPool::Status::Ready; passed = 0; break;
+                default:                              status = ALQueryPool::Status::Expired; break;
+                }
+            }
 
             if (status != ALQueryPool::Status::Pending)
             {
-                query = {};
+                forgetQuery(camera);
                 if (status == ALQueryPool::Status::Ready && passed == 0)
                 {
                     setOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
@@ -1222,9 +1243,41 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
         {
             if (!isOcclusionState(QUERY_PENDING) || isOcclusionState(DISCARD_QUERY))
             {
+                const U32 camera_id = LLViewerCamera::sCurCameraID;
+
+                // The main view's groups are tested against its depth pyramid where the pass does, all at once, rather
+                // than each asked by a query of its own (LLPipeline::doOcclusion). Not the object cache's, whose
+                // queries are exact (queryKind), nor a box too large on the screen for the pyramid to answer.
+                if (camera_id == LLViewerCamera::CAMERA_WORLD &&
+                    mSpatialPartition->mPartitionType != LLViewerRegion::PARTITION_VO_CACHE)
+                {
+                    LLVector4a half_extent;
+                    half_extent.splat(SG_OCCLUSION_FUDGE);
+                    half_extent.add(bounds[1]);
+                    if (gPipeline.boxOcclusionTakes(bounds[0], half_extent, *camera))
+                    {
+                        const ALBoxOcclusion::Ticket box = gPipeline.mBoxOcclusion.add(bounds[0], half_extent);
+                        if (box.isValid())
+                        {
+                            mOcclusionQuery[camera_id] = {};
+                            mBoxQuery = box;
+                            add(sOcclusionQueries, 1);
+                            mOcclusionIssued[camera_id] = gFrameCount;
+                            setOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING);
+                            clearOcclusionState(LLOcclusionCullingGroup::DISCARD_QUERY);
+                            return;
+                        }
+                    }
+                }
+
                 { //no query pending, or previous query to be discarded
                     LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - render");
 
+                    // A query in the box's place, the one or the other.
+                    if (camera_id == LLViewerCamera::CAMERA_WORLD)
+                    {
+                        mBoxQuery = {};
+                    }
                     ALQueryScope query(gGL.queries(), queryKind());
                     mOcclusionQuery[LLViewerCamera::sCurCameraID] = query.ticket();
                     if (!query.ticket().isValid())

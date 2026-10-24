@@ -38,6 +38,7 @@
 #include "llquaternion.h"
 #include "lloctree.h"
 #include "llviewercamera.h"
+#include "alboxocclusion.h"
 #include "alquerypool.h"
 
 class LLViewerRegion;
@@ -327,6 +328,8 @@ private:
     ALQueryKind queryKind() const;
     /// Discards the pending queries of the groups below this one that its occlusion hid, as it is found visible.
     void discardStaleQueriesBelow();
+    /// Lets go of what `camera` asked of this group, a query or a box.
+    void forgetQuery(U32 camera);
 
 protected:
     U32         mOcclusionState[LLViewerCamera::NUM_CAMERAS];
@@ -336,6 +339,9 @@ protected:
 
     LLViewerOctreePartition* mSpatialPartition;
     ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, while QUERY_PENDING
+    /// The world camera's box, tested against the main view's depth pyramid (gPipeline.mBoxOcclusion), while
+    /// QUERY_PENDING: in place of its query, the one or the other, never both.
+    ALBoxOcclusion::Ticket   mBoxQuery;
 
 private:
     static U32 sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS]; ///< the frame of each camera's forgetOcclusion()

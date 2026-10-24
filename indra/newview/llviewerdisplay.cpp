@@ -874,8 +874,11 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLGLState::checkStates();
 
         // The queries of the frames the frame fences have shown finished were read at the last frame's end
-        // (LLRender::endFrame), so nothing here asks GL for a result in the middle of the frame.
+        // (LLRender::endFrame), so nothing here asks GL for a result in the middle of the frame. The groups' boxes
+        // answered by the depth pyramid in those frames are taken in here, where the readback is mapped, by no GL call,
+        // before the cull reads them.
         gPipeline.readAttachmentTimes();
+        gPipeline.mBoxOcclusion.collect();
 
         static LLCullResult result;
         LLViewerCamera::sCurCameraID = LLViewerCamera::CAMERA_WORLD;

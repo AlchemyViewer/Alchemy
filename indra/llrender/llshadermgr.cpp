@@ -2283,6 +2283,10 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("depthPyramidSize");
     mReservedUniforms.push_back("depthPyramidCount");
 
+    // Boxes tested against the depth pyramid
+    mReservedUniforms.push_back("occlusionViewProj");
+    mReservedUniforms.push_back("occlusionBoxCount");
+
     // The light map's ambient occlusion blur in one dispatch
     mReservedUniforms.push_back("blur_light_apron");
     mReservedUniforms.push_back("blurLightTarget");
@@ -2333,6 +2337,7 @@ void LLShaderMgr::initAttribsAndUniforms()
 
     // The storage blocks, each with its element count, in eGLSLReservedStorageBlocks order.
     mReservedStorageBlocks.clear();
+    mReservedStorageBlocks.push_back({ "OcclusionBoxes", 1 });
 
     // The same three checks, and that every block's points fit the ones every compute context has.
     if (mReservedStorageBlocks.size() != END_RESERVED_STORAGE_BLOCKS)

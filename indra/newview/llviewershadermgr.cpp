@@ -121,6 +121,7 @@ LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
 LLGLSLShader        gWaterFieldProgram;
 LLGLSLShader        gDepthPyramidProgram;
+LLGLSLShader        gGroupOcclusionProgram;
 
 //interface shaders
 LLGLSLShader        gHighlightProgram;
@@ -1417,6 +1418,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
         gDepthPyramidProgram.unload();
+        gGroupOcclusionProgram.unload();
         gDeferredBufferVisualProgram.unload();
 
         for (U32 i = 0; i < LLMaterial::SHADER_COUNT; ++i)
@@ -3301,9 +3303,10 @@ void LLViewerShaderMgr::loadShadersDeferred()
         built(gDeferredGenBrdfLutProgram.createShader(), gDeferredGenBrdfLutProgram);
     }
 
-    // The depth pyramid's levels, where the session computes and the water's waves, its reader, are wanted. Optional,
-    // like them: its failing leaves the cull off (ALDepthPyramid::build), not the shaders after it.
-    if (mInputs.mLocal.mCompute && mInputs.mLocal.mWaterWaves)
+    // The depth pyramid's levels, where the session computes and a reader of them is wanted: the water's waves, or
+    // the main view's group occlusion. Optional, like them: its failing leaves the culls off (ALDepthPyramid::build),
+    // not the shaders after it.
+    if (mInputs.mLocal.mCompute && (mInputs.mLocal.mWaterWaves || mInputs.mLocal.mGPUOcclusion))
     {
         gDepthPyramidProgram.mName = "Depth Pyramid Shader";
         gDepthPyramidProgram.mShaderFiles.clear();
@@ -3312,8 +3315,26 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDepthPyramidProgram.clearPermutations();
         if (!gDepthPyramidProgram.createShader())
         {
-            LL_WARNS("Shader") << "The depth pyramid's program did not build; the water's patches are not culled by depth" << LL_ENDL;
+            LL_WARNS("Shader") << "The depth pyramid's program did not build; nothing is culled by depth" << LL_ENDL;
             gDepthPyramidProgram.unload();
+        }
+    }
+
+    // The main view's spatial groups tested against the pyramid all at once (ALBoxOcclusion), where the session
+    // computes and AlchemyRenderGPUOcclusion asks for it. Optional: its failing leaves each group to its query.
+    if (mInputs.mLocal.mCompute && mInputs.mLocal.mGPUOcclusion)
+    {
+        gGroupOcclusionProgram.mName = "Group Occlusion Shader";
+        gGroupOcclusionProgram.mShaderFiles.clear();
+        gGroupOcclusionProgram.mShaderFiles.push_back(make_pair("deferred/groupOcclusionC.glsl", GL_COMPUTE_SHADER));
+        // A compute program attaches no shared object: the pyramid's test is a file of its own, compiled for the stage.
+        gGroupOcclusionProgram.mShaderFiles.push_back(make_pair("deferred/depthPyramidUtil.glsl", GL_COMPUTE_SHADER));
+        gGroupOcclusionProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gGroupOcclusionProgram.clearPermutations();
+        if (!gGroupOcclusionProgram.createShader())
+        {
+            LL_WARNS("Shader") << "The group occlusion program did not build; each group is asked by query" << LL_ENDL;
+            gGroupOcclusionProgram.unload();
         }
     }
 

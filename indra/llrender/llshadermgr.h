@@ -699,6 +699,10 @@ public:
         DEPTH_PYRAMID_SIZE,                 //  "depthPyramidSize"  ivec4, the depth's size in pixels (xy) and the pyramid's levels (z)
         DEPTH_PYRAMID_COUNT,                //  "depthPyramidCount"  int, the levels a build dispatch writes
 
+        // Boxes tested against the depth pyramid in one dispatch (ALBoxOcclusion)
+        OCCLUSION_VIEW_PROJ,                //  "occlusionViewProj"  mat4, the boxes' space to the view's clip space
+        OCCLUSION_BOX_COUNT,                //  "occlusionBoxCount"  int, the boxes the dispatch tests
+
         // The light map's ambient occlusion blur in one dispatch (ALLightMapBlur)
         BLUR_LIGHT_APRON,                   //  "blur_light_apron"  int, the rows above and below a tile its taps down reach
         BLUR_LIGHT_TARGET,                  //  "blurLightTarget"  image2D, the sun's shadow and the blurred occlusion
@@ -723,6 +727,7 @@ public:
     // there for every program, so a pass binds it once whatever it draws or dispatches between.
     typedef enum
     {                                       // Block name, element count
+        OCCLUSION_BOXES = 0,                //  "OcclusionBoxes", 1: the boxes ALBoxOcclusion tests, then whether each is seen
         END_RESERVED_STORAGE_BLOCKS
     } eGLSLReservedStorageBlocks;
     // clang-format on

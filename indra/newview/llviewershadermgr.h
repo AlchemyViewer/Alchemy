@@ -166,6 +166,8 @@ extern LLGLSLShader         gWaterExclusionProgram;
 extern LLGLSLShader         gWaterFieldProgram;
 // One level of ALDepthPyramid; built where the session computes.
 extern LLGLSLShader         gDepthPyramidProgram;
+// The main view's group boxes against the depth pyramid (ALBoxOcclusion); built where the session computes.
+extern LLGLSLShader         gGroupOcclusionProgram;
 extern LLGLSLShader         gGlowProgram;
 extern LLGLSLShader         gGlowExtractProgram;
 extern LLGLSLShader         gBloomExtractProgram;

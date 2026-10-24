@@ -40,6 +40,7 @@
 #include "lldrawpoolmaterials.h"
 #include "llgl.h"
 #include "lldrawable.h"
+#include "alboxocclusion.h"
 #include "aldepthpyramid.h"
 #include "alprimitiveplot.h"
 #include "algpubuffer.h"
@@ -454,6 +455,12 @@ public:
     void        markOccluder(LLSpatialGroup* group);
 
     void        doOcclusion(LLCamera& camera);
+    // Whether the occlusion pass running now tests the group whose box is `center` +- `half_extent` (agent space) against the main
+    // view's depth pyramid, rather than asking a query of it: the pass does (mBoxOcclusionPass), and the box is not so
+    // large on the screen that the pyramid would keep it seen whatever hid it (ALBoxOcclusion::screenReach).
+    bool        boxOcclusionTakes(const LLVector4a& center, const LLVector4a& half_extent, const LLCamera& camera) const;
+    // Whether the occlusion pass running now, the current camera's, may test boxes against the depth pyramid at all.
+    bool        boxOcclusionWanted() const;
     void        markNotCulled(LLSpatialGroup* group, LLCamera &camera);
     void        markMoved(LLDrawable *drawablep, bool damped_motion = false);
     void        markShift(LLDrawable *drawablep);
@@ -1264,6 +1271,14 @@ public:
 
     // The farthest depth under each texel of the main view's depth, built where a GPU cull asks for it.
     ALDepthPyramid              mDepthPyramid;
+
+    // The main view's spatial groups tested against its depth all at once, rather than a query each (doOcclusion,
+    // AlchemyRenderGPUOcclusion), through a pyramid of their own, built from the G-buffer's depth where the occlusion
+    // pass runs: the water's is built later in the frame from another depth, and let go on frames it culls nothing.
+    ALDepthPyramid              mOcclusionPyramid;
+    ALBoxOcclusion              mBoxOcclusion;
+    // Set while the occlusion pass running now adds the groups' boxes to mBoxOcclusion.
+    bool                        mBoxOcclusionPass = false;
 
     // Profiling tracks, plotted at the start of each main frame for a frame a few before: the primitives the main view's
     // terrain and water passes draw, the water's flat field and its waves' patches apart, and the draws of water

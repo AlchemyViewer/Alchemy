@@ -3,13 +3,15 @@
 # Render infrastructure over llrender that holds no viewer state: what the
 # pipeline's render resources and programs are built from and when they
 # change, the far plane, the water's field, wave heights and stencil bits,
-# the depth pyramid, the light map's blur, the depth under the HUD,
+# the depth pyramid and the boxes tested against it, the light map's blur,
+# the depth under the HUD,
 # snapshot cutouts and whether a spot light's shadow map is drawn again; and
 # the pool that lends the frame's short-lived render targets by description.
 # Whatever reads settings or the scene hands these their inputs as values.
 
 set(
   alrender_SOURCES
+  alboxocclusion.cpp
   alcutoutimage.cpp
   aldepthpyramid.cpp
   alfarplane.cpp
@@ -27,6 +29,7 @@ set(
 
 set(
   alrender_HEADERS
+  alboxocclusion.h
   alcutoutimage.h
   aldepthpyramid.h
   alfarplane.h
@@ -103,6 +106,7 @@ if(AL_BUILD_TESTS)
     alrender_gl_tests
     PROJECT alrender
     SOURCES
+      tests/alboxocclusion_gl_test.cpp
       tests/alhuddepth_gl_test.cpp
       tests/allightmapblur_gl_test.cpp
       tests/alondemandtarget_gl_test.cpp

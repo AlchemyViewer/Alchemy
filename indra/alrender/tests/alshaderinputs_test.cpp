@@ -124,6 +124,7 @@ namespace
         check("terrain normals", s, [](Settings& x) { x.mTerrainPBRNormals = !x.mTerrainPBRNormals; }, Cost::Local);
         check("dynamic LOD", s, [](Settings& x) { x.mDynamicLOD = !x.mDynamicLOD; }, Cost::Local);
         check("water waves", s, [](Settings& x) { x.mWaterWaves = !x.mWaterWaves; }, Cost::Local);
+        check("GPU occlusion", s, [](Settings& x) { x.mGPUOcclusion = !x.mGPUOcclusion; }, Cost::Local);
         check("compute switched off", s, [](Settings& x) { x.mDisableCompute = true; }, Cost::Local);
         check("local terrain paint", s, [](Settings& x) { x.mLocalTerrainPaint = true; }, Cost::Local);
         check("GLOn12", s, [](Settings& x) { x.mIsD3D12 = true; }, Cost::Local);
@@ -161,6 +162,8 @@ namespace
         Settings no_compute = s;
         no_compute.mHasCompute = false;
         check("compute switch without compute", no_compute, [](Settings& x) { x.mDisableCompute = true; }, Cost::None);
+        check("GPU occlusion without compute", no_compute, [](Settings& x) { x.mGPUOcclusion = !x.mGPUOcclusion; },
+              Cost::None);
 
         // Clamped settings within what their clamps fold together.
         check("shadow detail past 2", s, [](Settings& x) { x.mShadowDetail = 3; }, Cost::None);

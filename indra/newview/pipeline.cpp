@@ -1163,6 +1163,7 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     s.mDynamicLOD               = gSavedSettings.getBOOL("RenderDynamicLOD");
     s.mWaterHextile             = gSavedSettings.getU32("AlchemyRenderWaterHextile");
     s.mWaterWaves               = gSavedSettings.getBOOL("AlchemyRenderWaterWaves");
+    s.mGPUOcclusion             = gSavedSettings.getBOOL("AlchemyRenderGPUOcclusion");
     s.mDisableCompute           = gSavedSettings.getBOOL("AlchemyRenderDisableCompute");
     s.mTransparentWater         = gSavedSettings.getBOOL("RenderTransparentWater");
     s.mSSAO                     = gSavedSettings.getBOOL("RenderDeferredSSAO");
@@ -1572,6 +1573,8 @@ void LLPipeline::releaseAllGLResources()
     mWaterPrimitives.release();
     mWaterPatchPrimitives.release();
     mAttachmentSpans.clear();
+    // And the boxes' stores and answers: every group waiting on one is taken as seen.
+    mBoxOcclusion.release();
 
     mGLResourcesLive = false;
 }
@@ -1612,6 +1615,7 @@ void LLPipeline::releaseDepthDependents()
 {
     mWaterSurface.release();
     mDepthPyramid.release();
+    mOcclusionPyramid.release();
 
     ALFarPlaneOverlay::release();
     if (ALSelectionOutline::instanceExists())
@@ -3687,6 +3691,12 @@ void LLPipeline::doOcclusion(LLCamera& camera)
     {
         LLVertexBuffer::unbind();
 
+        // The main view's groups tested against what the deferred pools have drawn so far all at once, where the
+        // session computes, rather than a query each: the pyramid of the G-buffer's depth as it stands, built before
+        // the boxes are added (ALBoxOcclusion). A query of a group costs a query, a box drawn and a result read at the
+        // frame's end, each a few calls a threaded driver runs one by one; a mainland view asks thousands of them.
+        mBoxOcclusionPass = boxOcclusionWanted() && mOcclusionPyramid.build(gDepthPyramidProgram, mRT->deferredScreen);
+
         LLGLSColorMask color_mask(false, false);
 
         LLGLDisable blend(GL_BLEND);
@@ -3713,6 +3723,18 @@ void LLPipeline::doOcclusion(LLCamera& camera)
             }
         }
 
+        if (mBoxOcclusionPass)
+        {
+            mBoxOcclusionPass = false;
+            // The boxes' space, agent space, to the clip space the depth was drawn in: the camera loaded for the pass.
+            LLMatrix4a view_proj;
+            view_proj.setMul(gGL.getModelviewMatrix(), gGL.getProjectionMatrix());
+            mBoxOcclusion.dispatch(gGroupOcclusionProgram, mOcclusionPyramid, view_proj);
+            // The dispatch bound its own program: the object cache's queries draw with the cube's again.
+            gOcclusionCubeProgram.bind();
+            mCubeVB->setBuffer();
+        }
+
         //apply occlusion culling to object cache tree
         for (LLWorld::region_list_t::const_iterator iter = LLWorld::getInstance()->getRegionList().begin();
             iter != LLWorld::getInstance()->getRegionList().end(); ++iter)
@@ -3724,6 +3746,44 @@ void LLPipeline::doOcclusion(LLCamera& camera)
             }
         }
     }
+}
+
+bool LLPipeline::boxOcclusionWanted() const
+{
+    // The main view's own pass alone: a shadow camera's map is fit again every frame, a probe face or a snapshot's
+    // tile draws another view at another size, and the pyramid is of the main view's depth.
+    return LLRender::sCompute && gGroupOcclusionProgram.isComplete() && gDepthPyramidProgram.isComplete() &&
+           LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD && !sShadowRender && !gCubeSnapshot &&
+           !gSnapshot && mRT == &mMainRT && mBoxOcclusion.canAdd();
+}
+
+bool LLPipeline::boxOcclusionTakes(const LLVector4a& center, const LLVector4a& half_extent, const LLCamera& camera) const
+{
+    if (!mBoxOcclusionPass || !mBoxOcclusion.canAdd())
+    {
+        return false;
+    }
+    // The box's image is no wider than its bounding sphere's, seen from the eye. One the eye is inside, or nearly,
+    // reaches its plane, which the pyramid keeps seen.
+    LLVector4a eye;
+    eye.load3(camera.getOrigin().mV);
+    LLVector4a to_box;
+    to_box.setSub(center, eye);
+    const F32 distance_sq = to_box.dot3(to_box).getF32();
+    const F32 radius_sq   = half_extent.dot3(half_extent).getF32();
+    if (distance_sq <= radius_sq * 1.01f)
+    {
+        return false;
+    }
+    const F32 tan_half_view = tanf(camera.getView() * 0.5f);
+    if (tan_half_view <= 0.f)
+    {
+        return false;
+    }
+    // The sphere's angular radius's tangent, over the view's: the share of the screen's height it spans each way.
+    const F32 tangent  = sqrtf(radius_sq / (distance_sq - radius_sq));
+    const F32 diameter = tangent / tan_half_view * (F32)camera.getViewHeightInPixels();
+    return diameter < ALBoxOcclusion::screenReach();
 }
 
 bool LLPipeline::updateDrawableGeom(LLDrawable* drawablep)

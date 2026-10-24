@@ -2333,6 +2333,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyRenderGPUOcclusion</key>
+        <map>
+            <key>Comment</key>
+            <string>Test the main view's spatial groups against a depth pyramid of what has been drawn so far, all of them in one compute dispatch, rather than asking an occlusion query of each: a view of many regions asks thousands a frame, each a draw and a result read of its own. Groups too large on the screen for the pyramid, and the object cache's, keep their queries. Needs compute (OpenGL 4.3).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyRenderMemoryDrawDistanceLimit</key>
         <map>
             <key>Comment</key>

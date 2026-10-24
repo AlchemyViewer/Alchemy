@@ -126,6 +126,7 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     l.mTerrainTessPinned = !s.mDynamicLOD;
     l.mWaterWaves        = s.mWaterWaves;
     l.mCompute           = s.mHasCompute && !s.mDisableCompute;
+    l.mGPUOcclusion      = s.mGPUOcclusion && l.mCompute;
     // One material per four texture units (base colour, normal, ORM, emissive), with no units reserved: the passes
     // drawing indexed materials bind no shadow or reflection maps. GLOn12 builds none: Mesa's d3d12 translates a
     // program to DXIL at its first draw and crashes inside the driver on an indexed legacy material's, with no GL call
