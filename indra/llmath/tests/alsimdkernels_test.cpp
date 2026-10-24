@@ -1408,8 +1408,10 @@ namespace
     // ------------------------------------------------------------------
     // Normalizing
 
-    // Vectors at unit length, or marked (0, 0, 0, 1) where they have none,
-    // against normalize3 to within its rounding at every width and count.
+    // Vectors at unit length with a w of 0, or marked (0, 0, 0, 1) where
+    // they have none, against normalize3 to within its rounding at every
+    // width and count, whatever w they came with: sums of cross products
+    // carry the rounding of their edges' w.
     TEST_CASE("alsimdkernels: normalize3_or_mark against normalize3 at every width", "[alsimdkernels]")
     {
         for (size_t n : COUNTS)
@@ -1425,7 +1427,7 @@ namespace
             }
             for (size_t i = 0; i < n; ++i)
             {
-                src[i].getF32ptr()[3] = 0.f;
+                src[i].getF32ptr()[3] = i % 3 == 0 ? 0.f : 0.25f * (F32)(i % 5 + 1);
             }
             bool any_expected = false;
             std::vector<LLVector4a> expected(src.begin(), src.begin() + n);
@@ -1434,6 +1436,7 @@ namespace
                 if (e.dot3(e).getF32() > FLT_MIN)
                 {
                     e.normalize3();
+                    e.getF32ptr()[3] = 0.f;
                 }
                 else
                 {

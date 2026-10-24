@@ -226,9 +226,9 @@ void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, co
 bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normals, size_t columns, size_t rows, bool joins, F32 same, F32 sign,
                            F32 w, LLVector4a* tangents);
 
-// Every vector at unit length in x, y and z, w scaled with them, where its
-// squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1).
-// Returns whether any was set so.
+// Every vector at unit length in x, y and z, with a w of 0, where its
+// squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1),
+// whatever w it had. Returns whether any was set so.
 bool normalize3_or_mark(LLVector4a* v, size_t n);
 
 } // namespace alsimd

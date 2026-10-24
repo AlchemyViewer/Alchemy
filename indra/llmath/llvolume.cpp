@@ -3265,6 +3265,7 @@ void LLVolume::sculptGenerateEmptyPlaceholder()
             p[0] = 0;
             p[1] = 0;
             p[2] = 0;
+            p[3] = 0;
 
             llassert(pt.isFinite3());
         }
@@ -3300,6 +3301,8 @@ void LLVolume::sculptGenerateSpherePlaceholder()
             p[0] = (F32)(sin(F_PI * v) * cos(2.0 * F_PI * u) * RADIUS);
             p[1] = (F32)(-sin(F_PI * v) * sin(2.0 * F_PI * u) * RADIUS);
             p[2] = (F32)(cos(F_PI * v) * RADIUS);
+            // mMesh's resize leaves what it adds as it found it.
+            p[3] = 0;
 
             llassert(pt.isFinite3());
         }

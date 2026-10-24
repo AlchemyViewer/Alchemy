@@ -1641,7 +1641,7 @@ bool normalize3_or_mark_impl(LLVector4a* v, size_t n)
         const reg scale = W::rsqrt(W::max(length2, W::set1(FLT_MIN)));
         a = { W::select(none, W::zero(), W::mul(a.x, scale)), W::select(none, W::zero(), W::mul(a.y, scale)),
               W::select(none, W::zero(), W::mul(a.z, scale)) };
-        w = W::select(none, W::set1(1.f), W::mul(w, scale));
+        w = W::select(none, W::set1(1.f), W::zero());
         const mask real = W::cmplt(W::add(W::ramp(), W::set1(F32(first))), W::set1(F32(n)));
         marked = W::or_(marked, W::and_(real, none));
         W::store_columns(a.x, a.y, a.z, w, [&](int i) { return first + i < n ? v[first + i].getF32ptr() : spill; });
