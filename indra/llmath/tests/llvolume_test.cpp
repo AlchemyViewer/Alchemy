@@ -33,13 +33,11 @@
 // mesh corpus is built here and goes through cacheOptimize as a decoded LOD
 // does.
 //
-// What the generator gets wrong today is a case of its own, tagged
-// [!shouldfail]: the case holds the generator to what it should do, so it
-// fails, as expected, while the defect stands, and the fix that clears the
-// defect removes the tag. Where a defect breaks one of the sweep's checks on
-// some faces, the sweep leaves that check on those faces to the defect's
-// case: a region below names the faces by what they are, not by how they
-// come out, and the fix removes the region with the tag.
+// What the generator gets wrong is a case of its own, tagged [!shouldfail]:
+// the case holds the generator to what it should do, so it fails, as
+// expected, while the defect stands, and the fix that clears the defect
+// removes the tag. A case may inspect only the faces of a region, which
+// names them by what they are, not by how they come out.
 
 #include "linden_common.h"
 
@@ -51,6 +49,7 @@
 #include "v3math.h"
 #include "v4math.h"
 #include "llvector4a.h"
+#include "alsimdkernels.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <fmt/format.h>
@@ -374,11 +373,6 @@ namespace
         return fmt::format("{} at LOD {}", s.name, lod);
     }
 
-    bool isRoundOrTriangle(U8 profile)
-    {
-        return profile != LL_PCODE_PROFILE_SQUARE;
-    }
-
     bool isTriangle(U8 profile)
     {
         return profile == LL_PCODE_PROFILE_ISOTRI || profile == LL_PCODE_PROFILE_EQUALTRI || profile == LL_PCODE_PROFILE_RIGHTTRI;
@@ -573,83 +567,20 @@ namespace
         constexpr U32 HardEdges = 1 << 8;   // a flat inner side is hard at every point
         constexpr U32 Tangents = 1 << 9;    // after genTangents: unit normals, unit tangents, w = +/-1
         constexpr U32 Orthogonal = 1 << 10; // after genTangents: tangent orthogonal to normal
+        constexpr U32 LoneNormals = 1 << 11; // a vertex in no triangle with area takes a normal the face has
+        constexpr U32 Meshopt = 1 << 12;     // after genTangents: meshoptimizer's tangents, where it gives a vertex one
 
-        // What the sweep holds every face to. RawUnit is broken on every
-        // side today, and Orthogonal on most curved ones: each has a case of
-        // its own.
-        constexpr U32 Sweep = Layout | Finite | Inversion | CapFacing | AffineUV | Oracle | SeamsAgree | HardEdges | Tangents;
+        // What the sweep holds every face to. Orthogonal is broken wherever
+        // the tangent generator makes a tangent up, and has a case of its
+        // own.
+        constexpr U32 Sweep =
+            Layout | Finite | RawUnit | Inversion | CapFacing | AffineUV | Oracle | SeamsAgree | HardEdges | Tangents | LoneNormals;
     }
 
     namespace Regions
     {
-        // A side of a closed profile whose first and last columns are
-        // apart, as each side of a box is, and of more than two rows, where
-        // the S wrap runs: it averages the side's two edges together.
-        constexpr U32 OpenSWrap = 1 << 0;
-        // A side whose path's openness disagrees with its rows. A path
-        // that counts as closed but whose first and last rows are apart, a
-        // torus at one and a half turns, has the T wrap sum rows half a
-        // turn apart; one that counts as open but whose rows meet, a
-        // skewed circle2 path, is never wrapped.
-        constexpr U32 TWrapByOpenness = 1 << 1;
-        // A cap with no area, which has no triangle to take a normal
-        // from.
+        // A cap with no area.
         constexpr U32 CapNoArea = 1 << 2;
-        // A square hole above 0.707 in a round or triangular profile,
-        // whose corners go through the wall.
-        constexpr U32 SquareHole = 1 << 3;
-        // A smooth closed side of two rows: the S wrap's test for a pole
-        // compares the first row with itself and passes, so the seam is
-        // not wrapped.
-        constexpr U32 TwoRowSeam = 1 << 4;
-        // A vertex in no triangle with area sums to no normal, or to the
-        // rounding left of one, which createTangents' normalize turns into
-        // NaN or infinity where its copies are exactly one point: the copied
-        // last column of a cut flat inner side, a half circle's square or
-        // triangle hole on its axis, the middle of a sculpt's pinch.
-        constexpr U32 ZeroNormal = 1 << 5;
-        // A cap with a centre vertex on a twisted path: the centre takes the
-        // middle of the cap's bounding box and the middle of its UVs', which
-        // a rotation makes two different points.
-        constexpr U32 TwistedCapHub = 1 << 6;
-        // A cap of a twisted sphere: the twist turns the half disc to the
-        // other side of the axis it sweeps about, which reverses the way
-        // the sphere leaves the cap, but not the cap.
-        constexpr U32 InsideOutCap = 1 << 7;
-    }
-
-    U32 excusedBy(U32 regions)
-    {
-        U32 checks = 0;
-        if (regions & Regions::OpenSWrap)
-        {
-            checks |= Checks::Oracle | Checks::Inversion;
-        }
-        if (regions & Regions::TWrapByOpenness)
-        {
-            checks |= Checks::Oracle | Checks::Inversion | Checks::SeamsAgree | Checks::HardEdges;
-        }
-        if (regions & Regions::CapNoArea)
-        {
-            checks |= Checks::Finite | Checks::RawUnit | Checks::CapFacing | Checks::Tangents | Checks::Orthogonal;
-        }
-        if (regions & Regions::SquareHole)
-        {
-            checks |= Checks::Inversion | Checks::CapFacing | Checks::Oracle;
-        }
-        if (regions & Regions::TwoRowSeam)
-        {
-            checks |= Checks::SeamsAgree;
-        }
-        if (regions & Regions::TwistedCapHub)
-        {
-            checks |= Checks::AffineUV;
-        }
-        if (regions & Regions::InsideOutCap)
-        {
-            checks |= Checks::CapFacing;
-        }
-        return checks;
     }
 
     // Vertices that no triangle with area uses.
@@ -674,52 +605,12 @@ namespace
         return (volume.getParams().getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_NONE;
     }
 
-    U32 regionsOf(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<bool>& lone)
+    U32 regionsOf(const LLVolumeFace& face, const std::vector<Triangle>& triangles)
     {
         U32 regions = 0;
-        const LLVolumeParams& params = volume.getParams();
-        const U8 profile = params.getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK;
-        const U8 hole = params.getProfileParams().getCurveType() & LL_PCODE_HOLE_MASK;
-        const bool twisted = params.getPathParams().getTwistBegin() != params.getPathParams().getTwist();
-        if (!isSculpt(volume) && hole == LL_PCODE_HOLE_SQUARE && params.getHollow() > 0.70711f && isRoundOrTriangle(profile))
+        if (isCap(face) && std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
         {
-            regions |= Regions::SquareHole;
-        }
-        if (isCap(face))
-        {
-            if (std::all_of(triangles.begin(), triangles.end(), [](const Triangle& t) { return t.degenerate; }))
-            {
-                regions |= Regions::CapNoArea;
-            }
-            if (twisted && !(face.mTypeMask & (LLVolumeFace::HOLLOW_MASK | LLVolumeFace::OPEN_MASK)))
-            {
-                regions |= Regions::TwistedCapHub;
-            }
-            if (twisted && profile == LL_PCODE_PROFILE_CIRCLE_HALF && params.getPathParams().getCurveType() != LL_PCODE_PATH_LINE)
-            {
-                regions |= Regions::InsideOutCap;
-            }
-        }
-        else if (!isSculpt(volume) && isGrid(face))
-        {
-            const bool profile_closed = !volume.getProfile().isOpen();
-            const bool columns_meet = columnsMeet(face);
-            if (profile_closed && face.mNumT > 2 && !columns_meet)
-            {
-                regions |= Regions::OpenSWrap;
-            }
-            if (volume.getPath().isOpen() == rowsMeet(face))
-            {
-                regions |= Regions::TWrapByOpenness;
-            }
-            if (columns_meet && face.mNumT == 2 && !isDoubled(face))
-            {
-                regions |= Regions::TwoRowSeam;
-            }
-        }
-        if (std::find(lone.begin(), lone.end(), true) != lone.end())
-        {
-            regions |= Regions::ZeroNormal;
+            regions |= Regions::CapNoArea;
         }
         return regions;
     }
@@ -727,15 +618,12 @@ namespace
     struct Inspect
     {
         U32 checks = Checks::Sweep;
-        // Nonzero: inspect only the faces in these regions, nothing of them
-        // excused. Either way, on each face the checks that its other
-        // regions break are excused.
+        // Nonzero: inspect only the faces in these regions.
         U32 only_regions = 0;
-        // How far a cap may lean from the direction its wall runs in: the
-        // cosine of the widest angle allowed.
-        F32 cap_facing = 0.f;
         // Check inversion also where the surface folds at a point.
         bool inversion_any_spread = false;
+        // Where Checks::Meshopt keeps what it found.
+        struct TangentAgreement* agreement = nullptr;
     };
 
     // ------------------------------------------------------------------
@@ -804,16 +692,11 @@ namespace
         }
     }
 
-    // A vertex in skip is left to the ZeroNormal region's case.
-    void checkRawUnit(const LLVolumeFace& face, const std::vector<LLVector3>& normals, const std::vector<bool>& skip, Report& report, const std::string& where)
+    void checkRawUnit(const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report, const std::string& where)
     {
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const F32 length = normals[v].length();
-            if (skip[v])
-            {
-                continue;
-            }
             if (!(fabsf(length - 1.f) <= UNIT_TOLERANCE))
             {
                 report.fail(fmt::format("{}: vertex {} has a normal of length {}", where, v, length));
@@ -882,10 +765,10 @@ namespace
         }
     }
 
-    // A cap faces along the path, away from the wall it closes: from the
-    // ring of the station next to it toward its own.
-    void checkCapFacing(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, F32 min_cos, Report& report,
-                        const std::string& where)
+    // A cap faces away from the wall it closes: its normal is on the side of
+    // its plane the path leaves the wall by, from the ring of the station
+    // next to it toward its own.
+    void checkCapFacing(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report, const std::string& where)
     {
         const LLAlignedArray<LLVector4a, 64>& mesh = volume.getMesh();
         const S32 ring = volume.getProfile().getTotal();
@@ -909,7 +792,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const LLVector3& n = normals[v];
-            if (!(n * away > min_cos * n.length() * away.length()))
+            if (!(n * away > 0.f))
             {
                 report.fail(fmt::format("{}: vertex {}'s normal is {:.1f} degrees from the way the path leaves its wall", where, v, degreesBetween(n, away)));
                 return;
@@ -1076,8 +959,8 @@ namespace
     // Where a side's first and last columns are one point, it is one
     // smooth surface across them, and both take one normal; so with the
     // rows of a closed path.
-    void checkSeamsAgree(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, const std::vector<bool>& skip,
-                         Report& report, const std::string& where)
+    void checkSeamsAgree(const LLVolume& volume, const LLVolumeFace& face, const std::vector<LLVector3>& normals, Report& report,
+                         const std::string& where)
     {
         if (!isGrid(face) || isDoubled(face))
         {
@@ -1090,7 +973,7 @@ namespace
         auto agree = [&](S32 a, S32 b, F32& off)
         {
             off = degreesBetween(normals[a], normals[b]);
-            return skip[a] || skip[b] || off <= 1.f;
+            return off <= 1.f;
         };
         if (wraps_s && columnsMeet(face))
         {
@@ -1123,19 +1006,22 @@ namespace
     // profile is cut), so the quads after even columns are the real ones
     // and the quads after odd columns have no width: a vertex takes its
     // normal from the one strip of real quads beside it, up and down the
-    // path, and from no other strip at its point.
+    // path, and from no other strip at its point. A vertex in no triangle
+    // with area, as the copies that close the side or an apex's copies,
+    // is beside no strip.
     S32 stripOf(S32 column)
     {
         return column % 2 == 0 ? column : column - 1;
     }
 
-    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
-                        const std::vector<bool>& skip, Report& report, const std::string& where)
+    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
+                        const std::string& where)
     {
         if (!isDoubled(face) || !isGrid(face))
         {
             return;
         }
+        const std::vector<bool> lone = loneVertices(face, triangles);
         const std::vector<U32> groups = weldGroups(face);
         std::map<std::pair<U32, S32>, std::vector<U32>> in_strip;
         for (size_t t = 0; t < triangles.size(); ++t)
@@ -1157,7 +1043,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const S32 column = v % face.mNumS;
-            if (skip[v])
+            if (lone[v])
             {
                 continue;
             }
@@ -1186,7 +1072,57 @@ namespace
         }
     }
 
-    void checkTangents(const LLVolumeFace& face, const std::vector<bool>& skip, U32 checks, Report& report, const std::string& where)
+    // A side's vertex in no triangle with area has no normal of its own, and
+    // takes the normal of a vertex that has one: never none, never what
+    // rounding leaves, and never a made-up one while the face has any. A
+    // sphere's pole, a column that is one place in every row, takes the
+    // axis instead.
+    void checkLoneNormals(const LLVolume& volume, const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
+                          Report& report, const std::string& where)
+    {
+        if (!isGrid(face))
+        {
+            return;
+        }
+        const LLVolumeParams& params = volume.getParams();
+        const bool sphere = !isSculpt(volume) && (params.getProfileParams().getCurveType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF &&
+                            params.getPathParams().getCurveType() == LL_PCODE_PATH_CIRCLE;
+        auto pole = [&](S32 column)
+        {
+            for (S32 t = 1; t < face.mNumT; ++t)
+            {
+                if (!coincide(face.mPositions[gridIndex(face, column, 0)], face.mPositions[gridIndex(face, column, t)]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+        const std::vector<bool> lone = loneVertices(face, triangles);
+        std::vector<S32> donors;
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (!lone[v])
+            {
+                donors.push_back(v);
+            }
+        }
+        if (donors.empty())
+        {
+            return;
+        }
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (lone[v] && !(sphere && pole(v % face.mNumS)) &&
+                std::none_of(donors.begin(), donors.end(), [&](S32 d) { return degreesBetween(normals[v], normals[d]) <= 0.1f; }))
+            {
+                report.fail(fmt::format("{}: vertex {} (column {}, row {}) has none of the face's normals", where, v, v % face.mNumS, v / face.mNumS));
+                return;
+            }
+        }
+    }
+
+    void checkTangents(const LLVolumeFace& face, U32 checks, Report& report, const std::string& where)
     {
         if (!face.mTangents)
         {
@@ -1197,10 +1133,6 @@ namespace
         bool orthogonal_failed = false;
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
-            if (skip[v])
-            {
-                continue;
-            }
             const LLVector3 n = v3(face.mNormals[v]);
             const LLVector3 t = v3(face.mTangents[v]);
             const F32 w = face.mTangents[v][3];
@@ -1229,8 +1161,298 @@ namespace
         }
     }
 
+    // What comparing tangents with meshoptimizer's found over a run.
+    struct TangentAgreement
+    {
+        S32 compared = 0; // vertices it gives one tangent with a length
+        S32 split = 0;    // vertices whose corners it gives more than one, or sums with another vertex's
+        S32 lone = 0;     // vertices it gives no tangent
+        S32 unsure = 0;   // vertices whose tangent rounding decides
+        F64 widest = 0.0; // degrees between the two, at most
+        std::string widest_at;
+        F64 nearest_bound = 0.0; // the most of a vertex's bound the two came apart by
+        std::string nearest_bound_at;
+    };
+
+    F64 degreesApart(const LLVector3& a, const LLVector3& b)
+    {
+        const F64 cx = (F64)a.mV[1] * b.mV[2] - (F64)a.mV[2] * b.mV[1];
+        const F64 cy = (F64)a.mV[2] * b.mV[0] - (F64)a.mV[0] * b.mV[2];
+        const F64 cz = (F64)a.mV[0] * b.mV[1] - (F64)a.mV[1] * b.mV[0];
+        const F64 dot = (F64)a.mV[0] * b.mV[0] + (F64)a.mV[1] * b.mV[1] + (F64)a.mV[2] * b.mV[2];
+        return atan2(sqrt(cx * cx + cy * cy + cz * cz), dot) * 180.0 / F_PI;
+    }
+
+    // Whether a triangle adds nothing to tangents: twice its area, in
+    // positions or in UVs, under 1e-5 of the sum of the squares of the two
+    // edges from its first corner.
+    bool tangentFlat(const LLVolumeFace& face, U32 a, U32 b, U32 c)
+    {
+        const LLVector3 pa = v3(face.mPositions[a]);
+        const LLVector3 ab = v3(face.mPositions[b]) - pa;
+        const LLVector3 ac = v3(face.mPositions[c]) - pa;
+        const LLVector2 uv_ab = face.mTexCoords[b] - face.mTexCoords[a];
+        const LLVector2 uv_ac = face.mTexCoords[c] - face.mTexCoords[a];
+        const F64 edges = (F64)ab.lengthSquared() + ac.lengthSquared();
+        const F64 uv_edges = (F64)uv_ab.lengthSquared() + uv_ac.lengthSquared();
+        const F64 area = (F64)uv_ab.mV[0] * uv_ac.mV[1] - (F64)uv_ab.mV[1] * uv_ac.mV[0];
+        return (F64)(ab % ac).lengthSquared() <= 1e-10 * edges * edges || area * area <= 1e-10 * uv_edges * uv_edges;
+    }
+
+    // How far rounding can turn each vertex's tangent, in degrees: its sum
+    // of corner shares worked again in double, as meshoptimizer's default
+    // mode makes them, and each share's size times how far rounding can
+    // move the share, against the size of the sum. A share's direction
+    // moves as far as its triangle's tangent can, from the rounding of the
+    // positions and UVs it is made from and of the chain rule's two terms,
+    // over the share's length in the normal's plane, short where the
+    // tangent nearly lies along the normal. Its weight moves as far as its
+    // edges' lengths in that plane can: short where an edge nearly lies
+    // along the normal, and shorter still to round where the square is
+    // taken as the edge's own less its square along the normal, as
+    // createTangents takes it. And as far as their angle can: near 0 or
+    // pi, where the arc cosine is a square root, by the square root of the
+    // cosine's rounding, however small the weight; and at a right angle by
+    // the step its arc cosine takes there, about 1e-3, where rounding
+    // decides the cosine's sign. 180 where the sum is
+    // nothing, or where a triangle's UVs wind one way or the other only by
+    // rounding, or it is nearly flat enough for one of the two to leave out
+    // and not the other.
+    std::vector<F64> tangentRoundingDegrees(const LLVolumeFace& face)
+    {
+        constexpr F64 EPSILON = 1.0 / (1 << 24);
+        using V = std::array<F64, 3>;
+        auto at = [](const LLVector4a& v) { return V{ v[0], v[1], v[2] }; };
+        auto sub = [](const V& a, const V& b) { return V{ a[0] - b[0], a[1] - b[1], a[2] - b[2] }; };
+        auto dot = [](const V& a, const V& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+        auto size = [&](const V& a) { return sqrt(dot(a, a)); };
+        auto less = [&](const V& v, const V& n)
+        {
+            const F64 d = dot(v, n);
+            return V{ v[0] - n[0] * d, v[1] - n[1] * d, v[2] - n[2] * d };
+        };
+        std::vector<V> sums(face.mNumVertices, { 0.0, 0.0, 0.0 });
+        std::vector<F64> spread(face.mNumVertices, 0.0);
+        std::vector<bool> unsure(face.mNumVertices, false);
+        for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+        {
+            const U32 corner[3] = { face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2] };
+            const V pa = at(face.mPositions[corner[0]]);
+            const V pb = at(face.mPositions[corner[1]]);
+            const V pc = at(face.mPositions[corner[2]]);
+            const LLVector2& ta = face.mTexCoords[corner[0]];
+            const LLVector2& tb = face.mTexCoords[corner[1]];
+            const LLVector2& tc = face.mTexCoords[corner[2]];
+            const V dp1 = sub(pb, pa);
+            const V dp2 = sub(pc, pa);
+            const F64 dt1x = (F64)tb.mV[0] - ta.mV[0];
+            const F64 dt1y = (F64)tb.mV[1] - ta.mV[1];
+            const F64 dt2x = (F64)tc.mV[0] - ta.mV[0];
+            const F64 dt2y = (F64)tc.mV[1] - ta.mV[1];
+
+            // How flat it is, in positions and in UVs, against the flat
+            // triangle's bound.
+            const V normal = { dp1[1] * dp2[2] - dp1[2] * dp2[1], dp1[2] * dp2[0] - dp1[0] * dp2[2], dp1[0] * dp2[1] - dp1[1] * dp2[0] };
+            const F64 det = dt1x * dt2y - dt1y * dt2x;
+            const F64 flat = llmin(size(normal) / (dot(dp1, dp1) + dot(dp2, dp2)), fabs(det) / (dt1x * dt1x + dt1y * dt1y + dt2x * dt2x + dt2y * dt2y));
+            // How far the UVs' rounding can move the UV area.
+            const F64 det_noise = EPSILON * ((fabs(ta.mV[0]) + fabs(tb.mV[0])) * fabs(dt2y) + fabs(dt1x) * (fabs(ta.mV[1]) + fabs(tc.mV[1])) +
+                                             (fabs(ta.mV[1]) + fabs(tb.mV[1])) * fabs(dt2x) + fabs(dt1y) * (fabs(ta.mV[0]) + fabs(tc.mV[0])) +
+                                             2.0 * fabs(dt1x * dt2y) + 2.0 * fabs(dt1y * dt2x));
+            const bool uncertain = (flat > 0.25e-5 && flat < 4e-5) || (fabs(det) <= 4.0 * det_noise && !(flat <= 0.25e-5));
+            if (uncertain)
+            {
+                for (U32 v : corner)
+                {
+                    unsure[v] = true;
+                }
+            }
+            if (flat <= 1e-5)
+            {
+                continue;
+            }
+
+            const V r = { dt2y * dp1[0] - dt1y * dp2[0], dt2y * dp1[1] - dt1y * dp2[1], dt2y * dp1[2] - dt1y * dp2[2] };
+            const F64 length = size(r);
+            if (length == 0.0)
+            {
+                continue;
+            }
+            const F64 scale = (det > 0.0 ? 1.0 : -1.0) / length;
+            const V t = { r[0] * scale, r[1] * scale, r[2] * scale };
+            // How far r can turn, against its length, in units of EPSILON:
+            // the rounding of its terms and of the differences they are
+            // made from.
+            const F64 noise_dt1y = fabs(ta.mV[1]) + fabs(tb.mV[1]) + fabs(dt1y);
+            const F64 noise_dt2y = fabs(ta.mV[1]) + fabs(tc.mV[1]) + fabs(dt2y);
+            const F64 noise_dp1 = size(pa) + size(pb) + size(dp1);
+            const F64 noise_dp2 = size(pa) + size(pc) + size(dp2);
+            const F64 turn = (noise_dt2y * size(dp1) + fabs(dt2y) * noise_dp1 + noise_dt1y * size(dp2) + fabs(dt1y) * noise_dp2 +
+                              2.0 * (fabs(dt2y) * size(dp1) + fabs(dt1y) * size(dp2))) / length;
+            for (int k = 0; k < 3; ++k)
+            {
+                const U32 v = corner[k];
+                const V n = at(face.mNormals[v]);
+                const V e1 = sub(at(face.mPositions[corner[(k + 1) % 3]]), at(face.mPositions[v]));
+                const V e2 = sub(at(face.mPositions[corner[(k + 2) % 3]]), at(face.mPositions[v]));
+                const V st = less(t, n);
+                const V p1 = less(e1, n);
+                const V p2 = less(e2, n);
+                const F64 sl = size(st);
+                const F64 l1 = size(p1);
+                const F64 l2 = size(p2);
+                if (sl == 0.0 || l1 == 0.0 || l2 == 0.0)
+                {
+                    continue;
+                }
+                const F64 cosine = llclamp(dot(p1, p2) / (l1 * l2), -1.0, 1.0);
+                const F64 ax = fabs(cosine);
+                F64 angle = (1.570337 + ax * (-0.2053972 + ax * 0.05147786)) * sqrt(1.0 - ax);
+                angle = cosine < 0.0 ? 3.1415926 - angle : angle;
+                const F64 weight = angle * l1 * l2;
+                for (int j = 0; j < 3; ++j)
+                {
+                    sums[v][j] += st[j] * weight / sl;
+                }
+                const F64 lengths = 1.0 + (size(e1) + size(at(face.mPositions[v]))) / l1 + (size(e2) + size(at(face.mPositions[v]))) / l2 +
+                                    dot(e1, e1) / (l1 * l1) + dot(e2, e2) / (l2 * l2);
+                const F64 cosine_noise = 2.0 * EPSILON * lengths;
+                const F64 angle_noise = cosine_noise + 1.570337 * (sqrt(1.0 - ax + cosine_noise) - sqrt(1.0 - ax)) +
+                                        (ax <= cosine_noise ? 3.1415926 - 2.0 * 1.570337 : 0.0);
+                spread[v] += weight * EPSILON * ((turn + 4.0) / sl + lengths) + l1 * l2 * angle_noise;
+            }
+        }
+        std::vector<F64> degrees(face.mNumVertices, 180.0);
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            const F64 length = size(sums[v]);
+            if (length > 0.0 && !unsure[v])
+            {
+                degrees[v] = llmin(180.0, 4.0 * spread[v] / length * 180.0 / F_PI);
+            }
+        }
+        return degrees;
+    }
+
+    // A face's tangents against meshoptimizer's default mode over its
+    // triangles that are not flat, which makes one tangent for each corner,
+    // and none where nothing adds to it: a vertex whose corners it gives
+    // one tangent must have that tangent's w, and its direction to within
+    // rounding, the larger of a thousandth of a degree and how far
+    // rounding can turn the vertex's sum.
+    constexpr F64 MESHOPT_TANGENT_DEGREES = 0.001;
+
+    void checkMeshoptTangents(const LLVolumeFace& face, TangentAgreement& agreement, Report& report, const std::string& where)
+    {
+        if (!face.mTangents || !face.mNumIndices)
+        {
+            return;
+        }
+        std::vector<U32> indices;
+        for (S32 i = 0; i + 2 < face.mNumIndices; i += 3)
+        {
+            if (!tangentFlat(face, face.mIndices[i], face.mIndices[i + 1], face.mIndices[i + 2]))
+            {
+                indices.insert(indices.end(), face.mIndices + i, face.mIndices + i + 3);
+            }
+        }
+        if (indices.empty())
+        {
+            return;
+        }
+        std::vector<F32> corners(indices.size() * 4);
+        meshopt_generateTangents(corners.data(), indices.data(), indices.size(), face.mPositions[0].getF32ptr(), face.mNumVertices,
+                                 sizeof(LLVector4a), face.mNormals[0].getF32ptr(), sizeof(LLVector4a), face.mTexCoords[0].mV,
+                                 sizeof(LLVector2), meshopt_TangentZeroFallback);
+        const std::vector<F64> rounding = tangentRoundingDegrees(face);
+        std::vector<S32> first(face.mNumVertices, -1);
+        std::vector<bool> split(face.mNumVertices, false);
+        // meshoptimizer welds vertices whose positions, normals and UVs
+        // compare equal and sums all their corners, where createTangents
+        // sums each vertex's own. A flat inner side's copied columns share a
+        // position and a UV, and where their normals come out equal to the
+        // last bit, as rounding decides on one platform and not another, it
+        // gives each the sum of both: such a vertex is not held to it.
+        std::map<std::array<U32, 8>, U32> places;
+        for (U32 v : indices)
+        {
+            std::array<U32, 8> key;
+            std::memcpy(key.data(), face.mPositions[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(key.data() + 3, face.mNormals[v].getF32ptr(), 3 * sizeof(F32));
+            std::memcpy(key.data() + 6, face.mTexCoords[v].mV, 2 * sizeof(F32));
+            for (U32& bits : key)
+            {
+                bits = bits == 0x80000000u ? 0u : bits; // -0 is 0, as meshoptimizer compares them
+            }
+            const auto [place, fresh] = places.emplace(key, v);
+            if (!fresh && place->second != v)
+            {
+                split[v] = true;
+                split[place->second] = true;
+            }
+        }
+        for (size_t c = 0; c < indices.size(); ++c)
+        {
+            const U32 v = indices[c];
+            if (first[v] < 0)
+            {
+                first[v] = (S32)c;
+            }
+            else if (std::memcmp(&corners[c * 4], &corners[first[v] * 4], 4 * sizeof(F32)) != 0)
+            {
+                split[v] = true;
+            }
+        }
+        bool failed = false;
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            if (first[v] < 0)
+            {
+                continue;
+            }
+            if (split[v])
+            {
+                ++agreement.split;
+                continue;
+            }
+            const F32* theirs = &corners[first[v] * 4];
+            const LLVector3 direction(theirs[0], theirs[1], theirs[2]);
+            if (direction.isExactlyZero())
+            {
+                ++agreement.lone;
+                continue;
+            }
+            if (rounding[v] >= 180.0)
+            {
+                ++agreement.unsure;
+                continue;
+            }
+            ++agreement.compared;
+            const F64 apart = degreesApart(v3(face.mTangents[v]), direction);
+            const F64 bound = llmax(MESHOPT_TANGENT_DEGREES, rounding[v]);
+            if (apart > agreement.widest)
+            {
+                agreement.widest = apart;
+                agreement.widest_at = fmt::format("{}: vertex {}, bound {} degrees", where, v, bound);
+            }
+            if (apart / bound > agreement.nearest_bound)
+            {
+                agreement.nearest_bound = apart / bound;
+                agreement.nearest_bound_at = fmt::format("{}: vertex {}, {} of {} degrees", where, v, apart, bound);
+            }
+            if (!failed && (!(apart <= bound) || (bound < 180.0 && face.mTangents[v][3] != theirs[3])))
+            {
+                report.fail(fmt::format("{}: vertex {} has the tangent ({}, {}, {}, {}), {} degrees from meshoptimizer's ({}, {}, {}, {}), past {}", where, v,
+                                        face.mTangents[v][0], face.mTangents[v][1], face.mTangents[v][2], face.mTangents[v][3], apart,
+                                        theirs[0], theirs[1], theirs[2], theirs[3], bound));
+                failed = true;
+            }
+        }
+    }
+
     // Every check the inspection asks for, on every face of the volume.
-    // Tangents come last: genTangents normalizes the normals it is given.
+    // Tangents come last, from genTangents, once every face's normals have
+    // been checked as generation left them.
     void inspect(LLVolume& volume, const std::string& name, const Inspect& how, Report& report)
     {
         const S32 faces = volume.getNumVolumeFaces();
@@ -1240,7 +1462,6 @@ namespace
             U32 checks = 0;
             U32 regions = 0;
             std::vector<LLVector3> raw;
-            std::vector<bool> skip;
         };
         std::vector<State> states(faces);
         for (S32 i = 0; i < faces; ++i)
@@ -1252,25 +1473,19 @@ namespace
                 continue;
             }
             const std::vector<Triangle> triangles = trianglesOf(face);
-            const std::vector<bool> lone = loneVertices(face, triangles);
             State& state = states[i];
-            state.regions = regionsOf(volume, face, triangles, lone);
+            state.regions = regionsOf(face, triangles);
             if (how.only_regions && !(state.regions & how.only_regions))
             {
                 continue;
             }
             state.inspected = true;
-            // A face in another defect's region still has that defect's
-            // checks excused.
-            state.checks = how.checks & ~excusedBy(state.regions & ~how.only_regions);
+            state.checks = how.checks;
             state.raw.resize(face.mNumVertices);
             for (S32 v = 0; v < face.mNumVertices; ++v)
             {
                 state.raw[v] = v3(face.mNormals[v]);
             }
-            // The ZeroNormal region is of vertices, not faces: everything
-            // else passes over those vertices alone.
-            state.skip = (how.only_regions & Regions::ZeroNormal) ? std::vector<bool>(face.mNumVertices, false) : lone;
 
             if (state.checks & Checks::Finite)
             {
@@ -1278,7 +1493,7 @@ namespace
             }
             if (state.checks & Checks::RawUnit)
             {
-                checkRawUnit(face, state.raw, state.skip, report, where);
+                checkRawUnit(face, state.raw, report, where);
             }
             if (state.checks & Checks::Inversion)
             {
@@ -1286,7 +1501,7 @@ namespace
             }
             if ((state.checks & Checks::CapFacing) && isCap(face))
             {
-                checkCapFacing(volume, face, state.raw, how.cap_facing, report, where);
+                checkCapFacing(volume, face, state.raw, report, where);
             }
             // A sculpt's UVs are its grid, wherever the map puts the points.
             if ((state.checks & Checks::AffineUV) && !isSculpt(volume))
@@ -1299,24 +1514,32 @@ namespace
             }
             if (state.checks & Checks::SeamsAgree)
             {
-                checkSeamsAgree(volume, face, state.raw, state.skip, report, where);
+                checkSeamsAgree(volume, face, state.raw, report, where);
             }
             if (state.checks & Checks::HardEdges)
             {
-                checkHardEdges(face, triangles, state.raw, state.skip, report, where);
+                checkHardEdges(face, triangles, state.raw, report, where);
+            }
+            if (state.checks & Checks::LoneNormals)
+            {
+                checkLoneNormals(volume, face, triangles, state.raw, report, where);
             }
         }
 
         for (S32 i = 0; i < faces; ++i)
         {
             const State& state = states[i];
-            if (!state.inspected || !(state.checks & (Checks::Tangents | Checks::Orthogonal)))
+            if (!state.inspected || !(state.checks & (Checks::Tangents | Checks::Orthogonal | Checks::Meshopt)))
             {
                 continue;
             }
             volume.genTangents(i);
             const LLVolumeFace& face = volume.getVolumeFace(i);
-            checkTangents(face, state.skip, state.checks, report, fmt::format("{}: {}", name, faceName(face)));
+            checkTangents(face, state.checks, report, fmt::format("{}: {}", name, faceName(face)));
+            if (state.checks & Checks::Meshopt)
+            {
+                checkMeshoptTangents(face, *how.agreement, report, fmt::format("{}: {}", name, faceName(face)));
+            }
         }
     }
 
@@ -2027,9 +2250,9 @@ namespace
     }
 
     // A flexible prim's frame, as the rebuild runs it: the path moves, the
-    // volume is rebuilt in place, and its faces' tangents are taken again
-    // where a face lost them. The rebuild must come out as a fresh volume
-    // built in full on the moved path, in the buffers it had.
+    // volume is rebuilt in place, and genTangents brings its faces'
+    // tangents up to the moved positions. The rebuild must come out as a
+    // fresh volume built in full on the moved path, in the buffers it had.
     void checkFlexiFrame(U8 profile, U8 hole, F32 hollow, S32 sections, S32 lod, Report& report, const std::string& name)
     {
         LLPointer<LLVolume> volume = flexiVolume(profile, hole, hollow, lod);
@@ -2547,12 +2770,14 @@ namespace
     }
 
     // ------------------------------------------------------------------
-    // Today's defects
+    // Defects, a case each: tagged [!shouldfail] while the generator has one
 
-    // The even-out switch adds each triangle's normal a second time to
-    // its top-right vertex, so a round prim's vertex normals lean around
-    // the axis, by an amount that depends on the row.
-    TEST_CASE("llvolume: a cylinder's side normals point straight out from its axis", "[llvolume][!shouldfail]")
+    // A cylinder side's quads are rectangles of one size, so a vertex has
+    // as much area on either side of it, in every row: a weight that went to
+    // some corners of a quad and not others, as the top right corner or the
+    // corners of one triangle, would lean the normals around the axis, by
+    // an amount that depends on the row.
+    TEST_CASE("llvolume: a cylinder's side normals point straight out from its axis", "[llvolume]")
     {
         for (S32 lod = 0; lod < LOD_COUNT; ++lod)
         {
@@ -2581,37 +2806,44 @@ namespace
         }
     }
 
-    // The double count goes to whichever vertex is top right in
-    // the grid, so a mirrored sculpt, whose rows run the other way, does
-    // not get the mirror image of the plain one's normals.
-    TEST_CASE("llvolume: a mirrored sculpt's normals mirror the plain one's", "[llvolume][!shouldfail]")
+    // A mirrored sculpt's rows run the other way, so a weight that went to
+    // whichever corner is top right in the grid would not give it the mirror
+    // image of the plain one's normals. The map is a cylinder's, whose quads
+    // are flat even in eight bits: a mirrored sculpt's diagonals run the
+    // other way across its surface, and where a quad is warped, as eight bits
+    // warp a torus's, its two triangles are not the mirror image of the plain
+    // one's, and neither are normals that follow them.
+    TEST_CASE("llvolume: a mirrored sculpt's normals mirror the plain one's", "[llvolume]")
     {
-        const SculptMap map = torusMap(64, 64);
-        LLPointer<LLVolume> plain = buildSculpt(LL_SCULPT_TYPE_TORUS, map, 3);
-        LLPointer<LLVolume> mirrored = buildSculpt((U8)(LL_SCULPT_TYPE_TORUS | LL_SCULPT_FLAG_MIRROR), map, 3);
-        const LLVolumeFace& a = plain->getVolumeFace(0);
-        const LLVolumeFace& b = mirrored->getVolumeFace(0);
-        REQUIRE(a.mNumS == b.mNumS);
-        F32 worst = 0.f;
-        for (S32 t = 0; t < a.mNumT; ++t)
+        const SculptMap map = cylinderMap(64, 64);
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
         {
-            for (S32 s = 0; s < a.mNumS; ++s)
+            LLPointer<LLVolume> plain = buildSculpt(LL_SCULPT_TYPE_CYLINDER, map, lod);
+            LLPointer<LLVolume> mirrored = buildSculpt((U8)(LL_SCULPT_TYPE_CYLINDER | LL_SCULPT_FLAG_MIRROR), map, lod);
+            const LLVolumeFace& a = plain->getVolumeFace(0);
+            const LLVolumeFace& b = mirrored->getVolumeFace(0);
+            REQUIRE(a.mNumS == b.mNumS);
+            REQUIRE(a.mNumT == b.mNumT);
+            F32 worst = 0.f;
+            for (S32 t = 0; t < a.mNumT; ++t)
             {
-                LLVector3 expected = v3(a.mNormals[gridIndex(a, a.mNumS - 1 - s, t)]);
-                expected.mV[0] = -expected.mV[0];
-                worst = llmax(worst, degreesBetween(v3(b.mNormals[gridIndex(b, s, t)]), expected));
+                for (S32 s = 0; s < a.mNumS; ++s)
+                {
+                    LLVector3 expected = v3(a.mNormals[gridIndex(a, a.mNumS - 1 - s, t)]);
+                    expected.mV[0] = -expected.mV[0];
+                    worst = llmax(worst, degreesBetween(v3(b.mNormals[gridIndex(b, s, t)]), expected));
+                }
             }
+            INFO(fmt::format("LOD {}: the mirrored normals are up to {:.2f} degrees from the mirror image", lod, worst));
+            CHECK(worst < 0.1f);
         }
-        INFO(fmt::format("the mirrored normals are up to {:.2f} degrees from the mirror image", worst));
-        CHECK(worst < 0.1f);
     }
 
-    // Where a smooth side creases sharply, as a flattened torus
-    // tube does at LOD 0, the double count's weights turn a normal past
-    // the triangles on the crease's light side. Equal weights cannot: a
-    // crease turns by less than 180 degrees, and its normal by half that
-    // from each side.
-    TEST_CASE("llvolume: a torus's normals face every triangle at a sharp crease", "[llvolume][!shouldfail]")
+    // Where a smooth side creases sharply, as a flattened torus tube does at
+    // LOD 0, weights that favour one side of the crease turn a normal past
+    // the triangles on its light side. Equal weights cannot: a crease turns
+    // by less than 180 degrees, and its normal by half that from each side.
+    TEST_CASE("llvolume: a torus's normals face every triangle at a sharp crease", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Inversion;
@@ -2628,16 +2860,15 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Every side of a closed profile has its first and last columns
-    // summed, so on a twisted box or tube each side's two edges take one
-    // averaged normal. A half cylinder's side, from one pole of its arc to
-    // the other, sums two opposite rims at LOD 2 and 3, as a skewed
-    // sphere's sums its poles, and their normals turn over.
-    TEST_CASE("llvolume: the S wrap joins only edges that meet", "[llvolume][!shouldfail]")
+    // A side's first and last columns are joined only where they are one
+    // place. A wrap by the profile's closing alone would average each side
+    // of a twisted box or tube with its own other edge, sum a half
+    // cylinder's two opposite rims at LOD 2 and 3, and a skewed sphere's
+    // two poles, and turn their normals over.
+    TEST_CASE("llvolume: the S wrap joins only edges that meet", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Oracle | Checks::Inversion;
-        how.only_regions = Regions::OpenSWrap;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2655,15 +2886,14 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // The T wrap trusts the path's openness, which ignores revolutions:
-    // at one and a half turns the first and last rows are half a turn
-    // apart, and their normals are summed. The other way, a skewed circle2
-    // path counts as open though its rows meet, and is never wrapped.
-    TEST_CASE("llvolume: the T wrap follows whether the first and last rows meet", "[llvolume][!shouldfail]")
+    // A path's openness ignores revolutions: at one and a half turns its
+    // first and last rows are half a turn apart, and a wrap by openness would
+    // sum their normals. The other way, a skewed circle2 path counts as open
+    // though its rows meet, and would never be wrapped.
+    TEST_CASE("llvolume: the T wrap follows whether the first and last rows meet", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Oracle | Checks::Inversion | Checks::SeamsAgree | Checks::HardEdges;
-        how.only_regions = Regions::TWrapByOpenness;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2681,15 +2911,17 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A cap's normal is the first triangle's, with +/-Z when that has
-    // no area; the uncut cube cap normalizes a zero cross product. A cap
-    // with no area, as on a pyramid or a prism, still faces along the path.
-    TEST_CASE("llvolume: a cap with no area still faces away from its wall", "[llvolume][!shouldfail]")
+    // A cap with no area, as on a pyramid or a prism, has no triangle to
+    // take a normal from, and still has a unit normal facing away from its
+    // wall. Where a circle2 path's alternating stations, or a half circle
+    // on a circle path tapered to a point, leave the cap within its plane,
+    // that normal is close to square to the way the wall runs, but on its
+    // far side.
+    TEST_CASE("llvolume: a cap with no area still faces away from its wall", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::Finite | Checks::CapFacing | Checks::Tangents;
+        how.checks = Checks::Finite | Checks::RawUnit | Checks::CapFacing | Checks::Tangents;
         how.only_regions = Regions::CapNoArea;
-        how.cap_facing = 0.5f;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2718,10 +2950,13 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // Lengyel's Gram-Schmidt step runs on the normals before
-    // createTangents normalizes them, removing only |n|^2 of the normal's
-    // part, so a tangent leans out of the plane its normal makes.
-    TEST_CASE("llvolume: every prim tangent is orthogonal to its normal", "[llvolume][!shouldfail]")
+    // A tangent is a sum of shares each in the plane of its vertex's
+    // normal, put back in that plane once summed; where nothing adds to it,
+    // it is an axis put in that plane. Either way it is orthogonal to the
+    // normal: at a cap with no area, at a vertex in no triangle with area,
+    // and at the point where a twisted half circle's pole crosses the axis
+    // it sweeps about.
+    TEST_CASE("llvolume: every prim tangent is orthogonal to its normal", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Orthogonal;
@@ -2733,10 +2968,291 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A triangle whose UVs have no area gets an invented ratio of
-    // 1024 and outweighs its real neighbours, and one whose positions have
-    // no area still adds a tangent. Neither has a tangent to give.
-    TEST_CASE("llvolume: a triangle with no area or no UV area adds nothing to a tangent", "[llvolume][!shouldfail]")
+    // Prims' and sculpts' tangents are meshoptimizer's default mode summed
+    // a vertex at a time, which is its sum over the vertex's corners
+    // wherever it gives them all one tangent.
+    TEST_CASE("llvolume: prim and sculpt tangents agree with meshoptimizer's", "[llvolume]")
+    {
+        TangentAgreement agreement;
+        Inspect how;
+        how.checks = Checks::Meshopt;
+        how.agreement = &agreement;
+        Report report;
+        S32 volumes = 0;
+        inspectSweep(how, report, volumes);
+        inspectSculpts(how, report);
+        INFO(fmt::format("{} vertices compared, {} whose corners meshoptimizer splits, {} it gives no tangent, {} whose tangent rounding "
+                         "decides; at most {} degrees apart, at {}; at most {} of a vertex's bound, at {}",
+                         agreement.compared, agreement.split, agreement.lone, agreement.unsure, agreement.widest, agreement.widest_at,
+                         agreement.nearest_bound, agreement.nearest_bound_at));
+        INFO(report.text());
+        CHECK(report.failures == 0);
+        CHECK(agreement.compared > 0);
+    }
+
+    // The flexible prims the partial-build cases build: the sweep's
+    // line-path shapes, plain and profile cut, on paths of 4 and 16
+    // sections, straight and bent, at every LOD, rebuilt in place once.
+    template <class Each>
+    void forEachFlexiFrame(Each each)
+    {
+        for (const Shape& base : sweepShapes())
+        {
+            if (base.path != LL_PCODE_PATH_LINE || (base.name.find(", plain") == std::string::npos && base.name.find(", profile cut") == std::string::npos))
+            {
+                continue;
+            }
+            for (S32 sections : { 4, 16 })
+            {
+                for (F32 bend : { 0.f, 1.1f })
+                {
+                    for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                    {
+                        LLPointer<LLVolume> volume = flexiVolume(base, lod);
+                        bendPath(*volume, sections, 0.4f);
+                        volume->regen();
+                        genAllTangents(*volume);
+                        bendPath(*volume, sections, bend);
+                        volume->regen();
+                        genAllTangents(*volume);
+                        each(*volume, fmt::format("flexible {}, {} sections bent {} at LOD {}", base.name, sections, bend, lod), sections, bend);
+                    }
+                }
+            }
+        }
+    }
+
+    // A flexible prim's tangents are its cheap ones: unit length, finite,
+    // orthogonal to their normals, and with the w each triangle's UVs wind
+    // for, where the triangle has area in positions and in UVs.
+    TEST_CASE("llvolume: a flexible prim's tangents are unit and orthogonal and wind with its UVs", "[llvolume]")
+    {
+        Report report;
+        S32 faces = 0;
+        forEachFlexiFrame([&](LLVolume& volume, const std::string& name, S32, F32)
+        {
+            for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+            {
+                const LLVolumeFace& face = volume.getVolumeFace(i);
+                const std::string where = fmt::format("{}: {}", name, faceName(face));
+                ++faces;
+                checkTangents(face, Checks::Tangents | Checks::Orthogonal, report, where);
+                for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+                {
+                    const U16 a = face.mIndices[t], b = face.mIndices[t + 1], c = face.mIndices[t + 2];
+                    // The generator takes points within 1e-5 of each other
+                    // as one place: a strip that narrow, as a cut end where
+                    // the hole meets its wall, winds as rounding has it.
+                    auto apart = [&](U16 p, U16 q) { return (v3(face.mPositions[p]) - v3(face.mPositions[q])).lengthSquared() > 1e-10f; };
+                    if (tangentFlat(face, a, b, c) || !apart(a, b) || !apart(b, c) || !apart(a, c))
+                    {
+                        continue;
+                    }
+                    const LLVector2 uv_ab = face.mTexCoords[b] - face.mTexCoords[a];
+                    const LLVector2 uv_ac = face.mTexCoords[c] - face.mTexCoords[a];
+                    const F32 uv_area = uv_ab.mV[0] * uv_ac.mV[1] - uv_ab.mV[1] * uv_ac.mV[0];
+                    const LLVector3 geometric = (v3(face.mPositions[b]) - v3(face.mPositions[a])) % (v3(face.mPositions[c]) - v3(face.mPositions[a]));
+                    bool failed = false;
+                    for (U16 v : { a, b, c })
+                    {
+                        const F32 facing = geometric * v3(face.mNormals[v]);
+                        if (fabsf(facing) <= 1e-3f * geometric.length())
+                        {
+                            continue;
+                        }
+                        const F32 expected = (uv_area > 0.f) == (facing > 0.f) ? 1.f : -1.f;
+                        if (face.mTangents[v][3] != expected)
+                        {
+                            report.fail(fmt::format("{}: triangle {}'s UVs wind for w = {} at vertex {}, which has {}", where, t / 3, expected, v,
+                                                    face.mTangents[v][3]));
+                            failed = true;
+                            break;
+                        }
+                    }
+                    if (failed)
+                    {
+                        break;
+                    }
+                }
+            }
+        });
+        INFO(fmt::format("{} faces", faces));
+        INFO(report.text());
+        CHECK(faces > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // The cheap tangents stay near the meshoptimizer-weighted ones every
+    // other prim takes, on the same geometry, away from the points where
+    // either has nothing to go by: a vertex in a triangle with no area or
+    // no UV area, and one whose weighted tangent rounding decides. A cap's
+    // and a straight side's are the weighted ones to within rounding. On a
+    // bent path a side's row turns from one station to the next, and the
+    // weighted tangent takes in the edges of the rows beside a vertex's
+    // own, where the cheap one follows its own row: they are as far apart
+    // as the path turns over a section, at most.
+    TEST_CASE("llvolume: a flexible prim's tangents stay near the weighted ones", "[llvolume]")
+    {
+        Report report;
+        F64 widest = 0.0;
+        std::string widest_at;
+        S32 compared = 0;
+        forEachFlexiFrame([&](LLVolume& volume, const std::string& name, S32 sections, F32 bend)
+        {
+            const F64 bound = llmax(0.01, fabs((F64)bend) / sections * 180.0 / F_PI);
+            for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+            {
+                const LLVolumeFace& face = volume.getVolumeFace(i);
+                const std::string where = fmt::format("{}: {}", name, faceName(face));
+                std::vector<LLVector4a> weighted(face.mNumVertices);
+                const bool grid = !(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumS * face.mNumT == face.mNumVertices;
+                if (grid)
+                {
+                    alsimd::grid_tangents(face.mPositions, face.mNormals, face.mTexCoords, face.mNumS, face.mNumT, weighted.data());
+                }
+                else
+                {
+                    alsimd::indexed_tangents(face.mPositions, face.mNormals, face.mTexCoords, face.mNumVertices, face.mIndices, face.mNumIndices,
+                                             weighted.data());
+                }
+                std::vector<bool> skip(face.mNumVertices, false);
+                for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+                {
+                    if (tangentFlat(face, face.mIndices[t], face.mIndices[t + 1], face.mIndices[t + 2]))
+                    {
+                        skip[face.mIndices[t]] = skip[face.mIndices[t + 1]] = skip[face.mIndices[t + 2]] = true;
+                    }
+                }
+                const std::vector<F64> rounding = tangentRoundingDegrees(face);
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    if (skip[v] || rounding[v] >= 1.0)
+                    {
+                        continue;
+                    }
+                    ++compared;
+                    const F64 apart = degreesApart(v3(face.mTangents[v]), v3(weighted[v]));
+                    if (apart > widest)
+                    {
+                        widest = apart;
+                        widest_at = fmt::format("{}: vertex {}", where, v);
+                    }
+                    if (!(apart <= bound) || face.mTangents[v][3] != weighted[v][3])
+                    {
+                        report.fail(fmt::format("{}: vertex {} is {} degrees from the weighted tangent, past {}, w {} against {}", where, v, apart,
+                                                bound, face.mTangents[v][3], weighted[v][3]));
+                        break;
+                    }
+                }
+            }
+        });
+        INFO(fmt::format("{} vertices compared; at most {} degrees apart, at {}", compared, widest, widest_at));
+        INFO(report.text());
+        CHECK(compared > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // Lengyel's tangents, which a mesh LOD too large for meshoptimizer's
+    // weld still takes, give a vertex no triangle gives a direction an axis
+    // put in the plane of its normal: unit length and orthogonal to it,
+    // whichever way the normal points.
+    TEST_CASE("llvolume: Lengyel's tangent with no direction lies in the plane of its normal", "[llvolume]")
+    {
+        // Two triangles whose UVs are one point, so that neither gives a
+        // tangent, with a normal along each axis and between them.
+        const LLVector3 positions[] = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
+        const LLVector2 uvs[] = { { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 0.5f } };
+        const U16 indices[] = { 0, 1, 2, 2, 1, 3 };
+        const LLVector3 normals[] = { { 0, 0, 1 }, { 1, 0, 0 }, { 0, 1, 0 }, { 0.6f, 0.f, 0.8f }, { 0.8f, -0.6f, 0.f } };
+        for (const LLVector3& normal : normals)
+        {
+            LLVector4a positions4[4], normals4[4], tangents[4];
+            for (S32 v = 0; v < 4; ++v)
+            {
+                positions4[v].load3(positions[v].mV);
+                normals4[v].load3(normal.mV);
+                tangents[v].clear();
+            }
+            LLCalculateTangentArray(4, positions4, normals4, uvs, 2, indices, tangents);
+            for (S32 v = 0; v < 4; ++v)
+            {
+                const LLVector3 t = v3(tangents[v]);
+                INFO(fmt::format("normal ({}, {}, {}): vertex {} has the tangent ({}, {}, {}, {})", normal.mV[0], normal.mV[1], normal.mV[2], v,
+                                 t.mV[0], t.mV[1], t.mV[2], tangents[v][3]));
+                CHECK(fabsf(t.length() - 1.f) <= UNIT_TOLERANCE);
+                CHECK(fabsf(t * normal) <= 2e-3f);
+                CHECK((tangents[v][3] == 1.f || tangents[v][3] == -1.f));
+            }
+        }
+    }
+
+    // A circle path's stations step around it and end at its end cut. The
+    // steps add up with rounding, and a station they bring a rounding short
+    // of the end would leave a row with no height before the end's: no two
+    // stations are within rounding of each other.
+    TEST_CASE("llvolume: a circle path's stations are apart", "[llvolume]")
+    {
+        Report report;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.path == LL_PCODE_PATH_LINE)
+            {
+                continue;
+            }
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                const auto& path = volume->getPath().mPath;
+                for (S32 i = 0; i + 1 < (S32)path.size(); ++i)
+                {
+                    if (!(path[i + 1].mTexT - path[i].mTexT > 1e-4f))
+                    {
+                        report.fail(fmt::format("{}: stations {} and {} of {} are at t {} and {}", lodName(s, lod), i, i + 1, path.size(),
+                                                path[i].mTexT, path[i + 1].mTexT));
+                        break;
+                    }
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // The streaming cost counts a circle2 path's points with
+    // getNumNGonPoints, which walks the stations as genNGon places them. An
+    // end cut on a step, which the summed steps reach a rounding short of,
+    // is one station to both.
+    TEST_CASE("llvolume: a circle2 path's point count is its stations", "[llvolume]")
+    {
+        Report report;
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            const S32 sides = llfloor(MIN_DETAIL_FACES * LOD_DETAIL[lod]);
+            for (S32 k = 1; k <= sides; ++k)
+            {
+                Shape s = torus();
+                s.name = "circle2 torus";
+                s.path = LL_PCODE_PATH_CIRCLE2;
+                s.path_end = (F32)k / (F32)sides;
+                const LLVolumeParams params = s.params();
+                LLPointer<LLVolume> volume = new LLVolume(params, LOD_DETAIL[lod]);
+                const S32 counted = LLPath::getNumPoints(params.getPathParams(), LOD_DETAIL[lod]);
+                const S32 stations = (S32)volume->getPath().mPath.size();
+                if (counted != stations)
+                {
+                    report.fail(fmt::format("{} cut to {} of {} sides at LOD {}: {} points counted, {} stations", s.name, k, sides, lod,
+                                            counted, stations));
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // A triangle whose UVs have no area has no dP/du, and one whose
+    // positions have no area has no surface to give one: neither adds to
+    // its corners' tangents, so a real neighbour's tangent stands alone.
+    TEST_CASE("llvolume: a triangle with no area or no UV area adds nothing to a tangent", "[llvolume]")
     {
         // Vertex 0 is in one real triangle, whose tangent is +X, and in one
         // other: a triangle whose UVs lie in a line, or one whose first two
@@ -2773,9 +3289,10 @@ namespace
         }
     }
 
-    // A side's normals are area sums, and are unit length only once
-    // createTangents has normalized them.
-    TEST_CASE("llvolume: normals are unit length straight out of generation", "[llvolume][!shouldfail]")
+    // A side's normals are sums over the quads around each vertex, and must
+    // leave the build unit length: the vertex buffer takes them as they are
+    // where a face has no tangents.
+    TEST_CASE("llvolume: normals are unit length straight out of generation", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::RawUnit;
@@ -2788,9 +3305,9 @@ namespace
     }
 
     // SetHollow no longer holds a square hole in a round profile to
-    // 0.7, and the hole's corners, at 0.707 of the hollow, go through the
-    // wall above it: the hole's points must stay inside the wall.
-    TEST_CASE("llvolume: a square hole above 0.707 stays inside its wall", "[llvolume][!shouldfail]")
+    // 0.7, and the hole's corners, at 0.707 of the hollow, would go through
+    // the wall above it: the hole's points must stay inside the wall.
+    TEST_CASE("llvolume: a square hole above 0.707 stays inside its wall", "[llvolume]")
     {
         Report report;
         for (const Shape& base : { cylinder(), sphere(), prism() })
@@ -2834,18 +3351,28 @@ namespace
                 }
             }
         }
+        // The sweep's square holes above 0.707 in round and triangular
+        // profiles, cut, twisted and tapered: where hole and wall touch, the
+        // cap's strip and the inner side still have a layout.
         Inspect how;
         how.checks = Checks::Inversion | Checks::CapFacing | Checks::Oracle;
-        how.only_regions = Regions::SquareHole;
-        S32 volumes = 0;
-        inspectSweep(how, report, volumes);
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.hole == LL_PCODE_HOLE_SQUARE && s.hollow > 0.70711f && s.profile != LL_PCODE_PROFILE_SQUARE)
+            {
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    inspectPrim(s, lod, how, report);
+                }
+            }
+        }
         INFO(report.text());
         CHECK(report.failures == 0);
     }
 
     // Partial builds: a flexible prim's every frame rebuilds its volume in
     // place, and must come out as a full build would, in the buffers it had.
-    TEST_CASE("llvolume: a flexible box's partial build equals a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible box's partial build equals a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2859,7 +3386,7 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    TEST_CASE("llvolume: a flexible cylinder's partial build equals a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible cylinder's partial build equals a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2874,7 +3401,7 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    TEST_CASE("llvolume: a flexible box with a square hole has a partial build equal to a full one", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: a flexible box with a square hole has a partial build equal to a full one", "[llvolume]")
     {
         Report report;
         for (S32 sections : { 4, 16 })
@@ -2891,7 +3418,7 @@ namespace
 
     // The uncut cube cap is built only on a line path, which flexi never
     // has; its partial build is the one a regen of an unmoved box makes.
-    TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume][!shouldfail]")
+    TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume]")
     {
         Report report;
         for (S32 lod = 0; lod < LOD_COUNT; ++lod)
@@ -2918,15 +3445,15 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // createSide takes a side's first column as a pole where it meets the
-    // row before the last; on a side of two rows that row is the first, so
-    // every closed side of two rows passes, and its seam is never wrapped:
-    // a cylinder's seam at LOD 0 and 1 is two one-sided normals.
-    TEST_CASE("llvolume: a closed side of two rows has one normal at its seam", "[llvolume][!shouldfail]")
+    // A pole test that compared a side's first row with the row before its
+    // last would compare the first row with itself on a side of two rows,
+    // take every such side's first column for a pole and leave its seam
+    // unwrapped: a cylinder's seam at LOD 0 and 1 would be two one-sided
+    // normals.
+    TEST_CASE("llvolume: a closed side of two rows has one normal at its seam", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::SeamsAgree;
-        how.only_regions = Regions::TwoRowSeam;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2935,14 +3462,13 @@ namespace
     }
 
     // A general cap's centre vertex takes the middle of the cap's bounding
-    // box for its position and the middle of the UVs' box for its UV. A
-    // twist rotates the cap, and the two are no longer one point: the
-    // texture slides at the centre of every twisted cap.
-    TEST_CASE("llvolume: a twisted cap's centre vertex has the UV of its position", "[llvolume][!shouldfail]")
+    // box for its position. A twist rotates the cap, and the middle of the
+    // UVs' box is then another point: a centre that took that UV would
+    // slide the texture at the centre of every twisted cap.
+    TEST_CASE("llvolume: a twisted cap's centre vertex has the UV of its position", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::AffineUV;
-        how.only_regions = Regions::TwistedCapHub;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2952,13 +3478,12 @@ namespace
 
     // A sphere's half disc sweeps about the axis it touches. A twist turns
     // it about its own centre on that axis, to the other side of the axis,
-    // and the sphere then leaves the cap the other way; the cap's winding
-    // and normal stay, and the cap faces into the sphere.
-    TEST_CASE("llvolume: a twisted sphere's caps face out of the sphere", "[llvolume][!shouldfail]")
+    // and the sphere then leaves the cap the other way: a cap that kept the
+    // winding and normal its profile gives it would face into the sphere.
+    TEST_CASE("llvolume: a twisted sphere's caps face out of the sphere", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::CapFacing;
-        how.only_regions = Regions::InsideOutCap;
+        how.checks = Checks::CapFacing | Checks::Inversion;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);
@@ -2966,11 +3491,12 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // The sphere placeholder runs u around along the path and v pole to
-    // pole along the profile, the other way round from a sculpt map, but
-    // gets a sphere sculpt's normal stitching: the poles' average lands on
-    // one meridian, and the S wrap sums the north pole with the south.
-    TEST_CASE("llvolume: the sphere placeholder's normals follow its surface", "[llvolume][!shouldfail]")
+    // The sphere placeholder gets a sphere sculpt's normal stitching, so it
+    // must run as a sphere sculpt's map does, around along the profile and
+    // pole to pole along the path. The other way round, the poles' average
+    // would land on one meridian, and the S wrap would sum the north pole
+    // with the south.
+    TEST_CASE("llvolume: the sphere placeholder's normals follow its surface", "[llvolume]")
     {
         Inspect how;
         how.checks = Checks::Inversion | Checks::Oracle;
@@ -2980,16 +3506,17 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A vertex whose every triangle has no area sums to a zero normal, and
-    // createTangents' normalize3fast makes it NaN: the copied last column
-    // of a cut flat inner side, the inner side of a half circle with a
-    // square or triangle hole, the middle of a sculpt's pinch, the whole of
-    // the empty placeholder.
-    TEST_CASE("llvolume: a vertex with only zero-area triangles gets a finite normal", "[llvolume][!shouldfail]")
+    // A vertex whose every triangle has no area sums to a zero normal, which
+    // a normalize makes NaN: the copied last column of a cut flat inner
+    // side, the inner side of a half circle with a square or triangle hole,
+    // the middle of a sculpt's pinch, the whole of the empty placeholder.
+    // It takes a neighbour's normal instead; where a copy is one place with
+    // its neighbour only to rounding, the edge between them must count as
+    // having no length, or it gives the copy a normal of rounding.
+    TEST_CASE("llvolume: a vertex with only zero-area triangles takes a neighbour's normal", "[llvolume]")
     {
         Inspect how;
-        how.checks = Checks::Tangents;
-        how.only_regions = Regions::ZeroNormal;
+        how.checks = Checks::Tangents | Checks::LoneNormals;
         Report report;
         S32 volumes = 0;
         inspectSweep(how, report, volumes);

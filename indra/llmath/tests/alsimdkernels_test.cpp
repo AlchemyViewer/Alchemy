@@ -265,6 +265,51 @@ namespace
         }
     }
 
+    // Directions turned and then moved, against rotate and an add, bit for
+    // bit at every count and width; nothing written past the count.
+    TEST_CASE("alsimdkernels: transform_directions_offset against rotate and add at every count and width", "[alsimdkernels]")
+    {
+        const LLMatrix4a m = some_matrix();
+        const LLVector4a offset(1.f, -20.f, 300.f, 0.25f);
+        for (size_t n : COUNTS)
+        {
+            const std::vector<LLVector4a> src = some_vectors(n, 3);
+            std::vector<LLVector4a> expected(n + 1, SENTINEL);
+            for (size_t i = 0; i < n; ++i)
+            {
+                LLVector4a turned;
+                m.rotate(src[i], turned);
+                expected[i].setAdd(turned, offset);
+            }
+
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<LLVector4a> dst(n + 1, SENTINEL);
+                transform_offset_impl<W>(m, offset, src.data(), dst.data(), n);
+                for (size_t i = 0; i <= n; ++i)
+                {
+                    CAPTURE(width, n, i);
+                    require_same_bits("transform_directions_offset", dst[i], expected[i]);
+                }
+            });
+
+            // The library is built at the tree's level, which may fuse
+            // where this file does not.
+            std::vector<LLVector4a> dst(n + 1, SENTINEL);
+            alsimd::transform_directions_offset(m, offset, src.data(), dst.data(), n);
+            require_same_bits("past the count through the library", dst[n], SENTINEL);
+            for (size_t i = 0; i < n; ++i)
+            {
+                INFO("through the library");
+                CAPTURE(n, i);
+                for (int lane = 0; lane < 4; ++lane)
+                {
+                    require_close("transform_directions_offset", dst[i][lane], expected[i][lane], 1e-6, 1000.0);
+                }
+            }
+        }
+    }
+
     // Texture coordinates: two per vector, against the scalar arithmetic
     // in double within the two roundings the fused form takes, and every
     // width bit for bit against the first.
@@ -749,6 +794,302 @@ namespace
                     REQUIRE(std::bit_cast<S32>(dst[i][3]) == index);
                 }
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Tangents
+
+    // The widths the lane kernels have.
+    template <class Body>
+    void for_each_lane_width(Body body)
+    {
+        body.template operator()<ALSimd4>("ALSimd4");
+#if AL_SIMD_AVX
+        body.template operator()<ALSimd8>("ALSimd8");
+#endif
+    }
+
+    // A grid of columns by rows over a wavy sheet, with the sheet's normals
+    // and the grid's UVs, indexed as createSide indexes one. Column 2 lies
+    // on column 1 and row 2 has row 1's UVs, so that some quads are lines
+    // and some triangles have no UV area.
+    struct TangentGrid
+    {
+        std::vector<LLVector4a> positions;
+        std::vector<LLVector4a> normals;
+        std::vector<LLVector2> uvs;
+        std::vector<U16> indices;
+    };
+
+    TangentGrid tangent_grid(size_t columns, size_t rows, U32 seed)
+    {
+        std::mt19937 rng(seed);
+        std::uniform_real_distribution<F32> jitter(-0.2f, 0.2f);
+        TangentGrid g;
+        g.positions.resize(columns * rows);
+        g.normals.resize(columns * rows);
+        g.uvs.resize(columns * rows);
+        for (size_t t = 0; t < rows; ++t)
+        {
+            for (size_t s = 0; s < columns; ++s)
+            {
+                const size_t at = s + columns * t;
+                const size_t column = (s == 2) ? 1 : s;
+                const F32 x = F32(column) * 0.3f + (column == s ? jitter(rng) * 0.3f : 0.f);
+                const F32 y = F32(t) * 0.25f + jitter(rng) * 0.25f;
+                g.positions[at].set(x, y, 0.3f * sinf(x) * cosf(y), 0.f);
+                LLVector4a normal(-0.3f * cosf(x) * cosf(y), 0.3f * sinf(x) * sinf(y), 1.f, 0.f);
+                normal.normalize3();
+                g.normals[at] = normal;
+                const size_t row = (t == 2) ? 1 : t;
+                g.uvs[at].set(F32(s) / F32(llmax(columns, size_t(2)) - 1), F32(row) / F32(llmax(rows, size_t(2)) - 1));
+            }
+            if (columns > 2)
+            {
+                g.positions[2 + columns * t] = g.positions[1 + columns * t];
+            }
+        }
+        for (size_t t = 0; t + 1 < rows; ++t)
+        {
+            for (size_t s = 0; s + 1 < columns; ++s)
+            {
+                const U16 bl = U16(s + columns * t);
+                const U16 br = U16(bl + 1);
+                const U16 tl = U16(bl + columns);
+                const U16 tr = U16(tl + 1);
+                for (U16 i : { bl, tr, tl, bl, br, tr })
+                {
+                    g.indices.push_back(i);
+                }
+            }
+        }
+        return g;
+    }
+
+    F64 degrees_apart(const LLVector4a& a, const LLVector4a& b)
+    {
+        const F64 cx = (F64)a[1] * b[2] - (F64)a[2] * b[1];
+        const F64 cy = (F64)a[2] * b[0] - (F64)a[0] * b[2];
+        const F64 cz = (F64)a[0] * b[1] - (F64)a[1] * b[0];
+        const F64 dot = (F64)a[0] * b[0] + (F64)a[1] * b[1] + (F64)a[2] * b[2];
+        return std::atan2(std::sqrt(cx * cx + cy * cy + cz * cz), dot) * 180.0 / F_PI;
+    }
+
+    // The grid and indexed forms at every width against the 128-bit ones,
+    // over grids that leave every tail: each lane runs the same
+    // instructions, but the compiler may reassociate the reciprocal square
+    // root's refinement differently in each, so to within a few ulps, with
+    // the same w. And against each other, which differ only in the order of
+    // their sums: within rounding, the same w, unit length and orthogonal
+    // to the normal. Nothing is written past the grid.
+    TEST_CASE("alsimdkernels: tangents at every width, and the grid form against the indexed", "[alsimdkernels]")
+    {
+        std::vector<F32> scratch;
+        U32 seed = 20;
+        for (size_t columns : { 1, 2, 3, 4, 5, 8, 9, 16, 17, 23 })
+        {
+            for (size_t rows : { 1, 2, 3, 6 })
+            {
+                const TangentGrid g = tangent_grid(columns, rows, ++seed);
+                const size_t n = columns * rows;
+                std::vector<LLVector4a> grid(n + 1, SENTINEL);
+                std::vector<LLVector4a> indexed(n + 1, SENTINEL);
+                grid_tangents_impl<ALSimd4>(g.positions.data(), g.normals.data(), g.uvs.data(), columns, rows, grid.data(), scratch);
+                indexed_tangents_impl<ALSimd4>(g.positions.data(), g.normals.data(), g.uvs.data(), n, g.indices.data(), g.indices.size(),
+                                               indexed.data());
+                CAPTURE(columns, rows);
+                require_same_bits("past the grid form's end", grid[n], SENTINEL);
+                require_same_bits("past the indexed form's end", indexed[n], SENTINEL);
+                for (size_t v = 0; v < n; ++v)
+                {
+                    CAPTURE(v);
+                    const F64 apart = degrees_apart(grid[v], indexed[v]);
+                    INFO("grid (" << precise(grid[v][0]) << ", " << precise(grid[v][1]) << ", " << precise(grid[v][2]) << ", " << grid[v][3]
+                                  << ") and indexed (" << precise(indexed[v][0]) << ", " << precise(indexed[v][1]) << ", "
+                                  << precise(indexed[v][2]) << ", " << indexed[v][3] << ") are " << precise(apart) << " degrees apart");
+                    REQUIRE(apart <= 1e-3);
+                    REQUIRE(grid[v][3] == indexed[v][3]);
+                    REQUIRE((grid[v][3] == 1.f || grid[v][3] == -1.f));
+                    REQUIRE(std::fabs(grid[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                    REQUIRE(std::fabs(grid[v].dot3(g.normals[v]).getF32()) <= 1e-5f);
+                }
+
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    CAPTURE(width);
+                    std::vector<LLVector4a> wide_grid(n + 1, SENTINEL);
+                    std::vector<LLVector4a> wide_indexed(n + 1, SENTINEL);
+                    grid_tangents_impl<W>(g.positions.data(), g.normals.data(), g.uvs.data(), columns, rows, wide_grid.data(), scratch);
+                    indexed_tangents_impl<W>(g.positions.data(), g.normals.data(), g.uvs.data(), n, g.indices.data(), g.indices.size(),
+                                             wide_indexed.data());
+                    require_same_bits("past the grid form's end", wide_grid[n], SENTINEL);
+                    require_same_bits("past the indexed form's end", wide_indexed[n], SENTINEL);
+                    for (size_t v = 0; v < n; ++v)
+                    {
+                        CAPTURE(v);
+                        for (int lane = 0; lane < 3; ++lane)
+                        {
+                            require_close("grid form", wide_grid[v][lane], grid[v][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                            require_close("indexed form", wide_indexed[v][lane], indexed[v][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                        }
+                        REQUIRE(wide_grid[v][3] == grid[v][3]);
+                        REQUIRE(wide_indexed[v][3] == indexed[v][3]);
+                    }
+                });
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Tangents by central difference
+
+    // The chord tangents as the rule gives them, a vertex at a time in
+    // double: the chord between a vertex's row neighbours, across the seam
+    // or one-sided at the ends, in the plane of its normal; none where that
+    // is shorter than `same` or within 1e-3 of the chord's length.
+    std::vector<LLVector4a> central_tangents(const TangentGrid& g, size_t columns, size_t rows, bool joins, F32 same, F32 sign, F32 w)
+    {
+        std::vector<LLVector4a> out(columns * rows);
+        for (size_t t = 0; t < rows; ++t)
+        {
+            for (size_t s = 0; s < columns; ++s)
+            {
+                size_t left = s == 0 ? (joins ? columns - 2 : 0) : s - 1;
+                size_t right = s == columns - 1 ? (joins ? 1 : columns - 1) : s + 1;
+                if (columns < 2)
+                {
+                    left = right = 0;
+                }
+                const LLVector4a& a = g.positions[left + columns * t];
+                const LLVector4a& b = g.positions[right + columns * t];
+                const LLVector4a& n = g.normals[s + columns * t];
+                F64 chord[3], length2 = 0.0, chord2 = 0.0, dn = 0.0;
+                for (int k = 0; k < 3; ++k)
+                {
+                    chord[k] = ((F64)b[k] - a[k]) * sign;
+                    dn += chord[k] * n[k];
+                    chord2 += chord[k] * chord[k];
+                }
+                for (int k = 0; k < 3; ++k)
+                {
+                    chord[k] -= n[k] * dn;
+                    length2 += chord[k] * chord[k];
+                }
+                if (length2 <= std::max((F64)same * same, 1e-6 * chord2))
+                {
+                    out[s + columns * t].set(0.f, 0.f, 0.f, 0.f);
+                    continue;
+                }
+                const F64 scale = 1.0 / std::sqrt(length2);
+                out[s + columns * t].set(F32(chord[0] * scale), F32(chord[1] * scale), F32(chord[2] * scale), w);
+            }
+        }
+        return out;
+    }
+
+    // The chord tangents at every width against the rule worked in double,
+    // with and without a seam, either way along the rows: directions to
+    // within rounding, w as given, and w 0 where the chord gives no
+    // direction, as where both neighbours are one point in a row of three
+    // with a seam, or a row of one. Nothing is written past the grid.
+    TEST_CASE("alsimdkernels: grid_tangents_central against the rule in double at every width", "[alsimdkernels]")
+    {
+        U32 seed = 90;
+        for (size_t columns : { 1, 2, 3, 4, 5, 8, 9, 16, 17 })
+        {
+            for (size_t rows : { 1, 2, 5 })
+            {
+                const TangentGrid g = tangent_grid(columns, rows, ++seed);
+                const size_t n = columns * rows;
+                for (bool joins : { false, true })
+                {
+                    for (F32 sign : { 1.f, -1.f })
+                    {
+                        const std::vector<LLVector4a> expected = central_tangents(g, columns, rows, joins, 1e-5f, sign, -sign);
+                        bool any_expected = false;
+                        for (const LLVector4a& e : expected)
+                        {
+                            any_expected = any_expected || e[3] == 0.f;
+                        }
+                        for_each_lane_width([&]<class W>(const char* width)
+                        {
+                            std::vector<LLVector4a> got(n + 1, SENTINEL);
+                            const bool any = grid_tangents_central_impl<W>(g.positions.data(), g.normals.data(), columns, rows, joins, 1e-5f, sign, -sign,
+                                                                           got.data());
+                            CAPTURE(width, columns, rows, joins, sign);
+                            REQUIRE(any == any_expected);
+                            require_same_bits("past the grid", got[n], SENTINEL);
+                            for (size_t v = 0; v < n; ++v)
+                            {
+                                CAPTURE(v);
+                                REQUIRE(got[v][3] == expected[v][3]);
+                                if (expected[v][3] != 0.f)
+                                {
+                                    REQUIRE(degrees_apart(got[v], expected[v]) <= 1e-3);
+                                    REQUIRE(std::fabs(got[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Normalizing
+
+    // Vectors at unit length, or marked (0, 0, 0, 1) where they have none,
+    // against normalize3 to within its rounding at every width and count.
+    TEST_CASE("alsimdkernels: normalize3_or_mark against normalize3 at every width", "[alsimdkernels]")
+    {
+        for (size_t n : COUNTS)
+        {
+            std::vector<LLVector4a> src = some_vectors(n, 12);
+            for (size_t i = 0; i < n; i += 5)
+            {
+                src[i].set(0.f, 0.f, 0.f, 0.f);
+            }
+            for (size_t i = 3; i < n; i += 7)
+            {
+                src[i].set(1e-25f, 0.f, 0.f, 0.f);
+            }
+            for (size_t i = 0; i < n; ++i)
+            {
+                src[i].getF32ptr()[3] = 0.f;
+            }
+            bool any_expected = false;
+            std::vector<LLVector4a> expected(src.begin(), src.begin() + n);
+            for (LLVector4a& e : expected)
+            {
+                if (e.dot3(e).getF32() > FLT_MIN)
+                {
+                    e.normalize3();
+                }
+                else
+                {
+                    e.set(0.f, 0.f, 0.f, 1.f);
+                    any_expected = true;
+                }
+            }
+            for_each_lane_width([&]<class W>(const char* width)
+            {
+                std::vector<LLVector4a> v(src.begin(), src.end());
+                v[n] = SENTINEL;
+                const bool any = normalize3_or_mark_impl<W>(v.data(), n);
+                CAPTURE(width, n);
+                REQUIRE(any == any_expected);
+                require_same_bits("past the end", v[n], SENTINEL);
+                for (size_t i = 0; i < n; ++i)
+                {
+                    CAPTURE(i);
+                    for (int lane = 0; lane < 4; ++lane)
+                    {
+                        require_close("normalized", v[i][lane], expected[i][lane], 4.0 * std::numeric_limits<F32>::epsilon());
+                    }
+                }
+            });
         }
     }
 }

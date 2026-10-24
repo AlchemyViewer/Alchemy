@@ -2643,7 +2643,7 @@ LLVector3 LLVOVolume::getApproximateFaceNormal(U8 face_id)
             result.add(face.mNormals[i]);
         }
 
-        LLVector3 ret(result.getF32ptr());
+        ret.set(result.getF32ptr());
         ret = volumeDirectionToAgent(ret);
         ret.normVec();
     }

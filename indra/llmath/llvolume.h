@@ -709,6 +709,9 @@ public:
     bool generate(const LLProfileParams& params, bool path_open, F32 detail = 1.0f, S32 split = 0,
                   bool is_sculpted = false, S32 sculpt_size = 0);
     bool isConcave() const                              { return mConcave; }
+    // Whether the hole was drawn in where it would have gone through the
+    // outer wall, and so touches it there.
+    bool holeTouchesWall() const                        { return mHoleTouchesWall; }
 public:
     struct Face
     {
@@ -743,6 +746,7 @@ protected:
     bool          mOpen;
     bool          mConcave;
     bool          mDirty;
+    bool          mHoleTouchesWall = false;
 
     S32           mTotalOut;
     S32           mTotal;
@@ -941,6 +945,26 @@ public:
     S32 mNumS;
     S32 mNumT;
 
+    // Whether a side's first and last columns, and its first and last rows,
+    // are one seam whose normals are joined. A full build decides them and a
+    // partial build keeps them.
+    bool mJoinsS = false;
+    bool mJoinsT = false;
+
+    // Whether a cap's triangles wind against the way its profile runs, so
+    // that it faces away from the wall it closes where that wall lies on the
+    // side its profile's winding faces. A full build decides it and a
+    // partial build keeps it.
+    bool mReversed = false;
+
+    // Whether the face is a flexible prim's. Its tangents are then the cheap
+    // ones, on every build, so that they do not change in kind between its
+    // first build and the partial builds of its frames: along a side's rows
+    // by central difference, and over a cap the one tangent its end
+    // station's frame gives, which every build of the cap sets here.
+    bool mFlexible = false;
+    F32 mCapTangent[4] = { 1.f, 0.f, 0.f, 1.f };
+
     LLVector4a* mExtents; //minimum and maximum point of face
     LLVector4a* mCenter;
     LLVector2   mTexCoordExtents[2]; //minimum and maximum of texture coordinates of the face.
@@ -988,6 +1012,10 @@ public:
 private:
     LLVolumeOctree* mOctree;
     LLVolumeTriangle* mOctreeTriangles;
+
+    // The tangents were made for positions a partial build has since moved:
+    // createTangents makes them again, in the buffer they have.
+    bool mTangentsStale = false;
 
     bool createUnCutCubeCap(LLVolume* volume, bool partial_build = false);
     bool createCap(LLVolume* volume, bool partial_build = false);
