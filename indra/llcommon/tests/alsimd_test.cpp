@@ -562,6 +562,47 @@ namespace
         CHECK((AL_ISA_LEVEL <= 2 || (AL_ISA_LEVEL == 3 && AL_SIMD_AVX2) || (AL_ISA_LEVEL == 4 && AL_SIMD_AVX512)));
     }
 
+    // Four 32-bit lanes: unaligned loads and stores move bits, the
+    // comparison is of whole lanes, and the pack clamps each lane to a byte
+    // in argument order.
+    TEST_CASE_METHOD(alsimd_data, "alsimd: integer lanes load and compare whole lanes and pack to clamped bytes", "[alsimd]")
+    {
+        const int32_t src[6] = {7, -1, 0x7fffffff, (int32_t)0x80000000, 42, 99};
+        const Lanes loaded = lanes_of(loadu_i32(src + 1));
+        CHECK(int_lane(loaded, 0) == -1);
+        CHECK(int_lane(loaded, 1) == 0x7fffffff);
+        CHECK(int_lane(loaded, 2) == (int32_t)0x80000000);
+        CHECK(int_lane(loaded, 3) == 42);
+
+        int32_t dst[6] = {1, 1, 1, 1, 1, 1};
+        storeu_i32(dst + 1, ints(5, -6, 7, -8));
+        CHECK(dst[0] == 1);
+        CHECK(dst[1] == 5);
+        CHECK(dst[2] == -6);
+        CHECK(dst[3] == 7);
+        CHECK(dst[4] == -8);
+        CHECK(dst[5] == 1);
+
+        const Lanes ones = lanes_of(set1_i32(-3));
+        CHECK(int_lane(ones, 0) == -3);
+        CHECK(int_lane(ones, 3) == -3);
+        const Lanes anded = lanes_of(and_i32(ints(0x0ff0, -1, 0x00ff00ff, 6), ints(0x00ff, 0x1234, -1, 3)));
+        CHECK(int_lane(anded, 0) == 0x00f0);
+        CHECK(int_lane(anded, 1) == 0x1234);
+        CHECK(int_lane(anded, 2) == 0x00ff00ff);
+        CHECK(int_lane(anded, 3) == 2);
+
+        // a lane that differs in one bit, or only in the sign bit, is unequal
+        CHECK(bits(cmpeq_i32(ints(1, 2, 0, (int32_t)0x80000000), ints(1, 3, 0, 0))) == 0x5u);
+        CHECK(bits(cmpeq_i32(ints(-1, -1, -1, -1), ints(-1, -1, -1, -1))) == 0xFu);
+
+        const Lanes packed = lanes_of(pack_u8(ints(0, 1, 254, 255), ints(-1, 256, 0x7fffffff, (int32_t)0x80000000), ints(10, 20, 30, 40), ints(128, 0, 0, 0)));
+        CHECK((U32)int_lane(packed, 0) == 0xFFFE0100u);
+        CHECK((U32)int_lane(packed, 1) == 0x00FFFF00u);
+        CHECK((U32)int_lane(packed, 2) == 0x281E140Au);
+        CHECK((U32)int_lane(packed, 3) == 0x00000080u);
+    }
+
     // The aligned copy moves every byte and no other, at every size the
     // three loops can be entered with, both ends at every sixteen-byte
     // offset within a line, and at the sizes the slabs come in.

@@ -133,4 +133,14 @@ bool normalize3_or_mark(LLVector4a* v, size_t n)
     return kernels::normalize3_or_mark_impl<ALSimdLanes>(v, n);
 }
 
+void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst)
+{
+    kernels::unit_cube_codes_impl<ALSimdWide>(src, n, dst);
+}
+
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words)
+{
+    return kernels::grid_coincident_triangles_impl<ALSimdWide>(codes, columns, rows, upper, lower, words);
+}
+
 } // namespace alsimd

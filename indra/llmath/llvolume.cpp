@@ -58,6 +58,8 @@
 
 #include <meshoptimizer.h>
 
+#include <bit>
+
 constexpr F32 MIN_CUT_DELTA = 0.02f;
 
 constexpr F32 HOLLOW_MIN = 0.f;
@@ -6077,58 +6079,407 @@ namespace
         return collapse;
     }
 
-    // A side's triangles, from the quads of its grid, vertex s + num_s * t,
-    // whose left columns are listed, or from every quad: bottom left, top
-    // right, top left and bottom left, bottom right, top right, but for
-    // those whose corners a collapsed row or column puts in one place.
-    // Returns the end of what it wrote.
-    template <bool LISTED, bool COLLAPSED>
-    U16* grid_indices(U16* out, S32 num_s, S32 num_t, const S32* lefts, S32 quads, const Collapse& collapse)
+    // A side's quads go in an order a 16-entry vertex cache reuses. A grid
+    // of up to COLUMN_ROWS rows goes a column at a time, every row of a
+    // column before the next: a column's right edge is still cached when the
+    // next column takes it as its left. A taller grid of up to LONE_BAND_QUADS
+    // quads across goes row by row; a wider one in bands of at most
+    // BAND_QUADS quads across, as near equal as the quads divide, each band
+    // row by row, every other band from the last row back to the first: a
+    // band's row reuses the row before it, and a band starts where the band
+    // before it ended. That is on a first or last row, where a collapse or a
+    // pinch leaves triangles out and loads the row's vertices in another
+    // order; two rows of a band take 14 entries, so the band's next row still
+    // finds them. The order depends on the grid's layout alone, never on
+    // positions, so the indices a full build writes hold for the partial
+    // builds after it.
+    constexpr S32 COLUMN_ROWS = 7;
+    constexpr S32 LONE_BAND_QUADS = 7;
+    constexpr S32 BAND_QUADS = 6;
+
+    // What a side keeps of its quads' triangles: all of them; all but those
+    // a collapsed row or column leaves out, a collapsed column being the
+    // first quad's left or the last quad's right; or all but those flagged
+    // as having two corners in one place. whole(t) is whether every
+    // triangle of row t is kept. WHOLE_ROWS is whether rows are whole often
+    // enough to write a band's row at once: a sphere's collapsed poles
+    // leave a triangle out of every row.
+    struct KeepAll
     {
-        const auto upper = [&](S32 s, S32 t)
+        static constexpr bool ALL = true;
+        static constexpr bool WHOLE_ROWS = true;
+
+        bool upper(S32, S32) const { return true; }
+        bool lower(S32, S32) const { return true; }
+        bool whole(S32) const { return true; }
+    };
+
+    struct Kept
+    {
+        static constexpr bool ALL = false;
+        static constexpr bool WHOLE_ROWS = false;
+
+        bool first_row;
+        bool last_row;
+        bool first_column;
+        bool last_column;
+        S32 last_quad_column;
+        S32 last_quad_row;
+
+        bool upper(S32 s, S32 t) const { return !((last_row && t == last_quad_row) || (first_column && s == 0)); }
+        bool lower(S32 s, S32 t) const { return !((first_row && t == 0) || (last_column && s == last_quad_column)); }
+        bool whole(S32 t) const { return !first_column && !last_column && !(first_row && t == 0) && !(last_row && t == last_quad_row); }
+    };
+
+    struct Unpinched
+    {
+        static constexpr bool ALL = false;
+        static constexpr bool WHOLE_ROWS = true;
+
+        // Bit s % 64 of word t * words + s / 64 for the quad at column s
+        // and row t.
+        const U64* upper_pinched;
+        const U64* lower_pinched;
+        S32 words;
+
+        bool upper(S32 s, S32 t) const { return !((upper_pinched[t * words + s / 64] >> (s % 64)) & 1); }
+        bool lower(S32 s, S32 t) const { return !((lower_pinched[t * words + s / 64] >> (s % 64)) & 1); }
+        bool whole(S32 t) const
         {
-            *out++ = (U16)(s   + num_s*t);          //bottom left
-            *out++ = (U16)(s+1 + num_s*(t+1));      //top right
-            *out++ = (U16)(s   + num_s*(t+1));      //top left
-        };
-        const auto lower = [&](S32 s, S32 t)
-        {
-            *out++ = (U16)(s   + num_s*t);          //bottom left
-            *out++ = (U16)(s+1 + num_s*t);          //bottom right
-            *out++ = (U16)(s+1 + num_s*(t+1));      //top right
-        };
-        // The last quad's column.
-        const S32 last = num_s - 2;
-        for (S32 t = 0; t < num_t - 1; t++)
-        {
-            const bool keep_upper = !COLLAPSED || !(collapse.last_row && t + 1 == num_t - 1);
-            const bool keep_lower = !COLLAPSED || !(collapse.first_row && t == 0);
-            if (!COLLAPSED || (keep_upper && keep_lower && !collapse.first_column && !collapse.last_column))
+            U64 any = 0;
+            for (S32 w = 0; w < words; ++w)
             {
-                for (S32 q = 0; q < quads; ++q)
-                {
-                    const S32 s = LISTED ? lefts[q] : q;
-                    upper(s, t);
-                    lower(s, t);
-                }
-                continue;
+                any |= upper_pinched[t * words + w] | lower_pinched[t * words + w];
             }
-            // A collapsed column is the first quad's left or the last
-            // quad's right.
+            return any == 0;
+        }
+    };
+
+    // The quad at column s and row t of a grid of vertices s + num_s * t, as
+    // its two triangles, bottom left, top right, top left and bottom left,
+    // bottom right, top right, but for those keep leaves out. Returns the end
+    // of what it wrote.
+    template <class KEEP>
+    LL_FORCE_INLINE U16* quad_indices(U16* out, S32 s, S32 t, S32 num_s, const KEEP& keep)
+    {
+        const S32 bottom = s + num_s * t;
+        const S32 top = bottom + num_s;
+        if (KEEP::ALL || keep.upper(s, t))
+        {
+            out[0] = (U16)bottom;       //bottom left
+            out[1] = (U16)(top + 1);    //top right
+            out[2] = (U16)top;          //top left
+            out += 3;
+        }
+        if (KEEP::ALL || keep.lower(s, t))
+        {
+            out[0] = (U16)bottom;       //bottom left
+            out[1] = (U16)(bottom + 1); //bottom right
+            out[2] = (U16)(top + 1);    //top right
+            out += 3;
+        }
+        return out;
+    }
+
+    // Whole quads written together, a band's row or a column: each quad's
+    // indices, the quad step vertices on from the one before, as offsets
+    // from the first quad's bottom left vertex, padded to whole vectors.
+    struct QuadUnit
+    {
+        static constexpr S32 VECTORS = 6;
+        static constexpr S32 MAX_QUADS = VECTORS * 8 / 6;
+
+        alignas(16) U16 offsets[VECTORS * 8];
+        S32 quads;
+        S32 length;
+        S32 vectors;
+
+        // quad_count is from 1 to MAX_QUADS.
+        QuadUnit(S32 quad_count, S32 step, S32 num_s)
+            : quads(quad_count), length(quad_count * 6), vectors((quad_count * 6 + 7) / 8)
+        {
             for (S32 q = 0; q < quads; ++q)
             {
-                const S32 s = LISTED ? lefts[q] : q;
-                if (keep_upper && !(s == 0 && collapse.first_column))
+                const S32 bottom = q * step;
+                const S32 top = bottom + num_s;
+                U16* quad = offsets + 6 * q;
+                quad[0] = (U16)bottom;       //bottom left
+                quad[1] = (U16)(top + 1);    //top right
+                quad[2] = (U16)top;          //top left
+                quad[3] = (U16)bottom;       //bottom left
+                quad[4] = (U16)(bottom + 1); //bottom right
+                quad[5] = (U16)(top + 1);    //top right
+            }
+            std::fill(offsets + length, offsets + vectors * 8, (U16)0);
+        }
+
+    };
+
+    // A unit while it is written, its offsets held as values: a store of an
+    // index could otherwise be one to the offsets, and each would be loaded
+    // again after it.
+    struct UnitWriter
+    {
+        alsimd::u16x8 v0, v1, v2, v3, v4, v5;
+        const U16* offsets;
+        S32 length;
+        S32 vectors;
+
+        explicit UnitWriter(const QuadUnit& unit)
+            : v0(alsimd::loadu_u16(unit.offsets)), v1(alsimd::loadu_u16(unit.offsets + 8)), v2(alsimd::loadu_u16(unit.offsets + 16)),
+              v3(alsimd::loadu_u16(unit.offsets + 24)), v4(alsimd::loadu_u16(unit.offsets + 32)), v5(alsimd::loadu_u16(unit.offsets + 40)),
+              offsets(unit.offsets), length(unit.length), vectors(unit.vectors)
+        {
+        }
+
+        // The unit whose first quad's bottom left vertex is base, at out.
+        // Its whole vectors run past its length into what is written after
+        // it, and are written one index at a time where they would run past
+        // limit. Returns the end of the unit.
+        LL_FORCE_INLINE U16* write(U16* out, S32 base, const U16* limit) const
+        {
+            if (out + vectors * 8 > limit)
+            {
+                for (S32 k = 0; k < length; ++k)
                 {
-                    upper(s, t);
+                    out[k] = (U16)(offsets[k] + base);
                 }
-                if (keep_lower && !(s == last && collapse.last_column))
+                return out + length;
+            }
+            const alsimd::u16x8 b = alsimd::set1_u16((U16)base);
+            switch (vectors)
+            {
+                case 6: alsimd::storeu_u16(out + 40, alsimd::add_u16(v5, b)); [[fallthrough]];
+                case 5: alsimd::storeu_u16(out + 32, alsimd::add_u16(v4, b)); [[fallthrough]];
+                case 4: alsimd::storeu_u16(out + 24, alsimd::add_u16(v3, b)); [[fallthrough]];
+                case 3: alsimd::storeu_u16(out + 16, alsimd::add_u16(v2, b)); [[fallthrough]];
+                case 2: alsimd::storeu_u16(out + 8, alsimd::add_u16(v1, b)); [[fallthrough]];
+                default: alsimd::storeu_u16(out, alsimd::add_u16(v0, b));
+            }
+            return out + length;
+        }
+    };
+    static_assert(LONE_BAND_QUADS <= QuadUnit::MAX_QUADS && BAND_QUADS <= QuadUnit::MAX_QUADS && COLUMN_ROWS - 1 <= QuadUnit::MAX_QUADS);
+
+    // A unit pays for its offsets once it has this many quads and is written
+    // this many times.
+    constexpr S32 UNIT_QUADS = 4;
+    constexpr S32 UNIT_USES = 3;
+
+    // The index order is called, not inlined, so that createSide's own loops
+    // keep one layout however the order is written.
+#if LL_WINDOWS
+#define VOLUME_NOINLINE __declspec(noinline)
+#else
+#define VOLUME_NOINLINE __attribute__((noinline))
+#endif
+
+    // count columns of rows quads, the listed ones or the first count, a
+    // unit each. Nothing is written past limit. Returns the end of what it
+    // wrote.
+    template <bool LISTED>
+    VOLUME_NOINLINE U16* unit_columns(U16* out, const U16* limit, const S32* lefts, S32 count, S32 num_s, S32 rows)
+    {
+        const QuadUnit column(rows, num_s, num_s);
+        const UnitWriter writer(column);
+        for (S32 q = 0; q < count; ++q)
+        {
+            out = writer.write(out, LISTED ? lefts[q] : q, limit);
+        }
+        return out;
+    }
+
+    // The quads from grid column begin on in bands, the first wide of them
+    // a quad wider than narrow, of rows quads up: each band row by row,
+    // every other band down, a unit a band's row where keep keeps the whole
+    // row and a quad at a time where it does not. Nothing is written past
+    // limit. Returns the end of what it wrote.
+    template <class KEEP>
+    VOLUME_NOINLINE U16* unit_bands(U16* out, const U16* limit, S32 begin, S32 bands, S32 narrow, S32 wide, S32 num_s, S32 rows, const KEEP& keep)
+    {
+        const QuadUnit narrow_row(narrow, 1, num_s);
+        const QuadUnit wide_row(wide > 0 ? narrow + 1 : narrow, 1, num_s);
+        S32 first = begin;
+        for (S32 band = 0; band < bands; ++band)
+        {
+            const S32 width = band < wide ? narrow + 1 : narrow;
+            const UnitWriter writer(band < wide ? wide_row : narrow_row);
+            const auto band_row = [&](U16* at, S32 t)
+            {
+                if (KEEP::ALL || keep.whole(t))
                 {
-                    lower(s, t);
+                    return writer.write(at, first + num_s * t, limit);
                 }
+                for (S32 s = first; s < first + width; ++s)
+                {
+                    at = quad_indices<KEEP>(at, s, t, num_s, keep);
+                }
+                return at;
+            };
+            if (band & 1)
+            {
+                for (S32 t = rows - 1; t >= 0; --t)
+                {
+                    out = band_row(out, t);
+                }
+            }
+            else
+            {
+                for (S32 t = 0; t < rows; ++t)
+                {
+                    out = band_row(out, t);
+                }
+            }
+            first += width;
+        }
+        return out;
+    }
+
+    // A grid of up to COLUMN_ROWS rows, a column of quads at a time: the
+    // count columns listed, or the first count. Nothing is written past
+    // limit. Returns the end of what it wrote.
+    template <bool LISTED, class KEEP>
+    U16* grid_columns(U16* out, const U16* limit, const S32* lefts, S32 count, S32 num_s, S32 rows, const KEEP& keep)
+    {
+        if (KEEP::ALL && rows >= UNIT_QUADS && count >= UNIT_USES)
+        {
+            return unit_columns<LISTED>(out, limit, lefts, count, num_s, rows);
+        }
+        if (rows == 1)
+        {
+            for (S32 q = 0; q < count; ++q)
+            {
+                out = quad_indices<KEEP>(out, LISTED ? lefts[q] : q, 0, num_s, keep);
+            }
+            return out;
+        }
+        for (S32 q = 0; q < count; ++q)
+        {
+            const S32 s = LISTED ? lefts[q] : q;
+            for (S32 t = 0; t < rows; ++t)
+            {
+                out = quad_indices<KEEP>(out, s, t, num_s, keep);
             }
         }
         return out;
+    }
+
+    // The count quads from grid column begin on, each sharing its left edge
+    // with the one before it, in bands of rows quads up: each band row by
+    // row, every other band down. Nothing is written past limit. Returns the
+    // end of what it wrote.
+    template <class KEEP>
+    U16* grid_bands(U16* out, const U16* limit, S32 begin, S32 count, S32 num_s, S32 rows, const KEEP& keep)
+    {
+        const S32 bands = count <= LONE_BAND_QUADS ? 1 : (count + BAND_QUADS - 1) / BAND_QUADS;
+        const S32 narrow = bands == 1 ? count : count / bands;
+        const S32 wide = bands == 1 ? 0 : count % bands;
+        if constexpr (KEEP::WHOLE_ROWS)
+        {
+            if (narrow >= UNIT_QUADS)
+            {
+                return unit_bands<KEEP>(out, limit, begin, bands, narrow, wide, num_s, rows, keep);
+            }
+        }
+        if (bands == 1)
+        {
+            for (S32 t = 0; t < rows; ++t)
+            {
+                for (S32 s = begin; s < begin + count; ++s)
+                {
+                    out = quad_indices<KEEP>(out, s, t, num_s, keep);
+                }
+            }
+            return out;
+        }
+        S32 first = begin;
+        for (S32 band = 0; band < bands; ++band)
+        {
+            const S32 end = first + narrow + (band < wide ? 1 : 0);
+            const bool down = band & 1;
+            for (S32 row = 0; row < rows; ++row)
+            {
+                const S32 t = down ? rows - 1 - row : row;
+                for (S32 s = first; s < end; ++s)
+                {
+                    out = quad_indices<KEEP>(out, s, t, num_s, keep);
+                }
+            }
+            first = end;
+        }
+        return out;
+    }
+
+    // A side's triangles, from the quads of its grid whose left columns are
+    // listed, or from every quad, but for those keep leaves out, in the order
+    // above. Writes nothing past limit. Returns the end of what it wrote.
+    template <bool LISTED, class KEEP>
+    VOLUME_NOINLINE U16* grid_indices(U16* out, const U16* limit, S32 num_s, S32 num_t, const S32* lefts, S32 quads, const KEEP& keep)
+    {
+        const S32 rows = num_t - 1;
+        if (num_t <= COLUMN_ROWS)
+        {
+            return grid_columns<LISTED, KEEP>(out, limit, lefts, quads, num_s, rows, keep);
+        }
+        if (!LISTED)
+        {
+            return grid_bands<KEEP>(out, limit, 0, quads, num_s, rows, keep);
+        }
+        // A flat inner side's quads run between its corners, and two runs
+        // share no vertex, so each is a grid of its own.
+        S32 begin = 0;
+        for (S32 q = 1; q <= quads; ++q)
+        {
+            if (q == quads || lefts[q] != lefts[q - 1] + 1)
+            {
+                out = grid_bands<KEEP>(out, limit, lefts[begin], q - begin, num_s, rows, keep);
+                begin = q;
+            }
+        }
+        return out;
+    }
+
+    bool same_point(const LLVector4a& a, const LLVector4a& b)
+    {
+        return a.equal(b).areAllSet(LLVector4Logical::MASK_XYZ);
+    }
+
+    // Leaves set only the flags of triangles two of whose corners are the
+    // same point, of those grid_coincident_triangles found two corners of
+    // one code in, and returns how many are left set.
+    S32 confirm_pinches(const LLVector4a* pos, S32 num_s, S32 num_t, U64* upper, U64* lower, S32 words)
+    {
+        S32 pinched = 0;
+        // other is the corner off the triangle's diagonal, as a step from
+        // its bottom left one.
+        const auto confirm = [&](U64& flags, S32 first, S32 other)
+        {
+            U64 left = flags;
+            while (left)
+            {
+                const S32 bit = std::countr_zero(left);
+                left &= left - 1;
+                const S32 bl = first + bit;
+                const S32 tr = bl + num_s + 1;
+                if (same_point(pos[bl], pos[tr]) || same_point(pos[bl], pos[bl + other]) || same_point(pos[bl + other], pos[tr]))
+                {
+                    ++pinched;
+                }
+                else
+                {
+                    flags &= ~(U64(1) << bit);
+                }
+            }
+        };
+        for (S32 t = 0; t < num_t - 1; ++t)
+        {
+            for (S32 w = 0; w < words; ++w)
+            {
+                confirm(upper[t * words + w], num_s * t + w * 64, num_s);
+                confirm(lower[t * words + w], num_s * t + w * 64, 1);
+            }
+        }
+        return pinched;
     }
 
     // The path station a cap closes: the last for a top cap, the first for a
@@ -7345,20 +7696,52 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("llvfcs - generate indices");
 
-        // Now we generate the indices.
+        // Now we generate the indices, into resizeIndices' whole 16-byte
+        // vectors.
+        const U16* limit = mIndices + ((mNumIndices + 7) & ~7);
         U16* end_index = mIndices;
         if (collapsed)
         {
-            end_index = doubled ? grid_indices<true, true>(mIndices, mNumS, mNumT, lefts, quads, collapse)
-                                : grid_indices<false, true>(mIndices, mNumS, mNumT, lefts, quads, collapse);
+            const Kept kept = { collapse.first_row, collapse.last_row, collapse.first_column, collapse.last_column, mNumS - 2, mNumT - 2 };
+            end_index = doubled ? grid_indices<true>(mIndices, limit, mNumS, mNumT, lefts, quads, kept)
+                                : grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, kept);
+        }
+        else if (sculpt_stitching != LL_SCULPT_TYPE_NONE && !volume->isUnique() && quads > 0 && rows > 0)
+        {
+            // A sculpt's triangles two of whose corners are one point have
+            // no area, and are left out: the points' codes find them and the
+            // points confirm them. A flexible sculpt's points move after its
+            // full build, and it keeps them. A face keeps at least one
+            // triangle.
+            ALScratchArena::Scope scratch;
+            U32* codes = scratch.allocate<U32>(num_vertices + 8);
+            alsimd::unit_cube_codes(pos, num_vertices, codes);
+            std::fill(codes + num_vertices, codes + num_vertices + 8, 0u);
+            const S32 words = (quads + 63) / 64;
+            U64* upper = scratch.allocate<U64>((size_t)words * rows);
+            U64* lower = scratch.allocate<U64>((size_t)words * rows);
+            S32 pinched = 0;
+            if (alsimd::grid_coincident_triangles(codes, mNumS, mNumT, upper, lower, words) > 0)
+            {
+                pinched = confirm_pinches(pos, mNumS, mNumT, upper, lower, words);
+            }
+            if (pinched > 0 && pinched < triangles)
+            {
+                end_index = grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, Unpinched{ upper, lower, words });
+            }
+            else
+            {
+                end_index = grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, KeepAll());
+            }
         }
         else
         {
-            end_index = doubled ? grid_indices<true, false>(mIndices, mNumS, mNumT, lefts, quads, collapse)
-                                : grid_indices<false, false>(mIndices, mNumS, mNumT, lefts, quads, collapse);
+            end_index = doubled ? grid_indices<true>(mIndices, limit, mNumS, mNumT, lefts, quads, KeepAll())
+                                : grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, KeepAll());
         }
         cur_index = (S32)(end_index - mIndices);
-        llassert(cur_index == mNumIndices);
+        llassert(cur_index <= mNumIndices);
+        mNumIndices = cur_index;
     }
 
     // The normals come from the grid's quads, not from the triangles the

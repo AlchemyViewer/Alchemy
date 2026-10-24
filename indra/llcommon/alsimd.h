@@ -1406,6 +1406,70 @@ AL_SIMD_INLINE u16x8 add_u16(u16x8 a, u16x8 b)
 }
 
 ////////////////////////////////////
+// Four signed 32-bit lanes
+////////////////////////////////////
+
+AL_SIMD_INLINE i32x4 loadu_i32(const int32_t* p)
+{
+#if AL_SIMD_X86
+    return _mm_loadu_si128(reinterpret_cast<const __m128i*>(p));
+#else
+    return vld1q_s32(p);
+#endif
+}
+
+AL_SIMD_INLINE void storeu_i32(int32_t* p, i32x4 v)
+{
+#if AL_SIMD_X86
+    _mm_storeu_si128(reinterpret_cast<__m128i*>(p), v);
+#else
+    vst1q_s32(p, v);
+#endif
+}
+
+AL_SIMD_INLINE i32x4 set1_i32(int32_t x)
+{
+#if AL_SIMD_X86
+    return _mm_set1_epi32(x);
+#else
+    return vdupq_n_s32(x);
+#endif
+}
+
+AL_SIMD_INLINE i32x4 and_i32(i32x4 a, i32x4 b)
+{
+#if AL_SIMD_X86
+    return _mm_and_si128(a, b);
+#else
+    return vandq_s32(a, b);
+#endif
+}
+
+// All ones in each lane where a and b hold the same bits.
+AL_SIMD_INLINE mask4 cmpeq_i32(i32x4 a, i32x4 b)
+{
+#if AL_SIMD_X86
+    return _mm_castsi128_ps(_mm_cmpeq_epi32(a, b));
+#else
+    return vceqq_s32(a, b);
+#endif
+}
+
+// Every lane of a, b, c and d clamped to 0..255, as sixteen bytes in that
+// order: lane 0 of the result holds a's four, its lane 0 the low byte,
+// lane 1 b's, lane 2 c's and lane 3 d's.
+AL_SIMD_INLINE i32x4 pack_u8(i32x4 a, i32x4 b, i32x4 c, i32x4 d)
+{
+#if AL_SIMD_X86
+    return _mm_packus_epi16(_mm_packs_epi32(a, b), _mm_packs_epi32(c, d));
+#else
+    const uint8x8_t ab = vqmovun_s16(vcombine_s16(vqmovn_s32(a), vqmovn_s32(b)));
+    const uint8x8_t cd = vqmovun_s16(vcombine_s16(vqmovn_s32(c), vqmovn_s32(d)));
+    return vreinterpretq_s32_u8(vcombine_u8(ab, cd));
+#endif
+}
+
+////////////////////////////////////
 // Memory hints
 ////////////////////////////////////
 

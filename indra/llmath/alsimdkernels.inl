@@ -541,6 +541,118 @@ void offset_indices_u16_impl(const U16* src, U16* dst, size_t n, U16 offset)
 }
 
 ////////////////////////////////////
+// Coincident corners
+////////////////////////////////////
+
+// Four points a step, eight under AVX2, the rest one at a time.
+template <class W>
+void unit_cube_codes_impl(const LLVector4a* src, size_t n, U32* dst)
+{
+    size_t i = 0;
+#if AL_SIMD_AVX2
+    if constexpr (W::lanes >= 2)
+    {
+        const __m256 half = _mm256_set1_ps(0.5f);
+        const __m256 steps = _mm256_set1_ps(255.f);
+        const __m256i xyz = _mm256_set1_epi32(0x00FFFFFF);
+        // The packs keep each 128-bit half apart: the codes come out as
+        // points 0, 2, 4, 6, 1, 3, 5, 7.
+        const __m256i order = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
+        const auto code = [&](const F32* p) { return _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_add_ps(_mm256_loadu_ps(p), half), steps)); };
+        for (; i + 8 <= n; i += 8)
+        {
+            const F32* p = src[i].getF32ptr();
+            const __m256i packed = _mm256_packus_epi16(_mm256_packs_epi32(code(p), code(p + 8)), _mm256_packs_epi32(code(p + 16), code(p + 24)));
+            _mm256_storeu_si256(reinterpret_cast<__m256i*>(dst + i), _mm256_and_si256(_mm256_permutevar8x32_epi32(packed, order), xyz));
+        }
+    }
+#endif
+    const f32x4 half = alsimd::set1(0.5f);
+    const f32x4 steps = alsimd::set1(255.f);
+    const i32x4 xyz = alsimd::set1_i32(0x00FFFFFF);
+    const auto code = [&](size_t k) { return alsimd::cvt_round(alsimd::mul(alsimd::add(alsimd::load(src[k].getF32ptr()), half), steps)); };
+    for (; i + 4 <= n; i += 4)
+    {
+        alsimd::storeu_i32(reinterpret_cast<int32_t*>(dst + i), alsimd::and_i32(alsimd::pack_u8(code(i), code(i + 1), code(i + 2), code(i + 3)), xyz));
+    }
+    for (; i < n; ++i)
+    {
+        int32_t lanes[4];
+        const i32x4 c = code(i);
+        alsimd::storeu_i32(lanes, alsimd::and_i32(alsimd::pack_u8(c, c, c, c), xyz));
+        dst[i] = static_cast<U32>(lanes[0]);
+    }
+}
+
+// A row of quads at a time, four quads a step, eight under AVX2. A step
+// reads its bottom left, bottom right, top left and top right corners'
+// codes four or eight at once, which runs past the row's last quad: the
+// flags past it are cleared.
+template <class W>
+size_t grid_coincident_triangles_impl(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words)
+{
+    if (columns < 2 || rows < 2)
+    {
+        return 0;
+    }
+    const size_t quads = columns - 1;
+    const size_t last_word = (quads - 1) / 64;
+    const U64 last_bits = (quads % 64) ? (U64(1) << (quads % 64)) - 1 : ~U64(0);
+    size_t flagged = 0;
+    for (size_t t = 0; t + 1 < rows; ++t)
+    {
+        const int32_t* bottom = reinterpret_cast<const int32_t*>(codes + columns * t);
+        const int32_t* top = bottom + columns;
+        U64* up = upper + words * t;
+        U64* lo = lower + words * t;
+        for (size_t w = 0; w < words; ++w)
+        {
+            up[w] = 0;
+            lo[w] = 0;
+        }
+        size_t s = 0;
+#if AL_SIMD_AVX2
+        if constexpr (W::lanes >= 2)
+        {
+            for (; s < quads; s += 8)
+            {
+                const __m256i bl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s));
+                const __m256i br = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s + 1));
+                const __m256i tl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s));
+                const __m256i tr = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s + 1));
+                const __m256i diagonal = _mm256_cmpeq_epi32(bl, tr);
+                const __m256i u = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(tl, tr)), _mm256_cmpeq_epi32(bl, tl));
+                const __m256i l = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(bl, br)), _mm256_cmpeq_epi32(br, tr));
+                up[s / 64] |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(u))) << (s % 64);
+                lo[s / 64] |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(l))) << (s % 64);
+            }
+        }
+#endif
+        for (; s < quads; s += 4)
+        {
+            const i32x4 bl = alsimd::loadu_i32(bottom + s);
+            const i32x4 br = alsimd::loadu_i32(bottom + s + 1);
+            const i32x4 tl = alsimd::loadu_i32(top + s);
+            const i32x4 tr = alsimd::loadu_i32(top + s + 1);
+            const mask4 diagonal = alsimd::cmpeq_i32(bl, tr);
+            const mask4 u = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(tl, tr)), alsimd::cmpeq_i32(bl, tl));
+            const mask4 l = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(bl, br)), alsimd::cmpeq_i32(br, tr));
+            up[s / 64] |= U64(alsimd::bits(u)) << (s % 64);
+            lo[s / 64] |= U64(alsimd::bits(l)) << (s % 64);
+        }
+        up[last_word] &= last_bits;
+        lo[last_word] &= last_bits;
+        U64 any = 0;
+        for (size_t w = 0; w <= last_word; ++w)
+        {
+            any |= up[w] | lo[w];
+        }
+        flagged += any != 0;
+    }
+    return flagged;
+}
+
+////////////////////////////////////
 // Dequantization
 ////////////////////////////////////
 
