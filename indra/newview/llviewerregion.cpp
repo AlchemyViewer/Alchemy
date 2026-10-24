@@ -1596,7 +1596,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
     return;
 }
 
-void LLViewerRegion::createVisibleObjects(F32 max_time)
+void LLViewerRegion::createVisibleObjects()
 {
     if(mDead)
     {
@@ -1608,9 +1608,12 @@ void LLViewerRegion::createVisibleObjects(F32 max_time)
         return;
     }
 
+    // At most NewObjectCreationThrottle objects a frame, as the setting says; below 0 (-1 off, -2 lifted under the login
+    // or teleport screen) no count. The count stopped the loop only where its last creation also found the update's time
+    // spent: one that came in under it went on with no count at all, through the whole waiting list. The time between
+    // regions is LLWorld::updateRegions's to share out.
     S32 throttle = sNewObjectCreationThrottle;
     bool has_new_obj = false;
-    LLTimer update_timer;
     for(LLVOCacheEntry::vocache_entry_priority_list_t::iterator iter = mImpl->mWaitingList.begin();
         iter != mImpl->mWaitingList.end(); ++iter)
     {
@@ -1620,7 +1623,7 @@ void LLViewerRegion::createVisibleObjects(F32 max_time)
         {
             addNewObject(vo_entry);
             has_new_obj = true;
-            if(throttle > 0 && !(--throttle) && update_timer.getElapsedTimeF32() > max_time)
+            if(throttle > 0 && --throttle == 0)
             {
                 break;
             }
@@ -1694,9 +1697,8 @@ void LLViewerRegion::idleUpdate(F32 max_update_time)
     max_time = max_update_time - update_timer.getElapsedTimeF32();
 
     updateVisibleEntries(max_time);
-    max_time = max_update_time - update_timer.getElapsedTimeF32();
 
-    createVisibleObjects(max_time);
+    createVisibleObjects();
 
     mImpl->mWaitingList.clear();
     mImpl->mVisibleGroups.clear();

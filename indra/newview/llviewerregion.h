@@ -468,7 +468,7 @@ private:
     void removeFromVOCacheTree(LLVOCacheEntry* entry);
     void killCacheEntry(LLVOCacheEntry* entry, bool for_rendering = false); //physically delete the cache entry
     void killInvisibleObjects(F32 max_time);
-    void createVisibleObjects(F32 max_time);
+    void createVisibleObjects();
     void updateVisibleEntries(F32 max_time); //update visible entries
 
     void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
