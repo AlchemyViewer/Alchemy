@@ -5824,11 +5824,12 @@ LLVector4a LLVolumeFace::makePlanarNormal() const
             if (length2 > 0.f && std::isfinite(length2))
             {
                 sum.mul(1.f / sqrtf(length2));
+                constexpr F32 cone = PLANAR_CONE_COS + PLANAR_CONE_TIE;
                 bool within = true;
                 for (S32 v = 0; v < mNumVertices && within; ++v)
                 {
                     const F32 along = mNormals[v].dot3(sum).getF32();
-                    within = along > 0.f && along * along >= PLANAR_CONE_COS * PLANAR_CONE_COS * mNormals[v].dot3(mNormals[v]).getF32();
+                    within = along > 0.f && along * along >= cone * cone * mNormals[v].dot3(mNormals[v]).getF32();
                 }
                 planar = sum;
                 planar.getF32ptr()[3] = within ? 1.f : -1.f;

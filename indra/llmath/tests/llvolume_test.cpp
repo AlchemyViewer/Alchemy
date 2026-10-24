@@ -105,7 +105,12 @@ namespace
         {
             return 180.f;
         }
-        return acosf(llclamp((a * b) / (la * lb), -1.f, 1.f)) * RAD_TO_DEG;
+        // From the cross and dot products in double: a float's arc cosine
+        // resolves nothing finer than 0.02 degrees near 0.
+        const double cross[3] = { (double)a.mV[1] * b.mV[2] - (double)a.mV[2] * b.mV[1], (double)a.mV[2] * b.mV[0] - (double)a.mV[0] * b.mV[2],
+                                  (double)a.mV[0] * b.mV[1] - (double)a.mV[1] * b.mV[0] };
+        const double dot = (double)a.mV[0] * b.mV[0] + (double)a.mV[1] * b.mV[1] + (double)a.mV[2] * b.mV[2];
+        return (F32)std::atan2(std::sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]), dot) * RAD_TO_DEG;
     }
 
     bool coincide(const LLVector4a& a, const LLVector4a& b)
