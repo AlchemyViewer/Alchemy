@@ -78,12 +78,18 @@ void main()
     // the alpha pool's programs, and in this one where the alpha pool draws with it (an impostor
     // bake, the depth of field's depth pass). Outside the alpha pool LLFace stores shininess
     // there, so the opaque mask pool tests the texture's alpha alone.
+    //
+    // The mask pool's cutoff is a material's 8-bit one, which a texel of that value is compared
+    // with half an 8-bit step under it, so it is not dropped or kept by how each rounded. The
+    // alpha pool's is its coverage floor, tested as alphaF tests it.
 #ifdef IS_ALPHA
     float mask_alpha = final_alpha;
+    float bias = 0.0;
 #else
     float mask_alpha = (vertex_alpha_coverage > 0.0) ? final_alpha : color.a;
+    float bias = (vertex_alpha_coverage > 0.0) ? 0.0 : 0.001953125; // 1/512, half an 8-bit quantization
 #endif
-    if (mask_alpha < minimum_alpha)
+    if (mask_alpha < minimum_alpha - bias)
     {
         discard;
     }

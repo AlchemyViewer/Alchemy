@@ -90,7 +90,9 @@ void main()
 {
     float alpha = sample_alpha(vary_texcoord0.xy) * vertex_color.a;
 
-    if (alpha < gltf_minimum_alpha[vary_material_index])
+    // As pbropaqueF compares it.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (alpha < gltf_minimum_alpha[vary_material_index] - bias)
     {
         discard;
     }

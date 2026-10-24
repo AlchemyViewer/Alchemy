@@ -57,7 +57,10 @@ void main()
 {
     float coverage = texture(diffuseMap, base_color_texcoord.xy).a * baseColorAlpha.x;
 
-    if (coverage < minimum_alpha)
+    // A MASK cutoff as pbropaqueF compares it. BLEND's is the alpha pool's coverage floor, tested
+    // as pbralphaF tests it.
+    float bias = (baseColorAlpha.y > 0.0) ? 0.0 : 0.001953125; // 1/512, half an 8-bit quantization
+    if (coverage < minimum_alpha - bias)
     {
         discard;
     }

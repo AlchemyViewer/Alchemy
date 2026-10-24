@@ -58,8 +58,9 @@ bool keepsCut()
     return selection_keep_cut != 0;
 }
 
-// Whether `alpha`, from faceAlpha, leaves the fragment out.
+// Whether `alpha`, from faceAlpha, leaves the fragment out: under the cutoff by more than half an 8-bit step
+// (ALSelectionOutline::ALPHA_TEST_BIAS), as the passes that draw the face compare it.
 bool isCutOut(float alpha)
 {
-    return alpha < minimum_alpha;
+    return alpha < minimum_alpha - 0.001953125;
 }
