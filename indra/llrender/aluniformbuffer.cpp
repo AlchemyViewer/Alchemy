@@ -52,6 +52,26 @@ namespace
     // two evaluations. Growth is always immediate. Shared by all three streaming rings.
     constexpr int RING_SHRINK_COOLDOWN = 240;
 
+    // The frames the GPU may still be drawing when the CPU begins the next: AlchemyRenderMaxFramesAhead's default,
+    // the depth the frame ends pace the CPU to. A fenced ring's segment left in frame t comes round to the head again
+    // once the head has crossed the ring's other segments, (segments - 1) / segments of the ring's frames later, and
+    // is written then without a wait only once the frame fences have shown frame t finished: during frame G, a frame
+    // end paced this deep has shown G - MAX_FRAMES_AHEAD - 1. The ring keeps a frame more than that, for a frame
+    // whose traffic climbs past what the ring was sized for.
+    constexpr int MAX_FRAMES_AHEAD = 3;
+
+    // The fewest frames of traffic a fenced ring of `segments` keeps for its segments to come round only once their
+    // frames are shown finished: (segments - 1) * slack >= segments * (MAX_FRAMES_AHEAD + 2).
+    constexpr int fenced_ring_slack(int segments)
+    {
+        int slack = 1;
+        while ((segments - 1) * slack < segments * (MAX_FRAMES_AHEAD + 2))
+        {
+            ++slack;
+        }
+        return slack;
+    }
+
     // Shared streaming ring for UPDATE_RING: every dirty shadowed buffer appends its contents and
     // binds its slice, so no store is ever rewritten while the GPU may still be reading it. On wrap
     // the whole ring is orphaned (glBufferData respecify -- the driver keeps the old store alive for
@@ -62,6 +82,7 @@ namespace
     // smaller than the persistent ring's.
     constexpr size_t RING_MIN_BYTES    = 1 * 1024 * 1024;  // initial ring, and the floor
     constexpr size_t RING_MAX_BYTES    = 4 * 1024 * 1024;  // grow cap (the old fixed size)
+    // Not fenced (fenced_ring_slack): a wrap orphans the store, so the slack sets only how often it wraps.
     constexpr int    RING_SLACK_FRAMES = 4;                // keep >= this many frames before a wrap
     static_assert(RING_MIN_BYTES <= RING_MAX_BYTES, "ring floor must not exceed the cap");
 
@@ -92,17 +113,17 @@ namespace
     // write-combined memory is fine at, so a mode knob would only add a recreate path.
     // Sizing. The persistent ring is sized adaptively from observed per-frame traffic (endFrame),
     // between SCRATCH_MIN_BYTES and SCRATCH_MAX_BYTES: most scenes stream a few hundred KiB of
-    // palettes per frame, far under the old fixed 16 MiB, so a light scene keeps a tiny footprint
-    // while a crowded region grows to the slack it needs (and shrinks back when the crowd leaves). A payload must fit ONE segment, so the
+    // palettes per frame, so a light scene keeps a tiny footprint while a crowd across many regions
+    // grows to the slack it needs (and shrinks back when the crowd leaves). A payload must fit ONE segment, so the
     // accepted payload cap is the SMALLEST ring's segment (segments only ever grow); that cap is
     // ~25x a full 152-bone Bento palette, so real skinning never approaches it. Segment COUNT stays
     // fixed at 4 across sizes -- growth doubles segment SIZE, not count (see the sPersistRing note).
     constexpr size_t SCRATCH_MIN_BYTES    = 1 * 1024 * 1024;  // initial persistent ring, and the floor
-    constexpr size_t SCRATCH_MAX_BYTES    = 16 * 1024 * 1024; // grow cap
+    constexpr size_t SCRATCH_MAX_BYTES    = 64 * 1024 * 1024; // grow cap
     constexpr int    SCRATCH_SEGMENTS     = 4;
     constexpr size_t SCRATCH_MAX_PAYLOAD  = 256 * 1024;       // scratchWrite reject cap
     constexpr size_t SCRATCH_BYTES        = 4 * 1024 * 1024;  // fixed orphan fallback ring (macOS GL 4.1)
-    constexpr int    SCRATCH_SLACK_FRAMES = 4;                // keep >= this many frames of head slack
+    constexpr int    SCRATCH_SLACK_FRAMES = fenced_ring_slack(SCRATCH_SEGMENTS); // frames of head slack kept
     static_assert(SCRATCH_MAX_PAYLOAD <= SCRATCH_MIN_BYTES / SCRATCH_SEGMENTS, "payload must fit the smallest ring's segment");
     static_assert(SCRATCH_MAX_PAYLOAD <= SCRATCH_BYTES, "payload must fit the orphan fallback ring");
     static_assert(SCRATCH_MIN_BYTES <= SCRATCH_MAX_BYTES, "scratch ring floor must not exceed the cap");
@@ -149,20 +170,26 @@ namespace
     // small floor grown toward the cap (and shrunk back as traffic falls), so a light scene costs
     // little while a busy one gets the slack it needs. Consumption is COUNT-driven -- each slice
     // takes a GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT-rounded slot, so a busy scene streaming
-    // ~3.4 MB/frame is ~6k slices regardless of block size. We keep >= PERSIST_SLACK_FRAMES of head slack, which also holds each segment near
-    // one frame of slices so a clean block is left (and re-flushed) at most ~once per frame --
-    // undersizing below that would multiply that churn. The old fixed size was 16 MiB (~4.8 frames
-    // for a busy scene); the cap preserves that ceiling.
+    // ~3.4 MB/frame is ~6k slices regardless of block size. We keep >= PERSIST_SLACK_FRAMES of head
+    // slack (fenced_ring_slack: a segment comes round only once its frame is shown finished at the
+    // pacing depth), which also holds each segment near two frames of slices so a clean block is left
+    // (and re-flushed) at most ~once every other frame -- undersizing below that would multiply that
+    // churn. The cap holds that slack for ~9 MB/frame, some eighteen thousand 512-byte slices: what the
+    // main view, the shadow cascades and a probe face can make of 30 regions' active objects.
     //
     // Segment COUNT deliberately stays at 4, so a grow doubles segment SIZE rather than adding
     // segments. Bigger segments halve the advance rate -- and every advance invalidates outstanding
     // slices (see bindCurrent), forcing clean blocks to re-flush -- so fewer, bigger segments mean
     // less of that churn (the reason a smaller floor trades memory for a little more of it).
     constexpr size_t PERSIST_MIN_BYTES    = 1 * 1024 * 1024;  // initial ring, and the floor
-    constexpr size_t PERSIST_MAX_BYTES    = 16 * 1024 * 1024; // grow cap
+    constexpr size_t PERSIST_MAX_BYTES    = 64 * 1024 * 1024; // grow cap
     constexpr int    PERSIST_SEGMENTS     = 4;
-    constexpr int    PERSIST_SLACK_FRAMES = 4;                // keep >= this many frames of head slack
+    constexpr int    PERSIST_SLACK_FRAMES = fenced_ring_slack(PERSIST_SEGMENTS); // frames of head slack kept
     static_assert(PERSIST_MIN_BYTES <= PERSIST_MAX_BYTES, "persistent ring floor must not exceed the cap");
+    static_assert((PERSIST_SEGMENTS - 1) * PERSIST_SLACK_FRAMES >= PERSIST_SEGMENTS * (MAX_FRAMES_AHEAD + 1),
+                  "a persistent segment must come round only once the pacing has shown its frame finished");
+    static_assert((SCRATCH_SEGMENTS - 1) * SCRATCH_SLACK_FRAMES >= SCRATCH_SEGMENTS * (MAX_FRAMES_AHEAD + 1),
+                  "a scratch segment must come round only once the pacing has shown its frame finished");
 
     ALGPUBuffer sPersistRing;            // allocated only while mapped (== whole ring)
     size_t sPersistHead       = 0;
