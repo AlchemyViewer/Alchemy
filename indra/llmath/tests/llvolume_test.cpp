@@ -5838,6 +5838,16 @@ namespace
             bent = bent || !oneNormal(flexi->getVolumeFace(f));
         }
         CHECK(bent);
+        // A copy of a bent face takes the planar normal its first build made,
+        // not one made again from the bent geometry.
+        for (S32 f = 0; f < flexi->getNumVolumeFaces(); ++f)
+        {
+            LLVolumeFace copied_bent(flexi->getVolumeFace(f));
+            CHECK(same(copied_bent.getPlanarNormal(), first[f]));
+            LLVolumeFace assigned_bent;
+            assigned_bent = flexi->getVolumeFace(f);
+            CHECK(same(assigned_bent.getPlanarNormal(), first[f]));
+        }
         LLPointer<LLVolume> fresh = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SAME, 0.f, 2);
         bendPath(*fresh, 4, 1.1f);
         fresh->regen();

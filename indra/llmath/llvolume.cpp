@@ -4776,7 +4776,6 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
     mReversed = src.mReversed;
     mFlexible = src.mFlexible;
     std::copy(std::begin(src.mCapTangent), std::end(src.mCapTangent), mCapTangent);
-    std::copy(std::begin(src.mPlanarNormal), std::end(src.mPlanarNormal), mPlanarNormal);
 
     mExtents[0] = src.mExtents[0];
     mExtents[1] = src.mExtents[1];
@@ -4789,6 +4788,8 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
 
     resizeVertices(src.mNumVertices);
     resizeIndices(src.mNumIndices);
+    // after resizeVertices, which drops the planar normal with the vertices
+    std::copy(std::begin(src.mPlanarNormal), std::end(src.mPlanarNormal), mPlanarNormal);
 
     if (mNumVertices)
     {
