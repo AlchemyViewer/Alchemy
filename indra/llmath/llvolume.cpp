@@ -1398,6 +1398,18 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // affect most sample points.
     t = ((S32)(t * sides)) / (F32)sides;
 
+    // A step the snap brings within a hundredth of a step of the begin cut,
+    // as it does a cut just short of a step, or the first step where the
+    // rounding of the step's size takes it back to the cut, is the begin's
+    // own: it would leave a row with no height after the begin's. A sculpt
+    // keeps it, as it keeps the end's, and so does a circle2 path, a spiral
+    // whose stations alternate sides: leaving one out would turn every
+    // station after it the other way.
+    if (!is_sculpted && (params.getCurveType() & 0xf0) == LL_PCODE_PATH_CIRCLE && t - params.getBegin() < step * 0.01f)
+    {
+        t += step;
+    }
+
     // Run through the non-cut dependent points. A point within a hundredth
     // of a step of the end cut is the end's own, short of it only by the
     // rounding the steps add up to: it would leave a row with no height

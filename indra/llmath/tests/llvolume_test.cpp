@@ -4193,6 +4193,58 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A begin cut just short of a step, as the cuts the wire carries can
+    // be, snaps the path's first step to within a hundredth of a step of
+    // the cut, and so can the rounding of the step's size where the cut is
+    // on a step: a twist of 1.4 turns at LOD 3 gives a torus 41 sides,
+    // whose first step rounds back to a cut at 0. That step is the cut's
+    // own, as the end's last step is, and the first row has height.
+    TEST_CASE("llvolume: a circle path's first station after its begin cut is apart from it", "[llvolume]")
+    {
+        Report report;
+        S32 cuts = 0;
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            const F32 detail = LOD_DETAIL[lod];
+            for (F32 twist : { 0.f, 0.7f })
+            {
+                const S32 sides = llfloor(MIN_DETAIL_FACES * detail + 2.f * twist * 3.5f * (detail - 0.5f));
+                const F32 step = 1.f / sides;
+                std::vector<F32> begins = { 0.f };
+                for (S32 k = 1; k < sides; ++k)
+                {
+                    const S32 quanta = (S32)((F32)k / (F32)sides / CUT_QUANTA);
+                    for (S32 j = 0; j < 3; ++j)
+                    {
+                        begins.push_back((F32)(quanta - j) * CUT_QUANTA);
+                    }
+                }
+                for (F32 begin : begins)
+                {
+                    Shape s = torus();
+                    s.twist_begin = -twist;
+                    s.twist_end = twist;
+                    s.path_begin = begin;
+                    LLPath path;
+                    path.generate(s.params().getPathParams(), detail);
+                    ++cuts;
+                    for (S32 i = 0; i + 1 < (S32)path.mPath.size(); ++i)
+                    {
+                        if (!(path.mPath[i + 1].mTexT - path.mPath[i].mTexT >= step * 0.01f))
+                        {
+                            report.fail(fmt::format("{} sides at LOD {}, cut at {}: stations {} and {} are at t {} and {}", sides, lod,
+                                                    begin, i, i + 1, path.mPath[i].mTexT, path.mPath[i + 1].mTexT));
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        INFO(fmt::format("{} cuts", cuts));
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // The streaming cost counts a circle2 path's points with
     // getNumNGonPoints, which walks the stations as genNGon places them. An
     // end cut on a step, which the summed steps reach a rounding short of,
