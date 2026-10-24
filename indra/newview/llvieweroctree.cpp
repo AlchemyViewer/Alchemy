@@ -1173,6 +1173,13 @@ bool LLOcclusionCullingGroup::checkOcclusion()
                 case ALBoxOcclusion::Status::Pending: status = ALQueryPool::Status::Pending; break;
                 case ALBoxOcclusion::Status::Seen:    status = ALQueryPool::Status::Ready; passed = 1; break;
                 case ALBoxOcclusion::Status::Hidden:  status = ALQueryPool::Status::Ready; passed = 0; break;
+                case ALBoxOcclusion::Status::Unanswered:
+                    // No answer either way: the group keeps what it was found to be, and its next ask is a query,
+                    // rather than reading as seen every time and never being culled.
+                    forgetQuery(camera);
+                    mBoxUnanswered = true;
+                    clearOcclusionState(QUERY_PENDING);
+                    return false;
                 default:                              status = ALQueryPool::Status::Expired; break;
                 }
             }
@@ -1248,7 +1255,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                 // The main view's groups are tested against its depth pyramid where the pass does, all at once, rather
                 // than each asked by a query of its own (LLPipeline::doOcclusion). Not the object cache's, whose
                 // queries are exact (queryKind), nor a box too large on the screen for the pyramid to answer.
-                if (camera_id == LLViewerCamera::CAMERA_WORLD &&
+                if (camera_id == LLViewerCamera::CAMERA_WORLD && !mBoxUnanswered &&
                     mSpatialPartition->mPartitionType != LLViewerRegion::PARTITION_VO_CACHE)
                 {
                     LLVector4a half_extent;
@@ -1273,10 +1280,11 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                 { //no query pending, or previous query to be discarded
                     LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - render");
 
-                    // A query in the box's place, the one or the other.
+                    // A query in the box's place, the one or the other; the box is tried again after it.
                     if (camera_id == LLViewerCamera::CAMERA_WORLD)
                     {
-                        mBoxQuery = {};
+                        mBoxQuery      = {};
+                        mBoxUnanswered = false;
                     }
                     ALQueryScope query(gGL.queries(), queryKind());
                     mOcclusionQuery[LLViewerCamera::sCurCameraID] = query.ticket();

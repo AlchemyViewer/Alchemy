@@ -88,7 +88,7 @@ bool ALBoxOcclusion::reserve(U32 boxes)
         capacity *= 2;
     }
     capacity = std::min(capacity, MAX_BOXES);
-    if (!mStream.allocate(capacity * (BOX_BYTES + ANSWER_BYTES), IN_FLIGHT, "Occlusion boxes")
+    if (!mStream.allocate(capacity * (BOX_BYTES + ANSWER_BYTES), IN_FLIGHT + 1, "Occlusion boxes")
         || !mReadback.allocate(capacity * ANSWER_BYTES, IN_FLIGHT, "Occlusion answers"))
     {
         LL_WARNS_ONCE("BoxOcclusion") << "No stores for the boxes the depth pyramid tests; they are asked by query" << LL_ENDL;
@@ -181,12 +181,19 @@ void ALBoxOcclusion::collect()
         Answers& answers = mAnswers[flight.mBatch % RESULT_BATCHES];
         answers.mBatch = flight.mBatch;
         answers.mCount = flight.mCount;
-        answers.mBits.assign((flight.mCount + 63) / 64, 0);
+        answers.mSeen.assign((flight.mCount + 63) / 64, 0);
+        answers.mUnanswered.assign((flight.mCount + 63) / 64, 0);
         for (U32 i = 0; i < flight.mCount; ++i)
         {
-            if (mWords[i] != 0)
+            // depthPyramidUtil.glsl's DEPTH_PYRAMID_HIDDEN, _SEEN and _UNANSWERED: 0, 1 and 2.
+            const U64 bit = U64(1) << (i % 64);
+            if (mWords[i] == 1)
             {
-                answers.mBits[i / 64] |= U64(1) << (i % 64);
+                answers.mSeen[i / 64] |= bit;
+            }
+            else if (mWords[i] != 0)
+            {
+                answers.mUnanswered[i / 64] |= bit;
             }
         }
     }
@@ -213,8 +220,13 @@ ALBoxOcclusion::Status ALBoxOcclusion::result(const Ticket& ticket) const
     const Answers& answers = mAnswers[ticket.mBatch % RESULT_BATCHES];
     if (answers.mBatch == ticket.mBatch && ticket.mIndex < answers.mCount)
     {
-        const bool seen = (answers.mBits[ticket.mIndex / 64] >> (ticket.mIndex % 64)) & 1;
-        return seen ? Status::Seen : Status::Hidden;
+        const U32 word = ticket.mIndex / 64;
+        const U32 bit  = ticket.mIndex % 64;
+        if ((answers.mUnanswered[word] >> bit) & 1)
+        {
+            return Status::Unanswered;
+        }
+        return (answers.mSeen[word] >> bit) & 1 ? Status::Seen : Status::Hidden;
     }
     if (ticket.mBatch == mBatch || isInFlight(ticket.mBatch))
     {
@@ -234,7 +246,8 @@ void ALBoxOcclusion::release()
     {
         answers.mBatch = 0;
         answers.mCount = 0;
-        answers.mBits.clear();
+        answers.mSeen.clear();
+        answers.mUnanswered.clear();
     }
     // A ticket taken before is of no batch to come.
     ++mBatch;

@@ -3780,9 +3780,11 @@ bool LLPipeline::boxOcclusionTakes(const LLVector4a& center, const LLVector4a& h
     {
         return false;
     }
-    // The sphere's angular radius's tangent, over the view's: the share of the screen's height it spans each way.
+    // The sphere's angular radius's tangent, over the view's: the share of the screen's height it spans each way, in
+    // the pixels of the depth the pyramid is built from, which the render resolution scales from the window's. On the
+    // view's axis: a box off it spans more, which the pyramid answers as unanswered, and its group asks a query next.
     const F32 tangent  = sqrtf(radius_sq / (distance_sq - radius_sq));
-    const F32 diameter = tangent / tan_half_view * (F32)camera.getViewHeightInPixels();
+    const F32 diameter = tangent / tan_half_view * (F32)mRT->deferredScreen.getHeight();
     return diameter < ALBoxOcclusion::screenReach();
 }
 

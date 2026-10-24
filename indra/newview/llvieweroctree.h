@@ -342,6 +342,9 @@ protected:
     /// The world camera's box, tested against the main view's depth pyramid (gPipeline.mBoxOcclusion), while
     /// QUERY_PENDING: in place of its query, the one or the other, never both.
     ALBoxOcclusion::Ticket   mBoxQuery;
+    /// The pyramid could not answer for the world camera's last box (too large on the screen, or reaching the eye's
+    /// plane): its next ask is a query, which then lets the box be tried again.
+    bool                     mBoxUnanswered = false;
 
 private:
     static U32 sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS]; ///< the frame of each camera's forgetOcclusion()

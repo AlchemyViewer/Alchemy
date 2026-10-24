@@ -41,8 +41,9 @@ class LLMatrix4a;
 /// (ALDepthPyramid, depth_pyramid_box_visible), and the answers come back through a readback once the frame fences show
 /// the frame finished, a frame or two later -- where a GL occlusion query costs a query, a draw and a result read for
 /// each box. An answer errs only toward seen: a box is hidden only where every point of it lies behind the farthest
-/// depth of the pyramid's texels it covers, so none is hidden that the scene does not hide, and one too large on the
-/// screen for the pyramid's levels to answer is seen (boxes past screenReach() are better asked by a query).
+/// depth of the pyramid's texels it covers, so none is hidden that the scene does not hide. One the pyramid cannot
+/// answer for -- too large on the screen for its levels, or reaching the eye's plane -- is answered Unanswered, for its
+/// user to ask a query of instead; boxes past screenReach() are better asked by a query from the start.
 ///
 /// A batch is the boxes added between two dispatches, the answers of the last RESULT_BATCHES of them kept, as the
 /// query pool keeps its results, for a user that reads them only every few frames. Past that, before a batch's answers
@@ -54,19 +55,21 @@ class ALBoxOcclusion
 public:
     /// The batches whose answers are kept.
     static constexpr U32 RESULT_BATCHES = 64;
-    /// The batches that may be on their way at once: the stream's regions and the readback's slots. A frame end paced
-    /// three frames deep leaves the three before the one ending on the GPU, the readback takes its answers a frame end
-    /// after their frame, and a region is noted read at the next dispatch: six covers them all with one to spare.
+    /// The batches that may be on their way at once: the readback's slots. A frame end paced three frames deep leaves
+    /// the three before the one ending on the GPU, and the readback takes its answers a frame end after their frame:
+    /// six covers them with one to spare. The stream keeps one region more, since a region is noted read only at the
+    /// next dispatch's map, a frame later than its reads.
     static constexpr U32 IN_FLIGHT = 6;
     /// The most boxes one batch takes.
     static constexpr U32 MAX_BOXES = 32768;
 
     enum class Status : U8
     {
-        Pending, ///< added, and its answer not back yet
-        Seen,    ///< some point of the box lies in front of the depth under it
-        Hidden,  ///< the depth hides the whole box
-        Expired, ///< no answer: no box, one refused, or one whose answer was dropped or released
+        Pending,    ///< added, and its answer not back yet
+        Seen,       ///< some point of the box lies in front of the depth under it
+        Hidden,     ///< the depth hides the whole box
+        Unanswered, ///< the pyramid could not tell, the box too large on its screen or reaching the eye's plane
+        Expired,    ///< no answer: no box, one refused, or one whose answer was dropped or released
     };
 
     struct Ticket
@@ -121,12 +124,13 @@ private:
         U32 mBatch = 0;
         U32 mCount = 0;
     };
-    // A batch's answers, a bit a box.
+    // A batch's answers, a bit a box in each of two sets: whether it was seen, and whether the pyramid could not tell.
     struct Answers
     {
         U32              mBatch = 0;
         U32              mCount = 0;
-        std::vector<U64> mBits;
+        std::vector<U64> mSeen;
+        std::vector<U64> mUnanswered;
     };
 
     // Stores for `boxes` boxes a batch, made again past the room they have. False where GL could not make them.

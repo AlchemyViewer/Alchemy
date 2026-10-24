@@ -26,7 +26,8 @@
 layout(local_size_x = 64) in;
 
 // occlusionBoxCount boxes of eight words each -- a centre and a half extent, each three floats and a word unread --
-// and after them a word a box, which this writes: 1 where the box is seen, 0 where the depth hides every point of it.
+// and after them a word a box, which this writes: depth_pyramid_box_test's answer, 0 where the depth hides every
+// point of the box, 1 where it is seen, 2 where the pyramid cannot tell and a query must.
 // One block for both, so that the boxes and their answers take one of the storage points every compute context has.
 layout(std430) buffer OcclusionBoxes
 {
@@ -37,7 +38,7 @@ layout(std430) buffer OcclusionBoxes
 uniform mat4 occlusionViewProj;
 uniform int occlusionBoxCount;
 
-bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip);
+int depth_pyramid_box_test(vec3 lo, vec3 hi, mat4 to_clip);
 
 void main()
 {
@@ -52,8 +53,7 @@ void main()
     vec3 centre      = uintBitsToFloat(uvec3(occlusion_words[at + 0u], occlusion_words[at + 1u], occlusion_words[at + 2u]));
     vec3 half_extent = uintBitsToFloat(uvec3(occlusion_words[at + 4u], occlusion_words[at + 5u], occlusion_words[at + 6u]));
 
-    // Seen unless the pyramid shows it hidden: a box too large for the pyramid's levels, or reaching the eye's plane,
-    // is kept (depthPyramidUtil.glsl).
-    bool seen = depth_pyramid_box_visible(centre - half_extent, centre + half_extent, occlusionViewProj);
-    occlusion_words[count * 8u + box] = seen ? 1u : 0u;
+    // A box too large for the pyramid's levels, or reaching the eye's plane, is answered as such (depthPyramidUtil.glsl).
+    occlusion_words[count * 8u + box] = uint(depth_pyramid_box_test(centre - half_extent, centre + half_extent,
+                                                                    occlusionViewProj));
 }

@@ -256,6 +256,24 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // A box reaching the eye's plane, which the pyramid cannot answer for, comes back unanswered rather than seen, so
+    // that its group asks a query instead of being kept every frame.
+    TEST_CASE_METHOD(alboxocclusion_data, "alboxocclusion_gl: a box reaching the eye's plane is unanswered", "[alboxocclusion_gl]")
+    {
+        setUp();
+        drawAndBuild();
+        // Clip w is the point's z: a box straddling z = 0 has corners behind the eye's plane.
+        LLMatrix4a w_is_z = mIdentity;
+        w_is_z.mMatrix[2] = LLVector4a(0.f, 0.f, 1.f, 1.f);
+        w_is_z.mMatrix[3] = LLVector4a(0.f, 0.f, 0.f, 0.f);
+        const ALBoxOcclusion::Ticket straddling = mBoxes.add(vec(-0.5f, 0.f, 0.2f), vec(0.1f, 0.1f, 0.3f));
+        REQUIRE(straddling.isValid());
+        REQUIRE(mBoxes.dispatch(mGroupProgram, mPyramid, w_is_z));
+        finishAndCollect();
+        CHECK(mBoxes.result(straddling) == ALBoxOcclusion::Status::Unanswered);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // While every readback slot waits on the GPU, no box is taken, so that its group is asked by query instead of
     // waiting on an answer no dispatch will give; once the frames are shown finished, boxes are taken again.
     TEST_CASE_METHOD(alboxocclusion_data, "alboxocclusion_gl: no box is taken while every answer is on its way", "[alboxocclusion_gl]")

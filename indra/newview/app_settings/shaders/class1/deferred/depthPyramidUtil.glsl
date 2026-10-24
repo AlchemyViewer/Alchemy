@@ -42,9 +42,14 @@ float depth_pyramid_farthest(float a, float b)
 #endif
 }
 
-// True unless every point of the box [lo, hi], taken to clip space by `to_clip`, lies behind the farthest depth under
-// the pixels it covers, so the depth test would reject all of it. A box reaching the eye's plane is in front.
-bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip)
+// What the pyramid says of the box [lo, hi], taken to clip space by `to_clip`: DEPTH_PYRAMID_HIDDEN where every point
+// of it lies behind the farthest depth under the pixels it covers, so the depth test would reject all of it;
+// DEPTH_PYRAMID_SEEN where some point may not; DEPTH_PYRAMID_UNANSWERED where the pyramid cannot tell, the box reaching
+// the eye's plane or covering more of the coarsest level than is read, and it is kept.
+#define DEPTH_PYRAMID_HIDDEN     0
+#define DEPTH_PYRAMID_SEEN       1
+#define DEPTH_PYRAMID_UNANSWERED 2
+int depth_pyramid_box_test(vec3 lo, vec3 hi, mat4 to_clip)
 {
     vec2 ndc_lo = vec2(1.0);
     vec2 ndc_hi = vec2(-1.0);
@@ -59,7 +64,7 @@ bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip)
         vec4 clip = to_clip * vec4(corner, 1.0);
         if (clip.w <= 0.0)
         {
-            return true;
+            return DEPTH_PYRAMID_UNANSWERED;
         }
         vec3 ndc = clip.xyz / clip.w;
         ndc_lo = min(ndc_lo, ndc.xy);
@@ -90,7 +95,7 @@ bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip)
     ivec2 t_hi = p_hi >> (level + 1);
     if (any(greaterThanEqual(t_hi - t_lo, ivec2(DEPTH_PYRAMID_MOST_READ))))
     {
-        return true;
+        return DEPTH_PYRAMID_UNANSWERED;
     }
 
     float farthest = texelFetch(depthPyramid, t_lo, level).r;
@@ -105,8 +110,15 @@ bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip)
     // Hidden only where the box's nearest point is strictly behind the farthest of what covers it; a NaN on either
     // side compares false both ways, and the box is kept.
 #ifdef REVERSE_Z
-    return !(nearest < farthest);
+    return nearest < farthest ? DEPTH_PYRAMID_HIDDEN : DEPTH_PYRAMID_SEEN;
 #else
-    return !(nearest > farthest);
+    return nearest > farthest ? DEPTH_PYRAMID_HIDDEN : DEPTH_PYRAMID_SEEN;
 #endif
+}
+
+// True unless every point of the box [lo, hi], taken to clip space by `to_clip`, lies behind the farthest depth under
+// the pixels it covers, so the depth test would reject all of it. A box the pyramid cannot answer for is kept.
+bool depth_pyramid_box_visible(vec3 lo, vec3 hi, mat4 to_clip)
+{
+    return depth_pyramid_box_test(lo, hi, to_clip) != DEPTH_PYRAMID_HIDDEN;
 }
