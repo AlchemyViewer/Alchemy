@@ -3,8 +3,8 @@
  * @brief ALStagingRing on the hidden window: room aligned and apart in one mapped store, a segment entered again only
  *        once the frame it was left in has finished and never waited for, a take too large for a segment refused and
  *        the ring grown for it at the frame's end and shrunk again after a window, the store a new size replaces kept
- *        until its frame has finished, the ring switched off, a texture upload read from the ring's store, and
- *        release.
+ *        until its frame has finished, the fences of its own it waits on where the frames are stamped, the ring
+ *        switched off, a texture upload read from the ring's store, and release.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -267,6 +267,56 @@ namespace
         gGL.getTextureSlot(0)->unbind();
         CHECK(std::all_of(got.begin(), got.begin() + BYTES, [](U8 b) { return b == 0x11; }));
         CHECK(std::all_of(got.begin() + BYTES, got.end(), [](U8 b) { return b == 0x22; }));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Where the frames' ends stamp their frames, a stamp is no sync object: the ring lays a fence of its own as it leaves
+    // a segment and enters it again only once that fence has signalled as well as the frame it was left in. A store
+    // replaced takes one fence behind every upload from it, its segments' then of no more use.
+    TEST_CASE_METHOD(alstagingring_data, "alstagingring_gl: while stamping, a segment is entered again only once its own fence has signalled", "[alstagingring_gl]")
+    {
+        requireMaps();
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("the context cannot stamp frames");
+        }
+        mFrames.setStamps(true);
+        endFrame();
+        glFinish();
+        endFrame();
+        REQUIRE(mFrames.isStamping());
+
+        constexpr size_t TAKE = SEGMENT / 4;
+        for (U32 i = 0; i < 4 * ALStagingRing::SEGMENTS; ++i)
+        {
+            REQUIRE(mRing.take(TAKE).isValid());
+            mRing.endFrame();
+        }
+        UNSCOPED_INFO("a fence for each segment left");
+        CHECK(mRing.getFences() == ALStagingRing::SEGMENTS - 1);
+        CHECK_FALSE(mRing.take(TAKE).isValid());
+
+        endFrame();
+        glFinish();
+        endFrame();
+        const ALStagingRing::Span again = mRing.take(TAKE);
+        REQUIRE(again.isValid());
+        CHECK(again.mOffset == 0);
+        UNSCOPED_INFO("segment 0's fence polled and gone, the last segment's laid as it was left");
+        CHECK(mRing.getFences() == ALStagingRing::SEGMENTS - 1);
+
+        CHECK_FALSE(mRing.take(SEGMENT + 1).isValid());
+        endFrame();
+        CHECK(mRing.getRetired() == 1);
+        CHECK(mRing.getFences() == 1);
+        endFrame();
+        glFinish();
+        endFrame();
+        CHECK(mRing.getRetired() == 0);
+        CHECK(mRing.getFences() == 0);
+
+        mFrames.setStamps(false);
+        endFrame();
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

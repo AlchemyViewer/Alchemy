@@ -244,8 +244,9 @@ if(AL_BUILD_TESTS)
   # - ALStagingRing: room aligned and apart, a segment entered again only once
   #   the frame it was left in has finished, a take too large for a segment
   #   refused and the ring grown for it at the frame's end, the store a new
-  #   size replaces kept until its frame has finished, the ring switched off,
-  #   a texture upload read from the ring, and release;
+  #   size replaces kept until its frame has finished, fences of its own
+  #   waited on where frames are stamped, the ring switched off, a texture
+  #   upload read from the ring, and release;
   # - ALTextureReadback: a level read back collected once its frame has
   #   finished, buffers given back serving the reads after, requests past the
   #   pool's bounds refused, reads no one collects expiring, and release;

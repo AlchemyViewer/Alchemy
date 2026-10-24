@@ -1607,13 +1607,14 @@ static U32 staged_pixel_bytes(U32 pixformat, U32 pixtype)
 // rows, `stride` pixels apart from `src`, copied tight into room the ring gives, and one glTexSubImage2D from the bound
 // pixel buffer, which a threaded driver queues as it would a draw. From client memory NVIDIA's threaded optimization
 // copies the rows on this thread first, and Mesa's glthread waits for its own thread to catch up before it runs the
-// upload. False, and nothing uploaded, off the main thread, for a format the ring does not take, or where it gives no
-// room (ALStagingRing::take), for the caller to send the rows from client memory instead. GL_UNPACK_ROW_LENGTH, which
-// strides client memory by `stride`, is set aside for the call, the rows being tight.
+// upload. False, and nothing uploaded, off the main thread, before the context reads rows tight (LLRender::init), for
+// a format the ring does not take, or where it gives no room (ALStagingRing::take), for the caller to send the rows from
+// client memory instead. GL_UNPACK_ROW_LENGTH, which strides client memory by `stride`, is set aside for the call, the
+// rows being tight.
 static bool upload_staged(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 height, U32 pixformat, U32 pixtype,
                           const U8* src, S32 stride)
 {
-    if (!on_main_thread() || width <= 0 || height <= 0 || !src)
+    if (!on_main_thread() || !gGL.unpacksTightRows() || width <= 0 || height <= 0 || !src)
     {
         return false;
     }

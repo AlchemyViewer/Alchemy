@@ -27,6 +27,7 @@
 #include "alstagingring.h"
 
 #include "alframefences.h"
+#include "llglheaders.h"
 
 #include <algorithm>
 #include <iterator>
@@ -54,6 +55,32 @@ namespace
             power <<= 1;
         }
         return power;
+    }
+
+    // Whether `fence` has signalled, deleting it once it has: a poll, a call that returns a value. No fence is
+    // signalled, and so is one GL could not wait on, which no wait would ever see signal.
+    bool fence_signalled(void*& fence)
+    {
+        if (!fence)
+        {
+            return true;
+        }
+        if (glClientWaitSync(static_cast<GLsync>(fence), GL_SYNC_FLUSH_COMMANDS_BIT, 0) == GL_TIMEOUT_EXPIRED)
+        {
+            return false;
+        }
+        glDeleteSync(static_cast<GLsync>(fence));
+        fence = nullptr;
+        return true;
+    }
+
+    void delete_fence(void*& fence)
+    {
+        if (fence)
+        {
+            glDeleteSync(static_cast<GLsync>(fence));
+            fence = nullptr;
+        }
     }
 
     // The ring that holds `asked` bytes a frame for SLACK_FRAMES frames, and a take of `largest` in each segment. A power
@@ -92,13 +119,14 @@ ALStagingRing::Span ALStagingRing::take(size_t bytes)
         // Into the next segment, once the frame it was left in has finished; until then the open one stays open, for
         // the takes that still fit it.
         const U32 next = (mSegment + 1) % SEGMENTS;
-        if (!mFrames.isComplete(mLeftIn[next]))
+        if (!mFrames.isComplete(mLeftIn[next]) || !fence_signalled(mSegmentFences[next]))
         {
             ++mBusy;
             return {};
         }
-        mLeftIn[mSegment] = mFrames.frame();
-        mSegment          = next;
+        mLeftIn[mSegment]        = mFrames.frame();
+        mSegmentFences[mSegment] = layFence();
+        mSegment                 = next;
         mHead             = size_t(next) * segment;
         mLeftIn[next]     = 0;
     }
@@ -140,6 +168,25 @@ bool ALStagingRing::ready()
     return true;
 }
 
+U32 ALStagingRing::getFences() const
+{
+    U32 fences = 0;
+    for (void* fence : mSegmentFences)
+    {
+        fences += fence != nullptr;
+    }
+    for (const Retired& retired : mRetired)
+    {
+        fences += retired.mFence != nullptr;
+    }
+    return fences;
+}
+
+void* ALStagingRing::layFence() const
+{
+    return mFrames.isStamping() ? glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) : nullptr;
+}
+
 void ALStagingRing::retire()
 {
     if (mStore.isAllocated())
@@ -147,7 +194,13 @@ void ALStagingRing::retire()
         Retired retired;
         retired.mStore = std::move(mStore);
         retired.mFrame = mFrames.frame();
+        // Behind every upload from the store: its segments' own fences are then of no more use.
+        retired.mFence = layFence();
         mRetired.push_back(std::move(retired));
+    }
+    for (void*& fence : mSegmentFences)
+    {
+        delete_fence(fence);
     }
     mHead    = 0;
     mSegment = 0;
@@ -169,7 +222,7 @@ void ALStagingRing::endFrame()
     // to the next store first, and the uploads not yet read would read what is written there next.
     for (size_t i = 0; i < mRetired.size();)
     {
-        if (mFrames.isComplete(mRetired[i].mFrame))
+        if (mFrames.isComplete(mRetired[i].mFrame) && fence_signalled(mRetired[i].mFence))
         {
             mRetired[i].mStore.release();
             mRetired.erase(mRetired.begin() + i);
@@ -219,9 +272,14 @@ void ALStagingRing::release()
     // The context is going, and its commands with it.
     for (Retired& retired : mRetired)
     {
+        delete_fence(retired.mFence);
         retired.mStore.release();
     }
     mRetired.clear();
+    for (void*& fence : mSegmentFences)
+    {
+        delete_fence(fence);
+    }
     mStore.release();
     mUnavailable   = false;
     mBytes         = MIN_BYTES;

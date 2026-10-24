@@ -531,6 +531,11 @@ namespace
             SKIP("the context maps no buffer persistently");
         }
         ALStagingRing& ring = gGL.stagingRing();
+        // The ring packs rows tight, which is how the context reads them once LLRender::init has set the alignment.
+        REQUIRE(gGL.unpacksTightRows());
+        GLint alignment = 0;
+        glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
+        REQUIRE(alignment == 1);
         const auto unpackState = []()
         {
             GLint row_length = -1;
