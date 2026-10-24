@@ -249,7 +249,8 @@ if(AL_BUILD_TESTS)
   #   upload read from the ring, and release;
   # - ALTextureReadback: a level read back collected once its frame has
   #   finished, buffers given back serving the reads after, requests past the
-  #   pool's bounds refused, reads no one collects expiring, and release;
+  #   pool's bounds refused, reads no one collects expiring, fences of its own
+  #   waited on where frames are stamped, and release;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug

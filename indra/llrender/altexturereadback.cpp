@@ -27,6 +27,7 @@
 #include "altexturereadback.h"
 
 #include "alframefences.h"
+#include "llgl.h"
 #include "llglheaders.h"
 
 #include <algorithm>
@@ -48,6 +49,33 @@ namespace
     // A free buffer serves a read only up to this many times the size a buffer made for the read would have, so that a
     // large one is kept for the large reads.
     constexpr size_t MAX_REUSE_RATIO = 4;
+
+    // Whether `fence` has signalled, deleting it once it has: a poll, a call that returns a value. No fence is
+    // signalled, and so is one GL could not wait on, which no wait would ever see signal.
+    bool fence_signalled(void*& fence)
+    {
+        if (!fence)
+        {
+            return true;
+        }
+        if (glClientWaitSync(static_cast<GLsync>(fence), GL_SYNC_FLUSH_COMMANDS_BIT, 0) == GL_TIMEOUT_EXPIRED)
+        {
+            return false;
+        }
+        glDeleteSync(static_cast<GLsync>(fence));
+        fence = nullptr;
+        return true;
+    }
+
+    void delete_fence(void*& fence)
+    {
+        // Not after the context has gone: its fences went with it.
+        if (fence && gGLManager.mInited)
+        {
+            glDeleteSync(static_cast<GLsync>(fence));
+        }
+        fence = nullptr;
+    }
 }
 
 ALTextureReadback::Ticket ALTextureReadback::request(U32 target, S32 level, U32 format, U32 type, size_t bytes)
@@ -67,10 +95,19 @@ ALTextureReadback::Ticket ALTextureReadback::request(U32 target, S32 level, U32 
     }
 
     // Through the pack buffer binding, which nothing else in the renderer caches, and back to none after: while a
-    // buffer is bound there, the read writes into it at the offset it is given in place of a pointer.
+    // buffer is bound there, the read writes into it at the offset it is given in place of a pointer. The rows tight,
+    // as `bytes` counts them: LLRender::init sets that alignment, and a context before it, or code after it, may not
+    // have it.
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer.mStore.getGLName());
     glGetTexImage(target, level, format, type, nullptr);
     glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    // Behind this read and the buffer's reads before it.
+    delete_fence(buffer.mFence);
+    if (mFrames.willStamp())
+    {
+        buffer.mFence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    }
 
     Read read;
     read.mTicket = ++mLastTicket;
@@ -88,7 +125,7 @@ ALTextureReadback::EResult ALTextureReadback::collect(Ticket ticket, U8* out, si
     {
         return GONE;
     }
-    if (!mFrames.isComplete(read->mFrame))
+    if (!written(*read))
     {
         return PENDING;
     }
@@ -112,14 +149,39 @@ ALTextureReadback::EResult ALTextureReadback::collect(Ticket ticket, U8* out, si
     return READY;
 }
 
-ALTextureReadback::EResult ALTextureReadback::state(Ticket ticket) const
+ALTextureReadback::EResult ALTextureReadback::state(Ticket ticket)
 {
-    const Read* read = find(ticket);
+    Read* read = find(ticket);
     if (!read)
     {
         return GONE;
     }
-    return mFrames.isComplete(read->mFrame) ? READY : PENDING;
+    return written(*read) ? READY : PENDING;
+}
+
+bool ALTextureReadback::written(Read& read)
+{
+    // No GL call: the read's own fence is polled at the frame's end (endFrame), and goes once it has signalled.
+    return mFrames.isComplete(read.mFrame) && !read.mBuffer.mFence;
+}
+
+bool ALTextureReadback::idle(Buffer& buffer)
+{
+    return mFrames.isComplete(buffer.mLastUsed) && !buffer.mFence;
+}
+
+U32 ALTextureReadback::getFences() const
+{
+    U32 fences = 0;
+    for (const Buffer& buffer : mFree)
+    {
+        fences += buffer.mFence != nullptr;
+    }
+    for (const Read& read : mReads)
+    {
+        fences += read.mBuffer.mFence != nullptr;
+    }
+    return fences;
 }
 
 void ALTextureReadback::cancel(Ticket ticket)
@@ -132,6 +194,25 @@ void ALTextureReadback::cancel(Ticket ticket)
 
 void ALTextureReadback::endFrame()
 {
+    // The fences of the reads, and of the free buffers' last reads, whose frames have finished: polled here, where the
+    // frame fences are, and not where the reads are asked for and taken in, in the middle of a frame, where a threaded
+    // driver answers a poll only once its own thread has caught up. Behind a finished frame they have all but surely
+    // signalled, and a poll of one that has answers at once.
+    for (Read& read : mReads)
+    {
+        if (read.mBuffer.mFence && mFrames.isComplete(read.mFrame))
+        {
+            fence_signalled(read.mBuffer.mFence);
+        }
+    }
+    for (Buffer& buffer : mFree)
+    {
+        if (buffer.mFence && mFrames.isComplete(buffer.mLastUsed))
+        {
+            fence_signalled(buffer.mFence);
+        }
+    }
+
     const U32 frame = mFrames.frame();
     for (size_t i = 0; i < mReads.size();)
     {
@@ -147,7 +228,7 @@ void ALTextureReadback::endFrame()
     }
     for (size_t i = 0; i < mFree.size();)
     {
-        if (frame - mFree[i].mLastUsed > TRIM_FRAMES && mFrames.isComplete(mFree[i].mLastUsed))
+        if (frame - mFree[i].mLastUsed > TRIM_FRAMES && idle(mFree[i]))
         {
             mBytes -= mFree[i].mStore.size();
             mFree[i].mStore.release();
@@ -168,10 +249,12 @@ void ALTextureReadback::release()
 {
     for (Buffer& buffer : mFree)
     {
+        delete_fence(buffer.mFence);
         buffer.mStore.release();
     }
     for (Read& read : mReads)
     {
+        delete_fence(read.mBuffer.mFence);
         read.mBuffer.mStore.release();
     }
     mFree.clear();
@@ -182,16 +265,11 @@ void ALTextureReadback::release()
 
 ALTextureReadback::Read* ALTextureReadback::find(Ticket ticket)
 {
-    return const_cast<Read*>(std::as_const(*this).find(ticket));
-}
-
-const ALTextureReadback::Read* ALTextureReadback::find(Ticket ticket) const
-{
     if (ticket == 0)
     {
         return nullptr;
     }
-    for (const Read& read : mReads)
+    for (Read& read : mReads)
     {
         if (read.mTicket == ticket)
         {
@@ -234,7 +312,7 @@ bool ALTextureReadback::take(size_t bytes, Buffer& out)
         auto oldest = mFree.end();
         for (auto it = mFree.begin(); it != mFree.end(); ++it)
         {
-            if (mFrames.isComplete(it->mLastUsed) && (oldest == mFree.end() || it->mLastUsed < oldest->mLastUsed))
+            if ((oldest == mFree.end() || it->mLastUsed < oldest->mLastUsed) && idle(*it))
             {
                 oldest = it;
             }

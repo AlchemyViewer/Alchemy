@@ -30,6 +30,7 @@
 
 #include "llvovolume.h"
 
+#include <set>
 #include <sstream>
 
 #include "llviewercontrol.h"
@@ -1502,6 +1503,24 @@ void LLVOVolume::sculpt()
         }
 
         getVolume()->sculpt(sculpt_width, sculpt_height, sculpt_components, sculpt_data, discard_level, mSculptTexture->isMissingAsset());
+
+        if (getVolume()->isSculptSpherePlaceholder())
+        {
+            // Once a map: why a sculpt shows its sphere, and what it had to build from.
+            static std::set<LLUUID> told;
+            if (told.insert(mSculptTexture->getID()).second)
+            {
+                LL_INFOS("Sculpt") << "Sculpt map " << mSculptTexture->getID() << " builds the placeholder: "
+                                   << (mSculptTexture->isMissingAsset() ? "the map is missing" : "its surface is out of bounds")
+                                   << ", area " << getVolume()->getSurfaceArea() << ", built from " << sculpt_width << "x"
+                                   << sculpt_height << "x" << (S32)sculpt_components << " at discard " << discard_level
+                                   << " (" << (!raw_image ? "nothing" : raw_image == mSculptTexture->getRawImage() ? "the raw image" : "the saved copy")
+                                   << "), the texture " << mSculptTexture->getWidth() << "x" << mSculptTexture->getHeight()
+                                   << " at discard " << mSculptTexture->getDiscardLevel() << " with "
+                                   << (mSculptTexture->hasGLTexture() ? "a GL texture" : "no GL texture")
+                                   << ", the saved copy at discard " << mSculptTexture->getSavedRawImageLevel() << LL_ENDL;
+            }
+        }
     }
 }
 

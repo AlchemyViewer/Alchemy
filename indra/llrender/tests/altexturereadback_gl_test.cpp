@@ -2,7 +2,8 @@
  * @file altexturereadback_gl_test.cpp
  * @brief ALTextureReadback on the hidden window: a level read back collected once its frame has finished and not
  *        before, with no call on the frame fences, buffers given back serving the reads after, the reads and bytes
- *        refused past the pool's bounds, reads no one collects expiring and free buffers going, and release.
+ *        refused past the pool's bounds, reads no one collects expiring and free buffers going, the fences of its own
+ *        it waits on where frames are stamped, and release.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -130,6 +131,8 @@ namespace
         CHECK(mReadback.collect(level0, got.data(), got.size()) == ALTextureReadback::PENDING);
         UNSCOPED_INFO("no call on the frame fences to ask or to look");
         CHECK(mFrames.getCalls() == calls);
+        UNSCOPED_INFO("and, the frames fenced, no fence of the reads' own");
+        CHECK(mReadback.getFences() == 0);
 
         finishFrame();
         CHECK(mReadback.state(level0) == ALTextureReadback::READY);
@@ -145,6 +148,37 @@ namespace
         CHECK(mReadback.collect(level0, got.data(), got.size()) == ALTextureReadback::GONE);
         CHECK(mReadback.getReads() == 0);
         CHECK(mReadback.state(0) == ALTextureReadback::GONE);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A level three bytes a pixel and an odd number wide, as a sculpt map's often is, reads back tight, the bytes asked
+    // for and no more, whatever pack alignment the context was left with: the read sets the alignment of 1 its bytes
+    // count on.
+    TEST_CASE_METHOD(altexturereadback_data, "altexturereadback_gl: an RGB level of an odd width reads back tight", "[altexturereadback_gl]")
+    {
+        constexpr S32 RW = 13;
+        constexpr S32 RH = 9;
+        const std::vector<U8> rgb = pattern(size_t(RW) * RH * 3, 47);
+        GLuint texture = 0;
+        glGenTextures(1, &texture);
+        glBindTexture(GL_TEXTURE_2D, texture);
+        glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGB8, RW, RH);
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, RW, RH, GL_RGB, GL_UNSIGNED_BYTE, rgb.data());
+
+        // GL's default, under which each 39-byte row would be read out to 40.
+        glPixelStorei(GL_PACK_ALIGNMENT, 4);
+        const ALTextureReadback::Ticket ticket = mReadback.request(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, rgb.size());
+        REQUIRE(ticket != 0);
+        finishFrame();
+        std::vector<U8> got(rgb.size(), 0);
+        REQUIRE(mReadback.collect(ticket, got.data(), got.size()) == ALTextureReadback::READY);
+        CHECK(got == rgb);
+
+        glBindTexture(GL_TEXTURE_2D, mTexture);
+        gGL.forgetTextures(1, &texture);
+        glDeleteTextures(1, &texture);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
@@ -225,6 +259,43 @@ namespace
             endFrame();
         }
         CHECK(mReadback.getBytes() == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Where the frames' ends stamp their frames, a read lays a fence of its own behind it and is ready only once that has
+    // signalled too; a read given up leaves the fence on its buffer, and the next read into the buffer lays its own.
+    TEST_CASE_METHOD(altexturereadback_data, "altexturereadback_gl: while stamping, a read is ready only once its own fence has signalled", "[altexturereadback_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("the context cannot stamp frames");
+        }
+        mFrames.setStamps(true);
+        finishFrame();
+        REQUIRE(mFrames.isStamping());
+
+        const ALTextureReadback::Ticket ticket = readLevel0();
+        REQUIRE(ticket != 0);
+        CHECK(mReadback.getFences() == 1);
+        CHECK(mReadback.state(ticket) == ALTextureReadback::PENDING);
+        finishFrame();
+        CHECK(mReadback.state(ticket) == ALTextureReadback::READY);
+        CHECK(mReadback.getFences() == 0);
+        std::vector<U8> got(LEVEL0, 0);
+        REQUIRE(mReadback.collect(ticket, got.data(), got.size()) == ALTextureReadback::READY);
+        CHECK(got == mLevel0);
+
+        mReadback.cancel(readLevel0());
+        CHECK(mReadback.getFences() == 1);
+        const ALTextureReadback::Ticket next = readLevel0();
+        REQUIRE(next != 0);
+        CHECK(mReadback.getFences() == 1);
+        finishFrame();
+        REQUIRE(mReadback.collect(next, got.data(), got.size()) == ALTextureReadback::READY);
+        CHECK(got == mLevel0);
+
+        mFrames.setStamps(false);
+        finishFrame();
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
