@@ -387,7 +387,8 @@ public:
     bool        isRawImageValid()const { return mIsRawImageValid ; }
     void        forceToSaveRawImage(S32 desired_discard = 0, F32 kept_time = 0.f) ;
 
-    // readback the raw image from OpenGL if mRawImage is not valid
+    // readback the raw image from OpenGL if mRawImage is not valid: asked for at one call and taken in at a later one,
+    // once the GPU has written it
     void        readbackRawImage();
 
     void        destroySavedRawImage() ;

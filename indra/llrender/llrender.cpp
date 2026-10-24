@@ -563,9 +563,10 @@ void LLRender::shutdown()
     }
     mMatricesUBOBound = false;
 
-    // Its queries, fences and staging store, which it deletes only while the context is up.
+    // Its queries, fences, staging store and readback buffers, which it deletes only while the context is up.
     mQueries.release();
     mStagingRing.release();
+    mTextureReadback.release();
     mFrameFences.release();
 }
 
@@ -587,6 +588,7 @@ void LLRender::endFrame(U32 frames_ahead)
     mQueries.makeRoom();
     LLImageGL::pollUploads();
     mStagingRing.endFrame();
+    mTextureReadback.endFrame();
     ALUniformBuffer::endFrame();
 }
 

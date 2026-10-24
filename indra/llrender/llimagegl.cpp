@@ -2562,10 +2562,8 @@ void LLImageGL::discardPendingAlpha()
     mPendingAlpha = PendingAlpha();
 }
 
-bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const
+bool LLImageGL::readBackLevel(S32& discard_level, S32& gl_discard, S32& width, S32& height, S32& ncomponents) const
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-
     // What mTexName holds, through the same published view as getWidth/getComponents
     // below. While an upload is in flight the members describe the next texture, and
     // mixing them with those getters reads the old texture's level 0 at the new size.
@@ -2582,7 +2580,7 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
         return false;
     }
 
-    S32 gl_discard = discard_level - cur_discard;
+    gl_discard = discard_level - cur_discard;
 
     //explicitly unbind texture
     gGL.getTextureSlot(0)->unbind();
@@ -2598,9 +2596,9 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     //debug code, leave it there commented.
     //checkTexSize() ;
 
-    S32 width = getWidth(discard_level);
-    S32 height = getHeight(discard_level);
-    S32 ncomponents = getComponents();
+    width = getWidth(discard_level);
+    height = getHeight(discard_level);
+    ncomponents = getComponents();
     if (ncomponents == 0)
     {
         return false;
@@ -2637,6 +2635,22 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     if (width <= 0 || width > 2048 || height <= 0 || height > 2048 || ncomponents < 1 || ncomponents > 4)
     {
         LL_ERRS() << llformat("LLImageGL::readBackRaw: bogus params: %d x %d x %d",width,height,ncomponents) << LL_ENDL;
+    }
+
+    return true;
+}
+
+bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+
+    S32 gl_discard = 0;
+    S32 width = 0;
+    S32 height = 0;
+    S32 ncomponents = 0;
+    if (!readBackLevel(discard_level, gl_discard, width, height, ncomponents))
+    {
+        return false;
     }
 
     LLGLint is_compressed = 0;
@@ -2736,9 +2750,101 @@ bool LLImageGL::readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compre
     return true ;
 }
 
+bool LLImageGL::requestReadBack(S32 discard_level)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    llassert(on_main_thread());
+    cancelReadBack();
+
+    S32 gl_discard = 0;
+    S32 width = 0;
+    S32 height = 0;
+    S32 ncomponents = 0;
+    if (isCompressed() || !readBackLevel(discard_level, gl_discard, width, height, ncomponents))
+    {
+        return false;
+    }
+    // An LLImageRaw holds a byte a component, as for readBackRaw.
+    if (pixel_bytes(mFormatPrimary, mFormatType) != (U32)ncomponents)
+    {
+        return false;
+    }
+
+    const size_t bytes = (size_t)width * height * ncomponents;
+    mReadBack = gGL.textureReadback().request(mTarget, gl_discard, mFormatPrimary, mFormatType, bytes);
+    if (mReadBack == 0)
+    {
+        return false;
+    }
+    mReadBackDiscard    = discard_level;
+    mReadBackWidth      = width;
+    mReadBackHeight     = height;
+    mReadBackComponents = ncomponents;
+    return true;
+}
+
+LLImageGL::EReadBack LLImageGL::collectReadBack(LLImageRaw* imageraw, S32& discard_level)
+{
+    if (mReadBack == 0)
+    {
+        return READBACK_NONE;
+    }
+    llassert(on_main_thread());
+
+    ALTextureReadback& readbacks = gGL.textureReadback();
+    switch (readbacks.state(mReadBack))
+    {
+    case ALTextureReadback::PENDING:
+        return READBACK_PENDING;
+    case ALTextureReadback::GONE:
+        mReadBack = 0;
+        return READBACK_NONE;
+    case ALTextureReadback::READY:
+        break;
+    }
+
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    if (!imageraw)
+    {
+        llassert(false);
+        cancelReadBack();
+        return READBACK_NONE;
+    }
+    LLImageDataLock lock(imageraw);
+    if (!imageraw->allocateDataSize(mReadBackWidth, mReadBackHeight, mReadBackComponents))
+    {
+        LL_WARNS() << "Memory allocation failed for a texture readback of " << mReadBackWidth << "x" << mReadBackHeight
+                   << "x" << mReadBackComponents << LL_ENDL;
+        cancelReadBack();
+        return READBACK_NONE;
+    }
+    const size_t bytes = (size_t)mReadBackWidth * mReadBackHeight * mReadBackComponents;
+    const ALTextureReadback::EResult result = readbacks.collect(mReadBack, imageraw->getData(), bytes);
+    mReadBack = 0;
+    if (result != ALTextureReadback::READY)
+    {
+        return READBACK_NONE;
+    }
+    discard_level = mReadBackDiscard;
+    return READBACK_READY;
+}
+
+void LLImageGL::cancelReadBack()
+{
+    // The pool is the main context's: elsewhere the read is only forgotten, and the pool lets it expire.
+    if (mReadBack != 0 && on_main_thread())
+    {
+        gGL.textureReadback().cancel(mReadBack);
+    }
+    mReadBack = 0;
+}
+
 void LLImageGL::destroyGLTexture()
 {
     checkActiveThread();
+
+    // A read of the texture going is given up with it.
+    cancelReadBack();
 
     if (mTexName != 0)
     {

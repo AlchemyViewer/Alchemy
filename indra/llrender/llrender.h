@@ -46,6 +46,7 @@
 #include "algpubuffer.h"     // AL_NUM_STORAGE_BINDINGS -- the storage binding points this context keeps
 #include "alframefences.h"
 #include "alstagingring.h"
+#include "altexturereadback.h"
 #include "alimageslot.h"
 #include "alquerypool.h"
 #include "altextureslot.h"
@@ -561,8 +562,12 @@ public:
     // segments' frames kept by endFrame().
     ALStagingRing& stagingRing() { return mStagingRing; }
 
+    // The buffers the main thread's texture readbacks are read into and collected from once the GPU has written them
+    // (LLImageGL::requestReadBack), their reads expired and their buffers trimmed by endFrame().
+    ALTextureReadback& textureReadback() { return mTextureReadback; }
+
     // Ends the frame for what is kept a frame at a time: the query pool's batch closes, the frame's fence is laid, and
-    // the staging ring and the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
+    // the staging ring, the texture readbacks and the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
     // context's only. `frames_ahead`, above 0, paces the CPU: the frame that many before this one is waited for
     // (ALFrameFences::endFrame), on the frames a user sees.
     void endFrame(U32 frames_ahead = 0);
@@ -727,6 +732,7 @@ private:
     ALFrameFences mFrameFences;
     ALQueryPool   mQueries{ mFrameFences };
     ALStagingRing mStagingRing{ mFrameFences };
+    ALTextureReadback mTextureReadback{ mFrameFences };
 
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to

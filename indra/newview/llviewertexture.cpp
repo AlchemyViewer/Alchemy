@@ -2415,6 +2415,18 @@ void LLViewerFetchedTexture::setLoadedCallback( loaded_callback_func loaded_call
         mLastReferencedSavedRawImageTime = sCurrentTime;
 }
 
+// No callback is left for a read of the texture still on its way: it goes back to the pool, rather than holding a read
+// of the pool's until it expires. Not a sculpt map's: its volumes take in a read of it as their copy, whoever asked for
+// it (updateSculptReadback), and asked for it themselves only as they built.
+static void cancel_callback_readback(LLViewerFetchedTexture* texture)
+{
+    LLImageGL* image = texture->getGLTexture();
+    if (image && !texture->forSculpt())
+    {
+        image->cancelReadBack();
+    }
+}
+
 void LLViewerFetchedTexture::clearCallbackEntryList()
 {
     if(mLoadedCallbackList.empty())
@@ -2434,6 +2446,7 @@ void LLViewerFetchedTexture::clearCallbackEntryList()
         delete entryp;
     }
     gTextureList.mCallbackList.erase(this);
+    cancel_callback_readback(this);
 
     mLoadedCallbackDesiredDiscardLevel = S8_MAX;
     if(needsToSaveRawImage())
@@ -2482,6 +2495,7 @@ void LLViewerFetchedTexture::deleteCallbackEntry(const LLLoadedCallbackEntry::so
     {
         // If we have no callbacks, take us off of the image callback list.
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
 
         if(needsToSaveRawImage())
         {
@@ -2617,6 +2631,7 @@ bool LLViewerFetchedTexture::doLoadedCallbacks()
 
         // Remove ourself from the global list of textures with callbacks
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
         return false;
     }
 
@@ -2810,6 +2825,7 @@ bool LLViewerFetchedTexture::doLoadedCallbacks()
     if (mLoadedCallbackList.empty())
     {
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
     }
     else if(!res && mForceCallbackFetch && sCurrentTime - mLastCallBackActiveTime > MAX_IDLE_WAIT_TIME && !mIsFetching)
     {
@@ -2981,27 +2997,39 @@ void LLViewerFetchedTexture::readbackRawImage()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    // readback the raw image from vram if the current raw image is null or smaller than the texture
-    if (mGLTexturep.notNull() && mGLTexturep->getTexName() != 0 &&
-        (mRawImage.isNull() || mRawImage->getWidth() < mGLTexturep->getWidth() || mRawImage->getHeight() < mGLTexturep->getHeight() ))
+    // Reads the texture back from VRAM when there is no raw image, or one smaller than the texture. The read is asked
+    // for here and taken in at a later call, once the GPU has written it (LLImageGL::requestReadBack), so the callbacks
+    // waiting on the pixels run a few frames later instead of this frame waiting for the GPU to finish everything
+    // queued ahead of the read. Until then mIsRawImageValid is as it was.
+    if (mGLTexturep.isNull())
+    {
+        return;
+    }
+    if (mGLTexturep->getTexName() == 0 ||
+        (mRawImage.notNull() && mRawImage->getWidth() >= mGLTexturep->getWidth() &&
+         mRawImage->getHeight() >= mGLTexturep->getHeight()))
+    {
+        mGLTexturep->cancelReadBack();
+        return;
+    }
+
+    if (!mGLTexturep->isReadBackRequested())
+    {
+        mGLTexturep->requestReadBack(-1);
+        return;
+    }
+
+    LLPointer<LLImageRaw> raw = new LLImageRaw();
+    S32 discard = INVALID_DISCARD_LEVEL;
+    if (mGLTexturep->collectReadBack(raw, discard) == LLImageGL::READBACK_READY)
     {
         if (mRawImage.isNull())
         {
             sRawCount++;
         }
-        mRawImage = new LLImageRaw();
-        if (!mGLTexturep->readBackRaw(-1, mRawImage, false))
-        {
-            mRawImage = nullptr;
-            mIsRawImageValid = false;
-            mRawDiscardLevel = INVALID_DISCARD_LEVEL;
-            sRawCount--;
-        }
-        else
-        {
-            mIsRawImageValid = true;
-            mRawDiscardLevel = mGLTexturep->getDiscardLevel();
-        }
+        mRawImage = raw;
+        mIsRawImageValid = true;
+        mRawDiscardLevel = discard;
     }
 }
 
