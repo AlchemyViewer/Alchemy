@@ -3243,6 +3243,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
         sculpt_level = -1;
         data_is_empty = true;
     }
+    mSculptPixels = data_is_empty ? 0 : S32(sculpt_width) * S32(sculpt_height);
 
     S32 requested_sizeS = 0;
     S32 requested_sizeT = 0;

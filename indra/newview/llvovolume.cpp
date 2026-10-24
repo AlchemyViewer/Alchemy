@@ -1390,6 +1390,43 @@ void LLVOVolume::notifySkinInfoUnavailable()
     mSkinInfo = nullptr;
 }
 
+// How a sculpt map's positions vary, for the log: a map whose pixels, rows or columns are all alike has little or no
+// surface, as a decode with none of the detail in its short side comes out.
+static std::string describe_sculpt_pixels(const U8* data, S32 width, S32 height, S32 components)
+{
+    if (!data || width <= 0 || height <= 0 || components < 3)
+    {
+        return "no pixels";
+    }
+    const auto alike = [&](S32 x0, S32 y0, S32 x1, S32 y1)
+    {
+        return memcmp(data + (y0 * width + x0) * components, data + (y1 * width + x1) * components, 3) == 0;
+    };
+    bool rows_alike = true;
+    bool columns_alike = true;
+    U8 low[3] = { 255, 255, 255 };
+    U8 high[3] = { 0, 0, 0 };
+    for (S32 y = 0; y < height; ++y)
+    {
+        for (S32 x = 0; x < width; ++x)
+        {
+            rows_alike = rows_alike && alike(x, y, x, 0);
+            columns_alike = columns_alike && alike(x, y, 0, y);
+            const U8* p = data + (y * width + x) * components;
+            for (S32 c = 0; c < 3; ++c)
+            {
+                low[c] = llmin(low[c], p[c]);
+                high[c] = llmax(high[c], p[c]);
+            }
+        }
+    }
+    std::ostringstream out;
+    out << (rows_alike && columns_alike ? "every pixel alike" : rows_alike ? "its rows alike" : columns_alike ? "its columns alike" : "varied")
+        << ", x " << (S32)low[0] << "-" << (S32)high[0] << " y " << (S32)low[1] << "-" << (S32)high[1] << " z " << (S32)low[2] << "-"
+        << (S32)high[2];
+    return out.str();
+}
+
 // sculpt replaces generate() for sculpted surfaces
 void LLVOVolume::sculpt()
 {
@@ -1409,18 +1446,17 @@ void LLVOVolume::sculpt()
             discard_level = mSculptTexture->getSavedRawImageLevel();
         }
 
-        if (!raw_image || raw_image->getWidth() < mSculptTexture->getWidth() || raw_image->getHeight() < mSculptTexture->getHeight())
+        // The texture on screen may hold more than the image: a copy kept within the sculpts' budget, or none. Where it
+        // holds more than this volume was built from, it is read back without waiting on the GPU, and becomes the copy
+        // a few frames' ends later, marking this volume to build again (LLViewerFetchedTexture::requestSculptReadback).
+        // Until then the volume builds from the image there is, and the read, with more pixels at the same level,
+        // builds it again below. A texture with nothing on screen to read builds from the copy there is, which the
+        // decode setForSculpt asks for brings up to size.
+        const S32 texture_pixels = mSculptTexture->getWidth() * mSculptTexture->getHeight();
+        if ((!raw_image || raw_image->getWidth() < mSculptTexture->getWidth() || raw_image->getHeight() < mSculptTexture->getHeight()) &&
+            getVolume()->getSculptPixels() < texture_pixels)
         {
-            // The texture on screen holds more than the copy: it is read back without waiting on the GPU, and becomes
-            // the copy a few frames' ends later, marking this volume to build again
-            // (LLViewerFetchedTexture::requestSculptReadback). Until then the volume builds as it did when a read came
-            // back empty, from the raw image if there is one. A texture with nothing on screen to read builds from the
-            // copy there is, which the decode setForSculpt asks for brings up to size.
-            if (mSculptTexture->requestSculptReadback())
-            {
-                raw_image = mSculptTexture->getRawImage();
-                discard_level = mSculptTexture->getRawImageLevel();
-            }
+            mSculptTexture->requestSculptReadback();
         }
 
         S32 max_discard = mSculptTexture->getMaxDiscardLevel();
@@ -1473,7 +1509,10 @@ void LLVOVolume::sculpt()
             return;
         }
 
-        if (current_discard == discard_level)  // no work to do here
+        // No work to do here: the same level, with no more pixels than the volume was built from. A read of the texture
+        // on screen comes at the level of the copy it replaces, with more.
+        const S32 pixels = raw_image ? raw_image->getWidth() * raw_image->getHeight() : 0;
+        if (current_discard == discard_level && pixels <= getVolume()->getSculptPixels())
             return;
 
         if(!raw_image)
@@ -1495,10 +1534,11 @@ void LLVOVolume::sculpt()
 
         getVolume()->sculpt(sculpt_width, sculpt_height, sculpt_components, sculpt_data, discard_level, mSculptTexture->isMissingAsset());
 
+        // Once a map until it builds its shape: why a sculpt shows its sphere, what it had to build from and how that
+        // varies, and when the shape comes after all.
+        static std::set<LLUUID> told;
         if (getVolume()->isSculptPlaceholderVisible())
         {
-            // Once a map: why a sculpt shows its sphere, and what it had to build from.
-            static std::set<LLUUID> told;
             if (told.insert(mSculptTexture->getID()).second)
             {
                 LL_INFOS("Sculpt") << "Sculpt map " << mSculptTexture->getID() << " builds the placeholder: "
@@ -1506,11 +1546,18 @@ void LLVOVolume::sculpt()
                                    << ", area " << getVolume()->getSurfaceArea() << ", built from " << sculpt_width << "x"
                                    << sculpt_height << "x" << (S32)sculpt_components << " at discard " << discard_level
                                    << " (" << (!raw_image ? "nothing" : raw_image == mSculptTexture->getRawImage() ? "the raw image" : "the saved copy")
+                                   << ", " << describe_sculpt_pixels(sculpt_data, sculpt_width, sculpt_height, sculpt_components)
                                    << "), the texture " << mSculptTexture->getWidth() << "x" << mSculptTexture->getHeight()
-                                   << " at discard " << mSculptTexture->getDiscardLevel() << " with "
-                                   << (mSculptTexture->hasGLTexture() ? "a GL texture" : "no GL texture")
+                                   << " at discard " << mSculptTexture->getDiscardLevel() << " of " << mSculptTexture->getMaxDiscardLevel()
+                                   << " with " << (mSculptTexture->hasGLTexture() ? "a GL texture" : "no GL texture")
                                    << ", the saved copy at discard " << mSculptTexture->getSavedRawImageLevel() << LL_ENDL;
             }
+        }
+        else if (sculpt_data && told.erase(mSculptTexture->getID()))
+        {
+            LL_INFOS("Sculpt") << "Sculpt map " << mSculptTexture->getID() << " builds its shape after the placeholder, from "
+                               << sculpt_width << "x" << sculpt_height << "x" << (S32)sculpt_components << " at discard "
+                               << discard_level << LL_ENDL;
         }
     }
 }

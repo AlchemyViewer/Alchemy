@@ -2909,11 +2909,21 @@ void LLViewerFetchedTexture::saveRawImage()
     }
     else if (mBoostLevel == LLGLTexture::BOOST_SCULPTED)
     {
+        // Within the pixels of the size the sculpts are known to need, at the map's own proportions: a sculpt lays its
+        // mesh out by the map's, so a long, thin map squeezed into that square builds another shape, and one of 512x8
+        // fits the budget sixteen times over as it is.
         S32 expected_width = mKnownDrawWidth > 0 ? mKnownDrawWidth : sMaxSculptRez;
         S32 expected_height = mKnownDrawHeight > 0 ? mKnownDrawHeight : sMaxSculptRez;
-        if (mRawImage->getWidth() > expected_width || mRawImage->getHeight() > expected_height)
+        S32 width = mRawImage->getWidth();
+        S32 height = mRawImage->getHeight();
+        while (width * height > expected_width * expected_height && width > 1 && height > 1)
         {
-            mSavedRawImage = new LLImageRaw(expected_width, expected_height, mRawImage->getComponents());
+            width >>= 1;
+            height >>= 1;
+        }
+        if (width != mRawImage->getWidth() || height != mRawImage->getHeight())
+        {
+            mSavedRawImage = new LLImageRaw(width, height, mRawImage->getComponents());
             mSavedRawImage->copyScaled(mRawImage);
         }
         else
