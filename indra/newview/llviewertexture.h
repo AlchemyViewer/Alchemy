@@ -380,6 +380,12 @@ public:
     bool isForSculptOnly() const;
     // Marks every volume this texture sculpts to build again: its pixels, or its size, changed.
     void rebuildSculptVolumes();
+    // The volumes this texture sculpts build from a copy on the CPU. Where the texture on screen holds more than the
+    // copy, requestSculptReadback reads it back without waiting on the GPU (LLImageGL::requestReadBack): whether a read
+    // is on its way. updateSculptReadback, every frame a sculpt is drawn (setForSculpt), takes the read in once the GPU
+    // has written it, as the copy, and marks the sculpts to build again.
+    bool requestSculptReadback();
+    void updateSculptReadback();
 
     //raw image management
     LLImageRaw* getRawImage()const { return mRawImage ;}
