@@ -559,8 +559,9 @@ void LLRender::shutdown()
     }
     mMatricesUBOBound = false;
 
-    // Its queries and fences, which it deletes only while the context is up.
+    // Its queries, fences and staging store, which it deletes only while the context is up.
     mQueries.release();
+    mStagingRing.release();
     mFrameFences.release();
 }
 
@@ -581,6 +582,7 @@ void LLRender::endFrame(U32 frames_ahead)
     mQueries.openFrame();
     mQueries.makeRoom();
     LLImageGL::pollUploads();
+    mStagingRing.endFrame();
     ALUniformBuffer::endFrame();
 }
 

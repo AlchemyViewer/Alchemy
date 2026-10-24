@@ -11,6 +11,7 @@ set(
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
+  alstagingring.cpp
   altexture3d.cpp
   altextureblit.cpp
   altextureslot.cpp
@@ -54,6 +55,7 @@ set(
   alquerypool.h
   alrendertargetdesc.h
   alsamplerstate.h
+  alstagingring.h
   altexture3d.h
   altextureblit.h
   altextureslot.h
@@ -237,6 +239,10 @@ if(AL_BUILD_TESTS)
   #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images;
+  # - ALStagingRing: room aligned and apart, a segment entered again only once
+  #   the frame it was left in has finished, a take too large for a segment
+  #   refused and the ring grown for it at the frame's end, a texture upload
+  #   read from the ring, and release;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
@@ -254,6 +260,7 @@ if(AL_BUILD_TESTS)
       tests/alinstanceddraw_gl_test.cpp
       tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
+      tests/alstagingring_gl_test.cpp
       tests/altessellation_gl_test.cpp
       tests/altextureblit_gl_test.cpp
       tests/aluniformbuffer_gl_test.cpp

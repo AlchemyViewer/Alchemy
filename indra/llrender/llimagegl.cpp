@@ -1521,6 +1521,149 @@ static void sub_image_lines(U32 target, S32 miplevel, S32 x_offset, S32 y_offset
     }
 }
 
+// The size of a pixel of `pixformat` and `pixtype` as an upload reads it, or 0 for one upload_staged leaves to client
+// memory: pixel_bytes's table, GL_BGR too, giving 0 where pixel_bytes would abort.
+static U32 staged_pixel_bytes(U32 pixformat, U32 pixtype)
+{
+    switch (pixtype)
+    {
+    case GL_UNSIGNED_INT_8_8_8_8:
+    case GL_UNSIGNED_INT_8_8_8_8_REV:
+    case GL_UNSIGNED_INT_10_10_10_2:
+    case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case GL_UNSIGNED_INT_10F_11F_11F_REV:
+    case GL_UNSIGNED_INT_5_9_9_9_REV:
+        return 4;
+    case GL_UNSIGNED_SHORT_5_6_5:
+    case GL_UNSIGNED_SHORT_5_6_5_REV:
+    case GL_UNSIGNED_SHORT_4_4_4_4:
+    case GL_UNSIGNED_SHORT_4_4_4_4_REV:
+    case GL_UNSIGNED_SHORT_5_5_5_1:
+    case GL_UNSIGNED_SHORT_1_5_5_5_REV:
+        return 2;
+    default:
+        break;
+    }
+
+    U32 components = 0;
+    switch (pixformat)
+    {
+    case GL_RED:
+    case GL_ALPHA:
+    case GL_LUMINANCE:
+    case GL_RED_INTEGER:
+        components = 1;
+        break;
+    case GL_RG:
+    case GL_LUMINANCE_ALPHA:
+    case GL_RG_INTEGER:
+        components = 2;
+        break;
+    case GL_RGB:
+    case GL_BGR:
+    case GL_RGB_INTEGER:
+    case GL_BGR_INTEGER:
+        components = 3;
+        break;
+    case GL_RGBA:
+    case GL_BGRA:
+    case GL_RGBA_INTEGER:
+    case GL_BGRA_INTEGER:
+        components = 4;
+        break;
+    default:
+        return 0;
+    }
+
+    switch (pixtype)
+    {
+    case GL_UNSIGNED_BYTE:
+    case GL_BYTE:
+        return components;
+    case GL_UNSIGNED_SHORT:
+    case GL_SHORT:
+    case GL_HALF_FLOAT:
+        return components * 2;
+    case GL_UNSIGNED_INT:
+    case GL_INT:
+    case GL_FLOAT:
+        return components * 4;
+    default:
+        return 0;
+    }
+}
+
+// Uploads the rectangle at (x, y) of level `miplevel` of the bound `target` through the main context's staging ring: its
+// rows, `stride` pixels apart from `src`, copied tight into room the ring gives, and one glTexSubImage2D from the bound
+// pixel buffer, which a threaded driver queues as it would a draw. From client memory NVIDIA's threaded optimization
+// copies the rows on this thread first, and Mesa's glthread waits for its own thread to catch up before it runs the
+// upload. False, and nothing uploaded, off the main thread, for a format the ring does not take, or where it gives no
+// room (ALStagingRing::take), for the caller to send the rows from client memory instead. GL_UNPACK_ROW_LENGTH, which
+// strides client memory by `stride`, is set aside for the call, the rows being tight.
+static bool upload_staged(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 height, U32 pixformat, U32 pixtype,
+                          const U8* src, S32 stride)
+{
+    if (!on_main_thread() || width <= 0 || height <= 0 || !src)
+    {
+        return false;
+    }
+    const U32 pixel = staged_pixel_bytes(pixformat, pixtype);
+    if (pixel == 0)
+    {
+        return false;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    const size_t row = size_t(width) * pixel;
+    const ALStagingRing::Span room = gGL.stagingRing().take(row * size_t(height));
+    if (!room.isValid())
+    {
+        return false;
+    }
+
+    if (stride == width)
+    {
+        memcpy(room.mData, src, row * size_t(height));
+    }
+    else
+    {
+        const size_t source_row = size_t(stride) * pixel;
+        for (S32 r = 0; r < height; ++r)
+        {
+            memcpy(room.mData + size_t(r) * row, src + size_t(r) * source_row, row);
+        }
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    }
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, room.mBuffer);
+    glTexSubImage2D(target, miplevel, x, y, width, height, pixformat, pixtype,
+                    reinterpret_cast<const void*>(static_cast<uintptr_t>(room.mOffset)));
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    if (stride != width)
+    {
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, stride);
+    }
+    return true;
+}
+
+// The rows of the rectangle at (x, y) of level `miplevel` of the bound `target`, `stride` pixels apart from `src`, as
+// GL_UNPACK_ROW_LENGTH strides them: staged where the ring gives room (upload_staged), from client memory otherwise, in
+// slices where should_stagger_image_set says.
+static void upload_rows(U32 target, S32 miplevel, S32 x, S32 y, S32 width, S32 height, U32 pixformat, U32 pixtype,
+                        const U8* src, S32 stride, bool compressed)
+{
+    if (!compressed && upload_staged(target, miplevel, x, y, width, height, pixformat, pixtype, src, stride))
+    {
+        return;
+    }
+    if (should_stagger_image_set(compressed))
+    {
+        sub_image_lines(target, miplevel, x, y, width, height, pixformat, pixtype, src, stride);
+    }
+    else
+    {
+        glTexSubImage2D(target, miplevel, x, y, width, height, pixformat, pixtype, src);
+    }
+}
+
 bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S32 x_pos, S32 y_pos, S32 width, S32 height, bool force_fast_update /* = false */, LLGLuint use_name /* = 0 */, bool skip_unbind /* = false */)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -1607,15 +1750,8 @@ bool LLImageGL::setSubImage(const U8* datap, S32 data_width, S32 data_height, S3
         if (!res) LL_ERRS() << "LLImageGL::setSubImage(): bindTexture failed" << LL_ENDL;
         stop_glerror();
 
-        const bool use_sub_image = should_stagger_image_set(isCompressed());
-        if (!use_sub_image)
-        {
-            glTexSubImage2D(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap);
-        }
-        else
-        {
-            sub_image_lines(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap, data_width);
-        }
+        upload_rows(mTarget, 0, x_pos, y_pos, width, height, mFormatPrimary, mFormatType, sub_datap, data_width,
+                    isCompressed());
         if (!skip_unbind)
         {
             gGL.getTextureSlot(0)->unbind();
@@ -1794,14 +1930,7 @@ void LLImageGL::setManualSubImage(U32 target, S32 miplevel, S32 width, S32 heigh
         LL_PROFILE_ZONE_NUM(width);
         LL_PROFILE_ZONE_NUM(height);
 
-        if (should_stagger_image_set(false))
-        {
-            sub_image_lines(target, miplevel, 0, 0, width, height, pixformat, pixtype, (const U8*)pixels, width);
-        }
-        else
-        {
-            glTexSubImage2D(target, miplevel, 0, 0, width, height, pixformat, pixtype, pixels);
-        }
+        upload_rows(target, miplevel, 0, 0, width, height, pixformat, pixtype, (const U8*)pixels, width, false);
     }
     stop_glerror();
 }
@@ -1850,14 +1979,7 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
 
         if (pixels != nullptr)
         {
-            if (should_stagger_image_set(false))
-            {
-                sub_image_lines(target, 0, 0, 0, width, height, pixformat, pixtype, (const U8*)pixels, width);
-            }
-            else
-            {
-                glTexSubImage2D(target, 0, 0, 0, width, height, pixformat, pixtype, pixels);
-            }
+            upload_rows(target, 0, 0, 0, width, height, pixformat, pixtype, (const U8*)pixels, width, false);
         }
     }
 

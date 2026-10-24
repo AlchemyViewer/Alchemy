@@ -7,7 +7,8 @@
  * core texture lifecycle, the setSubImage bind-preservation
  * invariant, the deprecated-format resolution path, downscaling,
  * the published view of an upload in flight, the bind state
- * edits rely on, and the integer formats.
+ * edits rely on, the integer formats, and uploads read from the
+ * staging ring.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -31,6 +32,8 @@
 
 #include "linden_common.h"
 
+#include "../algpubuffer.h"
+#include "../alstagingring.h"
 #include "../llimagegl.h"
 #include "../llgl.h"
 #include "../llrender.h"
@@ -434,6 +437,89 @@ namespace
         }
         UNSCOPED_INFO("the update lands where it was asked and nowhere else");
         CHECK(match);
+    }
+
+    // On the main thread an upload a segment of the staging ring holds is read from the ring, a rectangle narrower than
+    // its source among them, its rows packed tight there, and one larger than a segment is sent from client memory.
+    // Either way the texture holds what it was given, and no unpack state is left behind.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: main-thread uploads are read from the staging ring where it has room", "[LLImageGL]")
+    {
+        if (!ALGPUBuffer::canMapPersistently())
+        {
+            SKIP("the context maps no buffer persistently");
+        }
+        ALStagingRing& ring = gGL.stagingRing();
+        const auto unpackState = []()
+        {
+            GLint row_length = -1;
+            GLint buffer = -1;
+            glGetIntegerv(GL_UNPACK_ROW_LENGTH, &row_length);
+            glGetIntegerv(GL_PIXEL_UNPACK_BUFFER_BINDING, &buffer);
+            return std::make_pair(row_length, buffer);
+        };
+
+        // Three bytes a pixel and an odd width: no row starts on a multiple of four.
+        constexpr U16 W = 13, H = 9;
+        LLPointer<LLImageRaw> src = new LLImageRaw(W, H, 3);
+        U8* sd = src->getData();
+        for (size_t i = 0; i < (size_t)W * H * 3; ++i)
+            sd[i] = (U8)(i * 5 + 1);
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        U64 taken = ring.getTaken();
+        REQUIRE(img->createGLTexture(0, src.get()));
+        CHECK(ring.getTaken() > taken);
+        CHECK(unpackState() == std::make_pair(0, 0));
+
+        std::vector<U8> got((size_t)W * H * 3);
+        readTexture(img, GL_RGB, GL_UNSIGNED_BYTE, got.data());
+        UNSCOPED_INFO("the whole level");
+        CHECK(std::memcmp(got.data(), sd, got.size()) == 0);
+
+        LLPointer<LLImageRaw> patch = new LLImageRaw(W, H, 3);
+        U8* pd = patch->getData();
+        for (size_t i = 0; i < (size_t)W * H * 3; ++i)
+            pd[i] = (U8)(0xFF - i * 3);
+        taken = ring.getTaken();
+        CHECK(img->setSubImage(patch.get(), /*x_pos=*/2, /*y_pos=*/3, /*width=*/7, /*height=*/4,
+                               /*force_fast_update=*/true));
+        CHECK(ring.getTaken() == taken + 1);
+        CHECK(unpackState() == std::make_pair(0, 0));
+
+        readTexture(img, GL_RGB, GL_UNSIGNED_BYTE, got.data());
+        bool match = true;
+        for (U32 y = 0; y < H && match; ++y)
+        {
+            for (U32 x = 0; x < W && match; ++x)
+            {
+                const bool in_patch = x >= 2 && x < 9 && y >= 3 && y < 7;
+                const size_t at = ((size_t)y * W + x) * 3;
+                match = std::memcmp(got.data() + at, (in_patch ? pd : sd) + at, 3) == 0;
+            }
+        }
+        UNSCOPED_INFO("the rectangle lands where it was asked and nowhere else");
+        CHECK(match);
+
+        // A level larger than a segment: refused by the ring, sent as before.
+        U16 side = 16;
+        while ((size_t)side * side * 4 <= ring.size() / ALStagingRing::SEGMENTS)
+            side *= 2;
+        LLPointer<LLImageRaw> large = new LLImageRaw(side, side, 4);
+        U8* ld = large->getData();
+        for (size_t i = 0; i < (size_t)side * side * 4; ++i)
+            ld[i] = (U8)(i * 11 + 7);
+        LLPointer<LLImageGL> big = new LLImageGL(/*usemipmaps=*/false);
+        const U64 too_large = ring.getTooLarge();
+        taken = ring.getTaken();
+        REQUIRE(big->createGLTexture(0, large.get()));
+        CHECK(ring.getTooLarge() > too_large);
+        CHECK(ring.getTaken() == taken);
+        CHECK(unpackState() == std::make_pair(0, 0));
+        std::vector<U8> big_got((size_t)side * side * 4);
+        readTexture(big, GL_RGBA, GL_UNSIGNED_BYTE, big_got.data());
+        UNSCOPED_INFO("the level sent from client memory");
+        CHECK(std::memcmp(big_got.data(), ld, big_got.size()) == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
     // scaleDown builds a new texture object, and texture-object state does not
