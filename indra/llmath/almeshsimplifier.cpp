@@ -281,13 +281,16 @@ namespace
         };
         for (size_t i = 0; i < index_count; i += 3)
         {
-            const U32 a = root(remap[indices[i]]);
+            // a stays the root of the corners joined so far.
+            U32 a = root(remap[indices[i]]);
             for (S32 k = 1; k < 3; ++k)
             {
                 const U32 b = root(remap[indices[i + k]]);
                 if (a != b)
                 {
-                    parent[llmax(a, b)] = llmin(a, b);
+                    const U32 joined = llmin(a, b);
+                    parent[llmax(a, b)] = joined;
+                    a = joined;
                 }
             }
         }
@@ -339,8 +342,9 @@ namespace
     // indices numbered from first. Where prune is set, it may drop detached
     // parts as its error grows past their size, none larger than
     // PRUNE_LIMIT; where it would have dropped a larger one to reach its
-    // target, it drops each part within PRUNE_LIMIT first and simplifies
-    // what is left without dropping any more.
+    // target, or every part, it drops each part within PRUNE_LIMIT first
+    // and simplifies what is left without dropping any more. An error
+    // within PRUNE_LIMIT drops no part larger than it.
     size_t simplifyMesh(const Mesh& mesh, U32 first, U32 count, const U32* indices, size_t index_count, size_t target_count, F32 error,
                         U32 options, const std::vector<U8>& locks, bool prune, U32* destination, F32& result_error)
     {
@@ -361,8 +365,10 @@ namespace
         }
 
         const size_t simplified = simplify(indices, index_count, options | meshopt_SimplifyPrune);
-        const F32 extent = meshopt_simplifyScale(positions, count, sizeof(LLVector4a));
-        if (largestDropped(vertices, count, indices, index_count, destination, simplified, extent) <= PRUNE_LIMIT)
+        if (simplified >= 3 &&
+            (error <= PRUNE_LIMIT ||
+             largestDropped(vertices, count, indices, index_count, destination, simplified,
+                            meshopt_simplifyScale(positions, count, sizeof(LLVector4a))) <= PRUNE_LIMIT))
         {
             return simplified;
         }

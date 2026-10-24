@@ -919,6 +919,48 @@ namespace
         CHECK(triangleCount(*near_target) > target_triangles);
     }
 
+    // A distant level of detail made to an error, with no triangle target,
+    // of a model that is nothing but detached parts within that error: the
+    // parts are all it has, and it keeps them rather than drop every one,
+    // as a simplification to nothing would leave the uploader to take the
+    // whole model for it. The modes tried hold the cubes' seams, so only
+    // dropping a part could take one away; a mode free to cross them may
+    // collapse a cube smaller than the error to nothing.
+    TEST_CASE("almeshsimplifier: a distant level of detail to an error keeps a model of small parts", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        Geometry model;
+        for (S32 bead = 0; bead < 16; ++bead)
+        {
+            const Geometry part = cube(1);
+            const F32 phi = F_TWO_PI * bead / 16;
+            const LLVector3 at(0.5f * cosf(phi), 0.5f * sinf(phi), 0.f);
+            const U16 first = (U16)model.positions.size();
+            for (size_t v = 0; v < part.positions.size(); ++v)
+            {
+                model.add(at + part.positions[v] * 0.02f, part.normals[v], part.uvs[v]);
+            }
+            for (U16 index : part.indices)
+            {
+                model.indices.push_back((U16)(first + index));
+            }
+        }
+        LLPointer<LLVolume> base = volumeOf({ model });
+
+        ALMeshSimplifier::Target goal;
+        goal.decimator = 0.f;
+        goal.error = 0.03f;
+        goal.distant = true;
+        for (Seams seams : { Seams::ALL, Seams::UV })
+        {
+            INFO(nameOf(seams));
+            LLPointer<LLVolume> target = targetFor(*base);
+            CHECK(ALMeshSimplifier(*base).simplifyModel(*target, goal, seams) > 0.f);
+            REQUIRE(wellFormed(target->getVolumeFace(0)));
+            CHECK(triangleCount(*target) >= 16);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Compaction
 
