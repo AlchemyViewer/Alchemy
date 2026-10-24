@@ -893,6 +893,8 @@ void LLPipeline::latchRenderInputs()
 
     mMaxFramesAhead  = gSavedSettings.getU32("AlchemyRenderMaxFramesAhead");
     mPacingSlackWork = gSavedSettings.getBOOL("AlchemyRenderPacingSlackWork");
+    // Where the GPU writes the query results, which is where a fence's poll waits on the driver's own thread.
+    gGL.frameFences().setStamps(gSavedSettings.getBOOL("AlchemyRenderFrameStamps") && gGLManager.mWritesQueryResults);
 }
 
 const ALShaderInputs& LLPipeline::shaderInputs() const
