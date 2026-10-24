@@ -300,12 +300,13 @@ static void remap_attribute(std::vector<T>& attribute, const U32* remap, size_t 
 // vertices in the order those triangles first take them, every attribute
 // moved alike; a vertex no triangle takes is dropped. The remap and
 // meshoptimizer's scratch come from the thread's arena. A primitive whose
-// attributes are not one value a vertex is left as it is.
+// attributes are not one value a vertex, or whose indices are not whole
+// triangles, is left as it is.
 static void order_for_vertex_cache(Primitive& prim)
 {
     const size_t index_count = prim.mIndexArray.size();
     const size_t vertex_count = prim.mPositions.size();
-    if (prim.mGLMode != LLRender::TRIANGLES || index_count < 3 || vertex_count == 0)
+    if (prim.mGLMode != LLRender::TRIANGLES || index_count < 3 || index_count % 3 != 0 || vertex_count == 0)
     {
         return;
     }

@@ -93,13 +93,21 @@ namespace
     public:
         static constexpr size_t DEFAULT_SAMPLE = 2000;
 
-        // The corpus AL_MESH_CORPUS_DIR names, or none.
+        // The corpus AL_MESH_CORPUS_DIR names, or none where it names none.
+        // A name that is not a directory fails the case, as a mistyped one
+        // would otherwise pass it as though no corpus had been asked for.
         static std::optional<ALMeshCorpus> fromEnvironment()
         {
             const char* dir = std::getenv("AL_MESH_CORPUS_DIR");
-            if (!dir || !*dir || !std::filesystem::is_directory(dir))
+            if (!dir || !*dir)
             {
                 return std::nullopt;
+            }
+            std::error_code is_dir;
+            if (!std::filesystem::is_directory(dir, is_dir))
+            {
+                throw std::filesystem::filesystem_error("AL_MESH_CORPUS_DIR", dir,
+                                                        is_dir ? is_dir : std::make_error_code(std::errc::not_a_directory));
             }
             ALMeshCorpus corpus;
             corpus.mSample = number("AL_MESH_CORPUS_SAMPLE", DEFAULT_SAMPLE);
