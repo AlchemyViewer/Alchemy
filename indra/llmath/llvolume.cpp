@@ -8126,13 +8126,15 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // one seam, and across its first and last rows: a prim's where they are
     // one place in every row or column, as its own positions say; a
     // sculpt's where its stitching samples them from one column or row of
-    // the map. A flat inner side's seam is one of its corners.
+    // the map. A flat inner side's seam is one of its corners. A flexible
+    // prim's path is open, and its first build, which its partial builds
+    // keep the joins of, lays every row at one place before it has a pose.
     if (!partial_build)
     {
         if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
         {
             mJoinsS = !doubled && columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
-            mJoinsT = rows_meet(pos, mNumS, 0, mNumT - 1);
+            mJoinsT = !mFlexible && rows_meet(pos, mNumS, 0, mNumT - 1);
         }
         else
         {

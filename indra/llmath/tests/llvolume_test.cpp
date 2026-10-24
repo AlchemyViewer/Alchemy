@@ -4317,6 +4317,39 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A flexible prim of one section, as a distant one is drawn, keeps the
+    // two stations its volume is first built with, both at the origin
+    // before the rebuild gives them a pose, so every frame is a partial
+    // build of that first one. Its first and last rows were one place
+    // there, and are not joined for it: its normals are those a full build
+    // at its pose makes.
+    TEST_CASE("llvolume: a flexible prim of one section keeps its first and last rows apart", "[llvolume]")
+    {
+        Report report;
+        for (U8 profile : { LL_PCODE_PROFILE_SQUARE, LL_PCODE_PROFILE_CIRCLE })
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                const std::string name =
+                    fmt::format("flexible {}, one section, LOD {}", profile == LL_PCODE_PROFILE_SQUARE ? "box" : "cylinder", lod);
+                LLPointer<LLVolume> volume = flexiVolume(profile, LL_PCODE_HOLE_SAME, 0.f, lod);
+                REQUIRE(volume->getPath().getPathLength() == 2);
+                bendPath(*volume, 1, 1.1f);
+                volume->regen();
+                genAllTangents(*volume);
+
+                LLPointer<LLVolume> full = flexiVolume(profile, LL_PCODE_HOLE_SAME, 0.f, lod);
+                full->resizePath(2);
+                bendPath(*full, 1, 1.1f);
+                full->regen();
+                genAllTangents(*full);
+                compareBuilds(*volume, *full, report, name);
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // The uncut cube cap is built only on a line path, which flexi never
     // has; its partial build is the one a regen of an unmoved box makes.
     TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume]")
