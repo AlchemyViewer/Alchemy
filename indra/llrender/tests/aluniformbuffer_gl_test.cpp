@@ -362,4 +362,58 @@ namespace
         }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
+
+    // Frame ends paced three deep, as the viewer paces them by default, have shown a segment's frame finished by the
+    // time the head comes round to it: at a steady traffic the persistent ring is sized for, a frame's slices never
+    // wait or poll, and no segment's step makes a call to the frame fences.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: at the pacing depth a persistent segment comes round finished", "[aluniformbuffer_gl]")
+    {
+        if (!glBufferStorage)
+        {
+            SKIP("no buffer storage: the persistent modes stream as UPDATE_ORPHAN");
+        }
+        ALUniformBuffer::cleanupClass();
+        ALUniformBuffer::sUpdateMode = ALUniformBuffer::UPDATE_PERSISTENT;
+
+        // 1 KiB slices, a multiple of every context's offset alignment, 256 a frame: a quarter of the 1 MiB floor,
+        // which a ring keeping only four frames would hold, its segments coming round three frames on.
+        constexpr size_t SLICE  = 1024;
+        constexpr U32    SLICES = 256;
+        constexpr U32    FRAMES_AHEAD = 3;
+        ALUniformBuffer block;
+        block.initShadowed(SLICE);
+        ALFrameFences& frames = gGL.frameFences();
+
+        auto frame = [&](U32 index)
+        {
+            for (U32 i = 0; i < SLICES; ++i)
+            {
+                U32* words = reinterpret_cast<U32*>(block.beginWrite());
+                words[0] = index * SLICES + i;
+                block.endWrite(0, sizeof(U32));
+                block.flush(BINDING);
+            }
+        };
+
+        // The ring grows to the traffic at the first frames' ends.
+        for (U32 f = 0; f < 4; ++f)
+        {
+            frame(f);
+            gGL.endFrame(FRAMES_AHEAD);
+        }
+        for (U32 f = 4; f < 64; ++f)
+        {
+            CAPTURE(f);
+            const U32 calls = frames.getCalls();
+            frame(f);
+            {
+                INFO("no slice of the frame waited for, or polled, the frame fences");
+                CHECK(frames.getCalls() == calls);
+            }
+            gGL.endFrame(FRAMES_AHEAD);
+            CHECK(ALUniformBuffer::lastFramePersistentStats().mStalls == 0);
+            CHECK(ALUniformBuffer::lastFramePersistentStats().mSlices == SLICES);
+        }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
 }

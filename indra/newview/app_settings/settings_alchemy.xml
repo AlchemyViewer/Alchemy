@@ -2281,7 +2281,7 @@
         <key>AlchemyRenderMaxFramesAhead</key>
         <map>
             <key>Comment</key>
-            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 3, the default, keeps a GPU-bound frame's CPU work and the driver's under the GPU's: at 1 a GPU-bound scene that runs at 150 fps can fall to 50. Past 3 the frame rings, four deep (the uniform blocks' segments, the queries' batches), can wait inside a frame for a GPU that far behind. 1 is the least latency. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
+            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 3, the default, keeps a GPU-bound frame's CPU work and the driver's under the GPU's: at 1 a GPU-bound scene that runs at 150 fps can fall to 50. Past 3 the frame rings, sized for 3 (the queries' four batches, the uniform blocks' segments), can wait inside a frame for a GPU that far behind. 1 is the least latency. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
