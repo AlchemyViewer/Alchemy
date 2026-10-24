@@ -118,8 +118,14 @@ namespace
     // accepted payload cap is the SMALLEST ring's segment (segments only ever grow); that cap is
     // ~25x a full 152-bone Bento palette, so real skinning never approaches it. Segment COUNT stays
     // fixed at 4 across sizes -- growth doubles segment SIZE, not count (see the sPersistRing note).
+    // The cap is what keeps the slack for a crowd's palettes: every rigged attachment's skin is a
+    // palette of its own each frame, up to 5 KiB, and with impostors off an event's crowd makes
+    // thousands. At 64 MiB the slack held for some 9 MiB of them a frame, past which every lap
+    // waited for the GPU in the middle of the frame, with nothing to fall back on, since the
+    // rigged programs read only the block; 256 MiB holds it for some 36 MiB, while a light scene
+    // keeps the 1 MiB floor.
     constexpr size_t SCRATCH_MIN_BYTES    = 1 * 1024 * 1024;  // initial persistent ring, and the floor
-    constexpr size_t SCRATCH_MAX_BYTES    = 64 * 1024 * 1024; // grow cap
+    constexpr size_t SCRATCH_MAX_BYTES    = 256 * 1024 * 1024; // grow cap
     constexpr int    SCRATCH_SEGMENTS     = 4;
     constexpr size_t SCRATCH_MAX_PAYLOAD  = 256 * 1024;       // scratchWrite reject cap
     constexpr size_t SCRATCH_BYTES        = 4 * 1024 * 1024;  // fixed orphan fallback ring (macOS GL 4.1)
@@ -1231,11 +1237,13 @@ const ALUniformBuffer::RingStats& ALUniformBuffer::lastFrameScratchStats()
 }
 
 // static
-S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
+S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes, size_t reserve)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    if (!data || bytes == 0 || bytes > SCRATCH_MAX_PAYLOAD)
+    // What a bind of the payload may cover: the payload, or the block it is bound as.
+    const size_t span = llmax(bytes, reserve);
+    if (!data || bytes == 0 || span > SCRATCH_MAX_PAYLOAD)
     {
         return -1;
     }
@@ -1245,7 +1253,8 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
         return -1;
     }
 
-    const size_t aligned = align_up(bytes, (size_t)sScratchAlign);
+    const size_t aligned      = align_up(bytes, (size_t)sScratchAlign);
+    const size_t aligned_span = align_up(span, (size_t)sScratchAlign);
 
     if (U8* const ring = sScratchRing.getMapped())
     {
@@ -1253,8 +1262,8 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
         // segment being left is left in; before reusing the next one, wait out the frame that read
         // it a lap ago. A full lap bumps sScratchGeneration, staling the per-skin cached offsets
         // (owners re-write). Segment size tracks the adaptive ring size (SCRATCH_SEGMENTS stays
-        // fixed).
-        advance_segmented_ring(aligned, sScratchPersistBytes / SCRATCH_SEGMENTS, SCRATCH_SEGMENTS,
+        // fixed). The whole span a bind may cover fits the segment, so the segment's fencing covers it.
+        advance_segmented_ring(aligned_span, sScratchPersistBytes / SCRATCH_SEGMENTS, SCRATCH_SEGMENTS,
                                sScratchHead, sScratchSeg, sScratchLeftIn,
                                sScratchGeneration, sScratchStats, "Scratch");
 
@@ -1268,7 +1277,7 @@ S64 ALUniformBuffer::scratchWrite(const void* data, size_t bytes)
         return offset;
     }
 
-    if (sScratchHead + aligned > SCRATCH_BYTES)
+    if (sScratchHead + aligned_span > SCRATCH_BYTES)
     {
         // Wrapped: orphan the ring (in-flight draws keep reading the old store) and
         // invalidate every cached offset via the generation bump -- owners re-write
@@ -1327,6 +1336,20 @@ void ALUniformBuffer::scratchBindRange(U32 binding, S64 offset, size_t bytes)
 U32 ALUniformBuffer::scratchGeneration()
 {
     return sScratchGeneration;
+}
+
+// static
+void ALUniformBuffer::forgetScratchBinding()
+{
+    sScratchBoundBinding = 0xFFFFFFFFu;
+    sScratchBoundOffset  = -1;
+}
+
+// static
+bool ALUniformBuffer::scratchIsBound(U32 binding, S64 offset, size_t bytes)
+{
+    return offset >= 0 && binding == sScratchBoundBinding && offset == sScratchBoundOffset && bytes == sScratchBoundBytes
+        && sScratchGeneration == sScratchBoundGen;
 }
 
 void ALUniformBuffer::cleanupClass()

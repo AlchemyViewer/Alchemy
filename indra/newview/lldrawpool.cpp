@@ -835,16 +835,99 @@ void LLRenderPass::pushUntexturedBatch(LLDrawInfo& params)
     params.mVertexBuffer->drawRange(LLRender::TRIANGLES, params.mStart, params.mEnd, params.mCount, params.mOffset);
 }
 
+namespace
+{
+    // The ObjectSkin block, as objectSkinV.glsl declares it under OBJECT_SKIN_BLOCK and as a palette is packed for it
+    // (LLVOAvatar::MatrixPaletteCache::mGLMp): the rebase origin, then each joint's three columns. A mesh's palette
+    // fills only its own joints' rows; the block is bound whole, as GL requires.
+    struct ObjectSkinBlock
+    {
+        F32 mOrigin[4];
+        F32 mPalette[LL_MAX_JOINTS_PER_MESH_OBJECT][12];
+    };
+    static_assert(sizeof(ObjectSkinBlock) == 16 + 48 * LL_MAX_JOINTS_PER_MESH_OBJECT,
+                  "the ObjectSkin block is laid out as std140 lays it out");
+
+#if !LL_RELEASE_FOR_DOWNLOAD
+    const bool s_object_skin_layout_registered = []
+    {
+        LLGLSLShader::registerEngineBlockLayout("ObjectSkin",
+        {
+            { -1, "skin_origin4",     (U32)offsetof(ObjectSkinBlock, mOrigin),  false },
+            { -1, "matrixPalette[0]", (U32)offsetof(ObjectSkinBlock, mPalette), true },
+        });
+        return true;
+    }();
+#endif // !LL_RELEASE_FOR_DOWNLOAD
+
+    // The palette bound at UB_OBJECT_SKIN under the block. The binding is the context's, not a program's, so a pass
+    // that skips applying again the palette it applied last may skip only while that palette is still the one bound:
+    // another pass's tracker in the same loop (LLPipeline's rigged draws keep one for the GLTF draws and one for the
+    // rest) may have bound another since.
+    struct BoundPalette
+    {
+        const LLVOAvatar* mAvatar = nullptr;
+        U64               mHash   = 0;
+        U32               mFrame  = 0;
+        S64               mOffset = -1;
+    };
+    BoundPalette sBoundPalette;
+
+    // Whether the palette last applied for `avatar`'s skin `hash` is still what the bound program reads.
+    bool palette_still_applied(const LLVOAvatar* avatar, U64 hash)
+    {
+        // The uniforms are the program's, and keep what it was given.
+        if (!LLRender::sObjectSkinBlock)
+        {
+            return true;
+        }
+        return sBoundPalette.mAvatar == avatar && sBoundPalette.mHash == hash && sBoundPalette.mFrame == gFrameCount &&
+               ALUniformBuffer::scratchIsBound(LLGLSLShader::UB_OBJECT_SKIN, sBoundPalette.mOffset, sizeof(ObjectSkinBlock));
+    }
+}
+
 // Route a computed palette to the bound shader. mGLMp is [origin vec4 | count mat3x4]:
 // the array upload starts PAST the origin, and the origin rides as its own uniform, which
 // the shader adds back (skinTransformH / getObjectSkinnedTransform). The split is what keeps
 // the palette translations -- and so every per-vertex operand -- avatar-local; see
 // LLVOAvatar::updateSkinInfoMatrixPalette for why that matters.
-static void apply_matrix_palette(const LLVOAvatar::MatrixPaletteCache& mpc, U32 count)
+//
+// Under the ObjectSkin block the whole of mGLMp goes into the scratch UBO ring instead, once a frame for each skin,
+// and every draw of it after binds that slice: a palette is uploaded once however many passes and programs draw it,
+// where the uniforms upload it again for each program in each pass. False where the ring could take no palette.
+static bool apply_matrix_palette(const LLVOAvatar* avatar, U64 hash, const LLVOAvatar::MatrixPaletteCache& mpc, U32 count)
 {
-    LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-    shader->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX, count, false, (GLfloat*)&(mpc.mGLMp[4]));
-    shader->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, (GLfloat*)&(mpc.mGLMp[0]));
+    if (!LLRender::sObjectSkinBlock)
+    {
+        LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+        shader->uniformMatrix3x4fv(LLViewerShaderMgr::AVATAR_MATRIX, count, false, (GLfloat*)&(mpc.mGLMp[4]));
+        shader->uniform3fv(LLViewerShaderMgr::SKIN_ORIGIN, 1, (GLfloat*)&(mpc.mGLMp[0]));
+        return true;
+    }
+
+    // Written again for a palette made again (a new frame's), or where the ring has come round since it was written.
+    if (mpc.mScratchOffset < 0 || mpc.mScratchFrame != mpc.mFrame ||
+        mpc.mScratchGeneration != ALUniformBuffer::scratchGeneration())
+    {
+        mpc.mScratchOffset = ALUniformBuffer::scratchWrite(mpc.mGLMp.data(), mpc.mGLMp.size() * sizeof(F32),
+                                                           sizeof(ObjectSkinBlock));
+        // After the write, which may itself have taken the ring round.
+        mpc.mScratchGeneration = ALUniformBuffer::scratchGeneration();
+        mpc.mScratchFrame      = mpc.mFrame;
+    }
+    if (mpc.mScratchOffset < 0)
+    {
+        static bool warned = false;
+        if (!warned)
+        {
+            warned = true;
+            LL_WARNS("Avatar") << "The scratch UBO ring took no skinning palette; rigged meshes are not drawn" << LL_ENDL;
+        }
+        return false;
+    }
+    ALUniformBuffer::scratchBindRange(LLGLSLShader::UB_OBJECT_SKIN, mpc.mScratchOffset, sizeof(ObjectSkinBlock));
+    sBoundPalette = { avatar, hash, gFrameCount, mpc.mScratchOffset };
+    return true;
 }
 
 // static
@@ -872,9 +955,7 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
         return false;
     }
 
-    apply_matrix_palette(mpc, count);
-
-    return true;
+    return apply_matrix_palette(avatar, skinInfo->mHash, mpc, count);
 }
 
 // Returns true if rendering should proceed
@@ -891,21 +972,21 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
         return false;
     }
 
-    if (avatar == lastAvatar && skinInfo->mHash == lastMeshId)
+    if (avatar == lastAvatar && skinInfo->mHash == lastMeshId && palette_still_applied(avatar, skinInfo->mHash))
     {
         return !skipLastSkin;
     }
 
     const LLVOAvatar::MatrixPaletteCache& mpc = avatar->updateSkinInfoMatrixPalette(skinInfo);
     U32 count = static_cast<U32>(mpc.mMatrixPalette.size());
-    // skipLastSkin -> skin info not loaded yet, don't render
+    // skipLastSkin -> skin info not loaded yet, or no palette applied: don't render
     skipLastSkin = !bool(count);
     lastAvatar = avatar;
     lastMeshId = skinInfo->mHash;
 
     if (!skipLastSkin)
     {
-        apply_matrix_palette(mpc, count);
+        skipLastSkin = !apply_matrix_palette(avatar, skinInfo->mHash, mpc, count);
     }
 
     return !skipLastSkin;
@@ -925,14 +1006,15 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
         return false;
     }
 
-    if (avatar == lastAvatar && skinInfo->mHash == lastMeshId && lastAvatarShader == LLGLSLShader::sCurBoundShaderPtr)
+    if (avatar == lastAvatar && skinInfo->mHash == lastMeshId && lastAvatarShader == LLGLSLShader::sCurBoundShaderPtr &&
+        palette_still_applied(avatar, skinInfo->mHash))
     {
         return !skipLastSkin;
     }
 
     const LLVOAvatar::MatrixPaletteCache& mpc = avatar->updateSkinInfoMatrixPalette(skinInfo);
     U32 count = static_cast<U32>(mpc.mMatrixPalette.size());
-    // skipLastSkin -> skin info not loaded yet, don't render
+    // skipLastSkin -> skin info not loaded yet, or no palette applied: don't render
     skipLastSkin = !bool(count);
     lastAvatar = avatar;
     lastMeshId = skinInfo->mHash;
@@ -940,7 +1022,7 @@ bool LLRenderPass::uploadMatrixPalette(LLVOAvatar* avatar, LLMeshSkinInfo* skinI
 
     if (!skipLastSkin)
     {
-        apply_matrix_palette(mpc, count);
+        skipLastSkin = !apply_matrix_palette(avatar, skinInfo->mHash, mpc, count);
     }
 
     return !skipLastSkin;

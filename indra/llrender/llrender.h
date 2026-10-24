@@ -664,6 +664,13 @@ public:
     // from it, because a shader compiled against the wrong assumption unpacks noise.
     static bool sGBufferNormHDR;
 
+    // The rigged programs read their joint palette from the ObjectSkin uniform block (LLGLSLShader::UB_OBJECT_SKIN),
+    // which a draw binds a slice of the scratch UBO ring to, rather than from uniforms each program is given: the
+    // shared skinning object is compiled with OBJECT_SKIN_BLOCK. Where the context maps no buffer persistently, the
+    // scratch ring would map and unmap for every palette, and the uniforms stay. Latched by newview at shader load, as
+    // sGBufferNormHDR is.
+    static bool sObjectSkinBlock;
+
 private:
     friend class LLLightState;
     // The tests' state guard reads how deep each matrix stack is.

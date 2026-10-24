@@ -1144,6 +1144,7 @@ ALShaderInputs LLPipeline::shaderInputsFromSettings()
     // Intel's legacy drivers are held back from compute (LLGLManager::isIntelLegacy).
     s.mHasCompute = gGLManager.mHasCompute && glsl >= 430 && !gGLManager.isIntelLegacy();
     s.mIsD3D12    = gGLManager.mIsD3D12;
+    s.mHasBufferStorage = ALGPUBuffer::canMapPersistently();
 
     s.mReverseZ                 = gSavedSettings.getBOOL("AlchemyRenderReverseZ");
     s.mHDR                      = gSavedSettings.getBOOL("RenderHDREnabled");

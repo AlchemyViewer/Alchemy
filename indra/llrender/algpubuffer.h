@@ -146,6 +146,10 @@ public:
     // reads back without waiting.
     bool read(size_t offset, void* out, size_t bytes) const;
 
+    // Whether a READBACK or STREAM store is mapped persistently on this context (buffer storage, GL 4.4 or
+    // ARB_buffer_storage): what the CPU writes into a STREAM store is then a copy into its map, with no map or unmap.
+    static bool canMapPersistently();
+
     // Every live ALGPUBuffer's store, in bytes.
     static U64 sBytesAllocated;
 
