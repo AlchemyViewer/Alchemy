@@ -2341,6 +2341,15 @@ void LLVOVolume::changeTEImage(S32 index, LLViewerTexture* imagep)
     }
 }
 
+//virtual
+void LLVOVolume::changeTEMaterialTextures(S32 index)
+{
+    LLViewerObject::changeTEMaterialTextures(index);
+    // the rebuild hands the faces' texture channels what the material now draws
+    gPipeline.markTextured(mDrawable);
+    mFaceMappingChanged = true;
+}
+
 void LLVOVolume::setTEImage(const U8 te, LLViewerTexture *imagep)
 {
     bool changed = (mTEImages[te] != imagep);
@@ -6119,10 +6128,10 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                     facep->setTexture(LLRender::SPECULAR_MAP, nullptr);
 
                     // let texture streaming system know about PBR textures
-                    facep->setTexture(LLRender::BASECOLOR_MAP, gltf_mat->mBaseColorTexture);
-                    facep->setTexture(LLRender::GLTF_NORMAL_MAP, gltf_mat->mNormalTexture);
-                    facep->setTexture(LLRender::METALLIC_ROUGHNESS_MAP, gltf_mat->mMetallicRoughnessTexture);
-                    facep->setTexture(LLRender::EMISSIVE_MAP, gltf_mat->mEmissiveTexture);
+                    facep->setTexture(LLRender::BASECOLOR_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR));
+                    facep->setTexture(LLRender::GLTF_NORMAL_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL));
+                    facep->setTexture(LLRender::METALLIC_ROUGHNESS_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS));
+                    facep->setTexture(LLRender::EMISSIVE_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE));
                 }
 
                 //ALWAYS null out vertex buffer on rebuild -- if the face lands in a render
