@@ -1409,6 +1409,24 @@ bool LLSpatialPartition::visibleObjectsInFrustum(LLCamera& camera)
     return vis.mResult;
 }
 
+bool LLSpatialPartition::addRootBounds(LLVector4a& min, LLVector4a& max)
+{
+    if (mOctree->getElementCount() == 0 && mOctree->getChildCount() == 0)
+    {
+        return false;
+    }
+    LLSpatialGroup* group = (LLSpatialGroup*)mOctree->getListener(0);
+    group->rebound();
+    const LLVector4a* bounds = group->getBounds();
+    LLVector4a lo;
+    LLVector4a hi;
+    lo.setSub(bounds[0], bounds[1]);
+    hi.setAdd(bounds[0], bounds[1]);
+    min.setMin(min, lo);
+    max.setMax(max, hi);
+    return true;
+}
+
 S32 LLSpatialPartition::cull(LLCamera &camera, std::vector<LLDrawable *>* results, bool for_select)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SPATIAL;
