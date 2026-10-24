@@ -4118,6 +4118,38 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A sculpt samples a row of its map at each station of its path, as
+    // every viewer samples it, so its path keeps the station the summed
+    // steps bring a rounding short of the end, which a prim's leaves out:
+    // its last station before the end is the last step the steps take
+    // short of the end, and a step on from it is not short of the end.
+    TEST_CASE("llvolume: a sculpt's path keeps a station a rounding short of its end", "[llvolume]")
+    {
+        Report report;
+        S32 kept = 0;
+        const LLPathParams params = sphere().params().getPathParams();
+        for (S32 sides = 2; sides <= 300; ++sides)
+        {
+            LLPath path;
+            path.generate(params, 1.f, 0, true, sides);
+            const S32 count = (S32)path.mPath.size();
+            const F32 step = 1.0f / sides;
+            const F32 last = path.mPath[count - 2].mTexT;
+            if (!(last < params.getEnd()) || last + step < params.getEnd())
+            {
+                report.fail(
+                    fmt::format("{} sides: the last station before the end is at t {}, a step of {} short of the end", sides, last, step));
+            }
+            if (last > params.getEnd() - step * 0.01f)
+            {
+                ++kept;
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+        CHECK(kept > 0);
+    }
+
     // A triangle whose UVs have no area has no dP/du, and one whose
     // positions have no area has no surface to give one: neither adds to
     // its corners' tangents, so a real neighbour's tangent stands alone.

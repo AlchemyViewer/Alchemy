@@ -1293,7 +1293,7 @@ S32 LLPath::getNumNGonPoints(const LLPathParams& params, S32 sides, F32 startOff
     return ret;
 }
 
-void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 end_scale, F32 twist_scale)
+void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 end_scale, F32 twist_scale, bool is_sculpted)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
 
@@ -1401,8 +1401,9 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // Run through the non-cut dependent points. A point within a hundredth
     // of a step of the end cut is the end's own, short of it only by the
     // rounding the steps add up to: it would leave a row with no height
-    // before the end's.
-    const F32 end_before = params.getEnd() - step * 0.01f;
+    // before the end's. A sculpt keeps it: its rows are the rows of its map
+    // it samples, one a station, as every viewer samples them.
+    const F32 end_before = is_sculpted ? params.getEnd() : params.getEnd() - step * 0.01f;
     while (t < end_before)
     {
         pt      = mPath.append(1);
@@ -1604,7 +1605,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
                 sides = llmax(sculpt_size, 1);
 
             if (0 < sides)
-                genNGon(params, sides);
+                genNGon(params, sides, 0.f, 1.f, 1.f, is_sculpted);
         }
         break;
 

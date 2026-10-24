@@ -821,7 +821,8 @@ public:
     static S32 getNumPoints(const LLPathParams& params, F32 detail);
     static S32 getNumNGonPoints(const LLPathParams& params, S32 sides, F32 offset=0.0f, F32 end_scale = 1.f, F32 twist_scale = 1.f);
 
-    void genNGon(const LLPathParams& params, S32 sides, F32 offset=0.0f, F32 end_scale = 1.f, F32 twist_scale = 1.f);
+    void genNGon(const LLPathParams& params, S32 sides, F32 offset=0.0f, F32 end_scale = 1.f, F32 twist_scale = 1.f,
+                 bool is_sculpted = false);
     virtual bool generate(const LLPathParams& params, F32 detail=1.0f, S32 split = 0,
                           bool is_sculpted = false, S32 sculpt_size = 0);
 
