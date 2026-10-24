@@ -1655,7 +1655,8 @@ bool normalize3_or_mark_impl(LLVector4a* v, size_t n)
 
 // Every step rounds where it is written: MSVC's /fp:fast would otherwise
 // fuse a product into the sum it feeds, as it chooses at each place the
-// kernel is built.
+// kernel is built. GCC and Clang build alsimdplanar.cpp, which instantiates
+// the kernel, strict.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma float_control(precise, on, push)
 #endif

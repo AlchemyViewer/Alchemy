@@ -9,6 +9,7 @@ target_sources(
     alplaneset.cpp
     alprojection.cpp
     alsimdkernels.cpp
+    alsimdplanar.cpp
     llbbox.cpp
     llbboxlocal.cpp
     llcalc.cpp
@@ -102,6 +103,21 @@ target_sources(
 
 target_link_libraries(llmath PRIVATE al::flags PUBLIC llcommon ll::meshoptimizer)
 target_precompile_headers(llmath REUSE_FROM llprecompiled)
+
+# The planar kernels are instantiated in alsimdplanar.cpp, built strict as
+# the kernel test is: with the tree's reassociation and contraction, the
+# compiler may round one sum differently at each place it inlines it, and a
+# touch would then land a unit in the last place from the coordinate its
+# vertex is drawn with. MSVC is held to the same by the float_control pragma
+# around the kernels in alsimdkernels.inl.
+if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+  set_source_files_properties(
+    alsimdplanar.cpp
+    PROPERTIES
+      COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
+      SKIP_PRECOMPILE_HEADERS TRUE
+  )
+endif()
 
 # Add tests
 if(AL_BUILD_TESTS)

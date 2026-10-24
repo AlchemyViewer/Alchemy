@@ -36,7 +36,8 @@
 // has: 128 bits on NEON four vectors at a time, 256 at AVX two vectors per
 // register, 512 at AVX-512 four. The tail is finished one vector at a
 // time. The bodies are templates over a width type in alsimdkernels.inl;
-// this header is the entry points, instantiated once in alsimdkernels.cpp.
+// this header is the entry points, instantiated once in alsimdkernels.cpp,
+// and the planar ones in alsimdplanar.cpp, which is built strict.
 namespace alsimd
 {
 

@@ -956,7 +956,10 @@ public:
     // at least PLANAR_SWITCH_X in size and x where it is not.
     //
     // A face whose vertex normals all lie within 60 degrees of its planar
-    // normal is projected along that normal at every point, as one plane.
+    // normal, their cosines past PLANAR_CONE_COS by PLANAR_CONE_TIE, is
+    // projected along that normal at every point, as one plane: normals on
+    // the cone's edge, as a half cylinder's last ones at LOD 0, are outside
+    // it however rounding falls.
     // Any other face is projected along the normal at each point, where an
     // x within PLANAR_TIE below the switch counts as reaching it, so that
     // the normals a round prim puts on the switch go one way on every row
@@ -964,6 +967,7 @@ public:
     static constexpr F32 PLANAR_SWITCH_X = 0.5f;
     static constexpr F32 PLANAR_TIE = 1e-4f;
     static constexpr F32 PLANAR_CONE_COS = 0.5f;
+    static constexpr F32 PLANAR_CONE_TIE = 1e-4f;
 
     // The planar normal: in xyz the vertices' one normal where they all
     // have the same, and otherwise the sum of the triangles' normals

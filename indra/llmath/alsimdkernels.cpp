@@ -64,62 +64,6 @@ void transform_texcoords(const F32* src, F32* dst, size_t n,
     kernels::transform_texcoords_impl<ALSimdWide>(src, dst, n, trans, rot0, rot1, scale, offset);
 }
 
-void planar_texcoords(const LLVector4a* positions, size_t n, const LLVector4a& scale, const LLVector4a& binormal,
-                      const LLVector4a& tangent, const TexTransform* transform, F32* dst)
-{
-    const kernels::PlanarArgs a{ scale.getF32ptr(), binormal.getF32ptr(), tangent.getF32ptr(), 0.f, transform };
-    if (n == 0)
-    {
-        return;
-    }
-    // A face of a box is four points: one group, inline.
-    if (transform)
-    {
-        n <= 4 ? kernels::planar_texcoords_few<false, true>(positions, nullptr, n, a, dst)
-               : kernels::planar_texcoords_impl<ALSimdLanes, false, true>(positions, nullptr, n, a, dst);
-    }
-    else
-    {
-        n <= 4 ? kernels::planar_texcoords_few<false, false>(positions, nullptr, n, a, dst)
-               : kernels::planar_texcoords_impl<ALSimdLanes, false, false>(positions, nullptr, n, a, dst);
-    }
-}
-
-void planar_texcoords(const LLVector4a* positions, const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x,
-                      const TexTransform* transform, F32* dst)
-{
-    const LLVector4a none(0.f);
-    const kernels::PlanarArgs a{ scale.getF32ptr(), none.getF32ptr(), none.getF32ptr(), switch_x, transform };
-    if (n == 0)
-    {
-        return;
-    }
-    if (transform)
-    {
-        n <= 4 ? kernels::planar_texcoords_few<true, true>(positions, normals, n, a, dst)
-               : kernels::planar_texcoords_impl<ALSimdLanes, true, true>(positions, normals, n, a, dst);
-    }
-    else
-    {
-        n <= 4 ? kernels::planar_texcoords_few<true, false>(positions, normals, n, a, dst)
-               : kernels::planar_texcoords_impl<ALSimdLanes, true, false>(positions, normals, n, a, dst);
-    }
-}
-
-void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, const LLVector4a& binormal, const LLVector4a& tangent,
-                     LLVector4a* dst)
-{
-    const kernels::PlanarArgs a{ scale.getF32ptr(), binormal.getF32ptr(), tangent.getF32ptr(), 0.f, nullptr };
-    n <= 4 ? kernels::planar_tangents_impl<ALSimd4, false>(normals, n, a, dst) : kernels::planar_tangents_impl<ALSimdLanes, false>(normals, n, a, dst);
-}
-
-void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x, LLVector4a* dst)
-{
-    const LLVector4a none(0.f);
-    const kernels::PlanarArgs a{ scale.getF32ptr(), none.getF32ptr(), none.getF32ptr(), switch_x, nullptr };
-    n <= 4 ? kernels::planar_tangents_impl<ALSimd4, true>(normals, n, a, dst) : kernels::planar_tangents_impl<ALSimdLanes, true>(normals, n, a, dst);
-}
-
 void offset_indices_u16(const U16* src, U16* dst, size_t n, U16 offset)
 {
     kernels::offset_indices_u16_impl<ALSimdWide>(src, dst, n, offset);
