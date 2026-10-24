@@ -3231,6 +3231,36 @@ void sculpt_calc_mesh_resolution(U16 width, U16 height, U8 type, F32 detail, S32
     s = vertices / t;
 }
 
+// A sculpt map averaged down by two along x, y or both: each pixel the rounded mean of the two or four it covers.
+static std::vector<U8> sculpt_map_averaged_down(const U8* data, U16 width, U16 height, S8 components, bool along_x, bool along_y)
+{
+    const S32 step_x = along_x ? 2 : 1;
+    const S32 step_y = along_y ? 2 : 1;
+    const S32 out_width = width / step_x;
+    const S32 out_height = height / step_y;
+    std::vector<U8> out((size_t)out_width * out_height * components);
+    for (S32 y = 0; y < out_height; ++y)
+    {
+        for (S32 x = 0; x < out_width; ++x)
+        {
+            for (S32 c = 0; c < components; ++c)
+            {
+                S32 sum = 0;
+                for (S32 dy = 0; dy < step_y; ++dy)
+                {
+                    for (S32 dx = 0; dx < step_x; ++dx)
+                    {
+                        sum += data[((size_t)(y * step_y + dy) * width + (x * step_x + dx)) * components + c];
+                    }
+                }
+                const S32 count = step_x * step_y;
+                out[((size_t)y * out_width + x) * components + c] = (U8)((sum + count / 2) / count);
+            }
+        }
+    }
+    return out;
+}
+
 // sculpt replaces generate() for sculpted surfaces
 void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components, const U8* sculpt_data, S32 sculpt_level, bool visible_placeholder)
 {
@@ -3245,45 +3275,74 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
     }
     mSculptPixels = data_is_empty ? 0 : S32(sculpt_width) * S32(sculpt_height);
 
-    S32 requested_sizeS = 0;
-    S32 requested_sizeT = 0;
-
-    sculpt_calc_mesh_resolution(sculpt_width, sculpt_height, sculpt_type, mDetail, requested_sizeS, requested_sizeT);
-
-    mPathp->generate(mParams.getPathParams(), mDetail, 0, true, requested_sizeS);
-    mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(), mDetail, 0, true, requested_sizeT);
-
-    S32 sizeS = mPathp->mPath.size();         // we requested a specific size, now see what we really got
-    S32 sizeT = mProfilep->mProfile.size();   // we requested a specific size, now see what we really got
-
-    // weird crash bug - DEV-11158 - trying to collect more data:
-    if ((sizeS == 0) || (sizeT == 0))
+    // A map sampled more than two pixels apart along an axis can hold its surface between the samples: an oblong map
+    // that keeps each vertex on a pair of lines, with a line collapsed to a point every few pairs, gives a coarser
+    // detail nothing but the collapsed lines, and no area. Where the samples have no area, the map averaged down by
+    // two along each such axis is sampled instead, as the level below it would be, until one has or no axis is left
+    // to average; a map whose samples have their area builds as it always has.
+    U16 width = sculpt_width;
+    U16 height = sculpt_height;
+    const U8* data = sculpt_data;
+    std::vector<U8> averaged;
+    while (true)
     {
-        LL_WARNS() << "sculpt bad mesh size " << sizeS << " " << sizeT << LL_ENDL;
-    }
+        S32 requested_sizeS = 0;
+        S32 requested_sizeT = 0;
 
-    mMesh.resize(sizeS * sizeT);
+        sculpt_calc_mesh_resolution(width, height, sculpt_type, mDetail, requested_sizeS, requested_sizeT);
 
-    //generate vertex positions
-    if (!data_is_empty)
-    {
-        sculptGenerateMapVertices(sculpt_width, sculpt_height, sculpt_components, sculpt_data, sculpt_type);
+        mPathp->generate(mParams.getPathParams(), mDetail, 0, true, requested_sizeS);
+        mProfilep->generate(mParams.getProfileParams(), mPathp->isOpen(), mDetail, 0, true, requested_sizeT);
+
+        S32 sizeS = mPathp->mPath.size();         // we requested a specific size, now see what we really got
+        S32 sizeT = mProfilep->mProfile.size();   // we requested a specific size, now see what we really got
+
+        // weird crash bug - DEV-11158 - trying to collect more data:
+        if ((sizeS == 0) || (sizeT == 0))
+        {
+            LL_WARNS() << "sculpt bad mesh size " << sizeS << " " << sizeT << LL_ENDL;
+        }
+
+        mMesh.resize(sizeS * sizeT);
+
+        //generate vertex positions
+        if (data_is_empty)
+        {
+            break;
+        }
+
+        sculptGenerateMapVertices(width, height, sculpt_components, data, sculpt_type);
 
         // don't test lowest LOD to support legacy content DEV-33670
-        if (mDetail > SCULPT_MIN_AREA_DETAIL)
+        if (mDetail <= SCULPT_MIN_AREA_DETAIL)
         {
-            F32 area = sculptGetSurfaceArea();
-
-            mSurfaceArea = area;
-
-            const F32 SCULPT_MAX_AREA = 384.f;
-
-            if (area < SCULPT_MIN_AREA || area > SCULPT_MAX_AREA)
-            {
-                data_is_empty = true;
-                visible_placeholder = true;
-            }
+            break;
         }
+
+        F32 area = sculptGetSurfaceArea();
+
+        mSurfaceArea = area;
+
+        const F32 SCULPT_MAX_AREA = 384.f;
+
+        if (area >= SCULPT_MIN_AREA && area <= SCULPT_MAX_AREA)
+        {
+            break;
+        }
+
+        // The samples run along x by the profile and along y by the path.
+        const bool along_x = sizeT > 1 && width >= 2 && width > 2 * (sizeT - 1);
+        const bool along_y = sizeS > 1 && height >= 2 && height > 2 * (sizeS - 1);
+        if (!along_x && !along_y)
+        {
+            data_is_empty = true;
+            visible_placeholder = true;
+            break;
+        }
+        averaged = sculpt_map_averaged_down(data, width, height, sculpt_components, along_x, along_y);
+        data = averaged.data();
+        width = along_x ? width / 2 : width;
+        height = along_y ? height / 2 : height;
     }
 
     if (data_is_empty)

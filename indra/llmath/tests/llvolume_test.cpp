@@ -2275,6 +2275,33 @@ namespace
         CHECK(volume->getSculptPixels() == 0);
     }
 
+    // An oblong map as Second Life's 512x8 sculpts are made: each ring of a tube on a pair of identical columns, and
+    // every eighth column collapsed to the tube's axis. The coarser details sample every eighth or thirty-second
+    // column, all collapsed, so the map as it is has no area there; it builds from the map averaged down instead of the
+    // sphere, and the finest detail, whose samples have their area, builds from the map as it is.
+    TEST_CASE("llvolume: an oblong sculpt map whose coarse samples have no area builds from it averaged down", "[llvolume]")
+    {
+        const SculptMap tube = sculptMap(512, 8, [](U16 x, U16 y)
+        {
+            if (x % 8 == 0)
+            {
+                return LLVector3(0.f, 0.f, (F32)x / 512 - 0.5f);
+            }
+            const F32 a = F_TWO_PI * (F32)y / 8;
+            return LLVector3(0.2f * cosf(a), 0.2f * sinf(a), (F32)(x / 2 * 2) / 512 - 0.5f);
+        });
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            INFO("LOD " << lod);
+            LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_TORUS, tube, lod);
+            CHECK_FALSE(volume->isSculptPlaceholderVisible());
+            CHECK(volume->getSculptPixels() == 512 * 8);
+        }
+        // As it is: 257 samples along its 512 columns, which an averaged map would not have the pixels for.
+        LLPointer<LLVolume> finest = buildSculpt(LL_SCULPT_TYPE_TORUS, tube, LOD_COUNT - 1);
+        CHECK(finest->getProfile().mProfile.size() == 257);
+    }
+
     // Mirror reverses the sampling of each row and reflects x; invert
     // reverses the sampling alone, turning the surface inside out. Each
     // flips the tangent frame's handedness, and both together leave it.

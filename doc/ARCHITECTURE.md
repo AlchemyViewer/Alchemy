@@ -79,7 +79,7 @@ Every parser takes its input as hostile: an LLSD capability response picks its o
 ### Viewer Object System
 
 `LLViewerObject` (`indra/newview/llviewerobject.h`) is the base for all world objects, deriving from `LLPrimitive`. Key subclasses:
-- **`LLVOVolume`** (`llvovolume.h`) — Most common type: prims, meshes, sculpts. Contains volume geometry with multiple faces, materials, texture animation, media-on-surface, flex
+- **`LLVOVolume`** (`llvovolume.h`) — Most common type: prims, meshes, sculpts. Contains volume geometry with multiple faces, materials, texture animation, media-on-surface, flex. A sculpt samples its map at its detail's mesh; where the samples of a map sampled more than two pixels apart have no area (an oblong map with a collapsed line every few, at a coarser detail), `LLVolume::sculpt` samples the map averaged down by two along that axis, until they have or none is left, before it builds the sphere
 - **`LLVOAvatar`** (`llvoavatar.h`) — Avatar with skeletal system, mesh deformation, animation blending, appearance layering, impostor rendering. `LLVOAvatarSelf` is the player's own avatar
 - **`LLVOGrass`**, **`LLVOTree`**, **`LLVOSurfacePatch`** (terrain), **`LLVOPartGroup`** (particles), **`LLVOWLSky`** (sky dome)
 
