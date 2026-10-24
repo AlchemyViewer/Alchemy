@@ -854,6 +854,63 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // A frame end that paces the CPU FRAMES - 1 frames deep waits, in its pacing wait, for the frame whose batch the
+    // next frame reuses, and retire() reads that batch before it is opened: opening it waits for nothing, so the pacing
+    // wait is the frame end's only wait and keeps its slack.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a paced frame end reads the batch it reuses before opening it", "[alquerypool_gl]")
+    {
+        setUp();
+        constexpr U32 DEPTH = ALQueryPool::FRAMES - 1;
+        std::vector<ALQueryTicket> tickets;
+        const U32 stalls = mPool.getStalls();
+        for (U32 frame = 0; frame < 3 * ALQueryPool::FRAMES; ++frame)
+        {
+            {
+                ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+                tickets.push_back(scope.ticket());
+                draw(false);
+            }
+            REQUIRE(tickets.back().isValid());
+            mPool.closeFrame();
+            mFrames.endFrame(DEPTH);
+            mPool.retire();
+            if (tickets.size() > DEPTH)
+            {
+                // The batch openFrame() is about to reuse is the one DEPTH frames back.
+                U64 value = 0;
+                INFO("frame " << frame << ": the batch about to be reused was read by retire()");
+                CHECK(mPool.result(tickets[tickets.size() - 1 - DEPTH], value) == ALQueryPool::Status::Ready);
+                CHECK(value == 1);
+            }
+            mPool.openFrame();
+        }
+        {
+            INFO("opening a batch never waited");
+            CHECK(mPool.getStalls() == stalls);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
+    // LLRender's frame end, paced as the viewer paces it by default, never waits for a query batch: its pacing wait
+    // has done that.
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: LLRender's paced frame end never waits to open a batch", "[alquerypool_gl]")
+    {
+        setUp();
+        ALQueryPool& queries = gGL.queries();
+        const U32 stalls = queries.getStalls();
+        for (U32 frame = 0; frame < 3 * ALQueryPool::FRAMES; ++frame)
+        {
+            {
+                ALQueryScope scope(queries, ALQueryKind::Occlusion);
+                REQUIRE(scope.ticket().isValid());
+                draw(false);
+            }
+            gGL.endFrame(ALQueryPool::FRAMES - 1);
+        }
+        CHECK(queries.getStalls() == stalls);
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A batch opens with names for the busiest frame so far and half again, made at a frame's end: a frame that uses no
     // more makes no name in its middle, where glGenQueries waits for a threaded driver's thread to catch up.
     TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a batch opens with room for the busiest frame so far, and half again", "[alquerypool_gl]")
