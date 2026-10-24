@@ -43,7 +43,11 @@ class ALFrameFences;
 /// A buffer is kept for the reads after its own, each taking the smallest free one that holds it, and one is made only
 /// where none is free: making one asks GL for a name and, where it maps, for the map, calls that return a value. A free
 /// buffer is deleted only once the frame it was given back in has finished, since a read given up may still be writing
-/// it: one unused for TRIM_FRAMES frames goes, and so does a read no one has collected EXPIRE_FRAMES frames after it was
+/// it. Where the frames' ends stamp their frames rather than lay fences (ALFrameFences::isStamping, NVIDIA's driver), each
+/// read lays a fence of its own behind it, and is ready, or its buffer deleted, only once that fence has signalled as
+/// well: a stamp is a query, not a sync object, and the staging ring's uploads through a buffer came out wrong on
+/// NVIDIA's driver until it waited on fences of its own. A fence laid and polled is a call that returns a value each,
+/// once a read. Then: one unused for TRIM_FRAMES frames goes, and so does a read no one has collected EXPIRE_FRAMES frames after it was
 /// issued, so that a user that stops asking gives its buffer back. At most MAX_READS reads, and MAX_BYTES in all, are in
 /// flight or kept; past that a request is refused, as it is where no buffer could be made, and its user asks again
 /// later.
@@ -83,7 +87,7 @@ public:
     EResult collect(Ticket ticket, U8* out, size_t bytes);
 
     /// What collect() would answer, copying nothing and keeping the read: READY once it can be collected.
-    EResult state(Ticket ticket) const;
+    EResult state(Ticket ticket);
 
     /// Gives a read up, its buffer back to the pool. Nothing for a ticket that is not a read's.
     void cancel(Ticket ticket);
@@ -101,12 +105,15 @@ public:
     U64 getMade() const { return mMade; }
     U64 getRefused() const { return mRefused; }
     U64 getExpired() const { return mExpired; }
+    /// The fences laid and not yet seen signalled.
+    U32 getFences() const;
 
 private:
     struct Buffer
     {
         ALGPUBuffer mStore;
-        U32         mLastUsed = 0; // the frame it was last given back in
+        U32         mLastUsed = 0;       // the frame it was last given back in
+        void*       mFence    = nullptr; // the GLsync behind the last read into it, while stamping, until seen signalled
     };
 
     struct Read
@@ -119,7 +126,10 @@ private:
 
     // The read `ticket` names, or null.
     Read* find(Ticket ticket);
-    const Read* find(Ticket ticket) const;
+    // Whether the GPU has written `read`: its frame shown finished, and its fence, if it has one, signalled.
+    bool written(Read& read);
+    // Whether nothing the GPU has yet to do writes `buffer`, so that it may be deleted.
+    bool idle(Buffer& buffer);
     // The smallest free buffer holding `bytes`, taken from the free list, or one made: false where none can be.
     bool take(size_t bytes, Buffer& out);
     // `buffer` back on the free list.

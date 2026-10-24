@@ -3304,6 +3304,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
     }
 
     mSculptLevel = sculpt_level;
+    mSculptPlaceholderVisible = data_is_empty && visible_placeholder;
 
     // Delete any existing faces so that they get regenerated
     mVolumeFaces.clear();

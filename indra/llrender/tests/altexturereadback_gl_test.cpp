@@ -2,7 +2,8 @@
  * @file altexturereadback_gl_test.cpp
  * @brief ALTextureReadback on the hidden window: a level read back collected once its frame has finished and not
  *        before, with no call on the frame fences, buffers given back serving the reads after, the reads and bytes
- *        refused past the pool's bounds, reads no one collects expiring and free buffers going, and release.
+ *        refused past the pool's bounds, reads no one collects expiring and free buffers going, the fences of its own
+ *        it waits on where frames are stamped, and release.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -225,6 +226,43 @@ namespace
             endFrame();
         }
         CHECK(mReadback.getBytes() == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // Where the frames' ends stamp their frames, a read lays a fence of its own behind it and is ready only once that has
+    // signalled too; a read given up leaves the fence on its buffer, and the next read into the buffer lays its own.
+    TEST_CASE_METHOD(altexturereadback_data, "altexturereadback_gl: while stamping, a read is ready only once its own fence has signalled", "[altexturereadback_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("the context cannot stamp frames");
+        }
+        mFrames.setStamps(true);
+        finishFrame();
+        REQUIRE(mFrames.isStamping());
+
+        const ALTextureReadback::Ticket ticket = readLevel0();
+        REQUIRE(ticket != 0);
+        CHECK(mReadback.getFences() == 1);
+        CHECK(mReadback.state(ticket) == ALTextureReadback::PENDING);
+        finishFrame();
+        CHECK(mReadback.state(ticket) == ALTextureReadback::READY);
+        CHECK(mReadback.getFences() == 0);
+        std::vector<U8> got(LEVEL0, 0);
+        REQUIRE(mReadback.collect(ticket, got.data(), got.size()) == ALTextureReadback::READY);
+        CHECK(got == mLevel0);
+
+        mReadback.cancel(readLevel0());
+        CHECK(mReadback.getFences() == 1);
+        const ALTextureReadback::Ticket next = readLevel0();
+        REQUIRE(next != 0);
+        CHECK(mReadback.getFences() == 1);
+        finishFrame();
+        REQUIRE(mReadback.collect(next, got.data(), got.size()) == ALTextureReadback::READY);
+        CHECK(got == mLevel0);
+
+        mFrames.setStamps(false);
+        finishFrame();
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

@@ -1042,6 +1042,8 @@ public:
 
     S32 getSculptLevel() const                              { return mSculptLevel; }
     void setSculptLevel(S32 level)                          { mSculptLevel = level; }
+    // Whether the last sculpt() built the visible sphere: the map missing, or a surface out of bounds.
+    bool isSculptPlaceholderVisible() const                 { return mSculptPlaceholderVisible; }
 
 
     static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
@@ -1109,6 +1111,7 @@ public:
     bool mUnique;
     F32 mDetail;
     S32 mSculptLevel;
+    bool mSculptPlaceholderVisible = false;
     F32 mSurfaceArea; //unscaled surface area
     bool mIsMeshAssetLoaded;
     bool mIsMeshAssetUnavaliable;
