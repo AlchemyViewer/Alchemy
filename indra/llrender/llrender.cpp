@@ -118,6 +118,7 @@ bool LLRender::sMirrorPass = false;
 bool LLRender::sReverseZ = false;
 bool LLRender::sCompute = false;
 bool LLRender::sGBufferNormHDR = true;
+bool LLRender::sObjectSkinBlock = false;
 bool LLRender::s10bitBackBuffer = false;
 
 
@@ -388,9 +389,10 @@ bool LLRender::init(bool needs_vertex_buffer)
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-    // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had.
+    // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had, nor a scratch slice.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+    ALUniformBuffer::forgetScratchBinding();
 
     // Nor on any texture unit, and unit 0 is the active one. gGL is thread_local and outlives
     // a context -- the GL tests make one per test -- and a fresh context hands out the same
@@ -599,6 +601,7 @@ void LLRender::refreshState(void)
     // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+    ALUniformBuffer::forgetScratchBinding();
 
     U32 active_unit = mCurrTextureUnitIndex;
 

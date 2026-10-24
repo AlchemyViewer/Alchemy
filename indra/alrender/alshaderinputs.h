@@ -51,6 +51,7 @@ struct ALShaderSettings
     bool mHasClipControl    = true; ///< glClipControl, which reverse-Z needs
     bool mHasCompute        = true; ///< compute and GLSL 4.30, on a driver not held back (LLGLManager::isIntelLegacy)
     bool mIsD3D12           = false; ///< GLOn12, which builds no indexed material program
+    bool mHasBufferStorage  = true; ///< persistent buffer maps (ALGPUBuffer::canMapPersistently), the scratch UBO ring's
 
     // The settings, each by its name.
     bool mReverseZ               = true;  ///< AlchemyRenderReverseZ
@@ -113,6 +114,7 @@ struct ALShaderInputs
         S32  mTerrainPBRDetail = 0;   ///< TERRAIN_PBR_DETAIL, as much as the context's texture units can sample
         bool mTerrainHexTiling = false; ///< TERRAIN_HEX_TILING
         S32  mWaterHextile   = 1;     ///< WATER_HEXTILE: the hex-tiled wave layers, 0 to 2
+        bool mObjectSkinBlock = true; ///< OBJECT_SKIN_BLOCK: the joint palette from a uniform block, with buffer storage
 
         /// A digest of every field, which every program's hash folds in (LLGLSLShader::sSharedObjectsKey): the shared
         /// objects they link against are compiled from these, some of which reach no define.

@@ -363,6 +363,61 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // A payload written with a reserve, as a skinning palette is for the ObjectSkin block it is bound as whole: the head
+    // moves on by the payload alone, so the next payload overlaps the reserve, but no reserve runs past its segment's
+    // end -- the head steps to the next segment first, so that a bind of the reserve stays inside fenced bytes.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: a scratch reserve fits its segment, and the head moves by the payload", "[aluniformbuffer_gl]")
+    {
+        if (!glBufferStorage)
+        {
+            SKIP("no buffer storage: the scratch ring is the orphan fallback");
+        }
+        constexpr size_t SEGMENT = 256 * 1024;
+        constexpr size_t PAYLOAD = 1024;
+        constexpr size_t RESERVE = 5 * 1024;
+        ALUniformBuffer::cleanupClass();
+        ALFrameFences& frames = gGL.frameFences();
+        glFinish();
+        REQUIRE(frames.wait(frames.frame() - 1, 1000000000ull));
+
+        const std::vector<U8> payload(PAYLOAD, 0x5a);
+        S64 previous = ALUniformBuffer::scratchWrite(payload.data(), PAYLOAD, RESERVE);
+        REQUIRE(previous == 0);
+        S64 offset = 0;
+        for (;;)
+        {
+            offset = ALUniformBuffer::scratchWrite(payload.data(), PAYLOAD, RESERVE);
+            REQUIRE(offset > previous);
+            if (offset >= (S64)SEGMENT)
+            {
+                break;
+            }
+            {
+                INFO("within a segment the head moves on by the payload alone");
+                CHECK(offset - previous == (S64)PAYLOAD);
+            }
+            {
+                INFO("and the reserve after it stays inside the segment");
+                CHECK(offset + (S64)RESERVE <= (S64)SEGMENT);
+            }
+            previous = offset;
+        }
+        {
+            INFO("the last payload in the segment was the last whose reserve fit it");
+            CHECK(previous + (S64)RESERVE <= (S64)SEGMENT);
+            CHECK(previous + (S64)PAYLOAD + (S64)RESERVE > (S64)SEGMENT);
+        }
+        {
+            INFO("the next went to the start of the next segment");
+            CHECK(offset == (S64)SEGMENT);
+        }
+        {
+            INFO("a reserve past the largest payload is refused");
+            CHECK(ALUniformBuffer::scratchWrite(payload.data(), PAYLOAD, SEGMENT + 1) == -1);
+        }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // Frame ends paced three deep, as the viewer paces them by default, have shown a segment's frame finished by the
     // time the head comes round to it: at a steady traffic the persistent ring is sized for, a frame's slices never
     // wait or poll, and no segment's step makes a call to the frame fences.

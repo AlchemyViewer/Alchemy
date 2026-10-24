@@ -561,6 +561,10 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs, const ALRenderA
     // as it stands for this load.
     LLRender::sCompute = mInputs.mLocal.mCompute;
 
+    // And for where the rigged programs read their joint palette: the skinning object below compiles its block or its
+    // uniforms from this, and the draws bind the one it compiled (LLRenderPass::uploadMatrixPalette).
+    LLRender::sObjectSkinBlock = mInputs.mGlobal.mObjectSkinBlock;
+
     {
         static LLCachedControl<bool> shader_cache_enabled(gSavedSettings, "RenderShaderCacheEnabled", true);
         static LLUUID old_cache_version;
@@ -912,6 +916,12 @@ std::string LLViewerShaderMgr::loadBasicShaders()
 
     // The water's wave layers that hex-tile, read in waterSurface.glsl, a shared object.
     attribs["WATER_HEXTILE"] = std::to_string(in.mWaterHextile);
+
+    // The joint palette from the ObjectSkin block, in objectSkinV.glsl, a shared object.
+    if (in.mObjectSkinBlock)
+    {
+        attribs["OBJECT_SKIN_BLOCK"] = "1";
+    }
 
     LLGLSLShader::sGlobalDefines = attribs;
     // What the objects below compile from, which every program's hash follows.

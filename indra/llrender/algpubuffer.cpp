@@ -139,6 +139,12 @@ ALGPUBuffer& ALGPUBuffer::operator=(ALGPUBuffer&& other) noexcept
     return *this;
 }
 
+//static
+bool ALGPUBuffer::canMapPersistently()
+{
+    return can_map_persistent(use_dsa());
+}
+
 bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char* label)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
