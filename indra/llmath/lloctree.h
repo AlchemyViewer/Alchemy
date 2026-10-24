@@ -328,9 +328,11 @@ public:
         {
             // It belongs here where its size is this node's, or where it is too big for this node and the node of its
             // size, the parent, is full -- and either way, where this node has room. A node full of elements too big
-            // for it gives the next to a child in turn, so that no node above the minimum size holds more than
-            // gOctreeMaxCapacity. One that did, of the small static prims a dense build crowds into a few metres, made
-            // a group with more faces than its rebuild draws (LLVolumeGeometryManager's MAX_FACE_COUNT).
+            // for it gives the next to a child in turn, so that no node that can still split holds more than
+            // gOctreeMaxCapacity: one at the minimum size, or within twice it, where a child would sit at its own
+            // centre (below), takes what comes. One that did not, of the small static prims a dense build crowds into
+            // a few metres, made a group with more faces than its rebuild draws (LLVolumeGeometryManager's
+            // MAX_FACE_COUNT).
             const bool room = getElementCount() < gOctreeMaxCapacity || getSize()[0] <= gOctreeMinSize;
             if (room && (contains(data->getBinRadius()) ||
                          (data->getBinRadius() > getSize()[0] && parent && parent->getElementCount() >= gOctreeMaxCapacity)))

@@ -420,8 +420,22 @@ namespace
             }
         };
 
+        // Every entry of the size other cases left in the pool taken first, until both a vertex and an index store had
+        // to be made, so that what the pool holds of the size next is what this frame frees.
         std::vector<LLPointer<LLVertexBuffer>> buffers;
-        make_all(buffers);
+        for (U32 i = 0; i < 4096; ++i)
+        {
+            const U32 misses = LLVertexBuffer::getPoolStats().mMisses;
+            buffers.push_back(makeBuffer(4 * QUADS, 6 * QUADS));
+            if (LLVertexBuffer::getPoolStats().mMisses - misses == 2)
+            {
+                break;
+            }
+        }
+        while (buffers.size() < COUNT)
+        {
+            buffers.push_back(makeBuffer(4 * QUADS, 6 * QUADS));
+        }
         // Freed now, in the open frame.
         buffers.clear();
 
