@@ -1408,13 +1408,10 @@ void LLVOVolume::sculpt()
             discard_level = mSculptTexture->getSavedRawImageLevel();
         }
 
-        if (!raw_image || raw_image->getWidth() < mSculptTexture->getWidth() || raw_image->getHeight() < mSculptTexture->getHeight())
-        {
-            // last resort, read back from GL
-            mSculptTexture->readbackRawImage();
-            raw_image = mSculptTexture->getRawImage();
-            discard_level = mSculptTexture->getRawImageLevel();
-        }
+        // A copy smaller than the texture on screen is built from as it is, and with none the volume takes the placeholder,
+        // as when nothing could be read: setForSculpt has the fetcher decode the texture again from the cache, and the
+        // copy it saves marks this volume to build again (LLViewerFetchedTexture::rebuildSculptVolumes). Reading the
+        // texture back from GL instead waited for the GPU to finish everything queued ahead of the read.
 
         S32 max_discard = mSculptTexture->getMaxDiscardLevel();
         if (discard_level > max_discard)

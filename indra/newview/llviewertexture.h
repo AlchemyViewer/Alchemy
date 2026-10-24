@@ -378,6 +378,8 @@ public:
     void setForSculpt();
     bool forSculpt() const {return mForSculpt;}
     bool isForSculptOnly() const;
+    // Marks every volume this texture sculpts to build again: its pixels, or its size, changed.
+    void rebuildSculptVolumes();
 
     //raw image management
     LLImageRaw* getRawImage()const { return mRawImage ;}
