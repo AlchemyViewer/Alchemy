@@ -1,6 +1,7 @@
 /**
  * @file class1/deferred/matricesBlock.glsl
- * @brief THE declaration of the shared "Matrices" engine UBO (UB_MATRICES).
+ * @brief THE declaration of the shared "Matrices" and "ProjectionMatrices" engine UBOs
+ *        (UB_MATRICES, UB_PROJECTION_MATRICES).
  *        Not compiled directly: loadShaderFile() splices this file's contents
  *        wherever a shader says //[ENGINE_BLOCK Matrices], so every consumer
  *        shares one declaration instead of a per-file copy.
@@ -11,12 +12,17 @@
  * $/LicenseInfo$
  *
  * The member order/types MUST byte-match (std140) the C++
- * LLRender::MatricesUBOData, packed by packMatricesUBO and registered for debug
- * validation with offsetof on that struct. Matrices are COLUMN-major -- std140's
- * default, and glm's own storage -- which the debug validator asserts at shader
- * load.
+ * LLRender::MatricesUBOData and LLRender::ProjectionMatricesUBOData, packed by
+ * packMatricesUBO and registered for debug validation with offsetof on those
+ * structs. Matrices are COLUMN-major -- std140's default, and glm's own storage
+ * -- which the debug validator asserts at shader load.
  *
- * Every consumer splices the WHOLE block even when it reads only one member: an
+ * Two blocks, split by what moves them: a draw's own model matrix moves the
+ * modelview alone, which writes the first, 176 bytes, a 256-byte slice of the
+ * uniform ring where the alignment is 256; a pass's projection writes both, and a
+ * texture matrix the second. One block of all six took a 512-byte slice a draw.
+ *
+ * Every consumer splices BOTH blocks WHOLE even when it reads only one member: an
  * unnamed block's members land at fixed std140 offsets, so dropping a member a
  * given shader happens not to use would shift every member after it.
  */
@@ -24,9 +30,13 @@
 layout (std140) uniform Matrices
 {
     mat4 modelview_matrix;
-    mat4 projection_matrix;
     mat4 modelview_projection_matrix;
+    mat3 normal_matrix;
+};
+
+layout (std140) uniform ProjectionMatrices
+{
+    mat4 projection_matrix;
     mat4 inv_proj;
     mat4 texture_matrix0;
-    mat3 normal_matrix;
 };

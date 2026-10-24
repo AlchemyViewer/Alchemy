@@ -302,24 +302,34 @@ public:
         F32 light_ambient[3];  F32 _tail_pad;
     };
 
-    // ---- Shared matrix uniform block (UB_MATRICES) ----------------------------------------
+    // ---- Shared matrix uniform blocks (UB_MATRICES, UB_PROJECTION_MATRICES) ----------------
     // The matrix stack plus the matrices derived from it. Like the Lights block above, these
     // used to be LOOSE uniforms re-pushed per program -- and they were the worst offenders:
     // every (modelview, projection) epoch (camera set, shadow cascade, probe face, mirror
     // pass, each UI translate/scale) re-taxed every program bound after it with up to six
-    // matrix writes. Packed once per epoch and bound at a fixed engine point, a matrix change
-    // costs one upload total and a program bind costs no matrix work at all.
+    // matrix writes. Packed once per epoch and bound at fixed engine points, a matrix change
+    // costs an upload and a program bind costs no matrix work at all.
+    //
+    // Two blocks, split by what moves them. A draw with a model matrix of its own (an
+    // attachment, a moving object, a UI translate) moves the modelview alone: it writes the
+    // Matrices block, 176 bytes, which takes a 256-byte slice of the ring where the alignment
+    // is 256, and leaves the projection's block bound. One block of all six took 368 bytes, a
+    // 512-byte slice, for every such draw. A pass's projection moves both blocks, the
+    // modelview-projection being the Matrices block's, and a texture matrix the projection's.
     //
     // Matrices go up as they lie: LLMatrix4a's rows are the columns std140 reads by default.
     // normal is a mat3, which std140 strides at 16 bytes per column, hence float[3][4].
     struct alignas(16) MatricesUBOData
     {
         F32 modelview[16];
-        F32 projection[16];
         F32 modelview_projection[16];
+        F32 normal[3][4];   // .xyz used per column, .w std140 padding
+    };
+    struct alignas(16) ProjectionMatricesUBOData
+    {
+        F32 projection[16];
         F32 inv_proj[16];
         F32 texture0[16];
-        F32 normal[3][4];   // .xyz used per column, .w std140 padding
     };
 
     void translateUI(F32 x, F32 y, F32 z);
@@ -700,13 +710,14 @@ private:
     U32             mLightsUBOHash  = 0xFFFFFFFFu;
     bool            mLightsUBOBound = false;
 
-    // Rebuild the matrix block from the current stacks into the buffer's shadow. The derived
-    // matrices are recomputed only for the stack that actually moved.
+    // Rebuild the matrix blocks from the current stacks into the buffers' shadows, each written only where its bytes
+    // moved. The derived matrices are recomputed only for the stack that actually moved.
     void packMatricesUBO();
 
     ALUniformBuffer mMatricesUBO;
+    ALUniformBuffer mProjectionUBO;
     U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
-    bool            mMatricesUBOBound = false;
+    bool            mMatricesUBOBound = false; // both blocks
 
     ALFrameFences mFrameFences;
     ALQueryPool   mQueries{ mFrameFences };
