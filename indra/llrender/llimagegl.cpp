@@ -1470,7 +1470,8 @@ static U32 pixel_bytes(U32 pixformat, U32 pixtype)
 // Whether to break an upload into sub_image_lines slices. This is latency smoothing,
 // not throughput: it only ever applies on the main thread, where one large
 // glTexSubImage2D can stall long enough to cost a frame. Off-thread uploads issue a
-// single call.
+// single call, and so does an upload the staging ring takes (upload_staged): only one
+// it has no room for comes here.
 //
 // The compressed guard is structural, not a driver workaround: sub_image_lines slices
 // by scanline stride, which is meaningless for block-compressed data. (The comment that
@@ -1484,8 +1485,8 @@ static bool should_stagger_image_set(bool compressed)
     // Only NVIDIA's own driver slices. AMD and Intel were taken out on purpose
     // (2dcb7ae22c, March 2025), and the drivers that report neither -- nouveau, zink
     // on NVK, llvmpipe -- have not sliced since 1727c4d264. featuretable_linux.txt
-    // gives all of those threaded texture uploads instead, so a large upload leaves
-    // the main thread rather than stalling it.
+    // gives every driver threaded texture uploads, NVIDIA's too, so a large upload
+    // leaves the main thread rather than stalling it.
     return !compressed && on_main_thread() && gGLManager.mIsNVIDIA;
 #elif LL_DARWIN
     return !compressed && on_main_thread() && gGLManager.mIsAMD;
