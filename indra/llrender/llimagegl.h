@@ -274,8 +274,25 @@ public:
     // texture onto the screen rather than racing it.
     void afterPublish(std::function<void()> fn);
 
-    // Read back a raw image for this discard level, if it exists
+    // Read back a raw image for this discard level, if it exists. Waits for the GPU to finish everything queued ahead
+    // of the read; requestReadBack does not.
     bool readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const;
+
+    // Main thread: the pixels of level `discard_level` of what mTexName holds (-1: the level on screen), read back
+    // without waiting on the GPU (ALTextureReadback). requestReadBack issues the read, giving up one it issued before:
+    // false where readBackRaw would not read the level, for a compressed texture, or where the pool has no room this
+    // frame. collectReadBack fills `imageraw` with the read, at the size it was read, once the GPU has written it, a
+    // few frames' ends later, and gives the level it is of.
+    enum EReadBack
+    {
+        READBACK_NONE,    // nothing asked, or the read was lost (cancelled, expired, the context gone)
+        READBACK_PENDING, // asked, and the GPU has yet to be shown finished with it
+        READBACK_READY    // `imageraw` holds it
+    };
+    bool      requestReadBack(S32 discard_level = -1);
+    EReadBack collectReadBack(LLImageRaw* imageraw, S32& discard_level);
+    void      cancelReadBack();
+    bool      isReadBackRequested() const { return mReadBack != 0; }
     void destroyGLTexture();
     void forceToInvalidateGLTexture();
 
@@ -564,6 +581,18 @@ protected:
     LLGLenum mDeprecatedSourceFormat;
 
     bool mExternalTexture;
+
+    // The read requestReadBack issued, and what it read.
+    U64 mReadBack           = 0;
+    S32 mReadBackDiscard    = -1;
+    S32 mReadBackWidth      = 0;
+    S32 mReadBackHeight     = 0;
+    S32 mReadBackComponents = 0;
+
+    // The level a readback of `discard_level` (-1: the level on screen) reads -- `gl_discard` of mTexName -- its size and
+    // its components, through the published view; false where mTexName holds no such level. Binds mTexName on unit 0,
+    // for the read.
+    bool readBackLevel(S32& discard_level, S32& gl_discard, S32& width, S32& height, S32& ncomponents) const;
 
     // STATICS
 public:

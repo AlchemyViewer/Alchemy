@@ -8,7 +8,8 @@
  * invariant, the deprecated-format resolution path, downscaling,
  * the published view of an upload in flight, the bind state
  * edits rely on, the integer formats, uploads read from the
- * staging ring, and the levels a readback reads.
+ * staging ring, the levels a readback reads, and readbacks collected
+ * once the GPU has written them.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -425,6 +426,50 @@ namespace
         LLImageGL::updateStats(LLImageGL::sLastFrameTime);
         CHECK(LLImageGL::sReadbacks == 0);
         CHECK(LLImageGL::sReadbackSeconds == 0.0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A readback requested is the GPU's until a later frame's end has shown its frame finished; collected then, it
+    // holds the level readBackRaw would have read, and nothing waited for it. A texture destroyed gives its read up.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a readback requested is collected once the GPU has written it", "[LLImageGL]")
+    {
+        constexpr U16 W = 8, H = 8;
+        LLPointer<LLImageRaw> src = new LLImageRaw(W, H, 4);
+        U8* sd = src->getData();
+        for (size_t i = 0; i < (size_t)W * H * 4; ++i)
+            sd[i] = (U8)(i * 3 + 1);
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, src.get()));
+
+        LLImageGL::sReadbacks = 0;
+        REQUIRE(img->requestReadBack());
+        CHECK(img->isReadBackRequested());
+        LLPointer<LLImageRaw> dst = new LLImageRaw();
+        S32 discard = -1;
+        UNSCOPED_INFO("the open frame's read is the GPU's");
+        CHECK(img->collectReadBack(dst.get(), discard) == LLImageGL::READBACK_PENDING);
+
+        gGL.endFrame();
+        glFinish();
+        gGL.endFrame();
+        REQUIRE(img->collectReadBack(dst.get(), discard) == LLImageGL::READBACK_READY);
+        CHECK(discard == 0);
+        REQUIRE((S32)dst->getWidth() == (S32)W);
+        REQUIRE((S32)dst->getHeight() == (S32)H);
+        REQUIRE((S32)dst->getComponents() == 4);
+        CHECK(std::memcmp(dst->getData(), sd, (size_t)W * H * 4) == 0);
+        CHECK_FALSE(img->isReadBackRequested());
+        CHECK(img->collectReadBack(dst.get(), discard) == LLImageGL::READBACK_NONE);
+        UNSCOPED_INFO("no read waited");
+        CHECK(LLImageGL::sReadbacks == 0);
+
+        REQUIRE(img->requestReadBack());
+        const U32 reads = gGL.textureReadback().getReads();
+        img->destroyGLTexture();
+        CHECK_FALSE(img->isReadBackRequested());
+        CHECK(gGL.textureReadback().getReads() == reads - 1);
+        UNSCOPED_INFO("no texture, nothing to read");
+        CHECK_FALSE(img->requestReadBack());
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

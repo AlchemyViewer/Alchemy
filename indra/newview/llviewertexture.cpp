@@ -2810,6 +2810,11 @@ bool LLViewerFetchedTexture::doLoadedCallbacks()
     if (mLoadedCallbackList.empty())
     {
         gTextureList.mCallbackList.erase(this);
+        // No one is left for a read of the texture still on its way.
+        if (mGLTexturep.notNull())
+        {
+            mGLTexturep->cancelReadBack();
+        }
     }
     else if(!res && mForceCallbackFetch && sCurrentTime - mLastCallBackActiveTime > MAX_IDLE_WAIT_TIME && !mIsFetching)
     {
@@ -2981,27 +2986,39 @@ void LLViewerFetchedTexture::readbackRawImage()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    // readback the raw image from vram if the current raw image is null or smaller than the texture
-    if (mGLTexturep.notNull() && mGLTexturep->getTexName() != 0 &&
-        (mRawImage.isNull() || mRawImage->getWidth() < mGLTexturep->getWidth() || mRawImage->getHeight() < mGLTexturep->getHeight() ))
+    // Reads the texture back from VRAM when there is no raw image, or one smaller than the texture. The read is asked
+    // for here and taken in at a later call, once the GPU has written it (LLImageGL::requestReadBack), so the callbacks
+    // waiting on the pixels run a few frames later instead of this frame waiting for the GPU to finish everything
+    // queued ahead of the read. Until then mIsRawImageValid is as it was.
+    if (mGLTexturep.isNull())
+    {
+        return;
+    }
+    if (mGLTexturep->getTexName() == 0 ||
+        (mRawImage.notNull() && mRawImage->getWidth() >= mGLTexturep->getWidth() &&
+         mRawImage->getHeight() >= mGLTexturep->getHeight()))
+    {
+        mGLTexturep->cancelReadBack();
+        return;
+    }
+
+    if (!mGLTexturep->isReadBackRequested())
+    {
+        mGLTexturep->requestReadBack(-1);
+        return;
+    }
+
+    LLPointer<LLImageRaw> raw = new LLImageRaw();
+    S32 discard = INVALID_DISCARD_LEVEL;
+    if (mGLTexturep->collectReadBack(raw, discard) == LLImageGL::READBACK_READY)
     {
         if (mRawImage.isNull())
         {
             sRawCount++;
         }
-        mRawImage = new LLImageRaw();
-        if (!mGLTexturep->readBackRaw(-1, mRawImage, false))
-        {
-            mRawImage = nullptr;
-            mIsRawImageValid = false;
-            mRawDiscardLevel = INVALID_DISCARD_LEVEL;
-            sRawCount--;
-        }
-        else
-        {
-            mIsRawImageValid = true;
-            mRawDiscardLevel = mGLTexturep->getDiscardLevel();
-        }
+        mRawImage = raw;
+        mIsRawImageValid = true;
+        mRawDiscardLevel = discard;
     }
 }
 

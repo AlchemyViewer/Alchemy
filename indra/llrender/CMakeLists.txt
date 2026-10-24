@@ -14,6 +14,7 @@ set(
   alstagingring.cpp
   altexture3d.cpp
   altextureblit.cpp
+  altexturereadback.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
   alfontface.cpp
@@ -58,6 +59,7 @@ set(
   alstagingring.h
   altexture3d.h
   altextureblit.h
+  altexturereadback.h
   altextureslot.h
   alfontcolrv1.h
   alfontface.h
@@ -244,6 +246,9 @@ if(AL_BUILD_TESTS)
   #   refused and the ring grown for it at the frame's end, the store a new
   #   size replaces kept until its frame has finished, the ring switched off,
   #   a texture upload read from the ring, and release;
+  # - ALTextureReadback: a level read back collected once its frame has
+  #   finished, buffers given back serving the reads after, requests past the
+  #   pool's bounds refused, reads no one collects expiring, and release;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
@@ -264,6 +269,7 @@ if(AL_BUILD_TESTS)
       tests/alstagingring_gl_test.cpp
       tests/altessellation_gl_test.cpp
       tests/altextureblit_gl_test.cpp
+      tests/altexturereadback_gl_test.cpp
       tests/aluniformbuffer_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp
