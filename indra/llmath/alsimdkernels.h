@@ -36,7 +36,8 @@
 // has: 128 bits on NEON four vectors at a time, 256 at AVX two vectors per
 // register, 512 at AVX-512 four. The tail is finished one vector at a
 // time. The bodies are templates over a width type in alsimdkernels.inl;
-// this header is the entry points, instantiated once in alsimdkernels.cpp.
+// this header is the entry points, instantiated once in alsimdkernels.cpp,
+// and the planar ones in alsimdplanar.cpp, which is built strict.
 namespace alsimd
 {
 
@@ -66,6 +67,52 @@ void transform_directions_offset(const LLMatrix4a& m, const LLVector4a& offset, 
 void transform_texcoords(const F32* src, F32* dst, size_t n,
                          const LLVector4a& trans, const LLVector4a& rot0, const LLVector4a& rot1,
                          const LLVector4a& scale, const LLVector4a& offset);
+
+// A texture transform about the middle of the texture: a turn by the angle
+// whose cosine and sine these are, then a scale, then an offset.
+struct TexTransform
+{
+    F32 cos_ang = 1.f;
+    F32 sin_ang = 0.f;
+    F32 scale_s = 1.f;
+    F32 scale_t = 1.f;
+    F32 offset_s = 0.f;
+    F32 offset_t = 0.f;
+};
+
+// Planar texture coordinates, an <s, t> pair a point into dst, which needs
+// only float alignment. Each position times scale is p. b . p and t . p
+// are each summed from rounded products, x and y and then z as
+// LLVector4a::dot3 sums them, and doubled to db and dt. With no transform,
+// s = db + 0.5 and t = 0.5 - dt. Through one, s' = db cos - dt sin and
+// t' = -(dt cos) - db sin, each with its second product rounded and its
+// first fused into the sum; then s = (s' scale_s + offset_s) + 0.5, and t
+// likewise, rounded at every step.
+//
+// This form takes one binormal b and tangent t for every point: a face
+// projected as one plane.
+void planar_texcoords(const LLVector4a* positions, size_t n, const LLVector4a& scale, const LLVector4a& binormal,
+                      const LLVector4a& tangent, const TexTransform* transform, F32* dst);
+
+// This one takes each point's from its normal: b is y, negated where the
+// normal's x is below zero, where that x is at least switch_x in size, and
+// otherwise x, negated where the normal's y is above zero; t is b x normal
+// as LLVector4a::setCross3 rounds it.
+void planar_texcoords(const LLVector4a* positions, const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x,
+                      const TexTransform* transform, F32* dst);
+
+// The tangents of those coordinates, before any transform, one a normal:
+// the way s runs along the surface where that normal is, unit, with w 1
+// where w (normal x tangent) runs the way t does and -1 where it runs
+// against it, as the tangent generators give w. With s's gradient
+// gs = scale * b and t's gt = -(scale * t), w is the sign of
+// normal . (gs x gt) and the tangent is w (gt x normal) normalized; where
+// gt lies along the normal it is gs put in the normal's plane instead.
+// The normals need not be unit length. The one-plane and per-point forms
+// take b and t as planar_texcoords' do.
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, const LLVector4a& binormal, const LLVector4a& tangent,
+                     LLVector4a* dst);
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x, LLVector4a* dst);
 
 // dst[i] = src[i] + offset, wrapping at sixteen bits. Neither array need
 // be aligned.

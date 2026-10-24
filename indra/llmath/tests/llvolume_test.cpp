@@ -62,10 +62,12 @@
 
 #include <algorithm>
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <cstring>
 #include <map>
 #include <numeric>
+#include <optional>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -103,7 +105,12 @@ namespace
         {
             return 180.f;
         }
-        return acosf(llclamp((a * b) / (la * lb), -1.f, 1.f)) * RAD_TO_DEG;
+        // From the cross and dot products in double: a float's arc cosine
+        // resolves nothing finer than 0.02 degrees near 0.
+        const double cross[3] = { (double)a.mV[1] * b.mV[2] - (double)a.mV[2] * b.mV[1], (double)a.mV[2] * b.mV[0] - (double)a.mV[0] * b.mV[2],
+                                  (double)a.mV[0] * b.mV[1] - (double)a.mV[1] * b.mV[0] };
+        const double dot = (double)a.mV[0] * b.mV[0] + (double)a.mV[1] * b.mV[1] + (double)a.mV[2] * b.mV[2];
+        return (F32)std::atan2(std::sqrt(cross[0] * cross[0] + cross[1] * cross[1] + cross[2] * cross[2]), dot) * RAD_TO_DEG;
     }
 
     bool coincide(const LLVector4a& a, const LLVector4a& b)
@@ -5069,5 +5076,875 @@ namespace
             CHECK(manager.getGroup(params) == nullptr);
         }
         CHECK(manager.cleanup());
+    }
+
+    // ------------------------------------------------------------------
+    // Planar texgen
+
+    // LLFace's planar projection and texture transform as its vertex loops
+    // ran them, one vertex at a time along that vertex's normal, with the
+    // switch as a parameter: the reference the kernel is held to.
+    void perVertexProjection(LLVector2& tc, const LLVector4a& normal, const LLVector4a& vec, F32 switch_x)
+    {
+        LLVector4a binormal;
+        F32 d = normal[0];
+
+        if (d >= switch_x || d <= -switch_x)
+        {
+            if (d < 0)
+            {
+                binormal.set(0,-1,0);
+            }
+            else
+            {
+                binormal.set(0, 1, 0);
+            }
+        }
+        else
+        {
+            if (normal[1] > 0)
+            {
+                binormal.set(-1,0,0);
+            }
+            else
+            {
+                binormal.set(1,0,0);
+            }
+        }
+        LLVector4a tangent;
+        tangent.setCross3(binormal,normal);
+
+        tc.mV[1] = -((tangent.dot3(vec).getF32())*2 - 0.5f);
+        tc.mV[0] = 1.0f+((binormal.dot3(vec).getF32())*2 - 0.5f);
+    }
+
+    void perVertexXform(LLVector2 &tex_coord, F32 cosAng, F32 sinAng, F32 offS, F32 offT, F32 magS, F32 magT)
+    {
+        // New, good way
+        F32 s = tex_coord.mV[0];
+        F32 t = tex_coord.mV[1];
+
+        // Texture transforms are done about the center of the face.
+        s -= 0.5;
+        t -= 0.5;
+
+        // Handle rotation
+        F32 temp = s;
+        s  = s     * cosAng + t * sinAng;
+        t  = -temp * sinAng + t * cosAng;
+
+        // Then scale
+        s *= magS;
+        t *= magT;
+
+        // Then offset
+        s += offS + 0.5f;
+        t += offT + 0.5f;
+
+        tex_coord.mV[0] = s;
+        tex_coord.mV[1] = t;
+    }
+
+    // The loops, with no transform and with the texture entry's, each
+    // vertex along normals[i].
+    std::vector<LLVector2> perVertexTexCoords(const LLVolumeFace& vf, const LLVector4a* normals, const LLVector4a& scalea,
+                                              const alsimd::TexTransform* transform, F32 switch_x)
+    {
+        const S32 num_vertices = vf.mNumVertices;
+        std::vector<LLVector2> out(num_vertices);
+        LLVector2* tex_coords0 = out.data();
+        if (transform)
+        {
+            const F32 cos_ang = transform->cos_ang, sin_ang = transform->sin_ang;
+            const F32 ms = transform->scale_s, mt = transform->scale_t, os = transform->offset_s, ot = transform->offset_t;
+            for (S32 i = 0; i < num_vertices; i++)
+            {
+                LLVector2 tc(vf.mTexCoords[i]);
+                const LLVector4a& norm = normals[i];
+                LLVector4a vec = vf.mPositions[i];
+                vec.mul(scalea);
+                perVertexProjection(tc, norm, vec, switch_x);
+
+                perVertexXform(tc, cos_ang, sin_ang, os, ot, ms, mt);
+
+                *tex_coords0++ = tc;
+            }
+        }
+        else
+        {
+            for (S32 i = 0; i < num_vertices; i++)
+            {
+                LLVector2 tc(vf.mTexCoords[i]);
+                const LLVector4a& norm = normals[i];
+                LLVector4a vec = vf.mPositions[i];
+                vec.mul(scalea);
+                perVertexProjection(tc, norm, vec, switch_x);
+
+                *tex_coords0++ = tc;
+            }
+        }
+        return out;
+    }
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma float_control(precise, on, push)
+#endif
+    // The same loops as the viewer's MSVC build compiles them in
+    // llface.cpp, step by step, each step rounded where it is written.
+    // 1 + (2 b.p - 0.5) folds to 2 b.p + 0.5, and -(2 t.p - 0.5) to
+    // 0.5 - 2 t.p. Through the transform, s - 0.5 and t - 0.5 fold to
+    // 2 b.p and -2 t.p; each turned sum fuses its first product and rounds
+    // its second; and the offset is added before the 0.5.
+    std::vector<LLVector2> builtTexCoords(const LLVolumeFace& vf, const LLVector4a* normals, const LLVector4a& scalea,
+                                          const alsimd::TexTransform* transform)
+    {
+        std::vector<LLVector2> out(vf.mNumVertices);
+        for (S32 i = 0; i < vf.mNumVertices; i++)
+        {
+            LLVector4a binormal, tangent;
+            LLVolumeFace::getPlanarBasis(normals[i], 0.5f, binormal, tangent);
+            F32 p[3];
+            for (S32 k = 0; k < 3; ++k)
+            {
+                p[k] = vf.mPositions[i][k] * scalea[k];
+            }
+            const F32 b0 = binormal[0] * p[0], b1 = binormal[1] * p[1], b2 = binormal[2] * p[2];
+            const F32 t0 = tangent[0] * p[0], t1 = tangent[1] * p[1], t2 = tangent[2] * p[2];
+            const F32 b_half = (b0 + b1) + b2;
+            const F32 t_half = (t0 + t1) + t2;
+            const F32 db = b_half + b_half;
+            const F32 dt = t_half + t_half;
+            if (!transform)
+            {
+                out[i].set(db + 0.5f, 0.5f - dt);
+                continue;
+            }
+            const F32 dt_sin = dt * transform->sin_ang;
+            const F32 db_sin = transform->sin_ang * db;
+            const F32 turned_s = std::fma(db, transform->cos_ang, -dt_sin);
+            const F32 turned_t = std::fma(-dt, transform->cos_ang, -db_sin);
+            const F32 scaled_s = turned_s * transform->scale_s;
+            const F32 scaled_t = turned_t * transform->scale_t;
+            const F32 offset_s = scaled_s + transform->offset_s;
+            const F32 offset_t = scaled_t + transform->offset_t;
+            out[i].set(offset_s + 0.5f, offset_t + 0.5f);
+        }
+        return out;
+    }
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma float_control(pop)
+#endif
+
+    std::vector<LLVector2> planarTexCoords(const LLVolumeFace& face, const LLVector4a& scale, const alsimd::TexTransform* transform)
+    {
+        std::vector<LLVector2> out(face.mNumVertices + 1, LLVector2(1234.f, 1234.f));
+        face.getPlanarTexCoords(scale, transform, out[0].mV);
+        REQUIRE(out.back() == LLVector2(1234.f, 1234.f));
+        out.pop_back();
+        return out;
+    }
+
+    bool oneNormal(const LLVolumeFace& face)
+    {
+        for (S32 v = 1; v < face.mNumVertices; ++v)
+        {
+            if (bitsOf(face.mNormals[v]) != bitsOf(face.mNormals[0]))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // MSVC's rounding of the per-vertex code is what the kernel takes, so
+    // there the two agree bit for bit. Another compiler fuses and
+    // reassociates that code as it chooses, and agrees to within a few
+    // units in the last place of the sums it is made from, of size sums.
+    bool sameTexCoord(const LLVector2& a, const LLVector2& b, F32 sums)
+    {
+#if defined(_MSC_VER) && !defined(__clang__)
+        return std::memcmp(a.mV, b.mV, sizeof(a.mV)) == 0;
+#else
+        auto close = [&](F32 x, F32 y) { return fabsf(x - y) <= 4.f * FLT_EPSILON * llmax(sums, fabsf(x), fabsf(y)); };
+        return close(a.mV[0], b.mV[0]) && close(a.mV[1], b.mV[1]);
+#endif
+    }
+
+    // The scales an object gives its volume, and the texture entry
+    // transforms: none, a turn with scale and offset, and a flip.
+    const LLVector4a PLANAR_SCALES[] = { LLVector4a(1.f, 1.f, 1.f), LLVector4a(0.37f, 2.5f, 11.f) };
+
+    std::vector<std::pair<std::string, std::optional<alsimd::TexTransform>>> planarTransforms()
+    {
+        return { { "no transform", std::nullopt },
+                 { "turned, scaled and offset", alsimd::TexTransform{ cosf(0.3f), sinf(0.3f), 2.f, 0.75f, 0.1f, -0.2f } },
+                 { "flipped", alsimd::TexTransform{ cosf(2.5f), sinf(2.5f), -1.5f, 3.f, 0.45f, 0.8f } } };
+    }
+
+    // A face whose vertices share one normal is projected along it, and
+    // the kernel gives every vertex what the per-vertex loops gave it as
+    // the viewer's build rounds them: the flat faces, where nearly all
+    // planar content is, do not move. Without a transform that is also
+    // the loops' source as this file's build rounds it; through one, this
+    // file's build adds the offset and the 0.5 in another order, a few
+    // units of rounding apart in the size of the sums. The single-point
+    // form surfaceToTexture
+    // takes gives each vertex the same.
+    TEST_CASE("llvolume: a face whose vertices share one normal maps planar coordinates as the per-vertex code did", "[llvolume]")
+    {
+        Report report;
+        S32 faces = 0;
+        S64 compared = 0;
+        F32 worst_source = 0.f;
+        const auto transforms = planarTransforms();
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    if (face.mNumVertices == 0 || !oneNormal(face))
+                    {
+                        continue;
+                    }
+                    ++faces;
+                    const std::string where = fmt::format("{}: {}", lodName(s, lod), faceName(face));
+                    const LLVector4a planar = face.getPlanarNormal();
+                    if (planar[3] != 1.f || bitsOf(planar) != bitsOf(face.mNormals[0]))
+                    {
+                        report.fail(fmt::format("{}: planar normal {} {} {} w {}", where, planar[0], planar[1], planar[2], planar[3]));
+                        continue;
+                    }
+                    for (const LLVector4a& scale : PLANAR_SCALES)
+                    {
+                        for (const auto& [name, transform] : transforms)
+                        {
+                            const alsimd::TexTransform* tr = transform ? &*transform : nullptr;
+                            const std::vector<LLVector2> got = planarTexCoords(face, scale, tr);
+                            const std::vector<LLVector2> built = builtTexCoords(face, face.mNormals, scale, tr);
+                            const std::vector<LLVector2> source = perVertexTexCoords(face, face.mNormals, scale, tr, 0.5f);
+                            for (S32 v = 0; v < face.mNumVertices; ++v)
+                            {
+                                ++compared;
+                                LLVector4a at = face.mPositions[v];
+                                at.mul(scale);
+                                const LLVector2 point = face.getPlanarTexCoord(at, face.mNormals[v], tr);
+                                const F32 sums = llmax(1.f, 2.f * sqrtf(at.dot3(at).getF32()) * (tr ? llmax(fabsf(tr->scale_s), fabsf(tr->scale_t)) : 1.f));
+                                worst_source = llmax(worst_source, llmax(fabsf(got[v].mV[0] - source[v].mV[0]), fabsf(got[v].mV[1] - source[v].mV[1])) /
+                                                                       (sums * FLT_EPSILON));
+                                if (!sameTexCoord(got[v], built[v], sums) || (!tr && !sameTexCoord(got[v], source[v], sums)) ||
+                                    std::memcmp(point.mV, got[v].mV, sizeof(point.mV)) != 0)
+                                {
+                                    report.fail(fmt::format("{}, {}: vertex {} at {} {} {}: kernel {:.9g} {:.9g}, as built {:.9g} {:.9g}, source {:.9g} {:.9g}, "
+                                                            "point {:.9g} {:.9g}",
+                                                            where, name, v, at[0], at[1], at[2], got[v].mV[0], got[v].mV[1], built[v].mV[0],
+                                                            built[v].mV[1], source[v].mV[0], source[v].mV[1], point.mV[0], point.mV[1]));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        INFO(fmt::format("{} faces with one normal, {} coordinates compared, the source as this file builds it at most {:.2f} units of rounding apart",
+                         faces, compared, worst_source));
+        INFO(report.text());
+        CHECK(faces > 0);
+        CHECK(report.failures == 0);
+        CHECK(worst_source <= 4.f);
+    }
+
+    // Whether texture coordinates are one affine function of position: the
+    // planar projection along normal, evaluated in double.
+    void checkAffine(const LLVolumeFace& face, const LLVector4a& normal, const LLVector4a& scale, const std::vector<LLVector2>& uvs,
+                     const std::string& where, Report& report)
+    {
+        LLVector4a binormal, tangent;
+        LLVolumeFace::getPlanarBasis(normal, LLVolumeFace::PLANAR_SWITCH_X, binormal, tangent);
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            double b = 0.0, t = 0.0, size = 1.0;
+            for (S32 k = 0; k < 3; ++k)
+            {
+                const double p = (double)face.mPositions[v][k] * scale[k];
+                b += binormal[k] * p;
+                t += tangent[k] * p;
+                size = std::max(size, std::fabs(2.0 * p));
+            }
+            const double s = 2.0 * b + 0.5;
+            const double u = 0.5 - 2.0 * t;
+            if (std::fabs(uvs[v].mV[0] - s) > 1e-6 * size || std::fabs(uvs[v].mV[1] - u) > 1e-6 * size)
+            {
+                report.fail(fmt::format("{}: vertex {} maps to {:.7g} {:.7g}, the plane gives {:.7g} {:.7g}", where, v, uvs[v].mV[0], uvs[v].mV[1], s, u));
+                return;
+            }
+        }
+    }
+
+    // A quarter of a cylinder's side turns its normals through 90 degrees:
+    // it is projected as one plane, along the middle of its turn, at every
+    // LOD, and its coordinates are one affine function of position. Half a
+    // cylinder turns through 180 and is projected per vertex.
+    TEST_CASE("llvolume: a quarter cylinder's side is projected as one plane, its coordinates affine in position", "[llvolume]")
+    {
+        Report report;
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            for (const auto& [begin, end, plane] : { std::tuple{ 0.375f, 0.625f, true }, std::tuple{ 0.f, 0.25f, true },
+                                                     std::tuple{ 0.f, 0.5f, false } })
+            {
+                Shape s = cylinder();
+                s.cut_begin = begin;
+                s.cut_end = end;
+                s.name = fmt::format("cylinder cut {} to {}", begin, end);
+                LLPointer<LLVolume> volume = build(s, lod);
+                const LLVolumeFace* side = nullptr;
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    if ((face.mTypeMask & LLVolumeFace::OUTER_MASK) && !(face.mTypeMask & LLVolumeFace::FLAT_MASK))
+                    {
+                        side = &face;
+                    }
+                }
+                REQUIRE(side);
+                const std::string where = fmt::format("{}: {}", lodName(s, lod), faceName(*side));
+                const LLVector4a planar = side->getPlanarNormal();
+                if ((planar[3] > 0.f) != plane)
+                {
+                    report.fail(fmt::format("{}: w {}", where, planar[3]));
+                    continue;
+                }
+                if (!plane)
+                {
+                    continue;
+                }
+
+                // The triangles' normals weighted by area, and within the
+                // cone of every vertex normal.
+                LLVector3 expected = LLVector3::zero;
+                for (const Triangle& tri : trianglesOf(*side))
+                {
+                    expected += tri.normal;
+                }
+                if (degreesBetween(v3(planar), expected) > 0.01f)
+                {
+                    report.fail(fmt::format("{}: planar normal {} {} {}, {:.3f} degrees from the triangles' sum", where, planar[0], planar[1],
+                                            planar[2], degreesBetween(v3(planar), expected)));
+                }
+                for (S32 v = 0; v < side->mNumVertices; ++v)
+                {
+                    if (degreesBetween(v3(planar), v3(side->mNormals[v])) > 60.f)
+                    {
+                        report.fail(fmt::format("{}: vertex {} is {:.3f} degrees from the planar normal", where, v,
+                                                degreesBetween(v3(planar), v3(side->mNormals[v]))));
+                    }
+                }
+                for (const LLVector4a& scale : PLANAR_SCALES)
+                {
+                    checkAffine(*side, planar, scale, planarTexCoords(*side, scale, nullptr), where, report);
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // A full cylinder side is projected per vertex. Its normals at 60 and
+    // 120 degrees put x on the switch, and each must take the y binormal on
+    // every row and at every LOD rather than as its rounding falls; the
+    // kernel takes each vertex along the binormal the tie gives it.
+    void checkRoundSideBinormals(std::initializer_list<Shape> shapes, Report& report, S32& on_switch)
+    {
+        for (const Shape& s : shapes)
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    if (!isGrid(face) || (face.mTypeMask & LLVolumeFace::FLAT_MASK))
+                    {
+                        continue;
+                    }
+                    const std::string where = fmt::format("{}: {}", lodName(s, lod), faceName(face));
+                    if (face.getPlanarNormal()[3] > 0.f)
+                    {
+                        report.fail(where + ": projected as one plane");
+                        continue;
+                    }
+                    const F32 tie = LLVolumeFace::PLANAR_SWITCH_X - LLVolumeFace::PLANAR_TIE;
+                    for (S32 col = 0; col < face.mNumS; ++col)
+                    {
+                        LLVector4a first, binormal, tangent;
+                        LLVolumeFace::getPlanarBasis(face.mNormals[gridIndex(face, col, 0)], tie, first, tangent);
+                        for (S32 row = 0; row < face.mNumT; ++row)
+                        {
+                            const LLVector4a& n = face.mNormals[gridIndex(face, col, row)];
+                            LLVolumeFace::getPlanarBasis(n, tie, binormal, tangent);
+                            if (bitsOf(binormal) != bitsOf(first))
+                            {
+                                report.fail(fmt::format("{}: column {} row {}, x {:.9g}, takes another binormal than row 0, x {:.9g}", where, col,
+                                                        row, n[0], face.mNormals[gridIndex(face, col, 0)][0]));
+                            }
+                            if (fabsf(fabsf(n[0]) - LLVolumeFace::PLANAR_SWITCH_X) < 1e-3f)
+                            {
+                                ++on_switch;
+                                if (binormal[1] == 0.f)
+                                {
+                                    report.fail(fmt::format("{}: column {} row {}, x {:.9g} on the switch, takes the x binormal", where, col, row, n[0]));
+                                }
+                            }
+                        }
+                    }
+                    const std::vector<LLVector2> got = planarTexCoords(face, LLVector4a(1.f, 1.f, 1.f), nullptr);
+                    const std::vector<LLVector2> expected = perVertexTexCoords(face, face.mNormals, LLVector4a(1.f, 1.f, 1.f), nullptr, tie);
+                    for (S32 v = 0; v < face.mNumVertices; ++v)
+                    {
+                        const F32 sums = llmax(1.f, 2.f * sqrtf(face.mPositions[v].dot3(face.mPositions[v]).getF32()));
+                        if (!sameTexCoord(got[v], expected[v], sums))
+                        {
+                            report.fail(fmt::format("{}: vertex {} maps to {:.9g} {:.9g} and along its tie's binormal to {:.9g} {:.9g}", where, v,
+                                                    got[v].mV[0], got[v].mV[1], expected[v].mV[0], expected[v].mV[1]));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    TEST_CASE("llvolume: every row of a round side takes the same binormal at each column", "[llvolume]")
+    {
+        Report report;
+        S32 on_switch = 0;
+        Shape hollow = cylinder();
+        hollow.hole = LL_PCODE_HOLE_CIRCLE;
+        hollow.hollow = 0.5f;
+        hollow.name = "hollow cylinder";
+        checkRoundSideBinormals({ cylinder(), hollow }, report, on_switch);
+        INFO(fmt::format("{} vertices on the switch", on_switch));
+        INFO(report.text());
+        CHECK(on_switch > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // A tapered side's quads are trapezoids, whose two triangles weigh
+    // unequally on the vertex normals between them: its normals turn about
+    // the axis by a few tenths of a degree from row to row, and a column
+    // near 60 or 120 degrees crosses the switch by more than the tie.
+    TEST_CASE("llvolume: every row of a tapered round side takes the same binormal at each column", "[llvolume][!shouldfail]")
+    {
+        Report report;
+        S32 on_switch = 0;
+        Shape tapered = cylinder();
+        tapered.scale_x = 0.5f;
+        tapered.scale_y = 0.5f;
+        tapered.name = "tapered cylinder";
+        checkRoundSideBinormals({ tapered }, report, on_switch);
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // surfaceToTexture takes a touched point with its normal through the
+    // single-point form: at each vertex it gives what that vertex is drawn
+    // with, bit for bit. It normalizes the normal again: that changes
+    // nothing where the face is one plane, and elsewhere moves the point
+    // by what the normal's rounding moves its tangent.
+    void checkTouches(const LLVolumeFace& face, const std::string& where, Report& report, S64& touched)
+    {
+        const auto transforms = planarTransforms();
+        const bool plane = face.getPlanarNormal()[3] > 0.f;
+        for (const LLVector4a& scale : PLANAR_SCALES)
+        {
+            for (const auto& [name, transform] : transforms)
+            {
+                const alsimd::TexTransform* tr = transform ? &*transform : nullptr;
+                const F32 stretch = tr ? llmax(1.f, fabsf(tr->scale_s), fabsf(tr->scale_t)) : 1.f;
+                const std::vector<LLVector2> drawn = planarTexCoords(face, scale, tr);
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    ++touched;
+                    LLVector4a at = face.mPositions[v];
+                    at.mul(scale);
+                    LLVector4a renormalized = face.mNormals[v];
+                    renormalized.normalize3();
+                    const LLVector2 exact = face.getPlanarTexCoord(at, face.mNormals[v], tr);
+                    const LLVector2 touch = face.getPlanarTexCoord(at, renormalized, tr);
+                    const F32 off = llmax(fabsf(touch.mV[0] - drawn[v].mV[0]), fabsf(touch.mV[1] - drawn[v].mV[1]));
+                    const F32 reach = llmax(1.f, 2.f * sqrtf(at.dot3(at).getF32()) * stretch);
+                    if (std::memcmp(exact.mV, drawn[v].mV, sizeof(exact.mV)) != 0 || (plane ? off != 0.f : off > 1e-5f * reach))
+                    {
+                        report.fail(fmt::format("{}, {}: vertex {} is drawn at {:.9g} {:.9g} and touched at {:.9g} {:.9g}, renormalized {:.9g} {:.9g}",
+                                                where, name, v, drawn[v].mV[0], drawn[v].mV[1], exact.mV[0], exact.mV[1], touch.mV[0], touch.mV[1]));
+                        return;
+                    }
+                }
+            }
+        }
+    }
+
+    TEST_CASE("llvolume: a touch at a vertex lands on the planar coordinate it is drawn with", "[llvolume]")
+    {
+        Report report;
+        S64 touched = 0;
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    checkTouches(face, fmt::format("{}: {}", lodName(s, lod), faceName(face)), report, touched);
+                }
+            }
+        }
+        for (U8 stitching : STITCHINGS)
+        {
+            LLPointer<LLVolume> volume = buildSculpt(stitching, mapFor(stitching, 64, 64), 3);
+            checkTouches(volume->getVolumeFace(0), fmt::format("{} sculpt", stitchingName(stitching)), report, touched);
+        }
+        INFO(fmt::format("{} touches", touched));
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // Mesh faces take the same rule from their own triangles and normals:
+    // the gently curved strip and grid are one plane, facing up, as the flat
+    // grid is; the spheres and the cube with split normals are per vertex;
+    // and every touch lands where it is drawn.
+    TEST_CASE("llvolume: a mesh face takes planar coordinates by the same rule", "[llvolume]")
+    {
+        Report report;
+        S64 touched = 0;
+        for (const CorpusMesh& mesh : corpus())
+        {
+            LLVolumeFace face = mesh.face();
+            REQUIRE(face.cacheOptimize(true));
+            const LLVector4a planar = face.getPlanarNormal();
+            const bool curved = mesh.name == "strip with mirrored UVs" || mesh.name == "grid of vertices held twice";
+            const bool plane = curved || oneNormal(face);
+            if ((planar[3] > 0.f) != plane)
+            {
+                report.fail(fmt::format("{}: w {} where it is {}", mesh.name, planar[3], plane ? "one plane" : "not"));
+                continue;
+            }
+            if (curved && degreesBetween(v3(planar), LLVector3(0.f, 0.f, 1.f)) > 0.5f)
+            {
+                report.fail(fmt::format("{}: planar normal {} {} {}", mesh.name, planar[0], planar[1], planar[2]));
+            }
+            if (plane)
+            {
+                for (const LLVector4a& scale : PLANAR_SCALES)
+                {
+                    checkAffine(face, planar, scale, planarTexCoords(face, scale, nullptr), mesh.name, report);
+                }
+            }
+            checkTouches(face, mesh.name, report, touched);
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // A normal map planar texgen lays out shades by the frame of its own
+    // coordinates. Where a face is projected as one plane those are affine
+    // in position, and its planar tangents are the ones its own tangent
+    // generator makes for UVs that are the planar coordinates. They have
+    // the same handedness wherever a vertex normal leans less than 45
+    // degrees from each of its triangles: a folded face has triangles
+    // nearly edge on to their normals, whose winding in UV flips. They have
+    // the same direction to rounding on a face with one normal; on a curved
+    // one the generator puts each triangle's way of constant t in the
+    // vertex normal's plane, which turns it by up to about twice the angle
+    // between that normal and the triangle's, within the cone. That holds
+    // at an even scale. A scale that stretches one axis far past the others
+    // can lay t's gradient nearly along a curved face's normals, where the
+    // generator's sum swings and the vertex's own frame does not. There,
+    // and where a face is projected per vertex, each tangent lies in its
+    // normal's plane and runs the way s does and t does not, by the frame
+    // the vertex is projected with.
+    struct TangentFit
+    {
+        S64 compared = 0;
+        F32 worst_flat = 0.f;
+        F32 worst_curved = 0.f; // against the bound
+    };
+
+    void checkPlanarTangents(const LLVolumeFace& face, const std::string& where, Report& report, TangentFit& fit)
+    {
+        const LLVector4a planar = face.getPlanarNormal();
+        const bool flat = oneNormal(face);
+        const std::vector<Triangle> triangles = trianglesOf(face);
+        const std::vector<bool> lone = loneVertices(face, triangles);
+        // How far each vertex normal leans from its triangles'.
+        std::vector<F32> lean(face.mNumVertices, 0.f);
+        for (const Triangle& tri : triangles)
+        {
+            if (!tri.degenerate)
+            {
+                for (U32 v : tri.v)
+                {
+                    lean[v] = llmax(lean[v], degreesBetween(v3(face.mNormals[v]), tri.normal));
+                }
+            }
+        }
+        for (const LLVector4a& scale : PLANAR_SCALES)
+        {
+            std::vector<LLVector4a> tangents(face.mNumVertices + 1, LLVector4a(1234.f));
+            face.getPlanarTangents(scale, tangents.data());
+            if (bitsOf(tangents.back()) != bitsOf(LLVector4a(1234.f)))
+            {
+                report.fail(where + ": written past the vertices");
+                return;
+            }
+
+            const bool even = scale[0] == scale[1] && scale[1] == scale[2];
+            if (planar[3] > 0.f && (flat || even))
+            {
+                LLVolumeFace planar_uvs(face);
+                const std::vector<LLVector2> uvs = planarTexCoords(face, scale, nullptr);
+                std::copy(uvs.begin(), uvs.end(), planar_uvs.mTexCoords);
+                ll_aligned_free_16(planar_uvs.mTangents);
+                planar_uvs.mTangents = nullptr;
+                planar_uvs.createTangents();
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    if (lone[v])
+                    {
+                        continue;
+                    }
+                    ++fit.compared;
+                    const LLVector4a& made = planar_uvs.mTangents[v];
+                    const F32 off = degreesBetween(v3(made), v3(tangents[v]));
+                    const F32 bound = flat ? 0.05f : 0.5f + 2.f * lean[v];
+                    if (flat)
+                    {
+                        fit.worst_flat = llmax(fit.worst_flat, off);
+                    }
+                    else
+                    {
+                        fit.worst_curved = llmax(fit.worst_curved, off / bound);
+                    }
+                    if ((made[3] != tangents[v][3] && lean[v] < 45.f) || off > bound)
+                    {
+                        report.fail(fmt::format("{}: vertex {} planar tangent {} {} {} w {}, the generator's {} {} {} w {}, {:.3f} degrees apart, normal {:.1f} "
+                                                "degrees from its triangles'",
+                                                where, v, tangents[v][0], tangents[v][1], tangents[v][2], tangents[v][3], made[0], made[1], made[2], made[3],
+                                                off, lean[v]));
+                        return;
+                    }
+                }
+                continue;
+            }
+
+            for (S32 v = 0; v < face.mNumVertices; ++v)
+            {
+                LLVector4a b, t;
+                if (planar[3] > 0.f)
+                {
+                    LLVolumeFace::getPlanarBasis(planar, LLVolumeFace::PLANAR_SWITCH_X, b, t);
+                }
+                else
+                {
+                    LLVolumeFace::getPlanarBasis(face.mNormals[v], LLVolumeFace::PLANAR_SWITCH_X - LLVolumeFace::PLANAR_TIE, b, t);
+                }
+                LLVector3 gs, gt;
+                for (S32 k = 0; k < 3; ++k)
+                {
+                    gs.mV[k] = b[k] * scale[k];
+                    gt.mV[k] = -t[k] * scale[k];
+                }
+                const LLVector3 tangent = v3(tangents[v]);
+                LLVector3 n = v3(face.mNormals[v]);
+                n.normalize();
+                const LLVector3 bitangent = (n % tangent) * tangents[v][3];
+                if (fabsf(tangent.length() - 1.f) > 1e-5f || fabsf(tangent * n) > 1e-5f || !(tangent * gs > 0.f) ||
+                    fabsf(tangent * gt) > 1e-5f * gt.length() || !(bitangent * gt > 0.f))
+                {
+                    report.fail(fmt::format("{}: vertex {} planar tangent {} {} {} w {} against s {} {} {} and t {} {} {}", where, v, tangent.mV[0],
+                                            tangent.mV[1], tangent.mV[2], tangents[v][3], gs.mV[0], gs.mV[1], gs.mV[2], gt.mV[0], gt.mV[1], gt.mV[2]));
+                    return;
+                }
+            }
+        }
+    }
+
+    TEST_CASE("llvolume: planar tangents are the generator's for the planar coordinates", "[llvolume]")
+    {
+        Report report;
+        TangentFit fit;
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    checkPlanarTangents(face, fmt::format("{}: {}", lodName(s, lod), faceName(face)), report, fit);
+                }
+            }
+        }
+        for (const CorpusMesh& mesh : corpus())
+        {
+            LLVolumeFace face = mesh.face();
+            REQUIRE(face.cacheOptimize(true));
+            checkPlanarTangents(face, mesh.name, report, fit);
+        }
+        INFO(fmt::format("{} tangents compared with the generator's: worst {:.4f} degrees on faces with one normal, {:.3f} of the bound on curved ones",
+                         fit.compared, fit.worst_flat, fit.worst_curved));
+        INFO(report.text());
+        CHECK(fit.compared > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // The planar normal is made once and kept: a copy takes it, a flexible
+    // prim's partial build keeps its first build's, and a full build of the
+    // face makes it again from what was built, as a new sculpt map does.
+    TEST_CASE("llvolume: a face's planar normal lasts until its geometry is built again", "[llvolume]")
+    {
+        auto same = [](const LLVector4a& a, const LLVector4a& b) { return bitsOf(a) == bitsOf(b) && a[3] == b[3]; };
+
+        LLPointer<LLVolume> cut = build([] { Shape s = cylinder(); s.cut_begin = 0.375f; s.cut_end = 0.625f; return s; }(), 3);
+        const LLVolumeFace& side = cut->getVolumeFace(1);
+        const LLVector4a planar = side.getPlanarNormal();
+        REQUIRE(planar[3] == 1.f);
+        LLVolumeFace copied(side);
+        CHECK(same(copied.getPlanarNormal(), planar));
+        LLVolumeFace assigned;
+        assigned = side;
+        CHECK(same(assigned.getPlanarNormal(), planar));
+
+        // A flexible box bent across its sides: its sides' normals turn, and
+        // its first build's planar normals stay until each face is built in
+        // full.
+        LLPointer<LLVolume> flexi = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SAME, 0.f, 2);
+        bendPath(*flexi, 4, 0.f);
+        flexi->regen();
+        std::vector<LLVector4a> first;
+        for (S32 f = 0; f < flexi->getNumVolumeFaces(); ++f)
+        {
+            first.push_back(flexi->getVolumeFace(f).getPlanarNormal());
+        }
+        bendPath(*flexi, 4, 1.1f);
+        flexi->regen();
+        bool bent = false;
+        for (S32 f = 0; f < flexi->getNumVolumeFaces(); ++f)
+        {
+            CHECK(same(flexi->getVolumeFace(f).getPlanarNormal(), first[f]));
+            bent = bent || !oneNormal(flexi->getVolumeFace(f));
+        }
+        CHECK(bent);
+        LLPointer<LLVolume> fresh = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SAME, 0.f, 2);
+        bendPath(*fresh, 4, 1.1f);
+        fresh->regen();
+        bool changed = false;
+        for (S32 f = 0; f < flexi->getNumVolumeFaces(); ++f)
+        {
+            LLVolumeFace& face = flexi->getVolumeFace(f);
+            REQUIRE(face.create(flexi, false));
+            CHECK(same(face.getPlanarNormal(), fresh->getVolumeFace(f).getPlanarNormal()));
+            changed = changed || !same(face.getPlanarNormal(), first[f]);
+        }
+        CHECK(changed);
+
+        // A sculpt given a new map keeps its layout and is built again.
+        LLPointer<LLVolume> sculpt = buildSculpt(LL_SCULPT_TYPE_PLANE, planeMap(64, 64), 3);
+        const LLVector4a wavy = sculpt->getVolumeFace(0).getPlanarNormal();
+        const SculptMap flat_map = sculptMap(64, 64, [](U16 x, U16 y) { return LLVector3(x / 63.f - 0.5f, y / 63.f - 0.5f, 0.f); });
+        sculpt->sculpt(flat_map.width, flat_map.height, 3, flat_map.rgb.data(), 0, true);
+        LLPointer<LLVolume> flat = buildSculpt(LL_SCULPT_TYPE_PLANE, flat_map, 3);
+        CHECK(same(sculpt->getVolumeFace(0).getPlanarNormal(), flat->getVolumeFace(0).getPlanarNormal()));
+        CHECK(!same(sculpt->getVolumeFace(0).getPlanarNormal(), wavy));
+    }
+
+    // How the sweep's faces fall against the cone: the share projected as
+    // one plane at each half-angle, and the faces whose normals all agree
+    // to rounding without being one normal.
+    TEST_CASE("llvolume: planar texgen's cone over the sweep", "[llvolume][planar][.]")
+    {
+        const F32 cones[] = { 30.f, 45.f, 60.f, 75.f, 89.f };
+        S64 counts[std::size(cones)] = {};
+        S64 total = 0, one_normal = 0, near_flat = 0, near_flat_moved = 0, empty = 0;
+        F32 near_flat_worst = 0.f;
+        std::vector<std::string> moved_examples;
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    ++total;
+                    if (oneNormal(face))
+                    {
+                        ++one_normal;
+                        for (S64& count : counts)
+                        {
+                            ++count;
+                        }
+                        continue;
+                    }
+                    const LLVector4a planar = face.getPlanarNormal();
+                    if (!(planar.dot3(planar).getF32() > 0.f))
+                    {
+                        ++empty;
+                        continue;
+                    }
+                    F32 widest = 0.f;
+                    for (S32 v = 0; v < face.mNumVertices; ++v)
+                    {
+                        widest = llmax(widest, degreesBetween(v3(face.mNormals[v]), v3(planar)));
+                    }
+                    if (widest < 1e-3f)
+                    {
+                        ++near_flat;
+                        const std::vector<LLVector2> got = planarTexCoords(face, LLVector4a(1.f, 1.f, 1.f), nullptr);
+                        const std::vector<LLVector2> old = perVertexTexCoords(face, face.mNormals, LLVector4a(1.f, 1.f, 1.f), nullptr, 0.5f);
+                        F32 moved = 0.f;
+                        for (S32 v = 0; v < face.mNumVertices; ++v)
+                        {
+                            moved = llmax(moved, (got[v] - old[v]).length());
+                        }
+                        near_flat_worst = llmax(near_flat_worst, moved);
+                        if (moved > 1e-4f)
+                        {
+                            ++near_flat_moved;
+                            if (moved_examples.size() < 12)
+                            {
+                                F32 low = face.mNormals[0][0], high = low;
+                                for (S32 v = 1; v < face.mNumVertices; ++v)
+                                {
+                                    low = llmin(low, face.mNormals[v][0]);
+                                    high = llmax(high, face.mNormals[v][0]);
+                                }
+                                moved_examples.push_back(fmt::format("  {}: {}, moves {:.3g}, normal x {:.9g} to {:.9g}\n", lodName(s, lod),
+                                                                     faceName(face), moved, low, high));
+                            }
+                        }
+                    }
+                    for (size_t c = 0; c < std::size(cones); ++c)
+                    {
+                        counts[c] += widest <= cones[c];
+                    }
+                }
+            }
+        }
+        std::string table = fmt::format("{} faces: {} with one normal, {} flat to rounding ({} moved past 1e-4, worst {:.3g}), {} with no planar normal\n",
+                                        total, one_normal, near_flat, near_flat_moved, near_flat_worst, empty);
+        for (const std::string& example : moved_examples)
+        {
+            table += example;
+        }
+        for (size_t c = 0; c < std::size(cones); ++c)
+        {
+            table += fmt::format("  within {:2.0f} degrees: {:6} faces, {:5.1f}%, {} curved\n", cones[c], counts[c], 100.0 * counts[c] / total,
+                                 counts[c] - one_normal - near_flat);
+        }
+        WARN(table);
     }
 }
