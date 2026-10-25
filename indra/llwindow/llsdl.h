@@ -69,7 +69,8 @@ void quit_sdl();
 // handles itself, so what a worker failed to release can be reclaimed when
 // the main context goes.
 void* sdl_create_shared_context();
-void  sdl_make_shared_context_current(void* handle);
+// Whether the context is current on this thread now.
+bool  sdl_make_shared_context_current(void* handle);
 void  sdl_destroy_shared_context(void* handle);
 
 #if LL_LINUX

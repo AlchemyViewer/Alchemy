@@ -2013,13 +2013,15 @@ void* LLWindowWin32::createSharedContext()
     return rc;
 }
 
-void LLWindowWin32::makeContextCurrent(void* contextPtr)
+bool LLWindowWin32::makeContextCurrent(void* contextPtr)
 {
     if (!wglMakeCurrent(mhDC, (HGLRC) contextPtr))
     {
         LL_WARNS("Window") << "wglMakeCurrent failed: " << GetLastError() << LL_ENDL;
+        return false;
     }
     LL_PROFILER_GPU_CONTEXT;
+    return true;
 }
 
 void LLWindowWin32::destroySharedContext(void* contextPtr)

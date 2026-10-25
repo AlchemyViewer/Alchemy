@@ -93,7 +93,9 @@ public:
 
     // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
     // second at most in all, and publish them, since nothing will poll again. What has not
-    // signalled by then goes unpublished with the rest in cleanupClass.
+    // signalled by then is given up, its texture deleted unpublished and what waited on it
+    // run (afterPublish), so that the references it holds are let go while the world they
+    // name is still whole.
     static void finishUploads();
 
     // Get an estimate of how many bytes have been allocated in vram for
@@ -682,10 +684,11 @@ public:
 class LLImageGLThread : public LLSimpleton<LLImageGLThread>, LL::ThreadPool
 {
 public:
-    // follows gSavedSettings "RenderGLMultiThreadedTextures"
-    static bool sEnabledTextures;
-    // follows gSavedSettings "RenderGLMultiThreadedMedia"
-    static bool sEnabledMedia;
+    // follows gSavedSettings "RenderGLMultiThreadedTextures", and turned off by the thread where its context cannot be
+    // made current
+    static std::atomic<bool> sEnabledTextures;
+    // follows gSavedSettings "RenderGLMultiThreadedMedia", and turned off with it
+    static std::atomic<bool> sEnabledMedia;
 
     LLImageGLThread(LLWindow* window);
     // Joins the thread first: run() uses the window and context after the

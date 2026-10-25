@@ -623,9 +623,9 @@ void* LLWindowSDL::createSharedContext()
     return shared;
 }
 
-void LLWindowSDL::makeContextCurrent(void* contextPtr)
+bool LLWindowSDL::makeContextCurrent(void* contextPtr)
 {
-    sdl_make_shared_context_current(contextPtr);
+    return sdl_make_shared_context_current(contextPtr);
 }
 
 void LLWindowSDL::destroySharedContext(void* contextPtr)

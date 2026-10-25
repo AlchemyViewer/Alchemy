@@ -62,7 +62,7 @@ public:
 
     // Worker-thread contexts, through the same platform path LLWindowSDL uses.
     void* createSharedContext() override;
-    void makeContextCurrent(void* context) override;
+    bool makeContextCurrent(void* context) override;
     void destroySharedContext(void* context) override;
 
 private:

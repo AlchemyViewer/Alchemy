@@ -313,8 +313,8 @@ LLImageGL* LLImageGL::sDefaultGLTexture = NULL ;
 boost::unordered_set<LLImageGL*> LLImageGL::sImageList;
 
 
-bool LLImageGLThread::sEnabledTextures = false;
-bool LLImageGLThread::sEnabledMedia = false;
+std::atomic<bool> LLImageGLThread::sEnabledTextures{ false };
+std::atomic<bool> LLImageGLThread::sEnabledMedia{ false };
 
 //****************************************************************************************************
 //The below for texture auditing use only
@@ -2429,6 +2429,22 @@ void LLImageGL::finishUploads()
         constexpr GLuint64 WAIT_NS = 10'000'000;
         glClientWaitSync(sPendingPublishes.front().mFence, 0, WAIT_NS);
     }
+
+    // Given up: the texture deleted unpublished, and what waited on it run, publishing nothing (finishPublish(0)), so
+    // that the references its callbacks hold are let go. Taken out first, as publishUploads does: the callbacks must
+    // find the list settled.
+    std::vector<PendingPublish> given_up;
+    given_up.swap(sPendingPublishes);
+    for (PendingPublish& pending : given_up)
+    {
+        release_upload_stamp(pending.mStamp);
+        if (pending.mFence)
+        {
+            glDeleteSync(pending.mFence);
+        }
+        deleteTextures(1, &pending.mName);
+        pending.mImage->finishPublish(0);
+    }
 }
 
 // static
@@ -4053,7 +4069,18 @@ void LLImageGLThread::run()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     // We must perform setup on this thread before actually servicing our
     // WorkQueue, likewise cleanup afterwards.
-    mWindow->makeContextCurrent(mContext);
+    if (!mWindow->makeContextCurrent(mContext))
+    {
+        // No GL here: what is posted from now goes to the main thread, the queue refusing it, and nothing posted
+        // already is run against no context.
+        LL_WARNS("LLImageGL") << "The LLImageGL thread's context could not be made current; uploading on the main thread"
+                              << LL_ENDL;
+        sEnabledTextures = false;
+        sEnabledMedia    = false;
+        getQueue().close();
+        mWindow->destroySharedContext(mContext);
+        return;
+    }
     gGL.init(false);
     LL::ThreadPool::run();
     gGL.shutdown();
