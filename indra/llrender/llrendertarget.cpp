@@ -36,11 +36,15 @@
 #include "llgl.h"
 #include "llglslshader.h"
 #include "llglstates.h"
+#include "llrect.h"
+#include "llshadermgr.h"
+#include "llvertexbuffer.h"
 
 #include <algorithm>
 #include <bit>
 #include <cmath>
 #include <limits>
+#include <optional>
 
 #include <fmt/format.h>
 
@@ -1169,6 +1173,32 @@ void LLRenderTarget::copyContents(LLRenderTarget& source, S32 srcX0, S32 srcY0, 
         glBindFramebuffer(GL_FRAMEBUFFER, sCurFBO);
         stop_glerror();
     }
+}
+
+// static
+void LLRenderTarget::drawCopy(LLRenderTarget& dest, LLRenderTarget& source, const LLRect* rect, LLGLSLShader& program,
+                              LLVertexBuffer& triangle)
+{
+    dest.bindTarget();
+    {
+        LLGLSColorMask color(true, true);
+        LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+        LLGLDisable no_blend(GL_BLEND);
+        LLGLDisable no_cull(GL_CULL_FACE);
+        std::optional<LLGLSScissor> scissor;
+        if (rect)
+        {
+            scissor.emplace(rect->mLeft, rect->mBottom, rect->getWidth(), rect->getHeight());
+        }
+
+        program.bind();
+        program.bindTexture(LLShaderMgr::DIFFUSE_MAP, &source, ALSamplers::PointClamp);
+        triangle.setBuffer();
+        triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
+        program.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+        program.unbind();
+    }
+    dest.flush();
 }
 
 // static

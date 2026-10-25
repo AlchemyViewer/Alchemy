@@ -9419,32 +9419,6 @@ void LLPipeline::endWaterTargets()
     mWaterTargets.reset();
 }
 
-// `src`'s colour into `dst` through gCopyProgram over `triangle`, the screen triangle, point sampled: each texel of `dst`
-// takes the one of `src` under its centre. Only over `rect` where there is one.
-static void draw_color_copy(LLRenderTarget& dst, LLRenderTarget& src, const LLRect* rect, LLVertexBuffer& triangle)
-{
-    dst.bindTarget();
-    {
-        LLGLSColorMask color(true, true);
-        LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
-        LLGLDisable no_blend(GL_BLEND);
-        LLGLDisable no_cull(GL_CULL_FACE);
-        std::optional<LLGLSScissor> scissor;
-        if (rect)
-        {
-            scissor.emplace(rect->mLeft, rect->mBottom, rect->getWidth(), rect->getHeight());
-        }
-
-        gCopyProgram.bind();
-        gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &src, ALSamplers::PointClamp);
-        triangle.setBuffer();
-        triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
-        gCopyProgram.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
-        gCopyProgram.unbind();
-    }
-    dst.flush();
-}
-
 void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src)
 {
     LL_PROFILE_GPU_ZONE("color copy");
@@ -9456,7 +9430,7 @@ void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src)
                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
         return;
     }
-    draw_color_copy(dst, src, nullptr, *mScreenTriangleVB);
+    LLRenderTarget::drawCopy(dst, src, nullptr, gCopyProgram, *mScreenTriangleVB);
 }
 
 void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRect& rect)
@@ -9470,7 +9444,7 @@ void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRec
         return;
     }
     // Over a target of the source's size each fragment samples its own texel's centre: the source's texel for texel.
-    draw_color_copy(dst, src, &rect, *mScreenTriangleVB);
+    LLRenderTarget::drawCopy(dst, src, &rect, gCopyProgram, *mScreenTriangleVB);
 }
 
 void LLPipeline::copySceneDepth(LLRenderTarget& dst)

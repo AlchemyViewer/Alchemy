@@ -1,8 +1,8 @@
 /**
  * @file copycolor_gl_test.cpp
- * @brief LLPipeline::copyColor's draw, the copy program over the screen triangle, held against the nearest blit it
- *        replaces: scissored to a rect, as the water copies the screen, under HDR and without it; and over a whole
- *        target of the screen's size, as the reflections copy the scene.
+ * @brief LLRenderTarget::drawCopy through the viewer's copy program, as LLPipeline::copyColor draws it, held against
+ *        the nearest blit it replaces: scissored to a rect, as the water copies the screen, under HDR and without it;
+ *        and over a whole target of the screen's size, as the reflections copy the scene.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -33,7 +33,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
-#include <optional>
 #include <vector>
 
 namespace
@@ -60,28 +59,10 @@ namespace
             mDrawn.release();
         }
 
-        // `src` into `dst`, only over `rect` where there is one, as LLPipeline::copyColor draws it (draw_color_copy).
+        // `src` into `dst`, only over `rect` where there is one, as LLPipeline::copyColor draws it.
         void draw(LLRenderTarget& dst, LLRenderTarget& src, const LLRect* rect)
         {
-            dst.bindTarget();
-            {
-                LLGLSColorMask color(true, true);
-                LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
-                LLGLDisable no_blend(GL_BLEND);
-                LLGLDisable no_cull(GL_CULL_FACE);
-                std::optional<LLGLSScissor> scissor;
-                if (rect)
-                {
-                    scissor.emplace(rect->mLeft, rect->mBottom, rect->getWidth(), rect->getHeight());
-                }
-
-                mCopy.bind();
-                mCopy.bindTexture(LLShaderMgr::DIFFUSE_MAP, &src, ALSamplers::PointClamp);
-                mPost.drawTriangle();
-                mCopy.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
-                mCopy.unbind();
-            }
-            dst.flush();
+            LLRenderTarget::drawCopy(dst, src, rect, mCopy, mPost.triangle());
         }
 
         // An RGBA16F source of `width` x `height` holding a pattern scaled to `range`, and two copies of `format` at
