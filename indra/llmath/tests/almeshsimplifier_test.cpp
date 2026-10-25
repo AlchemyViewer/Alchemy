@@ -1091,6 +1091,105 @@ namespace
         CHECK(differ == 0);
     }
 
+    // A flat sheet of 600 columns by 200 rows of points as two faces of
+    // 60,000 vertices: the first has every other column's points, two
+    // columns a quad, and the second every point of the first 300 columns,
+    // a column a quad. A sloppy simplification that keeps every triangle
+    // takes the first face's vertex where the second's lies on it, so that
+    // the second's triangles with their first corner there are the first
+    // face's, and name half of the second's vertices besides its own.
+    LLPointer<LLVolume> sheetOverColumns()
+    {
+        constexpr S32 COLUMNS = 600;
+        constexpr S32 ROWS = 200;
+        auto point = [](S32 column, S32 row, Geometry& g)
+        {
+            const F32 x = (F32)column / (COLUMNS - 1);
+            const F32 y = (F32)row / (ROWS - 1);
+            g.add(LLVector3(x - 0.5f, y - 0.5f, 0.f), LLVector3(0.f, 0.f, 1.f), LLVector2(x, y));
+        };
+        auto grid = [](S32 columns, Geometry& g)
+        {
+            for (S32 j = 0; j + 1 < ROWS; ++j)
+            {
+                for (S32 i = 0; i + 1 < columns; ++i)
+                {
+                    const U16 c0 = (U16)(i + j * columns);
+                    const U16 c1 = (U16)(c0 + 1);
+                    const U16 c2 = (U16)(c0 + columns);
+                    const U16 c3 = (U16)(c2 + 1);
+                    g.triangle(c0, c1, c3);
+                    g.triangle(c0, c3, c2);
+                }
+            }
+        };
+        Geometry first, second;
+        for (S32 row = 0; row < ROWS; ++row)
+        {
+            for (S32 column = 0; column < COLUMNS; column += 2)
+            {
+                point(column, row, first);
+            }
+            for (S32 column = 0; column < COLUMNS / 2; ++column)
+            {
+                point(column, row, second);
+            }
+        }
+        grid(COLUMNS / 2, first);
+        grid(COLUMNS / 2, second);
+        return volumeOf({ first, second });
+    }
+
+    TEST_CASE("almeshsimplifier: simplified together, a face past 16-bit indices makes each face simplify on its own", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        LLPointer<LLVolume> base = sheetOverColumns();
+        const ALMeshSimplifier simplifier(*base);
+        const ALMeshSimplifier::Target goal = toCount(1.f);
+
+        // The scene: the sheet simplified as one mesh, as simplifyModel
+        // simplifies it, leaves the first face's triangles naming more
+        // vertices than 16-bit indices reach.
+        const LLVolumeFace& first = base->getVolumeFace(0);
+        const LLVolumeFace& second = base->getVolumeFace(1);
+        std::vector<LLVector4a> positions(first.mPositions, first.mPositions + first.mNumVertices);
+        positions.insert(positions.end(), second.mPositions, second.mPositions + second.mNumVertices);
+        std::vector<U32> indices(first.mIndices, first.mIndices + first.mNumIndices);
+        for (S32 i = 0; i < second.mNumIndices; ++i)
+        {
+            indices.push_back(second.mIndices[i] + (U32)first.mNumVertices);
+        }
+        std::vector<U32> together(indices.size());
+        const size_t together_count = meshopt_simplifySloppy(together.data(), indices.data(), indices.size(), positions[0].getF32ptr(),
+                                                             positions.size(), sizeof(LLVector4a), nullptr, indices.size(), 1.f, nullptr);
+        std::set<U32> named;
+        for (size_t i = 0; i < together_count; i += 3)
+        {
+            if (together[i] < (U32)first.mNumVertices)
+            {
+                named.insert(together.begin() + i, together.begin() + i + 3);
+            }
+        }
+        INFO(fmt::format("simplified as one mesh, the first face's triangles name {} vertices", named.size()));
+        REQUIRE(named.size() > U16_MAX);
+
+        LLPointer<LLVolume> target = targetFor(*base);
+        REQUIRE(simplifier.simplifyModel(*target, goal, Seams::SLOPPY) > 0.f);
+        for (S32 f = 0; f < 2; ++f)
+        {
+            INFO(fmt::format("face {}", f));
+            LLVolumeFace alone;
+            REQUIRE(simplifier.simplifyFace(f, alone, goal, Seams::SLOPPY) > 0.f);
+            const LLVolumeFace& face = target->getVolumeFace(f);
+            REQUIRE(wellFormed(face));
+            CHECK(fromBase(face, *base));
+            REQUIRE(face.mNumVertices == alone.mNumVertices);
+            REQUIRE(face.mNumIndices == alone.mNumIndices);
+            CHECK(std::equal(face.mIndices, face.mIndices + face.mNumIndices, alone.mIndices));
+            CHECK(memcmp(face.mPositions, alone.mPositions, sizeof(LLVector4a) * face.mNumVertices) == 0);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Normals
 
