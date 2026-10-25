@@ -392,6 +392,13 @@ using ALSimdLanes = ALSimd8;
 using ALSimdLanes = ALSimd4;
 #endif
 
+// Each file that includes this one makes the kernels it uses for itself,
+// under its own floating-point options and instruction set: with external
+// linkage the linker would keep one copy of each, and the strict kernel
+// test's copies would run in place of the library's, or one tier's in a
+// binary built for another.
+namespace
+{
 namespace kernels
 {
 
@@ -1947,6 +1954,7 @@ void planar_tangents_impl(const LLVector4a* normals, size_t n, const PlanarArgs&
 #endif
 
 } // namespace kernels
+} // namespace
 } // namespace alsimd
 
 #endif // AL_SIMDKERNELS_INL
