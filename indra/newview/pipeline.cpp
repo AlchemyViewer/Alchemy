@@ -9355,8 +9355,7 @@ void LLPipeline::copyScreenSpaceReflections(LLRenderTarget* src, LLRenderTarget*
     if (mResourcePlan.wants(ALRenderResourcePlan::Id::SSRScene) && dst->isComplete() && !gCubeSnapshot)
     {
         LL_PROFILE_GPU_ZONE("ssr copy");
-        dst->copyContents(*src, 0, 0, src->getWidth(), src->getHeight(), 0, 0, dst->getWidth(), dst->getHeight(),
-                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        copyColor(*dst, *src);
         copySceneDepth(*dst);
     }
 }
@@ -9444,6 +9443,20 @@ static void draw_color_copy(LLRenderTarget& dst, LLRenderTarget& src, const LLRe
         gCopyProgram.unbind();
     }
     dst.flush();
+}
+
+void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src)
+{
+    LL_PROFILE_GPU_ZONE("color copy");
+    // A stretch is the blit's: where a texel's centre falls on the edge between two of the source's, the draw's
+    // interpolated coordinate can take the one on the other side from the blit's.
+    if (!gCopyProgram.isComplete() || dst.getWidth() != src.getWidth() || dst.getHeight() != src.getHeight())
+    {
+        dst.copyContents(src, 0, 0, src.getWidth(), src.getHeight(), 0, 0, dst.getWidth(), dst.getHeight(),
+                         GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        return;
+    }
+    draw_color_copy(dst, src, nullptr, *mScreenTriangleVB);
 }
 
 void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRect& rect)

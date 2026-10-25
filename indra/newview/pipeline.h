@@ -305,9 +305,11 @@ public:
     // without the screen's stencil, which a blit's matching formats would make them carry. `dst` is cleared to the far
     // plane first, and stays so where the program has not built.
     void copySceneDepth(LLRenderTarget& dst);
-    // `rect` of `src`'s colour into the same texels of `dst`, a target of `src`'s size, through gCopyProgram: a draw,
-    // where a framebuffer blit is a pixel transfer NVIDIA's driver may have to synchronize with the rendering around it.
-    // The rest of `dst` is left as it was. A blit stands in where the program has not built.
+    // `src`'s colour into `dst` through gCopyProgram: a draw, where a framebuffer blit is a pixel transfer NVIDIA's
+    // driver may have to synchronize with the rendering around it. A blit stands in where the program has not built.
+    // Over the whole of `dst`: texel for texel where it is `src`'s size, and stretched by a nearest blit where it is not.
+    void copyColor(LLRenderTarget& dst, LLRenderTarget& src);
+    // Or only `rect` of `src` into the same texels of `dst`, a target of `src`'s size, the rest of `dst` left as it was.
     void copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRect& rect);
     // The scene's depth as a haze pass reads it, with mRT->screen bound and the draws since its binding having written
     // the depth it shares: past a texture barrier, the scene's own (nullptr); without one, a copy from `scope` taken

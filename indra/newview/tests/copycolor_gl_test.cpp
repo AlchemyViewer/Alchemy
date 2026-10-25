@@ -1,7 +1,8 @@
 /**
  * @file copycolor_gl_test.cpp
  * @brief LLPipeline::copyColor's draw, the copy program over the screen triangle, held against the nearest blit it
- *        replaces: scissored to a rect, as the water copies the screen, under HDR and without it.
+ *        replaces: scissored to a rect, as the water copies the screen, under HDR and without it; and over a whole
+ *        target of the screen's size, as the reflections copy the scene.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -84,12 +85,13 @@ namespace
         }
 
         // An RGBA16F source of `width` x `height` holding a pattern scaled to `range`, and two copies of `format` at
-        // `copy_width` x `copy_height` holding the same other pattern, as the pool gave them.
-        void setUp(U32 width, U32 height, U32 copy_width, U32 copy_height, U32 format, F32 range)
+        // `copy_width` x `copy_height`, with a depth of their own where `depth`, holding the same other pattern, as the
+        // pool gave them.
+        void setUp(U32 width, U32 height, U32 copy_width, U32 copy_height, U32 format, F32 range, bool depth = false)
         {
             REQUIRE(mSource.allocate(width, height, GL_RGBA16F));
-            REQUIRE(mBlitted.allocate(copy_width, copy_height, format));
-            REQUIRE(mDrawn.allocate(copy_width, copy_height, format));
+            REQUIRE(mBlitted.allocate(copy_width, copy_height, format, depth));
+            REQUIRE(mDrawn.allocate(copy_width, copy_height, format, depth));
 
             std::vector<F32> scene = ll_test::PostChainGL::pattern(width, height);
             for (F32& value : scene)
@@ -154,4 +156,30 @@ TEST_CASE_METHOD(CopyColor, "copycolor_gl: the copy program's draw over a rect w
     CHECK(differ_from_blit == 0);
     UNSCOPED_INFO("nothing outside the rect written");
     CHECK(written_past == 0);
+}
+
+TEST_CASE_METHOD(CopyColor, "copycolor_gl: the copy program's draw over a whole target of the source's size writes what the nearest blit wrote",
+                 "[copycolor_gl]")
+{
+    // The reflections' copy of the scene: R11F_G11F_B10F with a depth of its own, at the screen's size. A stretch stays
+    // the blit's (LLPipeline::copyColor).
+    setUp(W, H, W, H, GL_R11F_G11F_B10F, 8.f, true);
+    const std::vector<F32> before = ll_test::PostChainGL::read(mDrawn);
+
+    mBlitted.copyContents(mSource, 0, 0, W, H, 0, 0, W, H, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    draw(mDrawn, mSource, nullptr);
+    const std::vector<F32> blitted = ll_test::PostChainGL::read(mBlitted);
+    const std::vector<F32> drawn   = ll_test::PostChainGL::read(mDrawn);
+
+    size_t differ_from_blit = 0;
+    size_t copied           = 0;
+    for (size_t i = 0; i < drawn.size(); ++i)
+    {
+        differ_from_blit += drawn[i] != blitted[i] ? 1 : 0;
+        copied += drawn[i] != before[i] ? 1 : 0;
+    }
+    UNSCOPED_INFO("the target copied at all, so a draw that wrote nothing would not pass");
+    CHECK(copied > 0);
+    UNSCOPED_INFO("every channel of every texel as the blit left it");
+    CHECK(differ_from_blit == 0);
 }
