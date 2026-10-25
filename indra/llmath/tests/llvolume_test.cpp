@@ -4350,6 +4350,71 @@ namespace
         }
     }
 
+    // One triangle of a mesh face as the wire carries it, its vertices on
+    // the unit cube's axes and each value sixteen bits, low byte first.
+    LLSD wireTriangle()
+    {
+        auto binary = [](std::initializer_list<U16> values)
+        {
+            LLSD::Binary bytes;
+            for (U16 value : values)
+            {
+                bytes.push_back((U8)(value & 0xff));
+                bytes.push_back((U8)(value >> 8));
+            }
+            return LLSD(bytes);
+        };
+        LLSD face;
+        face["Position"] = binary({ 0, 0, 0, 65535, 0, 0, 0, 65535, 0 });
+        face["TriangleList"] = binary({ 0, 1, 2 });
+        face["PositionDomain"]["Min"] = LLVector3(-0.5f, -0.5f, -0.5f).getValue();
+        face["PositionDomain"]["Max"] = LLVector3(0.5f, 0.5f, 0.5f).getValue();
+        face["TexCoord0Domain"]["Min"] = LLVector2(0.f, 0.f).getValue();
+        face["TexCoord0Domain"]["Max"] = LLVector2(1.f, 1.f).getValue();
+        return face;
+    }
+
+    // A LOD of the one face, decoded into a mesh volume of its own.
+    LLPointer<LLVolume> decodeLOD(const LLSD& face, bool& decoded)
+    {
+        LLSD mdl = LLSD::emptyArray();
+        mdl.append(face);
+        LLVolumeParams params;
+        params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000c"), LL_SCULPT_TYPE_MESH);
+        LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
+        decoded = ll_test::VolumeProbe::decode(*volume, mdl);
+        return volume;
+    }
+
+    // A face's TriangleList of zeros deflates to almost nothing, so that one
+    // the unzip cap lets through could hold a hundred million indices, and
+    // cost every viewer that decodes it seconds and gigabytes. A LOD with a
+    // face of more indices than LL_SCULPT_MESH_MAX_FACE_INDICES does not
+    // decode; one with a face of as many as that does.
+    TEST_CASE("llvolume: a mesh face of more indices than a face may hold does not decode", "[llvolume]")
+    {
+        const S32 most = LL_SCULPT_MESH_MAX_FACE_INDICES - LL_SCULPT_MESH_MAX_FACE_INDICES % 3;
+        for (const S32 indices : { most, most + 3 })
+        {
+            CAPTURE(indices);
+            LLSD face = wireTriangle();
+            face["TriangleList"] = LLSD(LLSD::Binary((size_t)indices * sizeof(U16), 0));
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeLOD(face, decoded);
+            CHECK(decoded == (indices <= LL_SCULPT_MESH_MAX_FACE_INDICES));
+            if (decoded)
+            {
+                REQUIRE(volume->getNumVolumeFaces() == 1);
+                CHECK(volume->getVolumeFace(0).mNumIndices == indices);
+            }
+            else
+            {
+                CHECK(volume->getNumVolumeFaces() == 0);
+            }
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two

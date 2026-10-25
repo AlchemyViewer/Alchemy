@@ -2616,6 +2616,14 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                 LL_WARNS() << "Incomplete triangle discarded from face! Indices count " << num_indices << " was not divisible by 3. face index: " << i << " Total: " << face_count << LL_ENDL;
                 num_indices -= indices_to_discard;
             }
+
+            if (num_indices > (size_t)LL_SCULPT_MESH_MAX_FACE_INDICES)
+            {
+                LL_WARNS() << "Invalid index count " << num_indices << " exceeds maximum for face index: " << i << LL_ENDL;
+                mVolumeFaces.clear();
+                return false;
+            }
+
             face.resizeIndices(static_cast<S32>(num_indices));
 
             if (num_indices > 2 && !face.mIndices)

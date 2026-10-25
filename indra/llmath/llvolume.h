@@ -214,6 +214,12 @@ constexpr U8 LL_SCULPT_FLAG_MASK = LL_SCULPT_FLAG_INVERT | LL_SCULPT_FLAG_MIRROR
 
 constexpr S32 LL_SCULPT_MESH_MAX_FACES = 8;
 
+// The most indices a mesh face may hold: 32 for each of the 65,536 vertices
+// its 16-bit indices reach. A large face has about six for each of its
+// vertices, and the largest of 136,000 faces in a viewer's mesh cache held
+// 360,564. A LOD with a face past this does not decode.
+constexpr S32 LL_SCULPT_MESH_MAX_FACE_INDICES = 32 * 65536;
+
 extern bool gDebugGL;
 
 class LLProfileParams
