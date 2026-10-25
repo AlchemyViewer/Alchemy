@@ -46,8 +46,10 @@ public:
     // STATIC METHODS
     ///////////////////////////////////
 
-    // Sets the main thread's floating-point mode at startup; worker threads
-    // set their own at entry (set_thread_fp_mode in llthread.h).
+    // llmath's startup, once, before any other thread starts: sets the main
+    // thread's floating-point mode, worker threads setting their own at
+    // entry (set_thread_fp_mode in llthread.h), and makes meshoptimizer take
+    // its scratch from the calling thread's ALScratchArena.
     static void initClass();
 
     // Return a vector of all zeros

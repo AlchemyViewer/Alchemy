@@ -26,10 +26,13 @@
 
 #include "linden_common.h"
 
+#include "alscratcharena.h"
 #include "llmemory.h"
 #include "llmath.h"
 #include "llquantize.h"
 #include "llthread.h"
+
+#include <meshoptimizer.h>
 
 extern const LLVector4a LL_V4A_ZERO(0.f, 0.f, 0.f, 0.f);
 extern const LLVector4a LL_V4A_EPSILON(F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZERO);
@@ -37,6 +40,7 @@ extern const LLVector4a LL_V4A_EPSILON(F_APPROXIMATELY_ZERO, F_APPROXIMATELY_ZER
 /*static */void LLVector4a::initClass()
 {
     set_thread_fp_mode();
+    meshopt_setAllocator(ALScratchArena::allocate, ALScratchArena::deallocate);
 }
 
 /*static */void LLVector4a::memcpyNonAliased16(F32* __restrict dst, const F32* __restrict src, size_t bytes)

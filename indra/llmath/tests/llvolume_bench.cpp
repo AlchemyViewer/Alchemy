@@ -41,7 +41,6 @@
 #include "alscratcharena.h"
 #include "alsimdkernels.h"
 #include "llmath.h"
-#include "llmeshoptimizer.h"
 #include "llquaternion.h"
 #include "m3math.h"
 #include "v2math.h"
@@ -567,7 +566,7 @@ namespace
         static void* MESHOPTIMIZER_ALLOC_CALLCONV newBlock(size_t bytes) { return ::operator new(bytes); }
         static void MESHOPTIMIZER_ALLOC_CALLCONV deleteBlock(void* block) { ::operator delete(block); }
 
-        ArenaInstalled() { LLMeshOptimizer::initClass(); }
+        ArenaInstalled() { meshopt_setAllocator(ALScratchArena::allocate, ALScratchArena::deallocate); }
         ~ArenaInstalled() { meshopt_setAllocator(newBlock, deleteBlock); }
     };
 
