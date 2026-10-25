@@ -212,6 +212,9 @@ constexpr U8 LL_SCULPT_FLAG_INVERT    = 64;
 constexpr U8 LL_SCULPT_FLAG_MIRROR    = 128;
 constexpr U8 LL_SCULPT_FLAG_MASK = LL_SCULPT_FLAG_INVERT | LL_SCULPT_FLAG_MIRROR;
 
+// The most faces a mesh LOD may hold: an upload splits a model into
+// meshes of as many, and none of 66,000 LODs in a viewer's mesh cache held
+// more. A LOD of more does not decode.
 constexpr S32 LL_SCULPT_MESH_MAX_FACES = 8;
 
 // The most indices a mesh face may hold: 32 for each of the 65,536 vertices

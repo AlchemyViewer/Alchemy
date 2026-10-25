@@ -2582,6 +2582,15 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
             return false;
         }
 
+        // A face of no indices costs nothing against the index budget, but
+        // is made all the same.
+        if (face_count > (size_t)LL_SCULPT_MESH_MAX_FACES)
+        {
+            LL_WARNS() << "Invalid face count " << face_count << " exceeds maximum" << LL_ENDL;
+            mVolumeFaces.clear();
+            return false;
+        }
+
         // The LOD's indices between its faces, summed before any face is
         // made.
         size_t lod_indices = 0;

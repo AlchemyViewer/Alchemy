@@ -4450,6 +4450,29 @@ namespace
         }
     }
 
+    // A face with no geometry costs nothing against the index budget, but
+    // is made all the same, so that a LOD of many would cost what the index
+    // budget does not count. A LOD of more than LL_SCULPT_MESH_MAX_FACES
+    // faces does not decode; one of as many as that does.
+    TEST_CASE("llvolume: a mesh LOD of more faces than a LOD may hold does not decode", "[llvolume]")
+    {
+        for (const S32 faces : { LL_SCULPT_MESH_MAX_FACES, LL_SCULPT_MESH_MAX_FACES + 1 })
+        {
+            CAPTURE(faces);
+            LLSD mdl = LLSD::emptyArray();
+            for (S32 f = 0; f < faces; ++f)
+            {
+                LLSD face;
+                face["NoGeometry"] = true;
+                mdl.append(face);
+            }
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeFaces(mdl, decoded);
+            CHECK(decoded == (faces <= LL_SCULPT_MESH_MAX_FACES));
+            CHECK(volume->getNumVolumeFaces() == (decoded ? faces : 0));
+        }
+    }
+
     // A rigged face's weights are an influence after another, each a joint
     // and two bytes of weight. An array that ends inside an influence leaves
     // its vertex the influences before it, and is not read past its end.
