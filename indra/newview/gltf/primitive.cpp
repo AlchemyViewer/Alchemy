@@ -36,12 +36,64 @@
 using namespace LL::GLTF;
 
 
-// A primitive unrolled into a triangle list, for its tangents and flat normals
-struct MikktMesh
+// get the vertex index of each corner of a primitive's triangles, as a triangle list
+// returns false if the Primitive cannot be converted to a triangle list
+static bool get_triangle_corners(const Primitive* prim, std::vector<U32>& corners)
+{
+    bool indexed = !prim->mIndexArray.empty();
+    size_t count = indexed ? prim->mIndexArray.size() : prim->mPositions.size();
+    llassert(count <= size_t(U32_MAX));
+
+    corners.clear();
+
+    if (prim->mMode == Primitive::Mode::TRIANGLES)
+    {
+        for (U32 i = 0; i < U32(count / 3 * 3); ++i)
+        {
+            corners.push_back(i);
+        }
+    }
+    else if (prim->mMode == Primitive::Mode::TRIANGLE_STRIP ||
+             prim->mMode == Primitive::Mode::TRIANGLE_FAN)
+    {
+        for (U32 tri_idx = 0; size_t(tri_idx) + 2 < count; ++tri_idx)
+        {
+            U32 idx[3] = { tri_idx, tri_idx + 1, tri_idx + 2 };
+
+            if (prim->mMode == Primitive::Mode::TRIANGLE_FAN)
+            {
+                idx[0] = 0;
+            }
+            else if (tri_idx % 2 != 0)
+            {
+                std::swap(idx[1], idx[2]);
+            }
+
+            corners.insert(corners.end(), idx, idx + 3);
+        }
+    }
+    else
+    {
+        LL_WARNS("GLTF") << "Unsupported primitive mode for conversion to triangles: " << (S32)prim->mMode << LL_ENDL;
+        return false;
+    }
+
+    if (indexed)
+    {
+        for (U32& corner : corners)
+        {
+            corner = prim->mIndexArray[corner];
+        }
+    }
+
+    return true;
+}
+
+// A primitive unrolled into a triangle list, for its flat normals
+struct TriangleList
 {
     std::vector<LLVector3> p;       //positions
     std::vector<LLVector3> n;       //normals
-    std::vector<LLVector4> t;       //tangents
     std::vector<LLVector2> tc0;     //texcoords 0
     std::vector<LLVector2> tc1;     //texcoords 1
     std::vector<LLColor4U> c;       //colors
@@ -52,28 +104,13 @@ struct MikktMesh
     // returns false if the Primitive cannot be converted to a triangle list
     bool copy(const Primitive* prim)
     {
-        bool indexed = !prim->mIndexArray.empty();
-        size_t vert_count = indexed ? prim->mIndexArray.size() : prim->mPositions.size();
-
-        size_t triangle_count = 0;
-
-        if (prim->mMode == Primitive::Mode::TRIANGLE_STRIP ||
-            prim->mMode == Primitive::Mode::TRIANGLE_FAN)
+        std::vector<U32> corners;
+        if (!get_triangle_corners(prim, corners))
         {
-            triangle_count = vert_count - 2;
-        }
-        else if (prim->mMode == Primitive::Mode::TRIANGLES)
-        {
-            triangle_count = vert_count / 3;
-        }
-        else
-        {
-            LL_WARNS("GLTF") << "Unsupported primitive mode for conversion to triangles: " << (S32)prim->mMode << LL_ENDL;
             return false;
         }
 
-        vert_count = triangle_count * 3;
-        llassert(vert_count <= size_t(U32_MAX));  // triangle_count will also naturally be under the limit
+        size_t vert_count = corners.size();
 
         p.resize(vert_count);
         n.resize(vert_count);
@@ -81,15 +118,6 @@ struct MikktMesh
         c.resize(vert_count);
 
         bool has_normals = !prim->mNormals.empty();
-        if (has_normals)
-        {
-            n.resize(vert_count);
-        }
-        bool has_tangents = !prim->mTangents.empty();
-        if (has_tangents)
-        {
-            t.resize(vert_count);
-        }
 
         bool rigged = !prim->mWeights.empty();
         if (rigged)
@@ -104,63 +132,27 @@ struct MikktMesh
             tc1.resize(vert_count);
         }
 
-        for (U32 tri_idx = 0; tri_idx < U32(triangle_count); ++tri_idx)
+        for (size_t i = 0; i < vert_count; ++i)
         {
-            U32 idx[3] = {0, 0, 0};
+            U32 idx = corners[i];
+            p[i].set(prim->mPositions[idx].getF32ptr());
+            tc0[i].set(prim->mTexCoords0[idx]);
+            c[i] = prim->mColors[idx];
 
-            if (prim->mMode == Primitive::Mode::TRIANGLES)
+            if (multi_uv)
             {
-                idx[0] = tri_idx * 3;
-                idx[1] = tri_idx * 3 + 1;
-                idx[2] = tri_idx * 3 + 2;
-            }
-            else if (prim->mMode == Primitive::Mode::TRIANGLE_STRIP)
-            {
-                idx[0] = tri_idx;
-                idx[1] = tri_idx + 1;
-                idx[2] = tri_idx + 2;
-
-                if (tri_idx % 2 != 0)
-                {
-                    std::swap(idx[1], idx[2]);
-                }
-            }
-            else if (prim->mMode == Primitive::Mode::TRIANGLE_FAN)
-            {
-                idx[0] = 0;
-                idx[1] = tri_idx + 1;
-                idx[2] = tri_idx + 2;
+                tc1[i].set(prim->mTexCoords1[idx]);
             }
 
-            if (indexed)
+            if (has_normals)
             {
-                idx[0] = prim->mIndexArray[idx[0]];
-                idx[1] = prim->mIndexArray[idx[1]];
-                idx[2] = prim->mIndexArray[idx[2]];
+                n[i].set(prim->mNormals[idx].getF32ptr());
             }
 
-            for (U32 v = 0; v < 3; ++v)
+            if (rigged)
             {
-                U32 i = tri_idx * 3 + v;
-                p[i].set(prim->mPositions[idx[v]].getF32ptr());
-                tc0[i].set(prim->mTexCoords0[idx[v]]);
-                c[i] = prim->mColors[idx[v]];
-
-                if (multi_uv)
-                {
-                    tc1[i].set(prim->mTexCoords1[idx[v]]);
-                }
-
-                if (has_normals)
-                {
-                    n[i].set(prim->mNormals[idx[v]].getF32ptr());
-                }
-
-                if (rigged)
-                {
-                    w[i].set(prim->mWeights[idx[v]].getF32ptr());
-                    j[i] = prim->mJoints[idx[v]];
-                }
+                w[i].set(prim->mWeights[idx].getF32ptr());
+                j[i] = prim->mJoints[idx];
             }
         }
 
@@ -185,25 +177,6 @@ struct MikktMesh
         }
     }
 
-    // MikkTSpace's tangents, as meshoptimizer's compatible mode computes
-    // them. GLTF's V runs down the texture, the other way from the V a
-    // tangent's handedness is taken against, so the tangents are those of
-    // the UVs as they are with w the other way.
-    void genTangents()
-    {
-        t.resize(p.size());
-        if (p.empty())
-        {
-            return;
-        }
-        meshopt_generateTangents(t[0].mV, nullptr, p.size(), p[0].mV, p.size(), sizeof(LLVector3), n[0].mV, sizeof(LLVector3), tc0[0].mV,
-                                 sizeof(LLVector2), meshopt_TangentCompatible);
-        for (LLVector4& tangent : t)
-        {
-            tangent.mV[3] = -tangent.mV[3];
-        }
-    }
-
     // write to target primitive as an indexed triangle list
     // Only modifies runtime data, does not modify the original GLTF data
     void write(Primitive* prim) const
@@ -213,7 +186,6 @@ struct MikktMesh
         {
             { &p[0], sizeof(LLVector3), sizeof(LLVector3) },
             { &n[0], sizeof(LLVector3), sizeof(LLVector3) },
-            { &t[0], sizeof(LLVector4), sizeof(LLVector4) },
             { &tc0[0], sizeof(LLVector2), sizeof(LLVector2) },
             { &c[0], sizeof(LLColor4U), sizeof(LLColor4U) }
         };
@@ -238,7 +210,6 @@ struct MikktMesh
 
         prim->mTexCoords0.resize(vert_count);
         prim->mNormals.resize(vert_count);
-        prim->mTangents.resize(vert_count);
         prim->mPositions.resize(vert_count);
         prim->mColors.resize(vert_count);
         if (!w.empty())
@@ -263,7 +234,6 @@ struct MikktMesh
             prim->mPositions[dst_idx].load3(p[src_idx].mV);
             prim->mNormals[dst_idx].load3(n[src_idx].mV);
             prim->mTexCoords0[dst_idx] = tc0[src_idx];
-            prim->mTangents[dst_idx].loadua(t[src_idx].mV);
             prim->mColors[dst_idx] = c[src_idx];
 
             if (!w.empty())
@@ -281,6 +251,70 @@ struct MikktMesh
         prim->mGLMode = LLRender::TRIANGLES;
     }
 };
+
+template<class T>
+static void remap_vertices(std::vector<T>& vertices, const std::vector<U32>& remap, size_t vert_count)
+{
+    std::vector<T> remapped(vert_count);
+    meshopt_remapVertexBuffer(remapped.data(), vertices.data(), remap.size(), sizeof(T), remap.data());
+    vertices.swap(remapped);
+}
+
+// weld a primitive in place into an indexed triangle list of the vertices its triangles use
+// Only modifies runtime data, does not modify the original GLTF data
+static bool weld(Primitive* prim)
+{
+    std::vector<U32> corners;
+    if (!get_triangle_corners(prim, corners))
+    {
+        return false;
+    }
+
+    std::vector<meshopt_Stream> mos =
+    {
+        { prim->mPositions.data(), sizeof(LLVector3), sizeof(LLVector4a) },
+        { prim->mNormals.data(), sizeof(LLVector3), sizeof(LLVector4a) },
+        { prim->mTexCoords0.data(), sizeof(LLVector2), sizeof(LLVector2) },
+        { prim->mColors.data(), sizeof(LLColor4U), sizeof(LLColor4U) }
+    };
+
+    bool rigged = !prim->mWeights.empty();
+    if (rigged)
+    {
+        mos.push_back({ prim->mWeights.data(), sizeof(LLVector4a), sizeof(LLVector4a) });
+        mos.push_back({ prim->mJoints.data(), sizeof(U64), sizeof(U64) });
+    }
+
+    bool multi_uv = !prim->mTexCoords1.empty();
+    if (multi_uv)
+    {
+        mos.push_back({ prim->mTexCoords1.data(), sizeof(LLVector2), sizeof(LLVector2) });
+    }
+
+    // only the vertices the corners name are read, and those no corner names are dropped
+    std::vector<U32> remap(prim->mPositions.size());
+    size_t vert_count = meshopt_generateVertexRemapMulti(remap.data(), corners.data(), corners.size(), remap.size(), mos.data(), mos.size());
+
+    prim->mIndexArray.resize(corners.size());
+    meshopt_remapIndexBuffer(prim->mIndexArray.data(), corners.data(), corners.size(), remap.data());
+
+    remap_vertices(prim->mPositions, remap, vert_count);
+    remap_vertices(prim->mNormals, remap, vert_count);
+    remap_vertices(prim->mTexCoords0, remap, vert_count);
+    remap_vertices(prim->mColors, remap, vert_count);
+    if (rigged)
+    {
+        remap_vertices(prim->mWeights, remap, vert_count);
+        remap_vertices(prim->mJoints, remap, vert_count);
+    }
+    if (multi_uv)
+    {
+        remap_vertices(prim->mTexCoords1, remap, vert_count);
+    }
+
+    prim->mGLMode = LLRender::TRIANGLES;
+    return true;
+}
 
 
 static void vertical_flip(std::vector<LLVector2>& texcoords)
@@ -415,56 +449,27 @@ bool Primitive::prep(Asset& asset)
 
         if (mMode == Mode::POINTS || mMode == Mode::LINES || mMode == Mode::LINE_LOOP || mMode == Mode::LINE_STRIP)
         { //no normals and no surfaces, this primitive is unlit
-            mTangents.clear();
             unlit = true;
         }
         else
         {
             // unroll into non-indexed array of flat shaded triangles
-            MikktMesh data;
+            TriangleList data;
             if (!data.copy(this))
             {
                 return false;
             }
 
             data.genNormals();
-            data.genTangents();
             data.write(this);
         }
     }
-
-    if (mTangents.empty() && !unlit)
-    { // NOTE: must be done last because tangent generation rewrites the other arrays
-        if (mMode == Mode::POINTS || mMode == Mode::LINES || mMode == Mode::LINE_LOOP || mMode == Mode::LINE_STRIP)
+    else if (mTangents.empty() && !unlit &&
+             mMode != Mode::POINTS && mMode != Mode::LINES && mMode != Mode::LINE_LOOP && mMode != Mode::LINE_STRIP)
+    {
+        if (!weld(this))
         {
-            // for points and lines, just make sure tangent is perpendicular to normal
-            mTangents.resize(mNormals.size());
-            LLVector4a up(0.f, 0.f, 1.f, 0.f);
-            LLVector4a left(1.f, 0.f, 0.f, 0.f);
-            for (U32 i = 0; i < mNormals.size(); ++i)
-            {
-                if (fabsf(mNormals[i].getF32ptr()[2]) < 0.999f)
-                {
-                    mTangents[i] = up.cross3(mNormals[i]);
-                }
-                else
-                {
-                    mTangents[i] = left.cross3(mNormals[i]);
-                }
-
-                mTangents[i].getF32ptr()[3] = 1.f;
-            }
-        }
-        else
-        {
-            MikktMesh data;
-            if (!data.copy(this))
-            {
-                return false;
-            }
-
-            data.genTangents();
-            data.write(this);
+            return false;
         }
     }
 
