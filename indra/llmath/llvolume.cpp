@@ -2401,30 +2401,6 @@ bool LLVolumeFace::VertexData::operator==(const LLVolumeFace::VertexData& rhs)co
             mTexCoord == rhs.mTexCoord;
 }
 
-bool LLVolumeFace::VertexData::compareNormal(const LLVolumeFace::VertexData& rhs, F32 angle_cutoff) const
-{
-    bool retval = false;
-
-    const F32 epsilon = 0.00001f;
-
-    if (rhs.mPosition.equals3(mPosition, epsilon) &&
-        fabs(rhs.mTexCoord[0]-mTexCoord[0]) < epsilon &&
-        fabs(rhs.mTexCoord[1]-mTexCoord[1]) < epsilon)
-    {
-        if (angle_cutoff > 1.f)
-        {
-            retval = (mNormal.equals3(rhs.mNormal, epsilon));
-        }
-        else
-        {
-            F32 cur_angle = rhs.mNormal.dot3(mNormal).getF32();
-            retval = cur_angle > angle_cutoff;
-        }
-    }
-
-    return retval;
-}
-
 bool LLVolume::unpackVolumeFaces(std::istream& is, S32 size)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
@@ -4965,28 +4941,6 @@ bool LLVolumeFace::create(LLVolume* volume, bool partial_build)
     return ret ;
 }
 
-void LLVolumeFace::getVertexData(U16 index, LLVolumeFace::VertexData& cv)
-{
-    cv.setPosition(mPositions[index]);
-    if (mNormals)
-    {
-        cv.setNormal(mNormals[index]);
-    }
-    else
-    {
-        cv.getNormal().clear();
-    }
-
-    if (mTexCoords)
-    {
-        cv.mTexCoord = mTexCoords[index];
-    }
-    else
-    {
-        cv.mTexCoord.clear();
-    }
-}
-
 bool LLVolumeFace::VertexMapData::operator==(const LLVolumeFace::VertexData& rhs) const
 {
     return getPosition().equals3(rhs.getPosition()) &&
@@ -5054,110 +5008,6 @@ void LLVolumeFace::remap()
     mTexCoords = remap_tex_coords;
     mNumVertices = remap_vertices_count;
     mNumAllocatedVertices = remap_vertices_count;
-}
-
-void LLVolumeFace::optimize(F32 angle_cutoff)
-{
-    LLVolumeFace new_face;
-
-    //map of points to vector of vertices at that point
-    std::map<U64, std::vector<VertexMapData> > point_map;
-
-    LLVector4a range;
-    range.setSub(mExtents[1],mExtents[0]);
-
-    //remove redundant vertices
-    for (S32 i = 0; i < mNumIndices; ++i)
-    {
-        U16 index = mIndices[i];
-
-        if (index >= mNumVertices)
-        {
-            // invalid index
-            // replace with a valid index to avoid crashes
-            index = mNumVertices - 1;
-            mIndices[i] = index;
-
-            // Needs better logging
-            LL_DEBUGS_ONCE("LLVOLUME") << "Invalid index, substituting" << LL_ENDL;
-        }
-
-        LLVolumeFace::VertexData cv;
-        getVertexData(index, cv);
-
-        bool found = false;
-
-        LLVector4a pos;
-        pos.setSub(mPositions[index], mExtents[0]);
-        pos.div(range);
-
-        U64 pos64 = 0;
-
-        pos64 = (U16) (pos[0]*65535);
-        pos64 = pos64 | (((U64) (pos[1]*65535)) << 16);
-        pos64 = pos64 | (((U64) (pos[2]*65535)) << 32);
-
-        std::map<U64, std::vector<VertexMapData> >::iterator point_iter = point_map.find(pos64);
-
-        if (point_iter != point_map.end())
-        { //duplicate point might exist
-            for (U32 j = 0; j < point_iter->second.size(); ++j)
-            {
-                LLVolumeFace::VertexData& tv = (point_iter->second)[j];
-                if (tv.compareNormal(cv, angle_cutoff))
-                {
-                    found = true;
-                    new_face.pushIndex((point_iter->second)[j].mIndex);
-                    break;
-                }
-            }
-        }
-
-        if (!found)
-        {
-            new_face.pushVertex(cv);
-            U16 index = (U16) new_face.mNumVertices-1;
-            new_face.pushIndex(index);
-
-            VertexMapData d;
-            d.setPosition(cv.getPosition());
-            d.mTexCoord = cv.mTexCoord;
-            d.setNormal(cv.getNormal());
-            d.mIndex = index;
-            if (point_iter != point_map.end())
-            {
-                point_iter->second.push_back(d);
-            }
-            else
-            {
-                point_map[pos64].push_back(d);
-            }
-        }
-    }
-
-
-    if (angle_cutoff > 1.f && !mNormals)
-    {
-        // Now alloc'd with positions
-        //ll_aligned_free_16(new_face.mNormals);
-        new_face.mNormals = NULL;
-    }
-
-    if (!mTexCoords)
-    {
-        // Now alloc'd with positions
-        //ll_aligned_free_16(new_face.mTexCoords);
-        new_face.mTexCoords = NULL;
-    }
-
-    // Only swap data if we've actually optimized the mesh
-    //
-    if (new_face.mNumVertices <= mNumVertices)
-    {
-        llassert(new_face.mNumIndices == mNumIndices);
-        swapData(new_face);
-    }
-
 }
 
 namespace
@@ -5910,20 +5760,6 @@ LLVector4a LLVolumeFace::getPlanarTangent(const LLVector4a& normal, const LLVect
         alsimd::planar_tangents(&normal, 1, scale, PLANAR_SWITCH_X - PLANAR_TIE, &out);
     }
     return out;
-}
-
-
-void LLVolumeFace::swapData(LLVolumeFace& rhs)
-{
-    llswap(rhs.mPositions, mPositions);
-    llswap(rhs.mNormals, mNormals);
-    llswap(rhs.mTangents, mTangents);
-    llswap(rhs.mTangentsStale, mTangentsStale);
-    llswap(rhs.mTexCoords, mTexCoords);
-    llswap(rhs.mIndices,mIndices);
-    llswap(rhs.mNumVertices, mNumVertices);
-    llswap(rhs.mNumIndices, mNumIndices);
-    std::swap(rhs.mPlanarNormal, mPlanarNormal);
 }
 
 namespace
@@ -7475,61 +7311,6 @@ void LLVolumeFace::resizeVertices(S32 num_verts)
     mJointRiggingInfoTab.clear();
 }
 
-void LLVolumeFace::pushVertex(const LLVolumeFace::VertexData& cv)
-{
-    pushVertex(cv.getPosition(), cv.getNormal(), cv.mTexCoord);
-}
-
-void LLVolumeFace::pushVertex(const LLVector4a& pos, const LLVector4a& norm, const LLVector2& tc)
-{
-    S32 new_verts = mNumVertices+1;
-
-    if (new_verts > mNumAllocatedVertices)
-    {
-        // double buffer size on expansion
-        new_verts *= 2;
-
-        S32 new_tc_size = ((new_verts*8)+0xF) & ~0xF;
-        S32 old_tc_size = ((mNumVertices*8)+0xF) & ~0xF;
-
-        S32 old_vsize = mNumVertices*16;
-
-        S32 new_size = new_verts*16*2+new_tc_size;
-
-        LLVector4a* old_buf = mPositions;
-
-        mPositions = (LLVector4a*) ll_aligned_malloc<64>(new_size);
-        mNormals = mPositions+new_verts;
-        mTexCoords = (LLVector2*) (mNormals+new_verts);
-
-        if (old_buf != NULL)
-        {
-            // copy old positions into new buffer
-            LLVector4a::memcpyNonAliased16((F32*)mPositions, (F32*)old_buf, old_vsize);
-
-            // normals
-            LLVector4a::memcpyNonAliased16((F32*)mNormals, (F32*)(old_buf + mNumVertices), old_vsize);
-
-            // tex coords
-            LLVector4a::memcpyNonAliased16((F32*)mTexCoords, (F32*)(old_buf + mNumVertices * 2), old_tc_size);
-        }
-
-        // just clear tangents
-        ll_aligned_free_16(mTangents);
-        mTangents = NULL;
-        ll_aligned_free<64>(old_buf);
-
-        mNumAllocatedVertices = new_verts;
-
-    }
-
-    mPositions[mNumVertices] = pos;
-    mNormals[mNumVertices] = norm;
-    mTexCoords[mNumVertices] = tc;
-
-    mNumVertices++;
-}
-
 void LLVolumeFace::allocateTangents(S32 num_verts)
 {
     ll_aligned_free_16(mTangents);
@@ -7583,21 +7364,6 @@ void LLVolumeFace::resizeIndices(S32 num_indices)
         // Either num_indices is zero or allocation failure
         mNumIndices = 0;
     }
-}
-
-void LLVolumeFace::pushIndex(const U16& idx)
-{
-    S32 new_count = mNumIndices + 1;
-    S32 new_size = ((new_count*2)+0xF) & ~0xF;
-
-    S32 old_size = ((mNumIndices*2)+0xF) & ~0xF;
-    if (new_size != old_size)
-    {
-        mIndices = (U16*) ll_aligned_realloc_16(mIndices, new_size, old_size);
-        ll_assert_aligned(mIndices,16);
-    }
-
-    mIndices[mNumIndices++] = idx;
 }
 
 void LLVolumeFace::fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, std::vector<U16>& idx)
