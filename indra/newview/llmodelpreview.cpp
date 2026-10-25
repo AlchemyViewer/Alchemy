@@ -1602,22 +1602,27 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             {
                 // Remove progressively more data if we can't reach the target,
                 // keeping the closest a mode came: target_model holds the
-                // last mode's.
+                // last mode's, and closest a copy of the faces of the closest
+                // that fell short, as the passes after it replace them.
                 F32 allowed_ratio_drift = 1.8f;
                 using Seams = ALMeshSimplifier::Seams;
                 F32 precise_ratio = -1.f;
-                Seams precise_seams = Seams::ALL;
+                std::vector<LLVolumeFace> closest;
                 for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE })
                 {
                     const F32 ratio = simplify_model(indices_decimator, seams);
-                    if (ratio > precise_ratio)
+                    const bool closer = ratio > precise_ratio;
+                    if (closer)
                     {
                         precise_ratio = ratio;
-                        precise_seams = seams;
                     }
                     if (ratio >= 0 && ratio * allowed_ratio_drift >= indices_decimator)
                     {
                         break;
+                    }
+                    if (closer)
+                    {
+                        target_model->copyFacesTo(closest);
                     }
                 }
 
@@ -1699,8 +1704,12 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                         }
                         else
                         {
-                            // Fallback to normal method, in the mode that came closest
-                            precise_ratio = simplify_model(indices_decimator, precise_seams);
+                            // Fallback to normal method: the faces of the mode that came closest
+                            llassert(closest.size() == (size_t)target_model->getNumVolumeFaces());
+                            for (S32 face_idx = 0; face_idx < (S32)closest.size(); ++face_idx)
+                            {
+                                target_model->getVolumeFace(face_idx) = closest[face_idx];
+                            }
                         }
 
                         LL_DEBUGS("Upload") << "Model " << target_model->getName()
