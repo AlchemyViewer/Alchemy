@@ -220,7 +220,8 @@ namespace
 
         ll_test::SharedGLScope mGL;
         ALFrameFences mFrames;
-        ALQueryPool mPool{ mFrames };
+        // Read a frame on, as the cases time their reads; the age the viewer's pool reads at has a case of its own.
+        ALQueryPool mPool{ mFrames, 1 };
         GLuint mProgram = 0;
         GLuint mVAO = 0;
         GLuint mColor = 0;
@@ -861,9 +862,17 @@ namespace
             INFO("not at its own frame's end");
             CHECK(queries.result(seen, value) == ALQueryPool::Status::Pending);
         }
+        // The GPU has finished it, and frames' ends show so; the batch is read only once it is MIN_RESULT_AGE frames old.
+        for (U32 age = 1; age < ALQueryPool::MIN_RESULT_AGE; ++age)
+        {
+            gGL.endFrame();
+            glFinish();
+            INFO("not read " << age << " frames on, however long since the GPU finished it");
+            CHECK(queries.result(seen, value) == ALQueryPool::Status::Pending);
+        }
         gGL.endFrame();
         {
-            INFO("read by the next frame's end, with retire() called by nothing else");
+            INFO("read by the frame's end MIN_RESULT_AGE frames on, with retire() called by nothing else");
             REQUIRE(queries.result(seen, value) == ALQueryPool::Status::Ready);
             CHECK(value == 1);
         }

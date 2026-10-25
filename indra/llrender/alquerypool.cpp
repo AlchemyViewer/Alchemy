@@ -665,7 +665,8 @@ void ALQueryPool::read(Batch& batch)
 void ALQueryPool::retire()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    for (U32 back = FRAMES - 1; back > 0; --back)
+    // Oldest first, and none younger than the pool's age.
+    for (U32 back = FRAMES - 1; back >= mMinResultAge; --back)
     {
         if (mSerial <= back)
         {

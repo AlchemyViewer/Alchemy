@@ -124,6 +124,12 @@ class ALQueryPool
 public:
     static constexpr U32 FRAMES        = 4;
     static constexpr U32 RESULT_FRAMES = 64;
+    /// How many frames after its own a batch is read at the soonest, however soon its frame is shown finished, unless a
+    /// pool is made with another: a dense scene issues many queries, and results asked for only a few frames on are
+    /// read with neither the CPU nor the GPU waiting on them. At the pacing depth (3) the batch that old is the frame
+    /// the pacing wait has just seen finished.
+    static constexpr U32 MIN_RESULT_AGE = 3;
+    static_assert(MIN_RESULT_AGE < FRAMES, "a batch is read before its names are begun again");
 
     enum class Status : U8
     {
@@ -132,7 +138,12 @@ public:
         Expired, ///< no query, or one whose results have been dropped, RESULT_FRAMES frames on, or released
     };
 
-    explicit ALQueryPool(ALFrameFences& frames) : mFrames(frames) {}
+    /// `min_result_age` frames after its own, 1 to MIN_RESULT_AGE, a batch is read at the soonest.
+    explicit ALQueryPool(ALFrameFences& frames, U32 min_result_age = MIN_RESULT_AGE)
+    : mFrames(frames)
+    , mMinResultAge(llclamp(min_result_age, 1u, MIN_RESULT_AGE))
+    {
+    }
     ALQueryPool(const ALQueryPool&) = delete;
     ALQueryPool& operator=(const ALQueryPool&) = delete;
 
@@ -279,6 +290,7 @@ private:
     void          read(Batch& batch);
 
     ALFrameFences& mFrames;
+    U32            mMinResultAge = MIN_RESULT_AGE;
     Batch         mBatches[FRAMES];
     Results       mResults[RESULT_FRAMES];
     U32           mSerial = 1;      // the open batch's frame

@@ -109,7 +109,8 @@ namespace
 
         ll_test::SharedGLScope mGL;
         ALFrameFences mFrames;
-        ALQueryPool mPool{ mFrames };
+        // Read a frame on, as the cases time their reads.
+        ALQueryPool mPool{ mFrames, 1 };
     };
 
 
