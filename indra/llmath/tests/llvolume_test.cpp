@@ -4220,6 +4220,55 @@ namespace
         }
     }
 
+    // A rigged face's weights are read vertex by vertex until they run out;
+    // a vertex they run out before takes the weight of one with no
+    // influence, all of it on the first joint, rather than whatever its
+    // allocation held.
+    TEST_CASE("llvolume: a mesh face whose weights run out before its vertices weighs the rest by no influence", "[llvolume]")
+    {
+        auto binary = [](std::initializer_list<U16> values)
+        {
+            LLSD::Binary bytes;
+            for (U16 value : values)
+            {
+                bytes.push_back((U8)(value & 0xff));
+                bytes.push_back((U8)(value >> 8));
+            }
+            return LLSD(bytes);
+        };
+        LLSD face;
+        face["Position"] = binary({ 0, 0, 0, 65535, 0, 0, 0, 65535, 0 });
+        face["TriangleList"] = binary({ 0, 1, 2 });
+        face["PositionDomain"]["Min"] = LLVector3(-0.5f, -0.5f, -0.5f).getValue();
+        face["PositionDomain"]["Max"] = LLVector3(0.5f, 0.5f, 0.5f).getValue();
+        face["TexCoord0Domain"]["Min"] = LLVector2(0.f, 0.f).getValue();
+        face["TexCoord0Domain"]["Max"] = LLVector2(1.f, 1.f).getValue();
+        // The first vertex's influences, joint 3 at half, and no more.
+        face["Weights"] = LLSD(LLSD::Binary{ 3, 0xff, 0x7f, 0xff });
+        LLSD mdl = LLSD::emptyArray();
+        mdl.append(face);
+
+        LLVolumeParams params;
+        params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000b"), LL_SCULPT_TYPE_MESH);
+        LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
+        REQUIRE(ll_test::VolumeProbe::decode(*volume, mdl));
+        REQUIRE(volume->getNumVolumeFaces() == 1);
+        const LLVolumeFace& decoded = volume->getVolumeFace(0);
+        REQUIRE(decoded.mNumVertices == 3);
+        REQUIRE(decoded.mWeights);
+        CHECK((S32)decoded.mWeights[0][0] == 3);
+        for (S32 v = 1; v < decoded.mNumVertices; ++v)
+        {
+            CAPTURE(v);
+            const LLVector4a& weight = decoded.mWeights[v];
+            CHECK(weight[0] == 0.999f);
+            CHECK(weight[1] == 0.f);
+            CHECK(weight[2] == 0.f);
+            CHECK(weight[3] == 0.f);
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two

@@ -2887,6 +2887,14 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                     LL_WARNS() << "Vertex weight count does not match vertex count!" << LL_ENDL;
                 }
 
+                // A vertex the weights run out before takes the weight of a
+                // vertex with no influence, rather than what the allocation
+                // held.
+                for (; cur_vertex < num_verts; ++cur_vertex)
+                {
+                    face.mWeights[cur_vertex].set(0.999f, 0.f, 0.f, 0.f);
+                }
+
             }
 
             // modifier flags?
