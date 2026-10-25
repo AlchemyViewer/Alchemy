@@ -2738,9 +2738,11 @@ bool LLImageGL::readBackLevel(S32& discard_level, S32& gl_discard, S32& width, S
         }
     }
 
-    if (width <= 0 || width > 2048 || height <= 0 || height > 2048 || ncomponents < 1 || ncomponents > 4)
+    // As large as an image the viewer takes, 4096 on a side; nothing larger is read.
+    if (width <= 0 || width > MAX_IMAGE_SIZE || height <= 0 || height > MAX_IMAGE_SIZE || ncomponents < 1 || ncomponents > 4)
     {
-        LL_ERRS() << llformat("LLImageGL::readBackRaw: bogus params: %d x %d x %d",width,height,ncomponents) << LL_ENDL;
+        LL_WARNS() << llformat("LLImageGL::readBackRaw: bogus params: %d x %d x %d", width, height, ncomponents) << LL_ENDL;
+        return false;
     }
 
     return true;

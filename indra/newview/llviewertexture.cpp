@@ -2959,13 +2959,46 @@ void LLViewerFetchedTexture::saveRawImage()
     rebuildSculptVolumes();
 }
 
+void LLViewerFetchedTexture::getSculptCopySize(S32& width, S32& height, S32& discard) const
+{
+    width   = 0;
+    height  = 0;
+    discard = -1;
+    if (mGLTexturep.isNull() || mGLTexturep->getTexName() == 0)
+    {
+        return;
+    }
+    // The budget saveRawImage keeps a sculpt map's decode within, halved as it halves.
+    const S32 budget = (mKnownDrawWidth > 0 ? mKnownDrawWidth : sMaxSculptRez) *
+                       (mKnownDrawHeight > 0 ? mKnownDrawHeight : sMaxSculptRez);
+    discard = mGLTexturep->getDiscardLevel();
+    width   = mGLTexturep->getWidth(discard);
+    height  = mGLTexturep->getHeight(discard);
+    while (width * height > budget && width > 1 && height > 1)
+    {
+        width >>= 1;
+        height >>= 1;
+        ++discard;
+    }
+}
+
 bool LLViewerFetchedTexture::requestSculptReadback()
 {
     if (mGLTexturep.isNull() || mGLTexturep->getTexName() == 0 || mNeedsCreateTexture)
     {
         return false;
     }
-    return mGLTexturep->isReadBackRequested() || mGLTexturep->requestReadBack(-1);
+    if (mGLTexturep->isReadBackRequested())
+    {
+        return true;
+    }
+    // The level of the copy's size where the texture has it; else the level on screen, scaled down as it comes in.
+    S32 width   = 0;
+    S32 height  = 0;
+    S32 discard = -1;
+    getSculptCopySize(width, height, discard);
+    return mGLTexturep->requestReadBack(discard) ||
+           (discard != mGLTexturep->getDiscardLevel() && mGLTexturep->requestReadBack(-1));
 }
 
 void LLViewerFetchedTexture::updateSculptReadback()
@@ -2980,14 +3013,32 @@ void LLViewerFetchedTexture::updateSculptReadback()
     {
         return;
     }
+    // Within the copy's budget, as a decode is kept: a level read larger, where the texture had no smaller one, is
+    // halved to it.
+    S32 width   = 0;
+    S32 height  = 0;
+    S32 wanted  = -1;
+    getSculptCopySize(width, height, wanted);
+    S32 read_width  = raw->getWidth();
+    S32 read_height = raw->getHeight();
+    while (width > 0 && read_width * read_height > width * height && read_width > 1 && read_height > 1)
+    {
+        read_width >>= 1;
+        read_height >>= 1;
+        ++discard;
+    }
+    if (read_width != raw->getWidth() || read_height != raw->getHeight())
+    {
+        LLPointer<LLImageRaw> scaled = new LLImageRaw(read_width, read_height, raw->getComponents());
+        scaled->copyScaled(raw);
+        raw = scaled;
+    }
     // The decode may have brought as much first.
     if (mSavedRawImage.notNull() && mSavedRawImage->getWidth() >= raw->getWidth() &&
         mSavedRawImage->getHeight() >= raw->getHeight())
     {
         return;
     }
-    // Kept at the size it was read: the sculpts build from as much as the texture on screen holds, as they did when
-    // they read it back themselves.
     mSavedRawImage        = raw;
     mSavedRawDiscardLevel = discard;
     if (mForceToSaveRawImage && mSavedRawDiscardLevel <= mDesiredSavedRawDiscardLevel)

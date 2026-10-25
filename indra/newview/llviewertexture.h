@@ -380,10 +380,13 @@ public:
     bool isForSculptOnly() const;
     // Marks every volume this texture sculpts to build again: its pixels, or its size, changed.
     void rebuildSculptVolumes();
-    // The volumes this texture sculpts build from a copy on the CPU. Where the texture on screen holds more than the
-    // copy, requestSculptReadback reads it back without waiting on the GPU (LLImageGL::requestReadBack): whether a read
-    // is on its way. updateSculptReadback, every frame a sculpt is drawn (setForSculpt), takes the read in once the GPU
-    // has written it, as the copy, and marks the sculpts to build again.
+    // The volumes this texture sculpts build from a copy on the CPU, kept within the pixels they are known to need at
+    // the map's own proportions (saveRawImage). getSculptCopySize gives the size of the copy the texture on screen
+    // makes: no larger than it, nor than that budget. Where the texture holds more than the copy, requestSculptReadback
+    // reads it back without waiting on the GPU (LLImageGL::requestReadBack), the level of that size where the texture
+    // has it: whether a read is on its way. updateSculptReadback, every frame a sculpt is drawn (setForSculpt), takes
+    // the read in once the GPU has written it, scaled to that size, as the copy, and marks the sculpts to build again.
+    void getSculptCopySize(S32& width, S32& height, S32& discard) const;
     bool requestSculptReadback();
     void updateSculptReadback();
 

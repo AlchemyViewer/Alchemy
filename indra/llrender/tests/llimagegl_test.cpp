@@ -473,6 +473,28 @@ namespace
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
+    // As large as an image the viewer takes: a sculpt map or a callback's texture 4096 wide, as OpenSim serves them, is
+    // read back like any other, where it once halted the viewer as bogus past 2048.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a level 4096 wide reads back", "[LLImageGL]")
+    {
+        constexpr U16 W = 4096, H = 4;
+        LLPointer<LLImageRaw> src = makeRaw(W, H, 4, 0x5a);
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, src.get()));
+
+        REQUIRE(img->requestReadBack());
+        gGL.endFrame();
+        glFinish();
+        gGL.endFrame();
+        LLPointer<LLImageRaw> dst = new LLImageRaw();
+        S32 discard = -1;
+        REQUIRE(img->collectReadBack(dst.get(), discard) == LLImageGL::READBACK_READY);
+        REQUIRE((S32)dst->getWidth() == (S32)W);
+        REQUIRE((S32)dst->getHeight() == (S32)H);
+        CHECK(std::memcmp(dst->getData(), src->getData(), (size_t)W * H * 4) == 0);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // A packed pixel type is one value a pixel, whatever the format's component
     // count. GStreamer hands its frames over as GL_BGRA /
     // GL_UNSIGNED_INT_8_8_8_8_REV, and the upload that slices by scanline -- on the
