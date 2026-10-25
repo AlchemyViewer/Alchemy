@@ -5719,8 +5719,13 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
     }
     catch (std::bad_alloc&)
     {
-        LLError::LLUserWarningMsg::showOutOfMemory();
-        LL_ERRS("LLVolume") << "Bad memory allocation in cacheOptimize, " << vertex_count << " vertices, " << index_count << " indices" << LL_ENDL;
+        // Only the scratch and meshoptimizer's allocations throw, all made
+        // before the face's buffers are replaced, so the face keeps its
+        // buffers. This runs on the mesh threads, where a fatal error may
+        // not be raised.
+        LL_WARNS("LLVolume") << "Bad memory allocation in cacheOptimize, " << vertex_count << " vertices, " << index_count << " indices"
+                             << LL_ENDL;
+        return false;
     }
 
     return true;
