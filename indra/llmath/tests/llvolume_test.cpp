@@ -3526,6 +3526,83 @@ namespace
         }
     }
 
+    // A vertex whose position, normal and texture coordinate each differ from
+    // those of a vertex made from another n.
+    LLVolumeFace::VertexData distinct_vertex(F32 n)
+    {
+        LLVolumeFace::VertexData v;
+        v.setPosition(LLVector4a(n, n + 0.25f, n + 0.5f));
+        v.setNormal(LLVector4a(-n, 1.f, n * 2.f));
+        v.mTexCoord = LLVector2(n * 0.125f, 1.f - n * 0.125f);
+        return v;
+    }
+
+    // A face of these vertices and indices, as an importer hands one to remap.
+    LLVolumeFace face_of(std::vector<LLVolumeFace::VertexData> vertices, std::vector<U16> indices)
+    {
+        LLVolumeFace face;
+        face.fillFromLegacyData(vertices, indices);
+        return face;
+    }
+
+    LLVolumeFace::VertexData vertex_at(const LLVolumeFace& face, U16 index)
+    {
+        LLVolumeFace::VertexData v;
+        v.setPosition(face.mPositions[index]);
+        v.setNormal(face.mNormals[index]);
+        v.mTexCoord = face.mTexCoords[index];
+        return v;
+    }
+
+    // remap welds an uploaded face as weldVertices does: copies made one,
+    // unused vertices gone, and every corner given back the vertex it had.
+    TEST_CASE("llvolume: remap welds copies and drops unused vertices with every corner keeping its vertex", "[llvolume]")
+    {
+        // 5 is a copy of 0, and no index uses 6.
+        const std::vector<LLVolumeFace::VertexData> vertices = { distinct_vertex(1.f), distinct_vertex(2.f), distinct_vertex(3.f),
+                                                                 distinct_vertex(4.f), distinct_vertex(5.f), distinct_vertex(1.f),
+                                                                 distinct_vertex(6.f) };
+        const std::vector<U16> indices = { 3, 5, 1, 0, 2, 4 };
+
+        LLVolumeFace face = face_of(vertices, indices);
+        face.remap();
+
+        REQUIRE(face.mNumIndices == (S32)indices.size());
+        CHECK(face.mNumVertices == 5);
+        CHECK(face.mIndices[1] == face.mIndices[3]);
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+            INFO(fmt::format("corner {}, vertex {}, welded {}", i, indices[i], face.mIndices[i]));
+            REQUIRE(face.mIndices[i] < face.mNumVertices);
+            CHECK(vertex_at(face, face.mIndices[i]) == vertices[indices[i]]);
+        }
+    }
+
+    // An uploaded face's indices are untrusted. remap takes one past the
+    // face's vertices, however far past, as vertex 0, and reads its weld's
+    // table, one entry a vertex, only through indices it has checked.
+    TEST_CASE("llvolume: remap takes an index past the face's vertices as vertex 0", "[llvolume]")
+    {
+        const std::vector<LLVolumeFace::VertexData> vertices = { distinct_vertex(1.f), distinct_vertex(2.f), distinct_vertex(3.f),
+                                                                 distinct_vertex(4.f) };
+        // Vertex 0 is not the first the indices use, so the weld does not
+        // number it 0.
+        const std::vector<U16> indices = { 1, 2, 3, 1, 3, 5, 2, 3, 65535 };
+
+        LLVolumeFace face = face_of(vertices, indices);
+        face.remap();
+
+        REQUIRE(face.mNumIndices == (S32)indices.size());
+        CHECK(face.mNumVertices == 4);
+        for (size_t i = 0; i < indices.size(); ++i)
+        {
+            const size_t vertex = indices[i] < vertices.size() ? size_t(indices[i]) : size_t(0);
+            INFO(fmt::format("corner {}, index {}, welded {}", i, indices[i], face.mIndices[i]));
+            REQUIRE(face.mIndices[i] < face.mNumVertices);
+            CHECK(vertex_at(face, face.mIndices[i]) == vertices[vertex]);
+        }
+    }
+
     // A flat parallelogram as authored, P = a e1 + b e2 for a and b in
     // [-0.5, 0.5], whose box is 4 by 1 by 1. Its UVs are turned 45 degrees
     // against its edges, u = (a + b) / 2 + 0.5 and v = (b - a) / 2 + 0.5, so u

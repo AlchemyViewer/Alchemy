@@ -51,7 +51,6 @@
 #include "llmatrix4a.h"
 #include "alscratcharena.h"
 #include "alsimdkernels.h"
-#include "llmeshoptimizer.h"
 #include "lltimer.h"
 #include "llvolumeoctree.h"
 #include "workqueue.h"
@@ -4963,20 +4962,52 @@ bool LLVolumeFace::VertexMapData::ComparePosition::operator()(const LLVector3& a
     return a.mV[2] < b.mV[2];
 }
 
+// Uploads reach this, so the indices are untrusted: an index past the face's
+// vertices is taken as vertex 0, with a warning, before anything reads
+// through it.
 void LLVolumeFace::remap()
 {
-    // Generate a remap buffer
-    // Documentation for meshopt_generateVertexRemapMulti claims that remap should use vertice count
-    // but all examples use indice count. There are out of bounds crashes when using vertice count.
-    // To be on the safe side use bigger of the two.
-    std::vector<unsigned int> remap(llmax(mNumIndices, mNumVertices), 0);
-    S32 remap_vertices_count = static_cast<S32>(LLMeshOptimizer::generateRemapMultiU16(&remap[0],
-        mIndices,
-        mNumIndices,
-        mPositions,
-        mNormals,
-        mTexCoords,
-        mNumVertices));
+    ALScratchArena::Scope scratch;
+
+    // The indices at 32 bits, as meshoptimizer takes them, checked as they
+    // go. A face without indices is welded as unindexed geometry.
+    U32* indices = scratch.allocate<U32>(mNumIndices);
+    const U32* checked = nullptr;
+    if (mIndices)
+    {
+        S32 out_of_range_count = 0;
+        for (S32 i = 0; i < mNumIndices; ++i)
+        {
+            if (mIndices[i] < mNumVertices)
+            {
+                indices[i] = mIndices[i];
+            }
+            else
+            {
+                out_of_range_count++;
+                indices[i] = 0;
+            }
+        }
+
+        if (out_of_range_count)
+        {
+            LL_WARNS() << out_of_range_count << " indices are out of range." << LL_ENDL;
+        }
+        checked = indices;
+    }
+
+    // Each vertex's place among the vertices that differ in position, normal
+    // or texture coordinate, or ~0u where no index uses it.
+    const meshopt_Stream streams[] = {
+        { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) },
+        { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) },
+        { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) },
+    };
+    U32* remap = scratch.allocate<U32>(mNumVertices);
+    S32 remap_vertices_count = static_cast<S32>(meshopt_generateVertexRemapMulti(remap, checked, checked ? mNumIndices : mNumVertices,
+                                                                                 mNumVertices, streams,
+                                                                                 sizeof(streams) / sizeof(streams[0])));
+    meshopt_remapIndexBuffer(indices, checked, mNumIndices, remap);
 
     // Allocate new buffers
     S32 size = ((mNumIndices * sizeof(U16)) + 0xF) & ~0xF;
@@ -4988,10 +5019,13 @@ void LLVolumeFace::remap()
     LLVector2* remap_tex_coords = (LLVector2*)(remap_normals + remap_vertices_count);
 
     // Fill the buffers
-    LLMeshOptimizer::remapIndexBufferU16(remap_indices, mIndices, mNumIndices, &remap[0]);
-    LLMeshOptimizer::remapPositionsBuffer(remap_positions, mPositions, mNumVertices, &remap[0]);
-    LLMeshOptimizer::remapNormalsBuffer(remap_normals, mNormals, mNumVertices, &remap[0]);
-    LLMeshOptimizer::remapUVBuffer(remap_tex_coords, mTexCoords, mNumVertices, &remap[0]);
+    for (S32 i = 0; i < mNumIndices; ++i)
+    {
+        remap_indices[i] = static_cast<U16>(indices[i]);
+    }
+    meshopt_remapVertexBuffer(remap_positions, mPositions, mNumVertices, sizeof(LLVector4a), remap);
+    meshopt_remapVertexBuffer(remap_normals, mNormals, mNumVertices, sizeof(LLVector4a), remap);
+    meshopt_remapVertexBuffer(remap_tex_coords, mTexCoords, mNumVertices, sizeof(LLVector2), remap);
 
     // Free unused buffers
     ll_aligned_free_16(mIndices);
