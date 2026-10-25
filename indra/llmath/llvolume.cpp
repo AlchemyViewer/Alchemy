@@ -5030,16 +5030,21 @@ void LLVolumeFace::remap()
     }
 
     // Each vertex's place among the vertices that differ in position, normal
-    // or texture coordinate, or ~0u where no index uses it.
-    const meshopt_Stream streams[] = {
-        { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) },
-        { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) },
-        { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) },
-    };
+    // or texture coordinate, or ~0u where no index uses it. Normals and
+    // texture coordinates the face has none of take no part.
+    meshopt_Stream streams[3] = { { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) } };
+    size_t stream_count = 1;
+    if (mNormals)
+    {
+        streams[stream_count++] = { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) };
+    }
+    if (mTexCoords)
+    {
+        streams[stream_count++] = { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) };
+    }
     U32* remap = scratch.allocate<U32>(mNumVertices);
     S32 remap_vertices_count = static_cast<S32>(meshopt_generateVertexRemapMulti(remap, checked, checked ? mNumIndices : mNumVertices,
-                                                                                 mNumVertices, streams,
-                                                                                 sizeof(streams) / sizeof(streams[0])));
+                                                                                 mNumVertices, streams, stream_count));
     meshopt_remapIndexBuffer(indices, checked, mNumIndices, remap);
 
     // Allocate new buffers
@@ -5051,14 +5056,29 @@ void LLVolumeFace::remap()
     LLVector4a* remap_normals = remap_positions + remap_vertices_count;
     LLVector2* remap_tex_coords = (LLVector2*)(remap_normals + remap_vertices_count);
 
-    // Fill the buffers
+    // Fill the buffers, the normals and texture coordinates only where the
+    // face has them
     for (S32 i = 0; i < mNumIndices; ++i)
     {
         remap_indices[i] = static_cast<U16>(indices[i]);
     }
     meshopt_remapVertexBuffer(remap_positions, mPositions, mNumVertices, sizeof(LLVector4a), remap);
-    meshopt_remapVertexBuffer(remap_normals, mNormals, mNumVertices, sizeof(LLVector4a), remap);
-    meshopt_remapVertexBuffer(remap_tex_coords, mTexCoords, mNumVertices, sizeof(LLVector2), remap);
+    if (mNormals)
+    {
+        meshopt_remapVertexBuffer(remap_normals, mNormals, mNumVertices, sizeof(LLVector4a), remap);
+    }
+    else
+    {
+        remap_normals = nullptr;
+    }
+    if (mTexCoords)
+    {
+        meshopt_remapVertexBuffer(remap_tex_coords, mTexCoords, mNumVertices, sizeof(LLVector2), remap);
+    }
+    else
+    {
+        remap_tex_coords = nullptr;
+    }
 
     // Free unused buffers
     ll_aligned_free_16(mIndices);

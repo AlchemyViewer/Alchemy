@@ -4572,6 +4572,67 @@ namespace
         }
     }
 
+    // A face may come without normals or texture coordinates, as the DAE
+    // loader leaves one whose source has none. remap welds its vertices by
+    // what it has, and it comes out without what it came without. Two
+    // triangles share an edge whose two vertices are each held twice, the
+    // copies apart in both normal and texture coordinate: they weld only
+    // where the face has neither.
+    TEST_CASE("llvolume: a face without normals or texture coordinates remaps without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+            S32 vertices; // after the weld
+        };
+        const Without cases[] = {
+            { "normals", true, false, 6 },
+            { "texture coordinates", false, true, 6 },
+            { "either", true, true, 4 },
+        };
+        CorpusMesh mesh;
+        mesh.positions = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
+        mesh.normals = { { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0.6f, 0.8f }, { 0, 0.6f, 0.8f }, { 0, 0, 1 } };
+        mesh.uvs = { { 0, 0 }, { 0.5f, 0 }, { 0, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 1 }, { 1, 1 } };
+        mesh.indices = { 0, 1, 2, 4, 3, 5 };
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            LLVolumeFace face = mesh.face();
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            face.remap();
+            CHECK((face.mNormals != nullptr) == !without.normals);
+            CHECK((face.mTexCoords != nullptr) == !without.tex_coords);
+            CHECK(face.mNumVertices == without.vertices);
+            REQUIRE(face.mNumIndices == (S32)mesh.indices.size());
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                CAPTURE(i);
+                const U16 v = face.mIndices[i];
+                const U16 was = mesh.indices[i];
+                REQUIRE(v < face.mNumVertices);
+                CHECK(v3(face.mPositions[v]) == mesh.positions[was]);
+                if (!without.normals)
+                {
+                    CHECK(v3(face.mNormals[v]) == mesh.normals[was]);
+                }
+                if (!without.tex_coords)
+                {
+                    CHECK(face.mTexCoords[v] == mesh.uvs[was]);
+                }
+            }
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two
