@@ -975,8 +975,10 @@ public:
     // weighted by their areas, normalized; in w 1 where the face is
     // projected as one plane and -1 where it is not. Made on the first call
     // and kept until a build other than a flexible prim's partial one: its
-    // frames keep their first build's planar texture coordinates. Main
-    // thread only.
+    // frames keep their first build's planar texture coordinates. A face
+    // with no area keeps nothing, and its planar normal is made again at
+    // each call: a flexible prim's sides have none before its first pose.
+    // Main thread only.
     LLVector4a getPlanarNormal() const
     {
         LLVector4a planar;

@@ -6005,8 +6005,40 @@ const LLVolumeOctree* LLVolumeFace::getOctree() const
 LLVector4a LLVolumeFace::makePlanarNormal() const
 {
     LLVector4a planar(0.f, 0.f, 0.f, -1.f);
+    bool keep = true;
     if (mPositions && mNormals && mNumVertices > 0)
     {
+        // A triangle two of whose corners are one place has no area, which
+        // a fused multiply-add would leave as the rounding of its cross
+        // product.
+        auto same_place = [](const LLVector4a& p, const LLVector4a& q)
+        {
+            return std::memcmp(p.getF32ptr(), q.getF32ptr(), 3 * sizeof(F32)) == 0;
+        };
+        LLVector4a sum;
+        sum.clear();
+        for (S32 i = 0; i + 2 < mNumIndices; i += 3)
+        {
+            const LLVector4a& a = mPositions[mIndices[i]];
+            const LLVector4a& b = mPositions[mIndices[i + 1]];
+            const LLVector4a& c = mPositions[mIndices[i + 2]];
+            if (same_place(a, b) || same_place(b, c) || same_place(a, c))
+            {
+                continue;
+            }
+            LLVector4a ab, ac, area;
+            ab.setSub(b, a);
+            ac.setSub(c, a);
+            area.setCross3(ab, ac);
+            sum.add(area);
+        }
+        const F32 length2 = sum.dot3(sum).getF32();
+
+        // A face with no area keeps nothing, and is made again at the next
+        // call: a flexible prim's sides have none before its first pose, and
+        // the one normal they have then is no direction of theirs.
+        keep = length2 > 0.f && std::isfinite(length2);
+
         auto same_normal = [&](S32 v) { return std::memcmp(mNormals[v].getF32ptr(), mNormals[0].getF32ptr(), 3 * sizeof(F32)) == 0; };
         bool one_normal = true;
         for (S32 v = 1; v < mNumVertices && one_normal; ++v)
@@ -6019,38 +6051,25 @@ LLVector4a LLVolumeFace::makePlanarNormal() const
             planar = mNormals[0];
             planar.getF32ptr()[3] = 1.f;
         }
-        else
+        else if (keep)
         {
-            LLVector4a sum;
-            sum.clear();
-            for (S32 i = 0; i + 2 < mNumIndices; i += 3)
+            sum.mul(1.f / sqrtf(length2));
+            constexpr F32 cone = PLANAR_CONE_COS + PLANAR_CONE_TIE;
+            bool within = true;
+            for (S32 v = 0; v < mNumVertices && within; ++v)
             {
-                const LLVector4a& a = mPositions[mIndices[i]];
-                LLVector4a ab, ac, area;
-                ab.setSub(mPositions[mIndices[i + 1]], a);
-                ac.setSub(mPositions[mIndices[i + 2]], a);
-                area.setCross3(ab, ac);
-                sum.add(area);
+                const F32 along = mNormals[v].dot3(sum).getF32();
+                within = along > 0.f && along * along >= cone * cone * mNormals[v].dot3(mNormals[v]).getF32();
             }
-
-            const F32 length2 = sum.dot3(sum).getF32();
-            if (length2 > 0.f && std::isfinite(length2))
-            {
-                sum.mul(1.f / sqrtf(length2));
-                constexpr F32 cone = PLANAR_CONE_COS + PLANAR_CONE_TIE;
-                bool within = true;
-                for (S32 v = 0; v < mNumVertices && within; ++v)
-                {
-                    const F32 along = mNormals[v].dot3(sum).getF32();
-                    within = along > 0.f && along * along >= cone * cone * mNormals[v].dot3(mNormals[v]).getF32();
-                }
-                planar = sum;
-                planar.getF32ptr()[3] = within ? 1.f : -1.f;
-            }
+            planar = sum;
+            planar.getF32ptr()[3] = within ? 1.f : -1.f;
         }
     }
 
-    std::memcpy(mPlanarNormal, planar.getF32ptr(), sizeof(mPlanarNormal));
+    if (keep)
+    {
+        std::memcpy(mPlanarNormal, planar.getF32ptr(), sizeof(mPlanarNormal));
+    }
     return planar;
 }
 

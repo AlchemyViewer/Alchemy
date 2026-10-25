@@ -4616,6 +4616,52 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A flexible prim's sides have no area before its first pose, and keep
+    // no planar normal from it: a one-section flexible prim's frames, every
+    // one a partial build of that first one, would otherwise project every
+    // side along z. Once posed, each side's planar normal is the one a full
+    // build at the pose makes. Its caps have area from the first, and keep
+    // the planar normal they first have, as every face of a flexible prim
+    // does.
+    TEST_CASE("llvolume: a flexible prim keeps no planar normal from before its first pose", "[llvolume]")
+    {
+        Report report;
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SAME, 0.f, lod);
+            for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+            {
+                volume->getVolumeFace(f).getPlanarNormal();
+            }
+            bendPath(*volume, 1, 1.1f);
+            volume->regen();
+
+            LLPointer<LLVolume> full = flexiVolume(LL_PCODE_PROFILE_SQUARE, LL_PCODE_HOLE_SAME, 0.f, lod);
+            full->resizePath(2);
+            bendPath(*full, 1, 1.1f);
+            full->regen();
+            REQUIRE(volume->getNumVolumeFaces() == full->getNumVolumeFaces());
+            for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+            {
+                if (!(volume->getVolumeFace(f).mTypeMask & LLVolumeFace::SIDE_MASK))
+                {
+                    continue;
+                }
+                const LLVector4a got = volume->getVolumeFace(f).getPlanarNormal();
+                const LLVector4a want = full->getVolumeFace(f).getPlanarNormal();
+                if (std::memcmp(got.getF32ptr(), want.getF32ptr(), 4 * sizeof(F32)) != 0)
+                {
+                    report.fail(fmt::format("flexible box, one section, LOD {}: {} has planar normal ({}, {}, {}, {}), "
+                                            "a full build ({}, {}, {}, {})",
+                                            lod, faceName(volume->getVolumeFace(f)), got[0], got[1], got[2], got[3], want[0], want[1],
+                                            want[2], want[3]));
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // The uncut cube cap is built only on a line path, which flexi never
     // has; its partial build is the one a regen of an unmoved box makes.
     TEST_CASE("llvolume: an uncut cube cap's partial build keeps its buffers", "[llvolume]")
