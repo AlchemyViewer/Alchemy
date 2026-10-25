@@ -133,6 +133,11 @@ bool normalize3_or_mark(LLVector4a* v, size_t n)
     return kernels::normalize3_or_mark_impl<ALSimdLanes>(v, n);
 }
 
+bool swept_normals(const LLVector4a* frames, size_t frame_stride, size_t rows, const F32* const* columns, size_t count, LLVector4a* normals)
+{
+    return kernels::swept_normals_impl<ALSimdLanes>(frames, frame_stride, rows, columns, count, normals);
+}
+
 void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst)
 {
     kernels::unit_cube_codes_impl<ALSimdWide>(src, n, dst);

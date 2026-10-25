@@ -617,6 +617,15 @@ namespace
         return (volume.getParams().getSculptType() & LL_SCULPT_TYPE_MASK) != LL_SCULPT_TYPE_NONE;
     }
 
+    // Whether a volume's sides take the normals of the surface they are cut
+    // from: a prim on a line or circle path. A sculpt's, a flexible prim's
+    // and a circle2 path's come from their triangles.
+    bool sweptSides(const LLVolume& volume)
+    {
+        const U8 path = volume.getParams().getPathParams().getCurveType();
+        return !isSculpt(volume) && (path == LL_PCODE_PATH_LINE || path == LL_PCODE_PATH_CIRCLE);
+    }
+
     U32 regionsOf(const LLVolumeFace& face, const std::vector<Triangle>& triangles)
     {
         U32 regions = 0;
@@ -782,12 +791,15 @@ namespace
 
     // Where the triangles at a point span no more than a right angle, any
     // sum of them with positive weights faces every one of them, so a
-    // normal facing away from one was made of something else. Beyond a
-    // right angle the surface folds at the point, and whether its normal
-    // faces each triangle depends on the weights; any_spread checks there
-    // too.
+    // normal facing away from one was made of something else; so does the
+    // normal of the surface they are cut from, where they surround the
+    // point. Beyond a right angle the surface folds at the point, and
+    // whether its normal faces each triangle depends on the weights;
+    // any_spread checks there too. A vertex marked in open_edges is at an
+    // edge of a side whose normals are its surface's, which its cases of its
+    // own hold it to (see openEdges).
     void checkInversion(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, bool any_spread,
-                        Report& report, const std::string& where)
+                        const std::vector<bool>& open_edges, Report& report, const std::string& where)
     {
         const std::vector<F32> spread = spreadAt(face, triangles);
         for (size_t t = 0; t < triangles.size(); ++t)
@@ -800,6 +812,10 @@ namespace
             for (U32 v : tri.v)
             {
                 const LLVector3& n = normals[v];
+                if (!open_edges.empty() && open_edges[v])
+                {
+                    continue;
+                }
                 if ((any_spread || spread[v] <= 90.f) && !(n * tri.normal > 0.f))
                 {
                     report.fail(fmt::format("{}: triangle {} is {:.1f} degrees from its vertex {}'s normal, where the triangles span {:.1f}", where, t,
@@ -956,8 +972,11 @@ namespace
     // oracle's agree to within the widest angle between the triangles at
     // the point, where that is no more than a right angle: beyond it the
     // surface folds, and any normal faces away from some of its triangles.
-    void checkOracle(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
-                     const std::string& where)
+    // A vertex marked in open_edges is at an edge of a side whose normals
+    // are its surface's, where the oracle averages triangles to one side of
+    // it (see openEdges).
+    void checkOracle(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
+                     const std::vector<bool>& open_edges, Report& report, const std::string& where)
     {
         if (isCap(face) || isDoubled(face))
         {
@@ -988,7 +1007,8 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const std::vector<U32>& around = incident[groups[v]];
-            if (!used[v] || around.empty() || std::any_of(around.begin(), around.end(), [&](U32 t) { return triangles[t].degenerate; }))
+            if (!used[v] || around.empty() || std::any_of(around.begin(), around.end(), [&](U32 t) { return triangles[t].degenerate; }) ||
+                (!open_edges.empty() && open_edges[v]))
             {
                 continue;
             }
@@ -1081,8 +1101,45 @@ namespace
         return strip;
     }
 
-    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals, Report& report,
-                        const std::string& where)
+    // The vertices of a side at an edge of the surface they are on: a first
+    // or last column or row that does not meet the other end, and a flat
+    // inner side's columns where each of its strips ends, at its corners and
+    // its seam. The triangles at such a vertex lie to one side of it. Where a
+    // side's normals are its surface's, the normal there is the edge's own,
+    // which leans from them by up to half a step of the surface's turn: a
+    // cut column's by up to half a step, as its last partial step lies on
+    // the whole step's chord, and a twisted strip's corner by half a
+    // station's twist. The checks that compare a normal
+    // with the triangles at its point leave those vertices to cases that
+    // hold them to the surface itself.
+    std::vector<bool> openEdges(const LLVolumeFace& face)
+    {
+        std::vector<bool> edge(face.mNumVertices, false);
+        if (!isGrid(face))
+        {
+            return edge;
+        }
+        const bool doubled = isDoubled(face);
+        const bool wraps_s = !doubled && columnsMeet(face);
+        const bool wraps_t = rowsMeet(face);
+        const std::vector<S32> strips = doubled ? stripsOf(face) : std::vector<S32>();
+        for (S32 t = 0; t < face.mNumT; ++t)
+        {
+            for (S32 s = 0; s < face.mNumS; ++s)
+            {
+                bool at_edge = (!wraps_s && (s == 0 || s == face.mNumS - 1)) || (!wraps_t && (t == 0 || t == face.mNumT - 1));
+                if (doubled)
+                {
+                    at_edge = at_edge || (s > 0 && strips[s] != strips[s - 1]) || (s + 1 < face.mNumS && strips[s] != strips[s + 1]);
+                }
+                edge[gridIndex(face, s, t)] = at_edge;
+            }
+        }
+        return edge;
+    }
+
+    void checkHardEdges(const LLVolumeFace& face, const std::vector<Triangle>& triangles, const std::vector<LLVector3>& normals,
+                        const std::vector<bool>& open_edges, Report& report, const std::string& where)
     {
         if (!isDoubled(face) || !isGrid(face))
         {
@@ -1111,7 +1168,7 @@ namespace
         for (S32 v = 0; v < face.mNumVertices; ++v)
         {
             const S32 column = v % face.mNumS;
-            if (lone[v])
+            if (lone[v] || (!open_edges.empty() && open_edges[v]))
             {
                 continue;
             }
@@ -1554,6 +1611,7 @@ namespace
             {
                 state.raw[v] = v3(face.mNormals[v]);
             }
+            const std::vector<bool> open_edges = sweptSides(volume) ? openEdges(face) : std::vector<bool>();
 
             if (state.checks & Checks::Finite)
             {
@@ -1565,7 +1623,7 @@ namespace
             }
             if (state.checks & Checks::Inversion)
             {
-                checkInversion(face, triangles, state.raw, how.inversion_any_spread, report, where);
+                checkInversion(face, triangles, state.raw, how.inversion_any_spread, open_edges, report, where);
             }
             if ((state.checks & Checks::CapFacing) && isCap(face))
             {
@@ -1578,7 +1636,7 @@ namespace
             }
             if (state.checks & Checks::Oracle)
             {
-                checkOracle(face, triangles, state.raw, report, where);
+                checkOracle(face, triangles, state.raw, open_edges, report, where);
             }
             if (state.checks & Checks::SeamsAgree)
             {
@@ -1586,7 +1644,7 @@ namespace
             }
             if (state.checks & Checks::HardEdges)
             {
-                checkHardEdges(face, triangles, state.raw, report, where);
+                checkHardEdges(face, triangles, state.raw, open_edges, report, where);
             }
             if (state.checks & Checks::LoneNormals)
             {
@@ -3715,6 +3773,309 @@ namespace
         }
     }
 
+    // A straight path's surface, in double, from the path's parameters as
+    // LLPath::generate lays a line out: at t, a profile point p is scaled by
+    // S(t), twisted about z by phi(t), Rz, and moved to pos(t), each a lerp
+    // in t. Where q is the profile's tangent at p, its normal there is
+    // (q S Rz) x (p S' Rz + phi' p S Kz Rz + pos'), Kz taking (x, y) to
+    // (-y, x).
+    struct LinePathSurface
+    {
+        F64 begin_scale[2];
+        F64 end_scale[2];
+        F64 twist_begin;
+        F64 twist_end;
+        F64 shear[2];
+
+        explicit LinePathSurface(const LLPathParams& path)
+        {
+            const LLVector2 begin = path.getBeginScale();
+            const LLVector2 end = path.getEndScale();
+            for (S32 i = 0; i < 2; ++i)
+            {
+                begin_scale[i] = begin.mV[i];
+                end_scale[i] = end.mV[i];
+                shear[i] = path.getShear().mV[i];
+            }
+            twist_begin = F_PI * (F64)path.getTwistBegin();
+            twist_end = F_PI * (F64)path.getTwist();
+        }
+
+        F64 scale(S32 axis, F64 t) const { return begin_scale[axis] + (end_scale[axis] - begin_scale[axis]) * t; }
+
+        // (x, y) Rz(phi(t)): (1, 0) turned to (cos, sin).
+        LLVector3d turned(F64 x, F64 y, F64 t) const
+        {
+            const F64 phi = twist_begin + (twist_end - twist_begin) * t;
+            return LLVector3d(x * cos(phi) - y * sin(phi), x * sin(phi) + y * cos(phi), 0.0);
+        }
+
+        // The profile point a position at t was laid out from: moved back,
+        // turned back and scaled back.
+        LLVector3d pointOf(const LLVector4a& at, F64 t) const
+        {
+            const F64 phi = twist_begin + (twist_end - twist_begin) * t;
+            const F64 x = at[0] - shear[0] * t;
+            const F64 y = at[1] - shear[1] * t;
+            return LLVector3d((x * cos(phi) + y * sin(phi)) / scale(0, t), (y * cos(phi) - x * sin(phi)) / scale(1, t), 0.0);
+        }
+
+        LLVector3d normal(const LLVector3d& p, const LLVector3d& q, F64 t) const
+        {
+            const F64 sx = scale(0, t);
+            const F64 sy = scale(1, t);
+            const LLVector3d across = turned(q.mdV[0] * sx, q.mdV[1] * sy, t);
+            const LLVector3d widening = turned(p.mdV[0] * (end_scale[0] - begin_scale[0]), p.mdV[1] * (end_scale[1] - begin_scale[1]), t);
+            const LLVector3d twisting = turned(-p.mdV[1] * sy, p.mdV[0] * sx, t) * (twist_end - twist_begin);
+            const LLVector3d along = widening + twisting + LLVector3d(shear[0], shear[1], 1.0);
+            return across % along;
+        }
+    };
+
+    F64 degreesApart3d(const LLVector3d& a, const LLVector3d& b)
+    {
+        return atan2((a % b).length(), a * b) * RAD_TO_DEG;
+    }
+
+    // A straight path's sides take the normals of the surface they are cut
+    // from at every vertex, their edges and corners included: the rows a
+    // twist turns between, the corners of a twisted strip, a cut's column,
+    // an apex. The surface is worked out again here, in double, from the
+    // path's parameters, and each column's profile point from the side's
+    // own positions: a flat side's tangent from the ends of the edge its
+    // column is on, between a flat inner side's corner copies; a round
+    // side's square to its point, but at a cut, where it is the profile's
+    // own, at the cut's angle, which the case of the cut holds it to. A row
+    // a scale takes to a line or a point is taken a step into the face, as
+    // its limit.
+    TEST_CASE("llvolume: a straight path's side normals are its swept surface's at its edges too", "[llvolume]")
+    {
+        std::vector<Shape> shapes;
+        for (const Shape& s : sweepShapes())
+        {
+            if (s.path == LL_PCODE_PATH_LINE)
+            {
+                shapes.push_back(s);
+            }
+        }
+        Shape cone = cylinder();
+        cone.name = "cone";
+        cone.scale_x = cone.scale_y = 0.f;
+        Shape chisel = cylinder();
+        chisel.name = "cylinder narrowed to a line";
+        chisel.scale_x = 0.f;
+        Shape pyramid = box();
+        pyramid.name = "pyramid";
+        pyramid.scale_x = pyramid.scale_y = 0.f;
+        shapes.insert(shapes.end(), { cone, chisel, pyramid });
+        for (Shape s : { box(), cylinder(), prism() })
+        {
+            s.twist_begin = -1.f;
+            s.twist_end = 1.f;
+            s.hole = LL_PCODE_HOLE_SQUARE;
+            s.hollow = 0.6f;
+            s.name = "hollow " + s.name + " twisted a whole turn";
+            shapes.push_back(s);
+        }
+
+        Report report;
+        S64 compared = 0;
+        F64 worst = 0.0;
+        for (const Shape& s : shapes)
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLPointer<LLVolume> volume = build(s, lod);
+                const LinePathSurface surface(volume->getParams().getPathParams());
+                const LLPath& path = volume->getPath();
+                const LLProfile& profile = volume->getProfile();
+                const LLProfileParams& cut = volume->getParams().getProfileParams();
+                const bool profile_cut = cut.getBegin() > 0.f || cut.getEnd() < 1.f;
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    if (isCap(face) || !isGrid(face))
+                    {
+                        continue;
+                    }
+                    const std::string where = fmt::format("{}: {}", lodName(s, lod), faceName(face));
+
+                    // The profile points, from the row the scale leaves widest.
+                    S32 widest = 0;
+                    auto width = [&](S32 t)
+                    {
+                        const F64 at = path.mPath[t].mTexT;
+                        return std::min(fabs(surface.scale(0, at)), fabs(surface.scale(1, at)));
+                    };
+                    for (S32 t = 1; t < face.mNumT; ++t)
+                    {
+                        widest = width(t) > width(widest) ? t : widest;
+                    }
+                    if (width(widest) < 1e-3)
+                    {
+                        continue;
+                    }
+                    std::vector<LLVector3d> p(face.mNumS), q(face.mNumS);
+                    for (S32 k = 0; k < face.mNumS; ++k)
+                    {
+                        p[k] = surface.pointOf(face.mPositions[gridIndex(face, k, widest)], path.mPath[widest].mTexT);
+                    }
+                    if (face.mTypeMask & LLVolumeFace::FLAT_MASK)
+                    {
+                        const std::vector<S32> strips = isDoubled(face) ? stripsOf(face) : std::vector<S32>(face.mNumS, 0);
+                        for (S32 k = 0; k < face.mNumS; ++k)
+                        {
+                            S32 first = k;
+                            S32 last = k;
+                            while (first > 0 && strips[first - 1] == strips[k])
+                            {
+                                --first;
+                            }
+                            while (last + 1 < face.mNumS && strips[last + 1] == strips[k])
+                            {
+                                ++last;
+                            }
+                            q[k] = p[last] - p[first];
+                        }
+                    }
+                    else
+                    {
+                        for (S32 k = 0; k < face.mNumS; ++k)
+                        {
+                            if (profile_cut && (k == 0 || k == face.mNumS - 1))
+                            {
+                                const LLVector4a tangent = profile.getTangent((face.mBeginS + k) % profile.getTotal());
+                                q[k].setVec(tangent[0], tangent[1], 0.0);
+                            }
+                            else
+                            {
+                                q[k].setVec(-p[k].mdV[1], p[k].mdV[0], 0.0);
+                            }
+                            const LLVector3d run = p[llmin(k + 1, face.mNumS - 1)] - p[llmax(k - 1, 0)];
+                            if (q[k] * run < 0.0)
+                            {
+                                q[k] = -q[k];
+                            }
+                        }
+                    }
+                    // A point on an axis has the rounding of its position
+                    // for its other coordinate, which a row narrowed along
+                    // the axis would take for the tangent's direction.
+                    for (LLVector3d& tangent : q)
+                    {
+                        const F64 size = std::max(fabs(tangent.mdV[0]), fabs(tangent.mdV[1]));
+                        for (S32 i = 0; i < 2; ++i)
+                        {
+                            tangent.mdV[i] = fabs(tangent.mdV[i]) <= 1e-6 * size ? 0.0 : tangent.mdV[i];
+                        }
+                    }
+
+                    for (S32 t = 0; t < face.mNumT; ++t)
+                    {
+                        F64 at = path.mPath[t].mTexT;
+                        const bool narrowed = std::min(fabs(surface.scale(0, at)), fabs(surface.scale(1, at))) < 1e-6;
+                        if (narrowed)
+                        {
+                            at += t == 0 ? 1e-5 : -1e-5;
+                        }
+                        for (S32 k = 0; k < face.mNumS; ++k)
+                        {
+                            // An edge of no length, as where a hole meets its
+                            // wall, has no direction to take.
+                            const LLVector3d expected = surface.normal(p[k], q[k], at);
+                            if (q[k].length() <= 1e-5 || expected.length() <= 1e-9 * q[k].length())
+                            {
+                                continue;
+                            }
+                            const LLVector4a& made = face.mNormals[gridIndex(face, k, t)];
+                            const F64 off = degreesApart3d(LLVector3d(made[0], made[1], made[2]), expected);
+                            const F64 bound = narrowed ? 0.05 : 0.02;
+                            ++compared;
+                            worst = std::max(worst, off);
+                            if (!(off <= bound))
+                            {
+                                report.fail(fmt::format("{}: column {} row {} is {:.4f} degrees from its surface's normal", where, k, t, off));
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        INFO(fmt::format("{} normals compared, the worst {:.4f} degrees off", compared, worst));
+        INFO(report.text());
+        CHECK(compared > 0);
+        CHECK(report.failures == 0);
+    }
+
+    // Whether planar texgen projects a cut round side as one plane depends
+    // on the normals at its cut, as far from the planar normal as any. Those
+    // are the circle's at the cut's angle at every LOD, so a side spanning
+    // more than 120 degrees is projected per vertex at every LOD, and one
+    // within 120 as one plane. Summed from the triangles, they would be the
+    // normal of the chord of the whole step the cut falls in, up to half a
+    // step to either side of the cut and moving with the LOD's steps: a side
+    // cut from a twentieth of a turn through 115 degrees would be projected
+    // per vertex at LOD 0 to 2 and as one plane at LOD 3.
+    TEST_CASE("llvolume: a cut round side's normals at its cut are the circle's and its planar projection is the same at every LOD", "[llvolume][planar]")
+    {
+        Report report;
+        for (F32 begin : { 0.f, 0.05f, 0.3f })
+        {
+            for (F32 span : { 100.f, 115.f, 125.f, 140.f, 160.f, 175.f })
+            {
+                Shape s = cylinder();
+                s.cut_begin = begin;
+                s.cut_end = begin + span / 360.f;
+                s.name = fmt::format("cylinder cut from {} through {} degrees", begin, span);
+                std::optional<bool> one_plane;
+                for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+                {
+                    LLPointer<LLVolume> volume = build(s, lod);
+                    const LLVolumeFace* side = nullptr;
+                    for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                    {
+                        const LLVolumeFace& face = volume->getVolumeFace(f);
+                        if ((face.mTypeMask & LLVolumeFace::OUTER_MASK) && isGrid(face))
+                        {
+                            side = &face;
+                        }
+                    }
+                    REQUIRE(side);
+                    const LLProfileParams& cut = volume->getParams().getProfileParams();
+                    const F32 angles[] = { F_TWO_PI * cut.getBegin(), F_TWO_PI * cut.getEnd() };
+                    for (S32 end = 0; end < 2; ++end)
+                    {
+                        const S32 column = end == 0 ? 0 : side->mNumS - 1;
+                        const LLVector3 radial(cosf(angles[end]), sinf(angles[end]), 0.f);
+                        for (S32 t = 0; t < side->mNumT; ++t)
+                        {
+                            const F32 off = degreesBetween(v3(side->mNormals[gridIndex(*side, column, t)]), radial);
+                            if (!(off <= 0.01f))
+                            {
+                                report.fail(fmt::format("{} at LOD {}: the cut's column {} is {:.3f} degrees from the circle's normal at {:.2f} degrees",
+                                                        s.name, lod, column, off, angles[end] * RAD_TO_DEG));
+                                break;
+                            }
+                        }
+                    }
+                    const bool plane = side->getPlanarNormal()[3] > 0.f;
+                    if (one_plane && *one_plane != plane)
+                    {
+                        report.fail(fmt::format("{}: one plane at LOD {} is {}, where it was {} below", s.name, lod, plane, *one_plane));
+                    }
+                    one_plane = plane;
+                }
+                if (one_plane && *one_plane != (span < 120.f))
+                {
+                    report.fail(fmt::format("{}: one plane is {} at every LOD", s.name, *one_plane));
+                }
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // A mirrored sculpt's rows run the other way, so a weight that went to
     // whichever corner is top right in the grid would not give it the mirror
     // image of the plain one's normals. The map is a cylinder's, whose quads
@@ -4306,6 +4667,98 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A line or circle path's frames are its stations' and how fast they
+    // change: the rows of a station's scale and turn, M, against the
+    // station's own, and their rates and the station's velocity against
+    // its first station, at its begin cut, on paths cut a little before and
+    // after it, by central difference. Its frames repeat where nothing
+    // along it turns or scales. A circle2 path, whose stations alternate
+    // sides, and a sculpt's have none.
+    TEST_CASE("llvolume: a path's frames change at the rates its stations do", "[llvolume]")
+    {
+        constexpr F32 STEP = 1e-3f;
+        Report report;
+        S32 paths = 0;
+        auto row = [](const LLPath::PathPt& pt, S32 i)
+        {
+            LLVector4a r = i == 0 ? pt.mRot.getRow<0>() : pt.mRot.getRow<1>();
+            r.mul(pt.mScale[i]);
+            return r;
+        };
+        for (const Shape& s : sweepShapes())
+        {
+            for (S32 lod : { 0, 3 })
+            {
+                const LLVolumeParams params = s.params();
+                LLPath path;
+                path.generate(params.getPathParams(), LOD_DETAIL[lod]);
+                if (path.hasFrames() != (s.path != LL_PCODE_PATH_CIRCLE2))
+                {
+                    report.fail(fmt::format("{}: has frames is {}", lodName(s, lod), path.hasFrames()));
+                }
+                if (!path.hasFrames())
+                {
+                    continue;
+                }
+                LLPath sculpted;
+                sculpted.generate(params.getPathParams(), LOD_DETAIL[lod], 0, true, 16);
+                if (sculpted.hasFrames())
+                {
+                    report.fail(fmt::format("{}: a sculpt's path has frames", lodName(s, lod)));
+                }
+                const LLPathParams& line = params.getPathParams();
+                const bool still = s.path == LL_PCODE_PATH_LINE && line.getTwistBegin() == line.getTwist() &&
+                                   line.getBeginScale() == line.getEndScale();
+                if (path.framesRepeat() != still)
+                {
+                    report.fail(fmt::format("{}: frames repeat is {}", lodName(s, lod), path.framesRepeat()));
+                }
+                for (S32 t = 0; t < path.getPathLength(); ++t)
+                {
+                    for (S32 i = 0; i < 2; ++i)
+                    {
+                        if (!path.mPath[t].mFrame.mRow[i].equals3(row(path.mPath[t], i), 1e-6f))
+                        {
+                            report.fail(fmt::format("{}: station {}'s frame row {} is not its scale and turn", lodName(s, lod), t, i));
+                        }
+                    }
+                }
+
+                LLPath before, after;
+                LLPathParams early = params.getPathParams();
+                LLPathParams late = params.getPathParams();
+                early.setBegin(early.getBegin() - STEP);
+                late.setBegin(late.getBegin() + STEP);
+                before.generate(early, LOD_DETAIL[lod]);
+                after.generate(late, LOD_DETAIL[lod]);
+                const LLPath::PathPt& a = before.mPath[0];
+                const LLPath::PathPt& b = after.mPath[0];
+                const LLPath::PathFrame& frame = path.mPath[0].mFrame;
+                auto compare = [&](const char* what, const LLVector4a& low, const LLVector4a& high, const LLVector4a& rate)
+                {
+                    for (S32 i = 0; i < 3; ++i)
+                    {
+                        const F32 expected = (high[i] - low[i]) / (2.f * STEP);
+                        if (!(fabsf(rate[i] - expected) <= 2e-3f * llmax(1.f, fabsf(expected))))
+                        {
+                            report.fail(fmt::format("{}: the {}'s rate {} is {}, where its stations change at {}", lodName(s, lod), what, i, rate[i],
+                                                    expected));
+                            return;
+                        }
+                    }
+                };
+                compare("position", a.mPos, b.mPos, frame.mVelocity);
+                compare("first row", row(a, 0), row(b, 0), frame.mRate[0]);
+                compare("second row", row(a, 1), row(b, 1), frame.mRate[1]);
+                ++paths;
+            }
+        }
+        INFO(fmt::format("{} paths", paths));
+        INFO(report.text());
+        CHECK(paths > 0);
+        CHECK(report.failures == 0);
+    }
+
     // A begin cut just short of a step, as the cuts the wire carries can
     // be, snaps the path's first step to within a hundredth of a step of
     // the cut, and so can the rounding of the step's size where the cut is
@@ -4743,10 +5196,13 @@ namespace
     }
 
     // A sphere's poles are where its half circle touches the axis it sweeps
-    // about, and their normals lie along that axis: out of the sphere on its
-    // outer side, into it on a hollow sphere's inner side. A twist of a half
-    // turn at both ends puts each pole at the other end of the axis.
-    TEST_CASE("llvolume: a sphere's pole normals face out of it at any half turn of twist", "[llvolume]")
+    // about, and their normals lie along that axis, the way the side's own
+    // normals face beside them: out of the sphere on its outer side, into it
+    // on a hollow sphere's inner side. A twist of a half turn at both ends
+    // puts each pole at the other end of the axis and turns the half circle
+    // over, so that it sweeps the sphere the other way round: its triangles
+    // then face into the sphere, and so do all its normals, its poles' too.
+    TEST_CASE("llvolume: a sphere's pole normals lie along its axis the way its side faces at any half turn of twist", "[llvolume]")
     {
         Report report;
         S32 poles = 0;
@@ -4758,6 +5214,9 @@ namespace
                 s.twist_begin = s.twist_end = twist;
                 s.hollow = hollow;
                 s.name = fmt::format("sphere twisted {} hollow {}", twist, hollow);
+                // Untwisted or a whole turn, the half circle sweeps the outer
+                // side out of the sphere.
+                const bool turned_over = twist == 0.5f || twist == -0.5f;
                 for (S32 lod = 0; lod < LOD_COUNT; ++lod)
                 {
                     LLPointer<LLVolume> volume = build(s, lod);
@@ -4768,7 +5227,7 @@ namespace
                         {
                             continue;
                         }
-                        const F32 inward = (face.mTypeMask & LLVolumeFace::INNER_MASK) ? -1.f : 1.f;
+                        const F32 inward = ((face.mTypeMask & LLVolumeFace::INNER_MASK) ? -1.f : 1.f) * (turned_over ? -1.f : 1.f);
                         for (S32 column : { 0, face.mNumS - 1 })
                         {
                             bool pole = true;
@@ -4781,16 +5240,19 @@ namespace
                                 continue;
                             }
                             ++poles;
+                            const S32 beside = column == 0 ? 1 : column - 1;
                             for (S32 t = 0; t < face.mNumT; ++t)
                             {
                                 const S32 v = column + face.mNumS * t;
-                                const F32 out = inward * face.mNormals[v].dot3(face.mPositions[v]).getF32();
-                                if (!(out > 0.f))
+                                const LLVector3 n = v3(face.mNormals[v]);
+                                const F32 out = inward * (n * v3(face.mPositions[v]));
+                                const F32 off_axis = llmin(degreesBetween(n, LLVector3(1.f, 0.f, 0.f)), degreesBetween(n, LLVector3(-1.f, 0.f, 0.f)));
+                                const F32 with_side = n * v3(face.mNormals[beside + face.mNumS * t]);
+                                if (!(out > 0.f) || !(off_axis <= 0.01f) || !(with_side > 0.f))
                                 {
-                                    report.fail(fmt::format("{}: {}'s pole at column {} has normal ({}, {}, {}) at ({}, {}, {})",
-                                                            lodName(s, lod), faceName(face), column, face.mNormals[v][0],
-                                                            face.mNormals[v][1], face.mNormals[v][2], face.mPositions[v][0],
-                                                            face.mPositions[v][1], face.mPositions[v][2]));
+                                    report.fail(fmt::format("{}: {}'s pole at column {} has normal ({}, {}, {}) at ({}, {}, {}), {:.3f} degrees off the axis",
+                                                            lodName(s, lod), faceName(face), column, n.mV[0], n.mV[1], n.mV[2], face.mPositions[v][0],
+                                                            face.mPositions[v][1], face.mPositions[v][2], off_axis));
                                     break;
                                 }
                             }
@@ -5976,11 +6438,12 @@ namespace
         CHECK(report.failures == 0);
     }
 
-    // A tapered side's quads are trapezoids, whose two triangles weigh
-    // unequally on the vertex normals between them: its normals turn about
-    // the axis by a few tenths of a degree from row to row, and a column
-    // near 60 or 120 degrees crosses the switch by more than the tie.
-    TEST_CASE("llvolume: every row of a tapered round side takes the same binormal at each column", "[llvolume][!shouldfail]")
+    // A tapered side's quads are trapezoids, whose two triangles would weigh
+    // unequally on normals summed from them, turning them about the axis by a
+    // few tenths of a degree from row to row, past the tie at a column near
+    // 60 or 120 degrees. Its surface's normals point the one way all along a
+    // column.
+    TEST_CASE("llvolume: every row of a tapered round side takes the same binormal at each column", "[llvolume]")
     {
         Report report;
         S32 on_switch = 0;
@@ -6100,7 +6563,11 @@ namespace
     // generator makes for UVs that are the planar coordinates. They have
     // the same handedness wherever a vertex normal leans less than 45
     // degrees from each of its triangles: a folded face has triangles
-    // nearly edge on to their normals, whose winding in UV flips. They have
+    // nearly edge on to their normals, whose winding in UV flips. Nor can
+    // they agree at a vertex one of whose triangles lies across the
+    // projection from its normal, which winds the coordinates the other
+    // way, as a coarse twisted face's edge can be where its surface's
+    // normal is within the cone and its last triangle is not. They have
     // the same direction to rounding on a face with one normal; on a curved
     // one the generator puts each triangle's way of constant t in the
     // vertex normal's plane, which turns it by up to about twice the angle
@@ -6155,9 +6622,28 @@ namespace
                 ll_aligned_free_16(planar_uvs.mTangents);
                 planar_uvs.mTangents = nullptr;
                 planar_uvs.createTangents();
+                // The vertices with a triangle across the projection from
+                // their normal, by the way the coordinates' gradients wind.
+                LLVector4a b, t;
+                LLVolumeFace::getPlanarBasis(planar, LLVolumeFace::PLANAR_SWITCH_X, b, t);
+                LLVector3 gs, gt;
+                for (S32 k = 0; k < 3; ++k)
+                {
+                    gs.mV[k] = b[k] * scale[k];
+                    gt.mV[k] = -t[k] * scale[k];
+                }
+                const LLVector3 winding = gs % gt;
+                std::vector<bool> across(face.mNumVertices, false);
+                for (const Triangle& tri : triangles)
+                {
+                    for (U32 v : tri.v)
+                    {
+                        across[v] = across[v] || (!tri.degenerate && ((tri.normal * winding > 0.f) != (v3(face.mNormals[v]) * winding > 0.f)));
+                    }
+                }
                 for (S32 v = 0; v < face.mNumVertices; ++v)
                 {
-                    if (lone[v])
+                    if (lone[v] || across[v])
                     {
                         continue;
                     }

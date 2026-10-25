@@ -1661,6 +1661,64 @@ bool normalize3_or_mark_impl(LLVector4a* v, size_t n)
 }
 
 ////////////////////////////////////
+// Normals of a swept surface
+////////////////////////////////////
+
+template <class W>
+AL_SIMD_INLINE Lanes3<W> splat_lanes3(const LLVector4a& v)
+{
+    return { W::set1(v[0]), W::set1(v[1]), W::set1(v[2]) };
+}
+
+// The grid's normals a row at a time, the row's frame in every lane and
+// the columns W::floats at a time, from lanes padded to a whole register.
+template <class W>
+bool swept_normals_impl(const LLVector4a* frames, size_t frame_stride, size_t rows, const F32* const* columns, size_t count, LLVector4a* normals)
+{
+    using reg = typename W::reg;
+    using mask = typename W::mask;
+    constexpr size_t F = W::floats;
+    mask marked = W::none();
+    alignas(16) F32 spill[4];
+    for (size_t t = 0; t < rows; ++t)
+    {
+        const LLVector4a* frame = frames + frame_stride * t;
+        const Lanes3<W> row0 = splat_lanes3<W>(frame[0]);
+        const Lanes3<W> row1 = splat_lanes3<W>(frame[1]);
+        const Lanes3<W> rate0 = splat_lanes3<W>(frame[2]);
+        const Lanes3<W> rate1 = splat_lanes3<W>(frame[3]);
+        const Lanes3<W> velocity = splat_lanes3<W>(frame[4]);
+        LLVector4a* out = normals + t * count;
+        for (size_t first = 0; first < count; first += F)
+        {
+            const reg px = W::loadu(columns[0] + first);
+            const reg py = W::loadu(columns[1] + first);
+            const reg tx = W::loadu(columns[2] + first);
+            const reg ty = W::loadu(columns[3] + first);
+            const reg moves = W::loadu(columns[4] + first);
+            const Lanes3<W> across = { W::fmadd(ty, row1.x, W::mul(tx, row0.x)), W::fmadd(ty, row1.y, W::mul(tx, row0.y)),
+                                       W::fmadd(ty, row1.z, W::mul(tx, row0.z)) };
+            const Lanes3<W> along = { W::fmadd(py, rate1.x, W::fmadd(px, rate0.x, W::mul(moves, velocity.x))),
+                                      W::fmadd(py, rate1.y, W::fmadd(px, rate0.y, W::mul(moves, velocity.y))),
+                                      W::fmadd(py, rate1.z, W::fmadd(px, rate0.z, W::mul(moves, velocity.z))) };
+            Lanes3<W> n = { W::fnmadd(across.z, along.y, W::mul(across.y, along.z)), W::fnmadd(across.x, along.z, W::mul(across.z, along.x)),
+                            W::fnmadd(across.y, along.x, W::mul(across.x, along.y)) };
+            const reg length2 = dot_lanes3(n, n);
+            const reg parallel2 = W::mul(W::set1(SWEPT_PARALLEL * SWEPT_PARALLEL), W::mul(dot_lanes3(across, across), dot_lanes3(along, along)));
+            const mask none = W::cmple(length2, W::max(parallel2, W::set1(FLT_MIN)));
+            const reg scale = W::rsqrt(W::max(length2, W::set1(FLT_MIN)));
+            n = { W::select(none, W::zero(), W::mul(n.x, scale)), W::select(none, W::zero(), W::mul(n.y, scale)),
+                  W::select(none, W::zero(), W::mul(n.z, scale)) };
+            const reg w = W::select(none, W::set1(1.f), W::zero());
+            const mask real = W::cmplt(W::add(W::ramp(), W::set1(F32(first))), W::set1(F32(count)));
+            marked = W::or_(marked, W::and_(real, none));
+            W::store_columns(n.x, n.y, n.z, w, [&](int i) { return first + i < count ? out[first + i].getF32ptr() : spill; });
+        }
+    }
+    return W::any(marked);
+}
+
+////////////////////////////////////
 // Planar texture coordinates
 ////////////////////////////////////
 

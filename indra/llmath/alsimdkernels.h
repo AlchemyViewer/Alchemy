@@ -231,6 +231,25 @@ bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normal
 // whatever w it had. Returns whether any was set so.
 bool normalize3_or_mark(LLVector4a* v, size_t n);
 
+// The sine of the angle between a swept surface's two derivatives below
+// which their cross product is rounding's, not the surface's.
+constexpr F32 SWEPT_PARALLEL = 1e-4f;
+
+// The normals of a surface swept from a profile along a path, over a grid
+// of count columns, its profile's points, by rows, its path's stations,
+// vertex s + count * t. Row t's frame is the five vectors from
+// frames[frame_stride * t]: the two rows its profile's x and y move the
+// surface by, their rates along the path, and the station's velocity. Column s is (px, py, tx, ty, moves),
+// each from its own array of columns[0] to [4]: its point, its tangent,
+// and how much of the velocity it takes. A vertex's normal is the surface's
+// derivative across, tx row0 + ty row1, crossed with its derivative along,
+// px rate0 + py rate1 + moves velocity, at unit length with a w of 0; or
+// (0, 0, 0, 1), as normalize3_or_mark marks one, where its squared length
+// is FLT_MIN or less, or the two derivatives are within SWEPT_PARALLEL of
+// one line. Returns whether any was. The column arrays are read up to
+// seven floats past count.
+bool swept_normals(const LLVector4a* frames, size_t frame_stride, size_t rows, const F32* const* columns, size_t count, LLVector4a* normals);
+
 } // namespace alsimd
 
 #endif // AL_SIMDKERNELS_H
