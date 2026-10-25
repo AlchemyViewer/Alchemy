@@ -35,6 +35,8 @@
 #include <cstdint>
 #include <cstring>
 
+static_assert(ALQueryPool::FRAMES <= ALFrameFences::FRAMES, "a batch's frame is one the fences can still wait for");
+
 namespace
 {
     // The targets one query at a time may hold, by ALQueryPool::targetOf().

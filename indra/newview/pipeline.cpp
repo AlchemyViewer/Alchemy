@@ -896,6 +896,7 @@ void LLPipeline::latchRenderInputs()
     // Where the GPU writes the query results, which is where a fence's poll waits on the driver's own thread.
     gGL.frameFences().setStamps(gSavedSettings.getBOOL("AlchemyRenderFrameStamps") && gGLManager.mWritesQueryResults);
     gGL.stagingRing().setEnabled(gSavedSettings.getBOOL("AlchemyRenderStagedUploads"));
+    gGL.queries().setMinResultAge(gSavedSettings.getU32("AlchemyRenderQueryResultAge"));
 }
 
 const ALShaderInputs& LLPipeline::shaderInputs() const

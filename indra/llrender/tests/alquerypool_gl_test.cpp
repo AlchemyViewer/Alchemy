@@ -879,6 +879,66 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // The age a pool reads at is set while it runs: raised, a batch waits that many frames however soon its frame
+    // finished; lowered, one held back is read by the next retire().
+    TEST_CASE_METHOD(alquerypool_data, "alquerypool_gl: a pool set to another age reads at it", "[alquerypool_gl]")
+    {
+        setUp();
+        {
+            INFO("held to 1 to MIN_RESULT_AGE_LIMIT");
+            mPool.setMinResultAge(0);
+            CHECK(mPool.getMinResultAge() == 1);
+            mPool.setMinResultAge(ALQueryPool::MIN_RESULT_AGE_LIMIT + 1);
+            CHECK(mPool.getMinResultAge() == ALQueryPool::MIN_RESULT_AGE_LIMIT);
+        }
+        const auto issue = [this]()
+        {
+            ALQueryScope scope(mPool, ALQueryKind::Occlusion);
+            draw(false);
+            return scope.ticket();
+        };
+        U64 value = 0;
+
+        const ALQueryTicket held = issue();
+        REQUIRE(held.isValid());
+        for (U32 age = 1; age < ALQueryPool::MIN_RESULT_AGE_LIMIT; ++age)
+        {
+            endFrame();
+            glFinish();
+            mPool.retire();
+            INFO("not read " << age << " frames on, however long since the GPU finished it");
+            CHECK(mPool.result(held, value) == ALQueryPool::Status::Pending);
+        }
+        endFrame();
+        mPool.retire();
+        {
+            INFO("read MIN_RESULT_AGE_LIMIT frames on, before its names are begun again");
+            REQUIRE(mPool.result(held, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+        }
+
+        const ALQueryTicket lowered = issue();
+        REQUIRE(lowered.isValid());
+        for (U32 age = 1; age <= 2; ++age)
+        {
+            endFrame();
+            glFinish();
+            mPool.retire();
+        }
+        {
+            INFO("still held back two frames on");
+            CHECK(mPool.result(lowered, value) == ALQueryPool::Status::Pending);
+        }
+        mPool.setMinResultAge(1);
+        mPool.retire();
+        {
+            INFO("read by the next retire() once the age is lowered");
+            REQUIRE(mPool.result(lowered, value) == ALQueryPool::Status::Ready);
+            CHECK(value == 1);
+        }
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A frame end that paces the CPU FRAMES - 1 frames deep waits, in its pacing wait, for the frame whose batch the
     // next frame reuses, and retire() reads that batch before it is opened: opening it waits for nothing, so the pacing
     // wait is the frame end's only wait and keeps its slack.

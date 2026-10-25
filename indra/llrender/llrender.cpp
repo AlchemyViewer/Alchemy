@@ -582,7 +582,7 @@ void LLRender::endFrame(U32 frames_ahead)
     // fences' own calls have just caught it up. A frame stamped makes no such call, and the uploads are polled only
     // once a poll would find them signalled (LLImageGL::pollUploads). The next batch opens only after the fences' end
     // and the reads: it reuses the batch of the frame ALQueryPool::FRAMES - 1 before the one ending, which a pacing
-    // wait at that depth has just seen finished and retire() has read, so that opening it waits for nothing. Opened
+    // wait at that depth or less has seen finished and retire() has read, so that opening it waits for nothing. Opened
     // before the pacing wait, it would do the wait itself, and the pacing would find the frame done and keep no slack.
     mQueries.closeFrame();
     mFrameFences.endFrame(frames_ahead);

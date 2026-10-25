@@ -122,14 +122,18 @@ private:
 class ALQueryPool
 {
 public:
-    static constexpr U32 FRAMES        = 4;
+    /// Batches of names in flight: as many frames as the frame fences keep, so that a pool may hold a batch back up to
+    /// MIN_RESULT_AGE_LIMIT frames and a frame end paced that deep still waits for no batch it reuses.
+    static constexpr U32 FRAMES        = 8;
     static constexpr U32 RESULT_FRAMES = 64;
-    /// How many frames after its own a batch is read at the soonest, however soon its frame is shown finished, unless a
-    /// pool is made with another: a dense scene issues many queries, and results asked for only a few frames on are
-    /// read with neither the CPU nor the GPU waiting on them. At the pacing depth (3) the batch that old is the frame
-    /// the pacing wait has just seen finished.
+    /// How many frames after its own a batch is read at the soonest, however soon its frame is shown finished, unless
+    /// the pool is set to another (setMinResultAge): a dense scene issues many queries, and results asked for only a few
+    /// frames on are read with neither the CPU nor the GPU waiting on them. At the pacing depth (3) the batch that old
+    /// is the frame the pacing wait has just seen finished.
     static constexpr U32 MIN_RESULT_AGE = 3;
-    static_assert(MIN_RESULT_AGE < FRAMES, "a batch is read before its names are begun again");
+    /// The most frames a pool may hold a batch back: a batch is read before its names are begun again.
+    static constexpr U32 MIN_RESULT_AGE_LIMIT = FRAMES - 1;
+    static_assert(MIN_RESULT_AGE <= MIN_RESULT_AGE_LIMIT, "a batch is read before its names are begun again");
 
     enum class Status : U8
     {
@@ -138,14 +142,19 @@ public:
         Expired, ///< no query, or one whose results have been dropped, RESULT_FRAMES frames on, or released
     };
 
-    /// `min_result_age` frames after its own, 1 to MIN_RESULT_AGE, a batch is read at the soonest.
+    /// `min_result_age` frames after its own a batch is read at the soonest (setMinResultAge).
     explicit ALQueryPool(ALFrameFences& frames, U32 min_result_age = MIN_RESULT_AGE)
     : mFrames(frames)
-    , mMinResultAge(llclamp(min_result_age, 1u, MIN_RESULT_AGE))
     {
+        setMinResultAge(min_result_age);
     }
     ALQueryPool(const ALQueryPool&) = delete;
     ALQueryPool& operator=(const ALQueryPool&) = delete;
+
+    /// How many frames after its own a batch is read at the soonest, 1 to MIN_RESULT_AGE_LIMIT, from the next retire()
+    /// on: a batch already read stays read, and one held back is read as soon as it is old enough.
+    void setMinResultAge(U32 age) { mMinResultAge = llclamp(age, 1u, MIN_RESULT_AGE_LIMIT); }
+    U32  getMinResultAge() const { return mMinResultAge; }
 
     /// Whether the context can count `kind` at all.
     static bool supports(ALQueryKind kind);
