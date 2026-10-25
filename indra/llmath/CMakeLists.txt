@@ -109,13 +109,16 @@ target_precompile_headers(llmath REUSE_FROM llprecompiled)
 # compiler may round one sum differently at each place it inlines it, and a
 # touch would then land a unit in the last place from the coordinate its
 # vertex is drawn with. MSVC is held to the same by the float_control pragma
-# around the kernels in alsimdkernels.inl.
-if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+# around the kernels in alsimdkernels.inl, which clang-cl does not take, and
+# clang-cl by the same options as Clang.
+set(AL_STRICT_FP_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math")
+if(COMPILER_IS_CLANG_CL)
+  list(TRANSFORM AL_STRICT_FP_OPTIONS PREPEND "/clang:")
+endif()
+if(NOT COMPILER_IS_MSVC)
   set_source_files_properties(
     alsimdplanar.cpp
-    PROPERTIES
-      COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
-      SKIP_PRECOMPILE_HEADERS TRUE
+    PROPERTIES COMPILE_OPTIONS "${AL_STRICT_FP_OPTIONS}" SKIP_PRECOMPILE_HEADERS TRUE
   )
 endif()
 
@@ -172,10 +175,10 @@ if(AL_BUILD_TESTS)
   # intrinsics, and the file passes there as it is. Accuracy against a double
   # reference, and the library's own entry built as the viewer has it, are
   # checked to a tolerance.
-  if(NOT COMPILER_IS_MSVC AND NOT COMPILER_IS_CLANG_CL)
+  if(NOT COMPILER_IS_MSVC)
     set_source_files_properties(
       tests/alsimdkernels_test.cpp
-      PROPERTIES COMPILE_OPTIONS "-ffp-contract=off;-fno-associative-math;-fno-reciprocal-math"
+      PROPERTIES COMPILE_OPTIONS "${AL_STRICT_FP_OPTIONS}"
     )
   endif()
 
