@@ -2019,8 +2019,10 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
                 }
                 else
                 {
+                    // With no GL level (a sculpt-only map's texture went), the copy's level is the best a fetch
+                    // brings it: updateFetch stops there.
                     S32 dis_level = getDiscardLevel();
-                    mMinDiscardLevel = dis_level;
+                    mMinDiscardLevel = dis_level >= 0 ? dis_level : mSavedRawDiscardLevel;
                     //desired_discard = dis_level;
                 }
             }
@@ -2171,8 +2173,11 @@ bool LLViewerFetchedTexture::updateFetch()
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - create or missing");
         make_request = false;
     }
-    else if (current_discard >= 0 && current_discard <= mMinDiscardLevel)
+    else if (current_discard >= 0 ? current_discard <= mMinDiscardLevel
+                                  : mSavedRawImage.notNull() && mSavedRawDiscardLevel >= 0 &&
+                                        mSavedRawDiscardLevel <= mMinDiscardLevel)
     {
+        // At the best a fetch has brought: the texture's own level, or with none the copy's.
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - current < min");
         make_request = false;
     }
