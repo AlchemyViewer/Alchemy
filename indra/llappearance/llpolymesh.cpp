@@ -39,6 +39,7 @@
 #include "llvolume.h"
 #include "llendianswizzle.h"
 
+#include <meshoptimizer.h>
 
 #define HEADER_ASCII "Linden Mesh 1.0"
 #define HEADER_BINARY "Linden Binary Mesh 1.0"
@@ -269,7 +270,7 @@ bool LLPolyMeshSharedData::allocateJointNames( U32 numJointNames )
 //--------------------------------------------------------------------
 // LLPolyMeshSharedData::loadMesh()
 //--------------------------------------------------------------------
-bool LLPolyMeshSharedData::loadMesh( const std::string& fileName )
+bool LLPolyMeshSharedData::loadMesh( const std::string& fileName, bool keep_order )
 {
         //-------------------------------------------------------------------------
         // Open the file
@@ -559,6 +560,22 @@ bool LLPolyMeshSharedData::loadMesh( const std::string& fileName )
                         numTris++;
                 }
 
+                // The triangles in an order a vertex cache reuses, once for
+                // the file and every avatar that shares it. Morphs and skin
+                // weights address vertices, which keep their order, and an
+                // LOD's faces are its own.
+                const U32 vertex_count = (U32)mNumVertices;
+                bool in_range = numFaces > 0 && !keep_order;
+                for (i = 0; i < (U32)numFaces * 3 && in_range; i++)
+                {
+                        in_range = (U32)mFaces[i / 3][i % 3] < vertex_count;
+                }
+                if (in_range)
+                {
+                        unsigned int* indices = reinterpret_cast<unsigned int*>(mFaces);
+                        meshopt_optimizeVertexCache(indices, indices, (size_t)numFaces * 3, vertex_count);
+                }
+
                 LL_DEBUGS() << "verts: " << numVertices
                          << ", faces: "   << numFaces
                          << ", tris: "    << numTris
@@ -818,7 +835,7 @@ LLPolyMesh::~LLPolyMesh()
 //-----------------------------------------------------------------------------
 // LLPolyMesh::getMesh()
 //-----------------------------------------------------------------------------
-LLPolyMesh *LLPolyMesh::getMesh(const std::string &name, LLPolyMesh* reference_mesh)
+LLPolyMesh *LLPolyMesh::getMesh(const std::string &name, LLPolyMesh* reference_mesh, bool keep_order)
 {
         //-------------------------------------------------------------------------
         // search for an existing mesh by this name
@@ -842,7 +859,7 @@ LLPolyMesh *LLPolyMesh::getMesh(const std::string &name, LLPolyMesh* reference_m
         {
                 mesh_data->setupLOD(reference_mesh->getSharedData());
         }
-        if ( ! mesh_data->loadMesh( full_path ) )
+        if ( ! mesh_data->loadMesh( full_path, keep_order ) )
         {
                 delete mesh_data;
                 return NULL;

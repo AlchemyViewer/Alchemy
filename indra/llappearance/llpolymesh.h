@@ -128,8 +128,10 @@ private:
     // Retrieve the number of KB of memory used by this instance
     U32 getNumKB();
 
-    // Load mesh data from file
-    bool loadMesh( const std::string& fileName );
+    // Load mesh data from file. Its triangles are ordered for the vertex
+    // cache unless keep_order is set, for a mesh drawn blended, whose
+    // triangles blend over one another in the order they were made in.
+    bool loadMesh( const std::string& fileName, bool keep_order = false );
 
 public:
     void genIndices(S32 offset);
@@ -170,7 +172,8 @@ public:
     // Requests a mesh by name.
     // If the mesh already exists in the global mesh table, it is returned,
     // otherwise it is loaded from file, added to the table, and returned.
-    static LLPolyMesh *getMesh( const std::string &name, LLPolyMesh* reference_mesh = NULL);
+    // keep_order is loadMesh's.
+    static LLPolyMesh *getMesh( const std::string &name, LLPolyMesh* reference_mesh = NULL, bool keep_order = false);
 
     // Frees all loaded meshes.
     // This should only be called once you know there are no outstanding

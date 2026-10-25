@@ -97,6 +97,7 @@
 #include "lltoast.h"
 #include "llsdutil_math.h"
 #include "lllocationhistory.h"
+#include "llmeshoptimizer.h"
 #include "llvector4a.h"
 #include "llviewermenufile.h"
 #include "llvoicechannel.h"
@@ -809,6 +810,9 @@ bool LLAppViewer::init()
 
     // initialize SSE options
     LLVector4a::initClass();
+
+    // meshoptimizer's scratch from each thread's own arena
+    LLMeshOptimizer::initClass();
 
     //initialize particle index pool
     LLVOPartGroup::initClass();

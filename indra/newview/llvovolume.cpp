@@ -112,6 +112,15 @@ LLPointer<LLObjectMediaNavigateClient> LLVOVolume::sObjectMediaNavigateClient = 
 
 extern bool gCubeSnapshot;
 
+namespace
+{
+    // A frame's volumes whose LOD moved, those of them marked for a volume
+    // rebuild, and volume spatial groups whose geometry was rebuilt.
+    S32 sNumLODMoves = 0;
+    S32 sNumLODRebuilds = 0;
+    S32 sNumGroupRebuilds = 0;
+}
+
 // Implementation class of LLMediaDataClientObject.  See llmediadataclient.h
 class LLMediaDataClientObjectImpl : public LLMediaDataClientObject
 {
@@ -1716,10 +1725,14 @@ bool LLVOVolume::updateLOD()
         return false;
     }
 
-    if (lod_changed)
+    // An LOD-invariant volume is the same at the new LOD, so its faces and
+    // its spatial group's buffers stay as they are.
+    sNumLODMoves += lod_changed ? 1 : 0;
+    if (lod_changed && !getVolume()->isLODInvariant())
     {
         gPipeline.markRebuild(mDrawable, LLDrawable::REBUILD_VOLUME);
         mLODChanged = true;
+        ++sNumLODRebuilds;
     }
     else
     {
@@ -2630,22 +2643,20 @@ bool LLVOVolume::hasMedia() const
 LLVector3 LLVOVolume::getApproximateFaceNormal(U8 face_id)
 {
     LLVolume* volume = getVolume();
-    LLVector4a result;
-    result.clear();
-
     LLVector3 ret;
 
+    // A face that faces one way, as planar texgen takes it, faces along its
+    // planar normal. One that wraps around faces no one way, and the zero
+    // returned leaves the caller to look along the camera.
     if (volume && face_id < volume->getNumVolumeFaces())
     {
-        const LLVolumeFace& face = volume->getVolumeFace(face_id);
-        for (S32 i = 0; i < (S32)face.mNumVertices; ++i)
+        const LLVector4a planar = volume->getVolumeFace(face_id).getPlanarNormal();
+        if (planar[3] > 0.f)
         {
-            result.add(face.mNormals[i]);
+            ret.set(planar.getF32ptr());
+            ret = volumeDirectionToAgent(ret);
+            ret.normVec();
         }
-
-        LLVector3 ret(result.getF32ptr());
-        ret = volumeDirectionToAgent(ret);
-        ret.normVec();
     }
 
     return ret;
@@ -4509,6 +4520,14 @@ U32 LLVOVolume::getHighLODTriangleCount()
 //static
 void LLVOVolume::preUpdateGeom()
 {
+    // Counted since the previous frame's call.
+    LL_PROFILE_PLOT("volume LOD moves", (int64_t)sNumLODMoves);
+    LL_PROFILE_PLOT("volume LOD rebuilds", (int64_t)sNumLODRebuilds);
+    LL_PROFILE_PLOT("volume LOD change faces", (int64_t)sNumLODChanges);
+    LL_PROFILE_PLOT("volume group rebuilds", (int64_t)sNumGroupRebuilds);
+    sNumLODMoves = 0;
+    sNumLODRebuilds = 0;
+    sNumGroupRebuilds = 0;
     sNumLODChanges = 0;
 }
 
@@ -5935,6 +5954,7 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
         return;
     }
 
+    ++sNumGroupRebuilds;
     group->mBuilt = 1.f;
 
     LLSpatialBridge* bridge = group->getSpatialPartition()->asBridge();

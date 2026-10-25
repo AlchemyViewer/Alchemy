@@ -37,6 +37,10 @@ public:
     LLMeshOptimizer();
     ~LLMeshOptimizer();
 
+    // Makes meshoptimizer take its scratch from the calling thread's
+    // ALScratchArena. Called once, before any thread calls meshoptimizer.
+    static void initClass();
+
     static void generateShadowIndexBufferU32(
         U32 *destination,
         const U32 *indices,

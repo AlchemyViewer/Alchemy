@@ -2,7 +2,7 @@
  * @file llvolume_bench.cpp
  * @brief What generating a prim or sculpt, its tangents, a flexible frame,
  *        a mesh LOD's cacheOptimize and each index order cost, and how many
- *        blocks meshoptimizer allocates a call.
+ *        blocks meshoptimizer takes a call from the arena and the heap.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -29,8 +29,8 @@
 // face's tangents, one flexible frame, one LOD's cacheOptimize, one face's
 // index order. A row differs from the row beside it in one thing. The
 // figures that are not times, an index order's vertices transformed a
-// triangle and meshoptimizer's allocations a call, are printed as a table
-// by the case that measures them.
+// triangle and meshoptimizer's blocks a call, are printed as a table by the
+// case that measures them.
 //
 // The output is a table, not a verdict; a number is read against the row
 // next to it from the same run on the same quiet machine.
@@ -38,7 +38,10 @@
 #include "linden_common.h"
 
 #include "llvolume.h"
+#include "alscratcharena.h"
+#include "alsimdkernels.h"
 #include "llmath.h"
+#include "llmeshoptimizer.h"
 #include "llquaternion.h"
 #include "m3math.h"
 #include "v2math.h"
@@ -46,10 +49,13 @@
 #include "llvector4a.h"
 
 #include "altestbenchmark.h"
+#include "almeshcorpus.h"
 
 #include <fmt/format.h>
 #include <meshoptimizer.h>
 
+#include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <string>
 #include <vector>
@@ -420,7 +426,7 @@ namespace
         out.push_back(s + 1 + columns * (t + 1));
     }
 
-    // createSide's order: every quad of a row, row after row.
+    // The grid's own order: every quad of a row, row after row.
     void rowMajor(std::vector<U32>& out, U32 columns, U32 rows)
     {
         out.clear();
@@ -433,24 +439,60 @@ namespace
         }
     }
 
-    // Bands of BAND quads across, each band row by row before the next: a
-    // band's row reuses the BAND + 1 vertices the row before it loaded,
-    // and two rows of a band fit a 16-entry cache.
-    constexpr U32 BAND = 7;
-
-    void banded(std::vector<U32>& out, U32 columns, U32 rows)
+    // Every quad of a column, column after column: a column's right edge
+    // is still cached when the next column takes it, while a column of
+    // vertices fits the cache.
+    void byColumn(std::vector<U32>& out, U32 columns, U32 rows)
     {
         out.clear();
-        for (U32 first = 0; first + 1 < columns; first += BAND)
+        for (U32 s = 0; s + 1 < columns; ++s)
         {
-            const U32 last = llmin(first + BAND, columns - 1);
             for (U32 t = 0; t + 1 < rows; ++t)
             {
-                for (U32 s = first; s < last; ++s)
+                emitQuad(out, columns, s, t);
+            }
+        }
+    }
+
+    // One band up to LONE_BAND quads across, else bands of at most BAND
+    // quads across, as near equal as the quads divide, each band row by row
+    // and every other band back up: a band's row reuses the vertices the row
+    // before it loaded, two rows of a band fit a 16-entry cache with two to
+    // spare, and a band starts where the last one ended.
+    constexpr U32 LONE_BAND = 7;
+    constexpr U32 BAND = 6;
+
+    void inBands(std::vector<U32>& out, U32 columns, U32 rows)
+    {
+        out.clear();
+        const U32 quads = columns - 1;
+        const U32 bands = quads <= LONE_BAND ? 1 : (quads + BAND - 1) / BAND;
+        U32 first = 0;
+        for (U32 band = 0; band < bands; ++band)
+        {
+            const U32 end = first + quads / bands + (band < quads % bands ? 1 : 0);
+            for (U32 row = 0; row + 1 < rows; ++row)
+            {
+                const U32 t = (band & 1) ? rows - 2 - row : row;
+                for (U32 s = first; s < end; ++s)
                 {
                     emitQuad(out, columns, s, t);
                 }
             }
+            first = end;
+        }
+    }
+
+    // createSide's order: by column up to seven rows, in bands above.
+    void sideOrder(std::vector<U32>& out, U32 columns, U32 rows)
+    {
+        if (rows <= 7)
+        {
+            byColumn(out, columns, rows);
+        }
+        else
+        {
+            inBands(out, columns, rows);
         }
     }
 
@@ -466,8 +508,22 @@ namespace
         U32 rows;
     };
 
-    // The sweep's grids of more than two rows, from the prims and sculpts
-    // that have them.
+    // The first side of more than two rows, if the volume has one.
+    const LLVolumeFace* tallSide(const LLVolume& volume)
+    {
+        for (S32 i = 0; i < volume.getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = volume.getVolumeFace(i);
+            if (!(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumT > 2)
+            {
+                return &face;
+            }
+        }
+        return nullptr;
+    }
+
+    // The sweep's grids of more than two rows, from the prims, flexible
+    // prims and sculpts that have them.
     std::vector<Grid> sweepGrids()
     {
         std::vector<Grid> out;
@@ -476,16 +532,22 @@ namespace
             for (S32 lod = 2; lod < LOD_COUNT; ++lod)
             {
                 LLPointer<LLVolume> volume = new LLVolume(prim.params, LOD_DETAIL[lod]);
-                for (S32 i = 0; i < volume->getNumVolumeFaces(); ++i)
+                if (const LLVolumeFace* face = tallSide(*volume))
                 {
-                    const LLVolumeFace& face = volume->getVolumeFace(i);
-                    if (!(face.mTypeMask & LLVolumeFace::CAP_MASK) && face.mNumT > 2)
-                    {
-                        out.push_back({ fmt::format("{} side at LOD {}, {} by {}", prim.name, lod, face.mNumS, face.mNumT), (U32)face.mNumS,
-                                        (U32)face.mNumT });
-                        break;
-                    }
+                    out.push_back({ fmt::format("{} side at LOD {}, {} by {}", prim.name, lod, face->mNumS, face->mNumT), (U32)face->mNumS,
+                                    (U32)face->mNumT });
                 }
+            }
+        }
+        for (S32 sections : { 4, 16 })
+        {
+            LLPointer<LLVolume> volume = flexiVolume(LL_PCODE_PROFILE_CIRCLE, 3);
+            bendPath(*volume, sections, 0.4f);
+            volume->regen();
+            if (const LLVolumeFace* face = tallSide(*volume))
+            {
+                out.push_back({ fmt::format("flexible cylinder side, {} sections, LOD 3, {} by {}", sections, face->mNumS, face->mNumT), (U32)face->mNumS,
+                                (U32)face->mNumT });
             }
         }
         LLPointer<LLVolume> sculpted = sculptVolume(LL_SCULPT_TYPE_SPHERE, 3);
@@ -497,58 +559,34 @@ namespace
     }
 
     // ------------------------------------------------------------------
-    // meshoptimizer's allocations, counted through its allocator hook.
+    // meshoptimizer on the thread's arena, as the viewer runs it, while it
+    // lives, and on its own default, operator new and delete, after.
 
-    struct Allocations
+    struct ArenaInstalled
     {
-        static inline size_t blocks = 0;
-        static inline size_t bytes = 0;
+        static void* MESHOPTIMIZER_ALLOC_CALLCONV newBlock(size_t bytes) { return ::operator new(bytes); }
+        static void MESHOPTIMIZER_ALLOC_CALLCONV deleteBlock(void* block) { ::operator delete(block); }
 
-        static void* MESHOPTIMIZER_ALLOC_CALLCONV allocate(size_t size)
-        {
-            ++blocks;
-            bytes += size;
-            return ::operator new(size);
-        }
-
-        static void MESHOPTIMIZER_ALLOC_CALLCONV deallocate(void* p)
-        {
-            ::operator delete(p);
-        }
-
-        // meshoptimizer's own default: operator new and operator delete.
-        static void* MESHOPTIMIZER_ALLOC_CALLCONV defaultAllocate(size_t size)
-        {
-            return ::operator new(size);
-        }
-
-        static void MESHOPTIMIZER_ALLOC_CALLCONV defaultDeallocate(void* p)
-        {
-            ::operator delete(p);
-        }
+        ArenaInstalled() { LLMeshOptimizer::initClass(); }
+        ~ArenaInstalled() { meshopt_setAllocator(newBlock, deleteBlock); }
     };
 
-    // Counts while it lives, and puts meshoptimizer's default back however
-    // the case ends.
+    // The blocks a call takes from the arena and from the heap, counted by
+    // the arena, and the most of the arena it holds at once.
     struct CountAllocations
     {
-        CountAllocations()
-        {
-            meshopt_setAllocator(Allocations::allocate, Allocations::deallocate);
-        }
-
-        ~CountAllocations()
-        {
-            meshopt_setAllocator(Allocations::defaultAllocate, Allocations::defaultDeallocate);
-        }
+        ArenaInstalled installed;
+        size_t arena_blocks = 0;
 
         template <typename F>
         void row(const std::string& name, F&& call)
         {
-            Allocations::blocks = 0;
-            Allocations::bytes = 0;
+            ALScratchArena::resetCounters();
             call();
-            std::printf("  %-72s %4zu blocks %9zu bytes\n", name.c_str(), Allocations::blocks, Allocations::bytes);
+            const ALScratchArena::Counters counters = ALScratchArena::counters();
+            arena_blocks += counters.arena_blocks;
+            std::printf("  %-72s %4zu arena %4zu heap %9zu bytes at most\n", name.c_str(), counters.arena_blocks, counters.heap_blocks,
+                        counters.peak);
         }
     };
 
@@ -573,6 +611,19 @@ namespace
         }
     }
 
+    TEST_CASE("llvolume_bench: whether a prim of each class is LOD-invariant", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        for (const Prim& prim : primClasses())
+        {
+            const LLVolumeParams params = prim.params;
+            BENCHMARK(fmt::format("{}, {}", prim.name, LLVolume::isLODInvariant(params) ? "invariant" : "not invariant"))
+            {
+                return LLVolume::isLODInvariant(params);
+            };
+        }
+    }
+
     TEST_CASE("llvolume_bench: a sculpt of each stitching built from its map", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
@@ -592,17 +643,19 @@ namespace
         }
     }
 
-    // createTangents is Lengyel's generator; meshoptimizer's default mode
-    // weights by angle times the edges' lengths, its compatible mode by
-    // angle alone, as MikkTSpace does. Each row makes one face's tangents
-    // a vertex.
+    // createTangents sums meshoptimizer's default weighting a vertex at a
+    // time, over the grid on a side and over the indices elsewhere.
+    // meshoptimizer's default mode weights by angle times the edges'
+    // lengths a corner at a time, its compatible mode by angle alone, as
+    // MikkTSpace does. Each row makes one face's tangents a vertex, the
+    // allocation included where the generator makes one.
     TEST_CASE("llvolume_bench: one face's tangents from each generator", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
         for (const FaceClass& face_class : faceClasses())
         {
             LLVolumeFace& face = face_class.volume->getVolumeFace(face_class.face);
-            BENCHMARK(fmt::format("Lengyel (createTangents), {}", face_class.name))
+            BENCHMARK(fmt::format("createTangents, {}", face_class.name))
             {
                 ll_aligned_free_16(face.mTangents);
                 face.mTangents = nullptr;
@@ -623,7 +676,7 @@ namespace
         {
             LLVolumeFace face = mesh.face();
             const std::string name = fmt::format("{}, {} vertices", mesh.name, face.mNumVertices);
-            BENCHMARK(fmt::format("Lengyel (createTangents), {}", name))
+            BENCHMARK(fmt::format("createTangents, {}", name))
             {
                 ll_aligned_free_16(face.mTangents);
                 face.mTangents = nullptr;
@@ -674,11 +727,137 @@ namespace
     }
 
     // cacheOptimize as a mesh thread runs it on each decoded LOD: tangents,
-    // the weld, and the cache order. Each call takes a fresh copy of the
-    // decoded face, made outside the measurement.
+    // the weld, the cache order and the fetch order, its scratch and
+    // meshoptimizer's from the thread's arena. Each call takes a fresh copy
+    // of the decoded face, made outside the measurement.
+    // LLFace's planar projection and texture transform as its vertex loops
+    // ran them, a vertex at a time along its own normal.
+    void perVertexProjection(LLVector2& tc, const LLVector4a& normal, const LLVector4a& vec)
+    {
+        LLVector4a binormal;
+        F32 d = normal[0];
+
+        if (d >= 0.5f || d <= -0.5f)
+        {
+            if (d < 0)
+            {
+                binormal.set(0,-1,0);
+            }
+            else
+            {
+                binormal.set(0, 1, 0);
+            }
+        }
+        else
+        {
+            if (normal[1] > 0)
+            {
+                binormal.set(-1,0,0);
+            }
+            else
+            {
+                binormal.set(1,0,0);
+            }
+        }
+        LLVector4a tangent;
+        tangent.setCross3(binormal,normal);
+
+        tc.mV[1] = -((tangent.dot3(vec).getF32())*2 - 0.5f);
+        tc.mV[0] = 1.0f+((binormal.dot3(vec).getF32())*2 - 0.5f);
+    }
+
+    void perVertexXform(LLVector2 &tex_coord, F32 cosAng, F32 sinAng, F32 offS, F32 offT, F32 magS, F32 magT)
+    {
+        F32 s = tex_coord.mV[0];
+        F32 t = tex_coord.mV[1];
+        s -= 0.5;
+        t -= 0.5;
+        F32 temp = s;
+        s  = s     * cosAng + t * sinAng;
+        t  = -temp * sinAng + t * cosAng;
+        s *= magS;
+        t *= magT;
+        s += offS + 0.5f;
+        t += offT + 0.5f;
+        tex_coord.mV[0] = s;
+        tex_coord.mV[1] = t;
+    }
+
+    // One face's planar texture coordinates, with no transform and through
+    // the texture entry's: a vertex at a time along each vertex's normal,
+    // as LLFace's loops ran, and through the kernel, along the face's planar
+    // normal or each vertex's by what it is. And the planar normal itself,
+    // made on a face's first planar use, and the coordinates' tangents.
+    TEST_CASE("llvolume_bench: one face's planar texture coordinates", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        std::vector<FaceClass> classes = faceClasses();
+        LLVolumeParams quarter = primParams(LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE);
+        quarter.setBeginAndEndS(0.375f, 0.625f);
+        LLPointer<LLVolume> quarter_volume = new LLVolume(quarter, LOD_DETAIL[3]);
+        for (S32 i = 0; i < quarter_volume->getNumVolumeFaces(); ++i)
+        {
+            const LLVolumeFace& face = quarter_volume->getVolumeFace(i);
+            if ((face.mTypeMask & LLVolumeFace::OUTER_MASK) && !(face.mTypeMask & LLVolumeFace::FLAT_MASK))
+            {
+                classes.push_back({ fmt::format("quarter cylinder side at LOD 3, {} vertices", face.mNumVertices), quarter_volume, i });
+            }
+        }
+
+        const LLVector4a scale(0.37f, 2.5f, 11.f);
+        const alsimd::TexTransform turned{ cosf(0.3f), sinf(0.3f), 2.f, 0.75f, 0.1f, -0.2f };
+        for (const FaceClass& face_class : classes)
+        {
+            const LLVolumeFace& face = face_class.volume->getVolumeFace(face_class.face);
+            const LLVolumeFace pristine(face);
+            BENCHMARK_ADVANCED(fmt::format("planar normal, {}", face_class.name))(Catch::Benchmark::Chronometer meter)
+            {
+                std::vector<LLVolumeFace> faces(meter.runs(), pristine);
+                meter.measure([&](int i) { return faces[i].getPlanarNormal()[3]; });
+            };
+
+            const char* kind = face.getPlanarNormal()[3] > 0.f ? "one plane" : "per vertex";
+            std::vector<LLVector4a> tangents(face.mNumVertices);
+            BENCHMARK(fmt::format("tangents, {}, {}", kind, face_class.name))
+            {
+                face.getPlanarTangents(scale, tangents.data());
+                return tangents[0][0];
+            };
+            std::vector<LLVector2> out(face.mNumVertices);
+            for (const alsimd::TexTransform* transform : { (const alsimd::TexTransform*)nullptr, &turned })
+            {
+                const char* through = transform ? "turned" : "no transform";
+                BENCHMARK(fmt::format("a vertex at a time, {}, {}", through, face_class.name))
+                {
+                    LLVector2* tex_coords0 = out.data();
+                    for (S32 i = 0; i < face.mNumVertices; i++)
+                    {
+                        LLVector2 tc(face.mTexCoords[i]);
+                        LLVector4a vec = face.mPositions[i];
+                        vec.mul(scale);
+                        perVertexProjection(tc, face.mNormals[i], vec);
+                        if (transform)
+                        {
+                            perVertexXform(tc, transform->cos_ang, transform->sin_ang, transform->offset_s, transform->offset_t,
+                                           transform->scale_s, transform->scale_t);
+                        }
+                        *tex_coords0++ = tc;
+                    }
+                    return out[0].mV[0];
+                };
+                BENCHMARK(fmt::format("kernel, {}, {}, {}", kind, through, face_class.name))
+                {
+                    face.getPlanarTexCoords(scale, transform, out[0].mV);
+                    return out[0].mV[0];
+                };
+            }
+        }
+    }
+
     TEST_CASE("llvolume_bench: cacheOptimize over the mesh corpus", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
+        ArenaInstalled installed;
         std::vector<LLVolumeFace> all;
         for (const CorpusMesh& mesh : corpus())
         {
@@ -707,24 +886,94 @@ namespace
         };
     }
 
-    // Each grid's index order three ways: createSide's rows, bands of seven
-    // columns made the same way, and meshoptimizer's cache order over the
+    // cacheOptimize over the real mesh corpus (almeshcorpus.h), where
+    // AL_MESH_CORPUS_DIR names one: every face of every LOD of the sample,
+    // one call each on a fresh copy, as a mesh thread makes it. Printed as
+    // a table: the time a face and a vertex, the arena's high-water marks
+    // against its size, and the vertex cache and fetch figures it leaves.
+    TEST_CASE("llvolume_bench: cacheOptimize over the real mesh corpus", "[llvolume_bench][!benchmark]")
+    {
+        ll_test::skipUnlessOptimised();
+        std::optional<ALMeshCorpus> real = ALMeshCorpus::fromEnvironment();
+        if (!real)
+        {
+            SKIP("AL_MESH_CORPUS_DIR names no mesh cache");
+        }
+        ArenaInstalled installed;
+        std::vector<F64> face_ns, peaks, acmr, overfetch;
+        F64 total_ns = 0;
+        size_t vertices = 0, over_arena = 0;
+        constexpr size_t VERTEX_BYTES = 2 * sizeof(LLVector4a) + sizeof(LLVector2);
+        real->forEachLOD(
+            [&](const CorpusLOD& lod)
+            {
+                for (S32 f = 0; f < lod.volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& decoded = lod.volume->getVolumeFace(f);
+                    if (decoded.mNumVertices <= 0 || decoded.mNumIndices <= 0)
+                    {
+                        continue;
+                    }
+                    LLVolumeFace face = decoded;
+                    ALScratchArena::resetCounters();
+                    const auto start = std::chrono::steady_clock::now();
+                    const bool optimized = face.cacheOptimize(true);
+                    const F64 ns = (F64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+                    if (!optimized)
+                    {
+                        continue;
+                    }
+                    const ALScratchArena::Counters counters = ALScratchArena::counters();
+                    face_ns.push_back(ns);
+                    total_ns += ns;
+                    vertices += decoded.mNumVertices;
+                    peaks.push_back((F64)counters.peak);
+                    over_arena += counters.heap_blocks > 0;
+                    const std::vector<U32> indices(face.mIndices, face.mIndices + face.mNumIndices);
+                    acmr.push_back(meshopt_analyzeVertexCache(indices.data(), indices.size(), face.mNumVertices, 16, 0, 0).acmr);
+                    overfetch.push_back((F64)meshopt_analyzeVertexFetch(indices.data(), indices.size(), face.mNumVertices, VERTEX_BYTES).bytes_fetched /
+                                        ((F64)face.mNumVertices * VERTEX_BYTES));
+                }
+            });
+        REQUIRE(!face_ns.empty());
+        auto quantile = [](std::vector<F64> values, F64 q)
+        {
+            std::sort(values.begin(), values.end());
+            return values[std::min(values.size() - 1, (size_t)(q * (F64)(values.size() - 1) + 0.5))];
+        };
+        std::printf("cacheOptimize over the real mesh corpus: %s\n", real->describe().c_str());
+        std::printf("  %zu faces, %zu decoded vertices: %.0f ns a face (median %.0f, 99th percentile %.0f), %.1f ns a decoded vertex\n", face_ns.size(),
+                    vertices, total_ns / face_ns.size(), quantile(face_ns, 0.5), quantile(face_ns, 0.99), total_ns / vertices);
+        std::printf("  arena high-water mark: median %.0f, 99th percentile %.0f, most %.0f bytes of %zu; %zu faces larger than the arena\n",
+                    quantile(peaks, 0.5), quantile(peaks, 0.99), quantile(peaks, 1.0), ALScratchArena::CAPACITY, over_arena);
+        std::printf("  vertices transformed a triangle: median %.3f, 90th percentile %.3f; overfetch: median %.4f, 90th percentile %.4f\n",
+                    quantile(acmr, 0.5), quantile(acmr, 0.9), quantile(overfetch, 0.5), quantile(overfetch, 0.9));
+        std::fflush(stdout);
+    }
+
+    // Each grid's index order: row by row, by column, in bands, createSide's
+    // choice of the last two, and meshoptimizer's cache order over the
     // rows. The vertices each transforms a triangle in a 16-entry cache are
     // printed first.
     TEST_CASE("llvolume_bench: a grid's index order", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
         const std::vector<Grid> grids = sweepGrids();
-        std::printf("vertices transformed a triangle, 16-entry cache\n  %-40s %10s %10s %13s\n", "grid", "row-major", "banded", "meshoptimizer");
+        std::printf("vertices transformed a triangle, 16-entry cache\n  %-56s %8s %8s %8s %10s %13s\n", "grid", "rows", "columns", "bands",
+                    "createSide", "meshoptimizer");
         for (const Grid& grid : grids)
         {
-            std::vector<U32> rows, bands, optimized;
+            const U32 vertices = grid.columns * grid.rows;
+            std::vector<U32> rows, columns, bands, side, optimized;
             rowMajor(rows, grid.columns, grid.rows);
-            banded(bands, grid.columns, grid.rows);
+            byColumn(columns, grid.columns, grid.rows);
+            inBands(bands, grid.columns, grid.rows);
+            sideOrder(side, grid.columns, grid.rows);
             optimized.resize(rows.size());
-            meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), grid.columns * grid.rows);
-            std::printf("  %-40s %10.3f %10.3f %13.3f\n", grid.name.c_str(), transformedPerTriangle(rows, grid.columns * grid.rows),
-                        transformedPerTriangle(bands, grid.columns * grid.rows), transformedPerTriangle(optimized, grid.columns * grid.rows));
+            meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), vertices);
+            std::printf("  %-56s %8.3f %8.3f %8.3f %10.3f %13.3f\n", grid.name.c_str(), transformedPerTriangle(rows, vertices),
+                        transformedPerTriangle(columns, vertices), transformedPerTriangle(bands, vertices), transformedPerTriangle(side, vertices),
+                        transformedPerTriangle(optimized, vertices));
         }
         std::fflush(stdout);
 
@@ -732,20 +981,20 @@ namespace
         {
             std::vector<U32> out;
             out.reserve((grid.columns - 1) * (grid.rows - 1) * 6);
-            BENCHMARK(fmt::format("row-major, {}", grid.name))
+            BENCHMARK(fmt::format("row by row, {}", grid.name))
             {
                 rowMajor(out, grid.columns, grid.rows);
                 return out.back();
             };
-            BENCHMARK(fmt::format("banded, {}", grid.name))
+            BENCHMARK(fmt::format("createSide's order, {}", grid.name))
             {
-                banded(out, grid.columns, grid.rows);
+                sideOrder(out, grid.columns, grid.rows);
                 return out.back();
             };
             std::vector<U32> rows;
             rowMajor(rows, grid.columns, grid.rows);
             std::vector<U32> optimized(rows.size());
-            BENCHMARK(fmt::format("meshoptimizer over row-major, {}", grid.name))
+            BENCHMARK(fmt::format("meshoptimizer over row by row, {}", grid.name))
             {
                 meshopt_optimizeVertexCache(optimized.data(), rows.data(), rows.size(), grid.columns * grid.rows);
                 return optimized.back();
@@ -753,13 +1002,12 @@ namespace
         }
     }
 
-    // The blocks each meshoptimizer call takes from its allocator, counted
-    // through meshopt_setAllocator, and what cacheOptimize's calls take
-    // together.
+    // The blocks each meshoptimizer call takes, and what a cacheOptimize
+    // takes with its own scratch, from the arena and from the heap.
     TEST_CASE("llvolume_bench: meshoptimizer's allocations a call", "[llvolume_bench][!benchmark]")
     {
         ll_test::skipUnlessOptimised();
-        std::printf("meshoptimizer allocations a call\n");
+        std::printf("meshoptimizer blocks a call\n");
         size_t blocks = 0;
         {
             CountAllocations count;
@@ -784,8 +1032,8 @@ namespace
             {
                 LLVolumeFace face = mesh.face();
                 count.row(fmt::format("cacheOptimize, {}, {} vertices", mesh.name, face.mNumVertices), [&] { face.cacheOptimize(true); });
-                blocks += Allocations::blocks;
             }
+            blocks = count.arena_blocks;
         }
         std::fflush(stdout);
         CHECK(blocks > 0);

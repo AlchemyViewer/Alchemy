@@ -62,13 +62,6 @@
 
   "extras": [
     {
-      "name": "mikktspace",
-      "holder": "Copyright (C) 2011 by Morten S. Mikkelsen; Copyright (C) 2022 Blender Authors",
-      "license": "Apache-2.0",
-      "homepage": "https://github.com/blender/blender/tree/main/intern/mikktspace",
-      "text": "externals/mikktspace/LICENSE.txt"
-    },
-    {
       "name": "three.js",
       "holder": "Copyright (c) 2010-2021 three.js authors",
       "license": "MIT",

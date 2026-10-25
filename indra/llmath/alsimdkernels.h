@@ -1,8 +1,8 @@
 /**
  * @file alsimdkernels.h
  * @brief Batch kernels over arrays of vectors: transforms, dequantization,
- *        index offsets, skinning and bounds, at the register width the
- *        build was compiled for.
+ *        index offsets, skinning, bounds and tangents, at the register
+ *        width the build was compiled for.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -36,7 +36,8 @@
 // has: 128 bits on NEON four vectors at a time, 256 at AVX two vectors per
 // register, 512 at AVX-512 four. The tail is finished one vector at a
 // time. The bodies are templates over a width type in alsimdkernels.inl;
-// this header is the entry points, instantiated once in alsimdkernels.cpp.
+// this header is the entry points, instantiated once in alsimdkernels.cpp,
+// and the planar ones in alsimdplanar.cpp, which is built strict.
 namespace alsimd
 {
 
@@ -54,6 +55,12 @@ void transform_directions(const LLMatrix4a& m, const LLVector4a* src, LLVector4a
 // The same, with lane w of every result taken from its source.
 void transform_directions_keep_w(const LLMatrix4a& m, const LLVector4a* src, LLVector4a* dst, size_t n);
 
+// Every direction through the upper three rows, then offset added: a point
+// turned and scaled about the origin and then moved, rounded as
+// LLMatrix4a::rotate and an add round it, where transform_points folds the
+// move into the rows' sum.
+void transform_directions_offset(const LLMatrix4a& m, const LLVector4a& offset, const LLVector4a* src, LLVector4a* dst, size_t n);
+
 // Two texture coordinates per vector, <s0, t0, s1, t1>: translated by
 // trans, rotated by rot0 and rot1 (<cos, -sin, cos, -sin> and <sin, cos,
 // sin, cos>), scaled, then offset. n counts vectors.
@@ -61,9 +68,69 @@ void transform_texcoords(const F32* src, F32* dst, size_t n,
                          const LLVector4a& trans, const LLVector4a& rot0, const LLVector4a& rot1,
                          const LLVector4a& scale, const LLVector4a& offset);
 
+// A texture transform about the middle of the texture: a turn by the angle
+// whose cosine and sine these are, then a scale, then an offset.
+struct TexTransform
+{
+    F32 cos_ang = 1.f;
+    F32 sin_ang = 0.f;
+    F32 scale_s = 1.f;
+    F32 scale_t = 1.f;
+    F32 offset_s = 0.f;
+    F32 offset_t = 0.f;
+};
+
+// Planar texture coordinates, an <s, t> pair a point into dst, which needs
+// only float alignment. Each position times scale is p. b . p and t . p
+// are each summed from rounded products, x and y and then z as
+// LLVector4a::dot3 sums them, and doubled to db and dt. With no transform,
+// s = db + 0.5 and t = 0.5 - dt. Through one, s' = db cos - dt sin and
+// t' = -(dt cos) - db sin, each with its second product rounded and its
+// first fused into the sum; then s = (s' scale_s + offset_s) + 0.5, and t
+// likewise, rounded at every step.
+//
+// This form takes one binormal b and tangent t for every point: a face
+// projected as one plane.
+void planar_texcoords(const LLVector4a* positions, size_t n, const LLVector4a& scale, const LLVector4a& binormal,
+                      const LLVector4a& tangent, const TexTransform* transform, F32* dst);
+
+// This one takes each point's from its normal: b is y, negated where the
+// normal's x is below zero, where that x is at least switch_x in size, and
+// otherwise x, negated where the normal's y is above zero; t is b x normal
+// as LLVector4a::setCross3 rounds it.
+void planar_texcoords(const LLVector4a* positions, const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x,
+                      const TexTransform* transform, F32* dst);
+
+// The tangents of those coordinates, before any transform, one a normal:
+// the way s runs along the surface where that normal is, unit, with w 1
+// where w (normal x tangent) runs the way t does and -1 where it runs
+// against it, as the tangent generators give w. With s's gradient
+// gs = scale * b and t's gt = -(scale * t), w is the sign of
+// normal . (gs x gt) and the tangent is w (gt x normal) normalized; where
+// gt lies along the normal it is gs put in the normal's plane instead.
+// The normals need not be unit length. The one-plane and per-point forms
+// take b and t as planar_texcoords' do.
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, const LLVector4a& binormal, const LLVector4a& tangent,
+                     LLVector4a* dst);
+void planar_tangents(const LLVector4a* normals, size_t n, const LLVector4a& scale, F32 switch_x, LLVector4a* dst);
+
 // dst[i] = src[i] + offset, wrapping at sixteen bits. Neither array need
 // be aligned.
 void offset_indices_u16(const U16* src, U16* dst, size_t n, U16 offset);
+
+// Each point's x, y and z from [-0.5, 0.5] to the nearest of the 256
+// steps across it, packed x | y << 8 | z << 16, w left out; a coordinate
+// outside the cube clamps to its end. Points that are the same get one
+// code, and a sculpt's points, eight bits an axis, get a code each.
+void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst);
+
+// The triangles of a grid of columns by rows vertices, vertex
+// s + columns * t, that have two corners of one code. The quad at column s
+// and row t is bottom left, top right, top left, flagged in bit s % 64 of
+// upper[t * words + s / 64], and bottom left, bottom right, top right, in
+// lower; words is at least (columns + 62) / 64. codes is read up to eight
+// past its columns * rows. Returns how many rows of quads have a flag.
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words);
 
 // Three little-endian 16-bit values per vertex, six bytes apart, to
 // {x, y, z, 0} * scale + bias; the fourth lane of scale is ignored, so w
@@ -119,6 +186,50 @@ struct MorphApply
 };
 
 void morph_apply(const MorphApply& m);
+
+// Every vertex's tangent by meshoptimizer's default weighting, summed into
+// the vertex itself rather than into groups of its corners. A triangle's
+// tangent is dP/du by the chain rule. It adds nothing where the triangle
+// has no area, in positions or in UVs, to within rounding: twice the area
+// under 1e-5 of the sum of the squares of the two edges from its first
+// corner, as when two corners are one point. At each corner it is put in
+// the plane of that corner's normal, renormalized, and weighted by the
+// angle between the corner's edges in that plane times the product of
+// their lengths there. Each vertex's sum is put back in its normal's plane
+// and normalized; where nothing was added it is +x in that plane, or +y
+// where the normal is within 45 degrees of x. w is the sign of the UV
+// area of the vertex's triangles in index order, the sign of the most of
+// them where they differ; a vertex in none of them takes the face's, and
+// -1 where the face has none either. The normals are taken as unit length.
+//
+// The grid form is a grid of columns by rows, vertex s + columns * t, each
+// quad two triangles: bottom left, top right, top left and bottom left,
+// bottom right, top right, as LLVolumeFace::createSide indexes them. It
+// needs no index buffer, and keeps the grid as lanes in a scratch buffer
+// of each thread's, which grows to the largest grid the thread has made
+// tangents for.
+void grid_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t columns, size_t rows,
+                   LLVector4a* tangents);
+
+// The same over triangles from an index buffer.
+void indexed_tangents(const LLVector4a* positions, const LLVector4a* normals, const LLVector2* uvs, size_t vertex_count,
+                      const U16* indices, size_t index_count, LLVector4a* tangents);
+
+// A grid's tangents along its rows, cheaply: each vertex's is the chord
+// from its left neighbour in its row to its right one, times sign, put in
+// the plane of its normal and normalized, with w set to w. At a row's
+// ends the chord reaches across the seam to the column beside the other
+// end where joins is set, and is one-sided where it is not. A chord whose
+// part in that plane is shorter than `same`, or nearly along the normal,
+// gives no direction: the vertex is left with w 0, for the caller to fill.
+// Returns whether any was. The grid is laid out as grid_tangents takes it.
+bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normals, size_t columns, size_t rows, bool joins, F32 same, F32 sign,
+                           F32 w, LLVector4a* tangents);
+
+// Every vector at unit length in x, y and z, with a w of 0, where its
+// squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1),
+// whatever w it had. Returns whether any was set so.
+bool normalize3_or_mark(LLVector4a* v, size_t n);
 
 } // namespace alsimd
 
