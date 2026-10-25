@@ -9395,7 +9395,7 @@ void LLPipeline::beginWaterTargets()
     mWaterRefraction = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::Water));
     mWaterDepthCopy  = acquireResource(*mWaterTargets, Plan::inPack(renderPack(), Plan::Slot::DepthCopy));
 
-    // The colour over the part of the screen the water reads it at, the blit covering that and the rest of the copy
+    // The colour over the part of the screen the water reads it at, the copy covering that and the rest of the target
     // left as the pool gave it; the depth whole, which the waves' depth pyramid reduces, copySceneDepth drawing over
     // every texel of its target.
     LLRenderTarget& src = mRT->screen;
@@ -9404,8 +9404,7 @@ void LLPipeline::beginWaterTargets()
         const LLRect rect = water_refraction_rect(mWaterSurface, (S32)src.getWidth(), (S32)src.getHeight());
         if (rect.notEmpty())
         {
-            mWaterRefraction->copyContents(src, rect.mLeft, rect.mBottom, rect.mRight, rect.mTop, rect.mLeft, rect.mBottom,
-                                           rect.mRight, rect.mTop, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            copyColor(*mWaterRefraction, src, rect);
         }
     }
     if (mWaterDepthCopy)
@@ -9419,6 +9418,46 @@ void LLPipeline::endWaterTargets()
     mWaterRefraction = nullptr;
     mWaterDepthCopy  = nullptr;
     mWaterTargets.reset();
+}
+
+// `src`'s colour into `dst` through gCopyProgram over `triangle`, the screen triangle, point sampled: each texel of `dst`
+// takes the one of `src` under its centre. Only over `rect` where there is one.
+static void draw_color_copy(LLRenderTarget& dst, LLRenderTarget& src, const LLRect* rect, LLVertexBuffer& triangle)
+{
+    dst.bindTarget();
+    {
+        LLGLSColorMask color(true, true);
+        LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+        LLGLDisable no_blend(GL_BLEND);
+        LLGLDisable no_cull(GL_CULL_FACE);
+        std::optional<LLGLSScissor> scissor;
+        if (rect)
+        {
+            scissor.emplace(rect->mLeft, rect->mBottom, rect->getWidth(), rect->getHeight());
+        }
+
+        gCopyProgram.bind();
+        gCopyProgram.bindTexture(LLShaderMgr::DIFFUSE_MAP, &src, ALSamplers::PointClamp);
+        triangle.setBuffer();
+        triangle.drawArrays(LLRender::TRIANGLES, 0, 3);
+        gCopyProgram.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+        gCopyProgram.unbind();
+    }
+    dst.flush();
+}
+
+void LLPipeline::copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRect& rect)
+{
+    LL_PROFILE_GPU_ZONE("color rect copy");
+    llassert(dst.getWidth() == src.getWidth() && dst.getHeight() == src.getHeight());
+    if (!gCopyProgram.isComplete())
+    {
+        dst.copyContents(src, rect.mLeft, rect.mBottom, rect.mRight, rect.mTop, rect.mLeft, rect.mBottom, rect.mRight,
+                         rect.mTop, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        return;
+    }
+    // Over a target of the source's size each fragment samples its own texel's centre: the source's texel for texel.
+    draw_color_copy(dst, src, &rect, *mScreenTriangleVB);
 }
 
 void LLPipeline::copySceneDepth(LLRenderTarget& dst)
