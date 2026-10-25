@@ -2582,6 +2582,23 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
             return false;
         }
 
+        // The LOD's indices between its faces, summed before any face is
+        // made.
+        size_t lod_indices = 0;
+        for (size_t i = 0; i < face_count; ++i)
+        {
+            if (!mdl[i].has("NoGeometry"))
+            {
+                lod_indices += mdl[i]["TriangleList"].asBinary().size() / sizeof(U16);
+            }
+        }
+        if (lod_indices > (size_t)LL_SCULPT_MESH_MAX_LOD_INDICES)
+        {
+            LL_WARNS() << "Invalid index count " << lod_indices << " exceeds maximum for a LOD of " << face_count << " faces" << LL_ENDL;
+            mVolumeFaces.clear();
+            return false;
+        }
+
         mVolumeFaces.resize(face_count);
 
         for (size_t i = 0; i < face_count; ++i)

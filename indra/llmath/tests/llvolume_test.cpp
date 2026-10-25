@@ -4374,17 +4374,23 @@ namespace
         return face;
     }
 
-    // A LOD of the one face, decoded into a mesh volume of its own.
-    LLPointer<LLVolume> decodeLOD(const LLSD& face, bool& decoded)
+    // A LOD of the faces, decoded into a mesh volume of its own.
+    LLPointer<LLVolume> decodeFaces(const LLSD& mdl, bool& decoded)
     {
-        LLSD mdl = LLSD::emptyArray();
-        mdl.append(face);
         LLVolumeParams params;
         params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
         params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000c"), LL_SCULPT_TYPE_MESH);
         LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
         decoded = ll_test::VolumeProbe::decode(*volume, mdl);
         return volume;
+    }
+
+    // A LOD of the one face, decoded into a mesh volume of its own.
+    LLPointer<LLVolume> decodeLOD(const LLSD& face, bool& decoded)
+    {
+        LLSD mdl = LLSD::emptyArray();
+        mdl.append(face);
+        return decodeFaces(mdl, decoded);
     }
 
     // A face's TriangleList of zeros deflates to almost nothing, so that one
@@ -4412,6 +4418,35 @@ namespace
             {
                 CHECK(volume->getNumVolumeFaces() == 0);
             }
+        }
+    }
+
+    // Faces each within LL_SCULPT_MESH_MAX_FACE_INDICES could still carry,
+    // between them, all the indices the unzip cap lets through. A LOD whose
+    // faces hold more than LL_SCULPT_MESH_MAX_LOD_INDICES between them does
+    // not decode; one whose hold as many as that does.
+    TEST_CASE("llvolume: a mesh LOD of more indices than a LOD may hold does not decode", "[llvolume]")
+    {
+        const S32 most = LL_SCULPT_MESH_MAX_FACE_INDICES - LL_SCULPT_MESH_MAX_FACE_INDICES % 3;
+        REQUIRE(2 * most <= LL_SCULPT_MESH_MAX_LOD_INDICES);
+        REQUIRE(2 * most + 6 > LL_SCULPT_MESH_MAX_LOD_INDICES);
+        for (const S32 last : { 0, 6 })
+        {
+            CAPTURE(last);
+            LLSD mdl = LLSD::emptyArray();
+            for (const S32 indices : { most, most, last })
+            {
+                if (indices > 0)
+                {
+                    LLSD face = wireTriangle();
+                    face["TriangleList"] = LLSD(LLSD::Binary((size_t)indices * sizeof(U16), 0));
+                    mdl.append(face);
+                }
+            }
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeFaces(mdl, decoded);
+            CHECK(decoded == (last == 0));
+            CHECK(volume->getNumVolumeFaces() == (decoded ? (S32)mdl.size() : 0));
         }
     }
 

@@ -220,6 +220,11 @@ constexpr S32 LL_SCULPT_MESH_MAX_FACES = 8;
 // 360,564. A LOD with a face past this does not decode.
 constexpr S32 LL_SCULPT_MESH_MAX_FACE_INDICES = 32 * 65536;
 
+// The most indices a mesh LOD's faces may hold between them: two faces of
+// as many as a face may hold. The largest of 66,000 LODs in a viewer's mesh
+// cache held 526,422, an eighth of this. A LOD past this does not decode.
+constexpr S32 LL_SCULPT_MESH_MAX_LOD_INDICES = 2 * LL_SCULPT_MESH_MAX_FACE_INDICES;
+
 extern bool gDebugGL;
 
 class LLProfileParams
