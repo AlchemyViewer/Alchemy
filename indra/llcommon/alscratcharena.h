@@ -41,7 +41,12 @@
 //
 // The order is the caller's to keep: a block goes back before every block
 // taken after it has. Nothing holding a block may yield to a coroutine
-// that takes from the same thread's arena.
+// that takes from the same thread's arena. A block given back out of that
+// order, or twice, leaves the top where it is, so that no block still in
+// use is handed out again: its room is lost to the thread, and the first
+// such return is logged. The arena is freed as its thread ends, and a
+// block taken after, as by a thread_local destroyed after it, comes from
+// the heap.
 class LL_COMMON_API ALScratchArena
 {
 public:
