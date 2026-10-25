@@ -4461,6 +4461,82 @@ namespace
         }
     }
 
+    // A face may come without normals or texture coordinates, as the DAE
+    // loader leaves one whose source has none. Reordered without tangents,
+    // which need both, it keeps every corner's position and comes out
+    // without what it came without.
+    TEST_CASE("llvolume: a face without normals or texture coordinates reorders without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+        };
+        const Without cases[] = {
+            { "normals", true, false },
+            { "texture coordinates", false, true },
+            { "either", true, true },
+        };
+        const CorpusMesh mesh = uvSphere(16, 8);
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            // Each triangle as its corners' positions, and normals and
+            // texture coordinates where the face keeps them, from its least
+            // corner on; sorted, as the reordering leaves them in another
+            // order.
+            using Corner = std::array<F32, 8>;
+            auto triangles = [&](const LLVolumeFace& f)
+            {
+                std::vector<std::array<Corner, 3>> out(f.mNumIndices / 3);
+                for (size_t t = 0; t < out.size(); ++t)
+                {
+                    for (S32 k = 0; k < 3; ++k)
+                    {
+                        const U16 v = f.mIndices[t * 3 + k];
+                        Corner& corner = out[t][k];
+                        corner.fill(0.f);
+                        std::memcpy(&corner[0], f.mPositions[v].getF32ptr(), 3 * sizeof(F32));
+                        if (!without.normals)
+                        {
+                            std::memcpy(&corner[3], f.mNormals[v].getF32ptr(), 3 * sizeof(F32));
+                        }
+                        if (!without.tex_coords)
+                        {
+                            std::memcpy(&corner[6], f.mTexCoords[v].mV, 2 * sizeof(F32));
+                        }
+                    }
+                    std::rotate(out[t].begin(), std::min_element(out[t].begin(), out[t].end()), out[t].end());
+                }
+                std::sort(out.begin(), out.end());
+                return out;
+            };
+
+            LLVolumeFace face = mesh.face();
+            const auto before = triangles(face);
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            REQUIRE(face.cacheOptimize(true));
+            CHECK((face.mNormals != nullptr) == !without.normals);
+            CHECK((face.mTexCoords != nullptr) == !without.tex_coords);
+            CHECK(!face.mTangents);
+            REQUIRE(face.mNumIndices == (S32)before.size() * 3);
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                CAPTURE(i);
+                REQUIRE(face.mIndices[i] < face.mNumVertices);
+            }
+            CHECK(triangles(face) == before);
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two

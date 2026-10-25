@@ -5329,8 +5329,14 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
             const U32 from = first_corner ? indices[corner] : (U32)u;
 
             mPositions[to] = old_positions[from];
-            mNormals[to] = old_normals[from];
-            mTexCoords[to] = old_tex_coords[from];
+            if (old_normals)
+            {
+                mNormals[to] = old_normals[from];
+            }
+            if (old_tex_coords)
+            {
+                mTexCoords[to] = old_tex_coords[from];
+            }
             if (old_weights)
             {
                 mWeights[to] = old_weights[from];
@@ -5349,6 +5355,17 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         for (size_t i = 0; i < index_count; ++i)
         {
             mIndices[i] = (U16)place[ordered[i]];
+        }
+
+        // A face without normals or texture coordinates, as the DAE loader
+        // makes one, keeps none.
+        if (!old_normals)
+        {
+            mNormals = nullptr;
+        }
+        if (!old_tex_coords)
+        {
+            mTexCoords = nullptr;
         }
 
         ll_aligned_free<64>(old_positions);
