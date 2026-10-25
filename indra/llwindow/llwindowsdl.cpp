@@ -4502,9 +4502,10 @@ void LLWindowSDL::setUseMultGL(bool use_mult_gl)
 
     sUseMultGL = use_mult_gl;
 
-    if (gGLManager.mInited)
+    // The context current, which createContext calls this with before initGL has run: gGLManager.mInited would skip
+    // the engine at every start, leaving it on only in a session the setting changed in.
+    if (CGLContextObj ctx = CGLGetCurrentContext())
     {
-        CGLContextObj ctx = CGLGetCurrentContext();
         //enable multi-threaded OpenGL (whether or not sUseMultGL actually changed)
         if (sUseMultGL)
         {
