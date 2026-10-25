@@ -3051,6 +3051,9 @@ void LLViewerMediaImpl::update()
         return;
     }
 
+    // A texture update on the LLImageGL thread reads the source's shared memory, which a size change would remove.
+    mMediaSource->holdSharedMemory(mTextureUpdatePending);
+
     // Make sure a navigate doesn't happen during the idle -- it can cause mMediaSource to get destroyed, which can cause a crash.
     setNavigateSuspended(true);
 
@@ -3143,6 +3146,7 @@ void LLViewerMediaImpl::update()
                         // A no-op when syncTexName published the frame.
                         gl_image->endUpload();
                         mTextureUpdatePending = false;
+                        mUpdatingMediaSource.reset();
                         media_tex->unref();
                         unref();
                     });
@@ -3152,6 +3156,8 @@ void LLViewerMediaImpl::update()
                 // Taken once the post has succeeded: the callback that lets them go runs
                 // on this thread's queue, so not before this returns.
                 mTextureUpdatePending = true;
+                // Its shared memory is what the update reads.
+                mUpdatingMediaSource = mMediaSource;
                 ref();  // protect texture from deletion while active on bg queue
                 media_tex->ref();
             }
