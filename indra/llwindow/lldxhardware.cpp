@@ -608,6 +608,11 @@ bool LLDXHardware::initGLDXInterop()
     {
         return true;   // already up
     }
+    if (!mGLDXInteropWanted)
+    {
+        LL_INFOS("RenderInit") << "No D3D/GL interop: accelerated media paint is off" << LL_ENDL;
+        return false;
+    }
     // Require every WGL DX interop entry point the accelerated-paint path uses, not
     // just wglDXOpenDeviceNV. Otherwise hasGLDXInterop() could report success while
     // (e.g.) wglDXUnlockObjectsNV is missing, and the consumer would fail mid-blit

@@ -1798,7 +1798,8 @@ const   S32   max_format  = (S32)num_formats - 1;
     }
 
     // Bring up the process-shared D3D11 <-> GL interop device once, here on the
-    // main thread with the render context current and the WGL extensions loaded.
+    // main thread with the render context current and the WGL extensions loaded,
+    // where the viewer wants it (LLDXHardware::setGLDXInteropWanted).
     // Zero-copy CEF media surfaces share it instead of each creating a private
     // D3D device. Best-effort - failure just means accelerated paint falls back
     // to the CPU path.

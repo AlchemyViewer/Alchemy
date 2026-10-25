@@ -5,7 +5,7 @@
         <key>ALCefAcceleratedPaint</key>
         <map>
             <key>Comment</key>
-            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart. (CEF daemon rework, on by default; falls back to CPU paint where the GPU interop is unavailable.)</string>
+            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart: on Windows the D3D/GL interop it needs is opened with the window only while this is on. Falls back to CPU paint where the GPU interop is unavailable.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
