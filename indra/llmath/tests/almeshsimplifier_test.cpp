@@ -759,6 +759,37 @@ namespace
         CHECK(pair_target->getVolumeFace(0).mNumIndices / 3 < 4 * 32);
     }
 
+    // Two faces at the same positions, as a garment's inside is a copy of
+    // its outside turned over, with a material of its own: each is held
+    // where its open border runs, which the other's is too, and simplifies
+    // inside it as a face on its own does.
+    TEST_CASE("almeshsimplifier: faces that lie over one another simplify face by face", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        const F32 decimator = 9.f;
+        const Geometry front = plane(32);
+        Geometry back = front;
+        for (size_t i = 0; i < back.indices.size(); i += 3)
+        {
+            std::swap(back.indices[i + 1], back.indices[i + 2]);
+        }
+        for (LLVector3& normal : back.normals)
+        {
+            normal = -normal;
+        }
+        LLPointer<LLVolume> base = volumeOf({ front, back });
+        LLPointer<LLVolume> target = targetFor(*base);
+        for (S32 f = 0; f < 2; ++f)
+        {
+            INFO(fmt::format("face {}", f));
+            const F32 ratio = ALMeshSimplifier(*base).simplifyFace(f, target->getVolumeFace(f), toCount(decimator), Seams::ALL);
+            INFO(fmt::format("a ratio of {}", ratio));
+            CHECK(ratio * ALLOWED_DRIFT >= decimator);
+            REQUIRE(wellFormed(target->getVolumeFace(f)));
+            CHECK(borderOf(target->getVolumeFace(f)).size() == 4 * 32);
+        }
+    }
+
     // ------------------------------------------------------------------
     // Seams
 

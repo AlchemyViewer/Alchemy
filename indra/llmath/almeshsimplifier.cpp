@@ -47,6 +47,7 @@ struct ALMeshSimplifier::Mesh
     std::vector<LLVector4a> positions; // in the authored shape
     std::vector<F32> attributes;       // ATTRIBUTE_COUNT a vertex
     std::vector<U8> shared;            // at a position another face has a vertex at too
+    std::vector<U8> held;              // shared, and at a position on the open border of a face
     std::vector<U8> uv_seam;           // at a position its face has a vertex with another texture coordinate at
     F32 extent = 0.f;                  // the largest extent of the positions
 
@@ -220,11 +221,52 @@ namespace
                 }
             }
         }
+        // Each position on the open border of a face, where an edge of its
+        // runs that no other of its triangles has, its vertices taken at
+        // their positions. Where faces meet, one's border lies along the
+        // other; faces that overlap, as a garment's inside is a copy of its
+        // outside, share positions across their insides too.
+        std::vector<U8> border(vertex_count, 0);
+        std::vector<U64> edges;
+        for (S32 f = 0; f < faces; ++f)
+        {
+            edges.clear();
+            for (U32 i = mesh.first_index[f]; i < mesh.first_index[f + 1]; i += 3)
+            {
+                for (U32 k = 0; k < 3; ++k)
+                {
+                    const U32 a = remap[mesh.indices[i + k]];
+                    const U32 b = remap[mesh.indices[i + (k + 1) % 3]];
+                    if (a != b)
+                    {
+                        edges.push_back(((U64)llmin(a, b) << 32) | llmax(a, b));
+                    }
+                }
+            }
+            std::sort(edges.begin(), edges.end());
+            for (size_t e = 0; e < edges.size();)
+            {
+                size_t run = e + 1;
+                while (run < edges.size() && edges[run] == edges[e])
+                {
+                    ++run;
+                }
+                if (run - e == 1)
+                {
+                    border[(U32)(edges[e] >> 32)] = 1;
+                    border[(U32)edges[e]] = 1;
+                }
+                e = run;
+            }
+        }
+
         mesh.shared.resize(vertex_count);
+        mesh.held.resize(vertex_count);
         mesh.uv_seam.resize(vertex_count);
         for (U32 v = 0; v < vertex_count; ++v)
         {
             mesh.shared[v] = spans[remap[v]];
+            mesh.held[v] = spans[remap[v]] && border[remap[v]];
             mesh.uv_seam[v] = seam[remap[v]];
         }
 
@@ -656,8 +698,10 @@ F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target&
     {
         // A face that meets another keeps its vertices where it meets it,
         // which the other's simplification keeps as well, and all of its
-        // parts, as a part of one face may be joined to another face's. Its
-        // borders that meet no face are free.
+        // parts, as a part of one face may be joined to another face's. A
+        // face meets another along a border, one's or the other's; its
+        // borders that meet no face are free, and so is its inside where
+        // another face lies over it.
         const bool meets = std::any_of(mesh.shared.begin() + first, mesh.shared.begin() + first + vertex_count,
                                        [](U8 shared) { return shared != 0; });
         std::vector<U8> locks;
@@ -670,7 +714,7 @@ F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target&
             locks.resize(vertex_count, 0);
             for (U32 v = 0; v < vertex_count; ++v)
             {
-                if (mesh.shared[first + v])
+                if (mesh.held[first + v])
                 {
                     locks[v] |= (U8)meshopt_SimplifyVertex_Lock;
                 }
