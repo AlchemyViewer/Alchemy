@@ -3559,6 +3559,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
     }
 
     mSculptLevel = sculpt_level;
+    mSculptSpherePlaceholder = data_is_empty && visible_placeholder;
 
     // Delete any existing faces so that they get regenerated
     mVolumeFaces.clear();
@@ -7886,6 +7887,10 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     bool sculpt_invert = sculpt_type & LL_SCULPT_FLAG_INVERT;
     bool sculpt_mirror = sculpt_type & LL_SCULPT_FLAG_MIRROR;
     bool sculpt_reverse_horizontal = (sculpt_invert ? !sculpt_mirror : sculpt_mirror);  // XOR
+    if (volume->isSculptSpherePlaceholder())
+    {
+        sculpt_stitching = LL_SCULPT_TYPE_SPHERE;
+    }
 
     S32 num_vertices, num_indices;
 

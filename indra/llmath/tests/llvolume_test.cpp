@@ -3044,29 +3044,34 @@ namespace
     }
 
     // The sphere a sculpt shows while its map is missing or has no area,
-    // and the empty one it shows otherwise.
+    // whatever its stitching, and the empty one it shows otherwise.
     void inspectPlaceholders(const Inspect& how, bool spheres_only, Report& report)
     {
         for (S32 lod = 0; lod < LOD_COUNT; ++lod)
         {
-            for (bool visible : { true, false })
+            for (U8 stitching : STITCHINGS)
             {
-                if (spheres_only && !visible)
+                for (bool visible : { true, false })
                 {
-                    continue;
+                    if (spheres_only && !visible)
+                    {
+                        continue;
+                    }
+                    LLPointer<LLVolume> volume = buildSculpt(stitching, SculptMap(), lod, visible);
+                    const std::string name =
+                        fmt::format("{} placeholder of a {} sculpt at LOD {}", visible ? "sphere" : "empty", stitchingName(stitching), lod);
+                    if (volume->getSculptLevel() != -1 || volume->getNumVolumeFaces() != 1)
+                    {
+                        report.fail(
+                            fmt::format("{}: sculpt level {} and {} faces", name, volume->getSculptLevel(), volume->getNumVolumeFaces()));
+                        continue;
+                    }
+                    inspect(*volume, name, how, report);
                 }
-                LLPointer<LLVolume> volume = buildSculpt(LL_SCULPT_TYPE_SPHERE, SculptMap(), lod, visible);
-                const std::string name = fmt::format("{} placeholder at LOD {}", visible ? "sphere" : "empty", lod);
-                if (volume->getSculptLevel() != -1 || volume->getNumVolumeFaces() != 1)
+                if (!spheres_only || lod > 0)
                 {
-                    report.fail(fmt::format("{}: sculpt level {} and {} faces", name, volume->getSculptLevel(), volume->getNumVolumeFaces()));
-                    continue;
+                    inspectSculpt(stitching, oneColourMap(), lod, "one colour", how, report);
                 }
-                inspect(*volume, name, how, report);
-            }
-            if (!spheres_only || lod > 0)
-            {
-                inspectSculpt(LL_SCULPT_TYPE_SPHERE, oneColourMap(), lod, "one colour", how, report);
             }
         }
     }
@@ -4803,7 +4808,8 @@ namespace
     // must run as a sphere sculpt's map does, around along the profile and
     // pole to pole along the path. The other way round, the poles' average
     // would land on one meridian, and the S wrap would sum the north pole
-    // with the south.
+    // with the south. It gets the sphere's stitching whatever its own: a
+    // torus's would sum its two poles, and a plane's leave its seam open.
     TEST_CASE("llvolume: the sphere placeholder's normals follow its surface", "[llvolume]")
     {
         Inspect how;

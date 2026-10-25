@@ -1169,6 +1169,11 @@ public:
     S32 getSculptLevel() const                              { return mSculptLevel; }
     void setSculptLevel(S32 level)                          { mSculptLevel = level; }
 
+    // Whether the sculpt shows the sphere it shows while its map is missing
+    // or has no area, which is laid out and stitched as a sphere sculpt is,
+    // whatever its own stitching.
+    bool isSculptSpherePlaceholder() const                  { return mSculptSpherePlaceholder; }
+
 
     static void getLoDTriangleCounts(const LLVolumeParams& params, S32* counts);
 
@@ -1239,6 +1244,7 @@ public:
     bool mLODInvariant;
     F32 mDetail;
     S32 mSculptLevel;
+    bool mSculptSpherePlaceholder = false;
     F32 mSurfaceArea; //unscaled surface area
     bool mIsMeshAssetLoaded;
     bool mIsMeshAssetUnavaliable;
