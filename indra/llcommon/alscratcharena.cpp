@@ -39,22 +39,33 @@ namespace
 
     // The thread's arena. Nothing is done to destroy it, so that it lasts
     // as long as its thread, past every thread_local's destructor;
-    // ArenaRelease frees its memory.
+    // ArenaRelease ends it.
     struct Arena
     {
         U8* mBase = nullptr;
         size_t mTop = 0;
-        // The arena could not be made, or is freed: every block comes from
-        // the heap.
+        // The arena could not be made, or its thread has ended: every block
+        // comes from the heap.
         bool mUnavailable = false;
         ALScratchArena::Counters mCounters;
     };
 
     thread_local Arena tArena;
 
-    // Frees its thread's arena as the thread ends. It is made with the
-    // arena, so a thread_local made before is destroyed after it, and what
-    // that takes then comes from the heap.
+    // Frees an arena its thread has ended once no block is out of it.
+    void freeIfEnded(Arena& arena)
+    {
+        if (arena.mUnavailable && arena.mTop == 0)
+        {
+            ll_aligned_free<64>(arena.mBase);
+            arena.mBase = nullptr;
+        }
+    }
+
+    // Ends its thread's arena as the thread ends. It is made with the arena,
+    // so a thread_local made before is destroyed after it: what that takes
+    // then comes from the heap, and a block it holds goes back into the
+    // arena, which is freed once the last is back.
     struct ArenaRelease
     {
         Arena* mArena = nullptr;
@@ -63,9 +74,8 @@ namespace
         {
             if (mArena)
             {
-                ll_aligned_free<64>(mArena->mBase);
-                mArena->mBase = nullptr;
                 mArena->mUnavailable = true;
+                freeIfEnded(*mArena);
             }
         }
     };
@@ -87,7 +97,7 @@ void* ALScratchArena::allocate(size_t bytes)
     // Compared before it is rounded, so that a size near the top of size_t,
     // as meshoptimizer asks for when a count overflows, goes to the heap.
     const size_t room = CAPACITY - arena.mTop;
-    if (arena.mBase && room > HEADER && bytes <= room - HEADER)
+    if (!arena.mUnavailable && room > HEADER && bytes <= room - HEADER)
     {
         const size_t size = (bytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
         if (size <= room - HEADER)
@@ -121,6 +131,7 @@ void ALScratchArena::deallocate(void* block)
         if (start >= HEADER && start <= arena.mTop && *reinterpret_cast<const size_t*>(p - HEADER) == arena.mTop - start)
         {
             arena.mTop = start - HEADER;
+            freeIfEnded(arena);
         }
         else
         {

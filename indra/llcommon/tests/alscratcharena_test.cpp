@@ -158,13 +158,15 @@ namespace
 
     // A block given back while one taken after it is still out leaves the
     // top where it is: the next block is taken above the one still out, not
-    // over it. The thread is the case's own, and the lost room goes with
-    // its arena.
+    // over it. The thread is the case's own. Given back again once it is on
+    // top, the first block brings the top back to the start, so that the
+    // arena is freed as the thread ends.
     TEST_CASE("alscratcharena: a block given back out of order leaves the blocks above it to their holders", "[alscratcharena]")
     {
         void* below = nullptr;
         void* above = nullptr;
         void* next = nullptr;
+        void* again = nullptr;
         std::thread([&]
                     {
                         below = ALScratchArena::allocate(64);
@@ -173,10 +175,52 @@ namespace
                         next = ALScratchArena::allocate(64);
                         ALScratchArena::deallocate(next);
                         ALScratchArena::deallocate(above);
+                        ALScratchArena::deallocate(below);
+                        again = ALScratchArena::allocate(64);
+                        ALScratchArena::deallocate(again);
                     })
             .join();
         CHECK(address(above) > address(below));
         CHECK(address(next) >= address(above) + 64);
+        CHECK(again == below);
+    }
+
+    // A thread_local made before its thread first takes a block, holding
+    // one as the thread ends, is destroyed after the arena is ended. The
+    // block is still its own, to write and to give back into the arena;
+    // what it takes after comes from the heap.
+    struct LateHolder
+    {
+        void* block = nullptr;
+        // What the arena served the destructor, once it has finished.
+        std::optional<ALScratchArena::Counters>* served = nullptr;
+
+        ~LateHolder()
+        {
+            if (served)
+            {
+                std::memset(block, 0xab, 64);
+                ALScratchArena::deallocate(block);
+                ALScratchArena::resetCounters();
+                ALScratchArena::deallocate(ALScratchArena::allocate(64));
+                *served = ALScratchArena::counters();
+            }
+        }
+    };
+    thread_local LateHolder tLateHolder;
+
+    TEST_CASE("alscratcharena: a block still out as its thread ends goes back into the arena", "[alscratcharena]")
+    {
+        std::optional<ALScratchArena::Counters> late;
+        std::thread([&]
+                    {
+                        tLateHolder.served = &late;
+                        tLateHolder.block = ALScratchArena::allocate(64);
+                    })
+            .join();
+        REQUIRE(late.has_value());
+        CHECK(late->arena_blocks == 0);
+        CHECK(late->heap_blocks == 1);
     }
 
     // A thread_local made before its thread first takes a block is
