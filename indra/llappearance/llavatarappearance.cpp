@@ -1128,12 +1128,16 @@ bool LLAvatarAppearance::loadMeshNodes()
 
         LLPolyMesh *poly_mesh = NULL;
 
+        // Hair, skirt and eyelashes are drawn blended, and keep the order
+        // their triangles were made in.
+        const bool blended = mesh_id == MESH_ID_HAIR || mesh_id == MESH_ID_SKIRT || mesh_id == MESH_ID_EYELASH;
+
         if (!info->mReferenceMeshName.empty())
         {
             polymesh_map_t::const_iterator polymesh_iter = mPolyMeshes.find(info->mReferenceMeshName);
             if (polymesh_iter != mPolyMeshes.end())
             {
-                poly_mesh = LLPolyMesh::getMesh(info->mMeshFileName, polymesh_iter->second);
+                poly_mesh = LLPolyMesh::getMesh(info->mMeshFileName, polymesh_iter->second, blended);
                 poly_mesh->setAvatar(this);
             }
             else
@@ -1145,7 +1149,7 @@ bool LLAvatarAppearance::loadMeshNodes()
         }
         else
         {
-            poly_mesh = LLPolyMesh::getMesh(info->mMeshFileName);
+            poly_mesh = LLPolyMesh::getMesh(info->mMeshFileName, NULL, blended);
             poly_mesh->setAvatar(this);
         }
 
