@@ -317,6 +317,34 @@ namespace
 
         CHECK(light.getLinearColor() == LLColor4(1.f, 0.f, 0.f, 1.f));
     }
+
+    TEST_CASE_METHOD(llprimitive, "LLPrimitive: setVolume keeps an LOD-invariant shared volume at every LOD", "[LLPrimitive]")
+    {
+        // A box is the same at every LOD and keeps the volume it has.
+        LLPrimitive box;
+        LLVolumeParams box_params;
+        REQUIRE(LLVolume::isLODInvariant(box_params));
+        CHECK(box.setVolume(box_params, 0, false));
+        LLVolume* box_volume = box.getVolume();
+        REQUIRE(box_volume != NULL);
+        for (S32 lod : { 1, 2, 3, 0 })
+        {
+            CHECK_FALSE(box.setVolume(box_params, lod, false));
+            CHECK(box.getVolume() == box_volume);
+        }
+
+        // A cylinder takes the volume of each LOD it asks for.
+        LLPrimitive cylinder;
+        LLVolumeParams cylinder_params;
+        cylinder_params.setType(LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE);
+        REQUIRE_FALSE(LLVolume::isLODInvariant(cylinder_params));
+        CHECK(cylinder.setVolume(cylinder_params, 0, false));
+        for (S32 lod : { 1, 2, 3 })
+        {
+            CHECK(cylinder.setVolume(cylinder_params, lod, false));
+            CHECK(cylinder.getVolume()->getDetail() == LLVolumeLODGroup::getVolumeScaleFromDetail(lod));
+        }
+    }
 }
 
 #include "llmessagesystem_stub.cpp"

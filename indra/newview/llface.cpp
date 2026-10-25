@@ -58,6 +58,7 @@
 #include "llmeshrepository.h"
 #include "llskinningutil.h"
 #include "alsimdkernels.h"
+#include "alscratcharena.h"
 // [RLVa:KB] - Checked: RLVa-2.0.0
 #include "rlvhandler.h"
 // [/RLVa:KB]
@@ -68,53 +69,6 @@ bool LLFace::sSafeRenderSelect = true; // false
 
 
 #define DOTVEC(a,b) (a.mV[0]*b.mV[0] + a.mV[1]*b.mV[1] + a.mV[2]*b.mV[2])
-
-/*
-For each vertex, given:
-    B - binormal
-    T - tangent
-    N - normal
-    P - position
-
-The resulting texture coordinate <u,v> is:
-
-    u = 2(B dot P)
-    v = 2(T dot P)
-*/
-void planarProjection(LLVector2 &tc, const LLVector4a& normal,
-                      const LLVector4a &center, const LLVector4a& vec)
-{
-    LLVector4a binormal;
-    F32 d = normal[0];
-
-    if (d >= 0.5f || d <= -0.5f)
-    {
-        if (d < 0)
-        {
-            binormal.set(0,-1,0);
-        }
-        else
-        {
-            binormal.set(0, 1, 0);
-        }
-    }
-    else
-    {
-        if (normal[1] > 0)
-        {
-            binormal.set(-1,0,0);
-        }
-        else
-        {
-            binormal.set(1,0,0);
-        }
-    }
-    LLVector4a tangent;
-    tangent.setCross3(binormal,normal);
-
-    tc.mV[1] = -((tangent.dot3(vec).getF32())*2 - 0.5f);
-    tc.mV[0] = 1.0f+((binormal.dot3(vec).getF32())*2 - 0.5f);
-}
 
 ////////////////////
 //
@@ -794,7 +748,7 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
     U8 texgen = tep->getTexGen();
     if (texgen != LLTextureEntry::TEX_GEN_DEFAULT)
     {
-        LLVector4a& center = *(mDrawablep->getVOVolume()->getVolume()->getVolumeFace(mTEOffset).mCenter);
+        const LLVolumeFace& vf = mDrawablep->getVOVolume()->getVolume()->getVolumeFace(mTEOffset);
 
         LLVector4a volume_position;
         LLVector3 v_position(position.getF32ptr());
@@ -811,11 +765,21 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
         LLVector4a volume_normal;
         LLVector3 v_normal(normal.getF32ptr());
         volume_normal.load3(mDrawablep->getVOVolume()->agentDirectionToVolume(v_normal).mV);
-        volume_normal.normalize3fast();
+        // to full precision: a face projected per vertex takes its binormal
+        // by where the normal's x falls and scales its tangent by its length
+        volume_normal.normalize3();
 
         if (texgen == LLTextureEntry::TEX_GEN_PLANAR)
         {
-            planarProjection(tc, volume_normal, center, volume_position);
+            if (!mTextureMatrix)
+            {
+                // through the texture entry's transform as getGeometryVolume
+                // applies it to the vertices
+                const alsimd::TexTransform transform{ (F32)cos(tep->getRotation()), (F32)sin(tep->getRotation()), tep->mScaleS, tep->mScaleT,
+                                                      tep->mOffsetS, tep->mOffsetT };
+                return vf.getPlanarTexCoord(volume_position, volume_normal, &transform);
+            }
+            tc = vf.getPlanarTexCoord(volume_position, volume_normal);
         }
     }
 
@@ -837,27 +801,29 @@ LLVector2 LLFace::surfaceToTexture(LLVector2 surface_coord, const LLVector4a& po
 }
 
 // Returns scale compared to default texgen, and face orientation as calculated
-// by planarProjection(). This is needed to match planar texgen parameters.
+// by planar texgen. This is needed to match planar texgen parameters.
 void LLFace::getPlanarProjectedParams(LLQuaternion* face_rot, LLVector3* face_pos, F32* scale) const
 {
     const LLMatrix4 vol_mat = getWorldMatrix().toMatrix4();
     const LLVolumeFace& vf = getViewerObject()->getVolume()->getVolumeFace(mTEOffset);
-    if (! (vf.mNormals && vf.mTangents))
+    if (!vf.mNormals)
     {
         return;
     }
-    const LLVector4a& normal4a = *vf.mNormals;
-    const LLVector4a& tangent  = *vf.mTangents;
-
+    // the face's planar normal where it is projected as one plane, and its
+    // first vertex's where it is not; the binormal is the way planar
+    // texgen's t runs there
+    const LLVector4a planar = vf.getPlanarNormal();
+    const LLVector4a normal4a = planar[3] > 0.f ? planar : *vf.mNormals;
+    const LLVector4a tangent = vf.getPlanarTangent(normal4a, LLVector4a(1.f, 1.f, 1.f));
     LLVector4a binormal4a;
     binormal4a.setCross3(normal4a, tangent);
     binormal4a.mul(tangent.getF32ptr()[3]);
 
-    LLVector2 projected_binormal;
-    planarProjection(projected_binormal, normal4a, *vf.mCenter, binormal4a);
+    LLVector2 projected_binormal = vf.getPlanarTexCoord(binormal4a, normal4a);
     projected_binormal -= LLVector2(0.5f, 0.5f); // this normally happens in xform()
     *scale = projected_binormal.length();
-    // rotate binormal to match what planarProjection() thinks it is,
+    // rotate binormal to match what planar texgen thinks it is,
     // then find rotation from that:
     projected_binormal.normalize();
     F32 ang = acos(projected_binormal.mV[VY]);
@@ -1519,10 +1485,6 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
             const LLTextureEntry* tep = getTextureEntry();
             U8 texgen = tep ? tep->getTexGen() : LLTextureEntry::TEX_GEN_DEFAULT;
-            if (rebuild_tcoord && texgen != LLTextureEntry::TEX_GEN_DEFAULT)
-            { //planar texgen needs binormals
-                mVObjp->getVolume()->genTangents(face_index);
-            }
 
             U8 tex_mode = 0;
 
@@ -1621,53 +1583,17 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                 else
                 { //no bump, tex gen planar
                     LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("getGeometryVolume - texgen planar");
+                    const alsimd::TexTransform transform{ cos_ang, sin_ang, ms, mt, os, ot };
+                    vf.getPlanarTexCoords(scalea, !do_tex_mat && xforms != XFORM_NONE ? &transform : nullptr, (F32*) tex_coords0.get());
                     if (do_tex_mat)
                     {
                         for (S32 i = 0; i < num_vertices; i++)
                         {
-                            LLVector2 tc(vf.mTexCoords[i]);
-                            LLVector4a& norm = vf.mNormals[i];
-                            LLVector4a& center = *(vf.mCenter);
-                            LLVector4a vec = vf.mPositions[i];
-                            vec.mul(scalea);
-                            planarProjection(tc, norm, center, vec);
-
+                            LLVector2& tc = tex_coords0[i];
                             LLVector3 tmp(tc.mV[0], tc.mV[1], 0.f);
                             tmp = tmp * *mTextureMatrix;
                             tc.mV[0] = tmp.mV[0];
                             tc.mV[1] = tmp.mV[1];
-
-                            *tex_coords0++ = tc;
-                        }
-                    }
-                    else if (xforms != XFORM_NONE)
-                    {
-                        for (S32 i = 0; i < num_vertices; i++)
-                        {
-                            LLVector2 tc(vf.mTexCoords[i]);
-                            LLVector4a& norm = vf.mNormals[i];
-                            LLVector4a& center = *(vf.mCenter);
-                            LLVector4a vec = vf.mPositions[i];
-                            vec.mul(scalea);
-                            planarProjection(tc, norm, center, vec);
-
-                            xform(tc, cos_ang, sin_ang, os, ot, ms, mt);
-
-                            *tex_coords0++ = tc;
-                        }
-                    }
-                    else
-                    {
-                        for (S32 i = 0; i < num_vertices; i++)
-                        {
-                            LLVector2 tc(vf.mTexCoords[i]);
-                            LLVector4a& norm = vf.mNormals[i];
-                            LLVector4a& center = *(vf.mCenter);
-                            LLVector4a vec = vf.mPositions[i];
-                            vec.mul(scalea);
-                            planarProjection(tc, norm, center, vec);
-
-                            *tex_coords0++ = tc;
                         }
                     }
                 }
@@ -1747,30 +1673,19 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                         if (texgen == LLTextureEntry::TEX_GEN_PLANAR)
                         {
                             LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("tgd - planar");
-                            for (S32 i = 0; i < num_vertices; i++)
+                            const bool tex_mat = tex_mode && mTextureMatrix;
+                            const alsimd::TexTransform transform{ cos_ang, sin_ang, ms, mt, os, ot };
+                            vf.getPlanarTexCoords(scalea, !tex_mat && do_xform ? &transform : nullptr, (F32*) dst.get());
+                            if (tex_mat)
                             {
-                                LLVector2 tc(vf.mTexCoords[i]);
-                                LLVector4a& norm = vf.mNormals[i];
-                                LLVector4a& center = *(vf.mCenter);
-                                LLVector4a vec = vf.mPositions[i];
-
-                                vec.mul(scalea);
-
-                                planarProjection(tc, norm, center, vec);
-
-                                if (tex_mode && mTextureMatrix)
+                                for (S32 i = 0; i < num_vertices; i++)
                                 {
+                                    LLVector2& tc = dst[i];
                                     LLVector3 tmp(tc.mV[0], tc.mV[1], 0.f);
                                     tmp = tmp * *mTextureMatrix;
                                     tc.mV[0] = tmp.mV[0];
                                     tc.mV[1] = tmp.mV[1];
                                 }
-                                else if (do_xform)
-                                {
-                                    xform(tc, cos_ang, sin_ang, os, ot, ms, mt);
-                                }
-
-                                *dst++ = tc;
                             }
                         }
                         else
@@ -1804,11 +1719,23 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
                     LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("tgd - do bump");
                     mVertexBuffer->getTexCoord1Strider(tex_coords1, mGeomIndex, mGeomCount);
 
-                    mVObjp->getVolume()->genTangents(face_index);
+                    ALScratchArena::Scope scratch;
+                    const LLVector4a* tangents = nullptr;
+                    if (texgen == LLTextureEntry::TEX_GEN_PLANAR)
+                    {
+                        LLVector4a* planar_tangents = scratch.allocate<LLVector4a>(num_vertices);
+                        vf.getPlanarTangents(scalea, planar_tangents);
+                        tangents = planar_tangents;
+                    }
+                    else
+                    {
+                        mVObjp->getVolume()->genTangents(face_index);
+                        tangents = vf.mTangents;
+                    }
 
                     for (S32 i = 0; i < num_vertices; i++)
                     {
-                        LLVector4a tangent = vf.mTangents[i];
+                        LLVector4a tangent = tangents[i];
 
                         LLVector4a binorm;
                         binorm.setCross3(vf.mNormals[i], tangent);
@@ -1878,13 +1805,24 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_FACE("getGeometryVolume - tangent");
             mVertexBuffer->getTangentStrider(tangent, mGeomIndex, mGeomCount);
-
-            mVObjp->getVolume()->genTangents(face_index);
+            LLVector4a* tangents = (LLVector4a*) tangent.get();
 
             // A tangent lies in the surface, so it goes through the vertex matrix as the surface does; the
             // normal's inverse transpose would turn it off the surface under a non-uniform scale. The
-            // handedness rides in w and is not transformed.
-            alsimd::transform_directions_keep_w(mat_vert, vf.mTangents, (LLVector4a*) tangent.get(), num_vertices);
+            // handedness rides in w and is not transformed. Planar texgen's coordinates have a frame of
+            // their own, made here in volume space and turned in place.
+            if (tep->getTexGen() == LLTextureEntry::TEX_GEN_PLANAR)
+            {
+                LLVector4a scalea;
+                scalea.load3(scale.mV);
+                vf.getPlanarTangents(scalea, tangents);
+                alsimd::transform_directions_keep_w(mat_vert, tangents, tangents, num_vertices);
+            }
+            else
+            {
+                mVObjp->getVolume()->genTangents(face_index);
+                alsimd::transform_directions_keep_w(mat_vert, vf.mTangents, tangents, num_vertices);
+            }
         }
 
         if (rebuild_weights && vf.mWeights)

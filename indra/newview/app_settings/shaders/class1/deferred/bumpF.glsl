@@ -53,7 +53,10 @@ void main()
     vec4 col = texture(diffuseMap, vary_texcoord0.xy);
 
 #ifdef HAS_ALPHA_MASK
-    if(col.a < minimum_alpha)
+    // A material's cutoff is an 8-bit value: compared as floats with a texel of that value,
+    // the texel is dropped or kept by how each rounded.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if(col.a < minimum_alpha - bias)
     {
         discard;
     }

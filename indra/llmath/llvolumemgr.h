@@ -67,6 +67,8 @@ public:
 protected:
     LLVolumeParams mVolumeParams;
 
+    // Every LOD of LOD-invariant parameters refs one volume, the highest LOD's.
+    bool mLODInvariant;
     S32 mRefs;
     S32 mLODRefs[NUM_LODS];
     LLPointer<LLVolume> mVolumeLODs[NUM_LODS];

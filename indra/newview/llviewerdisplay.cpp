@@ -1651,7 +1651,8 @@ void render_ui(F32 zoom_factor, int subfield)
         LLViewerCamera::setCurrent(*LLViewerCamera::getInstance());
     }
 
-    if(LLSceneMonitor::getInstance()->needsUpdate())
+    // A disconnect deletes the monitor with the world's regions; asking it would make a new one.
+    if (LLSceneMonitor::instanceExists() && LLSceneMonitor::getInstance()->needsUpdate())
     {
         gGL.pushMatrix();
         gViewerWindow->setup2DRender();

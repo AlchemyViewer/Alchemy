@@ -796,8 +796,9 @@ bool LLPrimitive::setVolume(const LLVolumeParams &volume_params, const S32 detai
     {
         if (mVolumep.notNull())
         {
+            // An LOD-invariant volume serves every detail of its parameters.
             F32 volume_detail = LLVolumeLODGroup::getVolumeScaleFromDetail(detail);
-            if (volume_params == mVolumep->getParams() && (volume_detail == mVolumep->getDetail()))
+            if (volume_params == mVolumep->getParams() && (volume_detail == mVolumep->getDetail() || mVolumep->isLODInvariant()))
             {
                 return false;
             }

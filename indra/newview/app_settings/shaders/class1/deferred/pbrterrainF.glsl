@@ -476,7 +476,8 @@ void main()
     // Coverage and cutoff blended alike, so where one material lies alone the test is that
     // material's own: alpha against its cutoff for MASK, always kept otherwise.
     float minimum_alpha = terrain_mix(tm, max(minimum_alphas, vec4(0.0)));
-    clipped = clipped || (coverage < minimum_alpha);
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization, as pbropaqueF compares it
+    clipped = clipped || (coverage < minimum_alpha - bias);
 #endif
 #if (TERRAIN_PBR_DETAIL >= TERRAIN_PBR_DETAIL_NORMAL)
     // The materials' normals were composed and blended in region space; one transform brings

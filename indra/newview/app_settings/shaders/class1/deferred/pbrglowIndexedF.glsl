@@ -135,7 +135,9 @@ void main()
 
     float coverage = sample_basecolor(base_color_texcoord.xy).a * gltf_base_color_alpha[mi];
 
-    if (coverage < gltf_minimum_alpha[mi])
+    // As pbropaqueF compares it.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (coverage < gltf_minimum_alpha[mi] - bias)
     {
         discard;
     }

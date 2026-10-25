@@ -351,10 +351,13 @@ public:
     static constexpr F32 NO_ALPHA_TEST = -1.f;
     /// A face the scene shows none of, whose texture is not read either: every fragment is cut (faceAlphaTest).
     static constexpr F32 UNSHOWN = 2.f;
+    /// How far under its cutoff a texture alpha is cut: half an 8-bit step, as the passes that draw the face compare
+    /// it, so a texel whose alpha is an 8-bit cutoff is kept however the two round (isCutOut in selectionAlphaF.glsl).
+    static constexpr F32 ALPHA_TEST_BIAS = 1.f / 512.f;
 
-    /// How a face's fragments are tested against its texture's alpha (setAlphaTest): those under mCutoff are cut, and
-    /// with mKeepCut kept as surface the scene does not show, which the id pass lays behind every surface it shows;
-    /// without, they are left out.
+    /// How a face's fragments are tested against its texture's alpha (setAlphaTest): those under mCutoff by more than
+    /// ALPHA_TEST_BIAS are cut, and with mKeepCut kept as surface the scene does not show, which the id pass lays
+    /// behind every surface it shows; without, they are left out.
     struct AlphaTest
     {
         F32 mCutoff = NO_ALPHA_TEST;
@@ -496,11 +499,11 @@ public:
     /// `invisible`, whether the scene draws nothing of the face (LLVOVolume::isInvisibleFace). A face the scene shows
     /// none of is outlined whole, as surface the scene does not show (UNSHOWN): an invisible one; one wearing the
     /// library's transparent texture (IMG_TRANSPARENT), which builders put on roots, collision and touch prims to hide
-    /// them while they can still be picked and edited; and one whose texture has nothing at or above its cutoff. Else
+    /// them while they can still be picked and edited; and one whose texture has nothing its cutoff keeps. Else
     /// what the cutoff cuts is kept as such surface where `whole`, and left out where not.
     static AlphaTest faceAlphaTest(const LLUUID& texture_id, U8 max_alpha, F32 cutoff, bool whole, bool invisible)
     {
-        if (invisible || (cutoff > 0.f && (texture_id == IMG_TRANSPARENT || (F32)max_alpha / 255.f < cutoff)))
+        if (invisible || (cutoff > 0.f && (texture_id == IMG_TRANSPARENT || (F32)max_alpha / 255.f < cutoff - ALPHA_TEST_BIAS)))
         {
             return { UNSHOWN, true };
         }

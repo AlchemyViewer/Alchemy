@@ -87,7 +87,10 @@ void main()
     basecolor *= vertex_color;
 
 #ifdef HAS_ALPHA_MASK
-    if (basecolor.a < minimum_alpha)
+    // glTF keeps a texel at the cutoff, and cutoffs such as 0.2 or 0.6 are 8-bit values: compared
+    // as floats with a texel of that value, the texel is dropped or kept by how each rounded.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (basecolor.a < minimum_alpha - bias)
     {
         discard;
     }
@@ -170,7 +173,9 @@ void main()
 
     basecolor.a *= vertex_color.a;
 
-    if (basecolor.a < minimum_alpha)
+    // As the deferred branch above compares it.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (basecolor.a < minimum_alpha - bias)
     {
         discard;
     }

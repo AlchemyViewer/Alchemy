@@ -30,18 +30,35 @@
 
 #include <meshoptimizer.h>
 
+#include "alscratcharena.h"
 #include "llmath.h"
 #include "v2math.h"
 
+namespace
+{
+    void* MESHOPTIMIZER_ALLOC_CALLCONV scratch_allocate(size_t bytes)
+    {
+        return ALScratchArena::allocate(bytes);
+    }
+
+    void MESHOPTIMIZER_ALLOC_CALLCONV scratch_deallocate(void* block)
+    {
+        ALScratchArena::deallocate(block);
+    }
+} // namespace
+
 LLMeshOptimizer::LLMeshOptimizer()
 {
-    // Todo: Looks like for memory management, we can add allocator and deallocator callbacks
-    // Should be one time
-    // meshopt_setAllocator(allocate, deallocate);
 }
 
 LLMeshOptimizer::~LLMeshOptimizer()
 {
+}
+
+//static
+void LLMeshOptimizer::initClass()
+{
+    meshopt_setAllocator(scratch_allocate, scratch_deallocate);
 }
 
 //static

@@ -40,7 +40,11 @@ void main()
 {
     float alpha = diffuseLookup(vary_texcoord0.xy).a;
 
-    if (alpha < minimum_alpha)
+    // Masked content's cutoff is a material's 8-bit one, which a texel of that value is compared
+    // with half an 8-bit step under it, as the masked passes that draw it compare it. Blended
+    // content's is the shadow's own (ALPHA_BLEND_CUTOFF).
+    float bias = (shadow_stipple > 0.0) ? 0.0 : 0.001953125; // 1/512, half an 8-bit quantization
+    if (alpha < minimum_alpha - bias)
     {
         discard;
     }

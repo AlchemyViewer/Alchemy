@@ -18,6 +18,7 @@ ctest --test-dir build-<OS>-<preset> --output-on-failure -LE manual
 - **In another order:** `--order rand --rng-seed <n>`. Cases run in declared order by default.
 - **Every case in a process of its own:** configure with `-DAL_TEST_PER_CASE=ON`. Each case is then its own entry, found when CTest runs. It is for chasing a case that passes alone and fails with the others.
 - **The log:** `LOGTEST=DEBUG` logs everything at that level as it happens. `LOGFAIL=DEBUG` keeps it and prints a failing case's log only. `--al-log` also writes the log to `<binary>.<pid>.log`.
+- **Real mesh assets:** llmath's hidden `[corpus]` case and its corpus benchmark read the meshes of a viewer's cache from the directory `AL_MESH_CORPUS_DIR` names, a seeded sample of them (`indra/llmath/tests/almeshcorpus.h` says how to size and split it), skip where it is not set, and fail where it names no directory or the directory's walk meets an error: `llmath_tests "[corpus]"`. The assets are other people's, so nothing from them goes into the tree.
 
 ## Writing a test
 
@@ -60,6 +61,7 @@ Everything a test file defines goes in an anonymous namespace. A test binary is 
   - `UIImageProbe` (`llrender/lluiimage.h`);
   - `VertexBufferProbe` (`llrender/llfonttextcache.h`);
   - `RenderProbe` (`llrender/llrender.h`);
+  - `VolumeProbe` (`llmath/llvolume.h`);
   - `TextViewProbe` (`llui/text/altextview.h` and `altextruler.h`);
   - `alincludesearch_data` (`alscript/preprocessor/alincludesearch.h`).
 - **Internal is not enough for LL's name-keyed registries.** `LLSingleton`, `LLInstanceTracker` and `LLThreadLocalSingletonPointer` key on `typeid(T).name()`, which is `(anonymous namespace)::X` for every anonymous `X`. A type used with one of them needs a name unique across the tree.
@@ -88,7 +90,7 @@ The **state guard** compares a set of process facts after every case with what t
 - **An `LL_ERRS`** throws `ll_test::FatalError` in a test, so `REQUIRE_THROWS_AS(..., ll_test::FatalError)` checks one.
 - **A child process of the test's own making:** register it with `AL_TEST_HELPER(name)`, and launch the binary with `ll_test::Helper::argument(name)`. The main then runs only that helper.
 - **The running case's name:** `ll_test::currentTestName()`.
-- **Built with ThreadSanitizer:** `ll_test::THREAD_SANITIZER` (`altestsanitizer.h`). Its own call stack holds `THREAD_SANITIZER_FRAMES` frames, past which a process falls over with no report, so a case that recurses deeper on purpose is passed over under it.
+- **Built with ThreadSanitizer:** `ll_test::THREAD_SANITIZER` (`altestsanitizer.h`). Its own call stack holds `THREAD_SANITIZER_FRAMES` frames, past which a process falls over with no report, so a case that recurses deeper on purpose is passed over under it. `ll_test::SANITIZER_ALLOCATOR` says `operator new` is AddressSanitizer's or ThreadSanitizer's, which ends the process on a size it cannot serve where the standard's throws `std::bad_alloc`, so a case that checks for the throw is passed over under them.
 
 ## Binaries
 
@@ -105,7 +107,7 @@ A binary is a link set. Its files share their libraries, their fakes and their d
 
 - **`UNIT`** compiles the library's own files into the binary in place of linking the library, for a test that stubs what they call. Such a test is a binary of its own.
 - **`SUPPORT`** names object libraries linked whole: fakes and checks. A case or listener in a static archive would be dropped by the linker.
-- **`GL`** labels the entries `gl` and registers them disabled with `-DAL_ENABLE_GL_TESTS=OFF`. **`PYTHON`** gives them the interpreter, and registers them disabled without one that has `llsd`.
+- **`GL`** labels the entries `gl`, registers them disabled with `-DAL_ENABLE_GL_TESTS=OFF`, and holds Mesa's llvmpipe to AVX2 (`GALLIUM_OVERRIDE_CPU_CAPS=avx`): llvmpipe compiles the shaders for the host's CPU, and LLVM 21's AVX-512 code for AMD's Zen 4 leaves a NaN in `reflectionprobe_gl`'s screen-space reflection. A GL binary run by hand on llvmpipe wants the same. **`PYTHON`** gives them the interpreter, and registers them disabled without one that has `llsd`.
 - **`ISA_TIER`** builds the binary at an x86-64 tier, and it skips on a host below it.
 - **`RERUN`** runs some files a second time with more environment. alscript's SLua tests run again under Luau's new solver, as `alscript_tests_newsolver/<file stem>`, with `AL_TEST_LUAU_SOLVER=new`.
 - **`<binary>/stray_cases`** fails when a case belongs to no file's entry, such as one written in a header.

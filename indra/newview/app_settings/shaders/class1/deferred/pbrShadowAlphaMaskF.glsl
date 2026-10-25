@@ -37,7 +37,9 @@ void main()
 {
     float alpha = texture(diffuseMap,vary_texcoord0.xy).a * vertex_color.a;
 
-    if (alpha < minimum_alpha)
+    // As pbropaqueF compares it.
+    float bias = 0.001953125; // 1/512, half an 8-bit quantization
+    if (alpha < minimum_alpha - bias)
     {
         discard;
     }

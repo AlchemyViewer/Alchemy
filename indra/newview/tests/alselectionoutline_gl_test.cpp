@@ -1616,6 +1616,14 @@ namespace
             UNSCOPED_INFO("and keeps the opaque end");
             REQUIRE(idAt(ids, 63, 32) == ID_A);
 
+            // A cutoff a little over column 16's alpha, within half an 8-bit step of it.
+            const F32 over_66 = 66.f / 255.f + 0.001f;
+            ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, over_66, texture } });
+            UNSCOPED_INFO("a mask keeps a texel within half an 8-bit step under its cutoff");
+            REQUIRE(idAt(ids, 16, 32) == ID_A);
+            UNSCOPED_INFO("and cuts the one a step under it");
+            REQUIRE(idAt(ids, 15, 32) == 0U);
+
             // Column 5 samples alpha 22, column 6 alpha 26: either side of a tenth.
             ids = pixelIds({ { pixels(0, W, 16, 48), ID_A, Outline::PRIORITY_ROOT, blend, texture } });
             UNSCOPED_INFO("a blend cuts what is all but clear");
@@ -3246,7 +3254,7 @@ namespace
 
     // A face the scene shows none of is drawn whole, as surface the scene does not show: an invisible one, the library's
     // transparent texture, legacy or GLTF, whatever its alpha mode, so the invisible prims builders hide roots and touch
-    // areas with are outlined, and any other texture with no texel at or above its cutoff. A texture with something to
+    // areas with are outlined, and any other texture with no texel its cutoff keeps. A texture with something to
     // keep keeps its cut, which whole faces keep too, as unshown surface.
     TEST_CASE_METHOD(alselectionoutline_data, "ALSelectionOutline: a face whose texture's cut would leave nothing is drawn whole", "[ALSelectionOutline]")
     {
@@ -3271,6 +3279,9 @@ namespace
         CHECK(unshown(Outline::faceAlphaTest(other, 127, mask, false, false)));
         UNSCOPED_INFO("one with a texel at a mask's keeps its cut");
         CHECK(Outline::faceAlphaTest(other, 128, mask, false, false).mCutoff == mask);
+        UNSCOPED_INFO("as does one with a texel within half an 8-bit step under it");
+        const F32 over_128 = 128.f / 255.f + 0.001f;
+        CHECK(Outline::faceAlphaTest(other, 128, over_128, false, false).mCutoff == over_128);
         UNSCOPED_INFO("a face with no alpha test is given none");
         CHECK(Outline::faceAlphaTest(other, 0, Outline::NO_ALPHA_TEST, false, false).mCutoff == Outline::NO_ALPHA_TEST);
         UNSCOPED_INFO("an invisible face is drawn whole whatever its texture");

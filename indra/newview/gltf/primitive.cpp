@@ -30,15 +30,13 @@
 #include "buffer_util.h"
 #include "../llviewershadermgr.h"
 
-#include "mikktspace/mikktspace.hh"
-
 #include <meshoptimizer.h>
 
 
 using namespace LL::GLTF;
 
 
-// Mesh data useful for Mikktspace tangent generation (and flat normal generation)
+// A primitive unrolled into a triangle list, for its tangents and flat normals
 struct MikktMesh
 {
     std::vector<LLVector3> p;       //positions
@@ -187,11 +185,23 @@ struct MikktMesh
         }
     }
 
+    // MikkTSpace's tangents, as meshoptimizer's compatible mode computes
+    // them. GLTF's V runs down the texture, the other way from the V a
+    // tangent's handedness is taken against, so the tangents are those of
+    // the UVs as they are with w the other way.
     void genTangents()
     {
         t.resize(p.size());
-        mikk::Mikktspace ctx(*this);
-        ctx.genTangSpace();
+        if (p.empty())
+        {
+            return;
+        }
+        meshopt_generateTangents(t[0].mV, nullptr, p.size(), p[0].mV, p.size(), sizeof(LLVector3), n[0].mV, sizeof(LLVector3), tc0[0].mV,
+                                 sizeof(LLVector2), meshopt_TangentCompatible);
+        for (LLVector4& tangent : t)
+        {
+            tangent.mV[3] = -tangent.mV[3];
+        }
     }
 
     // write to target primitive as an indexed triangle list
@@ -269,40 +279,6 @@ struct MikktMesh
         }
 
         prim->mGLMode = LLRender::TRIANGLES;
-    }
-
-    uint32_t GetNumFaces()
-    {
-        return uint32_t(p.size()/3);
-    }
-
-    uint32_t GetNumVerticesOfFace(const uint32_t face_num)
-    {
-        return 3;
-    }
-
-    mikk::float3 GetPosition(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* v = p[face_num * 3 + vert_num].mV;
-        return mikk::float3(v);
-    }
-
-    mikk::float3 GetTexCoord(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* uv = tc0[face_num * 3 + vert_num].mV;
-        return mikk::float3(uv[0], 1.f-uv[1], 1.0f);
-    }
-
-    mikk::float3 GetNormal(const uint32_t face_num, const uint32_t vert_num)
-    {
-        F32* normal = n[face_num * 3 + vert_num].mV;
-        return mikk::float3(normal);
-    }
-
-    void SetTangentSpace(const uint32_t face_num, const uint32_t vert_num, mikk::float3 T, bool orientation)
-    {
-        S32 i = face_num * 3 + vert_num;
-        t[i].set(T.x, T.y, T.z, orientation ? 1.0f : -1.0f);
     }
 };
 
@@ -459,7 +435,6 @@ bool Primitive::prep(Asset& asset)
 
     if (mTangents.empty() && !unlit)
     { // NOTE: must be done last because tangent generation rewrites the other arrays
-        // adapted from usage of Mikktspace in llvolume.cpp
         if (mMode == Mode::POINTS || mMode == Mode::LINES || mMode == Mode::LINE_LOOP || mMode == Mode::LINE_STRIP)
         {
             // for points and lines, just make sure tangent is perpendicular to normal
