@@ -6296,10 +6296,11 @@ namespace
     // the middle of a sculpt's pinch, has no normal of its own. It takes the
     // nearest one up or down its column; where its whole column has none,
     // the nearest along its row; where its row has none either, as where a
-    // copied column crosses a copied row, the nearest around it. It takes
-    // only a normal a vertex has of its own, so that none is passed on twice.
-    // A grid with no normal at all faces +Z. Such a vertex is marked with a
-    // w of 1 until it has one; a normal of its own has a w of 0.
+    // copied column crosses a copied row, one of the nearest around it, in
+    // rings of the grid. It takes only a normal a vertex has of its own, so
+    // that none is passed on twice. A grid with no normal at all faces +Z.
+    // Such a vertex is marked with a w of 1 until it has one, and of 2 while
+    // it waits for the search around; a normal of its own has a w of 0.
     void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
     {
         const S32 count = num_s * num_t;
@@ -6318,6 +6319,7 @@ namespace
             return;
         }
 
+        bool around = false;
         for (S32 t = 0; t < num_t; ++t)
         {
             for (S32 s = 0; s < num_s; ++s)
@@ -6350,38 +6352,64 @@ namespace
                         }
                     }
                 }
-                // Each square looks only at its ring, since every point inside
-                // it was looked at by the square before.
-                for (S32 d = 1; d < llmax(num_s, num_t) && !donor; ++d)
+                if (donor)
                 {
-                    for (S32 row = llmax(t - d, 0); row <= llmin(t + d, num_t - 1) && !donor; ++row)
+                    n = *donor;
+                    n.getF32ptr()[3] = 1.f;
+                }
+                else
+                {
+                    n.getF32ptr()[3] = 2.f;
+                    around = true;
+                }
+            }
+        }
+
+        if (around)
+        {
+            // Every vertex's nearest normal of its own in rings, found
+            // outward from all of them at once a ring at a time: a step to
+            // any of the eight vertices around one is one ring further.
+            ALScratchArena::Scope scratch;
+            U32* source = scratch.allocate<U32>(count);
+            U32* queue = scratch.allocate<U32>(count);
+            size_t head = 0;
+            size_t tail = 0;
+            for (S32 v = 0; v < count; ++v)
+            {
+                source[v] = U32_MAX;
+                if (own(norm[v]))
+                {
+                    source[v] = (U32)v;
+                    queue[tail++] = (U32)v;
+                }
+            }
+            while (head < tail)
+            {
+                const U32 v = queue[head++];
+                const S32 s = (S32)v % num_s;
+                const S32 t = (S32)v / num_s;
+                for (S32 row = llmax(t - 1, 0); row <= llmin(t + 1, num_t - 1); ++row)
+                {
+                    for (S32 column = llmax(s - 1, 0); column <= llmin(s + 1, num_s - 1); ++column)
                     {
-                        if (row == t - d || row == t + d)
+                        const S32 u = column + num_s * row;
+                        if (source[u] == U32_MAX)
                         {
-                            for (S32 column = llmax(s - d, 0); column <= llmin(s + d, num_s - 1); ++column)
-                            {
-                                if (own(norm[column + num_s * row]))
-                                {
-                                    donor = &norm[column + num_s * row];
-                                    break;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            for (S32 column : { s - d, s + d })
-                            {
-                                if (column >= 0 && column < num_s && own(norm[column + num_s * row]))
-                                {
-                                    donor = &norm[column + num_s * row];
-                                    break;
-                                }
-                            }
+                            source[u] = source[v];
+                            queue[tail++] = (U32)u;
                         }
                     }
                 }
-                n = donor ? *donor : LLVector4a(0.f, 0.f, 1.f);
-                n.getF32ptr()[3] = 1.f;
+            }
+
+            for (S32 v = 0; v < count; ++v)
+            {
+                if (norm[v][3] == 2.f)
+                {
+                    norm[v] = norm[source[v]];
+                    norm[v].getF32ptr()[3] = 1.f;
+                }
             }
         }
 
