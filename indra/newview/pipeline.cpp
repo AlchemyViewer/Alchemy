@@ -14872,6 +14872,109 @@ void LLPipeline::readAttachmentTimes()
     });
 }
 
+namespace
+{
+    // What an impostor of an avatar is baked from, aimed from the viewer's camera: the camera, the half extents across
+    // and up that it frames, the subject's distance and the radius of its extents, the vertical field of view in
+    // degrees, and the target's size. The bake and the targets made before the frame's first draw both work it out
+    // here, so that a target made then is the size its bake wants.
+    struct ImpostorFrame
+    {
+        LLCamera  mCamera;
+        LLVector2 mHalfDim;
+        F32       mDistance = 0.f;
+        F32       mRadius   = 0.f;
+        F32       mFov      = 0.f;
+        U32       mResX     = 0;
+        U32       mResY     = 0;
+    };
+
+    ImpostorFrame impostor_frame(LLVOAvatar& avatar, const LLViewerCamera& viewer_camera)
+    {
+        ImpostorFrame frame;
+        frame.mCamera = viewer_camera;
+
+        const LLVector4a* ext = avatar.mDrawable->getSpatialExtents();
+        LLVector3 pos(avatar.getRenderPosition()+avatar.getImpostorOffset());
+
+        frame.mCamera.lookAt(viewer_camera.getOrigin(), pos, viewer_camera.getUpAxis());
+
+        LLVector4a half_height;
+        half_height.setSub(ext[1], ext[0]);
+        half_height.mul(0.5f);
+
+        // The half-extent of a box projected onto a direction is sum(half_i * |d_i|) -- the
+        // component-wise ABSOLUTE value of the axis, dotted with the half extents.
+        //
+        // This used to square the axis and renormalize, which computes
+        // sum(half_i * d_i^2) / sqrt(sum(d_i^4)). That agrees with the real answer only when
+        // the axis is aligned to a box axis or has equal components, and is otherwise too
+        // small -- so the captured frame was tighter than the avatar at oblique camera
+        // angles, clipping outstretched arms, tall hair and wide attachments at the edge of
+        // the impostor. The axes are already unit length, and taking absolute values does not
+        // change that, so the renormalize goes with it.
+        LLVector4a left;
+        left.load3(frame.mCamera.getLeftAxis().mV);
+        left.setAbs(left);
+
+        LLVector4a up;
+        up.load3(frame.mCamera.getUpAxis().mV);
+        up.setAbs(up);
+
+        // No fabsf needed now: both operands are non-negative by construction.
+        frame.mHalfDim.mV[0] = half_height.dot3(left).getF32();
+        frame.mHalfDim.mV[1] = half_height.dot3(up).getF32();
+
+        frame.mDistance = (pos-frame.mCamera.getOrigin()).length();
+        frame.mRadius   = half_height.getLength3().getF32();
+        frame.mFov      = atanf(frame.mHalfDim.mV[1]/frame.mDistance)*2.f*RAD_TO_DEG;
+
+        // get the number of pixels per angle
+        F32 pa = gViewerWindow->getWindowHeightRaw() / (RAD_TO_DEG * viewer_camera.getView());
+
+        //get resolution based on angle width and height of impostor (double desired resolution to prevent aliasing)
+        frame.mResY = llmin(nhpo2((U32) (frame.mFov*pa)), (U32) 512);
+        frame.mResX = llmin(nhpo2((U32) (atanf(frame.mHalfDim.mV[0]/frame.mDistance)*2.f*RAD_TO_DEG*pa)), (U32) 512);
+        return frame;
+    }
+}
+
+void LLPipeline::allocateImpostorTarget(LLVOAvatar& avatar)
+{
+    const ImpostorFrame frame = impostor_frame(avatar, *LLViewerCamera::getInstance());
+    allocateImpostorTarget(avatar, frame.mResX, frame.mResY);
+}
+
+void LLPipeline::allocateImpostorTarget(LLVOAvatar& avatar, U32 res_x, U32 res_y)
+{
+    // A resolution change rebuilds rather than resizing in place. allocate()
+    // releases first, so this is the same path as first creation and keeps the
+    // deferred attachments and TFO_POINT filtering that a resize would not have
+    // re-applied to fresh textures.
+    if (avatar.mImpostor.isComplete() && res_x == avatar.mImpostor.getWidth() && res_y == avatar.mImpostor.getHeight())
+    {
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
+
+    // sRGB, matching deferredScreen. renderGeomDeferred() runs the ordinary
+    // G-buffer pools into this target for the avatar's attachments, and those
+    // passes shade in linear and rely on the pass's hoisted GL_FRAMEBUFFER_SRGB
+    // (renderGeomDeferred) to encode on store. A plain GL_RGBA8 attachment gives
+    // that enable nothing to act on, so the linear result would be stored raw
+    // and then decoded a second time when the impostor writer feeds it back into
+    // the real G-buffer -- attachments on impostored avatars rendering too dark.
+    avatar.mImpostor.allocate(res_x, res_y, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
+
+    if (LLPipeline::sRenderDeferred)
+    {
+        addDeferredAttachments(avatar.mImpostor);
+    }
+
+    // Point filtering is applied where the impostor is sampled
+    // (LLVOAvatar::renderImpostor), not written onto the texture here.
+}
+
 void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool for_profile, LLViewerObject* specific_attachment)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_PIPELINE;
@@ -15032,47 +15135,18 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
 
     LLCamera camera = *viewer_camera;
     LLVector2 tdim;
-    U32 resY = 0;
-    U32 resX = 0;
 
     if (!preview_avatar)
     {
-        const LLVector4a* ext = avatar->mDrawable->getSpatialExtents();
-        LLVector3 pos(avatar->getRenderPosition()+avatar->getImpostorOffset());
-
-        camera.lookAt(viewer_camera->getOrigin(), pos, viewer_camera->getUpAxis());
-
-        LLVector4a half_height;
-        half_height.setSub(ext[1], ext[0]);
-        half_height.mul(0.5f);
-
-        // The half-extent of a box projected onto a direction is sum(half_i * |d_i|) -- the
-        // component-wise ABSOLUTE value of the axis, dotted with the half extents.
-        //
-        // This used to square the axis and renormalize, which computes
-        // sum(half_i * d_i^2) / sqrt(sum(d_i^4)). That agrees with the real answer only when
-        // the axis is aligned to a box axis or has equal components, and is otherwise too
-        // small -- so the captured frame was tighter than the avatar at oblique camera
-        // angles, clipping outstretched arms, tall hair and wide attachments at the edge of
-        // the impostor. The axes are already unit length, and taking absolute values does not
-        // change that, so the renormalize goes with it.
-        LLVector4a left;
-        left.load3(camera.getLeftAxis().mV);
-        left.setAbs(left);
-
-        LLVector4a up;
-        up.load3(camera.getUpAxis().mV);
-        up.setAbs(up);
-
-        // No fabsf needed now: both operands are non-negative by construction.
-        tdim.mV[0] = half_height.dot3(left).getF32();
-        tdim.mV[1] = half_height.dot3(up).getF32();
+        const ImpostorFrame frame = impostor_frame(*avatar, *viewer_camera);
+        camera = frame.mCamera;
+        tdim = frame.mHalfDim;
 
         gGL.matrixMode(LLRender::MM_PROJECTION);
         gGL.pushMatrix();
 
-        F32 distance = (pos-camera.getOrigin()).length();
-        F32 fov = atanf(tdim.mV[1]/distance)*2.f*RAD_TO_DEG;
+        const F32 distance = frame.mDistance;
+        const F32 fov = frame.mFov;
         F32 aspect = tdim.mV[0]/tdim.mV[1];
 
         // Clip planes bracketing the subject instead of a hardcoded 1..256.
@@ -15086,7 +15160,7 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         //
         // The bounding sphere of the extents is what has to fit, and 10cm of slack keeps a
         // caster exactly on the plane from being clipped by rounding.
-        const F32 radius = half_height.getLength3().getF32() + 0.1f;
+        const F32 radius = frame.mRadius + 0.1f;
         const F32 near_clip = llmax(0.1f, distance - radius);
         const F32 far_clip  = distance + radius;
 
@@ -15124,41 +15198,11 @@ void LLPipeline::generateImpostor(LLVOAvatar* avatar, bool preview_avatar, bool 
         gGL.setClearColor(LLColor4::transparent);
         gGL.setColorMask(true, true);
 
-        // get the number of pixels per angle
-        F32 pa = gViewerWindow->getWindowHeightRaw() / (RAD_TO_DEG * viewer_camera->getView());
-
-        //get resolution based on angle width and height of impostor (double desired resolution to prevent aliasing)
-        resY = llmin(nhpo2((U32) (fov*pa)), (U32) 512);
-        resX = llmin(nhpo2((U32) (atanf(tdim.mV[0]/distance)*2.f*RAD_TO_DEG*pa)), (U32) 512);
-
         if (!for_profile)
         {
-            // A resolution change rebuilds rather than resizing in place. allocate()
-            // releases first, so this is the same path as first creation and keeps the
-            // deferred attachments and TFO_POINT filtering that a resize would not have
-            // re-applied to fresh textures.
-            if (!avatar->mImpostor.isComplete()
-                || resX != avatar->mImpostor.getWidth()
-                || resY != avatar->mImpostor.getHeight())
-            {
-                // sRGB, matching deferredScreen. renderGeomDeferred() runs the ordinary
-                // G-buffer pools into this target for the avatar's attachments, and those
-                // passes shade in linear and rely on the pass's hoisted GL_FRAMEBUFFER_SRGB
-                // (renderGeomDeferred) to encode on store. A plain GL_RGBA8 attachment gives
-                // that enable nothing to act on, so the linear result would be stored raw
-                // and then decoded a second time when the impostor writer feeds it back into
-                // the real G-buffer -- attachments on impostored avatars rendering too dark.
-                avatar->mImpostor.allocate(resX, resY, GL_SRGB8_ALPHA8, true, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_NONE, mainDepthFormat());
-
-                if (LLPipeline::sRenderDeferred)
-                {
-                    addDeferredAttachments(avatar->mImpostor);
-                }
-
-                // Point filtering is applied where the impostor is sampled
-                // (LLVOAvatar::renderImpostor), not written onto the texture here.
-            }
-
+            // Made before the frame's first draw (LLVOAvatar::allocateImpostors) wherever the frame has not changed
+            // since; here only where it has.
+            allocateImpostorTarget(*avatar, frame.mResX, frame.mResY);
             avatar->mImpostor.bindTarget();
         }
     }

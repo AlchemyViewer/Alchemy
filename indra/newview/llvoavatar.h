@@ -753,6 +753,9 @@ public:
     void        cacheImpostorValues();
     void        setImpostorDim(const LLVector2& dim);
     static void resetImpostors();
+    // Makes the impostor targets updateImpostors will bake into this frame, before the frame's first draw
+    // (LLPipeline::allocateImpostorTarget).
+    static void allocateImpostors();
     static void updateImpostors();
     LLRenderTarget mImpostor;
 // [RLVa:KB] - Checked: RLVa-2.4 (@setcam_avdist)

@@ -275,6 +275,10 @@ public:
     //  for_profile - if true, a profile is being performed, do not update actual impostor
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
+    // The avatar's impostor target, made at the size a bake from the viewer's camera now wants where it is not that
+    // already. Making one asks GL for names and errors, which a threaded driver answers only once its thread has run
+    // everything queued before them, so LLVOAvatar::allocateImpostors makes the frame's before its first draw.
+    void allocateImpostorTarget(LLVOAvatar& avatar);
 
     // A full-screen quad at the far plane, depth-tested against the bound
     // target's depth and never writing it: GL_GREATER reaches every texel that
@@ -799,6 +803,8 @@ private:
     void hideDrawable( LLDrawable *pDrawable );
     void unhideDrawable( LLDrawable *pDrawable );
     void skipRenderingShadows();
+    // allocateImpostorTarget at `res_x` by `res_y`.
+    void allocateImpostorTarget(LLVOAvatar& avatar, U32 res_x, U32 res_y);
 public:
     enum {GPU_CLASS_MAX = 3 };
 
