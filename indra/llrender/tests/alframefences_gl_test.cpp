@@ -681,6 +681,41 @@ namespace
         CHECK(glGetError() == GL_NO_ERROR);
     }
 
+    // Stamps asked for in the middle of a frame whose commands were told its end lays a fence, and laid none of their
+    // own, start with the next frame: that frame's end lays the fence they count on, as an upload staged before the
+    // viewer latches the setting does.
+    TEST_CASE_METHOD(alframefences_data, "alframefences_gl: stamps asked for after a command counted on the frame's fence start with the next frame", "[alframefences_gl]")
+    {
+        if (!ALFrameFences::canStamp())
+        {
+            SKIP("no query buffers, timestamps or persistent maps on this context");
+        }
+        mFrames.setStamps(false);
+        mFrames.endFrame();
+        REQUIRE_FALSE(mFrames.isStamping());
+
+        // A command told the frame's end lays a fence, then the stamps asked for.
+        CHECK_FALSE(mFrames.willStamp());
+        mFrames.setStamps(true);
+        const U32 counted_on = mFrames.frame();
+        mFrames.endFrame();
+        {
+            INFO("that frame's end lays a fence");
+            CHECK_FALSE(mFrames.isStamping());
+        }
+        glFinish();
+        mFrames.endFrame();
+        {
+            INFO("its fence shows it finished");
+            CHECK(mFrames.isComplete(counted_on));
+            INFO("and the next frame's end stamps");
+            CHECK(mFrames.isStamping());
+        }
+        mFrames.setStamps(false);
+        mFrames.endFrame();
+        CHECK(glGetError() == GL_NO_ERROR);
+    }
+
     // A frame whose stamp the GPU has yet to write is not complete, however many frames' ends have read its slot since:
     // the GPU's write completes a stamped frame, not the frames' ends. Where the GPU writes the results behind the
     // frame; a driver that writes one as it is asked for waits for the frame there instead.

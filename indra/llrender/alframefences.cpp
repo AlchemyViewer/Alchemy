@@ -463,7 +463,11 @@ void ALFrameFences::endFrame(U32 frames_ahead)
 
     const U32 slot = mFrame % FRAMES;
     llassert(!mFences[slot] && !mStamped[slot]);
-    if (readyStamps())
+    // A frame some command of which was told its end lays a fence (willStamp()), and laid none of its own, ends with
+    // one, though stamps were asked for since: they start with the next frame.
+    const bool fence_counted_on = mFenceCountedOn && !isStamping();
+    mFenceCountedOn = false;
+    if (!fence_counted_on && readyStamps())
     {
         stamp(slot);
     }
@@ -527,6 +531,7 @@ void ALFrameFences::release()
     std::fill(std::begin(mStampBefore), std::end(mStampBefore), 0ull);
     mStampStore.release();
     mStampPace = 0.0;
+    mFenceCountedOn = false;
     // What was noted in the open frame is complete too: nothing the context ran is left to wait for.
     mComplete = mFrame;
     ++mFrame;

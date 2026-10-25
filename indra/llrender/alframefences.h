@@ -80,8 +80,15 @@ public:
     /// Whether the frames' ends stamp their frames.
     bool isStamping() const { return mStampStore.isAllocated() && !mStampsFailed; }
     /// Whether the open frame's end stamps it: the frames' ends stamp, or are asked to from this one on and can. What a
-    /// command issued now lays a fence of its own behind, where a stamp alone would be what shows it finished.
-    bool willStamp() const { return isStamping() || (mWantStamps && !mStampsFailed && canStamp()); }
+    /// command issued now lays a fence of its own behind, where a stamp alone would be what shows it finished. Told no,
+    /// the caller counts on the frame's end to lay a fence: that end lays one, whatever stamps are asked for since, and
+    /// the stamps start with the next frame.
+    bool willStamp() const
+    {
+        const bool stamps = isStamping() || (mWantStamps && !mStampsFailed && canStamp());
+        mFenceCountedOn = mFenceCountedOn || !stamps;
+        return stamps;
+    }
 
     /// The open frame: a command issued now completes with it.
     U32 frame() const { return mFrame; }
@@ -174,4 +181,5 @@ private:
     F64         mStampPace = 0.0;             // how long the last pacing wait for a stamp took, in seconds
     bool        mWantStamps = false;
     bool        mStampsFailed = false;        // a stamp did not come once the GPU had finished: fences for good
+    mutable bool mFenceCountedOn = false;     // willStamp() told the open frame's commands it lays a fence
 };
