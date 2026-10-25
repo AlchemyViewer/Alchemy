@@ -211,6 +211,54 @@ namespace
                                          // coherency retries rather than staying pinned to ORPHAN
     bool   sPersistOK         = false;   // mapping is live and usable
     bool   sPersistCoherent   = true;    // coherency the live ring was created with
+    bool   sPersistAligned    = false;   // sPersistAlign asked of GL, once a context
+    size_t sPersistCapBytes   = PERSIST_MAX_BYTES; // grow cap, lowered to a size a grow past it failed from
+    size_t sScratchCapBytes   = SCRATCH_MAX_BYTES; // the same for the scratch ring
+    bool   sScratchAligned    = false;   // sScratchAlign asked of GL, once a context
+
+    // A persistently mapped store a ring let go of while frames that read it may still be the GPU's, kept with the
+    // open frame it was let go in until the frame fences show that frame finished: a driver may hand a deleted store's
+    // memory to the next store at once, under the reads still queued against it, as the staging ring's glyphs once
+    // read other glyphs (ALStagingRing).
+    struct RetiredStore
+    {
+        ALGPUBuffer mStore;
+        U32         mFrame = 0;
+    };
+    std::vector<RetiredStore> sRetiredStores;
+
+    void retire_store(ALGPUBuffer& store)
+    {
+        if (!store.isAllocated())
+        {
+            return;
+        }
+        // With no context the reads went with it.
+        if (!gGLManager.mInited)
+        {
+            store.release();
+            return;
+        }
+        sRetiredStores.push_back({ std::move(store), gGL.frameFences().frame() });
+    }
+
+    // The retired stores whose frame has finished, or every one.
+    void release_retired_stores(bool all)
+    {
+        const ALFrameFences& frames = gGL.frameFences();
+        for (auto it = sRetiredStores.begin(); it != sRetiredStores.end();)
+        {
+            if (all || frames.isComplete(it->mFrame))
+            {
+                it->mStore.release();
+                it = sRetiredStores.erase(it);
+            }
+            else
+            {
+                ++it;
+            }
+        }
+    }
 
     // Ring pressure accumulators (see ALUniformBuffer::RingStats). Split per ring so a
     // mode comparison isn't muddied by the other ring's leftovers. Main-thread only,
@@ -365,9 +413,12 @@ namespace
             bool stalled = false;
             if (!frames.wait(left_in[next], 1000000000ull /* 1s */, &stalled))
             {
+                // Still the GPU's: waited out however long it takes, as a fenced frame's wait is, since the draws
+                // reading the segment would read what is written next.
                 ++stats.mStallTimeouts;
                 LL_WARNS_ONCE("ShaderUniform") << ring_label << " UBO ring: segment's frame did not finish "
                                                   "in a second; ring may be undersized." << LL_ENDL;
+                frames.waitFinished(left_in[next]);
             }
             if (stalled)
             {
@@ -381,12 +432,9 @@ namespace
     // outstanding slice re-flushes on its next bindCurrent.
     void teardown_persist_ring()
     {
-        if (sPersistRing.isAllocated())
-        {
-            // Deleting the store unmaps it, and release() issues no GL once the context is gone.
-            sPersistRing.release();
-        }
-        // A recreated ring's segments are all free: in-flight draws keep the old store alive.
+        // Kept until the frames that may read it have finished (retire_store).
+        retire_store(sPersistRing);
+        // A recreated ring's segments are all free: the old store is a store of its own.
         for (U32& left : sPersistLeftIn)
         {
             left = 0;
@@ -525,8 +573,13 @@ namespace
             return false;
         }
 
-        glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &sPersistAlign);
-        sPersistAlign = llmax(sPersistAlign, 1);
+        // A call that returns a value: asked once a context, not at every recreate.
+        if (!sPersistAligned)
+        {
+            glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &sPersistAlign);
+            sPersistAlign   = llmax(sPersistAlign, 1);
+            sPersistAligned = true;
+        }
 
         // WRITE + PERSISTENT, and COHERENT (mode 3) or FLUSH_EXPLICIT (mode 4). A store ALGPUBuffer could only make
         // unmapped is no ring.
@@ -546,6 +599,24 @@ namespace
         return true;
     }
 
+    // The persistent scratch ring at `bytes`, WRITE + PERSISTENT + COHERENT: a store ALGPUBuffer could only make
+    // unmapped is no ring.
+    bool allocate_scratch_ring(size_t bytes)
+    {
+        if (!glBufferStorage)
+        {
+            return false;
+        }
+        if (sScratchRing.allocate(bytes, ALGPUBuffer::STREAM, nullptr, "UBO scratch ring") && sScratchRing.getMapped())
+        {
+            sScratchHead = 0;
+            sScratchSeg  = 0;
+            return true;
+        }
+        sScratchRing.release();
+        return false;
+    }
+
     // Create the scratch ring on first use: persistently-mapped + COHERENT when
     // buffer-storage is available, else the legacy orphan-on-wrap STREAM_DRAW ring
     // (see the scratch state block above for why). Returns false only when buffer
@@ -557,25 +628,25 @@ namespace
             return true;
         }
 
-        glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &sScratchAlign);
-        sScratchAlign = llmax(sScratchAlign, 1);
+        // A call that returns a value: asked once a context, not at every recreate.
+        if (!sScratchAligned)
+        {
+            glGetIntegerv(GL_UNIFORM_BUFFER_OFFSET_ALIGNMENT, &sScratchAlign);
+            sScratchAlign   = llmax(sScratchAlign, 1);
+            sScratchAligned = true;
+        }
 
         if (!sScratchPersistTried)
         {
             sScratchPersistTried = true;
+            if (allocate_scratch_ring(sScratchPersistBytes))
+            {
+                return true;
+            }
             if (glBufferStorage)
             {
-                // WRITE + PERSISTENT + COHERENT. A store ALGPUBuffer could only make unmapped is no ring.
-                if (sScratchRing.allocate(sScratchPersistBytes, ALGPUBuffer::STREAM, nullptr, "UBO scratch ring")
-                    && sScratchRing.getMapped())
-                {
-                    sScratchHead = 0;
-                    sScratchSeg  = 0;
-                    return true;
-                }
                 LL_WARNS("ShaderUniform") << "Scratch UBO ring: persistent mapping failed; "
                                              "falling back to the orphan ring." << LL_ENDL;
-                sScratchRing.release();
             }
         }
 
@@ -600,11 +671,11 @@ namespace
             {
                 glDeleteBuffers(1, &sScratchOrphan);
             }
-            // Deleting the store unmaps it, and release() issues no GL once the context is gone.
-            sScratchRing.release();
+            // Kept until the frames that may read it have finished (retire_store).
+            retire_store(sScratchRing);
             sScratchOrphan = 0;
         }
-        // A recreated ring's segments are all free: in-flight draws keep the old store alive.
+        // A recreated ring's segments are all free: the old store is a store of its own.
         for (U32& left : sScratchLeftIn)
         {
             left = 0;
@@ -1101,7 +1172,7 @@ void ALUniformBuffer::endFrame()
     // MESSAGE STRING (llerror.cpp, mUniqueLogMessages), so interpolating per-frame counters makes
     // every line unique -- it would print every frame AND leak one permanent map entry per frame.
     static bool s_warned_pressure = false;
-    if (!s_warned_pressure && sPersistBytes >= PERSIST_MAX_BYTES
+    if (!s_warned_pressure && sPersistBytes >= sPersistCapBytes
         && (sPersistLastFrame.mStalls > 0 || sPersistLastFrame.mBytes >= sPersistBytes))
     {
         s_warned_pressure = true;
@@ -1143,7 +1214,7 @@ void ALUniformBuffer::endFrame()
     // -- sScratchRing unmapped -- is exempt: it keeps the old store alive for in-flight draws on
     // wrap.)
     static bool s_warned_scratch_lap = false;
-    if (!s_warned_scratch_lap && sScratchRing.getMapped() && sScratchPersistBytes >= SCRATCH_MAX_BYTES
+    if (!s_warned_scratch_lap && sScratchRing.getMapped() && sScratchPersistBytes >= sScratchCapBytes
         && sScratchLastFrame.mBytes >= sScratchPersistBytes)
     {
         s_warned_scratch_lap = true;
@@ -1195,19 +1266,52 @@ void ALUniformBuffer::endFrame()
     // before it's reused a lap later, and segments stay near one frame of slices so clean-block
     // churn stays low. UPDATE_RING orphans on wrap (correct even tiny), but each wrap orphans a
     // whole store kept a lap, so ~SLACK frames keeps wraps to about one every few frames.
+    //
+    // A resized ring is made again here, at the frame's end, rather than by its first use in the middle of the next
+    // frame's passes; where the driver will not give the new size, the old one is made again and the ring grows no
+    // further than it. The store it let go of stays until its frame has finished (retire_store).
+    release_retired_stores(false);
     if (sScratchRing.getMapped())
     {
         const size_t next = next_ring_size(sScratchPersistBytes, sScratchLastFrame.mBytes,
-                                           SCRATCH_MIN_BYTES, SCRATCH_MAX_BYTES, SCRATCH_SLACK_FRAMES,
+                                           SCRATCH_MIN_BYTES, sScratchCapBytes, SCRATCH_SLACK_FRAMES,
                                            sScratchShrinkCd, sScratchPeakBytes);
-        if (next != sScratchPersistBytes) { resize_scratch_ring(next); }
+        if (next != sScratchPersistBytes)
+        {
+            const size_t was = sScratchPersistBytes;
+            resize_scratch_ring(next);
+            sScratchPersistTried = true;
+            if (!allocate_scratch_ring(next) && next > was && allocate_scratch_ring(was))
+            {
+                LL_WARNS("ShaderUniform") << "Scratch UBO ring: no store of " << (next >> 10) << " KiB; kept at "
+                                          << (was >> 10) << " KiB" << LL_ENDL;
+                sScratchPersistBytes = was;
+                sScratchCapBytes     = was;
+            }
+        }
     }
     if (sPersistOK)
     {
         const size_t next = next_ring_size(sPersistBytes, sPersistLastFrame.mBytes,
-                                           PERSIST_MIN_BYTES, PERSIST_MAX_BYTES, PERSIST_SLACK_FRAMES,
+                                           PERSIST_MIN_BYTES, sPersistCapBytes, PERSIST_SLACK_FRAMES,
                                            sPersistShrinkCd, sPersistPeakBytes);
-        if (next != sPersistBytes) { resize_persist_ring(next); }
+        if (next != sPersistBytes)
+        {
+            const size_t was      = sPersistBytes;
+            const bool   coherent = sPersistCoherent;
+            resize_persist_ring(next);
+            if (!ensure_persist_ring(coherent) && next > was)
+            {
+                sPersistBytes = was;
+                sPersistTried = false;
+                if (ensure_persist_ring(coherent))
+                {
+                    LL_WARNS("ShaderUniform") << "Persistent UBO ring: no store of " << (next >> 10)
+                                              << " KiB; kept at " << (was >> 10) << " KiB" << LL_ENDL;
+                    sPersistCapBytes = was;
+                }
+            }
+        }
     }
     if (sRing != 0)
     {
@@ -1371,4 +1475,11 @@ void ALUniformBuffer::cleanupClass()
     sPersistBytes = PERSIST_MIN_BYTES;
     sPersistShrinkCd = 0;
     sPersistPeakBytes = 0;
+
+    // Nothing the context ran is left to read them.
+    release_retired_stores(true);
+    sPersistCapBytes = PERSIST_MAX_BYTES;
+    sScratchCapBytes = SCRATCH_MAX_BYTES;
+    sPersistAligned  = false;
+    sScratchAligned  = false;
 }

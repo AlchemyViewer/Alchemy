@@ -655,8 +655,10 @@ U8* ALGPUStream::map()
             bool stalled = false;
             if (!fences.wait(mReadIn[region], 1000000000ull /* 1s */, &stalled))
             {
-                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
+                // Waited out however long it takes: the reads still in flight would read what is written next.
+                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; waiting for it"
                                            << LL_ENDL;
+                fences.waitFinished(mReadIn[region]);
             }
             if (stalled)
             {

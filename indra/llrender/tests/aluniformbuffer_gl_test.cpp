@@ -179,6 +179,11 @@ namespace
             UNSCOPED_INFO("mapped coherent for mode 3, flushed explicitly for mode 4");
             CHECK(flags.mAccess == (writable | (coherent ? GL_MAP_COHERENT_BIT : GL_MAP_FLUSH_EXPLICIT_BIT)));
 
+            // The ring a switch of mode let go of stays until its frame has finished, and a later frame's end shows it.
+            glFinish();
+            gGL.endFrame();
+            glFinish();
+            gGL.endFrame();
             const U64 accounted = ALGPUBuffer::sBytesAllocated - before;
             UNSCOPED_INFO("the ring accounted with the GPU buffers");
             CHECK(accounted >= BYTES);
@@ -320,6 +325,59 @@ namespace
             CHECK(frames.getCalls() >= calls + 2);
         }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A frame of traffic the ring has too little slack for grows it at that frame's end: the new store is made there,
+    // not by the next frame's first payload in the middle of its passes, and the old one, mapped and read by the frames
+    // in flight, stays until they have finished, since a driver may hand a deleted store's memory to the next at once.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: a scratch ring that grows keeps its old store until its frame has finished", "[aluniformbuffer_gl]")
+    {
+        if (!glBufferStorage)
+        {
+            SKIP("no buffer storage: the scratch ring is the orphan fallback");
+        }
+        ALUniformBuffer::cleanupClass();
+        ALFrameFences& frames = gGL.frameFences();
+        glFinish();
+        REQUIRE(frames.wait(frames.frame() - 1, 1000000000ull));
+
+        // Three quarters of the smallest ring in one frame: far more than its slack holds.
+        const std::vector<U8> payload(256 * 1024, 0x5a);
+        S64 offset = -1;
+        for (U32 i = 0; i < 3; ++i)
+        {
+            offset = ALUniformBuffer::scratchWrite(payload.data(), payload.size());
+            REQUIRE(offset >= 0);
+        }
+        ALUniformBuffer::scratchBindRange(BINDING, offset, BYTES);
+        const GLuint old_store = (GLuint)boundRange().mName;
+        REQUIRE(old_store != 0);
+        const U64 before = ALGPUBuffer::sBytesAllocated;
+
+        gGL.endFrame();
+        UNSCOPED_INFO("the grown ring made at the frame's end, beside the old store");
+        CHECK(ALGPUBuffer::sBytesAllocated > before);
+        UNSCOPED_INFO("the old store kept for the frame that read it");
+        CHECK(glIsBuffer(old_store) == GL_TRUE);
+
+        const std::vector<U32> words = pattern(WORDS, 77u);
+        const S64 grown = ALUniformBuffer::scratchWrite(words.data(), BYTES);
+        REQUIRE(grown >= 0);
+        ALUniformBuffer::scratchBindRange(BINDING, grown, BYTES);
+        const BoundRange range = boundRange();
+        UNSCOPED_INFO("the next payload in the new store");
+        CHECK((GLuint)range.mName != old_store);
+        CHECK(gpuWords((GLuint)range.mName, range.mStart) == words);
+
+        // The frame the old store was let go in finishes, and a later frame's end shows it.
+        glFinish();
+        gGL.endFrame();
+        glFinish();
+        gGL.endFrame();
+        UNSCOPED_INFO("the old store deleted once its frame has finished");
+        CHECK(glIsBuffer(old_store) == GL_FALSE);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+        ALUniformBuffer::cleanupClass();
     }
 
     // A slice bound again in a later frame, as a cached skinning palette is, holds its segment until that frame has
