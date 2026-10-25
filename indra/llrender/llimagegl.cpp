@@ -129,6 +129,12 @@ namespace
         return stamp;
     }
 
+    // Whether the upload was given a stamp in the store that is mapped now.
+    bool has_upload_stamp(const UploadStamp& stamp)
+    {
+        return stamp.mSlot >= 0 && stamp.mStore == sUploadStampsMade && sUploadStamps.getMapped();
+    }
+
     // Whether the GPU has written the upload's stamp: no call.
     bool upload_stamped(const UploadStamp& stamp)
     {
@@ -2448,12 +2454,20 @@ void LLImageGL::pollUploads()
     const ALFrameFences& frames   = gGL.frameFences();
     const bool           stamping = frames.isStamping();
 
-    // Oldest first, up to the first not yet signalled, as publishUploads walks them.
+    // Oldest first, up to the first not yet signalled, as publishUploads walks them. An upload with a stamp waits for it
+    // however soon its frame finished: the LLImageGL thread's context can be behind the main one's.
     for (PendingPublish& pending : sPendingPublishes)
     {
-        if (pending.mFence &&
-            ((stamping && !upload_stamped(pending.mStamp) && !frames.isComplete(pending.mHandedIn)) ||
-             !poll_signalled(pending)))
+        if (!pending.mFence)
+        {
+            continue;
+        }
+        if (stamping && !(has_upload_stamp(pending.mStamp) ? upload_stamped(pending.mStamp)
+                                                             : frames.isComplete(pending.mHandedIn)))
+        {
+            break;
+        }
+        if (!poll_signalled(pending))
         {
             break;
         }
