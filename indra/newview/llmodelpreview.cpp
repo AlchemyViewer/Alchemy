@@ -1657,7 +1657,10 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                         sloppy_ratio = simplify_model(sloppy_decimator, ALMeshSimplifier::Seams::SLOPPY);
                     }
 
-                    if (last_working_decimator > 0 && sloppy_ratio < last_working_ratio)
+                    // A correction that failed, or came out further from the
+                    // target than the first pass, goes back to the first.
+                    if (last_working_decimator > 0 &&
+                        (sloppy_ratio < 0 || fabs(sloppy_ratio - indices_decimator) > fabs(last_working_ratio - indices_decimator)))
                     {
                         // Compensation didn't work, return back to previous decimator
                         sloppy_ratio = simplify_model(indices_decimator, ALMeshSimplifier::Seams::SLOPPY);
