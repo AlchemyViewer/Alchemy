@@ -1307,6 +1307,71 @@ namespace
         CHECK(img->getWidth() == 32);
     }
 
+    // Where the frames are stamped, an upload is published at the first frame's end after the GPU has finished it, by the
+    // stamp the LLImageGL thread had the GPU write behind it: not once the main context's frame it was handed over in has
+    // finished, which a frame's end shows a frame later at the soonest, and the viewer's pacing three.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a stamped upload publishes at the first frame's end after the GPU has finished it", "[LLImageGL]")
+    {
+        if (!gGLManager.mWritesQueryResults || !ALFrameFences::canStamp())
+        {
+            SKIP("the GPU writes no query results here: uploads are polled by the frames' fences");
+        }
+        ALFrameFences& frames = gGL.frameFences();
+        frames.setStamps(true);
+        gGL.endFrame();
+        REQUIRE(frames.isStamping());
+        // Stamps are gGL's, which outlives the case: asked for no more once the thread has gone.
+        struct StampsEnd
+        {
+            ~StampsEnd()
+            {
+                gGL.frameFences().setStamps(false);
+                gGL.endFrame();
+            }
+        } stamps_end;
+
+        LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        LLImageGLThread::createInstance(gl->window());
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
+
+        img->beginUpload();
+        LLImageGLThread::instance().post(
+            [img, raw, &worker_done]()
+            {
+                img->createGLTexture(0, raw.get());
+                worker_done = true;
+            });
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!worker_done && std::chrono::steady_clock::now() < deadline)
+        {
+            mainloop.runPending();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        mainloop.runPending();
+        REQUIRE(worker_done.load());
+
+        bool completed = false;
+        img->afterPublish([&]() { completed = true; });
+
+        // Long enough for the GPU to have finished the upload and written its stamp; then one frame's end.
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        gGL.endFrame();
+        LLImageGL::updateClass();
+        UNSCOPED_INFO("published at the first frame's end, by the upload's stamp");
+        CHECK(completed);
+        UNSCOPED_INFO("at the new size");
+        CHECK(img->getWidth() == 32);
+    }
+
     // And the rest of what LLRender's setters cache. A polygon offset or patch
     // size the last context was left with made the same setting on the next one
     // look redundant, so the fresh context kept GL's initial value instead.
