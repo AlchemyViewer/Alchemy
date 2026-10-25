@@ -420,7 +420,7 @@ TEST_CASE_METHOD(DriverSync, "aldriversync_bench: which calls wait for a threade
     GLsync old_fence = nullptr;
     GLuint name = 0;
     GLint value = 0;
-    U64 result = 0;
+    GLuint64 result = 0;
     const auto delete_name_texture = [&] { glDeleteTextures(1, &name); name = 0; };
     const auto delete_name_buffer = [&] { glDeleteBuffers(1, &name); name = 0; };
     const auto delete_name_query = [&] { glDeleteQueries(1, &name); name = 0; };
