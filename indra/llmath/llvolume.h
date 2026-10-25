@@ -858,9 +858,8 @@ public:
 class LLVolumeFace
 {
 public:
-    // A vertex as the importers and the optimizer pass it around: position,
-    // normal and texture coordinate in one block, so a vector of them is one
-    // allocation.
+    // A vertex as the importers pass it around: position, normal and texture
+    // coordinate in one block, so a vector of them is one allocation.
     class VertexData
     {
     public:
@@ -875,7 +874,6 @@ public:
 
         bool operator<(const VertexData& rhs) const;
         bool operator==(const VertexData& rhs) const;
-        bool compareNormal(const VertexData& rhs, F32 angle_cutoff) const;
 
     private:
         LLVector4a mPosition;
@@ -909,14 +907,6 @@ public:
     void resizeIndices(S32 num_indices);
     void fillFromLegacyData(std::vector<LLVolumeFace::VertexData>& v, std::vector<U16>& idx);
 
-    void pushVertex(const VertexData& cv);
-    void pushVertex(const LLVector4a& pos, const LLVector4a& norm, const LLVector2& tc);
-    void pushIndex(const U16& idx);
-
-    void swapData(LLVolumeFace& rhs);
-
-    void getVertexData(U16 indx, LLVolumeFace::VertexData& cv);
-
     class VertexMapData : public LLVolumeFace::VertexData
     {
     public:
@@ -936,7 +926,6 @@ public:
     // normals and texture coordinates into account.
     void remap();
 
-    void optimize(F32 angle_cutoff = 2.f);
     bool cacheOptimize(bool gen_tangents = false);
 
     // Normals made from the face's shape: smooth across an edge whose two

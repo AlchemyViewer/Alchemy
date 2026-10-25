@@ -113,14 +113,6 @@ void LLModel::remapVolumeFaces()
     }
 }
 
-void LLModel::optimizeVolumeFaces()
-{
-    for (S32 i = 0; i < getNumVolumeFaces(); ++i)
-    {
-        mVolumeFaces[i].optimize();
-    }
-}
-
 struct MaterialBinding
 {
     int             index;

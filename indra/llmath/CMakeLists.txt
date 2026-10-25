@@ -19,7 +19,6 @@ target_sources(
     llline.cpp
     llmatrix3a.cpp
     llmatrix4a.cpp
-    llmeshoptimizer.cpp
     llmodularmath.cpp
     lloctree.cpp
     llquaternion.cpp
@@ -66,7 +65,6 @@ target_sources(
         llmatrix3a.h
         llmatrix3a.inl
         llmatrix4a.h
-        llmeshoptimizer.h
         llmodularmath.h
         lloctree.h
         llplane.h
@@ -139,7 +137,6 @@ if(AL_BUILD_TESTS)
       tests/llbboxlocal_test.cpp
       tests/llmatrix3a_test.cpp
       tests/llmatrix4a_test.cpp
-      tests/llmeshoptimizer_test.cpp
       tests/llmodularmath_test.cpp
       tests/lloctree_test.cpp
       tests/llquaternion2_test.cpp
