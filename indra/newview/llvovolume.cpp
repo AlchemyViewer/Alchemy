@@ -1591,11 +1591,12 @@ void LLVOVolume::sculpt()
 
         getVolume()->sculpt(sculpt_width, sculpt_height, sculpt_components, sculpt_data, discard_level, mSculptTexture->isMissingAsset());
 
-        // Once a map until it builds its shape: why a sculpt shows its sphere, what it had to build from, and when the
-        // shape comes after all. Outside builds for download, also how the map varies and what it laid that out on, the
-        // map saved beside the log; and once a map and detail, a long, thin map's build, and a build from nothing of a
-        // map the texture has a level of.
+        // Once a map a session: why a sculpt shows its sphere and what it had to build from, and when the shape comes
+        // after all, however often the map's volumes go between the two by detail. Outside builds for download, also
+        // how the map varies and what it laid that out on, the map saved beside the log; and once a map and detail, a
+        // long, thin map's build, and a build from nothing of a map the texture has a level of.
         static std::set<LLUUID> told;
+        static std::set<LLUUID> told_recovered;
         const LLUUID& map_id = mSculptTexture->getID();
         const auto source = [&]() -> const char*
         {
@@ -1622,7 +1623,7 @@ void LLVOVolume::sculpt()
 #endif
             }
         }
-        else if (sculpt_data && told.erase(map_id))
+        else if (sculpt_data && told.count(map_id) && told_recovered.insert(map_id).second)
         {
             LL_INFOS("Sculpt") << "Sculpt map " << map_id << " builds its shape after the placeholder, area "
                                << getVolume()->getSurfaceArea() << ", from " << sculpt_width << "x" << sculpt_height << "x"
