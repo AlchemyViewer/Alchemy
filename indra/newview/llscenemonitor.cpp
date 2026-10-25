@@ -674,7 +674,12 @@ void LLSceneMonitorView::onTeleportFinished()
 
 void LLSceneMonitorView::onVisibilityChange(bool visible)
 {
-    LLSceneMonitor::getInstance()->setDebugViewerVisible(visible);
+    // Showing the view makes the monitor if it has to, since the view is what turns its capture on. Hiding it tells
+    // only a monitor that exists: a new one starts hidden, and a disconnect deletes it.
+    if (visible || LLSceneMonitor::instanceExists())
+    {
+        LLSceneMonitor::getInstance()->setDebugViewerVisible(visible);
+    }
 }
 
 void LLSceneMonitorView::draw()
