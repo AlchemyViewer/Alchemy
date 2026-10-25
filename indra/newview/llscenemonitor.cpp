@@ -679,6 +679,12 @@ void LLSceneMonitorView::onVisibilityChange(bool visible)
 
 void LLSceneMonitorView::draw()
 {
+    // A disconnect deletes the monitor; drawing it would make a new one.
+    if (!LLSceneMonitor::instanceExists())
+    {
+        return;
+    }
+
     const LLRenderTarget* target = LLSceneMonitor::getInstance()->getDiffTarget();
     if(!target)
     {

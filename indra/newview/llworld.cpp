@@ -95,6 +95,7 @@ LLWorld::LLWorld() :
     mLastPacketsIn(0),
     mLastPacketsOut(0),
     mLastPacketsLost(0),
+    mNumOfActiveCachedObjects(0),
     mSpaceTimeUSec(0)
 {
     LLViewerRegion::sVOCacheCullingEnabled = gSavedSettings.getBOOL("RequestFullRegionCache") && gSavedSettings.getBOOL("ObjectCacheEnabled");
@@ -110,6 +111,7 @@ void LLWorld::resetClass()
         LLViewerRegion* region_to_delete = *region_it++;
         removeRegion(region_to_delete->getHost());
     }
+    mNumOfActiveCachedObjects = 0;
 
     LLViewerPartSim::getInstance()->destroyClass();
 
