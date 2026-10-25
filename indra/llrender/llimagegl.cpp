@@ -71,98 +71,15 @@ namespace
 {
     // An off-thread upload handed to the main thread and waiting for its fence, oldest
     // first. Main thread only; see LLImageGL::syncToMainThread and publishUploads.
-    // Where the frames' ends stamp their frames (ALFrameFences::isStamping, NVIDIA's driver), the LLImageGL thread has the
-    // GPU stamp each upload it hands over, behind the upload's fence, into a slot of this store, which the main thread
-    // made and maps for reading. The upload has finished once its slot holds another stamp than it did when the stamp was
-    // asked for, which the main thread reads with no call: its fence is polled then and answers at once, rather than once
-    // the main context's frame it was handed over in has finished, at the pacing depth three frames on. The stamp only
-    // says when to poll; the fence is what publishes. A slot is the thread's to stamp again once the main thread has
-    // published its upload or let it go.
-    constexpr U32     UPLOAD_STAMP_SLOTS = 64;
-    ALGPUBuffer       sUploadStamps;                         // the main thread's, made and deleted with the LLImageGL thread
-    U32               sUploadStampsMade = 0;                 // bumped as each store is made: an old store's slot is not read
-    std::atomic<bool> sUploadStampBusy[UPLOAD_STAMP_SLOTS]; // the slot's upload yet to be published
-    std::atomic<bool> sUploadStampsWanted{ false };          // the main context's frames are stamped, as of its last end
-
-    struct UploadStamp
-    {
-        S32 mSlot   = -1; // none
-        U64 mBefore = 0;  // what the slot held when the stamp was asked for
-        U32 mStore  = 0;  // sUploadStampsMade then
-    };
-
-    // The LLImageGL thread's: has the GPU stamp what it has issued, into a free slot, where there is one.
-    UploadStamp stamp_upload()
-    {
-        UploadStamp stamp;
-        U8* const mapped = sUploadStamps.getMapped();
-        // Unstamped frames poll an upload's fence as it comes, and read no stamp.
-        if (!mapped || !sUploadStampsWanted.load(std::memory_order_relaxed))
-        {
-            return stamp;
-        }
-        // The thread's own timestamp queries, a slot each, made on its context the first time and gone with it.
-        thread_local GLuint queries[UPLOAD_STAMP_SLOTS] = {};
-        thread_local bool   made = false;
-        thread_local U32    next = 0;
-        if (!made)
-        {
-            glGenQueries(GLsizei(UPLOAD_STAMP_SLOTS), queries);
-            made = true;
-        }
-        for (U32 i = 0; i < UPLOAD_STAMP_SLOTS; ++i)
-        {
-            const U32 slot = (next + i) % UPLOAD_STAMP_SLOTS;
-            if (sUploadStampBusy[slot].exchange(true, std::memory_order_acquire))
-            {
-                continue;
-            }
-            next          = slot + 1;
-            stamp.mSlot   = (S32)slot;
-            stamp.mBefore = *reinterpret_cast<const volatile U64*>(mapped + slot * sizeof(U64));
-            stamp.mStore  = sUploadStampsMade;
-            glQueryCounter(queries[slot], GL_TIMESTAMP);
-            glGetQueryBufferObjectui64v(queries[slot], sUploadStamps.getGLName(), GL_QUERY_RESULT,
-                                        GLintptr(slot * sizeof(U64)));
-            break;
-        }
-        return stamp;
-    }
-
-    // Whether the upload was given a stamp in the store that is mapped now.
-    bool has_upload_stamp(const UploadStamp& stamp)
-    {
-        return stamp.mSlot >= 0 && stamp.mStore == sUploadStampsMade && sUploadStamps.getMapped();
-    }
-
-    // Whether the GPU has written the upload's stamp: no call.
-    bool upload_stamped(const UploadStamp& stamp)
-    {
-        U8* const mapped = sUploadStamps.getMapped();
-        if (stamp.mSlot < 0 || !mapped || stamp.mStore != sUploadStampsMade)
-        {
-            return false;
-        }
-        return *reinterpret_cast<const volatile U64*>(mapped + size_t(stamp.mSlot) * sizeof(U64)) != stamp.mBefore;
-    }
-
-    // The upload's slot back to the LLImageGL thread.
-    void release_upload_stamp(UploadStamp& stamp)
-    {
-        if (stamp.mSlot >= 0 && stamp.mStore == sUploadStampsMade)
-        {
-            sUploadStampBusy[stamp.mSlot].store(false, std::memory_order_release);
-        }
-        stamp.mSlot = -1;
-    }
-
+    // The LLImageGL thread sees each upload's fence signalled itself, on its own context, and only then marks it seen
+    // (LLImageGLThread::watchUpload): the main thread polls a fence once it is marked, and the poll answers at once,
+    // where a poll of a fence not yet signalled waits for a threaded driver's own thread to catch up.
     struct PendingPublish
     {
-        LLPointer<LLImageGL> mImage;
-        GLsync               mFence = nullptr; // null once seen signalled
-        LLGLuint             mName  = 0;
-        U32                  mHandedIn = 0;    // the main context's frame it was handed over in
-        UploadStamp          mStamp;           // the GPU's stamp of it, where the frames are stamped
+        LLPointer<LLImageGL>               mImage;
+        GLsync                             mFence = nullptr; // null once seen signalled
+        LLGLuint                           mName  = 0;
+        std::shared_ptr<std::atomic<bool>> mSeen;            // raised by the LLImageGL thread once the fence has signalled
     };
     std::vector<PendingPublish> sPendingPublishes;
 
@@ -449,7 +366,6 @@ void LLImageGL::cleanupClass()
     // -- left behind, the next context reissuing the name would find it already allocated.
     for (PendingPublish& pending : sPendingPublishes)
     {
-        release_upload_stamp(pending.mStamp);
         pending.mImage->mOnPublished.clear();
         pending.mImage->mPublishesPending = 0;
         pending.mImage->endUpload();
@@ -2335,14 +2251,11 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
     llassert(!on_main_thread());
 
     GLsync sync;
-    UploadStamp stamp;
     {
         LL_PROFILE_ZONE_NAMED("cglt - sync");
         // No flush before the fence: glFenceSync already orders after every command
         // issued on this context, so the flush below submits those too.
         sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-        // Behind the fence, so that a stamp written says the fence has signalled (sUploadStamps).
-        stamp = stamp_upload();
         // REQUIRED, and NOT replaceable by GL_SYNC_FLUSH_COMMANDS_BIT on the waiter:
         // that bit flushes the command stream of whichever context calls
         // glClientWaitSync, which is the main thread's context, not this one. Only a
@@ -2350,10 +2263,11 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
         glFlush();
     }
 
-    // Not waited on here. This thread used to block until the GPU had finished each upload,
-    // one texture at a time, so a backlog of decoded textures sat waiting for GL creation
-    // while it did. The main thread polls the fence instead (publishUploads) and publishes
-    // the texture once it has signalled.
+    // Not waited on here, upload by upload. This thread used to block until the GPU had
+    // finished each upload, one texture at a time, so a backlog of decoded textures sat
+    // waiting for GL creation while it did. The thread sees the fences signalled behind the
+    // work queued after them instead (LLImageGLThread::watchUpload), and marks each seen; the
+    // main thread polls a fence once it is marked (pollUploads), and publishes the texture.
     //
     // That is what the spec asks for. GL 4.6 section 5.3.1 has another context's changes
     // complete once its fence is seen signalled, and polling with glClientWaitSync on the
@@ -2361,32 +2275,40 @@ void LLImageGL::syncToMainThread(LLGLuint new_tex_name)
     // -- the guarantee NVIDIA needed where a GPU-side glWaitSync did not give it (SL-17284).
     // The main thread's first bind of the new name is then the re-attach section 5.3.3
     // requires. Meanwhile consumers read the snapshot beginUpload took (see getWidth).
+    auto seen = std::make_shared<std::atomic<bool>>(false);
     ref();
     if (!LL::WorkQueue::postMaybe(
             mMainQueue,
             [=, this]()
             {
                 LL_PROFILE_ZONE_NAMED("cglt - queue publish");
-                queuePublish(new_tex_name, sync);
-                sPendingPublishes.back().mStamp = stamp;
+                queuePublish(new_tex_name, sync, seen);
                 unref();
             }))
     {
         // main queue is gone (shutdown); nothing will run the lambda, so don't strand
-        // the reference we just took, or the fence, or the stamp's slot
+        // the reference we just took, or the fence
         glDeleteSync(sync);
-        release_upload_stamp(stamp);
         unref();
+    }
+    else if (LLImageGLThread::instanceExists())
+    {
+        LLImageGLThread::instance().watchUpload(sync, std::move(seen));
+    }
+    else
+    {
+        // No thread to see it: the main thread polls the fence as it comes.
+        seen->store(true, std::memory_order_release);
     }
 
     LL_PROFILER_GPU_COLLECT;
 }
 
-void LLImageGL::queuePublish(LLGLuint name, GLsync fence)
+void LLImageGL::queuePublish(LLGLuint name, GLsync fence, std::shared_ptr<std::atomic<bool>> seen)
 {
     llassert(on_main_thread());
     ++mPublishesPending;
-    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name, gGL.frameFences().frame() });
+    sPendingPublishes.push_back({ LLPointer<LLImageGL>(this), fence, name, std::move(seen) });
 }
 
 void LLImageGL::finishPublish(LLGLuint name)
@@ -2437,7 +2359,6 @@ void LLImageGL::finishUploads()
     given_up.swap(sPendingPublishes);
     for (PendingPublish& pending : given_up)
     {
-        release_upload_stamp(pending.mStamp);
         if (pending.mFence)
         {
             glDeleteSync(pending.mFence);
@@ -2450,9 +2371,6 @@ void LLImageGL::finishUploads()
 // static
 void LLImageGL::pollUploads()
 {
-    // The LLImageGL thread stamps its uploads only while the frames are stamped (AlchemyRenderFrameStamps).
-    sUploadStampsWanted.store(gGL.frameFences().isStamping(), std::memory_order_relaxed);
-
     if (sPendingPublishes.empty())
     {
         return;
@@ -2461,25 +2379,17 @@ void LLImageGL::pollUploads()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(on_main_thread());
 
-    // Where the frames' ends stamp their frames, a frame's end need not wait on a threaded driver's own thread, and a
-    // poll of a fence not yet signalled would: NVIDIA's answers it only once its thread has caught up. An upload
-    // is polled there only once the GPU has written the stamp the LLImageGL thread had it write behind the upload's
-    // fence (sUploadStamps), or, with no stamp, once the main context's frame it was handed over in has finished, which
-    // the upload's own commands, flushed before they were handed over, have all but surely finished before; a poll of a
-    // fence that has signalled answers at once.
-    const ALFrameFences& frames   = gGL.frameFences();
-    const bool           stamping = frames.isStamping();
-
-    // Oldest first, up to the first not yet signalled, as publishUploads walks them. An upload with a stamp waits for it
-    // however soon its frame finished: the LLImageGL thread's context can be behind the main one's.
+    // A poll of a fence not yet signalled waits for a threaded driver's own thread to catch up -- NVIDIA's answers it
+    // only once its thread has run every command before it -- and a poll of one signalled answers at once. An upload's
+    // fence is polled only once the LLImageGL thread has seen it signalled on its own context and marked it so, which
+    // the main thread reads with no call. Oldest first, up to the first not yet seen, as publishUploads walks them.
     for (PendingPublish& pending : sPendingPublishes)
     {
         if (!pending.mFence)
         {
             continue;
         }
-        if (stamping && !(has_upload_stamp(pending.mStamp) ? upload_stamped(pending.mStamp)
-                                                             : frames.isComplete(pending.mHandedIn)))
+        if (pending.mSeen && !pending.mSeen->load(std::memory_order_acquire))
         {
             break;
         }
@@ -2518,7 +2428,6 @@ U32 LLImageGL::publishUploads(bool poll)
 
     for (PendingPublish& pending : ready)
     {
-        release_upload_stamp(pending.mStamp);
         pending.mImage->finishPublish(pending.mName);
     }
 
@@ -4035,33 +3944,55 @@ LLImageGLThread::LLImageGLThread(LLWindow* window)
         sEnabledMedia = false;
         return;
     }
-    // The store the thread stamps its uploads into (sUploadStamps), where the GPU writes query results and so the frames'
-    // ends may stamp theirs: made before the thread starts, which reads it.
-    if (gGLManager.mWritesQueryResults && ALFrameFences::canStamp())
-    {
-        const U64 zeros[UPLOAD_STAMP_SLOTS] = {};
-        if (sUploadStamps.allocate(sizeof(zeros), ALGPUBuffer::READBACK, zeros, "Upload stamps") && sUploadStamps.getMapped())
-        {
-            ++sUploadStampsMade;
-            for (std::atomic<bool>& busy : sUploadStampBusy)
-            {
-                busy.store(false, std::memory_order_relaxed);
-            }
-        }
-        else
-        {
-            sUploadStamps.release();
-        }
-    }
     LL::ThreadPool::start();
 }
 
 LLImageGLThread::~LLImageGLThread()
 {
     close();
-    // The thread has ended, and with it every stamp it asked for that has not come: the uploads still to be published
-    // go by their fences.
-    sUploadStamps.release();
+}
+
+void LLImageGLThread::watchUpload(GLsync fence, std::shared_ptr<std::atomic<bool>> seen)
+{
+    mUploadsInFlight.push_back({ fence, std::move(seen) });
+    if (!mSeeingPosted)
+    {
+        mSeeingPosted = post([this]() { seeUploads(); });
+    }
+}
+
+void LLImageGLThread::seeUploads()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    mSeeingPosted = false;
+    while (!mUploadsInFlight.empty())
+    {
+        UploadInFlight& oldest = mUploadsInFlight.front();
+        // Waited for, a millisecond at a time, only while nothing else is queued here: work posted meanwhile runs first,
+        // and this runs again behind it. A poll or a wait here waits on this context's own driver thread, never the main
+        // context's, and the fence was flushed as it was laid.
+        constexpr GLuint64 WAIT_NS = 1'000'000;
+        const bool         idle    = getQueue().size() == 0;
+        const GLenum       status  = glClientWaitSync(oldest.mFence, 0, idle ? WAIT_NS : 0);
+        if (status == GL_TIMEOUT_EXPIRED)
+        {
+            if (getQueue().isClosed())
+            {
+                // Closing: the main thread waits the rest out itself (LLImageGL::finishUploads).
+                return;
+            }
+            if (!idle)
+            {
+                mSeeingPosted = post([this]() { seeUploads(); });
+                return;
+            }
+            continue;
+        }
+        // Signalled, or a fence that cannot be waited on, which the main thread's poll warns of. The fence is the main
+        // thread's to delete from here on.
+        oldest.mSeen->store(true, std::memory_order_release);
+        mUploadsInFlight.pop_front();
+    }
 }
 
 void LLImageGLThread::run()

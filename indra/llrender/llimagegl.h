@@ -41,7 +41,9 @@
 #include "workqueue.h"
 #include <boost/unordered_set.hpp>
 #include <atomic>
+#include <deque>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
@@ -85,10 +87,10 @@ public:
     static U32 publishUploads(bool poll = true);
 
     // Main thread, at the frame's end (LLRender::endFrame): poll the fences of the uploads
-    // handed over, oldest first, for updateClass to publish the signalled ones. A poll is a
-    // call that returns a value, which a threaded driver answers only once its own thread has
-    // caught up: in the middle of a frame that is most of the frame, where at its end the
-    // frame fences' calls have just caught it up.
+    // handed over, oldest first, for updateClass to publish the signalled ones, each only once
+    // the LLImageGL thread has seen it signalled (LLImageGLThread::watchUpload). A poll of a
+    // fence not yet signalled waits for a threaded driver's own thread to catch up; a poll of
+    // one signalled answers at once.
     static void pollUploads();
 
     // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
@@ -267,7 +269,8 @@ public:
 
     // Off the main thread: fence this thread's upload of new_tex_name and hand it to the main
     // thread, which publishes it in place of mTexName once the fence has signalled (see
-    // publishUploads). Does not wait for the GPU.
+    // publishUploads), and to the LLImageGL thread to see it signalled (watchUpload). Does
+    // not wait for the GPU.
     void syncToMainThread(LLGLuint new_tex_name);
 
     // Main thread: run fn once the upload handed over by syncToMainThread has published, or
@@ -482,7 +485,7 @@ private:
 
     // Off-thread uploads of this image handed to the main thread and not yet published, and
     // what is to run once none are. Main thread only; see syncToMainThread / afterPublish.
-    void queuePublish(LLGLuint name, GLsync fence);
+    void queuePublish(LLGLuint name, GLsync fence, std::shared_ptr<std::atomic<bool>> seen);
     void finishPublish(LLGLuint name);
     U32 mPublishesPending = 0;
     std::vector<std::function<void()>> mOnPublished;
@@ -707,9 +710,26 @@ public:
 
     void run() override;
 
+    // On the thread: an upload handed to the main thread (LLImageGL::syncToMainThread), whose fence the thread sees
+    // signalled behind the work queued after it, and then raises `seen`, which the main thread waits for before it
+    // polls the fence (LLImageGL::pollUploads).
+    void watchUpload(GLsync fence, std::shared_ptr<std::atomic<bool>> seen);
+
 private:
+    // On the thread: raises the seen flag of every upload in flight whose fence has signalled, oldest first, waiting for
+    // them only while nothing else is queued, and posting itself again behind what is.
+    void seeUploads();
+
+    struct UploadInFlight
+    {
+        GLsync                             mFence;
+        std::shared_ptr<std::atomic<bool>> mSeen;
+    };
+
     LLWindow* mWindow;
     void* mContext = nullptr;
+    std::deque<UploadInFlight> mUploadsInFlight; // the thread's
+    bool mSeeingPosted = false;                  // the thread's: seeUploads() is queued
 };
 
 #endif // LL_LLIMAGEGL_H

@@ -50,6 +50,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstring>
+#include <future>
 #include <string>
 #include <thread>
 #include <utility>
@@ -1329,29 +1330,10 @@ namespace
         CHECK(img->getWidth() == 32);
     }
 
-    // Where the frames are stamped, an upload is published at the first frame's end after the GPU has finished it, by the
-    // stamp the LLImageGL thread had the GPU write behind it: not once the main context's frame it was handed over in has
-    // finished, which a frame's end shows a frame later at the soonest, and the viewer's pacing three.
-    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a stamped upload publishes at the first frame's end after the GPU has finished it", "[LLImageGL]")
+    // An upload is published at the first frame's end after the LLImageGL thread has seen its fence signalled, which it
+    // does on its own context behind the work queued after the upload: not a frame or more later.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload publishes at the first frame's end after its thread has seen it finished", "[LLImageGL]")
     {
-        if (!gGLManager.mWritesQueryResults || !ALFrameFences::canStamp())
-        {
-            SKIP("the GPU writes no query results here: uploads are polled by the frames' fences");
-        }
-        ALFrameFences& frames = gGL.frameFences();
-        frames.setStamps(true);
-        gGL.endFrame();
-        REQUIRE(frames.isStamping());
-        // Stamps are gGL's, which outlives the case: asked for no more once the thread has gone.
-        struct StampsEnd
-        {
-            ~StampsEnd()
-            {
-                gGL.frameFences().setStamps(false);
-                gGL.endFrame();
-            }
-        } stamps_end;
-
         LL::WorkQueue mainloop("mainloop");
         std::atomic<bool> worker_done{ false };
         LLImageGLThread::createInstance(gl->window());
@@ -1384,11 +1366,91 @@ namespace
         bool completed = false;
         img->afterPublish([&]() { completed = true; });
 
-        // Long enough for the GPU to have finished the upload and written its stamp; then one frame's end.
+        // Long enough for the GPU to have finished the upload and the thread, with nothing else queued, to have seen it;
+        // then one frame's end.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         gGL.endFrame();
         LLImageGL::updateClass();
-        UNSCOPED_INFO("published at the first frame's end, by the upload's stamp");
+        UNSCOPED_INFO("published at the first frame's end");
+        CHECK(completed);
+        UNSCOPED_INFO("at the new size");
+        CHECK(img->getWidth() == 32);
+    }
+
+    // The main thread polls an upload's fence only once the LLImageGL thread has seen it signalled: a poll of a fence not
+    // yet signalled waits for a threaded driver's own thread to catch up. Held after it hands the upload over, the thread
+    // cannot look at the fence, and frames' ends publish nothing however long the GPU has had; let go, it sees the fence,
+    // and the next frame's end publishes the upload.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: an upload's fence is polled only once its thread has seen it signalled", "[LLImageGL]")
+    {
+        LL::WorkQueue mainloop("mainloop");
+        std::atomic<bool> worker_done{ false };
+        LLImageGLThread::createInstance(gl->window());
+        struct ThreadEnd
+        {
+            ~ThreadEnd() { LLImageGLThread::deleteSingleton(); }
+        } thread_end;
+        // Let go however the case ends, before the thread is joined.
+        std::promise<void> release;
+        std::shared_future<void> released = release.get_future().share();
+        struct Hold
+        {
+            std::promise<void>& mRelease;
+            bool mReleased = false;
+            void letGo()
+            {
+                if (!mReleased)
+                {
+                    mReleased = true;
+                    mRelease.set_value();
+                }
+            }
+            ~Hold() { letGo(); }
+        } hold{ release };
+
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x11).get()));
+        LLPointer<LLImageRaw> raw = makeRaw(32, 32, 4, 0x55);
+
+        img->beginUpload();
+        LLImageGLThread::instance().post(
+            [img, raw, &worker_done, released]()
+            {
+                img->createGLTexture(0, raw.get());
+                worker_done = true;
+                // The thread's look at the upload's fence is queued behind this, until the case lets it go.
+                released.wait();
+            });
+
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+        while (!worker_done && std::chrono::steady_clock::now() < deadline)
+        {
+            mainloop.runPending();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        mainloop.runPending();
+        REQUIRE(worker_done.load());
+
+        bool completed = false;
+        img->afterPublish([&]() { completed = true; });
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        for (int frame = 0; frame < 3; ++frame)
+        {
+            gGL.endFrame();
+            LLImageGL::updateClass();
+        }
+        UNSCOPED_INFO("not polled, so not published, while its thread has not seen it, however long the GPU has had");
+        CHECK_FALSE(completed);
+
+        hold.letGo();
+        while (!completed && std::chrono::steady_clock::now() < deadline)
+        {
+            gGL.endFrame();
+            LLImageGL::updateClass();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        UNSCOPED_INFO("published once its thread has seen it");
         CHECK(completed);
         UNSCOPED_INFO("at the new size");
         CHECK(img->getWidth() == 32);
