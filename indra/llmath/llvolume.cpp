@@ -4842,6 +4842,17 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
             LLVector4a::memcpyNonAliased16((F32*) mTexCoords, (F32*) src.mTexCoords, tc_size);
         }
 
+        // A source without normals or texture coordinates makes a face
+        // without them, not one whose are unwritten.
+        if (!src.mNormals)
+        {
+            mNormals = NULL;
+        }
+        if (!src.mTexCoords)
+        {
+            mTexCoords = NULL;
+        }
+
         if (src.mTangents)
         {
             allocateTangents(src.mNumVertices);

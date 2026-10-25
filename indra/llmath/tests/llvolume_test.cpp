@@ -4633,6 +4633,62 @@ namespace
         }
     }
 
+    // A face copied from one without normals or texture coordinates, by
+    // the copy constructor or by assignment, comes out without them too,
+    // rather than with room for them that nothing wrote.
+    TEST_CASE("llvolume: a copy of a face without normals or texture coordinates is without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+        };
+        const Without cases[] = {
+            { "normals", true, false },
+            { "texture coordinates", false, true },
+            { "either", true, true },
+        };
+        const CorpusMesh mesh = uvSphere(16, 8);
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            LLVolumeFace face = mesh.face();
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            const LLVolumeFace constructed(face);
+            LLVolumeFace assigned;
+            assigned = face;
+            const LLVolumeFace* copies[] = { &constructed, &assigned };
+            for (const LLVolumeFace* copy : copies)
+            {
+                INFO((copy == &constructed ? "by the copy constructor" : "by assignment"));
+                CHECK((copy->mNormals != nullptr) == !without.normals);
+                CHECK((copy->mTexCoords != nullptr) == !without.tex_coords);
+                REQUIRE(copy->mNumVertices == face.mNumVertices);
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    CAPTURE(v);
+                    CHECK(v3(copy->mPositions[v]) == v3(face.mPositions[v]));
+                    if (!without.normals)
+                    {
+                        CHECK(v3(copy->mNormals[v]) == v3(face.mNormals[v]));
+                    }
+                    if (!without.tex_coords)
+                    {
+                        CHECK(copy->mTexCoords[v] == face.mTexCoords[v]);
+                    }
+                }
+            }
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two
