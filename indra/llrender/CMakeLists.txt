@@ -282,6 +282,7 @@ if(AL_BUILD_TESTS)
       tests/llrendersphere_gl_test.cpp
       tests/lluiimage_test.cpp
       tests/llvertexbuffer_gl_test.cpp
+    BENCH_SOURCES tests/aldriversync_bench.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}

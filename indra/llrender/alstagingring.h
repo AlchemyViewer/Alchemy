@@ -44,8 +44,9 @@ class ALFrameFences;
 /// stamp their frames rather than lay fences (ALFrameFences::willStamp, NVIDIA's driver), the ring lays a fence of its
 /// own as it leaves a segment, and enters it again only once that fence has signalled too: GL says a persistently
 /// mapped store is no longer read by the commands before it only through a sync object, and a stamp is a query, not
-/// one. A fence laid and polled is a call that returns a value each, once a segment a lap; it is polled at the frame's
-/// end, once the frame it was laid in has finished, and take() makes no call that returns a value. take() never waits: where
+/// one. The fence is laid in take(), which NVIDIA's threaded optimization answers at once, and polled at the frame's
+/// end, once the frame it was laid in has finished, so that it has signalled and the poll answers at once too: take()
+/// waits on nothing the driver's thread has queued. take() never waits: where
 /// the next segment is still the GPU's, or the bytes asked for are more than a segment holds, it gives no room, and the
 /// caller sends its bytes from client memory as it would without the ring. endFrame() sizes the ring to the traffic of
 /// late, between MIN_BYTES and MAX_BYTES: what the last SLACK_FRAMES frames asked for together, a burst held once rather

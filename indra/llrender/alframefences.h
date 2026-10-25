@@ -34,7 +34,8 @@
 /// batches, the uniform buffer rings' segments, ALGPUReadback's slots and ALGPUStream's regions.
 ///
 /// The fences are polled once a frame, by endFrame(), straight after the swap, on every driver, and nowhere else but a
-/// wait. A threaded driver answers a fence laid or polled only once its own thread has caught up with it. Mesa's glthread
+/// wait. A threaded driver answers a poll of a fence not yet signalled only once its own thread has caught up with it;
+/// NVIDIA's threaded optimization lays a fence, and answers a poll of one signalled, at once. Mesa's glthread
 /// runs every call that returns a value so, and has caught up at the swap, since Mesa finishes glthread before it
 /// flushes the frame. NVIDIA's threaded optimization answers a poll of a fence not yet signalled in order on its thread,
 /// which a GPU-bound frame holds in the previous frame's present, so that a poll before the cull waits there for most
