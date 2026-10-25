@@ -450,6 +450,103 @@ namespace
         return options;
     }
 
+    // mesh's face simplified on its own, as ALMeshSimplifier::simplifyFace
+    // makes it: its triangles, numbered as mesh's vertices are, in
+    // simplified. Returns their index count, 0 where no triangle is left.
+    size_t simplifyOwnFace(const Mesh& mesh, S32 face, const ALMeshSimplifier::Target& goal, ALMeshSimplifier::Seams seams,
+                           std::vector<U32>& simplified)
+    {
+        using Seams = ALMeshSimplifier::Seams;
+        const U32 first = mesh.first[face];
+        const U32 vertex_count = mesh.first[face + 1] - first;
+        const size_t index_count = mesh.first_index[face + 1] - mesh.first_index[face];
+        simplified.clear();
+        if (index_count < 3)
+        {
+            return 0;
+        }
+
+        // The face's own triangles, numbered from its first vertex.
+        std::vector<U32> indices(mesh.indices.begin() + mesh.first_index[face], mesh.indices.begin() + mesh.first_index[face + 1]);
+        for (U32& index : indices)
+        {
+            index -= first;
+        }
+
+        // Error is the model's, relative to its size; the simplifier takes it
+        // relative to the face's.
+        const F32 face_extent = meshopt_simplifyScale(mesh.positions[first].getF32ptr(), vertex_count, sizeof(LLVector4a));
+        const F32 to_face = face_extent > 0.f ? mesh.extent / face_extent : 1.f;
+        const F32 error = goal.error * to_face;
+
+        const size_t target_count = targetCount(index_count, goal.decimator);
+        simplified.resize(index_count);
+        F32 result_error = 0.f;
+        size_t count = 0;
+        if (seams == Seams::SLOPPY)
+        {
+            count = meshopt_simplifySloppy(simplified.data(), indices.data(), index_count, mesh.positions[first].getF32ptr(), vertex_count,
+                                           sizeof(LLVector4a), nullptr, target_count, llmin(error, 1.f), &result_error);
+        }
+        else
+        {
+            // A face that meets another keeps its vertices where it meets it,
+            // which the other's simplification keeps as well, and all of its
+            // parts, as a part of one face may be joined to another face's. A
+            // face meets another along a border, one's or the other's; its
+            // borders that meet no face are free, and so is its inside where
+            // another face lies over it.
+            const bool meets = std::any_of(mesh.shared.begin() + first, mesh.shared.begin() + first + vertex_count,
+                                           [](U8 shared) { return shared != 0; });
+            std::vector<U8> locks;
+            if (seams != Seams::ALL)
+            {
+                protect(mesh, seams, first, vertex_count, locks);
+            }
+            if (meets)
+            {
+                locks.resize(vertex_count, 0);
+                for (U32 v = 0; v < vertex_count; ++v)
+                {
+                    if (mesh.held[first + v])
+                    {
+                        locks[v] |= (U8)meshopt_SimplifyVertex_Lock;
+                    }
+                }
+            }
+            count = simplifyMesh(mesh, first, vertex_count, indices.data(), index_count, target_count, error, seamOptions(seams, goal), locks,
+                                 goal.distant && !meets, simplified.data(), result_error);
+        }
+        if (count < 3)
+        {
+            simplified.clear();
+            return 0;
+        }
+
+        simplified.resize(count);
+        for (U32& index : simplified)
+        {
+            index += first;
+        }
+        return count;
+    }
+
+    // The vertices the triangles name.
+    size_t namedVertexCount(const std::vector<U32>& indices, size_t vertex_count)
+    {
+        std::vector<U8> named(vertex_count, 0);
+        size_t count = 0;
+        for (U32 index : indices)
+        {
+            if (!named[index])
+            {
+                named[index] = 1;
+                ++count;
+            }
+        }
+        return count;
+    }
+
     // What a simplified face takes from the face it is made from besides
     // its vertices and triangles.
     void copyLayout(const LLVolumeFace& layout, LLVolumeFace& face)
@@ -641,33 +738,29 @@ F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams 
         to.insert(to.end(), simplified.begin() + i, simplified.begin() + i + 3);
     }
 
-    for (S32 f = 0; f < faces; ++f)
+    // Nothing is written to target until every face is known to fit.
+    if (std::any_of(face_indices.begin(), face_indices.end(),
+                    [&](const std::vector<U32>& indices) { return namedVertexCount(indices, mesh.vertexCount()) > U16_MAX; }))
     {
-        if (face_indices[f].size() < 3)
+        LL_WARNS("MeshSimplifier") << "A face of a simplified model takes more vertices than 16-bit indices reach; "
+                                   << "simplifying each face on its own" << LL_ENDL;
+        count = 0;
+        for (S32 f = 0; f < faces; ++f)
         {
-            continue;
+            count += simplifyOwnFace(mesh, f, goal, seams, face_indices[f]);
         }
-        if (!compact(base, f, face_indices[f].data(), face_indices[f].size(), target.getVolumeFace(f)))
+        if (count < 3)
         {
-            LL_WARNS("MeshSimplifier") << "A face of a simplified model takes more vertices than 16-bit indices reach; "
-                                       << "simplifying each face on its own" << LL_ENDL;
-            size_t face_count = 0;
-            S32 kept = 0;
-            for (S32 g = 0; g < faces; ++g)
-            {
-                if (simplifyFace(g, target.getVolumeFace(g), goal, seams) > 0.f)
-                {
-                    face_count += target.getVolumeFace(g).mNumIndices;
-                    ++kept;
-                }
-            }
-            return kept ? (F32)index_count / (F32)face_count : -1.f;
+            return -1.f;
         }
     }
+
     for (S32 f = 0; f < faces; ++f)
     {
-        if (face_indices[f].size() < 3)
+        if (face_indices[f].size() < 3 || !compact(base, f, face_indices[f].data(), face_indices[f].size(), target.getVolumeFace(f)))
         {
+            // Every face fits, as counted above.
+            llassert(face_indices[f].size() < 3);
             makeEmpty(base.getVolumeFace(f), target.getVolumeFace(f));
         }
     }
@@ -676,84 +769,15 @@ F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams 
 
 F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const
 {
-    const LLVolume& base = mBase;
     const Mesh& mesh = *mMesh;
-    const U32 first = mesh.first[face];
-    const U32 vertex_count = mesh.first[face + 1] - first;
-    const size_t index_count = mesh.first_index[face + 1] - mesh.first_index[face];
-    if (index_count < 3)
-    {
-        makeEmpty(base.getVolumeFace(face), target);
-        return -1.f;
-    }
-
-    // The face's own triangles, numbered from its first vertex.
-    std::vector<U32> indices(mesh.indices.begin() + mesh.first_index[face], mesh.indices.begin() + mesh.first_index[face + 1]);
-    for (U32& index : indices)
-    {
-        index -= first;
-    }
-
-    // Error is the model's, relative to its size; the simplifier takes it
-    // relative to the face's.
-    const F32 face_extent = meshopt_simplifyScale(mesh.positions[first].getF32ptr(), vertex_count, sizeof(LLVector4a));
-    const F32 to_face = face_extent > 0.f ? mesh.extent / face_extent : 1.f;
-    const F32 error = goal.error * to_face;
-
-    const size_t target_count = targetCount(index_count, goal.decimator);
-    std::vector<U32> simplified(index_count);
-    F32 result_error = 0.f;
-    size_t count = 0;
-    if (seams == Seams::SLOPPY)
-    {
-        count = meshopt_simplifySloppy(simplified.data(), indices.data(), index_count, mesh.positions[first].getF32ptr(), vertex_count,
-                                       sizeof(LLVector4a), nullptr, target_count, llmin(error, 1.f), &result_error);
-    }
-    else
-    {
-        // A face that meets another keeps its vertices where it meets it,
-        // which the other's simplification keeps as well, and all of its
-        // parts, as a part of one face may be joined to another face's. A
-        // face meets another along a border, one's or the other's; its
-        // borders that meet no face are free, and so is its inside where
-        // another face lies over it.
-        const bool meets = std::any_of(mesh.shared.begin() + first, mesh.shared.begin() + first + vertex_count,
-                                       [](U8 shared) { return shared != 0; });
-        std::vector<U8> locks;
-        if (seams != Seams::ALL)
-        {
-            protect(mesh, seams, first, vertex_count, locks);
-        }
-        if (meets)
-        {
-            locks.resize(vertex_count, 0);
-            for (U32 v = 0; v < vertex_count; ++v)
-            {
-                if (mesh.held[first + v])
-                {
-                    locks[v] |= (U8)meshopt_SimplifyVertex_Lock;
-                }
-            }
-        }
-        count = simplifyMesh(mesh, first, vertex_count, indices.data(), index_count, target_count, error, seamOptions(seams, goal), locks,
-                             goal.distant && !meets, simplified.data(), result_error);
-    }
-    if (count < 3)
-    {
-        makeEmpty(base.getVolumeFace(face), target);
-        return -1.f;
-    }
-
-    for (size_t i = 0; i < count; ++i)
-    {
-        simplified[i] += first;
-    }
-    if (!compact(base, face, simplified.data(), count, target))
+    std::vector<U32> simplified;
+    const size_t count = simplifyOwnFace(mesh, face, goal, seams, simplified);
+    if (count < 3 || !compact(mBase, face, simplified.data(), count, target))
     {
         // A face's own vertices are never more than 16-bit indices reach.
-        llassert(false);
-        makeEmpty(base.getVolumeFace(face), target);
+        llassert(count < 3);
+        makeEmpty(mBase.getVolumeFace(face), target);
         return -1.f;
     }
-    return (F32)index_count / (F32)count;
+    return (F32)(mesh.first_index[face + 1] - mesh.first_index[face]) / (F32)count;
 }

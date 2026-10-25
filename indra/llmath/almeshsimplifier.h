@@ -90,7 +90,8 @@ public:
     // or -1 where no triangle was left, in which case target's faces are as
     // they were. A face left with no triangle is one of three indices to a
     // vertex at the origin. Where a face would take more vertices than 16-bit
-    // indices reach, each face is simplified on its own instead.
+    // indices reach, each face is simplified on its own instead, as
+    // simplifyFace simplifies it.
     F32 simplifyModel(LLVolume& target, const Target& goal, Seams seams) const;
 
     // Simplifies base's face on its own into target. A face that shares a
