@@ -43,6 +43,7 @@
 #include "../llshadermgr.h"
 
 #include "llheadlessgl_fixture.h"
+#include "tests/wrapllerrs.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -55,6 +56,10 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+// llgl.cpp's, which LLRender::init hands GL in a debug session.
+extern void APIENTRY gl_debug_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
+                                       const GLchar* message, GLvoid* userParam);
 
 namespace
 {
@@ -2429,6 +2434,51 @@ namespace
         CHECK(validates(mDraw2, TEST_SOURCE_MAP, GL_DEPTH_COMPONENT));
 
         glDeleteTextures(1, &texture);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // The debug callback runs inside the GL call that raised its message, where a GL call of its own is undefined: it
+    // describes a unit as gGL caches it. A unit rebound behind the cache's back is reported as the cache has it, which
+    // a callback asking GL would not do.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: the debug callback describes the slots as cached and asks GL nothing", "[llglslshader_gl]")
+    {
+        GLuint textures[2] = {};
+        glGenTextures(2, textures);
+        for (const GLuint texture : textures)
+        {
+            glBindTexture(GL_TEXTURE_2D, texture);
+            glTexStorage2D(GL_TEXTURE_2D, 1, GL_RGBA8, 4, 4);
+        }
+        glBindTexture(GL_TEXTURE_2D, 0);
+
+        constexpr U32 UNIT = 3;
+        ALTextureSlot* slot = gGL.getTextureSlot(UNIT);
+        slot->bindManual(ALTextureSlot::TT_TEXTURE, textures[0]);
+        // GL holds the other texture there, unknown to the cache.
+        glActiveTexture(GL_TEXTURE0 + UNIT);
+        glBindTexture(GL_TEXTURE_2D, textures[1]);
+        glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
+
+        std::string reported;
+        {
+            CaptureLog log(LLError::LEVEL_WARN);
+            const char message[] = "Pixel-path performance warning: raised by a test";
+            gl_debug_callback(GL_DEBUG_SOURCE_API, GL_DEBUG_TYPE_PERFORMANCE, 0x20072, GL_DEBUG_SEVERITY_MEDIUM,
+                              GLsizei(sizeof(message) - 1), message, nullptr);
+            reported = log.messageWith("unit " + std::to_string(UNIT) + " ", false);
+        }
+        INFO("the unit's line: " << reported);
+        UNSCOPED_INFO("the unit reported with the texture the cache holds");
+        CHECK(reported.find("tex=" + std::to_string(textures[0])) != std::string::npos);
+        UNSCOPED_INFO("not the one GL holds");
+        CHECK(reported.find("tex=" + std::to_string(textures[1])) == std::string::npos);
+
+        // GL as the cache has it again, and the slot let go.
+        glActiveTexture(GL_TEXTURE0 + UNIT);
+        glBindTexture(GL_TEXTURE_2D, textures[0]);
+        glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
+        slot->unbind();
+        glDeleteTextures(2, textures);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 
