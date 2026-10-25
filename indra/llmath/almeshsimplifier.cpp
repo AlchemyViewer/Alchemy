@@ -159,6 +159,11 @@ namespace
 
             if (face.mTexCoords && vertices)
             {
+                // A coordinate that is not finite counts for nothing, and is
+                // weighed as none: in the simplifier's error it would make
+                // every collapse near it free.
+                auto finite = [](const LLVector2& uv) { return std::isfinite(uv.mV[0]) && std::isfinite(uv.mV[1]); };
+
                 F64 area = 0.0;
                 size_t triangles = 0;
                 for (U32 i = mesh.first_index[f]; i < mesh.first_index[f + 1]; i += 3)
@@ -166,25 +171,35 @@ namespace
                     const LLVector2& a = face.mTexCoords[mesh.indices[i] - first];
                     const LLVector2& b = face.mTexCoords[mesh.indices[i + 1] - first];
                     const LLVector2& c = face.mTexCoords[mesh.indices[i + 2] - first];
-                    area += fabs(0.5 * ((F64)(b.mV[0] - a.mV[0]) * (c.mV[1] - a.mV[1]) - (F64)(c.mV[0] - a.mV[0]) * (b.mV[1] - a.mV[1])));
-                    ++triangles;
+                    if (finite(a) && finite(b) && finite(c))
+                    {
+                        area += fabs(0.5 * ((F64)(b.mV[0] - a.mV[0]) * (c.mV[1] - a.mV[1]) -
+                                            (F64)(c.mV[0] - a.mV[0]) * (b.mV[1] - a.mV[1])));
+                        ++triangles;
+                    }
                 }
                 const F64 mean = triangles ? area / (F64)triangles : 0.0;
                 const F32 density = mean > 0.0 && std::isfinite(mean) ? (F32)(1.0 / sqrt(mean)) : 0.f;
 
                 // Measured from the face's least coordinates, so that their
                 // size stays near the density's whatever the texture's offset.
-                LLVector2 least = face.mTexCoords[0];
-                for (U32 v = 1; v < vertices; ++v)
+                LLVector2 least(F32_MAX, F32_MAX);
+                for (U32 v = 0; v < vertices; ++v)
                 {
-                    least.mV[0] = llmin(least.mV[0], face.mTexCoords[v].mV[0]);
-                    least.mV[1] = llmin(least.mV[1], face.mTexCoords[v].mV[1]);
+                    if (finite(face.mTexCoords[v]))
+                    {
+                        least.mV[0] = llmin(least.mV[0], face.mTexCoords[v].mV[0]);
+                        least.mV[1] = llmin(least.mV[1], face.mTexCoords[v].mV[1]);
+                    }
                 }
                 for (U32 v = 0; v < vertices; ++v)
                 {
-                    F32* attribute = &mesh.attributes[(first + v) * ATTRIBUTE_COUNT];
-                    attribute[3] = (face.mTexCoords[v].mV[0] - least.mV[0]) * density;
-                    attribute[4] = (face.mTexCoords[v].mV[1] - least.mV[1]) * density;
+                    if (density > 0.f && finite(face.mTexCoords[v]))
+                    {
+                        F32* attribute = &mesh.attributes[(first + v) * ATTRIBUTE_COUNT];
+                        attribute[3] = (face.mTexCoords[v].mV[0] - least.mV[0]) * density;
+                        attribute[4] = (face.mTexCoords[v].mV[1] - least.mV[1]) * density;
+                    }
                 }
             }
         }

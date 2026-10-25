@@ -43,6 +43,7 @@
 #include <cmath>
 #include <cstring>
 #include <iterator>
+#include <limits>
 #include <map>
 #include <set>
 #include <string>
@@ -592,6 +593,36 @@ namespace
             CHECK(triangles > coarser);
             coarser = triangles;
         }
+    }
+
+    // A texture coordinate that is not finite, as a loader may pass on,
+    // counts for nothing, and the rest of its face's coordinates weigh as
+    // they did: one would otherwise make the face's texture density not a
+    // number, and the face's coordinates weigh nothing at all. A flat plane
+    // whose coordinates bend across it is held up by them alone.
+    TEST_CASE("almeshsimplifier: a texture coordinate that is not finite leaves its face's others their weight", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        Geometry model = plane(16);
+        for (LLVector2& uv : model.uvs)
+        {
+            uv.mV[0] += 0.2f * sinf(F_TWO_PI * 2.f * uv.mV[1]);
+        }
+        ALMeshSimplifier::Target goal;
+        goal.error = 0.005f;
+        auto simplified = [&](const Geometry& geometry)
+        {
+            LLPointer<LLVolume> base = volumeOf({ geometry });
+            LLPointer<LLVolume> target = targetFor(*base);
+            REQUIRE(ALMeshSimplifier(*base).simplifyModel(*target, goal, Seams::ALL) > 0.f);
+            return triangleCount(*target);
+        };
+        const S32 whole = simplified(model);
+        model.uvs[0] = LLVector2(std::numeric_limits<F32>::quiet_NaN(), 0.f);
+        const S32 with_nan = simplified(model);
+        INFO(fmt::format("{} triangles from finite coordinates, {} with one not", whole, with_nan));
+        REQUIRE(whole > 8);
+        CHECK(with_nan * 2 >= whole);
     }
 
     // ------------------------------------------------------------------
