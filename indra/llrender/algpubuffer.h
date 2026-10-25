@@ -165,8 +165,12 @@ private:
 // hands back the oldest result once the frame fences show that frame finished (ALFrameFences), which is a frame or two
 // later. A request that finds every slot holding a result not yet collected is refused rather than stalling on the
 // oldest. Slots are mapped for reading where persistent maps resolved, and read by glGetBufferSubData elsewhere --
-// once the frame has finished, so neither waits on the GPU. Neither a request nor a mapped slot's collect lays or polls
-// a fence of its own, so nothing waits on a threaded driver's own thread either.
+// once the frame has finished, so neither waits on the GPU. Where the frames' ends stamp their frames rather than lay
+// fences (ALFrameFences::willStamp), a request also lays a fence of its own, and its result is collected only once that
+// has signalled too: GL says a mapped store is written by the commands before it only through a sync object, and a
+// stamp is a query. The fence is laid at once and polled only once its frame has finished, when it has signalled and
+// the poll answers at once, so nothing waits on a threaded driver's own thread either. release() waits out the requests
+// still in flight before it lets the store go.
 //
 // All operations require the GL context of the frame fences to be current: gGL's, unless others are given. Non-copyable.
 class ALGPUReadback
@@ -186,6 +190,8 @@ public:
     size_t getSlotSize() const { return mSlotBytes; }
     // Requests made and not yet collected.
     U32    getPending() const { return mPending; }
+    // Fences of the slots' own, laid while stamping and not yet seen signalled.
+    U32    getFences() const;
 
     // Copy [src_offset, src_offset + bytes) of `src` into the next slot. A shader's writes to `src` are ordered before
     // the copy here. False, and nothing copied, while every slot is pending.
@@ -204,8 +210,9 @@ public:
 private:
     struct Slot
     {
-        U32    mFrame = 0;  // the frame the slot's copy was issued in
+        U32    mFrame = 0;        // the frame the slot's copy was issued in
         size_t mBytes = 0;
+        void*  mFence = nullptr;  // a fence of its own, where the frame is stamped (GLsync)
     };
 
     ALFrameFences& frames() const;
