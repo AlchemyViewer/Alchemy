@@ -2828,8 +2828,16 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                     U32 joints[4] = {0,0,0,0};
                     LLVector4 joints_with_weights(0,0,0,0);
 
-                    while (joint != END_INFLUENCES && idx < weights.size())
+                    while (joint != END_INFLUENCES)
                     {
+                        // An influence is its joint and two bytes of weight;
+                        // an array that ends inside one ends there, the
+                        // vertex keeping the influences before it.
+                        if (weights.size() - idx < 2)
+                        {
+                            idx = (U32)weights.size();
+                            break;
+                        }
                         U16 influence = weights[idx++];
                         influence |= ((U16) weights[idx++] << 8);
 
@@ -2838,7 +2846,7 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                         joints[cur_influence] = joint;
                         cur_influence++;
 
-                        if (cur_influence >= 4)
+                        if (cur_influence >= 4 || idx >= weights.size())
                         {
                             joint = END_INFLUENCES;
                         }

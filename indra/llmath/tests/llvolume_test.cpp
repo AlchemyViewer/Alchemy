@@ -4415,6 +4415,52 @@ namespace
         }
     }
 
+    // A rigged face's weights are an influence after another, each a joint
+    // and two bytes of weight. An array that ends inside an influence leaves
+    // its vertex the influences before it, and is not read past its end.
+    TEST_CASE("llvolume: a mesh face whose weights end inside an influence keeps the influences before it", "[llvolume]")
+    {
+        struct Cut
+        {
+            const char* what;
+            LLSD::Binary weights;
+            S32 joint; // the first vertex's first joint, or -1 for none
+        };
+        const Cut cuts[] = {
+            { "joint 5 at half, then joint 7 and one byte of its weight", { 5, 0xff, 0x7f, 7, 0xff }, 5 },
+            { "joint 5 and one byte of its weight", { 5, 0xff }, -1 },
+        };
+        for (const Cut& cut : cuts)
+        {
+            CAPTURE(cut.what);
+            LLSD face = wireTriangle();
+            face["Weights"] = LLSD(cut.weights);
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeLOD(face, decoded);
+            REQUIRE(decoded);
+            const LLVolumeFace& rigged = volume->getVolumeFace(0);
+            REQUIRE(rigged.mNumVertices == 3);
+            REQUIRE(rigged.mWeights);
+            for (S32 v = 0; v < rigged.mNumVertices; ++v)
+            {
+                CAPTURE(v);
+                const LLVector4a& weight = rigged.mWeights[v];
+                if (v == 0 && cut.joint >= 0)
+                {
+                    CHECK((S32)weight[0] == cut.joint);
+                }
+                else
+                {
+                    // No influence: all of the weight on the first joint.
+                    CHECK(weight[0] == 0.999f);
+                }
+                CHECK(weight[1] == 0.f);
+                CHECK(weight[2] == 0.f);
+                CHECK(weight[3] == 0.f);
+            }
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two
