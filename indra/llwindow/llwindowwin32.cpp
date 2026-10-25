@@ -4124,11 +4124,7 @@ void LLWindowWin32::swapBuffers()
         LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
         SwapBuffers(mhDC);
     }
-
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("GPU Collect");
-        LL_PROFILER_GPU_COLLECT;
-    }
+    // Tracy's GPU zones are collected at LLRender::endFrame, past the pacing wait.
 }
 
 

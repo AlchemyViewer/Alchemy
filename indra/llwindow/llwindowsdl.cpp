@@ -1021,7 +1021,7 @@ void LLWindowSDL::swapBuffers()
     {
         SDL_GL_SwapWindow(mWindow);
     }
-    LL_PROFILER_GPU_COLLECT;
+    // Tracy's GPU zones are collected at LLRender::endFrame, past the pacing wait.
 #if LL_LINUX
     checkGraphicsReset();
 #endif

@@ -586,6 +586,9 @@ void LLRender::endFrame(U32 frames_ahead)
     // before the pacing wait, it would do the wait itself, and the pacing would find the frame done and keep no slack.
     mQueries.closeFrame();
     mFrameFences.endFrame(frames_ahead);
+    // Tracy's GPU zones, while profiling: reading their results waits for a threaded driver's thread, which has least
+    // left to run past the pacing wait, rather than at the swap.
+    LL_PROFILER_GPU_COLLECT;
     mQueries.retire();
     mQueries.openFrame();
     mQueries.makeRoom();
