@@ -34,7 +34,9 @@
 #include <meshoptimizer.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
+#include <utility>
 #include <vector>
 
 // base's faces as meshoptimizer takes them, their vertices and indices
@@ -240,21 +242,33 @@ namespace
         // runs that no other of its triangles has, its vertices taken at
         // their positions. Where faces meet, one's border lies along the
         // other; faces that overlap, as a garment's inside is a copy of its
-        // outside, share positions across their insides too.
+        // outside, share positions across their insides too. A face made
+        // double-sided holds each triangle twice, once turned over, and each
+        // is counted once, so that its rim is its border as a face of one
+        // side's is.
         std::vector<U8> border(vertex_count, 0);
         std::vector<U64> edges;
+        std::vector<std::array<U32, 3>> triangles;
         for (S32 f = 0; f < faces; ++f)
         {
-            edges.clear();
+            triangles.clear();
             for (U32 i = mesh.first_index[f]; i < mesh.first_index[f + 1]; i += 3)
             {
-                for (U32 k = 0; k < 3; ++k)
+                std::array<U32, 3> corners = { remap[mesh.indices[i]], remap[mesh.indices[i + 1]], remap[mesh.indices[i + 2]] };
+                std::sort(corners.begin(), corners.end());
+                triangles.push_back(corners);
+            }
+            std::sort(triangles.begin(), triangles.end());
+            triangles.erase(std::unique(triangles.begin(), triangles.end()), triangles.end());
+
+            edges.clear();
+            for (const std::array<U32, 3>& corners : triangles)
+            {
+                for (const auto& [a, b] : { std::pair{ corners[0], corners[1] }, std::pair{ corners[1], corners[2] }, std::pair{ corners[0], corners[2] } })
                 {
-                    const U32 a = remap[mesh.indices[i + k]];
-                    const U32 b = remap[mesh.indices[i + (k + 1) % 3]];
                     if (a != b)
                     {
-                        edges.push_back(((U64)llmin(a, b) << 32) | llmax(a, b));
+                        edges.push_back(((U64)a << 32) | b);
                     }
                 }
             }
