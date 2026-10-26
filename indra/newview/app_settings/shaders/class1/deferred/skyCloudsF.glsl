@@ -102,11 +102,10 @@ vec4 skyClouds(vec3 dir)
     // The position relative to the camera, raised as windlightDome raises it.
     vec3 rel_pos = windlightDomeRaise(hit);
 
-    // WindLight drew clouds at full opacity above the horizon. SL-10751's (rel_pos.y + 512) / max_y fade was
-    // meant for the dome's underside, but rel_pos.y tops out near 650, so with max_y above ~1160 it capped
-    // every cloud (0.72 at the zenith for the default 1605). Below the horizon SL-11589 zeroes them (WindLight
-    // drew them hanging under it); this only softens that cut over the last two degrees above the horizon,
-    // where the haze has already taken the clouds most of the way to the horizon's colour.
+    // The clouds are at full opacity above the horizon and none below it (SL-11589), the cut softened over the last
+    // two degrees above it, where the haze has already taken them most of the way to the horizon's colour. SL-10751's
+    // fade, (rel_pos.y + 512) / max_y, is not used: rel_pos.y tops out near 650, so with max_y above ~1160 it would
+    // cap every cloud (0.72 at the zenith for the default 1605).
     float altitude_blend_factor = smoothstep(0.0, 0.035, rel_pos.y / length(rel_pos));
 
     // Set altitude. max_y is held at 1 m or more, as windlightDomeAt and calcAtmosphericVars hold it: the

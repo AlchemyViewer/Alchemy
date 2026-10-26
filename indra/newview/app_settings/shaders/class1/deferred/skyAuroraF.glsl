@@ -91,10 +91,9 @@ vec3 skyAurora(vec3 dir)
     n       += 0.14 * valueNoise3D(p * 4.5       + vec3(drift * 1.4, t * 0.22));
     n       += 0.08 * valueNoise3D(p * 9.5       + vec3(drift * 1.9, t * 0.33));
 
-    // Soft smoothstep instead of clamp+pow so the brightest curtain peaks
-    // don't plateau at 1.0 — that plateau becomes a visible "ceiling" where
-    // the elevation fade then scales it down, producing the hard top edge
-    // the user was seeing.
+    // A soft smoothstep rather than clamp+pow, so the brightest curtain peaks
+    // don't plateau at 1.0: a plateau becomes a visible "ceiling" where the
+    // elevation fade then scales it down, a hard top edge.
     float curtain_mask = pow(smoothstep(0.05, 0.92, n), 1.6);
 
     // ----- Elevation envelope --------------------------------------------
@@ -109,8 +108,8 @@ vec3 skyAurora(vec3 dir)
     float elev_env     = horizon_fade * zenith_fade;
 
     // ----- Body envelope --------------------------------------------------
-    // Below-base fade rate softened further (was 7) so the green trails
-    // gradually toward the horizon with no visible edge.
+    // A soft fade below the base, so the green trails gradually toward the
+    // horizon with no visible edge.
     float body_top = 0.30;
     float body_env = exp(min(d_above, 0.0) * 3.5)
                    * (1.0 - smoothstep(body_top * 0.15, body_top, d_above));
