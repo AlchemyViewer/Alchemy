@@ -417,16 +417,15 @@ namespace
                 }
 
                 // What each slot draws, as getTEImage is for the image: a bake proxy's bake, not the
-                // proxy's own ID
+                // proxy's own ID. A copy of the material not yet built since it was made
+                // (initRenderMaterial) draws nothing yet, and its slots' own IDs are what it will draw
                 const auto* mat = static_cast<const LLFetchedGLTFMaterial*>(node->getObject()->getTE(i)->getGLTFRenderMaterial());
                 if (mat)
                 {
                     for (U32 j = 0; j < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++j)
                     {
-                        if (const LLViewerTexture* tex = mat->getRenderTexture((LLGLTFMaterial::TextureInfo)j))
-                        {
-                            faces_per_tex[tex->getID()].push_back(i);
-                        }
+                        const LLViewerTexture* tex = mat->getRenderTexture((LLGLTFMaterial::TextureInfo)j);
+                        faces_per_tex[tex ? tex->getID() : mat->mTextureId[j]].push_back(i);
                     }
                 }
             }
