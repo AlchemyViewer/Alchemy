@@ -86,7 +86,7 @@ private:
     void                updateDimensions();
     LLUUID              mImageID;
     LLPointer<LLViewerFetchedTexture>       mImage;
-    S32                 mImageOldBoostLevel;
+    ALTextureBoost      mImageBoost;
     std::string         mSaveFileName;
     LLFrameTimer        mSavedFileTimer;
     bool                mSavingMultiple;

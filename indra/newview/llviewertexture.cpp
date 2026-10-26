@@ -795,7 +795,45 @@ void LLViewerTexture::dump()
 
 void LLViewerTexture::setBoostLevel(S32 level)
 {
-    if(mBoostLevel != level)
+    mBoostLevels.setOwn(level);
+    updateBoost();
+}
+
+void LLViewerTexture::addBoostHold(S32 level)
+{
+    mBoostLevels.addHold(level);
+    updateBoost();
+}
+
+void LLViewerTexture::removeBoostHold(S32 level)
+{
+    const bool held = mBoostLevels.removeHold(level);
+    llassert_msg(held, "a boost hold let go of that was not held");
+    if (held)
+    {
+        updateBoost();
+    }
+}
+
+void LLViewerTexture::boostThisFrame(S32 level)
+{
+    mBoostLevels.askForFrame(level, LLFrameTimer::getFrameCount());
+    updateBoost();
+}
+
+void LLViewerTexture::lapseFrameBoost()
+{
+    if (mBoostLevels.lapse(LLFrameTimer::getFrameCount()))
+    {
+        updateBoost();
+    }
+}
+
+void LLViewerTexture::updateBoost()
+{
+    const S32 level = mBoostLevels.level();
+    const bool changed = mBoostLevel != level;
+    if (changed)
     {
         mBoostLevel = level;
         if(mBoostLevel != LLViewerTexture::BOOST_NONE &&
@@ -807,10 +845,19 @@ void LLViewerTexture::setBoostLevel(S32 level)
         }
     }
 
-    // strongly encourage anything boosted to load at full res
+    // strongly encourage anything boosted to load at full res. Its largest wanted size stays that once the boost ends,
+    // as any texture's largest stays, until the bias brings it down under pressure: brought down as the boost ends,
+    // each end would queue a downscale, and letting go of a selection or closing a picker a burst of them. A texture
+    // larger than RenderMaxTextureResolution, which a boost lifts, still comes back to the cap as its boost ends, one
+    // downscale each, which the downscale queue takes within its time a frame.
     if (mBoostLevel >= LLViewerTexture::BOOST_HIGH)
     {
         mMaxVirtualSize = 2048.f * 2048.f;
+    }
+    // A level asked for again, as selection and swatches ask every frame, changes nothing that follows from it.
+    if (changed)
+    {
+        onBoostUpdated();
     }
 }
 
@@ -1381,7 +1428,7 @@ void LLViewerFetchedTexture::setForSculpt()
 
     forceToSaveRawImage(0, F32_MAX);
 
-    setBoostLevel(llmax((S32)getBoostLevel(),
+    setBoostLevel(llmax(mBoostLevels.own(),
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
@@ -1870,6 +1917,8 @@ void LLViewerFetchedTexture::processTextureStats()
     llassert(!gCubeSnapshot);  // should only be called when the main camera is active
     llassert(!LLPipeline::sShadowRender);
 
+    lapseFrameBoost();
+
     if(mFullyLoaded)
     {
         if(mDesiredDiscardLevel > mMinDesiredDiscardLevel)//need to load more
@@ -1989,12 +2038,12 @@ bool LLViewerFetchedTexture::isActiveFetching()
     return mFetchState > 7 && mFetchState < 10 && monitor_enabled; //in state of WAIT_HTTP_REQ or DECODE_IMAGE.
 }
 
-void LLViewerFetchedTexture::setBoostLevel(S32 level)
+//virtual
+void LLViewerFetchedTexture::onBoostUpdated()
 {
-    LLViewerTexture::setBoostLevel(level);
     updateVRAMClass();
 
-    if (level >= LLViewerTexture::BOOST_HIGH)
+    if (mBoostLevel >= LLViewerTexture::BOOST_HIGH)
     {
         mDesiredDiscardLevel = 0;
     }
@@ -3360,6 +3409,7 @@ bool LLViewerLODTexture::isUpdateFrozen()
 void LLViewerLODTexture::processTextureStats()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    lapseFrameBoost();
     updateVirtualSize();
 
     bool did_downscale = false;
@@ -3465,13 +3515,6 @@ void LLViewerLODTexture::processTextureStats()
     if(mForceToSaveRawImage && mDesiredSavedRawDiscardLevel >= 0)
     {
         mDesiredDiscardLevel = llmin(mDesiredDiscardLevel, (S8)mDesiredSavedRawDiscardLevel);
-    }
-
-    // selection manager will immediately reset BOOST_SELECTED but never unsets it
-    // unset it immediately after we consume it
-    if (getBoostLevel() == BOOST_SELECTED)
-    {
-        setBoostLevel(BOOST_NONE);
     }
 }
 

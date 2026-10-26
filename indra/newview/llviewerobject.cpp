@@ -4551,7 +4551,7 @@ void LLViewerObject::boostTexturePriority(bool boost_children /* = true */)
     S32 tex_count = getNumTEs();
     for (i = 0; i < tex_count; i++)
     {
-        getTEImage(i)->setBoostLevel(LLGLTexture::BOOST_SELECTED);
+        getTEImage(i)->boostThisFrame(LLGLTexture::BOOST_SELECTED);
     }
 
     if (isSculpted() && !isMesh())
@@ -4560,7 +4560,7 @@ void LLViewerObject::boostTexturePriority(bool boost_children /* = true */)
         if (sculpt_params)
         {
             LLUUID sculpt_id = sculpt_params->getSculptTexture();
-            LLViewerTextureManager::getFetchedTexture(sculpt_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE)->setBoostLevel(LLGLTexture::BOOST_SELECTED);
+            LLViewerTextureManager::getFetchedTexture(sculpt_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE)->boostThisFrame(LLGLTexture::BOOST_SELECTED);
         }
     }
 

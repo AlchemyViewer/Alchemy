@@ -658,6 +658,8 @@ struct ImageLoadedData
     bool mSilent;
     // Keep image reference to prevent deletion on timeout
     LLPointer<LLViewerFetchedTexture> mTexturep;
+    // The preview's boost on the image, while its full image is read
+    ALTextureBoost mBoost;
 };
 
 void LLFloaterChangeItemThumbnail::assignAndValidateAsset(const LLUUID &asset_id, bool silent)
@@ -768,7 +770,7 @@ void LLFloaterChangeItemThumbnail::assignAndValidateTexture(const LLUUID& asset_
             data->mSilent = false;
             data->mTexturep = texturep;
 
-            texturep->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+            data->mBoost.hold(texturep, LLGLTexture::BOOST_PREVIEW);
             texturep->setMinDiscardLevel(0);
             texturep->setLoadedCallback(onFullImageLoaded,
                 0, // Need best quality

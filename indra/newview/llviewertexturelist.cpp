@@ -891,6 +891,8 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     ++sVisitCount;
     U32 faces_walked = 0;
 
+    // A level asked for frame by frame and no longer asked for goes before the visit is decided by it.
+    imagep->lapseFrameBoost();
     if (imagep->getBoostLevel() < LLViewerFetchedTexture::BOOST_HIGH)  // don't bother checking face list for boosted textures
     {
         static LLCachedControl<F32> texture_scale_min(gSavedSettings, "TextureScaleMinAreaFactor", 0.0095f);

@@ -39,7 +39,6 @@ static LLDefaultChildRegistry::Register<LLProfileImageCtrl> r("profile_image");
 LLProfileImageCtrl::LLProfileImageCtrl(const LLProfileImageCtrl::Params& p)
     : LLIconCtrl(p)
     , mImage(nullptr)
-    , mImageOldBoostLevel(LLGLTexture::BOOST_NONE)
     , mWasNoDelete(false)
     , mImageLoadedSignal(nullptr)
 {
@@ -57,10 +56,10 @@ void LLProfileImageCtrl::releaseTexture()
 {
     if (mImage.notNull())
     {
-        mImage->setBoostLevel(mImageOldBoostLevel);
+        mImageBoost.release();
         if (!mWasNoDelete)
         {
-            // In most cases setBoostLevel marks images as NO_DELETE
+            // A boost marks the image NO_DELETE, the preview's hold among them
             mImage->forceActive();
         }
         mImage = NULL;
@@ -77,7 +76,7 @@ void LLProfileImageCtrl::setValue(const LLSD& value)
     }
     else
     {
-        // called second to not change priority before it gets saved to mImageOldBoostLevel
+        // called second, so that setImageAssetId makes the texture with no boost of its own and holds the preview's
         LLIconCtrl::setValue(value, LLGLTexture::BOOST_PREVIEW);
     }
 }
@@ -114,8 +113,7 @@ void LLProfileImageCtrl::setImageAssetId(const LLUUID& asset_id)
     {
         mImage = LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
         mWasNoDelete = mImage->getTextureState() == LLGLTexture::NO_DELETE;
-        mImageOldBoostLevel = mImage->getBoostLevel();
-        mImage->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+        mImageBoost.hold(mImage, LLGLTexture::BOOST_PREVIEW);
         mImage->setKnownDrawSize(LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT, LLViewerTexture::MAX_IMAGE_SIZE_DEFAULT);
         mImage->forceToSaveRawImage(0);
 

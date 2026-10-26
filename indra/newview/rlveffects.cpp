@@ -85,7 +85,7 @@ void RlvOverlayEffect::clearImage()
 {
     if (m_pImage)
     {
-        m_pImage->setBoostLevel(m_nImageOrigBoost);
+        m_ImageBoost.release();
         m_pImage = nullptr;
     }
 }
@@ -105,8 +105,7 @@ void RlvOverlayEffect::setImage(const LLUUID& idTexture)
 
     clearImage();
     m_pImage = LLViewerTextureManager::getFetchedTexture(idTexture, FTT_DEFAULT, MIPMAP_YES, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-    m_nImageOrigBoost = m_pImage->getBoostLevel();
-    m_pImage->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+    m_ImageBoost.hold(m_pImage, LLGLTexture::BOOST_PREVIEW);
     m_pImage->forceToSaveRawImage(0);
 }
 
