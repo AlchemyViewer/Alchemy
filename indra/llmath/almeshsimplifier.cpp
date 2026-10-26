@@ -50,6 +50,7 @@ struct ALMeshSimplifier::Mesh
     std::vector<U8> held;              // shared, and at a position on the open border of a face
     std::vector<U8> uv_seam;           // at a position its face has a vertex with another texture coordinate at
     F32 extent = 0.f;                  // the largest extent of the positions
+    bool uv_seams_shared = false;      // every vertex on a texture seam shared too
     bool parts_large = false;          // every part of the triangles larger than a simplification may drop
 
     size_t vertexCount() const { return first.back(); }
@@ -409,11 +410,13 @@ namespace
         mesh.shared.resize(vertex_count);
         mesh.held.resize(vertex_count);
         mesh.uv_seam.resize(vertex_count);
+        mesh.uv_seams_shared = true;
         for (U32 v = 0; v < vertex_count; ++v)
         {
             mesh.shared[v] = spans[remap[v]];
             mesh.held[v] = spans[remap[v]] && border[remap[v]];
             mesh.uv_seam[v] = seam[remap[v]];
+            mesh.uv_seams_shared &= !mesh.uv_seam[v] || mesh.shared[v];
         }
 
         mesh.extent = vertex_count ? meshopt_simplifyScale(mesh.positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a)) : 0.f;
@@ -838,6 +841,14 @@ F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams 
         }
     }
     return (F32)index_count / (F32)count;
+}
+
+bool ALMeshSimplifier::same(Seams a, Seams b) const
+{
+    // UV holds what NONE holds, the borders between faces, and the texture
+    // seams as well.
+    const bool uv_and_none = (a == Seams::UV && b == Seams::NONE) || (a == Seams::NONE && b == Seams::UV);
+    return a == b || (uv_and_none && mMesh->uv_seams_shared);
 }
 
 F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const

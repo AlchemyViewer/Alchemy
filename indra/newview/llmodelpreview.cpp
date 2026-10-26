@@ -1610,6 +1610,12 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                 std::vector<LLVolumeFace> closest;
                 for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE })
                 {
+                    // NONE simplifies as UV, which fell short, where it
+                    // holds the same seams.
+                    if (seams == Seams::NONE && simplifier.same(Seams::UV, Seams::NONE))
+                    {
+                        break;
+                    }
                     const F32 ratio = simplify_model(indices_decimator, seams);
                     const bool closer = ratio > precise_ratio;
                     if (closer)
