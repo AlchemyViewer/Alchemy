@@ -1,4 +1,4 @@
-version 60
+version 61
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -418,11 +418,12 @@ RenderReflectionProbeCount  0   0
 list Intel
 RenderDownScaleMethod       1   0
 
-// NVIDIA's own driver slices texture uploads on the main thread, as on
-// Windows, so they stay there. The Mesa drivers upload whole images
-// (should_stagger_image_set in llimagegl.cpp) and so upload off-thread.
+// NVIDIA's driver uploads textures off-thread, as the Mesa drivers do and
+// as on Windows: from the main thread its threaded optimization copies an
+// upload's pixels there first. What stays on the main thread reads from
+// the staging ring (upload_staged in llimagegl.cpp) where it fits.
 list NVIDIA
-RenderGLMultiThreadedTextures      1   0
+RenderGLMultiThreadedTextures      1   1
 
 // Intel's drivers short of OpenGL 4.6 (LLGLManager::isIntelLegacy), as on
 // Windows. Every entry is held at each start, not only when a level is

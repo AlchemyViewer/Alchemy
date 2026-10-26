@@ -455,6 +455,9 @@ private:
 private:
     // a single media url with some data and an impl.
     std::shared_ptr<LLPluginClassMedia> mMediaSource;
+    // The source whose shared memory a texture update on the LLImageGL thread reads, kept from the post to the
+    // publish, past a destroyMediaSource() between them, and let go on the main thread.
+    std::shared_ptr<LLPluginClassMedia> mUpdatingMediaSource;
     LLCoros::Mutex mLock;
     F64     mZoomFactor;
     LLUUID mTextureId;

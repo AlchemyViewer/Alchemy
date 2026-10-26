@@ -87,11 +87,15 @@ namespace
         LLGLSLShader::registerEngineBlockLayout("Matrices",
         {
             { LLShaderMgr::MODELVIEW_MATRIX,            nullptr, (U32)offsetof(M, modelview),            true },
-            { LLShaderMgr::PROJECTION_MATRIX,           nullptr, (U32)offsetof(M, projection),           true },
             { LLShaderMgr::MODELVIEW_PROJECTION_MATRIX, nullptr, (U32)offsetof(M, modelview_projection), true },
-            { LLShaderMgr::INVERSE_PROJECTION_MATRIX,   nullptr, (U32)offsetof(M, inv_proj),             true },
-            { LLShaderMgr::TEXTURE_MATRIX0,             nullptr, (U32)offsetof(M, texture0),             true },
             { LLShaderMgr::NORMAL_MATRIX,               nullptr, (U32)offsetof(M, normal),               true },
+        });
+        using P = LLRender::ProjectionMatricesUBOData;
+        LLGLSLShader::registerEngineBlockLayout("ProjectionMatrices",
+        {
+            { LLShaderMgr::PROJECTION_MATRIX,         nullptr, (U32)offsetof(P, projection), true },
+            { LLShaderMgr::INVERSE_PROJECTION_MATRIX, nullptr, (U32)offsetof(P, inv_proj),   true },
+            { LLShaderMgr::TEXTURE_MATRIX0,           nullptr, (U32)offsetof(P, texture0),   true },
         });
         return true;
     }();
@@ -118,6 +122,7 @@ bool LLRender::sMirrorPass = false;
 bool LLRender::sReverseZ = false;
 bool LLRender::sCompute = false;
 bool LLRender::sGBufferNormHDR = true;
+bool LLRender::sObjectSkinBlock = false;
 bool LLRender::s10bitBackBuffer = false;
 
 
@@ -387,10 +392,17 @@ bool LLRender::init(bool needs_vertex_buffer)
 
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+    mUnpacksTightRows = true;
 
-    // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES yet, whatever a previous one had.
+    // Fresh context: nothing is bound at UB_LIGHTS/UB_MATRICES/UB_PROJECTION_MATRICES yet, whatever a previous one had,
+    // nor a scratch slice. The scratch ring's record of its binding is the main context's alone, and not a worker's to
+    // write.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+    if (main_context)
+    {
+        ALUniformBuffer::forgetScratchBinding();
+    }
 
     // Nor on any texture unit, and unit 0 is the active one. gGL is thread_local and outlives
     // a context -- the GL tests make one per test -- and a fresh context hands out the same
@@ -542,32 +554,47 @@ void LLRender::shutdown()
     mLightsUBOHash  = 0xFFFFFFFFu;
     mLightsUBOBound = false;
 
-    // Same for the matrix block. syncMatrices re-initialises the shadow on the next use
-    // because release() leaves it unallocated.
+    // Same for the matrix blocks. syncMatrices re-initialises the shadows on the next use
+    // because release() leaves them unallocated.
     mMatricesUBO.release();
+    mProjectionUBO.release();
     for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
     {
         mMatricesUBOHash[i] = 0xFFFFFFFFu;
     }
     mMatricesUBOBound = false;
 
-    // Its queries and fences, which it deletes only while the context is up.
+    // Its queries, fences, staging store and readback buffers, which it deletes only while the context is up. A context
+    // made after this reads rows at GL's default alignment until init() runs on it.
+    mUnpacksTightRows = false;
     mQueries.release();
+    mStagingRing.release();
+    mTextureReadback.release();
     mFrameFences.release();
 }
 
 void LLRender::endFrame(U32 frames_ahead)
 {
-    // The batch's results are written ahead of the fence that follows them. The batches the fences have just shown
-    // finished are read here rather than before the next cull, the next batch's names are made here rather than by its
-    // queries, and the fences of the uploads handed over by other contexts are polled here rather than in the next
-    // idle: a threaded driver answers a call that returns a value only once its thread has caught up, and the fences'
-    // own calls have just caught it up.
-    mQueries.endFrame();
+    // The batch's results are written ahead of the fence, or the stamp, that follows them. The batches the fences have
+    // just shown finished are read here rather than before the next cull, the next batch's names are made here rather
+    // than by its queries, and the fences of the uploads handed over by other contexts are polled here rather than in
+    // the next idle: a threaded driver answers a call that returns a value only once its thread has caught up, and the
+    // fences' own calls have just caught it up. A frame stamped makes no such call, and the uploads are polled only
+    // once a poll would find them signalled (LLImageGL::pollUploads). The next batch opens only after the fences' end
+    // and the reads: it reuses the batch of the frame ALQueryPool::FRAMES - 1 before the one ending, which a pacing
+    // wait at that depth or less has seen finished and retire() has read, so that opening it waits for nothing. Opened
+    // before the pacing wait, it would do the wait itself, and the pacing would find the frame done and keep no slack.
+    mQueries.closeFrame();
     mFrameFences.endFrame(frames_ahead);
+    // Tracy's GPU zones, while profiling: reading their results waits for a threaded driver's thread, which has least
+    // left to run past the pacing wait, rather than at the swap.
+    LL_PROFILER_GPU_COLLECT;
     mQueries.retire();
+    mQueries.openFrame();
     mQueries.makeRoom();
     LLImageGL::pollUploads();
+    mStagingRing.endFrame();
+    mTextureReadback.endFrame();
     ALUniformBuffer::endFrame();
 }
 
@@ -595,6 +622,7 @@ void LLRender::refreshState(void)
     // blocks' bindings along with the texture units and the state the setters cache.
     mLightsUBOBound   = false;
     mMatricesUBOBound = false;
+    ALUniformBuffer::forgetScratchBinding();
 
     U32 active_unit = mCurrTextureUnitIndex;
 
@@ -744,7 +772,8 @@ void LLRender::packMatricesUBO()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
 
-    static_assert(sizeof(MatricesUBOData) == 368, "MatricesUBOData must match std140 (368 bytes)");
+    static_assert(sizeof(MatricesUBOData) == 176, "MatricesUBOData must match std140 (176 bytes)");
+    static_assert(sizeof(ProjectionMatricesUBOData) == 192, "ProjectionMatricesUBOData must match std140 (192 bytes)");
 
     const LLMatrix4a& mdv  = mMatrix[MM_MODELVIEW][mMatIdx[MM_MODELVIEW]];
     const LLMatrix4a& proj = mMatrix[MM_PROJECTION][mMatIdx[MM_PROJECTION]];
@@ -752,6 +781,7 @@ void LLRender::packMatricesUBO()
 
     const bool mdv_moved  = mMatHash[MM_MODELVIEW]  != mMatricesUBOHash[MM_MODELVIEW];
     const bool proj_moved = mMatHash[MM_PROJECTION] != mMatricesUBOHash[MM_PROJECTION];
+    const bool tex_moved  = mMatHash[MM_TEXTURE0]   != mMatricesUBOHash[MM_TEXTURE0];
 
     if (mdv_moved)
     {
@@ -770,30 +800,46 @@ void LLRender::packMatricesUBO()
         mCachedMVP.setMul(mdv, proj);
     }
 
-    MatricesUBOData d;
-    memcpy(d.modelview,            mdv.getF32ptr(),            sizeof(d.modelview));
-    memcpy(d.projection,           proj.getF32ptr(),           sizeof(d.projection));
-    memcpy(d.modelview_projection, mCachedMVP.getF32ptr(),     sizeof(d.modelview_projection));
-    memcpy(d.inv_proj,             mCachedInvProj.getF32ptr(), sizeof(d.inv_proj));
-    memcpy(d.texture0,             tex.getF32ptr(),            sizeof(d.texture0));
-
-    // normal_matrix is the upper 3x3 of the inverse modelview transposed: column c of the
-    // block is lane c of the inverse's first three rows, i.e. inv[4*k + c] for k = 0..2.
-    // This reproduces exactly the nine floats the loose uniformMatrix3fv used to upload.
-    const F32* inv = mCachedInvMdv.getF32ptr();
-    for (U32 c = 0; c < 3; ++c)
+    // Each block is written only where a stack it holds moved, and uploaded only where its bytes did.
+    if (mdv_moved || proj_moved)
     {
-        d.normal[c][0] = inv[0 * 4 + c];
-        d.normal[c][1] = inv[1 * 4 + c];
-        d.normal[c][2] = inv[2 * 4 + c];
-        d.normal[c][3] = 0.f;
+        MatricesUBOData d;
+        memcpy(d.modelview,            mdv.getF32ptr(),        sizeof(d.modelview));
+        memcpy(d.modelview_projection, mCachedMVP.getF32ptr(), sizeof(d.modelview_projection));
+
+        // normal_matrix is the upper 3x3 of the inverse modelview transposed: column c of the
+        // block is lane c of the inverse's first three rows, i.e. inv[4*k + c] for k = 0..2.
+        // This reproduces exactly the nine floats the loose uniformMatrix3fv used to upload.
+        const F32* inv = mCachedInvMdv.getF32ptr();
+        for (U32 c = 0; c < 3; ++c)
+        {
+            d.normal[c][0] = inv[0 * 4 + c];
+            d.normal[c][1] = inv[1 * 4 + c];
+            d.normal[c][2] = inv[2 * 4 + c];
+            d.normal[c][3] = 0.f;
+        }
+
+        U8* shadow = mMatricesUBO.beginWrite();
+        if (memcmp(shadow, &d, sizeof(d)) != 0)
+        {
+            memcpy(shadow, &d, sizeof(d));
+            mMatricesUBO.endWrite(0, sizeof(d));
+        }
     }
 
-    U8* shadow = mMatricesUBO.beginWrite();
-    if (memcmp(shadow, &d, sizeof(d)) != 0)
+    if (proj_moved || tex_moved)
     {
-        memcpy(shadow, &d, sizeof(d));
-        mMatricesUBO.endWrite(0, sizeof(d));
+        ProjectionMatricesUBOData p;
+        memcpy(p.projection, proj.getF32ptr(),           sizeof(p.projection));
+        memcpy(p.inv_proj,   mCachedInvProj.getF32ptr(), sizeof(p.inv_proj));
+        memcpy(p.texture0,   tex.getF32ptr(),            sizeof(p.texture0));
+
+        U8* shadow = mProjectionUBO.beginWrite();
+        if (memcmp(shadow, &p, sizeof(p)) != 0)
+        {
+            memcpy(shadow, &p, sizeof(p));
+            mProjectionUBO.endWrite(0, sizeof(p));
+        }
     }
 }
 
@@ -806,16 +852,18 @@ void LLRender::syncMatrices()
 
     if (shader)
     {
-        // The matrices live in the shared UB_MATRICES block: packed once per matrix EPOCH (any
-        // mMatHash movement since the last pack) rather than once per program, so a program
-        // bind costs no matrix work at all. The derived matrices (inverses, normal, MVP) are
-        // recomputed per epoch under per-stack gates inside the pack, and unconditionally --
-        // any program may read them from the block, so the old hasUniform() gates are gone.
-        if (!mMatricesUBO.allocated())
+        // The matrices live in the shared UB_MATRICES and UB_PROJECTION_MATRICES blocks: packed
+        // once per matrix EPOCH (any mMatHash movement since the last pack) rather than once per
+        // program, so a program bind costs no matrix work at all. The derived matrices (inverses,
+        // normal, MVP) are recomputed per epoch under per-stack gates inside the pack, and
+        // unconditionally -- any program may read them from the blocks, so the old hasUniform()
+        // gates are gone.
+        if (!mMatricesUBO.allocated() || !mProjectionUBO.allocated())
         {
-            // Fresh context (first use, or re-init after shutdown released the old block):
+            // Fresh context (first use, or re-init after shutdown released the old blocks):
             // re-pack and re-bind everything.
             mMatricesUBO.initShadowed(sizeof(MatricesUBOData));
+            mProjectionUBO.initShadowed(sizeof(ProjectionMatricesUBOData));
             for (U32 i = 0; i < NUM_MATRIX_MODES; ++i)
             {
                 mMatricesUBOHash[i] = 0xFFFFFFFFu;
@@ -834,12 +882,16 @@ void LLRender::syncMatrices()
             }
         }
 
+        // The projection's block flushes after the modelview's, and in UPDATE_RING a flush that wraps the ring orphans
+        // its store under the slice the modelview's block was just given: that one is flushed again into the new store.
+        const U32 ring_epoch = ALUniformBuffer::ringWrapEpoch();
         if (!mMatricesUBOBound)
         {
             // First attach on this context (or a refreshState() re-assert): bindCurrent both
             // uploads any pending bytes and (re)claims the binding point -- needed even when
             // clean, e.g. UPDATE_DIRECT where endWrite uploads without ever dirtying.
             mMatricesUBO.bindCurrent(LLGLSLShader::UB_MATRICES);
+            mProjectionUBO.bindCurrent(LLGLSLShader::UB_PROJECTION_MATRICES);
             mMatricesUBOBound = true;
         }
         else
@@ -847,6 +899,11 @@ void LLRender::syncMatrices()
             // Per-draw steady state: upload when the pack dirtied the shadow, otherwise just
             // confirm the last flushed slice is still readable (streaming-ring reuse can
             // invalidate it). No GL calls at all on the clean-and-live path.
+            mMatricesUBO.ensureCurrent(LLGLSLShader::UB_MATRICES);
+            mProjectionUBO.ensureCurrent(LLGLSLShader::UB_PROJECTION_MATRICES);
+        }
+        if (ALUniformBuffer::ringWrapEpoch() != ring_epoch)
+        {
             mMatricesUBO.ensureCurrent(LLGLSLShader::UB_MATRICES);
         }
 

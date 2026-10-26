@@ -66,6 +66,9 @@ public:
     // No-op / false on platforms without WGL_NV_DX_interop2.
     bool initGLDXInterop();
     void cleanupGLDXInterop();
+    // Whether initGLDXInterop() opens the interop at all: only accelerated media paint uses it, so the viewer says before
+    // the window is made whether that is on, and a change takes a restart. Off until set.
+    void setGLDXInteropWanted(bool wanted) { mGLDXInteropWanted = wanted; }
     bool hasGLDXInterop() const { return mGLDXInteropDevice != nullptr; }
     void* getD3DDevice() const { return mD3DDevice; }            // ID3D11Device1*
     void* getD3DContext() const { return mD3DContext; }          // ID3D11DeviceContext*
@@ -75,6 +78,7 @@ private:
     void* mD3DDevice = nullptr;
     void* mD3DContext = nullptr;
     void* mGLDXInteropDevice = nullptr;
+    bool  mGLDXInteropWanted = false;
 };
 
 extern LLDXHardware gDXHardware;

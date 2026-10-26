@@ -5,7 +5,7 @@
         <key>ALCefAcceleratedPaint</key>
         <map>
             <key>Comment</key>
-            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart. (CEF daemon rework, on by default; falls back to CPU paint where the GPU interop is unavailable.)</string>
+            <string>Use CEF GPU shared-texture (accelerated paint) zero-copy path for browser media instead of CPU pixel readback/upload. Requires a viewer restart: on Windows the D3D/GL interop it needs is opened with the window only while this is on. Falls back to CPU paint where the GPU interop is unavailable.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2281,7 +2281,51 @@
         <key>AlchemyRenderMaxFramesAhead</key>
         <map>
             <key>Comment</key>
-            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 3, the default, keeps a GPU-bound frame's CPU work and the driver's under the GPU's: at 1 a GPU-bound scene that runs at 150 fps can fall to 50. Past 3 the frame rings, four deep (the uniform blocks' segments, the queries' batches), can wait inside a frame for a GPU that far behind. 1 is the least latency. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
+            <string>How many frames the GPU may still be drawing when the viewer begins the next: each frame, straight after the swap, waits for the frame that many before it to finish, so frames come at an even pace and input is no more than that many frames behind. 3, the default, keeps a GPU-bound frame's CPU work and the driver's under the GPU's: at 1 a GPU-bound scene that runs at 150 fps can fall to 50. Past 3 the frame rings sized for 3 (the uniform blocks' segments) can wait inside a frame for a GPU that far behind. 1 is the least latency. 0 waits for none and leaves the pace to the driver, which on NVIDIA's threaded driver runs ahead and then stalls a whole frame. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>3</integer>
+        </map>
+        <key>AlchemyObjectCreationTime</key>
+        <map>
+            <key>Comment</key>
+            <string>The most milliseconds a frame spends making objects from the regions' object caches, every region's together, past the first few (NewObjectCreationThrottle still caps each region's count). A camera moving fast into a crowd of cached objects would otherwise make the count's worth in one frame and build their geometry in the next; under the limit they come in over a few frames instead. Not while the login or teleport screen is up, nor for NewObjectCreationThrottleDelayTime after. 0 for no limit but the count. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>AlchemyRenderFrameStamps</key>
+        <map>
+            <key>Comment</key>
+            <string>Where the GPU writes the query results (NVIDIA), have it also write when each frame has finished, into memory the viewer reads, rather than laying and polling a fence each frame. A poll of a fence, and the pacing wait on one, waits on NVIDIA's threaded optimization until its own thread has run every command before it, which leaves that thread idle while the next frame begins; reading the stamps makes no such call. Off lays a fence a frame, as other drivers do. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderStagedUploads</key>
+        <map>
+            <key>Comment</key>
+            <string>The main thread's texture uploads (glyphs, UI images, media) copy their pixels into a persistently mapped buffer and upload from it, which a threaded driver (NVIDIA's threaded optimization, Mesa's glthread) queues like a draw, rather than from the viewer's own memory, which it copies on the main thread first or waits for its own thread to catch up before reading. Off uploads from the viewer's memory. Takes effect at once.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyRenderQueryResultAge</key>
+        <map>
+            <key>Comment</key>
+            <string>How many frames after its own a frame's GPU queries (occlusion culling, GPU timers) are read at the soonest, however soon the GPU finished them, 1 to 7. A dense scene issues thousands of occlusion queries a frame; read sooner, a result may be one a threaded driver (NVIDIA's threaded optimization, Mesa's glthread) has yet to write, and asking for it waits for the driver's thread. 3, the default, is the frame AlchemyRenderMaxFramesAhead's pacing wait has just seen finished. Lower culls by fresher results; higher leaves each object as its last result left it, shown or hidden, that much longer. Takes effect at once.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

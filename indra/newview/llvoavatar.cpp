@@ -11687,6 +11687,29 @@ U32 LLVOAvatar::getPartitionType() const
     return mIsControlAvatar ? LLViewerRegion::PARTITION_CONTROL_AV : LLViewerRegion::PARTITION_AVATAR;
 }
 
+// Whether updateImpostors bakes the avatar's impostor: before the frame's cull, whether it would by the last's.
+static bool bakes_impostor(LLVOAvatar* avatar)
+{
+    return !avatar->isDead()
+        && avatar->isInView()
+        && avatar->isImpostor()
+        && avatar->needsImpostorUpdate();
+}
+
+//static
+void LLVOAvatar::allocateImpostors()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_AVATAR;
+    for (LLCharacter* character : LLCharacter::sInstances)
+    {
+        LLVOAvatar* avatar = (LLVOAvatar*)character;
+        if (bakes_impostor(avatar))
+        {
+            gPipeline.allocateImpostorTarget(*avatar);
+        }
+    }
+}
+
 //static
 void LLVOAvatar::updateImpostors()
 {
@@ -11695,10 +11718,7 @@ void LLVOAvatar::updateImpostors()
     for (LLCharacter* character : LLCharacter::sInstances)
     {
         LLVOAvatar* avatar = (LLVOAvatar*)character;
-        if (!avatar->isDead()
-            && avatar->isInView()
-            && avatar->isImpostor()
-            && avatar->needsImpostorUpdate())
+        if (bakes_impostor(avatar))
         {
             avatar->calcMutedAVColor();
             gPipeline.generateImpostor(avatar);

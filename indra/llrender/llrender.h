@@ -45,6 +45,8 @@
 #include "alsamplerstate.h"  // mSamplerCache -- this context's sampler objects
 #include "algpubuffer.h"     // AL_NUM_STORAGE_BINDINGS -- the storage binding points this context keeps
 #include "alframefences.h"
+#include "alstagingring.h"
+#include "altexturereadback.h"
 #include "alimageslot.h"
 #include "alquerypool.h"
 #include "altextureslot.h"
@@ -302,24 +304,34 @@ public:
         F32 light_ambient[3];  F32 _tail_pad;
     };
 
-    // ---- Shared matrix uniform block (UB_MATRICES) ----------------------------------------
+    // ---- Shared matrix uniform blocks (UB_MATRICES, UB_PROJECTION_MATRICES) ----------------
     // The matrix stack plus the matrices derived from it. Like the Lights block above, these
     // used to be LOOSE uniforms re-pushed per program -- and they were the worst offenders:
     // every (modelview, projection) epoch (camera set, shadow cascade, probe face, mirror
     // pass, each UI translate/scale) re-taxed every program bound after it with up to six
-    // matrix writes. Packed once per epoch and bound at a fixed engine point, a matrix change
-    // costs one upload total and a program bind costs no matrix work at all.
+    // matrix writes. Packed once per epoch and bound at fixed engine points, a matrix change
+    // costs an upload and a program bind costs no matrix work at all.
+    //
+    // Two blocks, split by what moves them. A draw with a model matrix of its own (an
+    // attachment, a moving object, a UI translate) moves the modelview alone: it writes the
+    // Matrices block, 176 bytes, which takes a 256-byte slice of the ring where the alignment
+    // is 256, and leaves the projection's block bound. One block of all six took 368 bytes, a
+    // 512-byte slice, for every such draw. A pass's projection moves both blocks, the
+    // modelview-projection being the Matrices block's, and a texture matrix the projection's.
     //
     // Matrices go up as they lie: LLMatrix4a's rows are the columns std140 reads by default.
     // normal is a mat3, which std140 strides at 16 bytes per column, hence float[3][4].
     struct alignas(16) MatricesUBOData
     {
         F32 modelview[16];
-        F32 projection[16];
         F32 modelview_projection[16];
+        F32 normal[3][4];   // .xyz used per column, .w std140 padding
+    };
+    struct alignas(16) ProjectionMatricesUBOData
+    {
+        F32 projection[16];
         F32 inv_proj[16];
         F32 texture0[16];
-        F32 normal[3][4];   // .xyz used per column, .w std140 padding
     };
 
     void translateUI(F32 x, F32 y, F32 z);
@@ -546,8 +558,22 @@ public:
     // context in shutdown().
     ALFrameFences& frameFences() { return mFrameFences; }
 
+    // The room the main thread's texture uploads read from in place of client memory (LLImageGL), sized and its
+    // segments' frames kept by endFrame().
+    ALStagingRing& stagingRing() { return mStagingRing; }
+
+    // Whether this context reads an upload's rows tight, at an unpack alignment of 1, which init() sets: before it a
+    // context reads them at GL's default of 4, padding every row to a multiple of four bytes. The rows the staging ring
+    // packs are tight, so no upload is staged before init(): the fonts made before it (LLViewerWindow::initFonts) would
+    // read every glyph whose rows are not a multiple of four bytes askew.
+    bool unpacksTightRows() const { return mUnpacksTightRows; }
+
+    // The buffers the main thread's texture readbacks are read into and collected from once the GPU has written them
+    // (LLImageGL::requestReadBack), their reads expired and their buffers trimmed by endFrame().
+    ALTextureReadback& textureReadback() { return mTextureReadback; }
+
     // Ends the frame for what is kept a frame at a time: the query pool's batch closes, the frame's fence is laid, and
-    // the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
+    // the staging ring, the texture readbacks and the uniform buffer rings close their counters and resize. Once a frame, straight after the swap; the main
     // context's only. `frames_ahead`, above 0, paces the CPU: the frame that many before this one is waited for
     // (ALFrameFences::endFrame), on the frames a user sees.
     void endFrame(U32 frames_ahead = 0);
@@ -664,6 +690,13 @@ public:
     // from it, because a shader compiled against the wrong assumption unpacks noise.
     static bool sGBufferNormHDR;
 
+    // The rigged programs read their joint palette from the ObjectSkin uniform block (LLGLSLShader::UB_OBJECT_SKIN),
+    // which a draw binds a slice of the scratch UBO ring to, rather than from uniforms each program is given: the
+    // shared skinning object is compiled with OBJECT_SKIN_BLOCK. Where the context maps no buffer persistently, the
+    // scratch ring would map and unmap for every palette, and the uniforms stay. Latched by newview at shader load, as
+    // sGBufferNormHDR is.
+    static bool sObjectSkinBlock;
+
 private:
     friend class LLLightState;
     // The tests' state guard reads how deep each matrix stack is.
@@ -693,16 +726,20 @@ private:
     U32             mLightsUBOHash  = 0xFFFFFFFFu;
     bool            mLightsUBOBound = false;
 
-    // Rebuild the matrix block from the current stacks into the buffer's shadow. The derived
-    // matrices are recomputed only for the stack that actually moved.
+    // Rebuild the matrix blocks from the current stacks into the buffers' shadows, each written only where its bytes
+    // moved. The derived matrices are recomputed only for the stack that actually moved.
     void packMatricesUBO();
 
     ALUniformBuffer mMatricesUBO;
+    ALUniformBuffer mProjectionUBO;
     U32             mMatricesUBOHash[NUM_MATRIX_MODES] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
-    bool            mMatricesUBOBound = false;
+    bool            mMatricesUBOBound = false; // both blocks
 
     ALFrameFences mFrameFences;
     ALQueryPool   mQueries{ mFrameFences };
+    ALStagingRing mStagingRing{ mFrameFences };
+    bool          mUnpacksTightRows = false;
+    ALTextureReadback mTextureReadback{ mFrameFences };
 
     // Derived matrices, cached across epochs so a stack that did not move is not re-derived.
     // Members rather than function statics: they belong to this context, and shutdown() has to

@@ -3557,6 +3557,10 @@ bool LLAppViewer::initWindow()
         .ignore_pixel_depth(ignorePixelDepth)
         .first_run(mIsFirstRun);
 
+#if LL_WINDOWS
+    // The window opens the D3D/GL interop device with its context, and only accelerated media paint uses it.
+    gDXHardware.setGLDXInteropWanted(gSavedSettings.getBOOL("ALCefAcceleratedPaint"));
+#endif
     gViewerWindow = new LLViewerWindow(window_params);
 
     LL_INFOS("AppInit") << "gViewerwindow created." << LL_ENDL;

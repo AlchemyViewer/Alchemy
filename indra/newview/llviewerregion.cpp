@@ -87,6 +87,9 @@
 #include "llsettingsdaycycle.h"
 #include "llslurl.h"
 
+#include <algorithm>
+#include <functional>
+#include <vector>
 
 #ifdef LL_WINDOWS
     #pragma warning(disable:4355)
@@ -106,6 +109,9 @@ const U32 DEFAULT_MAX_REGION_WIDE_PRIM_COUNT = 15000;
 bool LLViewerRegion::sVOCacheCullingEnabled = false;
 S32  LLViewerRegion::sLastCameraUpdated = 0;
 S32  LLViewerRegion::sNewObjectCreationThrottle = -1;
+F32  LLViewerRegion::sObjectCreationSeconds = 0.f;
+F32  LLViewerRegion::sObjectCreationSpent = 0.f;
+U32  LLViewerRegion::sObjectsCreated = 0;
 std::vector<LLPointer<LLVOCacheEntry>> LLViewerRegion::sRegionCacheCleanup;
 LLViewerRegion::region_info_signal_t LLViewerRegion::sRegionInfoChangedSignal;
 
@@ -221,7 +227,8 @@ public:
     std::set< LLPointer<LLViewerOctreeGroup> >      mVisibleGroups; //visible groupa
     LLVOCachePartition*                   mVOCachePartition;
     LLVOCacheEntry::vocache_entry_set_t   mVisibleEntries; //must-be-created visible entries wait for objects creation.
-    LLVOCacheEntry::vocache_entry_priority_list_t mWaitingList; //transient list storing sorted visible entries waiting for object creation.
+    std::vector<LLVOCacheEntry*>          mWaitingList; //transient list of the visible entries waiting for object creation, sorted by createVisibleObjects()
+    const LLViewerOctreeGroup*            mLastWalkedGroup = nullptr; // where updateVisibleEntries' walk of the visible groups stopped, compared only
     std::set<U32>                          mNonCacheableCreatedList; //list of local ids of all non-cacheable objects
     LLVOCacheEntry::vocache_gltf_overrides_map_t mGLTFOverridesLLSD; // for materials
 
@@ -1533,7 +1540,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
             //set a large number to force to load this object.
             vo_entry->setSceneContribution(LARGE_SCENE_CONTRIBUTION);
 
-            mImpl->mWaitingList.insert(vo_entry);
+            mImpl->mWaitingList.push_back(vo_entry);
             ++iter;
         }
         else
@@ -1552,14 +1559,14 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
     F32 projection_threshold = LLVOCacheEntry::getSquaredPixelThreshold(mImpl->mVOCachePartition->isFrontCull());
     F32 dist_threshold = mImpl->mVOCachePartition->isFrontCull() ? gAgentCamera.mDrawDistance : LLVOCacheEntry::sRearFarRadius;
 
-    std::set< LLPointer<LLViewerOctreeGroup> >::iterator group_iter = mImpl->mVisibleGroups.begin();
-    for(; group_iter != mImpl->mVisibleGroups.end(); ++group_iter)
+    // A visible group's cached objects, those not yet made with enough of the screen to make, onto the waiting list. The
+    // group is held for the walk, a reference the count below the set's and the octree's takes in.
+    auto walk = [&](LLPointer<LLViewerOctreeGroup> group)
     {
-        LLPointer<LLViewerOctreeGroup> group = *group_iter;
         if(group->getNumRefs() < 3 || //group to be deleted
             !group->getOctreeNode() || group->isEmpty()) //group empty
         {
-            continue;
+            return;
         }
 
         for (LLViewerOctreeGroup::element_iter i = group->getDataBegin(); i != group->getDataEnd(); ++i)
@@ -1579,12 +1586,76 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
                 }
 
                 vo_entry->calcSceneContribution(local_origin, needs_update, last_update, dist_threshold);
-                if(vo_entry->getSceneContribution() > projection_threshold)
+                if(vo_entry->getSceneContribution() > projection_threshold && vo_entry->getState() < LLVOCacheEntry::WAITING)
                 {
-                    mImpl->mWaitingList.insert(vo_entry);
+                    mImpl->mWaitingList.push_back(vo_entry);
                 }
             }
         }
+    };
+
+    // Every visible group within WALK_NEAR_RADIUS of the camera, whose objects a turn or a step brings into view the
+    // largest, and the rest for as long as `max_time` lasts, an eighth of them at the least, from the one after the far
+    // group the last walk stopped at, round to it. The cached objects in view too small to make yet stay in the cache's
+    // tree, and a crowd of them across a region was walked every frame the cache's cull ran, which is every frame the
+    // camera moves. An entry a walk passes over keeps the contribution it was last given, and takes one for the camera
+    // as it is when it is next walked, since it was last seen before the camera's last update.
+    auto& groups = mImpl->mVisibleGroups;
+    const auto is_near = [&local_origin](const LLViewerOctreeGroup* group)
+    {
+        const LLVector4a* bounds = group->getBounds();
+        LLVector4a to_centre;
+        to_centre.setSub(bounds[0], local_origin);
+        return to_centre.getLength3().getF32() - bounds[1].getLength3().getF32() <= WALK_NEAR_RADIUS;
+    };
+    LLTimer walk_timer;
+    size_t far_groups = 0;
+    for (const LLPointer<LLViewerOctreeGroup>& group : groups)
+    {
+        if (is_near(group.get()))
+        {
+            walk(group);
+        }
+        else
+        {
+            ++far_groups;
+        }
+    }
+
+    // However little time the update leaves, each walk takes this share of the far groups at the least, so that every
+    // one of them is walked within as many walks: a region's far groups number in the hundreds, the time is often gone
+    // before the far walk begins, and an entry a walk lists that the frame's creation passes over waits for its group's
+    // next turn.
+    constexpr size_t FAR_WALK_TURNS = 8;
+    const size_t far_least = (far_groups + FAR_WALK_TURNS - 1) / FAR_WALK_TURNS;
+    size_t far_walked = 0;
+
+    // The set is ordered by address, and the group the last walk stopped at may be gone: compared, never followed.
+    auto far_iter = groups.begin();
+    if (mImpl->mLastWalkedGroup)
+    {
+        far_iter = std::find_if(groups.begin(), groups.end(),
+                                [last = mImpl->mLastWalkedGroup](const LLPointer<LLViewerOctreeGroup>& group)
+                                { return std::less<const LLViewerOctreeGroup*>()(last, group.get()); });
+    }
+    for (size_t seen = 0; seen < groups.size(); ++seen, ++far_iter)
+    {
+        if (far_iter == groups.end())
+        {
+            far_iter = groups.begin();
+        }
+        const LLPointer<LLViewerOctreeGroup>& group = *far_iter;
+        if (is_near(group.get()))
+        {
+            continue;
+        }
+        if (far_walked >= far_least && walk_timer.getElapsedTimeF32() > max_time)
+        {
+            break;
+        }
+        walk(group);
+        ++far_walked;
+        mImpl->mLastWalkedGroup = group.get();
     }
 
     if(needs_update)
@@ -1596,7 +1667,7 @@ void LLViewerRegion::updateVisibleEntries(F32 max_time)
     return;
 }
 
-void LLViewerRegion::createVisibleObjects(F32 max_time)
+void LLViewerRegion::createVisibleObjects()
 {
     if(mDead)
     {
@@ -1608,24 +1679,51 @@ void LLViewerRegion::createVisibleObjects(F32 max_time)
         return;
     }
 
+    // At most NewObjectCreationThrottle objects a frame, as the setting says; below 0 (-1 off, -2 lifted under the login
+    // or teleport screen) no count. The count stopped the loop only where its last creation also found the update's time
+    // spent: one that came in under it went on with no count at all, through the whole waiting list. The time between
+    // regions is LLWorld::updateRegions's to share out.
     S32 throttle = sNewObjectCreationThrottle;
-    bool has_new_obj = false;
-    LLTimer update_timer;
-    for(LLVOCacheEntry::vocache_entry_priority_list_t::iterator iter = mImpl->mWaitingList.begin();
-        iter != mImpl->mWaitingList.end(); ++iter)
-    {
-        LLVOCacheEntry* vo_entry = *iter;
 
+    // Largest contribution first, as the set they were kept in sorted them: only as many as the count makes, where it
+    // makes fewer than wait.
+    std::vector<LLVOCacheEntry*>& waiting = mImpl->mWaitingList;
+    const LLVOCacheEntry::CompareVOCacheEntry larger_first;
+    if (throttle > 0 && (size_t)throttle < waiting.size())
+    {
+        std::partial_sort(waiting.begin(), waiting.begin() + throttle, waiting.end(), larger_first);
+    }
+    else
+    {
+        std::sort(waiting.begin(), waiting.end(), larger_first);
+    }
+
+    // And for no more than AlchemyObjectCreationTime a frame, every region's together, a few at the least: a fast
+    // camera that brings a crowd of cached objects into view would otherwise make the count's worth in one frame, and
+    // build them all in the next. Not while the login or teleport screen lifts the count (-2); the count turned off
+    // (-1) leaves the time.
+    const bool timed = throttle > -2 && sObjectCreationSeconds > 0.f;
+    LLTimer    creation_timer;
+    bool has_new_obj = false;
+    for (LLVOCacheEntry* vo_entry : waiting)
+    {
         if(vo_entry->getState() < LLVOCacheEntry::WAITING)
         {
+            if (timed && sObjectsCreated >= MIN_OBJECTS_CREATED
+                && sObjectCreationSpent + creation_timer.getElapsedTimeF32() >= sObjectCreationSeconds)
+            {
+                break;
+            }
             addNewObject(vo_entry);
             has_new_obj = true;
-            if(throttle > 0 && !(--throttle) && update_timer.getElapsedTimeF32() > max_time)
+            ++sObjectsCreated;
+            if(throttle > 0 && --throttle == 0)
             {
                 break;
             }
         }
     }
+    sObjectCreationSpent += creation_timer.getElapsedTimeF32();
 
     mImpl->mVOCachePartition->setCullHistory(has_new_obj);
 
@@ -1694,9 +1792,8 @@ void LLViewerRegion::idleUpdate(F32 max_update_time)
     max_time = max_update_time - update_timer.getElapsedTimeF32();
 
     updateVisibleEntries(max_time);
-    max_time = max_update_time - update_timer.getElapsedTimeF32();
 
-    createVisibleObjects(max_time);
+    createVisibleObjects();
 
     mImpl->mWaitingList.clear();
     mImpl->mVisibleGroups.clear();
@@ -1724,7 +1821,15 @@ void LLViewerRegion::calcNewObjectCreationThrottle()
 {
     static LLCachedControl<S32> new_object_creation_throttle(gSavedSettings,"NewObjectCreationThrottle");
     static LLCachedControl<F32> throttle_delay_time(gSavedSettings,"NewObjectCreationThrottleDelayTime");
+    static LLCachedControl<F32> object_creation_ms(gSavedSettings, "AlchemyObjectCreationTime");
     static LLFrameTimer timer;
+
+    // Once a frame, before any region's update: the frame's object creation starts afresh, the last one's plotted.
+    LL_PROFILE_PLOT("objects created from cache", (int64_t)sObjectsCreated);
+    LL_PROFILE_PLOT("object creation ms", (F64)sObjectCreationSpent * 1000.0);
+    sObjectCreationSeconds = llmax(0.f, (F32)object_creation_ms) * 0.001f;
+    sObjectCreationSpent   = 0.f;
+    sObjectsCreated        = 0;
 
     //
     //sNewObjectCreationThrottle =

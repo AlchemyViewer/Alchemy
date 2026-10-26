@@ -210,9 +210,21 @@ public:
     // observed per-frame traffic (small floor, grown toward the cap in endFrame), so a light
     // scene costs little; payloads over the floor's segment (a generous multiple of any real
     // skinning palette) are rejected (-1). Main-thread only, like the rest of the class.
-    static S64  scratchWrite(const void* data, size_t bytes); // ring offset, or -1 on failure
+    //
+    // `reserve`, where above `bytes`, is how much a later scratchBindRange of the payload binds: a block declared
+    // larger than what is written into it, such as a palette array sized for the most joints a mesh may have, must
+    // be bound whole. The range bound then stays inside one segment of the ring, so that what the head writes after
+    // the payload is fenced with it; the head still moves on by the payload alone, and the reserve past it overlaps
+    // the payloads that follow, which a shader reading only what was written never sees.
+    static S64  scratchWrite(const void* data, size_t bytes, size_t reserve = 0); // ring offset, or -1 on failure
     static void scratchBindRange(U32 binding, S64 offset, size_t bytes);
     static U32  scratchGeneration();
+    // What scratchBindRange last bound is no longer known to be bound: GL state was changed behind the cache
+    // (LLRender::refreshState), so the next bind is issued whatever it repeats.
+    static void forgetScratchBinding();
+    // Whether the slice [offset, offset + bytes) of the ring's current generation is what scratchBindRange last bound
+    // at `binding`, as far as the bind cache knows.
+    static bool scratchIsBound(U32 binding, S64 offset, size_t bytes);
 
     bool   allocated() const { return mName != 0; }
     size_t size() const { return mSize; }

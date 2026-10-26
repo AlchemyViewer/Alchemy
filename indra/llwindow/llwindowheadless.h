@@ -101,7 +101,7 @@ public:
         return true;
     }
     void* createSharedContext() override  { return nullptr; }
-    void makeContextCurrent(void*) override  {}
+    bool makeContextCurrent(void*) override  { return true; }
     void destroySharedContext(void*) override  {}
     /*virtual*/ void toggleVSync(bool enable_vsync) override { }
     /*virtual*/ bool setCursorPosition(LLCoordWindow position) override

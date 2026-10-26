@@ -597,8 +597,9 @@ static bool handleRepartition(const LLSD&)
 {
     if (gPipeline.isInit())
     {
-        gOctreeMaxCapacity = gSavedSettings.getU32("OctreeMaxNodeCapacity");
-        gOctreeMinSize = gSavedSettings.getF32("OctreeMinimumNodeSize");
+        // As LLPipeline::init reads them: a capacity of one at the least, and a size above none.
+        gOctreeMaxCapacity = llmax(gSavedSettings.getU32("OctreeMaxNodeCapacity"), 1u);
+        gOctreeMinSize = llmax(gSavedSettings.getF32("OctreeMinimumNodeSize"), 0.001f);
         gObjectList.repartitionObjects();
     }
     return true;
@@ -990,6 +991,9 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderDisableCompute", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderMaxFramesAhead", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "AlchemyRenderPacingSlackWork", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderFrameStamps", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderStagedUploads", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderQueryResultAge", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderShaderLightingMaxLevel", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderReservedTextureIndices", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "OctreeStaticObjectSizeFactor", handleRepartition);

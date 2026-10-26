@@ -121,6 +121,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alcompact.h
         alenumtable.h
         alfilewrite.h
         allinebreaks.h
@@ -307,6 +308,7 @@ if(AL_BUILD_TESTS)
     llcommon_tests
     PROJECT llcommon
     SOURCES
+      tests/alcompact_test.cpp
       tests/alenumtable_test.cpp
       tests/alfilewrite_test.cpp
       tests/alrecoverystore_test.cpp

@@ -238,10 +238,14 @@ bool LLSpatialGroup::updateInGroup(LLDrawable *drawablep, bool immediate)
 
     OctreeNode* parent = mOctreeNode->getOctParent();
 
+    // Where LLOctreeNode::insert would leave it: its own size's node, or a node below a full one with room, which here
+    // counts the drawable itself -- or one too small to split, which insert fills whatever it holds.
     if (mOctreeNode->isInside(drawablep->getPositionGroup()) &&
         (mOctreeNode->contains(drawablep->getEntry()) ||
          (drawablep->getBinRadius() > mOctreeNode->getSize()[0] &&
-                parent && parent->getElementCount() >= gOctreeMaxCapacity)))
+                parent && parent->getElementCount() >= gOctreeMaxCapacity &&
+                (mOctreeNode->getElementCount() <= gOctreeMaxCapacity ||
+                 mOctreeNode->getSize()[0] < 2.f * gOctreeMinSize))))
     {
         unbound();
         setState(OBJECT_DIRTY);
@@ -1403,6 +1407,24 @@ bool LLSpatialPartition::visibleObjectsInFrustum(LLCamera& camera)
     LLOctreeCullDetectVisible vis(&camera);
     vis.traverse(mOctree);
     return vis.mResult;
+}
+
+bool LLSpatialPartition::addRootBounds(LLVector4a& min, LLVector4a& max)
+{
+    if (mOctree->getElementCount() == 0 && mOctree->getChildCount() == 0)
+    {
+        return false;
+    }
+    LLSpatialGroup* group = (LLSpatialGroup*)mOctree->getListener(0);
+    group->rebound();
+    const LLVector4a* bounds = group->getBounds();
+    LLVector4a lo;
+    LLVector4a hi;
+    lo.setSub(bounds[0], bounds[1]);
+    hi.setAdd(bounds[0], bounds[1]);
+    min.setMin(min, lo);
+    max.setMax(max, hi);
+    return true;
 }
 
 S32 LLSpatialPartition::cull(LLCamera &camera, std::vector<LLDrawable *>* results, bool for_select)

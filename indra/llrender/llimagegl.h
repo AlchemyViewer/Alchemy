@@ -41,7 +41,9 @@
 #include "workqueue.h"
 #include <boost/unordered_set.hpp>
 #include <atomic>
+#include <deque>
 #include <functional>
+#include <memory>
 #include <vector>
 
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
@@ -85,15 +87,17 @@ public:
     static U32 publishUploads(bool poll = true);
 
     // Main thread, at the frame's end (LLRender::endFrame): poll the fences of the uploads
-    // handed over, oldest first, for updateClass to publish the signalled ones. A poll is a
-    // call that returns a value, which a threaded driver answers only once its own thread has
-    // caught up: in the middle of a frame that is most of the frame, where at its end the
-    // frame fences' calls have just caught it up.
+    // handed over, oldest first, for updateClass to publish the signalled ones, each only once
+    // the LLImageGL thread has seen it signalled (LLImageGLThread::watchUpload). A poll of a
+    // fence not yet signalled waits for a threaded driver's own thread to catch up; a poll of
+    // one signalled answers at once.
     static void pollUploads();
 
     // Main thread, as the viewer shuts down: wait for the GPU on every upload handed over, a
     // second at most in all, and publish them, since nothing will poll again. What has not
-    // signalled by then goes unpublished with the rest in cleanupClass.
+    // signalled by then is given up, its texture deleted unpublished and what waited on it
+    // run (afterPublish), so that the references it holds are let go while the world they
+    // name is still whole.
     static void finishUploads();
 
     // Get an estimate of how many bytes have been allocated in vram for
@@ -265,7 +269,8 @@ public:
 
     // Off the main thread: fence this thread's upload of new_tex_name and hand it to the main
     // thread, which publishes it in place of mTexName once the fence has signalled (see
-    // publishUploads). Does not wait for the GPU.
+    // publishUploads), and to the LLImageGL thread to see it signalled (watchUpload). Does
+    // not wait for the GPU.
     void syncToMainThread(LLGLuint new_tex_name);
 
     // Main thread: run fn once the upload handed over by syncToMainThread has published, or
@@ -274,8 +279,25 @@ public:
     // texture onto the screen rather than racing it.
     void afterPublish(std::function<void()> fn);
 
-    // Read back a raw image for this discard level, if it exists
+    // Read back a raw image for this discard level, if it exists. Waits for the GPU to finish everything queued ahead
+    // of the read; requestReadBack does not.
     bool readBackRaw(S32 discard_level, LLImageRaw* imageraw, bool compressed_ok) const;
+
+    // Main thread: the pixels of level `discard_level` of what mTexName holds (-1: the level on screen), read back
+    // without waiting on the GPU (ALTextureReadback). requestReadBack issues the read, giving up one it issued before:
+    // false where readBackRaw would not read the level, for a compressed texture, or where the pool has no room this
+    // frame. collectReadBack fills `imageraw` with the read, at the size it was read, once the GPU has written it, a
+    // few frames' ends later, and gives the level it is of.
+    enum EReadBack
+    {
+        READBACK_NONE,    // nothing asked, or the read was lost (cancelled, expired, the context gone)
+        READBACK_PENDING, // asked, and the GPU has yet to be shown finished with it
+        READBACK_READY    // `imageraw` holds it
+    };
+    bool      requestReadBack(S32 discard_level = -1);
+    EReadBack collectReadBack(LLImageRaw* imageraw, S32& discard_level);
+    void      cancelReadBack();
+    bool      isReadBackRequested() const { return mReadBack != 0; }
     void destroyGLTexture();
     void forceToInvalidateGLTexture();
 
@@ -284,7 +306,7 @@ public:
 
     // While an off-thread upload is in flight the members below describe the texture
     // being built, not the one mTexName still names. Consumers pair these getters with
-    // getTexName() -- LLVOVolume::sculpt reads back from GL at getWidth() -- so they must
+    // getTexName() -- readBackRaw reads mTexName back at getWidth() -- so they must
     // report what mTexName actually holds until both flip together in syncTexName.
     S32  getDiscardLevel() const        { return mUploadInFlight ? mPublished.mCurrentDiscardLevel : mCurrentDiscardLevel; }
     S32  getMaxDiscardLevel() const     { return mUploadInFlight ? mPublished.mMaxDiscardLevel : mMaxDiscardLevel; }
@@ -463,7 +485,7 @@ private:
 
     // Off-thread uploads of this image handed to the main thread and not yet published, and
     // what is to run once none are. Main thread only; see syncToMainThread / afterPublish.
-    void queuePublish(LLGLuint name, GLsync fence);
+    void queuePublish(LLGLuint name, GLsync fence, std::shared_ptr<std::atomic<bool>> seen);
     void finishPublish(LLGLuint name);
     U32 mPublishesPending = 0;
     std::vector<std::function<void()>> mOnPublished;
@@ -485,6 +507,7 @@ private:
         S8  mComponents = 0;
         S8  mCurrentDiscardLevel = -1;
         S8  mMaxDiscardLevel = 0;
+        S32 mMipLevels = 0;
         // The format, which createGLTexture works out again from mComponents for every
         // upload of an image without an explicit one.
         LLGLenum mFormatPrimary = 0;
@@ -564,6 +587,18 @@ protected:
 
     bool mExternalTexture;
 
+    // The read requestReadBack issued, and what it read.
+    U64 mReadBack           = 0;
+    S32 mReadBackDiscard    = -1;
+    S32 mReadBackWidth      = 0;
+    S32 mReadBackHeight     = 0;
+    S32 mReadBackComponents = 0;
+
+    // The level a readback of `discard_level` (-1: the level on screen) reads -- `gl_discard` of mTexName -- its size and
+    // its components, through the published view; false where mTexName holds no such level. Binds mTexName on unit 0,
+    // for the read.
+    bool readBackLevel(S32& discard_level, S32& gl_discard, S32& width, S32& height, S32& ncomponents) const;
+
     // STATICS
 public:
     static boost::unordered_set<LLImageGL*> sImageList;
@@ -574,6 +609,8 @@ public:
     // Global memory statistics
     static U32 sBindCount;                  // Tracks number of texture binds for current frame
     static U32 sUniqueCount;                // Tracks number of unique texture binds for current frame
+    static U32 sReadbacks;                  // Textures read back from GL for current frame (readBackRaw)
+    static F64 sReadbackSeconds;            // What those reads waited for the GPU, for current frame
     static LLImageGL* sDefaultGLTexture ;
     static bool sAutomatedTest;
 #if DEBUG_MISS
@@ -650,10 +687,11 @@ public:
 class LLImageGLThread : public LLSimpleton<LLImageGLThread>, LL::ThreadPool
 {
 public:
-    // follows gSavedSettings "RenderGLMultiThreadedTextures"
-    static bool sEnabledTextures;
-    // follows gSavedSettings "RenderGLMultiThreadedMedia"
-    static bool sEnabledMedia;
+    // follows gSavedSettings "RenderGLMultiThreadedTextures", and turned off by the thread where its context cannot be
+    // made current
+    static std::atomic<bool> sEnabledTextures;
+    // follows gSavedSettings "RenderGLMultiThreadedMedia", and turned off with it
+    static std::atomic<bool> sEnabledMedia;
 
     LLImageGLThread(LLWindow* window);
     // Joins the thread first: run() uses the window and context after the
@@ -672,9 +710,26 @@ public:
 
     void run() override;
 
+    // On the thread: an upload handed to the main thread (LLImageGL::syncToMainThread), whose fence the thread sees
+    // signalled behind the work queued after it, and then raises `seen`, which the main thread waits for before it
+    // polls the fence (LLImageGL::pollUploads).
+    void watchUpload(GLsync fence, std::shared_ptr<std::atomic<bool>> seen);
+
 private:
+    // On the thread: raises the seen flag of every upload in flight whose fence has signalled, oldest first, waiting for
+    // them only while nothing else is queued, and posting itself again behind what is.
+    void seeUploads();
+
+    struct UploadInFlight
+    {
+        GLsync                             mFence;
+        std::shared_ptr<std::atomic<bool>> mSeen;
+    };
+
     LLWindow* mWindow;
     void* mContext = nullptr;
+    std::deque<UploadInFlight> mUploadsInFlight; // the thread's
+    bool mSeeingPosted = false;                  // the thread's: seeUploads() is queued
 };
 
 #endif // LL_LLIMAGEGL_H

@@ -11,8 +11,10 @@ set(
   alprimitiveplot.cpp
   alquerypool.cpp
   alsamplerstate.cpp
+  alstagingring.cpp
   altexture3d.cpp
   altextureblit.cpp
+  altexturereadback.cpp
   altextureslot.cpp
   alfontcolrv1.cpp
   alfontface.cpp
@@ -54,8 +56,10 @@ set(
   alquerypool.h
   alrendertargetdesc.h
   alsamplerstate.h
+  alstagingring.h
   altexture3d.h
   altextureblit.h
+  altexturereadback.h
   altextureslot.h
   alfontcolrv1.h
   alfontface.h
@@ -237,6 +241,16 @@ if(AL_BUILD_TESTS)
   #   conditional draws;
   # - ALImageSlot: what a unit issues, re-issues and forgets as LLRender keeps
   #   it, and integer images;
+  # - ALStagingRing: room aligned and apart, a segment entered again only once
+  #   the frame it was left in has finished, a take too large for a segment
+  #   refused and the ring grown for it at the frame's end, the store a new
+  #   size replaces kept until its frame has finished, fences of its own
+  #   waited on where frames are stamped, the ring switched off, a texture
+  #   upload read from the ring, and release;
+  # - ALTextureReadback: a level read back collected once its frame has
+  #   finished, buffers given back serving the reads after, requests past the
+  #   pool's bounds refused, reads no one collects expiring, fences of its own
+  #   waited on where frames are stamped, and release;
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
@@ -254,8 +268,10 @@ if(AL_BUILD_TESTS)
       tests/alinstanceddraw_gl_test.cpp
       tests/alquerypool_gl_test.cpp
       tests/alrenderstate_gl_test.cpp
+      tests/alstagingring_gl_test.cpp
       tests/altessellation_gl_test.cpp
       tests/altextureblit_gl_test.cpp
+      tests/altexturereadback_gl_test.cpp
       tests/aluniformbuffer_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp
@@ -266,6 +282,7 @@ if(AL_BUILD_TESTS)
       tests/llrendersphere_gl_test.cpp
       tests/lluiimage_test.cpp
       tests/llvertexbuffer_gl_test.cpp
+    BENCH_SOURCES tests/aldriversync_bench.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
     DEFINES ${font_defines}

@@ -210,9 +210,10 @@ namespace ll_test
 
     // GL 3.3 core pass-through UI vertex shader. Same uniform / attribute
     // shape as indra/newview/app_settings/shaders/class1/interface/uiV.glsl:
-    // the matrices are read from the Matrices block, laid out as
-    // class1/deferred/matricesBlock.glsl lays it out, which
-    // LLRender::syncMatrices fills and mapUniforms binds at UB_MATRICES.
+    // the matrices are read from the Matrices and ProjectionMatrices blocks,
+    // laid out as class1/deferred/matricesBlock.glsl lays them out, which
+    // LLRender::syncMatrices fills and mapUniforms binds at UB_MATRICES and
+    // UB_PROJECTION_MATRICES.
     inline const char* kTestUIVertexShader()
     {
         return
@@ -220,11 +221,14 @@ namespace ll_test
             "layout (std140) uniform Matrices\n"
             "{\n"
             "    mat4 modelview_matrix;\n"
-            "    mat4 projection_matrix;\n"
             "    mat4 modelview_projection_matrix;\n"
+            "    mat3 normal_matrix;\n"
+            "};\n"
+            "layout (std140) uniform ProjectionMatrices\n"
+            "{\n"
+            "    mat4 projection_matrix;\n"
             "    mat4 inv_proj;\n"
             "    mat4 texture_matrix0;\n"
-            "    mat3 normal_matrix;\n"
             "};\n"
             "in vec3 position;\n"
             "in vec4 diffuse_color;\n"

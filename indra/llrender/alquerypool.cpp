@@ -35,6 +35,8 @@
 #include <cstdint>
 #include <cstring>
 
+static_assert(ALQueryPool::FRAMES <= ALFrameFences::FRAMES, "a batch's frame is one the fences can still wait for");
+
 namespace
 {
     // The targets one query at a time may hold, by ALQueryPool::targetOf().
@@ -239,6 +241,8 @@ void ALQueryPool::end(const ALQueryTicket& ticket)
     {
         return;
     }
+    // Ended between closeFrame() and openFrame(), a query of the closed batch would miss its late write.
+    llassert(!mBetweenFrames);
     const S32  target = targetOf(ticket.mKind);
     const bool open   = target >= 0 && mOpen[target] == ticket;
     llassert_msg(open, "a query ended that is not open");
@@ -302,6 +306,8 @@ void ALQueryPool::endSpan(ALQuerySpan& span)
 
 ALQueryTicket ALQueryPool::take(U32 kind)
 {
+    // A query taken between closeFrame() and openFrame() would land in the batch already closed.
+    llassert(!mBetweenFrames);
     Batch& open = batch(mSerial);
     // The first batch, and the first after release(), are opened by their first query.
     open.mSerial = mSerial;
@@ -661,7 +667,8 @@ void ALQueryPool::read(Batch& batch)
 void ALQueryPool::retire()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
-    for (U32 back = FRAMES - 1; back > 0; --back)
+    // Oldest first, and none younger than the pool's age.
+    for (U32 back = FRAMES - 1; back >= mMinResultAge; --back)
     {
         if (mSerial <= back)
         {
@@ -683,7 +690,14 @@ void ALQueryPool::retire()
 
 void ALQueryPool::endFrame()
 {
+    closeFrame();
+    openFrame();
+}
+
+void ALQueryPool::closeFrame()
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(!mBetweenFrames);
     Batch& closing = batch(mSerial);
     closing.mSerial = mSerial;
     closing.mClosed = true;
@@ -705,6 +719,16 @@ void ALQueryPool::endFrame()
     {
         closing.mRead = true;
     }
+    mBetweenFrames = true;
+
+    LL_PROFILE_PLOT("GL queries", (int64_t)used);
+}
+
+void ALQueryPool::openFrame()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
+    llassert(mBetweenFrames);
+    mBetweenFrames = false;
 
     ++mSerial;
     Batch& reused = batch(mSerial);
@@ -730,7 +754,6 @@ void ALQueryPool::endFrame()
         reused.mUsed[k] = 0;
     }
 
-    LL_PROFILE_PLOT("GL queries", (int64_t)used);
     LL_PROFILE_PLOT("GL query stalls", (int64_t)(stalled ? 1 : 0));
     LL_PROFILE_PLOT("GL query names", (int64_t)getNameCount());
 }
@@ -756,7 +779,8 @@ void ALQueryPool::release()
     {
         glEndConditionalRender();
     }
-    mConditional = false;
+    mConditional   = false;
+    mBetweenFrames = false;
     // GL keeps a query deleted while it counts until its target is ended, which would refuse the next begin.
     for (const ALQueryTicket& open : mOpen)
     {

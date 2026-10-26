@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "algpubuffer.h"
 #include "alpacingslack.h"
 #include "stdtypes.h"
 
@@ -33,11 +34,25 @@
 /// batches, the uniform buffer rings' segments, ALGPUReadback's slots and ALGPUStream's regions.
 ///
 /// The fences are polled once a frame, by endFrame(), straight after the swap, on every driver, and nowhere else but a
-/// wait. A threaded driver answers a fence laid or polled only once its own thread has caught up with it. Mesa's glthread
+/// wait. A threaded driver answers a poll of a fence not yet signalled only once its own thread has caught up with it;
+/// NVIDIA's threaded optimization lays a fence, and answers a poll of one signalled, at once. Mesa's glthread
 /// runs every call that returns a value so, and has caught up at the swap, since Mesa finishes glthread before it
 /// flushes the frame. NVIDIA's threaded optimization answers a poll of a fence not yet signalled in order on its thread,
 /// which a GPU-bound frame holds in the previous frame's present, so that a poll before the cull waits there for most
 /// of a frame. Straight after the swap that wait is the swap's own.
+///
+/// Where they are asked to (setStamps(), which the viewer asks where the GPU writes the query results: NVIDIA's driver),
+/// and the context can (canStamp()), the frames' ends lay no fence: each has the GPU stamp the frame instead, a
+/// timestamp counted once every command before it has finished (glQueryCounter), written into a slot of a store mapped
+/// for as long as it lives (glGetQueryBufferObjectui64v). A frame is complete once its slot holds another stamp than it
+/// did before. Reading the map is no GL call, so neither a frame's poll nor its pacing wait waits on the driver's
+/// thread: a poll of a fence not yet signalled, even at the swap, waits for that thread to run everything issued before
+/// it, which leaves it idle while the CPU begins the next frame, and the frame as long as the two threads' work end to
+/// end wherever the driver's thread is the slower. The pacing wait reads the slot until the stamp comes, sleeping
+/// through what the last wait took but its end and yielding the rest. A frame whose stamp has not come in a second is
+/// waited out on a fence laid behind it, and a stamp still missing after that sends the frames' ends back to fences.
+/// The GPU writes a stamp only once the frame has finished, so its front end may wait there before it begins the next
+/// frame.
 ///
 /// The frame's end may also pace the CPU, waiting every frame for the frame a given number before the one it ends. A
 /// poll waits only when it happens on a fence not yet signalled while the driver's thread is held in a present: on
@@ -56,6 +71,25 @@ public:
     ALFrameFences() = default;
     ALFrameFences(const ALFrameFences&) = delete;
     ALFrameFences& operator=(const ALFrameFences&) = delete;
+
+    /// Whether the context can stamp frames: query buffers written by name, timestamps and persistent maps.
+    static bool canStamp();
+
+    /// Whether the frames' ends are to stamp their frames rather than lay fences, from the next endFrame() on, where the
+    /// context can. Off again, the frames stamped so far are waited out first, at the next endFrame().
+    void setStamps(bool stamps) { mWantStamps = stamps; }
+    /// Whether the frames' ends stamp their frames.
+    bool isStamping() const { return mStampStore.isAllocated() && !mStampsFailed; }
+    /// Whether the open frame's end stamps it: the frames' ends stamp, or are asked to from this one on and can. What a
+    /// command issued now lays a fence of its own behind, where a stamp alone would be what shows it finished. Told no,
+    /// the caller counts on the frame's end to lay a fence: that end lays one, whatever stamps are asked for since, and
+    /// the stamps start with the next frame.
+    bool willStamp() const
+    {
+        const bool stamps = isStamping() || (mWantStamps && !mStampsFailed && canStamp());
+        mFenceCountedOn = mFenceCountedOn || !stamps;
+        return stamps;
+    }
 
     /// The open frame: a command issued now completes with it.
     U32 frame() const { return mFrame; }
@@ -78,10 +112,10 @@ public:
     /// How long waitFinished() waits before it logs that it is waiting.
     static constexpr U32 LONG_WAIT_SECONDS = 10;
 
-    /// Lays the open frame's fence; with `frames_ahead` above 0 waits for the frame that many before it to complete;
-    /// then polls the fences of the frames ended before, oldest first, up to the first that has not signalled, and opens
-    /// the next frame. Once a frame, after its last command: the viewer's is the swap. The frame it ends is shown
-    /// finished by the next one's end at the earliest.
+    /// Lays the open frame's fence, or stamps it; with `frames_ahead` above 0 waits for the frame that many before it to
+    /// complete; then polls the fences of the frames ended before, oldest first, up to the first that has not signalled,
+    /// and opens the next frame. Once a frame, after its last command: the viewer's is the swap. The frame it ends is
+    /// shown finished by the next one's end at the earliest.
     ///
     /// `frames_ahead` is how many frames the GPU may still be working on when the CPU begins the next: with 1, the frame
     /// before the one ending has finished. That wait paces the CPU and is no stall: it has a zone and a count of its
@@ -89,8 +123,8 @@ public:
     /// fence must make room. Either way the frame's end is noted in slack().
     void endFrame(U32 frames_ahead = 0);
 
-    /// Deletes every fence, while the context is current. Every frame so far, the open one too, is complete, and the
-    /// slack of the frames before is forgotten.
+    /// Deletes every fence and the stamps' store, while the context is current. Every frame so far, the open one too, is
+    /// complete, and the slack of the frames before is forgotten. Stamps asked for are made again at the next endFrame().
     void release();
 
     /// How long the paced frames' ends have waited for the GPU, and what work before the next one's wait may have of it.
@@ -101,21 +135,38 @@ public:
     U32 getStalls() const { return mStalls; }
     /// The frames' ends whose pacing wait had to wait for the GPU.
     U32 getPacingWaits() const { return mPacingWaits; }
-    /// The fences laid and polls made, each a call that returns a value.
+    /// The fences laid and polls made, each a call that returns a value, and the fence and waits a stamp that has not
+    /// come makes. Reading a stamp is none.
     U32 getCalls() const { return mCalls; }
 
 private:
     // Polls the ended frames not yet shown complete, oldest first, up to the first that has not signalled.
     void poll();
-    // Waits for the ended `frame` as a frame's end paces the CPU, however long the GPU takes: on that frame's fence
-    // alone, with no poll first, so that what the wait costs is the pacing zone's. The seconds it took; `behind` says
-    // whether the GPU was still drawing it.
+    // Waits for the ended `frame` as a frame's end paces the CPU, however long the GPU takes: on that frame's fence, or
+    // its stamp, alone, with no poll first, so that what the wait costs is the pacing zone's. The seconds it took;
+    // `behind` says whether the GPU was still drawing it.
     F64 pace(U32 frame, bool& behind);
     // Every frame up to `frame` is complete: their fences go.
     void completeThrough(U32 frame);
 
+    // Whether the frame's end is to stamp the open frame: makes the store and the queries the first time, and lets
+    // them go, the frames stamped so far waited out, once stamps are no longer asked for or have failed.
+    bool readyStamps();
+    void releaseStamps();
+    // Asks the GPU for the stamp of the frame in `slot`, behind every command issued so far.
+    void stamp(U32 slot);
+    // Whether the GPU has written the stamp in `slot`.
+    bool stampWritten(U32 slot) const;
+    // Waits up to `timeout` seconds for the stamp in `slot`: whether it came. Sleeps through all but the last of
+    // `expect` seconds, and past them, and spins between.
+    bool waitStamp(U32 slot, F64 timeout, F64 expect);
+    // A stamp has not come in a second: a fence laid behind every command so far, waited on until it signals, after
+    // which every stamp asked for has come and every ended frame is complete. One still missing sends the frames' ends
+    // back to fences.
+    void finishStamps();
+
     void* mFences[FRAMES] = {};  // the GLsync laid at the end of each frame not yet shown complete, by frame % FRAMES
-    bool  mFlushed[FRAMES] = {}; // its fence has been flushed toward the GPU
+    bool  mFlushed[FRAMES] = {}; // its fence, or its stamp, has been flushed toward the GPU
     U32   mFrame    = 1;         // the open frame
     U32   mComplete = 0;         // the newest frame shown complete, with every one before it
     U32   mStalls   = 0;
@@ -123,4 +174,13 @@ private:
     U32   mCalls    = 0;
     U32   mFrameCalls = 0;       // calls since the last endFrame(), for the profiler
     ALPacingSlack mSlack;
+
+    ALGPUBuffer mStampStore;                  // a stamp a slot, mapped for reading
+    U32         mStampQueries[FRAMES] = {};   // the timestamp query each slot's stamp is counted by
+    U64         mStampBefore[FRAMES] = {};    // what the slot held when its frame's stamp was asked for
+    bool        mStamped[FRAMES] = {};        // the frame in the slot was stamped and is not yet shown complete
+    F64         mStampPace = 0.0;             // how long the last pacing wait for a stamp took, in seconds
+    bool        mWantStamps = false;
+    bool        mStampsFailed = false;        // a stamp did not come once the GPU had finished: fences for good
+    mutable bool mFenceCountedOn = false;     // willStamp() told the open frame's commands it lays a fence
 };

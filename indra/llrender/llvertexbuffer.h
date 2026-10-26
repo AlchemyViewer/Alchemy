@@ -343,6 +343,17 @@ private:
 public:
 
     static U64 getBytesAllocated();
+
+    // What the buffer pool has handed out since it was made: stores it had to make, stores it reused, and of those the
+    // ones freed in a frame the GPU had not been shown finished with, which it gave a new store under the same name.
+    struct PoolStats
+    {
+        U32 mMisses  = 0;
+        U32 mHits    = 0;
+        U32 mOrphans = 0;
+    };
+    static PoolStats getPoolStats();
+
     static const U32 sTypeSize[TYPE_MAX];
     static const U32 sGLMode[LLRender::NUM_MODES];
     static U32 sGLRenderBuffer;
