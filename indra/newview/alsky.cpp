@@ -125,6 +125,19 @@ namespace
     }
 }
 
+F32 LLHeavenBody::angularHalfSize() const
+{
+    // Corners 0..3 are (-right, +up), (-right, -up), (+right, +up), (+right, -up) (ALSkyLayers::bodyCorners).
+    const F32 dist = ((mCorners[0] + mCorners[3]) * 0.5f).length();
+    if (dist <= 0.f)
+    {
+        return 0.f;
+    }
+    const F32 half_width  = (mCorners[2] - mCorners[0]).length() * 0.5f;
+    const F32 half_height = (mCorners[0] - mCorners[1]).length() * 0.5f;
+    return 0.5f * (half_width + half_height) / dist;
+}
+
 ALSky::ALSky()
     : mSun(SUN_DISK_RADIUS)
     , mMoon(MOON_DISK_RADIUS)
@@ -142,8 +155,8 @@ void ALSky::takeSky()
         return;
     }
 
-    // The bodies' quads about the camera, turned as the sky turns them: the stars' moon mask and the composite read
-    // them.
+    // The bodies' quads about the camera, turned as the sky turns them: the stars' moon mask, the composite and the
+    // lens flare's occlusion probe read them.
     mSun.setCorners(
         ALSkyLayers::bodyCorners(psky->getSunRotation(), HEAVENLY_BODY_DIST, mSunScale, mSun.getDiskRadius()));
     mMoon.setCorners(

@@ -67,6 +67,10 @@ public:
     const ALSkyLayers::Corners& corners() const { return mCorners; }
     void setCorners(const ALSkyLayers::Corners& corners) { mCorners = corners; }
 
+    /// The tangent of the quad's half-size seen from the camera: the mean of its half-width's and half-height's, which
+    /// grow apart toward the horizon (ALSkyLayers::bodyCorners). 0 before the quad is first taken.
+    F32 angularHalfSize() const;
+
 private:
     F32                  mDiskRadius;
     ALSkyLayers::Corners mCorners{};

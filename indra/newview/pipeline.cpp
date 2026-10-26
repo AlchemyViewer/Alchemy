@@ -8680,17 +8680,11 @@ void LLPipeline::generateLensFlareState(LLRenderTarget* src)
     }
 
     // Probe radius as a fraction of screen height: the body's own angular
-    // radius (ALSkyLayers::bodyCorners: ALSkyLayers::BODY_FACTOR x disk radius
-    // x sky scale, at unit distance) through the current vertical FOV, times
-    // the setting. It follows zoom and the sky's sun scale, so an occluder
-    // narrower than the disc dims the flare instead of cutting it.
-    LLSettingsSky::ptr_t psky = environment.getCurrentSky();
-    const F32 disk_radius = (sun_up ? mSky.getSun() : mSky.getMoon()).getDiskRadius();
-    const F32 body_scale = llmax(sun_up ? psky->getSunScale() : psky->getMoonScale(), 0.01f);
-    // The drawn quad grows towards the horizon (1.3x wide and 1.2x tall at
-    // dir.z = 0, ALSkyLayers::bodyCorners); a circular probe takes the mean of the two.
-    const F32 enlargement = 1.f + (1.f - light_dir.mV[VZ]) * 0.25f;
-    const F32 half_tan    = ALSkyLayers::BODY_FACTOR * disk_radius * body_scale * enlargement;
+    // radius through the current vertical FOV, times the setting. The radius is
+    // the quad the sky draws the body in (LLHeavenBody::angularHalfSize), so it
+    // follows zoom, the sky's scale and the quad's growth toward the horizon,
+    // and an occluder narrower than the disc dims the flare instead of cutting it.
+    const F32 half_tan = (sun_up ? mSky.getSun() : mSky.getMoon()).angularHalfSize();
     const LLViewerCamera* camera = LLViewerCamera::getInstance();
     const F32 fov_y       = llclamp(camera->getView(), 0.01f, F_PI - 0.01f);
     // A tiled snapshot zooms the projection without touching the FOV, and the
