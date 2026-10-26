@@ -5414,7 +5414,7 @@ void LLViewerObject::updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& 
     LLVOAvatar* avatar = getAvatar();
     if (avatar)
     {
-        avatar->updateMeshVisibility();
+        avatar->dirtyMeshVisibility();
     }
 }
 
@@ -5431,7 +5431,7 @@ void LLViewerObject::updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old
     LLVOAvatar* avatar = getAvatar();
     if (avatar && ALBakeProxies::drawnBy(material) != ALBakeProxies::drawnBy(old_material))
     {
-        avatar->updateMeshVisibility();
+        avatar->dirtyMeshVisibility();
     }
 }
 

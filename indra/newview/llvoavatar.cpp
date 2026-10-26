@@ -2855,6 +2855,11 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
         return;
     }
 
+    if (mMeshVisibilityDirty)
+    {
+        updateMeshVisibility();
+    }
+
     readProfileQuery();
 
     static LLCachedControl<bool> friends_only(gSavedSettings, "RenderAvatarFriendsOnly", false);
@@ -9499,6 +9504,8 @@ void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateMeshVisibility()
 {
+    mMeshVisibilityDirty = false;
+
     ALBakeProxies::bake_set_t bake_flag;
 
     if (getOverallAppearance() == AOA_NORMAL)
