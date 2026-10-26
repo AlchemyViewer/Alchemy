@@ -717,6 +717,7 @@ void LLModelPreview::clearModel(S32 lod)
     mVertexBuffer[lod].clear();
     mModel[lod].clear();
     mScene[lod].clear();
+    dropFacesCopiesOfLostModels();
 }
 
 void LLModelPreview::getJointAliases(JointMap& joint_map)
@@ -929,6 +930,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
             }
         }
     }
+    dropFacesCopiesOfLostModels();
 
     if (replaced_base_model && !mGenLOD)
     {
@@ -1276,6 +1278,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
             LLFloaterModelPreview::addStringToLog("ModelLoaded", args, false, loaded_lod);
         }
     }
+    dropFacesCopiesOfLostModels();
     refresh();
 
     mModelLoadedSignal();
@@ -1404,6 +1407,35 @@ const ALMeshSimplifier& LLModelPreview::simplifierFor(U32 mdl_idx)
         kept.mSimplifier = std::make_unique<const ALMeshSimplifier>(*base);
     }
     return *kept.mSimplifier;
+}
+
+void LLModelPreview::dropFacesCopiesOfLostModels()
+{
+    const auto held = [this](const LLPointer<LLModel>& model)
+    {
+        if (std::find(mBaseModel.begin(), mBaseModel.end(), model) != mBaseModel.end())
+        {
+            return true;
+        }
+        for (const LLModelLoader::model_list& models : mModel)
+        {
+            if (std::find(models.begin(), models.end(), model) != models.end())
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    const auto drop = [&](faces_copy_t& copy)
+    {
+        copy.erase(std::remove_if(copy.begin(), copy.end(), [&](const faces_copy_t::value_type& kept) { return !held(kept.first); }),
+                   copy.end());
+    };
+    drop(mBaseModelFacesCopy);
+    for (faces_copy_t& copy : mModelFacesCopy)
+    {
+        drop(copy);
+    }
 }
 
 void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 decimation, bool enforce_tri_limit)
@@ -1798,6 +1830,8 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             }
         }
     }
+
+    dropFacesCopiesOfLostModels();
 
     LL_INFOS("Upload") << "LOD " << which_lod << ", Mesh optimizer processed meshes : " << meshes_processed
         <<" simplified: " << meshes_simplified
@@ -2404,6 +2438,7 @@ void LLModelPreview::updateLodControls(S32 lod)
             mModel[lod] = mModel[lod + 1];
             mScene[lod] = mScene[lod + 1];
             mVertexBuffer[lod].clear();
+            dropFacesCopiesOfLostModels();
 
             // Also update lower LoD
             if (lod > LLModel::LOD_IMPOSTOR)

@@ -208,6 +208,9 @@ protected:
 
     void warnTextureScaling();
     void lookupLODModelFiles(S32 lod);
+    // Drops the face copies of models no LOD and not the base holds any
+    // longer, which nothing restores into and the copies alone keep.
+    void dropFacesCopiesOfLostModels();
 
 private:
     //Utility function for controller vertex compare
