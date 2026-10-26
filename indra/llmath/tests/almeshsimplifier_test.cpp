@@ -992,6 +992,46 @@ namespace
         CHECK(triangleCount(*near_target) > target_triangles);
     }
 
+    // Two flat shaded spheres, each far larger than a part a distant level
+    // of detail may drop, held to their seams, which keep the simplification
+    // far short of its target: dropping both would reach it, and neither is.
+    TEST_CASE("almeshsimplifier: a distant level of detail short of its target keeps every part too large to drop", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        Geometry model;
+        for (F32 x : { -0.6f, 0.6f })
+        {
+            const Geometry part = flatShaded(sphere(16, 8));
+            const U16 first = (U16)model.positions.size();
+            for (size_t v = 0; v < part.positions.size(); ++v)
+            {
+                model.add(part.positions[v] + LLVector3(x, 0.f, 0.f), part.normals[v], part.uvs[v]);
+            }
+            for (U16 index : part.indices)
+            {
+                model.indices.push_back((U16)(first + index));
+            }
+        }
+        LLPointer<LLVolume> base = volumeOf({ model });
+
+        ALMeshSimplifier::Target goal = toCount(9.f);
+        goal.distant = true;
+        LLPointer<LLVolume> target = targetFor(*base);
+        const F32 ratio = ALMeshSimplifier(*base).simplifyModel(*target, goal, Seams::ALL);
+        INFO(fmt::format("a ratio of {}", ratio));
+        REQUIRE(ratio > 0.f);
+        CHECK(ratio * ALLOWED_DRIFT < 9.f);
+        const LLVolumeFace& face = target->getVolumeFace(0);
+        REQUIRE(wellFormed(face));
+        S32 left = 0, right = 0;
+        for (S32 i = 0; i < face.mNumIndices; ++i)
+        {
+            (face.mPositions[face.mIndices[i]][0] < 0.f ? left : right) += 1;
+        }
+        CHECK(left > 0);
+        CHECK(right > 0);
+    }
+
     // A distant level of detail made to an error, with no triangle target,
     // of a model that is nothing but detached parts within that error: the
     // parts are all it has, and it keeps them rather than drop every one,
