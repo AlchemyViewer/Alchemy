@@ -52,6 +52,8 @@ struct ALMeshSimplifier::Mesh
     std::vector<U8> held;              // shared, and at a position on the open border of a face
     std::vector<U8> uv_seam;           // at a position its face has a vertex with another texture coordinate at
     F32 extent = 0.f;                  // the largest extent of the positions
+    bool uv_seams_shared = false;      // every vertex on a texture seam shared too
+    bool parts_large = false;          // every part of the triangles larger than a simplification may drop
 
     size_t vertexCount() const { return first.back(); }
     size_t indexCount() const { return first_index.back(); }
@@ -93,6 +95,136 @@ namespace
                   normalized_scale.mV[1] != 0.f ? normalized_scale.mV[1] : 1.f,
                   normalized_scale.mV[2] != 0.f ? normalized_scale.mV[2] : 1.f, 1.f);
         return scale;
+    }
+
+    // The largest detached part a simplification may drop: one whose
+    // vertices all lie within this distance of their mean, relative to the
+    // model's largest extent.
+    constexpr F32 PRUNE_LIMIT = 0.05f;
+
+    // The parts of a mesh's triangles, connected by shared positions, as
+    // meshoptimizer finds them.
+    struct Parts
+    {
+        std::vector<U32> part;     // each vertex's, named by its least position
+        std::vector<U8> used;      // each vertex's, by a triangle
+        std::vector<F32> distance; // each used vertex's from the mean of its part's
+    };
+
+    void measureParts(const LLVector4a* positions, size_t vertex_count, const U32* indices, size_t index_count, Parts& parts)
+    {
+        std::vector<U32> remap(vertex_count);
+        meshopt_generatePositionRemap(remap.data(), positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a));
+        std::vector<U32> parent(vertex_count);
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            parent[v] = v;
+        }
+        auto root = [&](U32 v)
+        {
+            while (parent[v] != v)
+            {
+                v = parent[v] = parent[parent[v]];
+            }
+            return v;
+        };
+        for (size_t i = 0; i < index_count; i += 3)
+        {
+            // a stays the root of the corners joined so far.
+            U32 a = root(remap[indices[i]]);
+            for (S32 k = 1; k < 3; ++k)
+            {
+                const U32 b = root(remap[indices[i + k]]);
+                if (a != b)
+                {
+                    const U32 joined = llmin(a, b);
+                    parent[llmax(a, b)] = joined;
+                    a = joined;
+                }
+            }
+        }
+
+        parts.part.resize(vertex_count);
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            parts.part[v] = root(remap[v]);
+        }
+        parts.used.assign(vertex_count, 0);
+        for (size_t i = 0; i < index_count; ++i)
+        {
+            parts.used[indices[i]] = 1;
+        }
+
+        // Each part's mean, then each vertex's distance from it.
+        std::vector<LLVector4a> mean(vertex_count);
+        std::vector<F32> weight(vertex_count, 0.f);
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            mean[v].clear();
+        }
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            if (parts.used[v])
+            {
+                mean[parts.part[v]].add(positions[v]);
+                weight[parts.part[v]] += 1.f;
+            }
+        }
+        parts.distance.assign(vertex_count, 0.f);
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            if (parts.used[v])
+            {
+                LLVector4a centre = mean[parts.part[v]];
+                centre.mul(1.f / weight[parts.part[v]]);
+                LLVector4a offset;
+                offset.setSub(positions[v], centre);
+                parts.distance[v] = sqrtf(offset.dot3(offset).getF32());
+            }
+        }
+    }
+
+    // Whether every part of the triangles is larger than a simplification
+    // may drop, both as largestDropped measures a part and as meshoptimizer
+    // does. Free to drop parts, meshoptimizer drops a part only whole, so
+    // its simplification of these either drops none, and is the one not
+    // free to, or drops one of them and is taken back, for the one that
+    // first drops the parts within PRUNE_LIMIT, which are none, and then no
+    // more: either way the simplification that drops no part.
+    bool partsLarge(const LLVector4a* positions, size_t vertex_count, const U32* indices, size_t index_count, F32 extent)
+    {
+        if (index_count < 3 || !(extent > 0.f))
+        {
+            return false;
+        }
+        Parts parts;
+        measureParts(positions, vertex_count, indices, index_count, parts);
+
+        // A part's radius is the farthest of its vertices, the same whatever
+        // parts largestDropped takes it with while every distance is a
+        // number; one that is not makes the order they are taken in count.
+        std::vector<F32> radius(vertex_count, 0.f);
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            if (parts.used[v])
+            {
+                if (!std::isfinite(parts.distance[v]))
+                {
+                    return false;
+                }
+                radius[parts.part[v]] = llmax(radius[parts.part[v]], parts.distance[v]);
+            }
+        }
+        for (U32 v = 0; v < vertex_count; ++v)
+        {
+            if (parts.used[v] && !(radius[parts.part[v]] / extent > PRUNE_LIMIT))
+            {
+                return false;
+            }
+        }
+        std::vector<U32> kept(index_count);
+        return meshopt_simplifyPrune(kept.data(), indices, index_count, positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a), PRUNE_LIMIT) ==
+               index_count;
     }
 
     void prepare(const LLVolume& base, Mesh& mesh)
@@ -292,14 +424,17 @@ namespace
         mesh.shared.resize(vertex_count);
         mesh.held.resize(vertex_count);
         mesh.uv_seam.resize(vertex_count);
+        mesh.uv_seams_shared = true;
         for (U32 v = 0; v < vertex_count; ++v)
         {
             mesh.shared[v] = spans[remap[v]];
             mesh.held[v] = spans[remap[v]] && border[remap[v]];
             mesh.uv_seam[v] = seam[remap[v]];
+            mesh.uv_seams_shared &= !mesh.uv_seam[v] || mesh.shared[v];
         }
 
         mesh.extent = vertex_count ? meshopt_simplifyScale(mesh.positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a)) : 0.f;
+        mesh.parts_large = vertex_count && partsLarge(mesh.positions.data(), vertex_count, mesh.indices.data(), mesh.indices.size(), mesh.extent);
     }
 
     // The vertex flags for a simplification free to cross seams: the
@@ -324,86 +459,25 @@ namespace
         return 3;
     }
 
-    // The largest detached part a simplification may drop: one whose
-    // vertices all lie within this distance of their mean, relative to the
-    // model's largest extent.
-    constexpr F32 PRUNE_LIMIT = 0.05f;
-
     // The radius of the largest part, connected by shared positions, that
     // indices has and simplified has none of, as meshoptimizer measures a
     // part: its vertices' farthest from their mean, over the extent.
     F32 largestDropped(const LLVector4a* positions, size_t vertex_count, const U32* indices, size_t index_count, const U32* simplified,
                        size_t simplified_count, F32 extent)
     {
-        std::vector<U32> remap(vertex_count);
-        meshopt_generatePositionRemap(remap.data(), positions[0].getF32ptr(), vertex_count, sizeof(LLVector4a));
-        std::vector<U32> parent(vertex_count);
-        for (U32 v = 0; v < vertex_count; ++v)
-        {
-            parent[v] = v;
-        }
-        auto root = [&](U32 v)
-        {
-            while (parent[v] != v)
-            {
-                v = parent[v] = parent[parent[v]];
-            }
-            return v;
-        };
-        for (size_t i = 0; i < index_count; i += 3)
-        {
-            // a stays the root of the corners joined so far.
-            U32 a = root(remap[indices[i]]);
-            for (S32 k = 1; k < 3; ++k)
-            {
-                const U32 b = root(remap[indices[i + k]]);
-                if (a != b)
-                {
-                    const U32 joined = llmin(a, b);
-                    parent[llmax(a, b)] = joined;
-                    a = joined;
-                }
-            }
-        }
-
+        Parts parts;
+        measureParts(positions, vertex_count, indices, index_count, parts);
         std::vector<U8> kept(vertex_count, 0);
         for (size_t i = 0; i < simplified_count; ++i)
         {
-            kept[root(remap[simplified[i]])] = 1;
-        }
-        std::vector<U8> used(vertex_count, 0);
-        for (size_t i = 0; i < index_count; ++i)
-        {
-            used[indices[i]] = 1;
-        }
-
-        // Each dropped part's mean, then its radius.
-        std::vector<LLVector4a> mean(vertex_count);
-        std::vector<F32> weight(vertex_count, 0.f);
-        for (U32 v = 0; v < vertex_count; ++v)
-        {
-            mean[v].clear();
-        }
-        for (U32 v = 0; v < vertex_count; ++v)
-        {
-            const U32 r = root(remap[v]);
-            if (used[v] && !kept[r])
-            {
-                mean[r].add(positions[v]);
-                weight[r] += 1.f;
-            }
+            kept[parts.part[simplified[i]]] = 1;
         }
         F32 largest = 0.f;
         for (U32 v = 0; v < vertex_count; ++v)
         {
-            const U32 r = root(remap[v]);
-            if (used[v] && !kept[r])
+            if (parts.used[v] && !kept[parts.part[v]])
             {
-                LLVector4a centre = mean[r];
-                centre.mul(1.f / weight[r]);
-                LLVector4a offset;
-                offset.setSub(positions[v], centre);
-                largest = llmax(largest, sqrtf(offset.dot3(offset).getF32()));
+                largest = llmax(largest, parts.distance[v]);
             }
         }
         return extent > 0.f ? largest / extent : 0.f;
@@ -415,9 +489,11 @@ namespace
     // PRUNE_LIMIT; where it would have dropped a larger one to reach its
     // target, or every part, it drops each part within PRUNE_LIMIT first
     // and simplifies what is left without dropping any more. An error
-    // within PRUNE_LIMIT drops no part larger than it.
+    // within PRUNE_LIMIT drops no part larger than it. Where parts_large
+    // holds, as partsLarge finds it, an error past PRUNE_LIMIT comes to the
+    // simplification that drops no part, which is made at once.
     size_t simplifyMesh(const Mesh& mesh, U32 first, U32 count, const U32* indices, size_t index_count, size_t target_count, F32 error,
-                        U32 options, const std::vector<U8>& locks, bool prune, U32* destination, F32& result_error)
+                        U32 options, const std::vector<U8>& locks, bool prune, bool parts_large, U32* destination, F32& result_error)
     {
         const LLVector4a* vertices = &mesh.positions[first];
         const F32* positions = vertices[0].getF32ptr();
@@ -430,7 +506,7 @@ namespace
                                                   ATTRIBUTE_COUNT * sizeof(F32), ATTRIBUTE_WEIGHTS, ATTRIBUTE_COUNT, lock,
                                                   llmin(target_count, from_count), error, with, &result_error);
         };
-        if (!prune)
+        if (!prune || (parts_large && error > PRUNE_LIMIT))
         {
             return simplify(indices, index_count, options);
         }
@@ -529,7 +605,7 @@ namespace
                 }
             }
             count = simplifyMesh(mesh, first, vertex_count, indices.data(), index_count, target_count, error, seamOptions(seams, goal), locks,
-                                 goal.distant && !meets, simplified.data(), result_error);
+                                 goal.distant && !meets, false, simplified.data(), result_error);
         }
         if (count < 3)
         {
@@ -736,7 +812,7 @@ F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams 
             protect(mesh, seams, 0, (U32)mesh.vertexCount(), locks);
         }
         count = simplifyMesh(mesh, 0, (U32)mesh.vertexCount(), mesh.indices.data(), index_count, target_count, goal.error,
-                             seamOptions(seams, goal), locks, goal.distant, simplified.data(), result_error);
+                             seamOptions(seams, goal), locks, goal.distant, mesh.parts_large, simplified.data(), result_error);
     }
     if (count < 3)
     {
@@ -779,6 +855,14 @@ F32 ALMeshSimplifier::simplifyModel(LLVolume& target, const Target& goal, Seams 
         }
     }
     return (F32)index_count / (F32)count;
+}
+
+bool ALMeshSimplifier::same(Seams a, Seams b) const
+{
+    // UV holds what NONE holds, the borders between faces, and the texture
+    // seams as well.
+    const bool uv_and_none = (a == Seams::UV && b == Seams::NONE) || (a == Seams::NONE && b == Seams::UV);
+    return a == b || (uv_and_none && mMesh->uv_seams_shared);
 }
 
 F32 ALMeshSimplifier::simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const

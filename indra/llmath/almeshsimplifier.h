@@ -104,6 +104,11 @@ public:
     // three indices to a vertex at the origin.
     F32 simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const;
 
+    // Whether a simplification in one mode is the simplification in the
+    // other: UV's is NONE's where every texture seam lies at positions
+    // another face has as well, which both modes hold.
+    bool same(Seams a, Seams b) const;
+
     // The face of base's face's layout that the given triangles make: the
     // vertices they name and no others, each with every attribute it has in
     // base, in the order the triangles first name them. The indices number

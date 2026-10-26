@@ -33,6 +33,7 @@
 #include "llmeshrepository.h"
 #include "llmodelloader.h" //NUM_LOD
 #include "llmodel.h"
+#include "almeshsimplifier.h"
 
 class LLJoint;
 class LLVOAvatar;
@@ -217,6 +218,8 @@ private:
     LLVOAvatar* getPreviewAvatar(void) { return mPreviewAvatar; }
     // Count amount of original models, excluding sub-models
     static U32 countRootModels(LLModelLoader::model_list models);
+    // The simplifier of mBaseModel[mdl_idx], kept in mSimplifiers.
+    const ALMeshSimplifier& simplifierFor(U32 mdl_idx);
     LLVector3   mGroundPlane[4];
     void        renderGroundPlane(float z_offset = 0.0f);
     /// Indicates whether we should warn of high-lod meshes that do not have a corresponding physics mesh.
@@ -292,6 +295,18 @@ protected:
 
     faces_copy_t mModelFacesCopy[LLModel::NUM_LODS];
     faces_copy_t mBaseModelFacesCopy;
+
+    // A simplifier of each of mBaseModel's models, made the first time a
+    // level of detail is generated from the model and kept for the levels
+    // after, while it is the same model with the faces it had. They are
+    // dropped where the base models are replaced or their faces rewritten.
+    struct BaseSimplifier
+    {
+        LLPointer<LLModel> mModel;
+        LLModel::material_list mMaterialList; // the model's when it was made
+        std::unique_ptr<const ALMeshSimplifier> mSimplifier;
+    };
+    std::vector<BaseSimplifier> mSimplifiers;
 
     U32 mGroup;
 

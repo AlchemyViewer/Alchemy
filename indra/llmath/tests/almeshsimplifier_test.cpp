@@ -394,6 +394,33 @@ namespace
         return true;
     }
 
+    // The two volumes' faces are the same to the bit, in every attribute.
+    bool identical(const LLVolume& a, const LLVolume& b)
+    {
+        // Two streams alike, or both absent.
+        auto alike = [](const void* x, const void* y, size_t bytes) { return x && y ? std::memcmp(x, y, bytes) == 0 : !x && !y; };
+        if (a.getNumVolumeFaces() != b.getNumVolumeFaces())
+        {
+            return false;
+        }
+        for (S32 f = 0; f < a.getNumVolumeFaces(); ++f)
+        {
+            const LLVolumeFace& x = a.getVolumeFace(f);
+            const LLVolumeFace& y = b.getVolumeFace(f);
+            const size_t vertices = (size_t)x.mNumVertices;
+            if (x.mNumVertices != y.mNumVertices || x.mNumIndices != y.mNumIndices ||
+                !alike(x.mIndices, y.mIndices, sizeof(U16) * x.mNumIndices) ||
+                !alike(x.mPositions, y.mPositions, sizeof(LLVector4a) * vertices) ||
+                !alike(x.mNormals, y.mNormals, sizeof(LLVector4a) * vertices) ||
+                !alike(x.mTexCoords, y.mTexCoords, sizeof(LLVector2) * vertices) ||
+                !alike(x.mWeights, y.mWeights, sizeof(LLVector4a) * vertices))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
     LLVector3 closestOnTriangle(const LLVector3& p, const LLVector3& a, const LLVector3& b, const LLVector3& c)
     {
         const LLVector3 ab = b - a, ac = c - a, ap = p - a;
@@ -986,6 +1013,40 @@ namespace
         CHECK(mixed(free->getVolumeFace(0)) > 0);
     }
 
+    // UV holds a model's texture seams where NONE does not. A model with no
+    // texture seam inside a face, as the cube whose sides share their
+    // coordinates, has none for UV to hold, and the two simplify it alike; a
+    // sphere has its meridian's.
+    TEST_CASE("almeshsimplifier: UV and NONE are one simplification where no texture seam lies inside a face", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        LLPointer<LLVolume> seamless = volumeOf({ cube(8, true) });
+        const ALMeshSimplifier simplifier(*seamless);
+        CHECK(simplifier.same(Seams::UV, Seams::NONE));
+        CHECK(simplifier.same(Seams::NONE, Seams::UV));
+        CHECK(simplifier.same(Seams::ALL, Seams::ALL));
+        CHECK_FALSE(simplifier.same(Seams::ALL, Seams::UV));
+        CHECK_FALSE(simplifier.same(Seams::NONE, Seams::SLOPPY));
+        for (bool distant : { false, true })
+        {
+            for (F32 decimator : DECIMATORS)
+            {
+                INFO(fmt::format("a {}th, {}", decimator, distant ? "distant" : "near"));
+                ALMeshSimplifier::Target goal = toCount(decimator);
+                goal.distant = distant;
+                LLPointer<LLVolume> uv = targetFor(*seamless);
+                LLPointer<LLVolume> none = targetFor(*seamless);
+                const F32 uv_ratio = simplifier.simplifyModel(*uv, goal, Seams::UV);
+                CHECK(uv_ratio > 0.f);
+                CHECK(uv_ratio == simplifier.simplifyModel(*none, goal, Seams::NONE));
+                CHECK(identical(*uv, *none));
+            }
+        }
+
+        LLPointer<LLVolume> seamed = volumeOf({ sphere(48, 24) });
+        CHECK_FALSE(ALMeshSimplifier(*seamed).same(Seams::UV, Seams::NONE));
+    }
+
     // ------------------------------------------------------------------
     // Small parts
 
@@ -1037,6 +1098,46 @@ namespace
         CHECK(triangleCount(*near_target) > target_triangles);
     }
 
+    // Two flat shaded spheres, each far larger than a part a distant level
+    // of detail may drop, held to their seams, which keep the simplification
+    // far short of its target: dropping both would reach it, and neither is.
+    TEST_CASE("almeshsimplifier: a distant level of detail short of its target keeps every part too large to drop", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        Geometry model;
+        for (F32 x : { -0.6f, 0.6f })
+        {
+            const Geometry part = flatShaded(sphere(16, 8));
+            const U16 first = (U16)model.positions.size();
+            for (size_t v = 0; v < part.positions.size(); ++v)
+            {
+                model.add(part.positions[v] + LLVector3(x, 0.f, 0.f), part.normals[v], part.uvs[v]);
+            }
+            for (U16 index : part.indices)
+            {
+                model.indices.push_back((U16)(first + index));
+            }
+        }
+        LLPointer<LLVolume> base = volumeOf({ model });
+
+        ALMeshSimplifier::Target goal = toCount(9.f);
+        goal.distant = true;
+        LLPointer<LLVolume> target = targetFor(*base);
+        const F32 ratio = ALMeshSimplifier(*base).simplifyModel(*target, goal, Seams::ALL);
+        INFO(fmt::format("a ratio of {}", ratio));
+        REQUIRE(ratio > 0.f);
+        CHECK(ratio * ALLOWED_DRIFT < 9.f);
+        const LLVolumeFace& face = target->getVolumeFace(0);
+        REQUIRE(wellFormed(face));
+        S32 left = 0, right = 0;
+        for (S32 i = 0; i < face.mNumIndices; ++i)
+        {
+            (face.mPositions[face.mIndices[i]][0] < 0.f ? left : right) += 1;
+        }
+        CHECK(left > 0);
+        CHECK(right > 0);
+    }
+
     // A distant level of detail made to an error, with no triangle target,
     // of a model that is nothing but detached parts within that error: the
     // parts are all it has, and it keeps them rather than drop every one,
@@ -1076,6 +1177,41 @@ namespace
             CHECK(ALMeshSimplifier(*base).simplifyModel(*target, goal, seams) > 0.f);
             REQUIRE(wellFormed(target->getVolumeFace(0)));
             CHECK(triangleCount(*target) >= 16);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // One simplifier, many simplifications
+
+    // A simplifier weighs its model once: each simplification it makes is
+    // the one a simplifier made for it alone makes, whatever it made before,
+    // as the uploader keeps one for a model's every level of detail.
+    TEST_CASE("almeshsimplifier: one simplifier makes each simplification as a new one would", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        LLPointer<LLVolume> base = halves();
+        const ALMeshSimplifier kept(*base);
+        for (bool distant : { false, true })
+        {
+            for (F32 decimator : DECIMATORS)
+            {
+                for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE, Seams::SLOPPY })
+                {
+                    INFO(fmt::format("a {}th, {}, {}", decimator, nameOf(seams), distant ? "distant" : "near"));
+                    ALMeshSimplifier::Target goal = toCount(decimator);
+                    goal.distant = distant;
+                    LLPointer<LLVolume> again = targetFor(*base);
+                    LLPointer<LLVolume> anew = targetFor(*base);
+                    CHECK(kept.simplifyModel(*again, goal, seams) == ALMeshSimplifier(*base).simplifyModel(*anew, goal, seams));
+                    CHECK(identical(*again, *anew));
+                    for (S32 f = 0; f < 2; ++f)
+                    {
+                        CHECK(kept.simplifyFace(f, again->getVolumeFace(f), goal, seams) ==
+                              ALMeshSimplifier(*base).simplifyFace(f, anew->getVolumeFace(f), goal, seams));
+                    }
+                    CHECK(identical(*again, *anew));
+                }
+            }
         }
     }
 
