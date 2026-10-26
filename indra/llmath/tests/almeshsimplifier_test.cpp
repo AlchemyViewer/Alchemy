@@ -1136,6 +1136,41 @@ namespace
     }
 
     // ------------------------------------------------------------------
+    // One simplifier, many simplifications
+
+    // A simplifier weighs its model once: each simplification it makes is
+    // the one a simplifier made for it alone makes, whatever it made before,
+    // as the uploader keeps one for a model's every level of detail.
+    TEST_CASE("almeshsimplifier: one simplifier makes each simplification as a new one would", "[almeshsimplifier]")
+    {
+        ArenaInstalled installed;
+        LLPointer<LLVolume> base = halves();
+        const ALMeshSimplifier kept(*base);
+        for (bool distant : { false, true })
+        {
+            for (F32 decimator : DECIMATORS)
+            {
+                for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE, Seams::SLOPPY })
+                {
+                    INFO(fmt::format("a {}th, {}, {}", decimator, nameOf(seams), distant ? "distant" : "near"));
+                    ALMeshSimplifier::Target goal = toCount(decimator);
+                    goal.distant = distant;
+                    LLPointer<LLVolume> again = targetFor(*base);
+                    LLPointer<LLVolume> anew = targetFor(*base);
+                    CHECK(kept.simplifyModel(*again, goal, seams) == ALMeshSimplifier(*base).simplifyModel(*anew, goal, seams));
+                    CHECK(identical(*again, *anew));
+                    for (S32 f = 0; f < 2; ++f)
+                    {
+                        CHECK(kept.simplifyFace(f, again->getVolumeFace(f), goal, seams) ==
+                              ALMeshSimplifier(*base).simplifyFace(f, anew->getVolumeFace(f), goal, seams));
+                    }
+                    CHECK(identical(*again, *anew));
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Compaction
 
     TEST_CASE("almeshsimplifier: compaction keeps each vertex the triangles name, and no other", "[almeshsimplifier]")
