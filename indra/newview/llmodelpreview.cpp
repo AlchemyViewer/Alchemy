@@ -1310,18 +1310,25 @@ void LLModelPreview::generateNormals()
 
     angle_cutoff *= DEG_TO_RAD;
 
-    if (which_lod == 3 && !mBaseModel.empty())
+    // Every model's faces are copied before any is rewritten: the base's
+    // models are the high LOD's own.
+    const auto keep = [](faces_copy_t& copy, const LLModelLoader::model_list& models)
     {
-        if (mBaseModelFacesCopy.empty())
+        for (const LLPointer<LLModel>& model : models)
         {
-            mBaseModelFacesCopy.reserve(mBaseModel.size());
-            for (LLModelLoader::model_list::iterator it = mBaseModel.begin(), itE = mBaseModel.end(); it != itE; ++it)
+            if (std::none_of(copy.begin(), copy.end(), [&](const faces_copy_t::value_type& kept) { return kept.first == model; }))
             {
                 v_LLVolumeFace_t faces;
-                (*it)->copyFacesTo(faces);
-                mBaseModelFacesCopy.push_back(faces);
+                model->copyFacesTo(faces);
+                copy.emplace_back(model, std::move(faces));
             }
         }
+    };
+    keep(mModelFacesCopy[which_lod], mModel[which_lod]);
+
+    if (which_lod == 3 && !mBaseModel.empty())
+    {
+        keep(mBaseModelFacesCopy, mBaseModel);
 
         for (LLModelLoader::model_list::iterator it = mBaseModel.begin(), itE = mBaseModel.end(); it != itE; ++it)
         {
@@ -1331,20 +1338,8 @@ void LLModelPreview::generateNormals()
         mVertexBuffer[LLModel::NUM_LODS].clear();
     }
 
-    bool perform_copy = mModelFacesCopy[which_lod].empty();
-    if (perform_copy) {
-        mModelFacesCopy[which_lod].reserve(mModel[which_lod].size());
-    }
-
     for (LLModelLoader::model_list::iterator it = mModel[which_lod].begin(), itE = mModel[which_lod].end(); it != itE; ++it)
     {
-        if (perform_copy)
-        {
-            v_LLVolumeFace_t faces;
-            (*it)->copyFacesTo(faces);
-            mModelFacesCopy[which_lod].push_back(faces);
-        }
-
         (*it)->generateNormals(angle_cutoff);
     }
 
@@ -1363,29 +1358,17 @@ void LLModelPreview::restoreNormals()
         return;
     }
 
-    if (!mBaseModelFacesCopy.empty())
+    // Each model takes back its own faces, whatever the LOD's models are now.
+    const auto restore = [](faces_copy_t& copy)
     {
-        llassert(mBaseModelFacesCopy.size() == mBaseModel.size());
-
-        vv_LLVolumeFace_t::const_iterator itF = mBaseModelFacesCopy.begin();
-        for (LLModelLoader::model_list::iterator it = mBaseModel.begin(), itE = mBaseModel.end(); it != itE; ++it, ++itF)
+        for (const faces_copy_t::value_type& kept : copy)
         {
-            (*it)->copyFacesFrom((*itF));
+            kept.first->copyFacesFrom(kept.second);
         }
-
-        mBaseModelFacesCopy.clear();
-    }
-
-    if (!mModelFacesCopy[which_lod].empty())
-    {
-        vv_LLVolumeFace_t::const_iterator itF = mModelFacesCopy[which_lod].begin();
-        for (LLModelLoader::model_list::iterator it = mModel[which_lod].begin(), itE = mModel[which_lod].end(); it != itE; ++it, ++itF)
-        {
-            (*it)->copyFacesFrom((*itF));
-        }
-
-        mModelFacesCopy[which_lod].clear();
-    }
+        copy.clear();
+    };
+    restore(mBaseModelFacesCopy);
+    restore(mModelFacesCopy[which_lod]);
 
     mVertexBuffer[which_lod].clear();
     refresh();

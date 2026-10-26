@@ -284,10 +284,14 @@ protected:
     LLModelLoader::model_list mBaseModel;
 
     typedef std::vector<LLVolumeFace>       v_LLVolumeFace_t;
-    typedef std::vector<v_LLVolumeFace_t>   vv_LLVolumeFace_t;
+    // Each model's faces as they were before generateNormals first rewrote
+    // them, for restoreNormals to put back into that model: a model the
+    // base and a LOD share is copied once, before either is rewritten, and
+    // a model loaded or made since takes nothing of another's.
+    typedef std::vector<std::pair<LLPointer<LLModel>, v_LLVolumeFace_t>> faces_copy_t;
 
-    vv_LLVolumeFace_t mModelFacesCopy[LLModel::NUM_LODS];
-    vv_LLVolumeFace_t mBaseModelFacesCopy;
+    faces_copy_t mModelFacesCopy[LLModel::NUM_LODS];
+    faces_copy_t mBaseModelFacesCopy;
 
     U32 mGroup;
 
