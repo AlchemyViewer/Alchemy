@@ -146,6 +146,7 @@ if(AL_BUILD_TESTS)
     BENCH_SOURCES
       tests/alcompute_gl_bench.cpp
       tests/alondemandtarget_bench.cpp
+      tests/alstarfield_gl_bench.cpp
       tests/alwatertargets_bench.cpp
       tests/reflectionprobe_gl_bench.cpp
     LIBRARIES alrender
