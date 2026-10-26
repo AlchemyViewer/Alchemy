@@ -1419,7 +1419,7 @@ namespace
 
     // From above, an exclusion prim over the water removes the water behind it; one under the water removes nothing,
     // since the water hides it.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from above, an exclusion prim over the water removes the water behind it", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from above an exclusion prim over the water removes the water behind it", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1443,7 +1443,7 @@ namespace
     }
 
     // From below, the reverse: the prim under the water, on the camera's side, removes it; the one above it does not.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, a prim under the water removes it and one above does not", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below a prim under the water removes it and one above does not", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1511,7 +1511,7 @@ namespace
 
     // From below, the surface is drawn twice, once where the exclude bit is clear and once where it is set, and each
     // pixel takes exactly one of them.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, each pixel takes exactly one of the surface's two draws", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below each pixel takes exactly one of the surface's two draws", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1599,7 +1599,7 @@ namespace
 
     // The haze pass's two draws, one where the surface bit is clear and one where it is set, shade every pixel once,
     // the second exactly where the water is.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the haze's two draws shade every pixel once, the converging one exactly on the water", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the haze's two draws shade every pixel once and the converging one exactly the water", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1686,7 +1686,7 @@ namespace
     }
 
     // Each cell lies at its own region's water height, and the rings at the agent region's.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: each cell lies at its own region's water height, and the rings at the agent region's", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: each cell lies at its own region's water height and the rings at the agent region's", "[alwatersurface_gl]")
     {
         setUpField();
         {
@@ -2241,7 +2241,7 @@ namespace
     // Whatever order the waves' patches are drawn in, each is drawn once and in the same place, and the order a view
     // asks for runs from its near end: every order the flags give tessellates the same triangles, and the slow axis run
     // from its high end draws the patches there first.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every patch order draws the same triangles, starting from the view's near end", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every patch order draws the same triangles starting from the view's near end", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
         mScene.flush();
@@ -2411,7 +2411,7 @@ namespace
     // With waves the field leaves the patches' cells to them and fans the cells beside them onto their corners: drawn
     // alone, it covers every pixel inside the rim once but those over the patches' cells, which it leaves; with the
     // patches drawn too, flat, every pixel inside the rim is covered once.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with waves, the field and the patches cover every pixel inside the rim once", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with waves the field and the patches cover every pixel inside the rim once", "[alwatersurface_gl]")
     {
         setUpField(REACH);
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);
