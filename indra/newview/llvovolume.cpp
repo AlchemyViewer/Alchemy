@@ -1504,13 +1504,14 @@ void LLVOVolume::sculpt()
         // Until then the volume builds from the image there is, and the read, with more pixels at the same level,
         // builds it again below. A texture with nothing on screen to read builds from the copy there is, which the
         // decode setForSculpt asks for brings up to size.
-        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept.
+        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept. A map of fewer than
+        // three components is no map a sculpt builds from, and reads nothing back.
         S32 copy_width   = 0;
         S32 copy_height  = 0;
         S32 copy_discard = -1;
         mSculptTexture->getSculptCopySize(copy_width, copy_height, copy_discard);
         const S32 copy_pixels = copy_width * copy_height;
-        if ((!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
+        if (mSculptTexture->getComponents() >= 3 && (!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
             getVolume()->getSculptPixels() < copy_pixels)
         {
             mSculptTexture->requestSculptReadback();
