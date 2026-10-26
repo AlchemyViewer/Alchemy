@@ -397,6 +397,38 @@ namespace
         std::uniform_int_distribution<int> byte(0, 255);
         std::uniform_real_distribution<F32> near_cube(-0.7f, 0.7f);
         const U32 UNWRITTEN = 0xDEADBEEFu;
+        // Every byte on each axis, x mirrored and not: a code each, so two
+        // such points have one code only where they are one point.
+        {
+            std::vector<LLVector4a> points(512);
+            std::vector<U32> expected(512);
+            for (int v = 0; v < 256; ++v)
+            {
+                for (int mirrored = 0; mirrored < 2; ++mirrored)
+                {
+                    const int r = v, g = 255 - v, b = (v * 7) & 255;
+                    LLVector4a p((F32)r, (F32)g, (F32)b);
+                    p.mul(1.f / 255.f);
+                    p.sub(LLVector4a(0.5f, 0.5f, 0.5f));
+                    if (mirrored)
+                    {
+                        p.mul(LLVector4a(-1.f, 1.f, 1.f, 1.f));
+                    }
+                    points[2 * v + mirrored] = p;
+                    expected[2 * v + mirrored] = (U32)(mirrored ? 255 - r : r) | ((U32)g << 8) | ((U32)b << 16);
+                }
+            }
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<U32> codes(points.size());
+                unit_cube_codes_impl<W>(points.data(), points.size(), codes.data());
+                for (size_t i = 0; i < points.size(); ++i)
+                {
+                    CAPTURE(width, i);
+                    REQUIRE(codes[i] == expected[i]);
+                }
+            });
+        }
         for (size_t n : COUNTS)
         {
             std::vector<LLVector4a> points(n + 1);
@@ -450,19 +482,20 @@ namespace
     // A grid's triangles with two corners of one code, against every
     // pair of every quad's corners: codes from a few values so that many
     // corners match, rows of quads across one, two and three words, the
-    // flags past the row's last quad and in the words past it clear, and
-    // the rows counted. The codes past the grid are what the kernel may
-    // read and must not flag from.
+    // flags past the row's last quad and in the words past it clear, the
+    // triangles counted and the rows with any marked. The codes past the
+    // grid are what the kernel may read and must not flag from.
     TEST_CASE("alsimdkernels: grid_coincident_triangles flags every triangle with two corners of one code and no other", "[alsimdkernels]")
     {
         std::mt19937 rng(15);
         const size_t columns_tried[] = {2, 3, 4, 5, 8, 9, 16, 17, 33, 64, 65, 66, 70, 129, 130};
-        const size_t rows_tried[] = {2, 3, 8};
+        const size_t rows_tried[] = {2, 3, 8, 66, 130};
         for (size_t columns : columns_tried)
         {
             for (size_t rows : rows_tried)
             {
-                for (int few : {3, 50})
+                // Sparse flags, so that some rows have none, and dense ones.
+                for (int few : {3, 50, 5000})
                 {
                     std::uniform_int_distribution<int> value(0, few);
                     std::vector<U32> codes(columns * rows + 8);
@@ -472,11 +505,11 @@ namespace
                     }
                     const size_t quads = columns - 1;
                     const size_t words = (columns + 62) / 64 + 1;
-                    std::vector<U64> want_upper(words * rows, 0), want_lower(words * rows, 0);
-                    size_t want_rows = 0;
+                    const size_t row_words = (rows + 62) / 64;
+                    std::vector<U64> want_upper(words * rows, 0), want_lower(words * rows, 0), want_rows(row_words, 0);
+                    size_t want_flags = 0;
                     for (size_t t = 0; t + 1 < rows; ++t)
                     {
-                        bool any = false;
                         for (size_t s = 0; s < quads; ++s)
                         {
                             const U32 bl = codes[s + columns * t], br = codes[s + 1 + columns * t];
@@ -485,16 +518,25 @@ namespace
                             const bool lower = bl == br || br == tr || bl == tr;
                             want_upper[words * t + s / 64] |= U64(upper) << (s % 64);
                             want_lower[words * t + s / 64] |= U64(lower) << (s % 64);
-                            any = any || upper || lower;
+                            want_rows[t / 64] |= U64(upper || lower) << (t % 64);
+                            want_flags += (upper ? 1 : 0) + (lower ? 1 : 0);
                         }
-                        want_rows += any ? 1 : 0;
                     }
                     for_each_width([&]<class W>(const char* width)
                     {
                         std::vector<U64> upper(words * rows, ~U64(0)), lower(words * rows, ~U64(0));
-                        const size_t got_rows = grid_coincident_triangles_impl<W>(codes.data(), columns, rows, upper.data(), lower.data(), words);
+                        // A word past the rows' is left as it is.
+                        std::vector<U64> flagged_rows(row_words + 1, ~U64(0));
+                        const size_t got_flags =
+                            grid_coincident_triangles_impl<W>(codes.data(), columns, rows, upper.data(), lower.data(), words, flagged_rows.data());
                         CAPTURE(width, columns, rows, few);
-                        CHECK(got_rows == want_rows);
+                        CHECK(got_flags == want_flags);
+                        for (size_t w = 0; w < row_words; ++w)
+                        {
+                            CAPTURE(w);
+                            CHECK(flagged_rows[w] == want_rows[w]);
+                        }
+                        CHECK(flagged_rows[row_words] == ~U64(0));
                         for (size_t t = 0; t + 1 < rows; ++t)
                         {
                             for (size_t w = 0; w < words; ++w)
