@@ -1504,13 +1504,14 @@ void LLVOVolume::sculpt()
         // Until then the volume builds from the image there is, and the read, with more pixels at the same level,
         // builds it again below. A texture with nothing on screen to read builds from the copy there is, which the
         // decode setForSculpt asks for brings up to size.
-        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept.
+        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept. A map of fewer than
+        // three components is no map a sculpt builds from, and reads nothing back.
         S32 copy_width   = 0;
         S32 copy_height  = 0;
         S32 copy_discard = -1;
         mSculptTexture->getSculptCopySize(copy_width, copy_height, copy_discard);
         const S32 copy_pixels = copy_width * copy_height;
-        if ((!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
+        if (mSculptTexture->getComponents() >= 3 && (!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
             getVolume()->getSculptPixels() < copy_pixels)
         {
             mSculptTexture->requestSculptReadback();
@@ -5105,7 +5106,20 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                 }
 
                 bool no_texture = !face->getTexture() || !face->getTexture()->hasGLTexture();
-                bool mask       = no_texture ? false : face->getTexture()->getMask(face->surfaceToTexture(tc, p, n));
+                bool mask       = false;
+                if (!no_texture)
+                {
+                    // surfaceToTexture takes the hit in agent space, which a
+                    // planar face projects from.
+                    LLVector4a agent_p = p;
+                    LLVector4a agent_n = n;
+                    if (transform)
+                    {
+                        agent_p.load3(volumePositionToAgent(LLVector3(p.getF32ptr())).mV);
+                        agent_n.load3(volumeDirectionToAgent(LLVector3(n.getF32ptr())).mV);
+                    }
+                    mask = face->getTexture()->getMask(face->surfaceToTexture(tc, agent_p, agent_n));
+                }
                 if (face &&
                     (ignore_alpha || pick_transparent || no_texture || mask))
                 {

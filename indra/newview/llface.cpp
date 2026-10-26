@@ -1118,6 +1118,21 @@ bool LLFace::getGeometryVolume(const LLVolume& volume,
 
     if (mVertexBuffer.notNull())
     {
+        // A face fills the slots its batch laid out for it, as large as its
+        // volume face was then. A shared sculpt built again from a better map
+        // keeps its grid but may leave out other triangles, and its faces
+        // filled into slots of another size would write into the next face's
+        // or leave their own tails drawn: the batch is laid out again.
+        if (num_indices != mIndicesCount || num_vertices > mGeomCount)
+        {
+            if (gDebugGL)
+            {
+                LL_WARNS() << "Face slots no longer fit: " << num_vertices << " vertices and " << num_indices << " indices into "
+                           << mGeomCount << " and " << mIndicesCount << LL_ENDL;
+            }
+            return false;
+        }
+
         if (num_indices + mIndicesIndex > mVertexBuffer->getNumIndices())
         {
             if (gDebugGL)
