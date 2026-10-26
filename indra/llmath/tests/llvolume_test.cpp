@@ -3331,6 +3331,59 @@ namespace
     }
 
     // The placeholders' normals have a case of their own, below.
+    // A sculpt block of no stitching with a map builds from the map, on
+    // whatever parameters its prim has. None of its rows or columns is the
+    // pole or apex those parameters would make of a prim's, and it keeps
+    // every triangle of its grid, as it always has.
+    TEST_CASE("llvolume: a sculpt of no stitching keeps every triangle of its map", "[llvolume]")
+    {
+        struct Shape
+        {
+            const char* name;
+            U8 profile;
+            U8 path;
+            F32 ratio;
+        };
+        const Shape shapes[] = {
+            { "sphere", LL_PCODE_PROFILE_CIRCLE_HALF, LL_PCODE_PATH_CIRCLE, 1.f },
+            { "line tapered to its end", LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE, 0.f },
+            { "line tapered from its beginning", LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE, 2.f },
+        };
+        const SculptMap map = sphereMap(64, 64);
+        Report report;
+        for (const Shape& shape : shapes)
+        {
+            for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+            {
+                LLVolumeParams p;
+                p.setType(shape.profile, shape.path);
+                p.setRatio(shape.ratio, shape.ratio);
+                p.setSculptID(LLUUID("c8b26d0b-6f5a-4f10-8d1e-5c3b3e4a9a01"), LL_SCULPT_TYPE_NONE);
+                LLPointer<LLVolume> volume = new LLVolume(p, LOD_DETAIL[lod]);
+                volume->sculpt(map.width, map.height, 3, map.rgb.data(), 0, true);
+                S32 sides = 0;
+                for (S32 f = 0; f < volume->getNumVolumeFaces(); ++f)
+                {
+                    const LLVolumeFace& face = volume->getVolumeFace(f);
+                    if ((face.mTypeMask & LLVolumeFace::CAP_MASK) || (face.mTypeMask & LLVolumeFace::FLAT_MASK))
+                    {
+                        continue;
+                    }
+                    ++sides;
+                    const S32 grid = 6 * (face.mNumS - 1) * (face.mNumT - 1);
+                    if (face.mNumIndices != grid)
+                    {
+                        report.fail(fmt::format("{} at LOD {}: {} has {} indices of its grid's {}", shape.name, lod, faceName(face),
+                                                face.mNumIndices, grid));
+                    }
+                }
+                CHECK(sides > 0);
+            }
+        }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     TEST_CASE("llvolume: an empty sculpt map makes a placeholder", "[llvolume]")
     {
         Inspect how;

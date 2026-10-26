@@ -8503,9 +8503,10 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // quad's two triangles, bottom left, top right, top left has two corners
     // on its left column and on its top row, and bottom left, bottom right,
     // top right on its right column and its bottom row. A face that would be
-    // left with none keeps them all.
+    // left with none keeps them all. A sculpt of no stitching is built from
+    // its map, whatever its parameters would make.
     Collapse collapse;
-    if (!volume->isUnique() && sculpt_stitching == LL_SCULPT_TYPE_NONE)
+    if (!volume->isUnique() && sculpt_stitching == LL_SCULPT_TYPE_NONE && volume->getParams().getSculptID().isNull())
     {
         collapse = collapse_of(volume, mTypeMask & INNER_MASK);
         if (mTypeMask & END_MASK)
