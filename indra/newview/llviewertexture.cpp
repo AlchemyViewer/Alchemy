@@ -46,6 +46,7 @@
 #include "llnotificationsutil.h"
 
 // viewer includes
+#include "alvramusage.h"
 #include "llimagegl.h"
 #include "lldrawpool.h"
 #include "lltexturefetch.h"
@@ -484,12 +485,9 @@ void LLViewerTexture::updateClass()
     static LLCachedControl<U32> tex_vram_divisor(gSavedSettings, "RenderTextureVRAMDivisor", 2);
     static LLCachedControl<U32> max_vram_budget(gSavedSettings, "RenderMaxVRAMBudget", 0);
 
-    F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0;
-    F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / 1024.0 / 512.0;
-
-    // get an estimate of how much video memory we're using
-    // NOTE: our metrics miss about half the vram we use, so this biases high but turns out to typically be within 5% of the real number
-    F32 used = (F32)ll_round(texture_bytes_alloc + vertex_bytes_alloc);
+    // What the budget counts as used: everything the viewer holds in video memory, each allocation once, at its size.
+    const ALVRAMUsage usage = ALVRAMUsage::current();
+    F32 used = (F32)ll_round((F64)usage.total() / (1024.0 * 1024.0));
 
     // For debugging purposes, it's useful to be able to set the VRAM budget manually.
     // But when manual control is not enabled, use the VRAM divisor.

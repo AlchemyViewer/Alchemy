@@ -121,13 +121,6 @@ public:
     // The bytes of every texture's storage, as alloc_tex_image recorded it: the levels each
     // was allocated with, at dataFormatVRAMBytes' size. The second form counts one class.
     // ALVRAMUsage puts them beside what buffers hold.
-    //
-    // NOTE: viewer consumers (llviewertexture.cpp, lltextureview.cpp)
-    // historically scaled this by 2x via a /512 divisor instead of /1024
-    // when converting to MB. That fudge predates per-mip accounting and
-    // also compensates for driver-side overhead (descriptor structs, page
-    // alignment). Leave it alone until the budget code is reconciled
-    // holistically.
     static U64 getTextureBytesAllocated();
     static U64 getTextureBytesAllocated(LLImageGLMemory::EClass cls);
 
