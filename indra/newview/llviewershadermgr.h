@@ -204,8 +204,6 @@ extern LLGLSLShader         gSelectionGlowReachProgram;
 extern LLGLSLShader         gSelectionGlowRowProgram;
 extern LLGLSLShader         gSelectionBackdropMaskProgram;
 
-extern LLGLSLShader         gDeferredHighlightProgram;
-
 extern LLGLSLShader         gPathfindingProgram;
 extern LLGLSLShader         gPathfindingNoNormalsProgram;
 

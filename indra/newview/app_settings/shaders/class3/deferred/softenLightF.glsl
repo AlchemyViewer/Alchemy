@@ -87,8 +87,6 @@ uniform vec4 waterPlane;
 
 uniform int cube_snapshot;
 
-uniform float sky_hdr_scale;
-
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
 float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
@@ -148,20 +146,6 @@ float ssaoVisibility(float ambocc)
 #else
     return 1.0;
 #endif
-}
-
-// The colour a fragment in front of the far plane flagged to skip the atmospherics wrote (the debug highlight,
-// highlightF.glsl), which nothing lights, scaled for fake HDR.
-vec3 skyColor(GBufferInfo gb)
-{
-#if defined(HAS_EMISSIVE)
-    vec3 color = srgb_to_linear(gb.emissive.rgb);
-#else
-    // the sRGB albedo target holds the colour display encoded, and this pass reads it with hardware
-    // decode, so it is linear already
-    vec3 color = gb.albedo.rgb;
-#endif
-    return color * sky_hdr_scale;
 }
 
 void writeColor(vec3 color)
@@ -267,8 +251,10 @@ void main()
     }
     else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
-        // unlit in front of the far plane, where the sky's own draw does not reach: a debug highlight writes SKIP_ATMOS
-        color = skyColor(gb);
+        // Unlit, as it is: class 1's material program (deferred/materialF.glsl) writes its magenta into the albedo,
+        // with no normal to light, flagged to skip the atmospherics. The sRGB albedo target is read with hardware
+        // decode, so the colour is linear already.
+        color = gb.albedo.rgb;
     }
     else
     {

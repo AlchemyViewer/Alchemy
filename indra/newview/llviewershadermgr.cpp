@@ -134,8 +134,6 @@ LLGLSLShader        gSelectionGlowReachProgram;
 LLGLSLShader        gSelectionGlowRowProgram;
 LLGLSLShader        gSelectionBackdropMaskProgram;
 
-LLGLSLShader        gDeferredHighlightProgram;
-
 LLGLSLShader        gPathfindingProgram;
 LLGLSLShader        gPathfindingNoNormalsProgram;
 
@@ -1387,8 +1385,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
 
-        gDeferredHighlightProgram.unload();
-
         gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
         gDepthPyramidProgram.unload();
@@ -1421,16 +1417,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
 // [/RLVa:KB]
 
         return;
-    }
-
-    {
-        gDeferredHighlightProgram.mName = "Deferred Highlight Shader";
-        gDeferredHighlightProgram.mShaderFiles.clear();
-        gDeferredHighlightProgram.mShaderFiles.push_back(make_pair("interface/highlightV.glsl", GL_VERTEX_SHADER));
-        gDeferredHighlightProgram.mShaderFiles.push_back(make_pair("deferred/highlightF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredHighlightProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        add_common_permutations(&gDeferredHighlightProgram);
-        built(gDeferredHighlightProgram.createShader(), gDeferredHighlightProgram);
     }
 
     {
