@@ -619,7 +619,13 @@ void unit_cube_codes_impl(const LLVector4a* src, size_t n, U32* dst)
         // The packs keep each 128-bit half apart: the codes come out as
         // points 0, 2, 4, 6, 1, 3, 5, 7.
         const __m256i order = _mm256_setr_epi32(0, 4, 1, 5, 2, 6, 3, 7);
-        const auto code = [&](const F32* p) { return _mm256_cvtps_epi32(_mm256_mul_ps(_mm256_add_ps(_mm256_loadu_ps(p), half), steps)); };
+        // Clamped before the conversion, which gives a value past what an
+        // int32 holds the least one, and the packs then the low end.
+        const auto code = [&](const F32* p)
+        {
+            const __m256 scaled = _mm256_mul_ps(_mm256_add_ps(_mm256_loadu_ps(p), half), steps);
+            return _mm256_cvtps_epi32(_mm256_min_ps(_mm256_max_ps(scaled, _mm256_setzero_ps()), steps));
+        };
         for (; i + 8 <= n; i += 8)
         {
             const F32* p = src[i].getF32ptr();
@@ -631,7 +637,11 @@ void unit_cube_codes_impl(const LLVector4a* src, size_t n, U32* dst)
     const f32x4 half = alsimd::set1(0.5f);
     const f32x4 steps = alsimd::set1(255.f);
     const i32x4 xyz = alsimd::set1_i32(0x00FFFFFF);
-    const auto code = [&](size_t k) { return alsimd::cvt_round(alsimd::mul(alsimd::add(alsimd::load(src[k].getF32ptr()), half), steps)); };
+    const auto code = [&](size_t k)
+    {
+        const f32x4 scaled = alsimd::mul(alsimd::add(alsimd::load(src[k].getF32ptr()), half), steps);
+        return alsimd::cvt_round(alsimd::min(alsimd::max(scaled, alsimd::zero()), steps));
+    };
     for (; i + 4 <= n; i += 4)
     {
         alsimd::storeu_i32(reinterpret_cast<int32_t*>(dst + i), alsimd::and_i32(alsimd::pack_u8(code(i), code(i + 1), code(i + 2), code(i + 3)), xyz));
