@@ -183,7 +183,6 @@ public:
     void forceDefaultProbeAndUpdateUniforms(bool force = true);
 
     U32 probeCount();
-    U32 probeMemory();
 
 private:
     friend class LLPipeline;

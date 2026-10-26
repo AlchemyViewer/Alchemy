@@ -60,7 +60,7 @@ Draw distance: [DRAW_DISTANCE]m
 Bandwidth: [NET_BANDWITH]kbit/s
 LOD factor: [LOD_FACTOR]
 Render quality: [RENDER_QUALITY]
-Texture memory: [TEXTURE_MEMORY]MB
+Video memory: [VIDEO_MEMORY]MB
 Disk cache: [DISK_CACHE_INFO]
 	</string>
   <string name="AboutOSXHiDPI">

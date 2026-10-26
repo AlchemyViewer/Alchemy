@@ -28,7 +28,7 @@
 
 #include "llinventorymodel.h"
 #include "llinventorymodelbackgroundfetch.h"
-#include "llimagegl.h"
+#include "alvramusage.h"
 #include "llviewerstats.h"
 
 namespace
@@ -181,9 +181,16 @@ void LLStatsListener::getPerfData(LLSD const & evt)
 
     stats["other"] = other;
 
-    // texture memory usage
+    // video memory usage, by what it is for (ALVRAMUsage)
+    constexpr F64 MB = 1024.0 * 1024.0;
+    const ALVRAMUsage vram = ALVRAMUsage::current();
     LLSD memory;
-    memory["texture_bytes_alloc_mb"] = (F64)LLImageGL::getTextureBytesAllocated() / 1024.0 / 512.0;
+    memory["texture_bytes_alloc_mb"] = (F64)vram.textures() / MB;
+    memory["render_target_bytes_alloc_mb"] = (F64)vram.mRenderTargets / MB;
+    memory["reflection_probe_bytes_alloc_mb"] = (F64)vram.mReflectionProbes / MB;
+    memory["geometry_bytes_alloc_mb"] = (F64)vram.mGeometry / MB;
+    memory["gpu_buffer_bytes_alloc_mb"] = (F64)vram.mGPUBuffers / MB;
+    memory["vram_used_mb"] = (F64)vram.total() / MB;
     stats["memory"] = memory;
 
     LLSD inventory;

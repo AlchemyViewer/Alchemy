@@ -43,8 +43,6 @@
 					<stat_bar label="ＲＡＷカウント" name="numrawimagesstat"/>
 					<stat_bar label="ＧＬメモリ" name="gltexmemstat"/>
 					<stat_bar label="フォーマット済メモリ" name="formattedmemstat"/>
-					<stat_bar label="ＲＡＷメモリ" name="rawmemstat"/>
-					<stat_bar label="統合メモリ" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="ネットワーク" name="network">
 					<stat_bar label="パケットイン" name="packetsinstat"/>

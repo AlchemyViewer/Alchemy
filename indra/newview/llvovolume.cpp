@@ -316,6 +316,8 @@ void LLVOVolume::markDead()
             mLightTexture->removeVolume(LLRender::LIGHT_TEX, this);
         }
 
+        mHUDBoosts.clear();
+
         if (mIsHeroProbe)
         {
             gPipeline.mHeroProbeManager.unregisterViewerObject(this);
@@ -865,6 +867,10 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
     F32 min_vsize=999999999.f, max_vsize=0.f;
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     std::stringstream debug_text;
+    // The textures this holds at BOOST_HUD from here on: those its faces have now, while it is a HUD, one hold a
+    // texture. Each is held in the place the last pass held its face's, so a texture held by both keeps its boost
+    // unchanged.
+    size_t hud_held = 0;
     for (S32 i = 0; i < num_faces; i++)
     {
         LLFace* face = mDrawable->getFace(i);
@@ -902,7 +908,20 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
         {
             F32 area = (F32) camera->getScreenPixelArea();
             vsize = area;
-            imagep->setBoostLevel(LLGLTexture::BOOST_HUD);
+            const auto held_end = mHUDBoosts.begin() + hud_held;
+            if (std::find_if(mHUDBoosts.begin(), held_end, [imagep](const ALTextureBoost& boost)
+                             { return boost.get() == imagep; }) == held_end)
+            {
+                if (hud_held < mHUDBoosts.size())
+                {
+                    mHUDBoosts[hud_held].hold(imagep, LLGLTexture::BOOST_HUD);
+                }
+                else
+                {
+                    mHUDBoosts.emplace_back(imagep, LLGLTexture::BOOST_HUD);
+                }
+                ++hud_held;
+            }
             face->setPixelArea(area); // treat as full screen
             face->setVirtualSize(vsize);
         }
@@ -964,6 +983,8 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
             if (pri > max_vsize) max_vsize = pri;
         }
     }
+    // What the last pass held past this pass's textures goes.
+    mHUDBoosts.erase(mHUDBoosts.begin() + hud_held, mHUDBoosts.end());
 
     if (isSculpted())
     {

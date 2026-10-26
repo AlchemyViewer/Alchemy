@@ -27,6 +27,7 @@
 #ifndef LL_LLVIEWERTEXTURE_H
 #define LL_LLVIEWERTEXTURE_H
 
+#include "altextureboost.h"
 #include "llatomic.h"
 #include "llgltexture.h"
 #include "lltimer.h"
@@ -131,8 +132,20 @@ public:
     /*virtual*/ bool isActiveFetching();
 
     /*virtual*/ const LLUUID& getID() const { return mID; }
-    virtual void setBoostLevel(S32 level);
+
+    // The texture's own boost level: what it is for (a UI image, a bump or sculpt map, a baked texture), as whoever
+    // made it for that says. Its boost (getBoostLevel) is the highest of this, the levels holders keep on it and one
+    // asked for frame by frame (ALTextureBoostLevels).
+    void setBoostLevel(S32 level);
     S32  getBoostLevel() { return mBoostLevel; }
+
+    // A level kept on the texture while a holder holds it, counted by holder (ALTextureBoost is the holder).
+    void addBoostHold(S32 level);
+    void removeBoostHold(S32 level);
+
+    // A level asked for every frame, as selection asks for its objects' textures and a swatch for the texture it
+    // draws: it lasts until the texture's stats are updated a frame after its last asking.
+    void boostThisFrame(S32 level);
     void setTextureListType(S32 tex_type) { mTextureListType = tex_type; }
     S32 getTextureListType() { return mTextureListType; }
 
@@ -161,6 +174,9 @@ public:
     S32 getNumVolumes(U32 channel) const;
     const ll_volume_list_t* getVolumeList(U32 channel) const { return &mVolumeList[channel]; }
 
+    // Whether a face or a volume in the world uses the texture.
+    bool hasWorldUse() const;
+
     bool isLargeImage() ;
 
     void setParcelMedia(LLViewerMediaTexture* media) {mParcelMedia = media;}
@@ -172,6 +188,17 @@ protected:
     void init(bool firstinit) ;
     void reorganizeFaceList() ;
     void reorganizeVolumeList();
+
+    // Called as the texture gains its first face or volume in the world, and as it loses its last.
+    virtual void onWorldUseChanged() {}
+
+    // Lets go of a level asked for frame by frame that was not asked for in the last frame. Called as the texture's
+    // stats are updated.
+    void lapseFrameBoost();
+    // Makes the boost again of its levels, after one of them changed.
+    void updateBoost();
+    // Called after the boost is made again of its levels, whether or not it changed.
+    virtual void onBoostUpdated() {}
 
 private:
     friend class LLBumpImageList;
@@ -188,6 +215,8 @@ protected:
     mutable S32  mMaxVirtualSizeResetCounter;
     mutable S32  mMaxVirtualSizeResetInterval;
     LLFrameTimer mLastReferencedTimer;
+
+    ALTextureBoostLevels mBoostLevels; // what mBoostLevel is the highest of
 
     ll_face_list_t    mFaceList[LLRender::NUM_TEXTURE_CHANNELS]; //reverse pointer pointing to the faces using this image as texture
     U32               mNumFaces[LLRender::NUM_TEXTURE_CHANNELS];
@@ -220,8 +249,8 @@ public:
     static bool sFreezeImageUpdates;
     static F64  sCurrentTime ;
 
-    // estimated free memory for textures, by bias calculation
-    static F32 sFreeVRAMMegabytes;
+    // The video memory budget, and the target the bias keeps used (ALVRAMUsage's total) under, in MB.
+    static void getVRAMBudget(F32& budget, F32& target);
 
     enum EDebugTexels
     {
@@ -334,7 +363,6 @@ public:
     S32  getDesiredDiscardLevel()            { return mDesiredDiscardLevel; }
     void setMinDiscardLevel(S32 discard)    { mMinDesiredDiscardLevel = llmin(mMinDesiredDiscardLevel,(S8)discard); }
 
-    void setBoostLevel(S32 level) override;
     bool updateFetch();
 
     void clearFetchedResults(); //clear all fetched results, for debug use.
@@ -433,10 +461,15 @@ public:
 protected:
     S32 getCurrentDiscardLevelForFetching() ;
     void forceToRefetchTexture(S32 desired_discard = 0, F32 kept_time = 60.f);
+    void onWorldUseChanged() override;
+    void onBoostUpdated() override;
 
 private:
     void init(bool firstinit) ;
     void cleanup() ;
+
+    // Count the storage as the source, the boost and the world's use of it say (vram_class_of).
+    void updateVRAMClass();
 
     bool processFetchResults(S32& desired_discard, S32 current_discard, S32 fetch_discard, F32 decode_priority);
 

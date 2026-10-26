@@ -59,7 +59,7 @@ Distanza visualizzazione: [DRAW_DISTANCE]m
 Larghezza banda: [NET_BANDWITH]kbit/s
 Fattore livello di dettaglio: [LOD_FACTOR]
 Qualità di rendering: [RENDER_QUALITY]
-Memoria texture: [TEXTURE_MEMORY]MB
+Memoria video: [VIDEO_MEMORY]MB
 	</string>
 	<string name="AboutOSXHiDPI">
 		Modalità display HiDPI: [HIDPI]

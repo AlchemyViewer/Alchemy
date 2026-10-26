@@ -27,8 +27,6 @@
 					<stat_bar label="Ham Sayım" name="numrawimagesstat"/>
 					<stat_bar label="GL Belleği" name="gltexmemstat"/>
 					<stat_bar label="Formatlanmış Bellek" name="formattedmemstat"/>
-					<stat_bar label="Ham Bellek" name="rawmemstat"/>
-					<stat_bar label="Bağlı Doku Belleği" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Ağ" name="network">
 					<stat_bar label="Gelen Paketler" name="packetsinstat"/>

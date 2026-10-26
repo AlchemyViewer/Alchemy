@@ -55,14 +55,32 @@ class LLWindow;
 
 namespace LLImageGLMemory
 {
-    // width/height are the level-0 dimensions. If has_mips is true,
-    // the recorded size includes the full mip pyramid down to 1x1
-    // (driver-padded via dataFormatVRAMBytes per level). count covers
-    // array slices / cube faces, each of which gets its own pyramid.
-    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool has_mips = false);
+    // What a texture's storage is for. The accounting keeps a total of each, and every
+    // texture's storage is in one of them.
+    enum EClass : U8
+    {
+        STREAMED_TEXTURE, // fetched by asset ID or from the bake service, but for one the UI alone holds (a
+                          // UI boost and no face or volume in the world), which is OTHER_TEXTURE. Not all of it
+                          // is the bias's to bring down: boosted ones (sculpt maps, HUDs, bakes) and those that
+                          // are not LOD textures keep their size
+        OTHER_TEXTURE,    // every other image: UI, media, local images, lookup tables
+        RENDER_TARGET,    // render target attachments
+        REFLECTION_PROBE, // the reflection and hero probes' cube map arrays
+        NUM_CLASSES
+    };
+
+    // Record the storage of the texture bound on unit 0, as `cls`: `levels` levels from the
+    // level-0 width x height down, as dataFormatVRAMBytes counts them, for each of `count`
+    // layers -- array layers, cube faces or 3D slices, each of which holds the levels. The
+    // texture must have no storage recorded. Returns the bytes recorded. Storage GL refused
+    // for want of video memory stays counted: nothing asks GL about it, which would wait for
+    // a threaded driver's thread, and that GL ran out is noted (take_gl_out_of_memory).
+    U64 alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, U32 levels, EClass cls);
     void free_tex_image(U32 texName);
     void free_tex_images(U32 count, const U32* texNames);
     void free_cur_tex_image();
+    // Count the storage recorded for texName, if any, as `cls` from now on.
+    void set_tex_class(U32 texName, EClass cls);
 }
 
 //============================================================================
@@ -100,18 +118,11 @@ public:
     // name is still whole.
     static void finishUploads();
 
-    // Get an estimate of how many bytes have been allocated in vram for
-    // textures. Allocations recorded via alloc_tex_image with has_mips=true
-    // include the full mip pyramid (driver-padded via dataFormatVRAMBytes);
-    // single-level allocations cover level 0 only.
-    //
-    // NOTE: viewer consumers (llviewertexture.cpp, lltextureview.cpp)
-    // historically scaled this by 2x via a /512 divisor instead of /1024
-    // when converting to MB. That fudge predates per-mip accounting and
-    // also compensates for driver-side overhead (descriptor structs, page
-    // alignment). Leave it alone until the budget code is reconciled
-    // holistically.
+    // The bytes of every texture's storage, as alloc_tex_image recorded it: the levels each
+    // was allocated with, at dataFormatVRAMBytes' size. The second form counts one class.
+    // ALVRAMUsage puts them beside what buffers hold.
     static U64 getTextureBytesAllocated();
+    static U64 getTextureBytesAllocated(LLImageGLMemory::EClass cls);
 
     // These 2 functions replace glGenTextures() and glDeleteTextures()
     static void generateTextures(S32 numTextures, U32 *textures);
@@ -128,11 +139,16 @@ public:
     // VRAM accounting. They differ from the host values for formats that
     // drivers pad (RGB8 -> RGBX, RGB16F -> RGBA16F, RGB32F -> RGBA32F,
     // DEPTH_COMPONENT24 -> 32-bit). For other formats they delegate to
-    // dataFormatBits/Bytes.
+    // dataFormatBits.
+    //
+    // dataFormatVRAMBytes counts `levels` levels from the level-0 width x height down, each
+    // dimension halved and held at 1, which is the chain glTexStorage* allocates: the texels
+    // at their padded size, and for a block-compressed format the whole 4x4 blocks that cover
+    // each level.
     static S32 dataFormatBits(S32 dataformat);
     static S64 dataFormatBytes(S32 dataformat, S32 width, S32 height);
     static S32 dataFormatVRAMBits(S32 dataformat);
-    static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height);
+    static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height, S32 levels = 1);
     static S32 dataFormatComponents(S32 dataformat);
 
     // The sized integer colour formats: R32UI, RG16I, RGB10_A2UI and the rest. A shader reads their texels as
@@ -222,10 +238,12 @@ public:
     // rather than resizing or reformatting this one -- that is what glTexStorage2D
     // requires, and what D3D11/12 and Vulkan require of every resource. pixels may be null
     // to allocate only. levels is the mip level COUNT; storage is allocated for all of
-    // them, so levels 1+ can be filled with setManualSubImage.
+    // them, so levels 1+ can be filled with setManualSubImage. The storage is counted as
+    // `cls`.
     static void allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
                                   U32 pixformat, U32 pixtype, const void *pixels,
-                                  S32 levels = 1);
+                                  S32 levels = 1,
+                                  LLImageGLMemory::EClass cls = LLImageGLMemory::OTHER_TEXTURE);
 
     // Upload one level into a texture that already has storage. Allocates nothing and does
     // no VRAM accounting, which is what makes it legal on immutable storage. The caller
@@ -320,9 +338,18 @@ public:
     S32  getWidth(S32 discard_level = -1) const;
     S32  getHeight(S32 discard_level = -1) const;
     U8   getComponents() const { return (U8)(mUploadInFlight ? mPublished.mComponents : mComponents); }
+    // The bytes of the storage allocateTextureStorage gave the texture: what alloc_tex_image
+    // records for it. 0 where its owner allocated it (markStorageAllocated), or it has none.
     S64Bytes getTextureMemory() const { return mUploadInFlight ? mPublished.mTextureMemory : mTextureMemory; }
+    // What the texture's storage is counted as, OTHER_TEXTURE unless set. Setting it moves
+    // the storage mTexName has to the new class; storage an upload in flight has made moves
+    // as it publishes. Main thread.
+    LLImageGLMemory::EClass getVRAMClass() const { return mVRAMClass.load(std::memory_order_relaxed); }
+    void setVRAMClass(LLImageGLMemory::EClass cls);
+
+    // The bytes of the buffer scaleDown reads a level back through.
+    static U64 getScratchBufferBytes() { return sScratchPBOSize; }
     S64  getBytes(S32 discard_level = -1) const;
-    S64  getMipBytes(S32 discard_level = -1) const;
     bool getBoundRecently() const;
     bool isJustBound() const;
     bool getHasExplicitFormat() const { return mHasExplicitFormat; }
@@ -428,7 +455,7 @@ private:
     void freePickMask();
     bool isCompressed() const;
 
-    // Bytes of one level at this size, as getBytes and getMipBytes count it: an integer level by its pixel format AND
+    // Bytes of one level at this size, as getBytes counts it: an integer level by its pixel format AND
     // type -- an R32UI texel is four bytes, which GL_RED_INTEGER alone cannot say -- and any other by dataFormatBytes
     // of its pixel format, a byte a component. Rounded up to four, as dataFormatBytes rounds.
     S64 levelBytes(S32 width, S32 height) const;
@@ -553,6 +580,9 @@ private:
         S32 mFormat = 0;
     };
     StorageDesc mStorage;
+    // Written on the main thread, and read by the upload that allocates storage, which may be
+    // the LLImageGL thread's.
+    std::atomic<LLImageGLMemory::EClass> mVRAMClass{ LLImageGLMemory::OTHER_TEXTURE };
     U16      mWidth;
     U16      mHeight;
     S8       mCurrentDiscardLevel;

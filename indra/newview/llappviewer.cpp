@@ -3903,7 +3903,7 @@ LLSD LLAppViewer::getViewerInfo() const
     info["NET_BANDWITH"] = LLViewerThrottle::getMaxBandwidthKbps();
     info["LOD_FACTOR"] = gSavedSettings.getF32("RenderVolumeLODFactor");
     info["RENDER_QUALITY"] = (F32)gSavedSettings.getU32("RenderQualityPerformance");
-    info["TEXTURE_MEMORY"] = LLSD::Integer(gGLManager.mVRAM);
+    info["VIDEO_MEMORY"] = LLSD::Integer(gGLManager.mVRAM);
 
 #if LL_DARWIN || LL_SDL_WINDOW
     info["HIDPI"] = gHiDPISupport;

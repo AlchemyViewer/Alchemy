@@ -49,86 +49,18 @@
 #include <fmt/format.h>
 
 LLRenderTarget* LLRenderTarget::sBoundTarget = NULL;
-U32 LLRenderTarget::sBytesAllocated = 0;
 U64 LLRenderTarget::sLastDepthSerial = 0;
 
 namespace
 {
-    // Resolve the GL (internal_format, pixel_format, pixel_type, bytes_per_pixel)
+    // Resolve the GL (internal_format, pixel_format, pixel_type)
     // for a given depth format and stencil request.
     struct DepthFormatInfo
     {
         U32 internal_format;
         U32 pixel_format;
         U32 pixel_type;
-        U32 bytes_per_pixel;
     };
-
-    // Bytes per pixel for the GL color internal formats we actually allocate as
-    // render targets. Used for sBytesAllocated accounting. Unknown formats fall
-    // back to 4 to preserve the historical estimate.
-    U32 get_color_format_bytes_per_pixel(U32 internal_format)
-    {
-        switch (internal_format)
-        {
-            case GL_R8:
-            case GL_R8I:
-            case GL_R8UI:
-                return 1;
-            case GL_RG8:
-            case GL_R16:
-            case GL_R16F:
-            case GL_RG8I:
-            case GL_RG8UI:
-            case GL_R16I:
-            case GL_R16UI:
-                return 2;
-            case GL_RGB8:
-            case GL_SRGB8:
-            case GL_RGB8I:
-            case GL_RGB8UI:
-                return 3;
-            case GL_RGBA8:
-            case GL_SRGB8_ALPHA8:
-            case GL_RGB10_A2:
-            case GL_R11F_G11F_B10F:
-            case GL_RG16:
-            case GL_RG16F:
-            case GL_R32F:
-            case GL_RGB9_E5:
-            case GL_RGBA8I:
-            case GL_RGBA8UI:
-            case GL_RGB10_A2UI:
-            case GL_RG16I:
-            case GL_RG16UI:
-            case GL_R32I:
-            case GL_R32UI:
-                return 4;
-            case GL_RGB16:
-            case GL_RGB16F:
-            case GL_RGB16I:
-            case GL_RGB16UI:
-                return 6;
-            case GL_RGBA16:
-            case GL_RGBA16F:
-            case GL_RG32F:
-            case GL_RGBA16I:
-            case GL_RGBA16UI:
-            case GL_RG32I:
-            case GL_RG32UI:
-                return 8;
-            case GL_RGB32F:
-            case GL_RGB32I:
-            case GL_RGB32UI:
-                return 12;
-            case GL_RGBA32F:
-            case GL_RGBA32I:
-            case GL_RGBA32UI:
-                return 16;
-            default:
-                return 4;
-        }
-    }
 
     // The clear colour as an integer attachment takes it: each component rounded to the nearest integer and held to
     // the 32-bit range of the attachment's sign, so a negative one clears an unsigned attachment to 0 and a huge one to
@@ -150,15 +82,15 @@ namespace
         {
             if (fmt == LLRenderTarget::DEPTH_FMT_32F)
             {
-                return { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV, 8 };
+                return { GL_DEPTH32F_STENCIL8, GL_DEPTH_STENCIL, GL_FLOAT_32_UNSIGNED_INT_24_8_REV };
             }
-            return { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8, 4 };
+            return { GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8 };
         }
         if (fmt == LLRenderTarget::DEPTH_FMT_32F)
         {
-            return { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT, 4 };
+            return { GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT };
         }
-        return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, 4 };
+        return { GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT };
     }
 
     LLRenderTarget::eMipGeneration mip_generation(ALRenderTargetDesc::Mips mips)
@@ -367,7 +299,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     }
 }
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, ALTextureSlot::eTextureType usage, eMipGeneration generateMipMaps, eDepthFormat depth_fmt)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, ALTextureSlot::eTextureType usage, eMipGeneration generateMipMaps, eDepthFormat depth_fmt, U32 mip_levels)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(usage == ALTextureSlot::TT_TEXTURE);
@@ -405,6 +337,10 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
         // floor(log2(n)) + 1, computed with integer math to avoid the
         // precision pitfall where log10(2^N)/log10(2) rounds below N.
         mMipLevels = static_cast<U32>(std::bit_width(static_cast<U32>(llmax(mResX, mResY))));
+        if (mip_levels > 0)
+        {
+            mMipLevels = llmin(mMipLevels, mip_levels);
+        }
     }
 
     if (depth)
@@ -443,19 +379,26 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
 }
 
 // static
-U64 LLRenderTarget::bytesFor(const ALRenderTargetDesc& desc)
+U64 LLRenderTarget::bytesFor(const ALRenderTargetDesc& wanted)
 {
-    U64 per_pixel = 0;
+    // As allocate and addColorAttachment allocate it: held to the context's largest texture where there is a context,
+    // each colour attachment the levels the mips give it, the depth one.
+    const ALRenderTargetDesc desc = gGLManager.mGLMaxTextureSize > 0 ? held_to_context(wanted) : wanted;
+    const S32 width  = (S32)desc.width;
+    const S32 height = (S32)desc.height;
+    const S32 levels = desc.mips == ALRenderTargetDesc::Mips::None ? 1 : LLImageGL::calcMipLevelCount(width, height);
+    U64 bytes = 0;
     for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
     {
-        per_pixel += get_color_format_bytes_per_pixel(desc.color[attachment]);
+        bytes += (U64)LLImageGL::dataFormatVRAMBytes((S32)desc.color[attachment], width, height, levels);
     }
     if (desc.depth != ALRenderTargetDesc::Depth::None)
     {
         const eDepthFormat format = desc.depth == ALRenderTargetDesc::Depth::D32F ? DEPTH_FMT_32F : DEPTH_FMT_24;
-        per_pixel += get_depth_format_info(format, desc.stencil).bytes_per_pixel;
+        bytes += (U64)LLImageGL::dataFormatVRAMBytes((S32)get_depth_format_info(format, desc.stencil).internal_format,
+                                                     width, height);
     }
-    return (U64)desc.width * desc.height * per_pixel;
+    return bytes;
 }
 
 ALRenderTargetDesc LLRenderTarget::desc() const
@@ -660,16 +603,16 @@ bool LLRenderTarget::addColorAttachment(U32 color_fmt)
         // No pixels go with the storage, but the format they would come in agrees with it.
         const U32 integer_format = LLImageGL::integerPixelFormat(color_fmt);
         LLImageGL::allocateTexture2D(ALTextureSlot::getInternalType(mUsage), color_fmt, mResX, mResY,
-                                     integer_format ? integer_format : GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels);
-        if (glGetError() != GL_NO_ERROR)
+                                     integer_format ? integer_format : GL_RGBA, GL_UNSIGNED_BYTE, NULL, levels,
+                                     LLImageGLMemory::RENDER_TARGET);
+        // Every flag the allocation raised, so that none is left for the next check, running out of memory noted.
+        if (read_gl_errors() != GL_NO_ERROR)
         {
             LL_WARNS() << "Could not allocate color buffer for render target." << LL_ENDL;
             LLImageGL::deleteTextures(1, &tex);
             return false;
         }
     }
-
-    sBytesAllocated += mResX * mResY * get_color_format_bytes_per_pixel(color_fmt);
 
     stop_glerror();
 
@@ -725,12 +668,11 @@ bool LLRenderTarget::allocateDepth()
     stop_glerror();
     clear_glerror();
     const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
-    LLImageGL::allocateTexture2D(internal_type, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL);
+    LLImageGL::allocateTexture2D(internal_type, info.internal_format, mResX, mResY, info.pixel_format, info.pixel_type, NULL,
+                                 1, LLImageGLMemory::RENDER_TARGET);
     // Point filtering comes from getDefaultDepthSampler now, not from the texture object.
 
-    sBytesAllocated += mResX * mResY * info.bytes_per_pixel;
-
-    if (glGetError() != GL_NO_ERROR)
+    if (read_gl_errors() != GL_NO_ERROR)
     {
         LL_WARNS() << "Unable to allocate depth buffer for render target." << LL_ENDL;
         return false;
@@ -822,9 +764,6 @@ void LLRenderTarget::release()
     {
         LLImageGL::deleteTextures(1, &mDepth);
 
-        const DepthFormatInfo info = get_depth_format_info(mDepthFormat, mStencil);
-        sBytesAllocated -= mResX * mResY * info.bytes_per_pixel;
-
         mDepth = 0;
         mDepthSerial = 0;
     }
@@ -853,10 +792,6 @@ void LLRenderTarget::release()
         size_t z;
         for (z = mTex.size() - 1; z >= 1; z--)
         {
-            if (z < mInternalFormat.size())
-            {
-                sBytesAllocated -= mResX * mResY * get_color_format_bytes_per_pixel(mInternalFormat[z]);
-            }
             glFramebufferTexture2D(GL_FRAMEBUFFER, static_cast<GLenum>(GL_COLOR_ATTACHMENT0+z), ALTextureSlot::getInternalType(mUsage), 0, 0);
             LLImageGL::deleteTextures(1, &mTex[z]);
         }
@@ -880,7 +815,6 @@ void LLRenderTarget::release()
     // texture and relies on the caller to manage that lifetime.
     if (!mTex.empty() && !mInternalFormat.empty())
     {
-        sBytesAllocated -= mResX * mResY * get_color_format_bytes_per_pixel(mInternalFormat[0]);
         LLImageGL::deleteTextures(1, &mTex[0]);
     }
 

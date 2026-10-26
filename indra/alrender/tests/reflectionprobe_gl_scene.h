@@ -941,7 +941,7 @@ void main()
             // Each probe's cube: every face, mip and layer its own smooth colours, so a tap's direction, mip and
             // layer all show.
             mCube = new LLCubeMapArray();
-            mCube->allocate(CUBE, 4, PROBES, true, true);
+            mCube->allocate(CUBE, 4, PROBES, LLImageGLMemory::REFLECTION_PROBE, true, true);
             mCube->bind(0);
             for (U32 level = 0, res = CUBE; res > 0; ++level, res >>= 1)
             {

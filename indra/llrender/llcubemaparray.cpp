@@ -111,7 +111,7 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     mCount = count;
 
     // Allocate a new cubemap array with the same criteria as the incoming cubemap array
-    allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mImage->getUseMipMaps(), lhs.mHDR);
+    allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mClass, lhs.mImage->getUseMipMaps(), lhs.mHDR);
 
     U32 min_count = std::min(count, lhs.mCount);
     if (min_count == 0)
@@ -143,11 +143,12 @@ LLCubeMapArray::~LLCubeMapArray()
 {
 }
 
-void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool use_mips, bool hdr)
+void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, EClass cls, bool use_mips, bool hdr)
 {
     U32 texname = 0;
     mWidth = resolution;
     mCount = count;
+    mClass = cls;
 
     mHDR = hdr;
 
@@ -176,7 +177,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
     mImage->markStorageAllocated();
     stop_glerror();
 
-    alloc_tex_image(resolution, resolution, format, count * 6, use_mips);
+    alloc_tex_image(resolution, resolution, format, count * 6, levels, cls);
 
     //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
 

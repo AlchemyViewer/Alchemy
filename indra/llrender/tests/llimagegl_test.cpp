@@ -8,8 +8,9 @@
  * invariant, the deprecated-format resolution path, downscaling,
  * the published view of an upload in flight, the bind state
  * edits rely on, the integer formats, uploads read from the
- * staging ring, the levels a readback reads, and readbacks collected
- * once the GPU has written them.
+ * staging ring, the levels a readback reads, readbacks collected
+ * once the GPU has written them, and the bytes each allocation is
+ * counted at.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -35,6 +36,7 @@
 
 #include "../algpubuffer.h"
 #include "../alstagingring.h"
+#include "../alvramusage.h"
 #include "../llimagegl.h"
 #include "../llgl.h"
 #include "../llrender.h"
@@ -42,6 +44,7 @@
 
 #include "llheadlessgl_fixture.h"
 
+#include "altestfatal.h"
 #include "llimage.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -279,15 +282,301 @@ namespace
         CHECK(LLImageGL::dataFormatVRAMBits(GL_RGB32F) == 128);
         CHECK(LLImageGL::dataFormatBits(GL_DEPTH_COMPONENT24) == 24);
         CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT24) == 32);
+        UNSCOPED_INFO("the other sized depth formats");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT16) == 16);
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT32) == 32);
 
-        // VRAM bytes path applies the same 4-byte alignment as the
-        // host bytes path and routes unpadded formats through the
-        // host table — so RGBA8 matches between the two.
+        // The VRAM bytes path routes unpadded formats through the host
+        // table, so RGBA8 matches between the two where the host
+        // layout's 4-byte rounding has nothing to round.
         UNSCOPED_INFO("matches the host bytes");
         CHECK((S32)LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 16, 16) == 1024);
         // 16x16 RGB8: host 16*16*3 = 768; VRAM 16*16*4 = 1024.
         CHECK((S32)LLImageGL::dataFormatBytes(GL_RGB8, 16, 16) == 768);
         CHECK((S32)LLImageGL::dataFormatVRAMBytes(GL_RGB8, 16, 16) == 1024);
+    }
+
+    // The bytes of a chain of levels, each level's sides halved and held at 1: the chain glTexStorage* allocates. A
+    // side reaching 1 does not end it while the other is longer, it stops at the levels asked, short of 1x1 or not,
+    // VRAM rounds nothing, and a block-compressed level is the whole 4x4 blocks that cover it.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: dataFormatVRAMBytes counts exactly the levels asked", "[LLImageGL]")
+    {
+        UNSCOPED_INFO("square: 256x256 RGBA8 to 1x1, 9 levels");
+        // 65536 + 16384 + 4096 + 1024 + 256 + 64 + 16 + 4 + 1 texels
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 256, 256, 9) == 87381 * 4);
+        UNSCOPED_INFO("non-square: 1024x16 RGBA8 to 1x1, 11 levels, the last six a texel high");
+        // 16384 + 4096 + 1024 + 256 + 64 + 32 + 16 + 8 + 4 + 2 + 1
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 1024, 16, 11) == 21887 * 4);
+        UNSCOPED_INFO("partial: 512x512 RGBA8, 3 levels");
+        // 262144 + 65536 + 16384
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_RGBA8, 512, 512, 3) == 344064 * 4);
+        UNSCOPED_INFO("padded: 4x2 RGB8 at four bytes a texel, 3 levels");
+        // 8 + 2 + 1
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_RGB8, 4, 2, 3) == 11 * 4);
+        UNSCOPED_INFO("odd sides: 13x7 R8, 4 levels, nothing rounded");
+        // 13x7, 6x3, 3x1, 1x1: 91 + 18 + 3 + 1
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_R8, 13, 7, 4) == 113);
+        UNSCOPED_INFO("compressed: 256x256 DXT1 to 1x1, the last three levels a block each");
+        // 4096 + 1024 + 256 + 64 + 16 + 4 + 1 + 1 + 1 blocks of 8 bytes
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 256, 256, 9) == 5463 * 8);
+        UNSCOPED_INFO("compressed, sides not whole blocks: 12x20 DXT5 to 1x1, 5 levels");
+        // 12x20, 6x10, 3x5, 1x2, 1x1: 3x5 + 2x3 + 1x2 + 1 + 1 blocks of 16 bytes
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_COMPRESSED_RGBA_S3TC_DXT5_EXT, 12, 20, 5) == 25 * 16);
+        UNSCOPED_INFO("one level unless asked");
+        CHECK(LLImageGL::dataFormatVRAMBytes(GL_RGBA16F, 16, 8) == 16 * 8 * 8);
+    }
+
+    // One of gGLManager's settings, set for a block and put back as the block ends, however it ends.
+    template <typename T>
+    struct GLManagerSetting
+    {
+        GLManagerSetting(T& setting, T value) : mSetting(setting), mWas(setting) { mSetting = value; }
+        ~GLManagerSetting() { mSetting = mWas; }
+        GLManagerSetting(const GLManagerSetting&)            = delete;
+        GLManagerSetting& operator=(const GLManagerSetting&) = delete;
+
+        T&      mSetting;
+        const T mWas;
+    };
+
+    // allocateTexture2D records the levels it allocates: one, every level of a texture one side of which is far
+    // shorter than the other, and a chain stopped short of 1x1.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: allocateTexture2D records exactly the levels it allocates", "[LLImageGL]")
+    {
+        struct Case
+        {
+            const char* what;
+            S32         width;
+            S32         height;
+            S32         levels;
+            S64         bytes;
+        };
+        const Case cases[] = {
+            { "one level", 64, 32, 1, 64 * 32 * 4 },
+            { "1024x16 to 1x1", 1024, 16, 11, 21887 * 4 },
+            { "512x512, three levels", 512, 512, 3, 344064 * 4 },
+        };
+        for (const Case& c : cases)
+        {
+            CAPTURE(c.what);
+            U32 name = 0;
+            LLImageGL::generateTextures(1, &name);
+            gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+            const U64 before = LLImageGL::getTextureBytesAllocated();
+            LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, c.width, c.height, GL_RGBA, GL_UNSIGNED_BYTE, nullptr,
+                                         c.levels);
+            CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == c.bytes);
+            CHECK(ll_test::boundTextureLevels() == c.levels);
+            gGL.getTextureSlot(0)->unbind();
+            LLImageGL::deleteTextures(1, &name);
+        }
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A texture's bytes are what the global count records for it, and both are its storage's: every level of a mipped
+    // texture one side of which is far shorter than the other, a three-component texture at the four bytes a texel its
+    // storage pads to, and a texture scaled down at its new storage.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a texture's bytes are its storage's and the global count's", "[LLImageGL]")
+    {
+        {
+            INFO("64x4 RGBA with mips: 7 levels");
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
+            const U64 before = LLImageGL::getTextureBytesAllocated();
+            REQUIRE(img->createGLTexture(0, makeRaw(64, 4, 4, 0x80).get()));
+            // 256 + 64 + 16 + 8 + 4 + 2 + 1 texels
+            CHECK(img->getTextureMemory().value() == 351 * 4);
+            CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 351 * 4);
+        }
+        {
+            INFO("8x8 RGB, padded to four bytes a texel");
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+            const U64 before = LLImageGL::getTextureBytesAllocated();
+            REQUIRE(img->createGLTexture(0, makeRaw(8, 8, 3, 0x80).get()));
+            CHECK(img->getTextureMemory().value() == 8 * 8 * 4);
+            CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 8 * 8 * 4);
+        }
+        {
+            INFO("64x64 RGBA with mips, scaled down to 32x32");
+            LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/true);
+            const U64 before = LLImageGL::getTextureBytesAllocated();
+            REQUIRE(img->createGLTexture(0, makeRaw(64, 64, 4, 0x80).get()));
+            // 4096 + 1024 + 256 + 64 + 16 + 4 + 1 texels
+            CHECK(img->getTextureMemory().value() == 5461 * 4);
+
+            // The PBO copy needs no framebuffer of its own. Its buffer, which each case starts with empty, grows to
+            // the level read back, and is counted with the GPU buffers.
+            const ALVRAMUsage usage = ALVRAMUsage::current();
+            REQUIRE(LLImageGL::getScratchBufferBytes() == 0);
+            const GLManagerSetting<U32> pbo(gGLManager.mDownScaleMethod, 1u);
+            REQUIRE(img->scaleDown(1));
+            // 1024 + 256 + 64 + 16 + 4 + 1
+            CHECK(img->getTextureMemory().value() == 1365 * 4);
+            CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 1365 * 4);
+            UNSCOPED_INFO("the readback buffer, a 32x32 level of 4 bytes a texel");
+            CHECK(LLImageGL::getScratchBufferBytes() == 32 * 32 * 4);
+            CHECK(ALVRAMUsage::current().mGPUBuffers - usage.mGPUBuffers == 32 * 32 * 4);
+        }
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A texture deleted or replaced leaves the count as it goes, not once the deferred delete frees its name frames
+    // later: a main-thread upload of another size swaps a new texture in, a publish puts a texture built elsewhere in
+    // place of the one on screen, and destroyGLTexture lets it go.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a replaced or deleted texture leaves the count at once", "[LLImageGL]")
+    {
+        const U64 before = LLImageGL::getTextureBytesAllocated();
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 16 * 16 * 4);
+
+        UNSCOPED_INFO("swapped for an upload of another size");
+        const U32 first = img->getTexName();
+        REQUIRE(img->createGLTexture(0, makeRaw(32, 8, 4, 0x80).get()));
+        REQUIRE(img->getTexName() != first);
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 32 * 8 * 4);
+
+        UNSCOPED_INFO("replaced by a texture published in its place");
+        U32 published = 0;
+        LLImageGL::generateTextures(1, &published);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, published);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 8, 8, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        gGL.getTextureSlot(0)->unbind();
+        img->beginUpload();
+        img->syncTexName(published);
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 8 * 8 * 4);
+
+        UNSCOPED_INFO("destroyed");
+        img->destroyGLTexture();
+        CHECK(LLImageGL::getTextureBytesAllocated() == before);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+#ifdef SHOW_ASSERT
+    // A deleted texture's name waits in the deferred-delete ring, counted for nothing, until GL frees it: storage
+    // recorded on it before then is an owner using a texture it let go of, and asserts.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: storage recorded on a deleted name asserts until the ring frees it", "[LLImageGL]")
+    {
+        U32 name = 0;
+        LLImageGL::generateTextures(1, &name);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        const U64 allocated = LLImageGL::getTextureBytesAllocated();
+        LLImageGL::deleteTextures(1, &name);
+        UNSCOPED_INFO("out of the count as it is deleted");
+        CHECK(allocated - LLImageGL::getTextureBytesAllocated() == 4 * 4 * 4);
+
+        // Still bound on slot 0. GL refuses the second storage of an immutable texture; the accounting asserts.
+        const auto allocate_again = [] {
+            LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        };
+        UNSCOPED_INFO("storage recorded on the deleted name");
+        CHECK_THROWS_AS(allocate_again(), ll_test::FatalError);
+        gGL.getTextureSlot(0)->unbind();
+        for (U32 i = 0; i < 8 && glGetError() != GL_NO_ERROR; ++i)
+        {
+        }
+    }
+#endif
+
+    // Each texture's storage is counted in one class: an image's in OTHER_TEXTURE unless it is told otherwise, before its
+    // storage is made or after, when the storage moves with it, and kept by every upload after; allocateTexture2D's in
+    // the class it is given; and each leaves its class as it is deleted. A class told while an upload is in flight
+    // reaches the texture the upload publishes.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: each texture's storage is counted in its class", "[LLImageGL]")
+    {
+        using namespace LLImageGLMemory;
+        U64 before[NUM_CLASSES];
+        for (U32 cls = 0; cls < NUM_CLASSES; ++cls)
+        {
+            before[cls] = LLImageGL::getTextureBytesAllocated((EClass)cls);
+        }
+        auto delta = [&before](EClass cls) { return (S64)(LLImageGL::getTextureBytesAllocated(cls) - before[cls]); };
+
+        LLPointer<LLImageGL> other = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(other->createGLTexture(0, makeRaw(8, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("an image is other unless told");
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(RENDER_TARGET) == 0);
+
+        LLPointer<LLImageGL> streamed = new LLImageGL(/*usemipmaps=*/false);
+        streamed->setVRAMClass(STREAMED_TEXTURE);
+        REQUIRE(streamed->createGLTexture(0, makeRaw(16, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("told before its storage is made");
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+
+        other->setVRAMClass(STREAMED_TEXTURE);
+        UNSCOPED_INFO("told after: the storage moves");
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 8 * 4 + 8 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        REQUIRE(streamed->createGLTexture(0, makeRaw(32, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("a new upload of another size keeps the class");
+        CHECK(delta(STREAMED_TEXTURE) == 32 * 8 * 4 + 8 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        U32 name = 0;
+        LLImageGL::generateTextures(1, &name);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA16F, 4, 4, GL_RGBA, GL_FLOAT, nullptr, 1, RENDER_TARGET);
+        gGL.getTextureSlot(0)->unbind();
+        UNSCOPED_INFO("allocateTexture2D in the class it is given");
+        CHECK(delta(RENDER_TARGET) == 4 * 4 * 8);
+
+        LLImageGL::deleteTextures(1, &name);
+        streamed->destroyGLTexture();
+        other->destroyGLTexture();
+        UNSCOPED_INFO("each leaves its class");
+        CHECK(delta(RENDER_TARGET) == 0);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        // An upload in flight that allocated under the class before: told while it is in flight, its texture takes
+        // the class as it publishes, and the texture on screen at once.
+        REQUIRE(other->createGLTexture(0, makeRaw(8, 8, 4, 0x80).get()));
+        other->beginUpload();
+        U32 built = 0;
+        LLImageGL::generateTextures(1, &built);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, built);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 16, 16, GL_RGBA, GL_UNSIGNED_BYTE, nullptr, 1,
+                                     other->getVRAMClass());
+        gGL.getTextureSlot(0)->unbind();
+        other->setVRAMClass(OTHER_TEXTURE);
+        UNSCOPED_INFO("told while in flight: the texture on screen moves");
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 16 * 4);
+        other->syncTexName(built);
+        UNSCOPED_INFO("the texture it published takes the class");
+        CHECK(delta(OTHER_TEXTURE) == 16 * 16 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        other->destroyGLTexture();
+        CHECK(delta(RENDER_TARGET) == 0);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A block-compressed texture keeps its sized compressed format as its primary format, and that is its storage: it
+    // is counted at its blocks, whatever its internal format names.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a block-compressed texture is counted at its blocks", "[LLImageGL]")
+    {
+        if (!gGLManager.mGLExtensions.contains("GL_EXT_texture_compression_s3tc"))
+        {
+            SKIP("the context has no GL_EXT_texture_compression_s3tc");
+        }
+
+        constexpr U16 W = 16, H = 16;
+        // 4x4 blocks of 8 bytes
+        constexpr S64 BYTES = 16 * 8;
+        const std::vector<U8> blocks((size_t)BYTES, 0);
+        LLPointer<LLImageGL> img = new LLImageGL(W, H, 4, /*usemipmaps=*/false);
+        img->setExplicitFormat(GL_COMPRESSED_RGBA, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT);
+        const U64 before = LLImageGL::getTextureBytesAllocated();
+        REQUIRE(img->createGLTexture(0, blocks.data()));
+        CHECK(img->getTextureMemory().value() == BYTES);
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == BYTES);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
     // When no explicit format is set, createGLTexture derives one from
@@ -1549,7 +1838,9 @@ namespace
         REQUIRE(r32ui->createGLTexture(0, reinterpret_cast<const U8*>(uints.data())));
         UNSCOPED_INFO("R32UI accounted at four bytes a texel");
         CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == (S64)N * 4);
-        CHECK((S64)r32ui->getMipBytes(0) == (S64)N * 4);
+        CHECK((S64)r32ui->getTextureMemory().value() == (S64)N * 4);
+        UNSCOPED_INFO("its level's bytes by its pixel format and type: four a texel, which GL_RED_INTEGER alone cannot say");
+        CHECK(r32ui->getBytes(0) == (S64)N * 4);
         UNSCOPED_INFO("an integer texture asked for mips takes none");
         CHECK_FALSE(r32ui->getUseMipMaps());
 

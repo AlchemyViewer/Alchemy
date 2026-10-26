@@ -27,8 +27,6 @@
 					<stat_bar label="Rohanzahl" name="numrawimagesstat"/>
 					<stat_bar label="GL Sp" name="gltexmemstat"/>
 					<stat_bar label="Formattierter Sp:" name="formattedmemstat"/>
-					<stat_bar label="Rohsp" name="rawmemstat"/>
-					<stat_bar label="Zugeteilter Sp" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Netzwerk" name="network">
 					<stat_bar label="Paketeingang" name="packetsinstat"/>

@@ -27,8 +27,6 @@
 					<stat_bar label="Необраб. изображений" name="numrawimagesstat"/>
 					<stat_bar label="Память GL" name="gltexmemstat"/>
 					<stat_bar label="Форматированная память" name="formattedmemstat"/>
-					<stat_bar label="Неформатированная память" name="rawmemstat"/>
-					<stat_bar label="Ограничение памяти" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Сеть" name="network">
 					<stat_bar label="Входящие пакеты" name="packetsinstat"/>

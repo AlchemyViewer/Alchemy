@@ -26,7 +26,11 @@
 
 #include "llviewerprecompiledheaders.h"
 
+#include <array>
 #include <set>
+#include <string_view>
+
+#include <fmt/format.h>
 
 #include "lltextureview.h"
 #include "pipeline.h"
@@ -36,7 +40,7 @@
 #include "lllfsthread.h"
 #include "llui.h"
 #include "llimageworker.h"
-#include "algpubuffer.h"
+#include "alvramusage.h"
 #include "llrender.h"
 
 #include "lltooltip.h"
@@ -602,9 +606,8 @@ void LLGLTexMemBar::draw()
    F64 raw_image_bytes_MB = raw_image_bytes / (1024.0 * 1024.0);
    F64 saved_raw_image_bytes_MB = saved_raw_image_bytes / (1024.0 * 1024.0);
    F64 aux_raw_image_bytes_MB = aux_raw_image_bytes / (1024.0 * 1024.0);
-   F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0;
-   F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / 1024.0 / 512.0;
-   F64 render_bytes_alloc = LLRenderTarget::sBytesAllocated / 1024.0 / 1024.0;
+   constexpr F64 MB = 1024.0 * 1024.0;
+   const ALVRAMUsage vram = ALVRAMUsage::current();
 
     //----------------------------------------------------------------------------
     LLGLSUIDefault gls_ui;
@@ -634,19 +637,24 @@ void LLGLTexMemBar::draw()
 
     // Parent LLContainerView already paints the full-rect background; this bar's
     // required height (see getRequiredRect) covers all eight lines of text below.
-    text = llformat("Est. Free: %d MB Sys Free: %d MB FBO: %d MB Buffers: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
-                    (S32)LLViewerTexture::sFreeVRAMMegabytes,
-                    LLMemory::getAvailableMemKB()/1024,
-                    LLRenderTarget::sBytesAllocated/(1024*1024),
-                    (S32)(ALGPUBuffer::sBytesAllocated/(1024*1024)),
-                    gPipeline.mReflectionMapManager.probeCount(),
-                    gPipeline.mReflectionMapManager.probeMemory(),
-                    discard_bias,
-                    cache_usage,
-                    cache_max_usage);
-    widest = llmax(widest, font_mono->getWidth(text));
-    font_mono->renderUTF8(text, 0, 0, v_offset + line_height*8,
-                          text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    // The two video memory lines are formatted into a buffer of the frame's, not a string.
+    std::array<char, 384> line;
+    {
+        // What the bias works from: the VRAM detected, the budget, the target it keeps used under, used and free.
+        F32 budget = 0.f;
+        F32 target = 0.f;
+        LLViewerTexture::getVRAMBudget(budget, target);
+        const F64 used = vram.total() / MB;
+        const auto out = fmt::format_to_n(line.data(), line.size(),
+                                          "VRAM: {} MB  Budget: {:.0f}  Target: {:.0f}  Used: {:.0f}  Free: {:.0f} MB  "
+                                          "Bias: {:.2f}  Sys Free: {} MB  Cache: {:.1f}/{:.1f} MB",
+                                          gGLManager.mVRAM, budget, target, used, target - used, discard_bias,
+                                          LLMemory::getAvailableMemKB().valueInUnits<LLUnits::Megabytes>(), cache_usage,
+                                          cache_max_usage);
+        const std::string_view status(line.data(), std::min(out.size, line.size()));
+        widest = llmax(widest, font_mono->getWidth(status));
+        font_mono->renderUTF8(status, 0, 0, v_offset + line_height * 8, text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    }
 
     text = llformat("Images: %d   Raw: %d (%.2f MB)  Saved: %d (%.2f MB) Aux: %d (%.2f MB)", image_count, raw_image_count, raw_image_bytes_MB,
         saved_raw_image_count, saved_raw_image_bytes_MB,
@@ -655,14 +663,22 @@ void LLGLTexMemBar::draw()
     font_mono->renderUTF8(text, 0, 0, v_offset + line_height * 7,
         text_color, LLFontGL::LEFT, LLFontGL::TOP);
 
-    text = llformat("Textures: %.2f MB  Vertex: %.2f MB  Render: %.2f MB  Total: %.2f MB",
-                    texture_bytes_alloc,
-                    vertex_bytes_alloc,
-                    render_bytes_alloc,
-        texture_bytes_alloc+vertex_bytes_alloc);
-    widest = llmax(widest, font_mono->getWidth(text));
-    font_mono->renderUTF8(text, 0, 0, v_offset + line_height * 6,
-        text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    {
+        // What used is made of, each allocation once: the textures of each kind, the render targets with the
+        // transient pool's share of them, the reflection and hero probes' arrays with the count of reflection probes,
+        // geometry with the pool's share, and the other buffers.
+        const auto out = fmt::format_to_n(
+            line.data(), line.size(),
+            "Streamed: {:.1f}  Other: {:.1f}  Targets: {:.1f} (pool {:.1f})  Probes: {:.1f} ({} reflection)  "
+            "Geometry: {:.1f} (pool {:.1f})  Buffers: {:.1f}  Total: {:.1f} MB",
+            vram.mStreamedTextures / MB, vram.mOtherTextures / MB, vram.mRenderTargets / MB,
+            gPipeline.mTransientTargets.stats().mBytes / MB, vram.mReflectionProbes / MB,
+            gPipeline.mReflectionMapManager.probeCount(), vram.mGeometry / MB, vram.mGeometryPooled / MB,
+            vram.mGPUBuffers / MB, vram.total() / MB);
+        const std::string_view classes(line.data(), std::min(out.size, line.size()));
+        widest = llmax(widest, font_mono->getWidth(classes));
+        font_mono->renderUTF8(classes, 0, 0, v_offset + line_height * 6, text_color, LLFontGL::LEFT, LLFontGL::TOP);
+    }
 
     U32 cache_read(0U), cache_write(0U), res_wait(0U);
     LLAppViewer::getTextureFetch()->getStateStats(&cache_read, &cache_write, &res_wait);

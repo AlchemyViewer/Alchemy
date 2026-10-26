@@ -487,6 +487,7 @@ private:
     LLVolumeInterface *mVolumeImpl;
     LLPointer<LLViewerFetchedTexture> mSculptTexture;
     LLPointer<LLViewerFetchedTexture> mLightTexture;
+    std::vector<ALTextureBoost> mHUDBoosts; // BOOST_HUD on its faces' textures, held while it is a HUD
     media_list_t mMediaImplList;
     S32         mLastFetchedMediaVersion; // as fetched from the server, starts as -1
     U32         mServerDrawableUpdateCount;

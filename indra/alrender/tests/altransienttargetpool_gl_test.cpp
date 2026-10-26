@@ -31,6 +31,7 @@
 #include "llgl.h"
 #include "llglheaders.h"
 #include "llglstates.h"
+#include "llimagegl.h"
 #include "llrender.h"
 #include "llrendertarget.h"
 
@@ -181,12 +182,12 @@ namespace
             CHECK(names.framebuffer != 0u);
             CHECK(pool.release(first));
 
-            const U32 bytes = LLRenderTarget::sBytesAllocated;
+            const U64 bytes = LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET);
             LLRenderTarget* again = pool.acquire(desc, "again");
             REQUIRE(again == first);
             UNSCOPED_INFO("nothing built: the names it had, and no byte more");
             CHECK(names_of(*again) == names);
-            CHECK(LLRenderTarget::sBytesAllocated == bytes);
+            CHECK(LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET) == bytes);
             CHECK(again->desc() == desc);
             CHECK(pool.release(again));
         }

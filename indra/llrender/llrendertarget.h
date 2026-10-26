@@ -70,7 +70,6 @@ class LLVertexBuffer;
 class LLRenderTarget
 {
 public:
-    static U32 sBytesAllocated;
     static U32 sCurFBO;
     static U32 sCurResX;
     static U32 sCurResY;
@@ -115,7 +114,10 @@ public:
     // stencil - if true, allocate a combined depth+stencil buffer (requires depth)
     // usage - deprecated, should always be TT_TEXTURE
     // depth_fmt - bit depth for the depth component (ignored unless depth is true)
-    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24);
+    // mip_levels - with mips, the levels each colour attachment holds from level 0 down: 0 for every level to 1x1, and
+    //              never more than that. desc() does not say it: a target given a shorter chain describes itself as
+    //              one with every level, so it is for targets ensure does not build, and resize gives every level.
+    bool allocate(U32 resx, U32 resy, U32 color_fmt, bool depth = false, bool stencil = false, ALTextureSlot::eTextureType usage = ALTextureSlot::TT_TEXTURE, eMipGeneration generateMipMaps = MIPS_NONE, eDepthFormat depth_fmt = DEPTH_FMT_24, U32 mip_levels = 0);
 
     // What this target's own storage is: its size, the formats of the colour attachments it allocated, the depth it
     // allocated, and its mips. A released target is the default description. A depth attachment shared from another
@@ -154,8 +156,9 @@ public:
     // it attached from one built since in its place. 0 for none.
     U64 getDepthSerial() const { return mDepthSerial; }
 
-    // What sBytesAllocated counts for a target built from `desc`: each colour attachment's first level and the depth
-    // of its own, not a depth it shares.
+    // What the VRAM accounting counts for a target built from `desc`, as render target storage: every level of each
+    // colour attachment and the depth of its own, not a depth it shares, at the size their formats pad to, and at the
+    // size allocate holds a description to where there is a context.
     static U64 bytesFor(const ALRenderTargetDesc& desc);
 
     // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the

@@ -83,11 +83,8 @@ void LLCubeMap::initGL()
         // sub-image writes instead of allocations.
         gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
-        // count of 6: alloc_tex_image's count covers cube faces. The per-face
-        // path used to account one face at a time onto the same texture name,
-        // each call releasing the last, so only one face's worth was ever
-        // recorded for the whole cube.
-        LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, false);
+        // Recorded once for the whole cube: alloc_tex_image's count of 6 covers its faces.
+        LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, 1, LLImageGLMemory::OTHER_TEXTURE);
         stop_glerror();
 
         for (int i = 0; i < 6; i++)
