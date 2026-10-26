@@ -84,11 +84,16 @@ namespace
 
     // Frames whose commands the GPU takes a while over, for the pacing wait: it is seen to wait for a frame only where
     // the GPU is still drawing that frame when the wait begins. The work is draws of a loop over a small target, each
-    // calibrated to take about DRAW_SECONDS, far short of a driver's watchdog, as many as a span asks.
+    // calibrated to take about DRAW_SECONDS, far short of a driver's watchdog, as many as a span asks, flushed every
+    // FLUSH_SECONDS of it.
     struct alframefences_paced_data : alframefences_data
     {
         static constexpr S32 SIZE = 256;
         static constexpr F64 DRAW_SECONDS = 0.01;
+        // How much of the work goes to the GPU in one submission. A driver that switches to another process's work only
+        // between submissions could not switch for the whole span otherwise, and Windows resets a GPU that does not
+        // switch within two seconds (TDR): spans of seconds, run beside other GL tests, did.
+        static constexpr F64 FLUSH_SECONDS = 0.05;
         // What one frame's work takes the GPU at the least: the cases' checks come within a millisecond of it, and the
         // pacing wait gives up after a second, which leaves room for other processes' work on the GPU.
         static constexpr F64 BUSY_SECONDS = 0.08;
@@ -184,13 +189,19 @@ namespace
             }
         }
 
-        // Work the GPU takes `seconds` over at the least, as calibrated, issued in the open frame.
+        // Work the GPU takes `seconds` over at the least, as calibrated, issued in the open frame in submissions of
+        // FLUSH_SECONDS.
         void keepBusy(F64 seconds = BUSY_SECONDS)
         {
-            const S32 draws = std::max(1, (S32)std::ceil(seconds / mDrawSeconds));
+            const S32 draws     = std::max(1, (S32)std::ceil(seconds / mDrawSeconds));
+            const S32 per_flush = std::max(1, (S32)(FLUSH_SECONDS / mDrawSeconds));
             for (S32 i = 0; i < draws; ++i)
             {
                 draw(mIterations);
+                if ((i + 1) % per_flush == 0)
+                {
+                    glFlush();
+                }
             }
         }
 
