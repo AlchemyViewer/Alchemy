@@ -4425,6 +4425,368 @@ namespace
         }
     }
 
+    // One triangle of a mesh face as the wire carries it, its vertices on
+    // the unit cube's axes and each value sixteen bits, low byte first.
+    LLSD wireTriangle()
+    {
+        auto binary = [](std::initializer_list<U16> values)
+        {
+            LLSD::Binary bytes;
+            for (U16 value : values)
+            {
+                bytes.push_back((U8)(value & 0xff));
+                bytes.push_back((U8)(value >> 8));
+            }
+            return LLSD(bytes);
+        };
+        LLSD face;
+        face["Position"] = binary({ 0, 0, 0, 65535, 0, 0, 0, 65535, 0 });
+        face["TriangleList"] = binary({ 0, 1, 2 });
+        face["PositionDomain"]["Min"] = LLVector3(-0.5f, -0.5f, -0.5f).getValue();
+        face["PositionDomain"]["Max"] = LLVector3(0.5f, 0.5f, 0.5f).getValue();
+        face["TexCoord0Domain"]["Min"] = LLVector2(0.f, 0.f).getValue();
+        face["TexCoord0Domain"]["Max"] = LLVector2(1.f, 1.f).getValue();
+        return face;
+    }
+
+    // A LOD of the faces, decoded into a mesh volume of its own.
+    LLPointer<LLVolume> decodeFaces(const LLSD& mdl, bool& decoded)
+    {
+        LLVolumeParams params;
+        params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000c"), LL_SCULPT_TYPE_MESH);
+        LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
+        decoded = ll_test::VolumeProbe::decode(*volume, mdl);
+        return volume;
+    }
+
+    // A LOD of the one face, decoded into a mesh volume of its own.
+    LLPointer<LLVolume> decodeLOD(const LLSD& face, bool& decoded)
+    {
+        LLSD mdl = LLSD::emptyArray();
+        mdl.append(face);
+        return decodeFaces(mdl, decoded);
+    }
+
+    // A face's TriangleList of zeros deflates to almost nothing, so that one
+    // the unzip cap lets through could hold a hundred million indices, and
+    // cost every viewer that decodes it seconds and gigabytes. A LOD with a
+    // face of more indices than LL_SCULPT_MESH_MAX_FACE_INDICES does not
+    // decode; one with a face of as many as that does.
+    TEST_CASE("llvolume: a mesh face of more indices than a face may hold does not decode", "[llvolume]")
+    {
+        const S32 most = LL_SCULPT_MESH_MAX_FACE_INDICES - LL_SCULPT_MESH_MAX_FACE_INDICES % 3;
+        for (const S32 indices : { most, most + 3 })
+        {
+            CAPTURE(indices);
+            LLSD face = wireTriangle();
+            face["TriangleList"] = LLSD(LLSD::Binary((size_t)indices * sizeof(U16), 0));
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeLOD(face, decoded);
+            CHECK(decoded == (indices <= LL_SCULPT_MESH_MAX_FACE_INDICES));
+            if (decoded)
+            {
+                REQUIRE(volume->getNumVolumeFaces() == 1);
+                CHECK(volume->getVolumeFace(0).mNumIndices == indices);
+            }
+            else
+            {
+                CHECK(volume->getNumVolumeFaces() == 0);
+            }
+        }
+    }
+
+    // Faces each within LL_SCULPT_MESH_MAX_FACE_INDICES could still carry,
+    // between them, all the indices the unzip cap lets through. A LOD whose
+    // faces hold more than LL_SCULPT_MESH_MAX_LOD_INDICES between them does
+    // not decode; one whose hold as many as that does.
+    TEST_CASE("llvolume: a mesh LOD of more indices than a LOD may hold does not decode", "[llvolume]")
+    {
+        const S32 most = LL_SCULPT_MESH_MAX_FACE_INDICES - LL_SCULPT_MESH_MAX_FACE_INDICES % 3;
+        REQUIRE(2 * most <= LL_SCULPT_MESH_MAX_LOD_INDICES);
+        REQUIRE(2 * most + 6 > LL_SCULPT_MESH_MAX_LOD_INDICES);
+        for (const S32 last : { 0, 6 })
+        {
+            CAPTURE(last);
+            LLSD mdl = LLSD::emptyArray();
+            for (const S32 indices : { most, most, last })
+            {
+                if (indices > 0)
+                {
+                    LLSD face = wireTriangle();
+                    face["TriangleList"] = LLSD(LLSD::Binary((size_t)indices * sizeof(U16), 0));
+                    mdl.append(face);
+                }
+            }
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeFaces(mdl, decoded);
+            CHECK(decoded == (last == 0));
+            CHECK(volume->getNumVolumeFaces() == (decoded ? (S32)mdl.size() : 0));
+        }
+    }
+
+    // A face with no geometry costs nothing against the index budget, but
+    // is made all the same, so that a LOD of many would cost what the index
+    // budget does not count. A LOD of more than LL_SCULPT_MESH_MAX_FACES
+    // faces does not decode; one of as many as that does.
+    TEST_CASE("llvolume: a mesh LOD of more faces than a LOD may hold does not decode", "[llvolume]")
+    {
+        for (const S32 faces : { LL_SCULPT_MESH_MAX_FACES, LL_SCULPT_MESH_MAX_FACES + 1 })
+        {
+            CAPTURE(faces);
+            LLSD mdl = LLSD::emptyArray();
+            for (S32 f = 0; f < faces; ++f)
+            {
+                LLSD face;
+                face["NoGeometry"] = true;
+                mdl.append(face);
+            }
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeFaces(mdl, decoded);
+            CHECK(decoded == (faces <= LL_SCULPT_MESH_MAX_FACES));
+            CHECK(volume->getNumVolumeFaces() == (decoded ? faces : 0));
+        }
+    }
+
+    // A rigged face's weights are an influence after another, each a joint
+    // and two bytes of weight. An array that ends inside an influence leaves
+    // its vertex the influences before it, and is not read past its end.
+    TEST_CASE("llvolume: a mesh face whose weights end inside an influence keeps the influences before it", "[llvolume]")
+    {
+        struct Cut
+        {
+            const char* what;
+            LLSD::Binary weights;
+            S32 joint; // the first vertex's first joint, or -1 for none
+        };
+        const Cut cuts[] = {
+            { "joint 5 at half, then joint 7 and one byte of its weight", { 5, 0xff, 0x7f, 7, 0xff }, 5 },
+            { "joint 5 and one byte of its weight", { 5, 0xff }, -1 },
+        };
+        for (const Cut& cut : cuts)
+        {
+            CAPTURE(cut.what);
+            LLSD face = wireTriangle();
+            face["Weights"] = LLSD(cut.weights);
+            bool decoded = false;
+            LLPointer<LLVolume> volume = decodeLOD(face, decoded);
+            REQUIRE(decoded);
+            const LLVolumeFace& rigged = volume->getVolumeFace(0);
+            REQUIRE(rigged.mNumVertices == 3);
+            REQUIRE(rigged.mWeights);
+            for (S32 v = 0; v < rigged.mNumVertices; ++v)
+            {
+                CAPTURE(v);
+                const LLVector4a& weight = rigged.mWeights[v];
+                if (v == 0 && cut.joint >= 0)
+                {
+                    CHECK((S32)weight[0] == cut.joint);
+                }
+                else
+                {
+                    // No influence: all of the weight on the first joint.
+                    CHECK(weight[0] == 0.999f);
+                }
+                CHECK(weight[1] == 0.f);
+                CHECK(weight[2] == 0.f);
+                CHECK(weight[3] == 0.f);
+            }
+        }
+    }
+
+    // A face may come without normals or texture coordinates, as the DAE
+    // loader leaves one whose source has none. Reordered without tangents,
+    // which need both, it keeps every corner's position and comes out
+    // without what it came without.
+    TEST_CASE("llvolume: a face without normals or texture coordinates reorders without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+        };
+        const Without cases[] = {
+            { "normals", true, false },
+            { "texture coordinates", false, true },
+            { "either", true, true },
+        };
+        const CorpusMesh mesh = uvSphere(16, 8);
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            // Each triangle as its corners' positions, and normals and
+            // texture coordinates where the face keeps them, from its least
+            // corner on; sorted, as the reordering leaves them in another
+            // order.
+            using Corner = std::array<F32, 8>;
+            auto triangles = [&](const LLVolumeFace& f)
+            {
+                std::vector<std::array<Corner, 3>> out(f.mNumIndices / 3);
+                for (size_t t = 0; t < out.size(); ++t)
+                {
+                    for (S32 k = 0; k < 3; ++k)
+                    {
+                        const U16 v = f.mIndices[t * 3 + k];
+                        Corner& corner = out[t][k];
+                        corner.fill(0.f);
+                        std::memcpy(&corner[0], f.mPositions[v].getF32ptr(), 3 * sizeof(F32));
+                        if (!without.normals)
+                        {
+                            std::memcpy(&corner[3], f.mNormals[v].getF32ptr(), 3 * sizeof(F32));
+                        }
+                        if (!without.tex_coords)
+                        {
+                            std::memcpy(&corner[6], f.mTexCoords[v].mV, 2 * sizeof(F32));
+                        }
+                    }
+                    std::rotate(out[t].begin(), std::min_element(out[t].begin(), out[t].end()), out[t].end());
+                }
+                std::sort(out.begin(), out.end());
+                return out;
+            };
+
+            LLVolumeFace face = mesh.face();
+            const auto before = triangles(face);
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            REQUIRE(face.cacheOptimize(true));
+            CHECK((face.mNormals != nullptr) == !without.normals);
+            CHECK((face.mTexCoords != nullptr) == !without.tex_coords);
+            CHECK(!face.mTangents);
+            REQUIRE(face.mNumIndices == (S32)before.size() * 3);
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                CAPTURE(i);
+                REQUIRE(face.mIndices[i] < face.mNumVertices);
+            }
+            CHECK(triangles(face) == before);
+        }
+    }
+
+    // A face may come without normals or texture coordinates, as the DAE
+    // loader leaves one whose source has none. remap welds its vertices by
+    // what it has, and it comes out without what it came without. Two
+    // triangles share an edge whose two vertices are each held twice, the
+    // copies apart in both normal and texture coordinate: they weld only
+    // where the face has neither.
+    TEST_CASE("llvolume: a face without normals or texture coordinates remaps without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+            S32 vertices; // after the weld
+        };
+        const Without cases[] = {
+            { "normals", true, false, 6 },
+            { "texture coordinates", false, true, 6 },
+            { "either", true, true, 4 },
+        };
+        CorpusMesh mesh;
+        mesh.positions = { { 0, 0, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 0, 0 }, { 0, 1, 0 }, { 1, 1, 0 } };
+        mesh.normals = { { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0, 1 }, { 0, 0.6f, 0.8f }, { 0, 0.6f, 0.8f }, { 0, 0, 1 } };
+        mesh.uvs = { { 0, 0 }, { 0.5f, 0 }, { 0, 0.5f }, { 0.5f, 0.5f }, { 0.5f, 1 }, { 1, 1 } };
+        mesh.indices = { 0, 1, 2, 4, 3, 5 };
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            LLVolumeFace face = mesh.face();
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            face.remap();
+            CHECK((face.mNormals != nullptr) == !without.normals);
+            CHECK((face.mTexCoords != nullptr) == !without.tex_coords);
+            CHECK(face.mNumVertices == without.vertices);
+            REQUIRE(face.mNumIndices == (S32)mesh.indices.size());
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                CAPTURE(i);
+                const U16 v = face.mIndices[i];
+                const U16 was = mesh.indices[i];
+                REQUIRE(v < face.mNumVertices);
+                CHECK(v3(face.mPositions[v]) == mesh.positions[was]);
+                if (!without.normals)
+                {
+                    CHECK(v3(face.mNormals[v]) == mesh.normals[was]);
+                }
+                if (!without.tex_coords)
+                {
+                    CHECK(face.mTexCoords[v] == mesh.uvs[was]);
+                }
+            }
+        }
+    }
+
+    // A face copied from one without normals or texture coordinates, by
+    // the copy constructor or by assignment, comes out without them too,
+    // rather than with room for them that nothing wrote.
+    TEST_CASE("llvolume: a copy of a face without normals or texture coordinates is without them", "[llvolume]")
+    {
+        struct Without
+        {
+            const char* what;
+            bool normals;
+            bool tex_coords;
+        };
+        const Without cases[] = {
+            { "normals", true, false },
+            { "texture coordinates", false, true },
+            { "either", true, true },
+        };
+        const CorpusMesh mesh = uvSphere(16, 8);
+        for (const Without& without : cases)
+        {
+            CAPTURE(without.what);
+            LLVolumeFace face = mesh.face();
+            if (without.normals)
+            {
+                face.mNormals = nullptr;
+            }
+            if (without.tex_coords)
+            {
+                face.mTexCoords = nullptr;
+            }
+            const LLVolumeFace constructed(face);
+            LLVolumeFace assigned;
+            assigned = face;
+            const LLVolumeFace* copies[] = { &constructed, &assigned };
+            for (const LLVolumeFace* copy : copies)
+            {
+                INFO((copy == &constructed ? "by the copy constructor" : "by assignment"));
+                CHECK((copy->mNormals != nullptr) == !without.normals);
+                CHECK((copy->mTexCoords != nullptr) == !without.tex_coords);
+                REQUIRE(copy->mNumVertices == face.mNumVertices);
+                for (S32 v = 0; v < face.mNumVertices; ++v)
+                {
+                    CAPTURE(v);
+                    CHECK(v3(copy->mPositions[v]) == v3(face.mPositions[v]));
+                    if (!without.normals)
+                    {
+                        CHECK(v3(copy->mNormals[v]) == v3(face.mNormals[v]));
+                    }
+                    if (!without.tex_coords)
+                    {
+                        CHECK(copy->mTexCoords[v] == face.mTexCoords[v]);
+                    }
+                }
+            }
+        }
+    }
+
     // A circle path's stations step around it and end at its end cut. The
     // steps add up with rounding, and a station they bring a rounding short
     // of the end would leave a row with no height before the end's: no two
@@ -6241,6 +6603,37 @@ namespace
             }
             checkTouches(face, mesh.name, report, touched);
         }
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
+    // A face with no area keeps no planar normal, and one with one normal is
+    // one plane along it all the same, made again at each call: it is drawn
+    // and touched along that normal as a face that keeps it is, whatever the
+    // touch's normal rounds to. Its normal here is off unit length, as a
+    // mesh's quantized normals are, so a touch projected along its own
+    // renormalized normal lands elsewhere.
+    TEST_CASE("llvolume: a face with no area is drawn and touched along its one normal", "[llvolume]")
+    {
+        LLVolumeFace face;
+        face.resizeVertices(3);
+        face.resizeIndices(3);
+        REQUIRE(face.mNumVertices == 3);
+        REQUIRE(face.mNumIndices == 3);
+        for (S32 v = 0; v < 3; ++v)
+        {
+            face.mPositions[v].set(0.25f, -0.375f, 0.125f);
+            face.mNormals[v].set(0.f, 0.6f, 0.9f);
+            face.mTexCoords[v].set(0.f, 0.f);
+            face.mIndices[v] = static_cast<U16>(v);
+        }
+        const LLVector4a planar = face.getPlanarNormal();
+        CHECK(planar[3] > 0.f);
+        CHECK(std::memcmp(planar.getF32ptr(), face.mNormals[0].getF32ptr(), 3 * sizeof(F32)) == 0);
+
+        Report report;
+        S64 touched = 0;
+        checkTouches(face, "a face of no area", report, touched);
         INFO(report.text());
         CHECK(report.failures == 0);
     }

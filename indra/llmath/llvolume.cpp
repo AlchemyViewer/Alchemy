@@ -2582,6 +2582,32 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
             return false;
         }
 
+        // A face of no indices costs nothing against the index budget, but
+        // is made all the same.
+        if (face_count > (size_t)LL_SCULPT_MESH_MAX_FACES)
+        {
+            LL_WARNS() << "Invalid face count " << face_count << " exceeds maximum" << LL_ENDL;
+            mVolumeFaces.clear();
+            return false;
+        }
+
+        // The LOD's indices between its faces, summed before any face is
+        // made.
+        size_t lod_indices = 0;
+        for (size_t i = 0; i < face_count; ++i)
+        {
+            if (!mdl[i].has("NoGeometry"))
+            {
+                lod_indices += mdl[i]["TriangleList"].asBinary().size() / sizeof(U16);
+            }
+        }
+        if (lod_indices > (size_t)LL_SCULPT_MESH_MAX_LOD_INDICES)
+        {
+            LL_WARNS() << "Invalid index count " << lod_indices << " exceeds maximum for a LOD of " << face_count << " faces" << LL_ENDL;
+            mVolumeFaces.clear();
+            return false;
+        }
+
         mVolumeFaces.resize(face_count);
 
         for (size_t i = 0; i < face_count; ++i)
@@ -2616,6 +2642,14 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                 LL_WARNS() << "Incomplete triangle discarded from face! Indices count " << num_indices << " was not divisible by 3. face index: " << i << " Total: " << face_count << LL_ENDL;
                 num_indices -= indices_to_discard;
             }
+
+            if (num_indices > (size_t)LL_SCULPT_MESH_MAX_FACE_INDICES)
+            {
+                LL_WARNS() << "Invalid index count " << num_indices << " exceeds maximum for face index: " << i << LL_ENDL;
+                mVolumeFaces.clear();
+                return false;
+            }
+
             face.resizeIndices(static_cast<S32>(num_indices));
 
             if (num_indices > 2 && !face.mIndices)
@@ -2820,8 +2854,16 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                     U32 joints[4] = {0,0,0,0};
                     LLVector4 joints_with_weights(0,0,0,0);
 
-                    while (joint != END_INFLUENCES && idx < weights.size())
+                    while (joint != END_INFLUENCES)
                     {
+                        // An influence is its joint and two bytes of weight;
+                        // an array that ends inside one ends there, the
+                        // vertex keeping the influences before it.
+                        if (weights.size() - idx < 2)
+                        {
+                            idx = (U32)weights.size();
+                            break;
+                        }
                         U16 influence = weights[idx++];
                         influence |= ((U16) weights[idx++] << 8);
 
@@ -2830,7 +2872,7 @@ bool LLVolume::decodeVolumeFaces(const LLSD& mdl)
                         joints[cur_influence] = joint;
                         cur_influence++;
 
-                        if (cur_influence >= 4)
+                        if (cur_influence >= 4 || idx >= weights.size())
                         {
                             joint = END_INFLUENCES;
                         }
@@ -4870,6 +4912,17 @@ LLVolumeFace& LLVolumeFace::operator=(const LLVolumeFace& src)
             LLVector4a::memcpyNonAliased16((F32*) mTexCoords, (F32*) src.mTexCoords, tc_size);
         }
 
+        // A source without normals or texture coordinates makes a face
+        // without them, not one whose are unwritten.
+        if (!src.mNormals)
+        {
+            mNormals = NULL;
+        }
+        if (!src.mTexCoords)
+        {
+            mTexCoords = NULL;
+        }
+
         if (src.mTangents)
         {
             allocateTangents(src.mNumVertices);
@@ -5058,16 +5111,21 @@ void LLVolumeFace::remap()
     }
 
     // Each vertex's place among the vertices that differ in position, normal
-    // or texture coordinate, or ~0u where no index uses it.
-    const meshopt_Stream streams[] = {
-        { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) },
-        { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) },
-        { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) },
-    };
+    // or texture coordinate, or ~0u where no index uses it. Normals and
+    // texture coordinates the face has none of take no part.
+    meshopt_Stream streams[3] = { { mPositions, sizeof(F32) * 3, sizeof(LLVector4a) } };
+    size_t stream_count = 1;
+    if (mNormals)
+    {
+        streams[stream_count++] = { mNormals, sizeof(F32) * 3, sizeof(LLVector4a) };
+    }
+    if (mTexCoords)
+    {
+        streams[stream_count++] = { mTexCoords, sizeof(LLVector2), sizeof(LLVector2) };
+    }
     U32* remap = scratch.allocate<U32>(mNumVertices);
     S32 remap_vertices_count = static_cast<S32>(meshopt_generateVertexRemapMulti(remap, checked, checked ? mNumIndices : mNumVertices,
-                                                                                 mNumVertices, streams,
-                                                                                 sizeof(streams) / sizeof(streams[0])));
+                                                                                 mNumVertices, streams, stream_count));
     meshopt_remapIndexBuffer(indices, checked, mNumIndices, remap);
 
     // Allocate new buffers
@@ -5079,14 +5137,29 @@ void LLVolumeFace::remap()
     LLVector4a* remap_normals = remap_positions + remap_vertices_count;
     LLVector2* remap_tex_coords = (LLVector2*)(remap_normals + remap_vertices_count);
 
-    // Fill the buffers
+    // Fill the buffers, the normals and texture coordinates only where the
+    // face has them
     for (S32 i = 0; i < mNumIndices; ++i)
     {
         remap_indices[i] = static_cast<U16>(indices[i]);
     }
     meshopt_remapVertexBuffer(remap_positions, mPositions, mNumVertices, sizeof(LLVector4a), remap);
-    meshopt_remapVertexBuffer(remap_normals, mNormals, mNumVertices, sizeof(LLVector4a), remap);
-    meshopt_remapVertexBuffer(remap_tex_coords, mTexCoords, mNumVertices, sizeof(LLVector2), remap);
+    if (mNormals)
+    {
+        meshopt_remapVertexBuffer(remap_normals, mNormals, mNumVertices, sizeof(LLVector4a), remap);
+    }
+    else
+    {
+        remap_normals = nullptr;
+    }
+    if (mTexCoords)
+    {
+        meshopt_remapVertexBuffer(remap_tex_coords, mTexCoords, mNumVertices, sizeof(LLVector2), remap);
+    }
+    else
+    {
+        remap_tex_coords = nullptr;
+    }
 
     // Free unused buffers
     ll_aligned_free_16(mIndices);
@@ -5374,8 +5447,14 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
             const U32 from = first_corner ? indices[corner] : (U32)u;
 
             mPositions[to] = old_positions[from];
-            mNormals[to] = old_normals[from];
-            mTexCoords[to] = old_tex_coords[from];
+            if (old_normals)
+            {
+                mNormals[to] = old_normals[from];
+            }
+            if (old_tex_coords)
+            {
+                mTexCoords[to] = old_tex_coords[from];
+            }
             if (old_weights)
             {
                 mWeights[to] = old_weights[from];
@@ -5394,6 +5473,17 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         for (size_t i = 0; i < index_count; ++i)
         {
             mIndices[i] = (U16)place[ordered[i]];
+        }
+
+        // A face without normals or texture coordinates, as the DAE loader
+        // makes one, keeps none.
+        if (!old_normals)
+        {
+            mNormals = nullptr;
+        }
+        if (!old_tex_coords)
+        {
+            mTexCoords = nullptr;
         }
 
         ll_aligned_free<64>(old_positions);
@@ -5772,14 +5862,7 @@ void LLVolumeFace::getPlanarBasis(const LLVector4a& normal, F32 switch_x, LLVect
 
 void LLVolumeFace::getPlanarTexCoords(const LLVector4a& scale, const alsimd::TexTransform* transform, F32* dst) const
 {
-    // read back from the member, whole: a vector rebuilt from its parts
-    // waits on their stores
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     if (planar[3] > 0.f)
     {
         LLVector4a binormal, tangent;
@@ -5794,12 +5877,7 @@ void LLVolumeFace::getPlanarTexCoords(const LLVector4a& scale, const alsimd::Tex
 
 LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVector4a& normal, const alsimd::TexTransform* transform) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     const LLVector4a unscaled(1.f);
     LLVector2 tc;
     if (planar[3] > 0.f)
@@ -5817,12 +5895,7 @@ LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVe
 
 void LLVolumeFace::getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     if (planar[3] > 0.f)
     {
         LLVector4a binormal, tangent;
@@ -5837,12 +5910,7 @@ void LLVolumeFace::getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) c
 
 LLVector4a LLVolumeFace::getPlanarTangent(const LLVector4a& normal, const LLVector4a& scale) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     LLVector4a out;
     if (planar[3] > 0.f)
     {
