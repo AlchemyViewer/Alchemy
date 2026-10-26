@@ -6396,8 +6396,12 @@ namespace
         // The rows' frames, each in its station.
         static_assert(sizeof(LLPath::PathFrame) == 5 * sizeof(LLVector4a), "a frame is five vectors");
         static_assert(sizeof(LLPath::PathPt) % sizeof(LLVector4a) == 0, "stations are a whole number of vectors apart");
+        static_assert(offsetof(LLPath::PathPt, mFrame) % sizeof(LLVector4a) == 0, "a frame starts on a vector");
         constexpr size_t STRIDE = sizeof(LLPath::PathPt) / sizeof(LLVector4a);
-        const LLVector4a* const frames = stations[begin_t].mFrame.mRow;
+        // A run of vectors over the stations, taken from the station rather
+        // than its frame's two rows, which the reads run past.
+        const LLVector4a* const frames =
+            reinterpret_cast<const LLVector4a*>(stations + begin_t) + offsetof(LLPath::PathPt, mFrame) / sizeof(LLVector4a);
 
         // A first or last row the path's scale narrows to a line or a point
         // takes its frame a step into the face.
