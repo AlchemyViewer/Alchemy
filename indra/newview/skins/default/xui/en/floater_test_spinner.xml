@@ -63,14 +63,14 @@
      top_delta="0"
      width="200" />
     <spinner
-     control_name="RenderFogRatio"
-     decimal_digits="1"
+     control_name="RenderDebugNormalScale"
+     decimal_digits="2"
      height="20"
      label="Control Spinner"
      layout="topleft"
      left="10"
-     max_val="20"
-     min_val="10"
+     max_val="1"
+     min_val="0"
      name="control_spinner"
      top="260"
      width="250" />

@@ -422,16 +422,6 @@ static bool handleGammaChanged(const LLSD& newvalue)
     return true;
 }
 
-const F32 MAX_USER_FOG_RATIO = 10.f;
-const F32 MIN_USER_FOG_RATIO = 0.5f;
-
-static bool handleFogRatioChanged(const LLSD& newvalue)
-{
-    F32 fog_ratio = llmax(MIN_USER_FOG_RATIO, llmin((F32) newvalue.asReal(), MAX_USER_FOG_RATIO));
-    gPipeline.mSky.setFogRatio(fog_ratio);
-    return true;
-}
-
 static bool handleMaxPartCountChanged(const LLSD& newvalue)
 {
     LLViewerPartSim::setMaxPartCount(newvalue.asInteger());
@@ -1026,7 +1016,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTreeLODFactor", handleTreeLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFlexTimeFactor", handleFlexLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGamma", handleGammaChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderFogRatio", handleFogRatioChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);

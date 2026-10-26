@@ -77,29 +77,23 @@ public:
 };
 
 /// The sky's colour a little above the horizon, toward the light, across from it and between, which the tracker's
-/// beacons fade into; and the colour the GL fog took, the water's below its surface.
+/// beacons fade into.
 class LLAtmospherics
 {
 public:
     LLAtmospherics();
     ~LLAtmospherics();
 
-    /// Works both colours out from the current sky, toward @a tosun (+z up), while the render debug feature Fog is on.
-    void updateFog(const F32 distance, const LLVector3& tosun);
+    /// Works the colour out from the current sky, toward @a tosun (+z up), while the render debug feature Fog is on.
+    void updateFog(const LLVector3& tosun);
 
-    void setFogRatio(const F32 fog_ratio)            { mFogRatio = fog_ratio; }
-
-    F32      getFogRatio() const                     { return mFogRatio; }
     LLColor4 getFogColor() const                     { return mFogColor; }
-    LLColor4 getGLFogColor() const                   { return mGLFogCol; }
 
 private:
     LLColor4 calcSkyColorInDir(const LLSettingsSky::ptr_t &psky, AtmosphericsVars& vars, const LLVector3& dir);
     void     calcSkyColorWLVert(const LLSettingsSky::ptr_t &psky, LLVector3 & Pn, AtmosphericsVars& vars);
 
     LLColor4            mFogColor;
-    LLColor4            mGLFogCol;
-    F32                 mFogRatio;
 };
 
 #endif

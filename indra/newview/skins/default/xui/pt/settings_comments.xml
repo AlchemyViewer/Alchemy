@@ -1869,8 +1869,6 @@
   <string>Clipe de distância de renderização.</string>
   <key>RenderFlexTimeFactor</key>
   <string>Controla o nível de detalhe de objetos flexíveis (multiplicador para o tempo gasto processando objetos flex).</string>
-  <key>RenderFogRatio</key>
-  <string>OBSOLETO - Distância da câmera onde a névoa atinge densidade máxima (fração ou múltiplo da distância de far clip).</string>
   <key>RenderGLContextCoreProfile</key>
   <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício. Apenas Windows.</string>
   <key>RenderGLMultiThreadedMedia</key>
@@ -2871,10 +2869,6 @@
   <string>Controla se o temporizador watchdog de threads é ativado. O valor é S32. Defina -1 para usar o padrão embutido.</string>
   <key>WaterGLFogDensityScale</key>
   <string>Mapeia a densidade da névoa de água do shader para a densidade da névoa do gl.</string>
-  <key>WaterGLFogDepthFloor</key>
-  <string>Controla quão escura a névoa de água do gl pode ficar.</string>
-  <key>WaterGLFogDepthScale</key>
-  <string>Controla quão rapidamente a névoa do gl escurece debaixo d'água.</string>
   <key>WearFolderLimit</key>
   <string>Limita o número de itens na pasta que podem ser substituídos/adicionados ao visual atual.</string>
   <key>WearablesEveryoneCopy</key>

@@ -173,7 +173,6 @@ void ALSky::update()
         mStarCountConnection = gSavedSettings.getControl("RenderStarCount")->getSignal()->connect(
             [this](LLControlVariable*, const LLSD&, const LLSD&) { requestStars(); });
 
-        setFogRatio(gSavedSettings.getF32("RenderFogRatio"));
         mReady = true;
     }
 
@@ -1144,7 +1143,7 @@ void ALSky::updateEnvironment()
     LL_PROFILE_ZONE_NAMED_CATEGORY_ENVIRONMENT("sky environment");
 
     // The fog colour the tracker's beacons fade into.
-    mAtmospherics.updateFog(LLViewerCamera::getInstance()->getFar(), LLEnvironment::instance().getClampedLightDirection());
+    mAtmospherics.updateFog(LLEnvironment::instance().getClampedLightDirection());
 
     // The sky is taken once the cube holds it, or where there is no cube to bake.
     mEnvironmentUpdated = now;

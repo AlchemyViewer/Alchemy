@@ -150,9 +150,6 @@ public:
     /// The sun's direction pushed south as it nears the zenith, so bump maps always show on cubes' upward faces.
     const LLVector3& getBumpSunDir() const { return mBumpSunDir; }
 
-    /// Fog distance as a fraction of the cull distance.
-    void setFogRatio(F32 fog_ratio) { mAtmospherics.setFogRatio(fog_ratio); }
-    F32  getFogRatio() const { return mAtmospherics.getFogRatio(); }
     /// The sky's colour near the horizon, which the tracker's beacons fade into.
     LLColor4 getSkyFogColor() const { return mAtmospherics.getFogColor(); }
 

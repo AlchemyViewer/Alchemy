@@ -28,26 +28,11 @@
 
 #include "lllegacyatmospherics.h"
 
-#include "llfeaturemanager.h"
-#include "llviewercontrol.h"
-#include "llframetimer.h"
-
-#include "llagent.h"
-#include "llagentcamera.h"
-#include "lldrawable.h"
-#include "llface.h"
-#include "llglheaders.h"
-#include "llviewercamera.h"
-#include "llviewertexturelist.h"
-#include "llviewerobjectlist.h"
-#include "llviewerregion.h"
-#include "llworld.h"
 #include "pipeline.h"
 #include "v3colorutil.h"
 
 #include "llsettingssky.h"
 #include "llenvironment.h"
-#include "lldrawpoolwater.h"
 
 class LLFastLn
 {
@@ -145,7 +130,6 @@ LLAtmospherics::LLAtmospherics()
 {
     mFogColor.mV[VRED] = mFogColor.mV[VGREEN] = mFogColor.mV[VBLUE] = 0.5f;
     mFogColor.mV[VALPHA] = 0.0f;
-    mFogRatio = 1.2f;
 }
 
 
@@ -266,7 +250,7 @@ void LLAtmospherics::calcSkyColorWLVert(const LLSettingsSky::ptr_t &psky, LLVect
     componentMultBy(vars.hazeColor, LLColor3::white - temp1);
 }
 
-void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
+void LLAtmospherics::updateFog(const LLVector3& tosun_in)
 {
     LLVector3 tosun = tosun_in;
 
@@ -275,20 +259,9 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
         return;
     }
 
-    LLColor4 target_fog(0.f, 0.2f, 0.5f, 0.f);
-
-    const F32 water_height = gAgent.getRegion() ? gAgent.getRegion()->getWaterHeight() : 0.f;
-    // LLWorld::getInstance()->getWaterHeight();
-    F32 camera_height = gAgentCamera.getCameraPositionAgent().mV[2];
-
-    F32 near_clip_height = LLViewerCamera::getInstance()->getAtAxis().mV[VZ] * LLViewerCamera::getInstance()->getNear();
-    camera_height += near_clip_height;
-
-    F32 fog_distance = 0.f;
     LLColor3 res_color[3];
 
     LLColor3 sky_fog_color = LLColor3::white;
-    LLColor3 render_fog_color = LLColor3::white;
 
     const F32 tosun_z = tosun.mV[VZ];
     tosun.mV[VZ] = 0.f;
@@ -351,35 +324,6 @@ void LLAtmospherics::updateFog(const F32 distance, const LLVector3& tosun_in)
 
     color_gamma_correct(sky_fog_color);
 
-    render_fog_color = sky_fog_color;
-
-    fog_distance = mFogRatio * distance;
-
-    if (camera_height > water_height)
-    {
-        LLColor4 fog(render_fog_color);
-        mGLFogCol = fog;
-    }
-    else
-    {
-        LLSettingsWater::ptr_t pwater = LLEnvironment::instance().getCurrentWater();
-        F32 depth = water_height - camera_height;
-        LLColor4 water_fog_color(pwater->getWaterFogColor());
-
-        // adjust the color based on depth.  We're doing linear approximations
-        float depth_scale = gSavedSettings.getF32("WaterGLFogDepthScale");
-        float depth_modifier = 1.0f - llmin(llmax(depth / depth_scale, 0.01f),
-            gSavedSettings.getF32("WaterGLFogDepthFloor"));
-
-        LLColor4 fogCol = water_fog_color * depth_modifier;
-        fogCol.setAlpha(1);
-
-        // set the gl fog color
-        mGLFogCol = fogCol;
-    }
-
     mFogColor = sky_fog_color;
     mFogColor.setAlpha(1);
-
-    stop_glerror();
 }
