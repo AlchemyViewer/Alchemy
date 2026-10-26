@@ -48,6 +48,7 @@
 // viewer includes
 #include "alvramusage.h"
 #include "llimagegl.h"
+#include "llviewerstats.h"
 #include "lldrawpool.h"
 #include "lltexturefetch.h"
 #include "llviewertexturelist.h"
@@ -103,7 +104,6 @@ F64 LLViewerTexture::sCurrentTime = 0.0;
 
 constexpr F32 MEMORY_CHECK_WAIT_TIME = 1.0f;
 constexpr F32 MIN_VRAM_BUDGET = 768.f;
-F32 LLViewerTexture::sFreeVRAMMegabytes = MIN_VRAM_BUDGET;
 
 LLViewerTexture::EDebugTexels LLViewerTexture::sDebugTexelsMode = LLViewerTexture::DEBUG_TEXELS_OFF;
 
@@ -471,12 +471,8 @@ void LLViewerTexture::initClass()
 }
 
 //static
-void LLViewerTexture::updateClass()
+void LLViewerTexture::getVRAMBudget(F32& budget, F32& target)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    sCurrentTime = gFrameTimeSeconds;
-
-    LLViewerMediaTexture::updateClass();
     // This is a divisor used to determine how much VRAM from our overall VRAM budget to use.
     // This is **cumulative** on whatever the detected or manually set VRAM budget is.
     // If we detect 2048MB of VRAM, this will, by default, only use 1024.
@@ -485,23 +481,60 @@ void LLViewerTexture::updateClass()
     static LLCachedControl<U32> tex_vram_divisor(gSavedSettings, "RenderTextureVRAMDivisor", 2);
     static LLCachedControl<U32> max_vram_budget(gSavedSettings, "RenderMaxVRAMBudget", 0);
 
-    // What the budget counts as used: everything the viewer holds in video memory, each allocation once, at its size.
-    const ALVRAMUsage usage = ALVRAMUsage::current();
-    F32 used = (F32)ll_round((F64)usage.total() / (1024.0 * 1024.0));
-
     // For debugging purposes, it's useful to be able to set the VRAM budget manually.
     // But when manual control is not enabled, use the VRAM divisor.
     // While we're at it, assume we have 1024 to play with at minimum when the divisor is in use.  Works more elegantly with the logic below this.
     // -Geenz 2025-03-21
-    F32 budget = max_vram_budget == 0 ? llmax(1024, (F32)gGLManager.mVRAM / tex_vram_divisor) : (F32)max_vram_budget;
+    budget = max_vram_budget == 0 ? llmax(1024, (F32)gGLManager.mVRAM / tex_vram_divisor) : (F32)max_vram_budget;
 
     // Try to leave at least half a GB for everyone else and for bias,
     // but keep at least 768MB for ourselves
     // Viewer can 'overshoot' target when scene changes, if viewer goes over budget it
     // can negatively impact performance, so leave 20% of a breathing room for
     // 'bias' calculation to kick in.
-    F32 target = llmax(llmin(budget - 512.f, budget * 0.8f), MIN_VRAM_BUDGET);
-    sFreeVRAMMegabytes = target - used;
+    target = llmax(llmin(budget - 512.f, budget * 0.8f), MIN_VRAM_BUDGET);
+}
+
+//static
+void LLViewerTexture::updateClass()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    sCurrentTime = gFrameTimeSeconds;
+
+    LLViewerMediaTexture::updateClass();
+
+    // What the budget counts as used: everything the viewer holds in video memory, each allocation once, at its size.
+    const ALVRAMUsage usage = ALVRAMUsage::current();
+    F32 used = (F32)ll_round((F64)usage.total() / (1024.0 * 1024.0));
+
+    F32 budget = 0.f;
+    F32 target = 0.f;
+    getVRAMBudget(budget, target);
+
+    sample(LLStatViewer::GL_TEX_MEM, F64Bytes((F64)usage.textures()));
+    LL_PROFILE_PLOT("VRAM used MB", (int64_t)used);
+    LL_PROFILE_PLOT("VRAM target MB", (int64_t)target);
+    LL_PROFILE_PLOT("VRAM budget MB", (int64_t)budget);
+    LL_PROFILE_PLOT("VRAM streamed textures MB", (int64_t)(usage.mStreamedTextures >> 20));
+    LL_PROFILE_PLOT("VRAM other textures MB", (int64_t)(usage.mOtherTextures >> 20));
+    LL_PROFILE_PLOT("VRAM render targets MB", (int64_t)(usage.mRenderTargets >> 20));
+    LL_PROFILE_PLOT("VRAM reflection probes MB", (int64_t)(usage.mReflectionProbes >> 20));
+    LL_PROFILE_PLOT("VRAM geometry MB", (int64_t)(usage.mGeometry >> 20));
+    LL_PROFILE_PLOT("VRAM GPU buffers MB", (int64_t)(usage.mGPUBuffers >> 20));
+
+    // GL said it ran out of video memory. Storage it refused stays counted, so used reads high while that lasts.
+    const bool out_of_memory = take_gl_out_of_memory();
+    LL_PROFILE_PLOT("GL out of video memory", (int64_t)out_of_memory);
+    if (out_of_memory)
+    {
+        static F64 next_warning = 0.0;
+        if (const F64 now = LLFrameTimer::getTotalSeconds(); now >= next_warning)
+        {
+            next_warning = now + 60.0;
+            LL_WARNS("Texture") << "GL ran out of video memory, at " << used << " MB used of a " << target
+                                << " MB target." << LL_ENDL;
+        }
+    }
 
     F32 over_pct = (used - target) / target;
 

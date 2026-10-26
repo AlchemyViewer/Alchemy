@@ -62,7 +62,7 @@ Distance de dessin : [DRAW_DISTANCE]m
 Bande passante : [NET_BANDWITH] kbit/s
 Facteur LOD (niveau de détail) : [LOD_FACTOR]
 Qualité de rendu : [RENDER_QUALITY]
-Mémoire textures : [TEXTURE_MEMORY] Mo
+Mémoire vidéo : [VIDEO_MEMORY] Mo
 	</string>
 	<string name="AboutOSXHiDPI">
 		Mode d'affichage HiDPI : [HIDPI]

@@ -19,8 +19,6 @@
 					<stat_bar label="Raw Count" name="numrawimagesstat"/>
 					<stat_bar label="GL Mem" name="gltexmemstat"/>
 					<stat_bar label="Formatted Mem" name="formattedmemstat"/>
-					<stat_bar label="Raw Mem" name="rawmemstat"/>
-					<stat_bar label="Bound Mem" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Netværk" name="network">
 					<stat_bar label="Packets In" name="packetsinstat"/>

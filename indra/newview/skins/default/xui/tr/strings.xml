@@ -62,7 +62,7 @@ UI Ölçeklendirme: [UI_SCALE]
 Bant genişliği: [NET_BANDWITH]kbit/s
 LOD faktörü: [LOD_FACTOR]
 İşleme kalitesi: [RENDER_QUALITY]
-Doku belleği: [TEXTURE_MEMORY]MB
+Video belleği: [VIDEO_MEMORY]MB
 	</string>
 	<string name="AboutOSXHiDPI">
 		HiDPI görüntü modu: [HIDPI]

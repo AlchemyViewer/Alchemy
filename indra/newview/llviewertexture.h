@@ -226,8 +226,8 @@ public:
     static bool sFreezeImageUpdates;
     static F64  sCurrentTime ;
 
-    // estimated free memory for textures, by bias calculation
-    static F32 sFreeVRAMMegabytes;
+    // The video memory budget, and the target the bias keeps used (ALVRAMUsage's total) under, in MB.
+    static void getVRAMBudget(F32& budget, F32& target);
 
     enum EDebugTexels
     {

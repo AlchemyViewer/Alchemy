@@ -188,6 +188,8 @@ extern LLTrace::SampleStatHandle<>      FPS_SAMPLE,
 extern LLTrace::SampleStatHandle<LLUnit<F32, LLUnits::Percent> > PACKETS_LOST_PERCENT;
 
 extern LLTrace::SampleStatHandle<F64Megabytes > FORMATTED_MEM;
+// The video memory textures hold, streamed and other (ALVRAMUsage::textures).
+extern LLTrace::SampleStatHandle<F64Megabytes > GL_TEX_MEM;
 
 extern SimMeasurement<F64Milliseconds > SIM_FRAME_TIME,
                                                             SIM_NET_TIME,

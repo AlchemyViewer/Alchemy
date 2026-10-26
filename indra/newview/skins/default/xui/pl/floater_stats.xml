@@ -27,8 +27,6 @@
 					<stat_bar label="Suma surowych" name="numrawimagesstat" />
 					<stat_bar label="Pamięć GL" name="gltexmemstat" />
 					<stat_bar label="Pamięć sformatowana" name="formattedmemstat" />
-					<stat_bar label="Pamięć surowa" name="rawmemstat" />
-					<stat_bar label="Pamięć przypisana" name="glboundmemstat" />
 				</stat_view>
 				<stat_view label="Sieć" name="network">
 					<stat_bar label="Pakiety wchodzące" name="packetsinstat" />

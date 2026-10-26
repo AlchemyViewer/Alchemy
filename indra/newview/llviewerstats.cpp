@@ -199,6 +199,7 @@ static LLTrace::SampleStatHandle<bool>
                             CHAT_BUBBLES("chatbubbles", "Chat Bubbles Enabled");
 
 LLTrace::SampleStatHandle<F64Megabytes > FORMATTED_MEM("formattedmemstat");
+LLTrace::SampleStatHandle<F64Megabytes > GL_TEX_MEM("gltexmemstat");
 
 SimMeasurement<F64Milliseconds >    SIM_FRAME_TIME("simframemsec", "", LL_SIM_STAT_FRAMEMS),
                                                     SIM_NET_TIME("simnetmsec", "", LL_SIM_STAT_NETMS),

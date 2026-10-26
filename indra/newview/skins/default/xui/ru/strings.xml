@@ -62,7 +62,7 @@ SLURL: &lt;nolink&gt;[SLURL]&lt;/nolink&gt;
 Ширина канала: [NET_BANDWITH] кбит/с
 Коэффициент детализации: [LOD_FACTOR]
 Качество визуализации: [RENDER_QUALITY]
-Память текстур: [TEXTURE_MEMORY] МБ
+Видеопамять: [VIDEO_MEMORY] МБ
 	</string>
 	<string name="AboutOSXHiDPI">
 		Режим отображения HiDPI: [HIDPI]

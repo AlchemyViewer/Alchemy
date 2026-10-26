@@ -53,7 +53,7 @@ Distancia de dibujo: [DRAW_DISTANCE]m
 Ancho de banda: [NET_BANDWITH]kbit/s
 Factor LOD: [LOD_FACTOR]
 Calidad de renderización: [RENDER_QUALITY]
-Memoria de textura: [TEXTURE_MEMORY]MB
+Memoria de vídeo: [VIDEO_MEMORY]MB
 	</string>
 	<string name="AboutOSXHiDPI">
 		Modo de visualización HiDPi: [HIDPI]
