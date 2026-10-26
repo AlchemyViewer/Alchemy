@@ -192,13 +192,7 @@ namespace
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &storage.width);
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &storage.height);
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &storage.format);
-            // The levels with an image, counted by their widths: GL_TEXTURE_IMMUTABLE_LEVELS would say it in one query,
-            // but it is GL 4.3's, past the floor's 4.1.
-            for (S32 width = storage.width; width > 0; ++storage.levels)
-            {
-                width = 0;
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, storage.levels + 1, GL_TEXTURE_WIDTH, &width);
-            }
+            storage.levels = ll_test::boundTextureLevels();
             gGL.getTextureSlot(0)->unbind();
             return storage;
         }
@@ -685,6 +679,34 @@ namespace
         CHECK(red_at(1, 0) == 0u);
         UNSCOPED_INFO("copied outside the scissor too");
         CHECK(blue_at(HALF - 1, HALF - 1) == 0u);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // A target allocated with mips holds the levels asked for: every level to 1x1 where none are asked, and no more
+    // than that where more are. Resized, it holds every level of the new size.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: allocate holds the mip levels asked for", "[llrendertarget_gl]")
+    {
+        struct Case
+        {
+            const char* what;
+            U32         asked;
+            S32         levels;
+        };
+        // 64x40: 7 levels to 1x1.
+        const Case cases[] = { { "every level", 0, 7 }, { "three", 3, 3 }, { "more than the chain", 20, 7 } };
+        for (const Case& c : cases)
+        {
+            CAPTURE(c.what);
+            REQUIRE(mTarget.allocate(64, 40, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL,
+                                     LLRenderTarget::DEPTH_FMT_24, c.asked));
+            CHECK(storage_of(mTarget.getTexture()).levels == c.levels);
+        }
+
+        REQUIRE(mTarget.allocate(64, 40, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL,
+                                 LLRenderTarget::DEPTH_FMT_24, 3));
+        UNSCOPED_INFO("a chain of three, resized to 32x20: its 6 levels");
+        mTarget.resize(32, 20);
+        CHECK(storage_of(mTarget.getTexture()).levels == 6);
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 

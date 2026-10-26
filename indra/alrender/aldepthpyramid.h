@@ -67,7 +67,7 @@ public:
     /// Whether the pyramid holds a texture.
     bool isAllocated() const { return mTexture.isComplete(); }
 
-    /// The pyramid: an R32F target whose first LEVELS levels are the pyramid's.
+    /// The pyramid: an R32F target of LEVELS levels.
     LLRenderTarget& getTarget() { return mTexture; }
     /// Its levels, and the size of the depth it was built from; 0 before a build.
     U32 getLevels() const { return mLevels; }

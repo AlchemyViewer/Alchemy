@@ -139,29 +139,12 @@ static std::atomic<U64> sTextureBytes{0};
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
-void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool has_mips)
+void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, U32 levels)
 {
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // allocations should always be done on tex unit 0
     U32 texName = gGL.getTextureSlot(texUnit)->getCurrTexture();
-    U64 size = LLImageGL::dataFormatVRAMBytes(intformat, width, height);
-    if (has_mips)
-    {
-        // Sum the mip pyramid down to 1x1 the same way getMipBytes does,
-        // so non-power-of-two and non-square cases stay exact rather than
-        // relying on the 4/3 geometric-series approximation.
-        S32 w = (S32)width;
-        S32 h = (S32)height;
-        while (w > 1 && h > 1)
-        {
-            w >>= 1; if (w == 0) w = 1;
-            h >>= 1; if (h == 0) h = 1;
-            size += LLImageGL::dataFormatVRAMBytes(intformat, w, h);
-        }
-    }
-    size *= count;
-
-    llassert(size >= 0);
+    const U64 size = (U64)LLImageGL::dataFormatVRAMBytes(intformat, width, height, levels) * count;
 
     sTexMemMutex.lock();
 
@@ -710,8 +693,9 @@ S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
 }
 
 //static
-S64 LLImageGL::dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height)
+S64 LLImageGL::dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height, S32 levels)
 {
+    bool blocks = false;
     switch (dataformat)
     {
     case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
@@ -720,15 +704,23 @@ S64 LLImageGL::dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height)
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:
     case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
     case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT5_EXT:
-        if (width < 4) width = 4;
-        if (height < 4) height = 4;
+        blocks = true;
         break;
     default:
         break;
     }
-    S64 bytes (((S64)width * (S64)height * (S64)dataFormatVRAMBits(dataformat)+7)>>3);
-    S64 aligned = (bytes+3)&~3;
-    return aligned;
+
+    const S64 bits = dataFormatVRAMBits(dataformat);
+    S64 bytes = 0;
+    for (S32 level = 0; level < levels; ++level)
+    {
+        // A block holds 4x4 texels, so its bytes are bits * 16 / 8.
+        bytes += blocks ? (S64)((width + 3) / 4) * ((height + 3) / 4) * bits * 2
+                        : (S64)width * height * bits / 8;
+        width  = llmax(width >> 1, 1);
+        height = llmax(height >> 1, 1);
+    }
+    return bytes;
 }
 
 //static
@@ -1995,7 +1987,7 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
         }
     }
 
-    alloc_tex_image(width, height, intformat, 1, levels > 1);
+    alloc_tex_image(width, height, intformat, 1, levels);
     stop_glerror();
 }
 
@@ -2229,9 +2221,6 @@ bool LLImageGL::createGLTexture(S32 discard_level, const U8* data_in, bool data_
             mTexName = new_texname;
         }
     }
-
-
-    mTextureMemory = (S64Bytes)getMipBytes(mCurrentDiscardLevel);
 
     // mark this as bound at this point, so we don't throw it out immediately. Off the main
     // thread syncTexName() marks it when the texture publishes: the frame time is the main
@@ -2982,30 +2971,6 @@ S64 LLImageGL::getBytes(S32 discard_level) const
     return levelBytes(w, h);
 }
 
-S64 LLImageGL::getMipBytes(S32 discard_level) const
-{
-    if (discard_level < 0)
-    {
-        // Match getWidth/getHeight/getBytes: mCurrentDiscardLevel can still
-        // be -1 if no discard has been set; treat that as "full resolution"
-        // rather than shifting by a negative (which is UB).
-        discard_level = llmax<S32>(mCurrentDiscardLevel, 0);
-    }
-    S32 w = mWidth>>discard_level;
-    S32 h = mHeight>>discard_level;
-    S64 res = levelBytes(w, h);
-    if (mUseMipMaps)
-    {
-        while (w > 1 && h > 1)
-        {
-            w >>= 1; if (w == 0) w = 1;
-            h >>= 1; if (h == 0) h = 1;
-            res += levelBytes(w, h);
-        }
-    }
-    return res;
-}
-
 S64 LLImageGL::levelBytes(S32 width, S32 height) const
 {
     if (!isIntegerFormat(mFormatInternal))
@@ -3719,7 +3684,9 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
         mStorage.mFormat = getStorageInternalFormat();
     }
 
-    alloc_tex_image(width, height, mFormatInternal, 1, has_mips);
+    // The texture's bytes and the global count are the same figure, of the storage just made.
+    mTextureMemory = (S64Bytes)dataFormatVRAMBytes(mStorage.mFormat, mStorage.mWidth, mStorage.mHeight, mStorage.mLevels);
+    alloc_tex_image(mStorage.mWidth, mStorage.mHeight, mStorage.mFormat, 1, mStorage.mLevels);
 }
 
 bool LLImageGL::storageFits(S32 width, S32 height) const

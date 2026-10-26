@@ -367,7 +367,7 @@ void LLRenderTarget::resize(U32 resx, U32 resy)
     }
 }
 
-bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, ALTextureSlot::eTextureType usage, eMipGeneration generateMipMaps, eDepthFormat depth_fmt)
+bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, bool stencil, ALTextureSlot::eTextureType usage, eMipGeneration generateMipMaps, eDepthFormat depth_fmt, U32 mip_levels)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(usage == ALTextureSlot::TT_TEXTURE);
@@ -405,6 +405,10 @@ bool LLRenderTarget::allocate(U32 resx, U32 resy, U32 color_fmt, bool depth, boo
         // floor(log2(n)) + 1, computed with integer math to avoid the
         // precision pitfall where log10(2^N)/log10(2) rounds below N.
         mMipLevels = static_cast<U32>(std::bit_width(static_cast<U32>(llmax(mResX, mResY))));
+        if (mip_levels > 0)
+        {
+            mMipLevels = llmin(mMipLevels, mip_levels);
+        }
     }
 
     if (depth)

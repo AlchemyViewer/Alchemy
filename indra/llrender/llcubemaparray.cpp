@@ -176,7 +176,7 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, bool us
     mImage->markStorageAllocated();
     stop_glerror();
 
-    alloc_tex_image(resolution, resolution, format, count * 6, use_mips);
+    alloc_tex_image(resolution, resolution, format, count * 6, levels);
 
     //glGenerateMipmap(GL_TEXTURE_CUBE_MAP_ARRAY);  // <=== latest AMD drivers do not appreciate this method of allocating mipmaps
 

@@ -55,11 +55,11 @@ class LLWindow;
 
 namespace LLImageGLMemory
 {
-    // width/height are the level-0 dimensions. If has_mips is true,
-    // the recorded size includes the full mip pyramid down to 1x1
-    // (driver-padded via dataFormatVRAMBytes per level). count covers
-    // array slices / cube faces, each of which gets its own pyramid.
-    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, bool has_mips = false);
+    // Record the storage of the texture bound on unit 0: `levels` levels from the level-0
+    // width x height down, as dataFormatVRAMBytes counts them, for each of `count` layers --
+    // array layers, cube faces or 3D slices, each of which holds the levels. The texture must
+    // have no storage recorded.
+    void alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, U32 levels);
     void free_tex_image(U32 texName);
     void free_tex_images(U32 count, const U32* texNames);
     void free_cur_tex_image();
@@ -100,10 +100,8 @@ public:
     // name is still whole.
     static void finishUploads();
 
-    // Get an estimate of how many bytes have been allocated in vram for
-    // textures. Allocations recorded via alloc_tex_image with has_mips=true
-    // include the full mip pyramid (driver-padded via dataFormatVRAMBytes);
-    // single-level allocations cover level 0 only.
+    // The bytes of every texture's storage, as alloc_tex_image recorded it: the levels each
+    // was allocated with, at dataFormatVRAMBytes' size.
     //
     // NOTE: viewer consumers (llviewertexture.cpp, lltextureview.cpp)
     // historically scaled this by 2x via a /512 divisor instead of /1024
@@ -128,11 +126,16 @@ public:
     // VRAM accounting. They differ from the host values for formats that
     // drivers pad (RGB8 -> RGBX, RGB16F -> RGBA16F, RGB32F -> RGBA32F,
     // DEPTH_COMPONENT24 -> 32-bit). For other formats they delegate to
-    // dataFormatBits/Bytes.
+    // dataFormatBits.
+    //
+    // dataFormatVRAMBytes counts `levels` levels from the level-0 width x height down, each
+    // dimension halved and held at 1, which is the chain glTexStorage* allocates: the texels
+    // at their padded size, and for a block-compressed format the whole 4x4 blocks that cover
+    // each level.
     static S32 dataFormatBits(S32 dataformat);
     static S64 dataFormatBytes(S32 dataformat, S32 width, S32 height);
     static S32 dataFormatVRAMBits(S32 dataformat);
-    static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height);
+    static S64 dataFormatVRAMBytes(S32 dataformat, S32 width, S32 height, S32 levels = 1);
     static S32 dataFormatComponents(S32 dataformat);
 
     // The sized integer colour formats: R32UI, RG16I, RGB10_A2UI and the rest. A shader reads their texels as
@@ -320,9 +323,10 @@ public:
     S32  getWidth(S32 discard_level = -1) const;
     S32  getHeight(S32 discard_level = -1) const;
     U8   getComponents() const { return (U8)(mUploadInFlight ? mPublished.mComponents : mComponents); }
+    // The bytes of the storage allocateTextureStorage gave the texture: what alloc_tex_image
+    // records for it. 0 where its owner allocated it (markStorageAllocated), or it has none.
     S64Bytes getTextureMemory() const { return mUploadInFlight ? mPublished.mTextureMemory : mTextureMemory; }
     S64  getBytes(S32 discard_level = -1) const;
-    S64  getMipBytes(S32 discard_level = -1) const;
     bool getBoundRecently() const;
     bool isJustBound() const;
     bool getHasExplicitFormat() const { return mHasExplicitFormat; }
@@ -428,7 +432,7 @@ private:
     void freePickMask();
     bool isCompressed() const;
 
-    // Bytes of one level at this size, as getBytes and getMipBytes count it: an integer level by its pixel format AND
+    // Bytes of one level at this size, as getBytes counts it: an integer level by its pixel format AND
     // type -- an R32UI texel is four bytes, which GL_RED_INTEGER alone cannot say -- and any other by dataFormatBytes
     // of its pixel format, a byte a component. Rounded up to four, as dataFormatBytes rounds.
     S64 levelBytes(S32 width, S32 height) const;
