@@ -5801,14 +5801,7 @@ void LLVolumeFace::getPlanarBasis(const LLVector4a& normal, F32 switch_x, LLVect
 
 void LLVolumeFace::getPlanarTexCoords(const LLVector4a& scale, const alsimd::TexTransform* transform, F32* dst) const
 {
-    // read back from the member, whole: a vector rebuilt from its parts
-    // waits on their stores
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     if (planar[3] > 0.f)
     {
         LLVector4a binormal, tangent;
@@ -5823,12 +5816,7 @@ void LLVolumeFace::getPlanarTexCoords(const LLVector4a& scale, const alsimd::Tex
 
 LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVector4a& normal, const alsimd::TexTransform* transform) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     const LLVector4a unscaled(1.f);
     LLVector2 tc;
     if (planar[3] > 0.f)
@@ -5846,12 +5834,7 @@ LLVector2 LLVolumeFace::getPlanarTexCoord(const LLVector4a& position, const LLVe
 
 void LLVolumeFace::getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     if (planar[3] > 0.f)
     {
         LLVector4a binormal, tangent;
@@ -5866,12 +5849,7 @@ void LLVolumeFace::getPlanarTangents(const LLVector4a& scale, LLVector4a* dst) c
 
 LLVector4a LLVolumeFace::getPlanarTangent(const LLVector4a& normal, const LLVector4a& scale) const
 {
-    if (mPlanarNormal[3] == 0.f)
-    {
-        makePlanarNormal();
-    }
-    LLVector4a planar;
-    planar.loadua(mPlanarNormal);
+    const LLVector4a planar = getPlanarNormal();
     LLVector4a out;
     if (planar[3] > 0.f)
     {

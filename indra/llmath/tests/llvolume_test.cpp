@@ -6532,6 +6532,37 @@ namespace
         CHECK(report.failures == 0);
     }
 
+    // A face with no area keeps no planar normal, and one with one normal is
+    // one plane along it all the same, made again at each call: it is drawn
+    // and touched along that normal as a face that keeps it is, whatever the
+    // touch's normal rounds to. Its normal here is off unit length, as a
+    // mesh's quantized normals are, so a touch projected along its own
+    // renormalized normal lands elsewhere.
+    TEST_CASE("llvolume: a face with no area is drawn and touched along its one normal", "[llvolume]")
+    {
+        LLVolumeFace face;
+        face.resizeVertices(3);
+        face.resizeIndices(3);
+        REQUIRE(face.mNumVertices == 3);
+        REQUIRE(face.mNumIndices == 3);
+        for (S32 v = 0; v < 3; ++v)
+        {
+            face.mPositions[v].set(0.25f, -0.375f, 0.125f);
+            face.mNormals[v].set(0.f, 0.6f, 0.9f);
+            face.mTexCoords[v].set(0.f, 0.f);
+            face.mIndices[v] = static_cast<U16>(v);
+        }
+        const LLVector4a planar = face.getPlanarNormal();
+        CHECK(planar[3] > 0.f);
+        CHECK(std::memcmp(planar.getF32ptr(), face.mNormals[0].getF32ptr(), 3 * sizeof(F32)) == 0);
+
+        Report report;
+        S64 touched = 0;
+        checkTouches(face, "a face of no area", report, touched);
+        INFO(report.text());
+        CHECK(report.failures == 0);
+    }
+
     // A normal map planar texgen lays out shades by the frame of its own
     // coordinates. Where a face is projected as one plane those are affine
     // in position, and its planar tangents are the ones its own tangent
