@@ -1406,6 +1406,119 @@ namespace
     }
 
     // ------------------------------------------------------------------
+    // Normals of a swept surface
+
+    // A grid's normals at every width against the cross product worked in
+    // double, over grids that leave every tail: directions to within
+    // rounding at unit length with a w of 0, and (0, 0, 0, 1) where the
+    // product has no length or the derivatives lie along one line, as at a
+    // column whose tangent is nothing and one whose derivative along the
+    // path is a multiple of its derivative across. The column lanes'
+    // padding is read and comes to nothing, and nothing is written past the
+    // grid.
+    TEST_CASE("alsimdkernels: swept_normals against the cross product in double at every width", "[alsimdkernels]")
+    {
+        U32 seed = 300;
+        for (size_t columns : { 1, 2, 3, 7, 8, 9, 16, 17 })
+        {
+            for (size_t rows : { 1, 3 })
+            {
+                std::mt19937 rng(++seed);
+                std::uniform_real_distribution<F32> spread(-2.f, 2.f);
+                std::vector<LLVector4a> frames(5 * rows);
+                for (LLVector4a& row : frames)
+                {
+                    row.set(spread(rng), spread(rng), spread(rng), spread(rng));
+                }
+                const size_t padded = (columns + 7) & ~(size_t)7;
+                std::vector<F32> lanes(5 * padded, std::numeric_limits<F32>::quiet_NaN());
+                F32* const point_x = lanes.data();
+                F32* const point_y = point_x + padded;
+                F32* const tangent_x = point_y + padded;
+                F32* const tangent_y = tangent_x + padded;
+                F32* const moves = tangent_y + padded;
+                for (size_t s = 0; s < columns; ++s)
+                {
+                    point_x[s] = spread(rng);
+                    point_y[s] = spread(rng);
+                    tangent_x[s] = spread(rng);
+                    tangent_y[s] = spread(rng);
+                    moves[s] = s % 4 == 3 ? 0.f : 1.f;
+                }
+                // A column with no tangent, and, where every row's rates are
+                // its rows, one moving only along its own tangent.
+                tangent_x[columns / 2] = tangent_y[columns / 2] = 0.f;
+                const bool along_itself = rows == 1 && columns > 2;
+                if (along_itself)
+                {
+                    frames[2] = frames[0];
+                    frames[3] = frames[1];
+                    const size_t s = columns - 1;
+                    point_x[s] = 3.f * tangent_x[s];
+                    point_y[s] = 3.f * tangent_y[s];
+                    moves[s] = 0.f;
+                }
+
+                const size_t n = columns * rows;
+                std::vector<LLVector4a> expected(n);
+                bool any_expected = false;
+                for (size_t t = 0; t < rows; ++t)
+                {
+                    const LLVector4a* frame = &frames[5 * t];
+                    for (size_t s = 0; s < columns; ++s)
+                    {
+                        F64 across[3], along[3];
+                        for (int k = 0; k < 3; ++k)
+                        {
+                            across[k] = (F64)tangent_x[s] * frame[0][k] + (F64)tangent_y[s] * frame[1][k];
+                            along[k] = (F64)point_x[s] * frame[2][k] + (F64)point_y[s] * frame[3][k] + (F64)moves[s] * frame[4][k];
+                        }
+                        const F64 nx = across[1] * along[2] - across[2] * along[1];
+                        const F64 ny = across[2] * along[0] - across[0] * along[2];
+                        const F64 nz = across[0] * along[1] - across[1] * along[0];
+                        const F64 length2 = nx * nx + ny * ny + nz * nz;
+                        const F64 across2 = across[0] * across[0] + across[1] * across[1] + across[2] * across[2];
+                        const F64 along2 = along[0] * along[0] + along[1] * along[1] + along[2] * along[2];
+                        if (length2 <= std::max((F64)FLT_MIN, 1e-8 * across2 * along2))
+                        {
+                            expected[s + columns * t].set(0.f, 0.f, 0.f, 1.f);
+                            any_expected = true;
+                            continue;
+                        }
+                        const F64 scale = 1.0 / std::sqrt(length2);
+                        expected[s + columns * t].set(F32(nx * scale), F32(ny * scale), F32(nz * scale), 0.f);
+                    }
+                }
+                REQUIRE(any_expected);
+
+                const F32* const column_lanes[5] = { point_x, point_y, tangent_x, tangent_y, moves };
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    std::vector<LLVector4a> got(n + 1, SENTINEL);
+                    const bool any = swept_normals_impl<W>(frames.data(), 5, rows, column_lanes, columns, got.data());
+                    CAPTURE(width, columns, rows, along_itself);
+                    REQUIRE(any == any_expected);
+                    require_same_bits("past the grid", got[n], SENTINEL);
+                    for (size_t v = 0; v < n; ++v)
+                    {
+                        CAPTURE(v);
+                        REQUIRE(got[v][3] == expected[v][3]);
+                        if (expected[v][3] == 0.f)
+                        {
+                            REQUIRE(degrees_apart(got[v], expected[v]) <= 1e-3);
+                            REQUIRE(std::fabs(got[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                        }
+                        else
+                        {
+                            require_same_bits("marked", got[v], LLVector4a(0.f, 0.f, 0.f, 1.f));
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Normalizing
 
     // Vectors at unit length with a w of 0, or marked (0, 0, 0, 1) where

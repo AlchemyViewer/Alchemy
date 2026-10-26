@@ -476,6 +476,30 @@ bool LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F3
 
     t_first = floor(begin * sides) / (F32)sides;
 
+    // Room for every point at once: a cut point at each end, a point at each
+    // step with its split points before it, and the cut profile's centre.
+    // The array would otherwise grow, and move, a few times on the way.
+    const U32 room = mProfile.size() + (U32)((sides + 2) * (split + 1)) + 2;
+    if (mProfile.mCapacity < room)
+    {
+        const U32 count = mProfile.size();
+        mProfile.resize(room);
+        mProfile.resize(count);
+    }
+
+    // A cut point that falls between two steps lies on the chord of its
+    // step; its tangent is the circle's at the cut's angle.
+    auto keep_cut = [&](F32 cut)
+    {
+        if (mCutCount < (S32)LL_ARRAY_SIZE(mCutPoints))
+        {
+            const F32 at = 2.0f*F_PI*(cut*ang_scale + offset);
+            mCutPoints[mCutCount] = mProfile.size();
+            mCutTangents[mCutCount].set(-sin(at)*scale, cos(at)*scale, 0.f);
+            ++mCutCount;
+        }
+    };
+
     // pt1 is the first point on the fractional face.
     // Starting t and ang values for the first face
     t = t_first;
@@ -496,6 +520,10 @@ bool LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F3
     {
         LLVector4a new_pt;
         new_pt.setLerp(pt1, pt2, t_fraction);
+        if (t_fraction > 0.0001f)
+        {
+            keep_cut(begin);
+        }
         mProfile.push_back(new_pt);
     }
 
@@ -546,6 +574,10 @@ bool LLProfile::genNGon(const LLProfileParams& params, S32 sides, F32 offset, F3
                 pt1.add(p);
                 mProfile.push_back(pt1);
             }
+        }
+        if (t_fraction < 0.9999f)
+        {
+            keep_cut(end);
         }
         mProfile.push_back(new_pt);
     }
@@ -670,6 +702,18 @@ LLProfile::Face* LLProfile::addHole(const LLProfileParams& params, bool flat, F3
     for (S32 i=mTotalOut;i<mTotal;i++)
     {
         mProfile[i] = pt[j--];
+    }
+
+    // The hole runs the other way round, and so do its cut points and their
+    // tangents.
+    mHoleBegin = mTotalOut;
+    for (S32 c = 0; c < mCutCount; ++c)
+    {
+        if (mCutPoints[c] >= mTotalOut)
+        {
+            mCutPoints[c] = mTotalOut + mTotal - 1 - mCutPoints[c];
+            mCutTangents[c].negate();
+        }
     }
 
     // A flat hole's corners. genNGon laid the points out as its begin point,
@@ -827,6 +871,8 @@ bool LLProfile::generate(const LLProfileParams& params, bool path_open,F32 detai
     mProfile.resize(0);
     mFaces.resize(0);
     mHoleTouchesWall = false;
+    mCutCount = 0;
+    mHoleBegin = S32_MAX;
 
     // Generate the face data
     S32 i;
@@ -1292,6 +1338,113 @@ S32 LLPath::getNumNGonPoints(const LLPathParams& params, S32 sides, F32 startOff
     return ret;
 }
 
+namespace
+{
+    // A station's frame from the first two rows of its rotation, R, its
+    // scale, S, and how fast each changes: M = S R, and M' = S' R + S R'.
+    void set_frame(LLPath::PathFrame& frame, const LLVector4a& row0, const LLVector4a& row1, F32 scale_x, F32 scale_y, F32 scale_x_rate,
+                   F32 scale_y_rate, const LLVector4a& row0_rate, const LLVector4a& row1_rate, const LLVector4a& velocity)
+    {
+        LLVector4a turning;
+        frame.mRow[0] = row0;
+        frame.mRow[0].mul(scale_x);
+        frame.mRow[1] = row1;
+        frame.mRow[1].mul(scale_y);
+        frame.mRate[0] = row0;
+        frame.mRate[0].mul(scale_x_rate);
+        turning = row0_rate;
+        turning.mul(scale_x);
+        frame.mRate[0].add(turning);
+        frame.mRate[1] = row1;
+        frame.mRate[1].mul(scale_y_rate);
+        turning = row1_rate;
+        turning.mul(scale_y);
+        frame.mRate[1].add(turning);
+        frame.mVelocity = velocity;
+    }
+
+    // A circular path as LLPath::genNGon lays it out: its station at any t,
+    // and how fast the station changes there, per unit of t. A station's
+    // rotation is a twist about the profile's z, then a turn about the
+    // path's x, each at a steady rate about its own axis, so it changes as
+    // twist' Kz R + turn' R Kx: Kz R is R's second row, its first negated,
+    // and nothing, and R Kx crosses x with each row.
+    struct CirclePath
+    {
+        F32 revolutions;
+        F32 skew;
+        F32 shear_x;
+        F32 shear_y;
+        F32 hole_x;
+        F32 hole_y;
+        F32 taper_x_begin;
+        F32 taper_x_end;
+        F32 taper_y_begin;
+        F32 taper_y_end;
+        F32 radius_start;
+        F32 radius_end;
+        F32 twist_begin;
+        F32 twist_end;
+
+        void station(F32 t, LLPath::PathPt& pt, LLPath::PathFrame* frame) const
+        {
+            const F32 ang = 2.0f*F_PI*revolutions * t;
+            const F32 c   = cos(ang)*lerp(radius_start, radius_end, t);
+            const F32 s   = sin(ang)*lerp(radius_start, radius_end, t);
+
+            pt.mPos.set(0 + lerp(0.f, shear_x, s)
+                              + lerp(-skew ,skew, t) * 0.5f,
+                        c + lerp(0.f, shear_y, s),
+                        s);
+
+            pt.mScale.set(hole_x * lerp(taper_x_begin, taper_x_end, t),
+                          hole_y * lerp(taper_y_begin, taper_y_end, t),
+                          0.f, 1.f);
+            pt.mTexT  = t;
+
+            // Twist rotates the path along the x,y plane (I think) - DJS 04/05/02
+            LLQuaternion twist, qang;
+            twist.setQuat  (lerp(twist_begin,twist_end,t) * 2.f * F_PI - F_PI,0,0,1);
+            // Rotate the point around the circle's center.
+            qang.setQuat   (ang,LLVector3(1.f, 0.f, 0.f));
+            LLMatrix3 rot(twist*qang);
+            pt.mRot.set(rot);
+
+            if (!frame)
+            {
+                return;
+            }
+
+            // The turn's cosine and sine are the rotation's last row, (0,
+            // -sin, cos), which the twist about z leaves as it is.
+            const LLVector4a& row0 = pt.mRot.getRow<0>();
+            const LLVector4a& row1 = pt.mRot.getRow<1>();
+            const LLVector4a& row2 = pt.mRot.getRow<2>();
+            const F32 turn_rate = 2.0f*F_PI*revolutions;
+            const F32 radius_rate = radius_end - radius_start;
+            const F32 dc = -s*turn_rate + row2[2]*radius_rate;
+            const F32 ds = c*turn_rate - row2[1]*radius_rate;
+            const LLVector4a velocity(shear_x * ds + skew, dc + shear_y * ds, ds);
+
+            const F32 twist_rate = (twist_end - twist_begin) * 2.f * F_PI;
+            const LLVector4a x_axis(1.f, 0.f, 0.f);
+            LLVector4a row0_rate, row1_rate, twisting;
+            row0_rate.setCross3(x_axis, row0);
+            row0_rate.mul(turn_rate);
+            twisting = row1;
+            twisting.mul(twist_rate);
+            row0_rate.add(twisting);
+            row1_rate.setCross3(x_axis, row1);
+            row1_rate.mul(turn_rate);
+            twisting = row0;
+            twisting.mul(twist_rate);
+            row1_rate.sub(twisting);
+            set_frame(*frame, row0, row1, pt.mScale[0], pt.mScale[1], hole_x * (taper_x_end - taper_x_begin), hole_y * (taper_y_end - taper_y_begin),
+                      row0_rate, row1_rate, velocity);
+        }
+    };
+}
+
 void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 end_scale, F32 twist_scale, bool is_sculpted)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
@@ -1299,29 +1452,32 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     // Generates a circular path, starting at (1, 0, 0), counterclockwise along the xz plane.
     constexpr F32 tableScale[] = { 1, 1, 1, 0.5f, 0.707107f, 0.53f, 0.525f, 0.5f };
 
-    F32 revolutions = params.getRevolutions();
-    F32 skew        = params.getSkew();
-    F32 skew_mag    = fabs(skew);
-    F32 hole_x      = params.getScaleX() * (1.0f - skew_mag);
-    F32 hole_y      = params.getScaleY();
+    CirclePath circle;
+    circle.revolutions = params.getRevolutions();
+    circle.skew        = params.getSkew();
+    circle.shear_x     = params.getShear().mV[VX];
+    circle.shear_y     = params.getShear().mV[VY];
+    F32 skew_mag       = fabs(circle.skew);
+    circle.hole_x      = params.getScaleX() * (1.0f - skew_mag);
+    circle.hole_y      = params.getScaleY();
 
     // Calculate taper begin/end for x,y (Negative means taper the beginning)
-    F32 taper_x_begin   = 1.0f;
-    F32 taper_x_end     = 1.0f - params.getTaperX();
-    F32 taper_y_begin   = 1.0f;
-    F32 taper_y_end     = 1.0f - params.getTaperY();
+    circle.taper_x_begin = 1.0f;
+    circle.taper_x_end   = 1.0f - params.getTaperX();
+    circle.taper_y_begin = 1.0f;
+    circle.taper_y_end   = 1.0f - params.getTaperY();
 
-    if ( taper_x_end > 1.0f )
+    if ( circle.taper_x_end > 1.0f )
     {
         // Flip tapering.
-        taper_x_begin   = 2.0f - taper_x_end;
-        taper_x_end     = 1.0f;
+        circle.taper_x_begin = 2.0f - circle.taper_x_end;
+        circle.taper_x_end   = 1.0f;
     }
-    if ( taper_y_end > 1.0f )
+    if ( circle.taper_y_end > 1.0f )
     {
         // Flip tapering.
-        taper_y_begin   = 2.0f - taper_y_end;
-        taper_y_end     = 1.0f;
+        circle.taper_y_begin = 2.0f - circle.taper_y_end;
+        circle.taper_y_end   = 1.0f;
     }
 
     // For spheres, the radius is usually zero.
@@ -1332,7 +1488,7 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     }
 
     // Scale the radius to take the hole size into account.
-    radius_start *= 1.0f - hole_y;
+    radius_start *= 1.0f - circle.hole_y;
 
     // Now check the radius offset to calculate the start,end radius.  (Negative means
     // decrease the start radius instead).
@@ -1346,50 +1502,43 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     {
         radius_end   *= 1.f - radius_offset;
     }
+    circle.radius_start = radius_start;
+    circle.radius_end   = radius_end;
 
     // Is the path NOT a closed loop?
     mOpen = ( (params.getEnd()*end_scale - params.getBegin() < 1.0f) ||
               (skew_mag > 0.001f) ||
-              (fabs(taper_x_end - taper_x_begin) > 0.001f) ||
-              (fabs(taper_y_end - taper_y_begin) > 0.001f) ||
+              (fabs(circle.taper_x_end - circle.taper_x_begin) > 0.001f) ||
+              (fabs(circle.taper_y_end - circle.taper_y_begin) > 0.001f) ||
               (fabs(radius_end - radius_start) > 0.001f) );
 
-    F32 ang, c, s;
-    LLQuaternion twist, qang;
-    PathPt *pt;
-    LLVector3 path_axis (1.f, 0.f, 0.f);
-    //LLVector3 twist_axis(0.f, 0.f, 1.f);
-    F32 twist_begin = params.getTwistBegin() * twist_scale;
-    F32 twist_end   = params.getTwist() * twist_scale;
+    circle.twist_begin = params.getTwistBegin() * twist_scale;
+    circle.twist_end   = params.getTwist() * twist_scale;
+
+    // A sculpt's normals come from its points.
+    mHasFrames = !is_sculpted;
+    auto station = [&](F32 t)
+    {
+        PathPt& pt = *mPath.append(1);
+        circle.station(t, pt, is_sculpted ? nullptr : &pt.mFrame);
+    };
+
+    // Room for every station at once, the begin's, a step's each and the
+    // end's: the array would otherwise grow, and move, a few times on the
+    // way.
+    const U32 room = (U32)sides + 3;
+    if (mPath.mCapacity < room)
+    {
+        const U32 count = mPath.size();
+        mPath.resize(room);
+        mPath.resize(count);
+    }
 
     // We run through this once before the main loop, to make sure
     // the path begins at the correct cut.
     F32 step= 1.0f / sides;
     F32 t   = params.getBegin();
-    pt      = mPath.append(1);
-    ang     = 2.0f*F_PI*revolutions * t;
-    s       = sin(ang)*lerp(radius_start, radius_end, t);
-    c       = cos(ang)*lerp(radius_start, radius_end, t);
-
-
-    pt->mPos.set(0 + lerp(0.f, params.getShear().mV[VX], s)
-                      + lerp(-skew ,skew, t) * 0.5f,
-                    c + lerp(0.f, params.getShear().mV[VY], s),
-                    s);
-
-    pt->mScale.set(hole_x * lerp(taper_x_begin, taper_x_end, t),
-        hole_y * lerp(taper_y_begin, taper_y_end, t),
-        0,1);
-    pt->mTexT  = t;
-
-    // Twist rotates the path along the x,y plane (I think) - DJS 04/05/02
-    twist.setQuat  (lerp(twist_begin,twist_end,t) * 2.f * F_PI - F_PI,0,0,1);
-    // Rotate the point around the circle's center.
-    qang.setQuat   (ang,path_axis);
-
-    LLMatrix3 rot(twist * qang);
-
-    pt->mRot.set(rot);
+    station(t);
 
     t+=step;
 
@@ -1417,54 +1566,12 @@ void LLPath::genNGon(const LLPathParams& params, S32 sides, F32 startOff, F32 en
     const F32 end_before = is_sculpted ? params.getEnd() : params.getEnd() - step * 0.01f;
     while (t < end_before)
     {
-        pt      = mPath.append(1);
-
-        ang = 2.0f*F_PI*revolutions * t;
-        c   = cos(ang)*lerp(radius_start, radius_end, t);
-        s   = sin(ang)*lerp(radius_start, radius_end, t);
-
-        pt->mPos.set(0 + lerp(0.f, params.getShear().mV[VX], s)
-                          + lerp(-skew ,skew, t) * 0.5f,
-                        c + lerp(0.f, params.getShear().mV[VY], s),
-                        s);
-
-        pt->mScale.set(hole_x * lerp(taper_x_begin, taper_x_end, t),
-                    hole_y * lerp(taper_y_begin, taper_y_end, t),
-                    0.f, 1.f);
-        pt->mTexT  = t;
-
-        // Twist rotates the path along the x,y plane (I think) - DJS 04/05/02
-        twist.setQuat  (lerp(twist_begin,twist_end,t) * 2.f * F_PI - F_PI,0,0,1);
-        // Rotate the point around the circle's center.
-        qang.setQuat   (ang,path_axis);
-        LLMatrix3 tmp(twist*qang);
-        pt->mRot.set(tmp);
-
+        station(t);
         t+=step;
     }
 
     // Make one final pass for the end cut.
-    t = params.getEnd();
-    pt      = mPath.append(1);
-    ang = 2.0f*F_PI*revolutions * t;
-    c   = cos(ang)*lerp(radius_start, radius_end, t);
-    s   = sin(ang)*lerp(radius_start, radius_end, t);
-
-    pt->mPos.set(0 + lerp(0.f, params.getShear().mV[VX], s)
-                      + lerp(-skew ,skew, t) * 0.5f,
-                    c + lerp(0.f, params.getShear().mV[VY], s),
-                    s);
-    pt->mScale.set(hole_x * lerp(taper_x_begin, taper_x_end, t),
-                   hole_y * lerp(taper_y_begin, taper_y_end, t),
-                   0,1);
-    pt->mTexT  = t;
-
-    // Twist rotates the path along the x,y plane (I think) - DJS 04/05/02
-    twist.setQuat  (lerp(twist_begin,twist_end,t) * 2.f * F_PI - F_PI,0,0,1);
-    // Rotate the point around the circle's center.
-    qang.setQuat   (ang,path_axis);
-    LLMatrix3 tmp(twist*qang);
-    pt->mRot.set(tmp);
+    station(params.getEnd());
 
     mTotal = mPath.size();
 }
@@ -1565,6 +1672,9 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
     S32 np = 2; // hardcode for line
 
     mPath.resize(0);
+    mHasFrames = false;
+    mFramesRepeat = false;
+    mFramesTurn = false;
     mOpen = true;
 
     // Is this 0xf0 mask really necessary?  DK 03/02/05
@@ -1587,6 +1697,18 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
             LLVector2 start_scale = params.getBeginScale();
             LLVector2 end_scale = params.getEndScale();
 
+            // Along a line every station moves, scales and twists at one
+            // rate: the rotation turns about z, and so changes as
+            // twist' Kz R, R's second row and its first negated.
+            const F32 twist_rate = F_PI * params.getTwist() - F_PI * params.getTwistBegin();
+            const F32 scale_x_rate = end_scale.mV[0] - start_scale.mV[0];
+            const F32 scale_y_rate = end_scale.mV[1] - start_scale.mV[1];
+            const LLVector4a velocity(params.getShear().mV[VX], params.getShear().mV[VY], 1.f);
+            mHasFrames = !is_sculpted;
+            mFramesTurn = mHasFrames && scale_x_rate == 0.f && scale_y_rate == 0.f && params.getShear().mV[VX] == 0.f &&
+                          params.getShear().mV[VY] == 0.f;
+            mFramesRepeat = mHasFrames && twist_rate == 0.f && scale_x_rate == 0.f && scale_y_rate == 0.f;
+
             for (S32 i=0;i<np;i++)
             {
                 F32 t = lerp(params.getBegin(),params.getEnd(),(F32)i * mStep);
@@ -1601,6 +1723,18 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
                                     lerp(start_scale.mV[1],end_scale.mV[1],t),
                                     0,1);
                 mPath[i].mTexT        = t;
+
+                if (!is_sculpted)
+                {
+                    const LLVector4a& row0 = mPath[i].mRot.getRow<0>();
+                    const LLVector4a& row1 = mPath[i].mRot.getRow<1>();
+                    LLVector4a row0_rate = row1;
+                    row0_rate.mul(twist_rate);
+                    LLVector4a row1_rate = row0;
+                    row1_rate.mul(-twist_rate);
+                    set_frame(mPath[i].mFrame, row0, row1, mPath[i].mScale[0], mPath[i].mScale[1], scale_x_rate, scale_y_rate, row0_rate, row1_rate,
+                              velocity);
+                }
             }
         }
         break;
@@ -1630,6 +1764,7 @@ bool LLPath::generate(const LLPathParams& params, F32 detail, S32 split,
 
             //genNGon(params, llfloor(MIN_DETAIL_FACES * detail), 4.f, 0.f);
             genNGon(params, llfloor(MIN_DETAIL_FACES * detail));
+            mHasFrames = false;
 
             F32 toggle = 0.5f;
             for (S32 i=0;i<(S32)mPath.size();i++)
@@ -6027,24 +6162,18 @@ namespace
         norm[tl].add(upper);
     }
 
-    // Brings every normal of a grid to unit length. A vertex whose quads all
-    // have no area, as a copy that closes a cut flat inner side or a row in
-    // the middle of a sculpt's pinch, has no normal of its own. It takes the
+    // Gives every vertex of a grid marked as having no normal of its own,
+    // (0, 0, 0, 1), a normal from one that has, whose w is 0. It takes the
     // nearest one up or down its column; where its whole column has none,
     // the nearest along its row; where its row has none either, as where a
     // copied column crosses a copied row, one of the nearest around it, in
     // rings of the grid. It takes only a normal a vertex has of its own, so
     // that none is passed on twice. A grid with no normal at all faces +Z.
-    // Such a vertex is marked with a w of 1 until it has one, and of 2 while
-    // it waits for the search around; a normal of its own has a w of 0.
-    void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
+    // Such a vertex keeps a w of 1 until it has one, and has 2 while it
+    // waits for the search around.
+    void fill_marked_normals(LLVector4a* norm, S32 num_s, S32 num_t)
     {
         const S32 count = num_s * num_t;
-        if (!alsimd::normalize3_or_mark(norm, count))
-        {
-            return;
-        }
-
         auto own = [](const LLVector4a& n) { return n[3] == 0.f; };
         if (std::none_of(norm, norm + count, own))
         {
@@ -6152,6 +6281,381 @@ namespace
         for (S32 v = 0; v < count; ++v)
         {
             norm[v].getF32ptr()[3] = 0.f;
+        }
+    }
+
+    // Brings every normal of a grid to unit length. A vertex whose quads all
+    // have no area, as a copy that closes a cut flat inner side or a row in
+    // the middle of a sculpt's pinch, has no normal of its own, and takes a
+    // neighbour's.
+    void normalize_grid_normals(LLVector4a* norm, S32 num_s, S32 num_t)
+    {
+        if (alsimd::normalize3_or_mark(norm, num_s * num_t))
+        {
+            fill_marked_normals(norm, num_s, num_t);
+        }
+    }
+
+    // A side's column: the profile point it is laid out from, and its s.
+    struct SideColumn
+    {
+        S32 mesh;
+        F32 s;
+    };
+
+    // How far into its face a side takes a row the path's scale narrows to a
+    // line or a point, in the path's t: far enough that the profile's
+    // direction it is narrowed across outweighs rounding, near enough to
+    // leave every other column's normal as it is to a hundredth of a degree.
+    constexpr F32 NARROWED_ROW_STEP = 1e-4f;
+
+    // A profile tangent's component this small a part of the tangent is the
+    // rounding of a point on an axis, as sin(2 pi) leaves one: nothing.
+    constexpr F32 TANGENT_ROUNDING = 1e-6f;
+
+    // A pole's step along the profile this small a part of what its terms
+    // could make is their rounding: the face lies along the axis.
+    constexpr F32 POLE_STEP_ROUNDING = 1e-4f;
+
+    // A prim side's normals from the surface it is cut from, its profile
+    // swept along its path: at each vertex, the surface's derivative along
+    // the profile, M p', crossed with its derivative along the path,
+    // M' p + v, where M takes the profile's x and y at the vertex's station,
+    // and M' and v are how fast M and the station's position change. A
+    // round side's columns take the profile's tangents, a cut point's at the
+    // cut, so they do not depend on the LOD; a flat side's take the direction
+    // of the straight edge each lies on, a corner's copy the next edge's.
+    // Both derivatives run the way the grid's indices do, so each normal
+    // faces the way its triangles do, an inner side's into the hole.
+    //
+    // Where the product vanishes, the side is taken a step into its face, as
+    // the limit there. A row the path's scale narrows to a line or a point,
+    // at an apex, is taken NARROWED_ROW_STEP along the path. A column whose
+    // point the path does not move, a sphere's pole, has no M' p + v, and
+    // takes the step along the profile, M' p', one way from its first
+    // column and the other from its last. A vertex that is both, one whose
+    // edge has no length, and one whose two derivatives lie along one line,
+    // as where a twist carries a point on the axis along the profile, takes
+    // a neighbour's normal.
+    void swept_side_normals(const LLVolume& volume, const SideColumn* columns, S32 num_s, S32 begin_t, S32 num_t, bool flat, const LLVector4a* pos,
+                            LLVector4a* norm)
+    {
+        LL_PROFILE_ZONE_SCOPED_CATEGORY_VOLUME;
+
+        const LLProfile& outline = volume.getProfile();
+        const LLVector4a* const profile = outline.mProfile.data();
+        const LLPath& path = volume.getPath();
+        const LLPath::PathPt* const stations = path.mPath.data();
+
+        // The rows' frames, each in its station.
+        static_assert(sizeof(LLPath::PathFrame) == 5 * sizeof(LLVector4a), "a frame is five vectors");
+        static_assert(sizeof(LLPath::PathPt) % sizeof(LLVector4a) == 0, "stations are a whole number of vectors apart");
+        constexpr size_t STRIDE = sizeof(LLPath::PathPt) / sizeof(LLVector4a);
+        const LLVector4a* const frames = stations[begin_t].mFrame.mRow;
+
+        // A first or last row the path's scale narrows to a line or a point
+        // takes its frame a step into the face.
+        LLVector4a stepped[2][5];
+        S32 narrowed[2];
+        S32 narrowed_count = 0;
+        const S32 last_station = (S32)path.mPath.size() - 1;
+        for (S32 t = 0; t < num_t; t = t == 0 && num_t > 1 ? num_t - 1 : num_t)
+        {
+            const S32 station = begin_t + t;
+            const LLVector4a& scale = stations[station].mScale;
+            if ((station == 0 || station == last_station) && (scale[0] == 0.f || scale[1] == 0.f))
+            {
+                LLVector4a* frame = stepped[narrowed_count];
+                std::copy(frames + STRIDE * t, frames + STRIDE * t + 5, frame);
+                const F32 step = station == 0 ? NARROWED_ROW_STEP : -NARROWED_ROW_STEP;
+                for (S32 i = 0; i < 2; ++i)
+                {
+                    LLVector4a along = frame[2 + i];
+                    along.mul(step);
+                    frame[i].add(along);
+                }
+                narrowed[narrowed_count++] = t;
+            }
+        }
+        auto narrowed_frame = [&](S32 t) -> const LLVector4a*
+        {
+            for (S32 r = 0; r < narrowed_count; ++r)
+            {
+                if (narrowed[r] == t)
+                {
+                    return stepped[r];
+                }
+            }
+            return nullptr;
+        };
+
+        // A tangent's component that is only the rounding of a point on an
+        // axis goes; an edge of no length has none.
+        auto clean = [](F32& x, F32& y)
+        {
+            const F32 size = llmax(fabsf(x), fabsf(y));
+            x = fabsf(x) <= TANGENT_ROUNDING * size ? 0.f : x;
+            y = fabsf(y) <= TANGENT_ROUNDING * size ? 0.f : y;
+        };
+        // A flat side's run of columns between a corner's copies lies on one
+        // edge, from its first column to its last.
+        auto edge_of = [&](S32 first, S32 last, F32& x, F32& y)
+        {
+            x = profile[columns[last].mesh][0] - profile[columns[first].mesh][0];
+            y = profile[columns[last].mesh][1] - profile[columns[first].mesh][1];
+            if (fabsf(x) <= SAME_PLACE && fabsf(y) <= SAME_PLACE)
+            {
+                x = y = 0.f;
+            }
+            clean(x, y);
+        };
+
+        // Where every row is the first turned as its station turns from the
+        // first's, as along a straight path that neither scales nor shears,
+        // so are its normals, n R0^T Rt; where none turns, they are copies.
+        const bool repeat = path.framesRepeat();
+        const bool turn = path.framesTurn() && narrowed_count == 0;
+        auto rows_from_first = [&](bool marked)
+        {
+            if (repeat)
+            {
+                for (S32 t = 1; t < num_t; ++t)
+                {
+                    std::memcpy(norm + num_s * t, norm, num_s * sizeof(LLVector4a));
+                }
+                return;
+            }
+            // Each column's first normal in the first station's own frame,
+            // then out through each other row's. Their w, as every row's,
+            // is 0, and a vertex marked in the first row is marked in all.
+            LLMatrix4a back = stations[begin_t].mRot;
+            back.transpose();
+            for (S32 k = 0; k < num_s; ++k)
+            {
+                LLVector4a own;
+                back.rotate(norm[k], own);
+                for (S32 t = 1; t < num_t; ++t)
+                {
+                    stations[begin_t + t].mRot.rotate(own, norm[k + num_s * t]);
+                }
+            }
+            for (S32 k = 0; k < num_s && marked; ++k)
+            {
+                if (norm[k][3] != 0.f)
+                {
+                    for (S32 t = 1; t < num_t; ++t)
+                    {
+                        norm[k + num_s * t] = norm[k];
+                    }
+                }
+            }
+        };
+
+        // A flat side there takes its first row a column at a time: its
+        // edges are few, and the columns along each fewer. Where nothing
+        // along the path turns or scales, an edge's columns are one normal.
+        if (flat && turn)
+        {
+            const LLVector4a& velocity = frames[4];
+            const F32 velocity2 = velocity.dot3(velocity).getF32();
+            const bool still = repeat && frames[2].dot3(frames[2]).getF32() == 0.f && frames[3].dot3(frames[3]).getF32() == 0.f;
+            bool marked = false;
+            S32 first = 0;
+            for (S32 k = 1; k <= num_s; ++k)
+            {
+                if (k < num_s && columns[k].mesh != columns[k - 1].mesh)
+                {
+                    continue;
+                }
+                F32 edge_x, edge_y;
+                edge_of(first, k - 1, edge_x, edge_y);
+                LLVector4a across = frames[0];
+                across.mul(edge_x);
+                LLVector4a second = frames[1];
+                second.mul(edge_y);
+                across.add(second);
+                const F32 across2 = across.dot3(across).getF32();
+                for (S32 j = first; j < (still ? first + 1 : k); ++j)
+                {
+                    LLVector4a along = velocity;
+                    F32 along2 = velocity2;
+                    if (!still)
+                    {
+                        const LLVector4a& point = profile[columns[j].mesh];
+                        LLVector4a rate = frames[2];
+                        rate.mul(point[0]);
+                        along.add(rate);
+                        rate = frames[3];
+                        rate.mul(point[1]);
+                        along.add(rate);
+                        along2 = along.dot3(along).getF32();
+                    }
+                    LLVector4a& n = norm[j];
+                    n.setCross3(across, along);
+                    const F32 length2 = n.dot3(n).getF32();
+                    if (length2 <= llmax(alsimd::SWEPT_PARALLEL * alsimd::SWEPT_PARALLEL * across2 * along2, FLT_MIN))
+                    {
+                        n.set(0.f, 0.f, 0.f, 1.f);
+                        marked = true;
+                    }
+                    else
+                    {
+                        n.normalize3();
+                    }
+                }
+                if (still)
+                {
+                    std::fill(norm + first + 1, norm + k, norm[first]);
+                }
+                first = k;
+            }
+            rows_from_first(marked);
+            if (marked)
+            {
+                fill_marked_normals(norm, num_s, num_t);
+            }
+            return;
+        }
+
+        // Each column's point, tangent and share of the station's velocity,
+        // as lanes padded to whole registers. A side of the size most are
+        // takes them from the stack.
+        constexpr size_t STACK_LANES = 64;
+        alignas(32) F32 stack_lanes[5 * STACK_LANES];
+        S32 stack_poles[STACK_LANES];
+        ALScratchArena::Scope scratch;
+        const size_t padded = ((size_t)num_s + 7) & ~(size_t)7;
+        F32* const lanes = padded <= STACK_LANES ? stack_lanes : scratch.allocate<F32>(5 * padded);
+        S32* const poles = padded <= STACK_LANES ? stack_poles : scratch.allocate<S32>(num_s);
+        F32* const px = lanes;
+        F32* const py = px + padded;
+        F32* const tx = py + padded;
+        F32* const ty = tx + padded;
+        F32* const moves = ty + padded;
+        for (S32 k = 0; k < num_s; ++k)
+        {
+            const LLVector4a& point = profile[columns[k].mesh];
+            px[k] = point[0];
+            py[k] = point[1];
+            moves[k] = 1.f;
+        }
+        for (F32* lane : { px, py, tx, ty, moves })
+        {
+            std::fill(lane + num_s, lane + padded, 0.f);
+        }
+        if (flat)
+        {
+            S32 first = 0;
+            for (S32 k = 1; k <= num_s; ++k)
+            {
+                if (k < num_s && columns[k].mesh != columns[k - 1].mesh)
+                {
+                    continue;
+                }
+                F32 edge_x, edge_y;
+                edge_of(first, k - 1, edge_x, edge_y);
+                std::fill(tx + first, tx + k, edge_x);
+                std::fill(ty + first, ty + k, edge_y);
+                first = k;
+            }
+        }
+        else
+        {
+            for (S32 k = 0; k < num_s; ++k)
+            {
+                const LLVector4a tangent = outline.getTangent(columns[k].mesh);
+                tx[k] = tangent[0];
+                ty[k] = tangent[1];
+                clean(tx[k], ty[k]);
+            }
+        }
+
+        // A line moves every point along it, and leaves none in place.
+        S32 pole_count = 0;
+        if (volume.getPathType() != LL_PCODE_PATH_LINE)
+        {
+            for (S32 k = 0; k < num_s; ++k)
+            {
+                if (column_is_point(pos, num_s, num_t, k))
+                {
+                    const F32 into = k + 1 < num_s ? 1.f : -1.f;
+                    px[k] = into * tx[k];
+                    py[k] = into * ty[k];
+                    moves[k] = 0.f;
+                    poles[pole_count++] = k;
+                }
+            }
+        }
+
+        const F32* const column_lanes[5] = { px, py, tx, ty, moves };
+        bool marked = false;
+        if (turn)
+        {
+            marked = alsimd::swept_normals(frames, STRIDE, 1, column_lanes, num_s, norm);
+            rows_from_first(marked);
+        }
+        else
+        {
+            // The rows between the narrowed ones in one run.
+            for (S32 t = 0; t < num_t;)
+            {
+                if (const LLVector4a* frame = narrowed_frame(t))
+                {
+                    marked = alsimd::swept_normals(frame, 5, 1, column_lanes, num_s, norm + num_s * t) || marked;
+                    ++t;
+                    continue;
+                }
+                S32 end = t + 1;
+                while (end < num_t && !narrowed_frame(end))
+                {
+                    ++end;
+                }
+                marked = alsimd::swept_normals(frames + STRIDE * t, STRIDE, end - t, column_lanes, num_s, norm + num_s * t) || marked;
+                t = end;
+            }
+        }
+
+        auto mark = [&](S32 k, S32 t)
+        {
+            norm[k + num_s * t].set(0.f, 0.f, 0.f, 1.f);
+            marked = true;
+        };
+        // A pole's step that leaves only the rounding of its terms finds no
+        // width there either: a flat face lies along the axis its pole is
+        // on. A round face's tangent at a pole is square to its radius, so
+        // the turn about the axis always moves it.
+        for (S32 t = 0; t < num_t && pole_count > 0 && flat; ++t)
+        {
+            const LLVector4a& rate0 = frames[STRIDE * t + 2];
+            const LLVector4a& rate1 = frames[STRIDE * t + 3];
+            const F32 rates2 = rate0.dot3(rate0).getF32() + rate1.dot3(rate1).getF32();
+            for (S32 c = 0; c < pole_count; ++c)
+            {
+                const S32 k = poles[c];
+                LLVector4a step = rate0;
+                step.mul(px[k]);
+                LLVector4a second = rate1;
+                second.mul(py[k]);
+                step.add(second);
+                const F32 terms = (px[k] * px[k] + py[k] * py[k]) * rates2;
+                if (step.dot3(step).getF32() <= POLE_STEP_ROUNDING * POLE_STEP_ROUNDING * terms)
+                {
+                    mark(k, t);
+                }
+            }
+        }
+        // Where a pole meets an apex, both derivatives are steps into the
+        // face, and the two steps are along one line.
+        for (S32 r = 0; r < narrowed_count; ++r)
+        {
+            for (S32 c = 0; c < pole_count; ++c)
+            {
+                mark(poles[c], narrowed[r]);
+            }
+        }
+        if (marked)
+        {
+            fill_marked_normals(norm, num_s, num_t);
         }
     }
 
@@ -7609,11 +8113,7 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // Every row takes the same columns of its mesh row with the same s
     // texture coordinates, and the path's t for its own: the columns and
     // their s are worked out once, so the rows are copies.
-    struct Column
-    {
-        S32 mesh;
-        F32 s;
-    };
+    using Column = SideColumn;
     constexpr S32 STACK_COLUMNS = 256;
     Column stack_columns[STACK_COLUMNS];
     std::vector<Column> heap_columns;
@@ -7848,10 +8348,46 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         mNumIndices = cur_index;
     }
 
-    // The normals come from the grid's quads, not from the triangles the
-    // indices make of them, so they do not depend on the diagonals or on the
-    // order of the triangles.
     LLVector4a* norm = mNormals;
+
+    // A prim on a path that is a function of t has the surface its side is
+    // cut from, and takes that surface's normals. Its seams join nothing:
+    // the surface is the same on either side of them.
+    const LLPath& path = volume->getPath();
+    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && path.hasFrames())
+    {
+        mJoinsS = false;
+        mJoinsT = false;
+        swept_side_normals(*volume, columns, mNumS, mBeginT, mNumT, flat, pos, norm);
+        return true;
+    }
+
+    // A flexible prim's path and a sculpt's map are points, and a circle2
+    // path's stations alternate sides. Their normals come from the grid's
+    // quads, not from the triangles the indices make of them, so they do not
+    // depend on the diagonals or on the order of the triangles.
+    //
+    // Such a side's normals join across its first and last columns where
+    // they are one seam, and across its first and last rows: a prim's where
+    // they are one place in every row or column, as its own positions say; a
+    // sculpt's where its stitching samples them from one column or row of the
+    // map. A flat inner side's seam is one of its corners. A flexible prim's
+    // path is open, and its first build, which its partial builds keep the
+    // joins of, lays every row at one place before it has a pose.
+    if (!partial_build)
+    {
+        if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
+        {
+            mJoinsS = !doubled && columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
+            mJoinsT = !mFlexible && rows_meet(pos, mNumS, 0, mNumT - 1);
+        }
+        else
+        {
+            mJoinsS = sculpt_stitching == LL_SCULPT_TYPE_SPHERE || sculpt_stitching == LL_SCULPT_TYPE_TORUS ||
+                      sculpt_stitching == LL_SCULPT_TYPE_CYLINDER;
+            mJoinsT = sculpt_stitching == LL_SCULPT_TYPE_TORUS;
+        }
+    }
 
     for (S32 v = 0; v < mNumVertices; ++v)
     {
@@ -7878,28 +8414,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             drop_rounding(top);
             add_quad_to_normals(norm, bl, bl + 1, tl, tl + 1, bottom, right, top, left, diagonal);
             left = right;
-        }
-    }
-
-    // A side's normals join across its first and last columns where they are
-    // one seam, and across its first and last rows: a prim's where they are
-    // one place in every row or column, as its own positions say; a
-    // sculpt's where its stitching samples them from one column or row of
-    // the map. A flat inner side's seam is one of its corners. A flexible
-    // prim's path is open, and its first build, which its partial builds
-    // keep the joins of, lays every row at one place before it has a pose.
-    if (!partial_build)
-    {
-        if (sculpt_stitching == LL_SCULPT_TYPE_NONE)
-        {
-            mJoinsS = !doubled && columns_meet(pos, mNumS, mNumT, 0, mNumS - 1);
-            mJoinsT = !mFlexible && rows_meet(pos, mNumS, 0, mNumT - 1);
-        }
-        else
-        {
-            mJoinsS = sculpt_stitching == LL_SCULPT_TYPE_SPHERE || sculpt_stitching == LL_SCULPT_TYPE_TORUS ||
-                      sculpt_stitching == LL_SCULPT_TYPE_CYLINDER;
-            mJoinsT = sculpt_stitching == LL_SCULPT_TYPE_TORUS;
         }
     }
 
@@ -7956,33 +8470,6 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
             n.setAdd(norm[i], norm[mNumS*(mNumT-1)+i]);
             norm[i] = n;
             norm[mNumS*(mNumT-1)+i] = n;
-        }
-    }
-
-    // On a sphere's side, a column that is one place in every row is a pole
-    // on the axis the half circle sweeps about, and takes the axis: away
-    // from the sphere's centre on an outer side, toward it on an inner one.
-    // Which end of the axis a column's pole is at follows the twist, which
-    // turns the half circle about its centre. A cut end of a hollow sphere
-    // lies on the axis, and has no area. A flat inner side is a cone at a
-    // pole, and its ends keep the normals of the strips they end.
-    if (sculpt_stitching == LL_SCULPT_TYPE_NONE && !(mTypeMask & END_MASK) && !doubled && volume->getPathType() == LL_PCODE_PATH_CIRCLE &&
-        ((volume->getProfileType() & LL_PCODE_PROFILE_MASK) == LL_PCODE_PROFILE_CIRCLE_HALF))
-    {
-        const bool outer = !(mTypeMask & INNER_MASK);
-        for (S32 column : { 0, mNumS - 1 })
-        {
-            if (column_is_point(pos, mNumS, mNumT, column))
-            {
-                // A pole at the centre, of a sphere with no size, takes the
-                // side it has untwisted.
-                const F32 at = pos[column][0];
-                const F32 x = at == 0.f ? (column == 0 ? 1.f : -1.f) : ((at > 0.f) == outer ? 1.f : -1.f);
-                for (S32 i = 0; i < mNumT; i++)
-                {
-                    norm[mNumS * i + column].set(x, 0.f, 0.f);
-                }
-            }
         }
     }
 

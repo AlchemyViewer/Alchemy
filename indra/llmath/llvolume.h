@@ -736,6 +736,26 @@ public:
     // Whether the hole was drawn in where it would have gone through the
     // outer wall, and so touches it there.
     bool holeTouchesWall() const                        { return mHoleTouchesWall; }
+
+    // The tangent in the profile's plane at point i, the way the points'
+    // indices run, of no length in particular: its circle's at the point's
+    // angle, which is the point turned a quarter turn about the centre, the
+    // other way round along a hole. A cut point lies on the chord of its
+    // step, and genNGon keeps the circle's at the cut's angle for it. The
+    // centre of a cut profile has none, and a flat profile's points have
+    // the circle's they were laid out on, which only a round side reads.
+    LLVector4a getTangent(S32 i) const
+    {
+        for (S32 c = 0; c < mCutCount; ++c)
+        {
+            if (mCutPoints[c] == i)
+            {
+                return mCutTangents[c];
+            }
+        }
+        const LLVector4a& point = mProfile[i];
+        return i >= mHoleBegin ? LLVector4a(point[1], -point[0], 0.f) : LLVector4a(-point[1], point[0], 0.f);
+    }
 public:
     struct Face
     {
@@ -787,6 +807,14 @@ protected:
 
     S32           mTotalOut;
     S32           mTotal;
+
+    // The cut points that fall between two steps, of the profile and of its
+    // hole, and their tangents; and the first of the hole's points, or
+    // past the last point where there is none.
+    S32           mCutPoints[4] = { -1, -1, -1, -1 };
+    LLVector4a    mCutTangents[4];
+    S32           mCutCount = 0;
+    S32           mHoleBegin = S32_MAX;
 };
 
 //-------------------------------------------------------------------
@@ -796,6 +824,18 @@ protected:
 class LLPath
 {
 public:
+    // A station's frame for the surface its profile sweeps out: the rows
+    // its profile's x and y are scaled and turned by, M, how fast they
+    // change along the path, M', and how fast the station moves, per unit
+    // of its t. Five vectors one after another, as alsimd::swept_normals
+    // reads a row's.
+    struct PathFrame
+    {
+        LLVector4a mRow[2];
+        LLVector4a mRate[2];
+        LLVector4a mVelocity;
+    };
+
     class PathPt
     {
     public:
@@ -805,6 +845,8 @@ public:
         LLVector4a   mScale;
         F32          mTexT;
         F32 pad[3]; //for alignment
+        // Where the path has frames (see hasFrames).
+        PathFrame    mFrame;
         PathPt()
         {
             mPos.clear();
@@ -848,6 +890,18 @@ public:
 
     void resizePath(S32 length) { mPath.resize(length); }
 
+    // Whether its stations have frames: a path that is a function of t, a
+    // line or a circle. A circle2 path's stations alternate sides, and a
+    // flexible or sculpted one's normals come from its points.
+    bool hasFrames() const                  { return mHasFrames; }
+    // Whether every station's frame is the first's: a line that neither
+    // twists nor scales.
+    bool framesRepeat() const               { return mFramesRepeat; }
+    // Whether every station's frame is the first's turned as the station's
+    // rotation turns it from the first's: a line that neither scales nor
+    // shears, twisted or not.
+    bool framesTurn() const                 { return mFramesTurn; }
+
     friend std::ostream& operator<<(std::ostream &s, const LLPath &path);
 
 public:
@@ -858,6 +912,9 @@ protected:
     S32           mTotal;
     bool          mDirty;
     F32           mStep;
+    bool          mHasFrames = false;
+    bool          mFramesRepeat = false;
+    bool          mFramesTurn = false;
 };
 
 class LLDynamicPath : public LLPath
