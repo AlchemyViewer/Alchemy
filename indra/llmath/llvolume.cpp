@@ -3641,31 +3641,77 @@ void sculpt_calc_mesh_resolution(U16 width, U16 height, U8 type, F32 detail, S32
 // A sculpt map averaged down by two along x, y or both: each pixel the rounded mean of the two or four it covers.
 static std::vector<U8> sculpt_map_averaged_down(const U8* data, U16 width, U16 height, S8 components, bool along_x, bool along_y)
 {
-    const S32 step_x = along_x ? 2 : 1;
-    const S32 step_y = along_y ? 2 : 1;
-    const S32 out_width = width / step_x;
-    const S32 out_height = height / step_y;
-    std::vector<U8> out((size_t)out_width * out_height * components);
-    for (S32 y = 0; y < out_height; ++y)
+    const size_t pixel = (size_t)components;
+    const size_t out_width = along_x ? width / 2 : width;
+    const size_t out_height = along_y ? height / 2 : height;
+    const size_t in_row = (size_t)width * pixel;
+    const size_t out_row = out_width * pixel;
+    std::vector<U8> out(out_row * out_height);
+    for (size_t y = 0; y < out_height; ++y)
     {
-        for (S32 x = 0; x < out_width; ++x)
+        const U8* upper = data + (along_y ? 2 * y : y) * in_row;
+        const U8* lower = along_y ? upper + in_row : upper;
+        U8* to = out.data() + y * out_row;
+        if (along_x && along_y)
         {
-            for (S32 c = 0; c < components; ++c)
+            for (size_t x = 0; x < out_width; ++x, upper += 2 * pixel, lower += 2 * pixel)
             {
-                S32 sum = 0;
-                for (S32 dy = 0; dy < step_y; ++dy)
+                for (size_t c = 0; c < pixel; ++c)
                 {
-                    for (S32 dx = 0; dx < step_x; ++dx)
-                    {
-                        sum += data[((size_t)(y * step_y + dy) * width + (x * step_x + dx)) * components + c];
-                    }
+                    *to++ = (U8)((upper[c] + upper[pixel + c] + lower[c] + lower[pixel + c] + 2) >> 2);
                 }
-                const S32 count = step_x * step_y;
-                out[((size_t)y * out_width + x) * components + c] = (U8)((sum + count / 2) / count);
+            }
+        }
+        else if (along_x)
+        {
+            for (size_t x = 0; x < out_width; ++x, upper += 2 * pixel)
+            {
+                for (size_t c = 0; c < pixel; ++c)
+                {
+                    *to++ = (U8)((upper[c] + upper[pixel + c] + 1) >> 1);
+                }
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < out_row; ++i)
+            {
+                to[i] = (U8)((upper[i] + lower[i] + 1) >> 1);
             }
         }
     }
     return out;
+}
+
+// Whether every pixel of each row of a sculpt map is its row's first, or, where the stitching does not pinch its first
+// and last rows to their middle pixels, every row is the first: each mesh row of such a map samples one point, or
+// every mesh row the same points, and so does each of the map averaged down any number of times, which has each row one
+// colour or its rows alike as it does.
+static bool sculpt_map_has_no_area_at_any_size(const U8* data, U16 width, U16 height, S8 components, U8 sculpt_stitching)
+{
+    const size_t row = (size_t)width * components;
+    if (sculpt_stitching != LL_SCULPT_TYPE_SPHERE)
+    {
+        bool rows_alike = true;
+        for (U16 y = 1; y < height && rows_alike; ++y)
+        {
+            rows_alike = std::memcmp(data + y * row, data, row) == 0;
+        }
+        if (rows_alike)
+        {
+            return true;
+        }
+    }
+    for (U16 y = 0; y < height; ++y)
+    {
+        // Each pixel the one before it: the row from its second pixel on is the row up to its last.
+        const U8* start = data + y * row;
+        if (std::memcmp(start + components, start, row - components) != 0)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 // sculpt replaces generate() for sculpted surfaces
@@ -3687,10 +3733,13 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
     // detail nothing but the collapsed lines, and no area. Where the samples have no area, the map averaged down by
     // two along each such axis is sampled instead, as the level below it would be, until one has or no axis is left
     // to average; a map whose samples have their area builds as it always has.
+    // A map that no averaging down gives area is not averaged, and the sizes it would go through are taken as they
+    // would be, so that the sphere it ends as is the one it would.
     U16 width = sculpt_width;
     U16 height = sculpt_height;
     const U8* data = sculpt_data;
     std::vector<U8> averaged;
+    bool never_has_area = false;
     while (true)
     {
         S32 requested_sizeS = 0;
@@ -3718,7 +3767,10 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             break;
         }
 
-        sculptGenerateMapVertices(width, height, sculpt_components, data, sculpt_type);
+        if (!never_has_area)
+        {
+            sculptGenerateMapVertices(width, height, sculpt_components, data, sculpt_type);
+        }
 
         // don't test lowest LOD to support legacy content DEV-33670
         if (mDetail <= SCULPT_MIN_AREA_DETAIL)
@@ -3726,7 +3778,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             break;
         }
 
-        F32 area = sculptGetSurfaceArea();
+        F32 area = never_has_area ? 0.f : sculptGetSurfaceArea();
 
         mSurfaceArea = area;
 
@@ -3747,8 +3799,13 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             visible_placeholder = true;
             break;
         }
-        averaged = sculpt_map_averaged_down(data, width, height, sculpt_components, along_x, along_y);
-        data = averaged.data();
+        never_has_area =
+            never_has_area || sculpt_map_has_no_area_at_any_size(data, width, height, sculpt_components, sculpt_type & LL_SCULPT_TYPE_MASK);
+        if (!never_has_area)
+        {
+            averaged = sculpt_map_averaged_down(data, width, height, sculpt_components, along_x, along_y);
+            data = averaged.data();
+        }
         width = along_x ? width / 2 : width;
         height = along_y ? height / 2 : height;
     }

@@ -183,6 +183,30 @@ namespace
         return map;
     }
 
+    // A map as large as a decode on screen hands a sculpt, each pixel what
+    // pixel gives: its samples have no area, and the map is averaged down
+    // until they have or none is left to average.
+    template <typename Pixel>
+    SculptMap largeSculptMap(U16 size, Pixel pixel)
+    {
+        SculptMap map;
+        map.width = size;
+        map.height = size;
+        map.rgb.resize((size_t)size * size * 3);
+        for (U16 y = 0; y < size; ++y)
+        {
+            for (U16 x = 0; x < size; ++x)
+            {
+                const LLVector3 p = pixel(x, y);
+                U8* out = &map.rgb[((size_t)y * size + x) * 3];
+                out[0] = toByte(p.mV[0]);
+                out[1] = toByte(p.mV[1]);
+                out[2] = toByte(p.mV[2]);
+            }
+        }
+        return map;
+    }
+
     LLPointer<LLVolume> sculptVolume(U8 stitching, S32 lod)
     {
         LLVolumeParams p;
@@ -669,6 +693,30 @@ namespace
             BENCHMARK(fmt::format("pinched plane sculpt, LOD {}, 64 by 64 map, {}", lod, counts(*volume)))
             {
                 volume->sculpt(pinched.width, pinched.height, 3, pinched.rgb.data(), 0, false);
+                return volume->getNumVolumeFaces();
+            };
+        }
+
+        // Large maps whose samples have no area: one colour and one of rows
+        // alike, which no averaging gives any, and one of two halves either
+        // side of a diagonal, which is averaged down to the end.
+        constexpr U16 LARGE = 2048;
+        const struct
+        {
+            const char* name;
+            SculptMap map;
+        } arealess[] = {
+            { "one colour", largeSculptMap(LARGE, [](U16, U16) { return LLVector3(0.1f, -0.2f, 0.3f); }) },
+            { "rows alike", largeSculptMap(LARGE, [](U16 x, U16) { return LLVector3((F32)x / (LARGE - 1) - 0.5f, 0.f, 0.f); }) },
+            { "diagonal halves",
+              largeSculptMap(LARGE, [](U16 x, U16 y) { return x + y < LARGE ? LLVector3(-0.25f, 0.f, 0.f) : LLVector3(0.25f, 0.f, 0.f); }) },
+        };
+        for (const auto& [name, map] : arealess)
+        {
+            LLPointer<LLVolume> volume = sculptVolume(LL_SCULPT_TYPE_PLANE, 3);
+            BENCHMARK(fmt::format("plane sculpt, LOD 3, {} by {} map of {}", map.width, map.height, name))
+            {
+                volume->sculpt(map.width, map.height, 3, map.rgb.data(), 0, true);
                 return volume->getNumVolumeFaces();
             };
         }
