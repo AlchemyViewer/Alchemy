@@ -230,6 +230,7 @@ LLModelPreview::~LLModelPreview()
     {
         clearModel(i);
     }
+    mSimplifiers.clear();
     mBaseModel.clear();
     mBaseScene.clear();
 
@@ -919,6 +920,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
 
                 if (i == LLModel::LOD_HIGH)
                 {
+                    mSimplifiers.clear();
                     mBaseModel = mModel[lod];
                     mBaseScene = mScene[lod];
                     mVertexBuffer[LLModel::NUM_LODS].clear();
@@ -1002,6 +1004,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
 
     if (loaded_lod == -1)
     { //populate all LoDs from model loader scene
+        mSimplifiers.clear();
         mBaseModel.clear();
         mBaseScene.clear();
 
@@ -1142,6 +1145,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
                 mGenLOD = true;
             }
 
+            mSimplifiers.clear();
             mBaseModel = mModel[loaded_lod];
 
             mBaseScene = mScene[loaded_lod];
@@ -1306,6 +1310,10 @@ void LLModelPreview::generateNormals()
 
     F32 angle_cutoff = (F32)mFMP->childGetValue("crease_angle").asReal();
 
+    // The faces rewritten here may be the base models', as their
+    // simplifiers took them.
+    mSimplifiers.clear();
+
     mRequestedCreaseAngle[which_lod] = angle_cutoff;
 
     angle_cutoff *= DEG_TO_RAD;
@@ -1363,6 +1371,10 @@ void LLModelPreview::restoreNormals()
         return;
     }
 
+    // The faces restored here may be the base models', as in
+    // generateNormals.
+    mSimplifiers.clear();
+
     if (!mBaseModelFacesCopy.empty())
     {
         llassert(mBaseModelFacesCopy.size() == mBaseModel.size());
@@ -1390,6 +1402,25 @@ void LLModelPreview::restoreNormals()
     mVertexBuffer[which_lod].clear();
     refresh();
     updateStatusMessages();
+}
+
+const ALMeshSimplifier& LLModelPreview::simplifierFor(U32 mdl_idx)
+{
+    // A model's faces change in place where generateNormals and
+    // restoreNormals rewrite them, which drop every simplifier, and where
+    // rebuildUploadData puts them in another model's material order, which
+    // puts the model's material list in that order too.
+    mSimplifiers.resize(mBaseModel.size());
+    BaseSimplifier& kept = mSimplifiers[mdl_idx];
+    LLModel* base = mBaseModel[mdl_idx];
+    if (!kept.mSimplifier || kept.mModel != base || kept.mMaterialList != base->mMaterialList)
+    {
+        kept.mSimplifier.reset();
+        kept.mModel = base;
+        kept.mMaterialList = base->mMaterialList;
+        kept.mSimplifier = std::make_unique<const ALMeshSimplifier>(*base);
+    }
+    return *kept.mSimplifier;
 }
 
 void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 decimation, bool enforce_tri_limit)
@@ -1539,7 +1570,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
             goal.decimator = indices_decimator;
             goal.error = lod_error_threshold;
             goal.distant = lod <= LLModel::LOD_LOW;
-            const ALMeshSimplifier simplifier(*base);
+            const ALMeshSimplifier& simplifier = simplifierFor(mdl_idx);
             auto simplify_model = [&](F32 decimator, ALMeshSimplifier::Seams seams)
             {
                 ALMeshSimplifier::Target at = goal;
@@ -1610,6 +1641,12 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
                 std::vector<LLVolumeFace> closest;
                 for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE })
                 {
+                    // NONE simplifies as UV, which fell short, where it
+                    // holds the same seams.
+                    if (seams == Seams::NONE && simplifier.same(Seams::UV, Seams::NONE))
+                    {
+                        break;
+                    }
                     const F32 ratio = simplify_model(indices_decimator, seams);
                     const bool closer = ratio > precise_ratio;
                     if (closer)
