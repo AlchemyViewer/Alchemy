@@ -168,20 +168,6 @@ namespace
 LLGLSLShader    gUIProgram;
 LLGLSLShader    gSolidColorProgram;
 
-// NOTE: Keep gShaderConsts* and LLGLSLShader::ShaderConsts_e in sync!
-const std::string gShaderConstsKey[LLGLSLShader::NUM_SHADER_CONSTS] =
-{
-      "LL_SHADER_CONST_CLOUD_MOON_DEPTH"
-    , "LL_SHADER_CONST_STAR_DEPTH"
-};
-
-// NOTE: Keep gShaderConsts* and LLGLSLShader::ShaderConsts_e in sync!
-const std::string gShaderConstsVal[LLGLSLShader::NUM_SHADER_CONSTS] =
-{
-      "0.99998" // SHADER_CONST_CLOUD_MOON_DEPTH // SL-14113
-    , "0.99999" // SHADER_CONST_STAR_DEPTH       // SL-14113
-};
-
 namespace
 {
     // The bits a component is uploaded as, which is what the uniform value cache compares: an int or a uint as
@@ -1414,11 +1400,6 @@ void LLGLSLShader::addPermutation(std::string name, std::string value)
 {
     mDefines[name] = value;
     mPermutationsAdded = true;
-}
-
-void LLGLSLShader::addConstant(const LLGLSLShader::eShaderConsts shader_const)
-{
-    addPermutation(gShaderConstsKey[shader_const], gShaderConstsVal[shader_const]);
 }
 
 void LLGLSLShader::removePermutation(std::string name)

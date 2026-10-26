@@ -147,14 +147,6 @@ public:
 class LLGLSLShader
 {
 public:
-    // NOTE: Keep gShaderConsts and LLGLSLShader::ShaderConsts_e in sync!
-    enum eShaderConsts
-    {
-        SHADER_CONST_CLOUD_MOON_DEPTH
-        , SHADER_CONST_STAR_DEPTH
-        , NUM_SHADER_CONSTS
-    };
-
     // enum primarily used to control application sky settings uniforms
     typedef enum
     {
@@ -454,8 +446,6 @@ public:
         mPermutationsAdded = true;
     }
     void removePermutation(std::string name);
-
-    void addConstant(const LLGLSLShader::eShaderConsts shader_const);
 
     // Texture channel for the specified uniform, or -1 if the uniform is not used as a
     // texture. enableTexture only resolves it; disableTexture also releases the slot, and its

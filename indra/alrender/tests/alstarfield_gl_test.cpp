@@ -409,7 +409,6 @@ void main()
             program.mShaderFiles.push_back(std::make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
             program.mShaderGroup = LLGLSLShader::SG_SKY;
-            program.addConstant(LLGLSLShader::SHADER_CONST_STAR_DEPTH);
             if (quads)
             {
                 program.addPermutation("STAR_QUADS", "1");

@@ -147,7 +147,6 @@ namespace
             program.mShaderFiles.push_back(std::make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
             program.mShaderLevel = 1;
             program.mShaderGroup = LLGLSLShader::SG_SKY;
-            program.addConstant(LLGLSLShader::SHADER_CONST_STAR_DEPTH);
             program.addPermutation("HAS_EMISSIVE", "1");
             UNSCOPED_INFO("the star program builds from " << vertex);
             REQUIRE(program.createShader());

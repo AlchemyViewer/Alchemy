@@ -419,7 +419,6 @@ void main()
                 {
                     LLGLSLShader& program = quads ? mStarQuads[path] : mStarPoints[path];
                     program.mShaderGroup = LLGLSLShader::SG_SKY;
-                    program.addConstant(LLGLSLShader::SHADER_CONST_STAR_DEPTH);
                     buildProgram(program, quads ? "Deferred Star Quad Program" : "Deferred Star Program",
                                  { { "deferred/starsV.glsl", GL_VERTEX_SHADER },
                                    { "deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER },
