@@ -5487,6 +5487,9 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         }
         getTE(te)->setGLTFMaterial(mat);
         initRenderMaterial(te);
+        // initRenderMaterial compared the face's copy with the material just set on it, which names the
+        // same bakes: the face had no material before
+        updateAvatarMeshVisibility(te, nullptr);
         mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
         llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(getTE(te)->getGLTFRenderMaterial()) != nullptr);
     }
