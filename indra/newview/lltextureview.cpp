@@ -604,7 +604,7 @@ void LLGLTexMemBar::draw()
    F64 aux_raw_image_bytes_MB = aux_raw_image_bytes / (1024.0 * 1024.0);
    F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0;
    F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / 1024.0 / 512.0;
-   F64 render_bytes_alloc = LLRenderTarget::sBytesAllocated / 1024.0 / 1024.0;
+   F64 render_bytes_alloc = LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET) / 1024.0 / 1024.0;
 
     //----------------------------------------------------------------------------
     LLGLSUIDefault gls_ui;
@@ -637,7 +637,7 @@ void LLGLTexMemBar::draw()
     text = llformat("Est. Free: %d MB Sys Free: %d MB FBO: %d MB Buffers: %d MB Probe#: %d Probe Mem: %d MB Bias: %.2f Cache: %.1f/%.1f MB",
                     (S32)LLViewerTexture::sFreeVRAMMegabytes,
                     LLMemory::getAvailableMemKB()/1024,
-                    LLRenderTarget::sBytesAllocated/(1024*1024),
+                    (S32)(LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET)/(1024*1024)),
                     (S32)(ALGPUBuffer::sBytesAllocated/(1024*1024)),
                     gPipeline.mReflectionMapManager.probeCount(),
                     gPipeline.mReflectionMapManager.probeMemory(),

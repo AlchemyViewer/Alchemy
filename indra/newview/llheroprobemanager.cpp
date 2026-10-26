@@ -580,7 +580,7 @@ void LLHeroProbeManager::initReflectionMaps()
         mHDR = planned->mHDR;
 
         // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation source)
-        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, true, mHDR);
+        mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, LLImageGLMemory::REFLECTION_PROBE, true, mHDR);
 
         if (mDefaultProbe.isNull())
         {

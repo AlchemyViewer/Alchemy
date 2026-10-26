@@ -294,6 +294,27 @@ namespace
         }
     }
 
+    // The bytes of the blocks' own stores, made through store_data. The orphan-on-wrap rings are counted from their
+    // names (ALUniformBuffer::getStoreBytes), and the persistent rings are ALGPUBuffers, which count their own.
+    U64 sStoreBytes = 0;
+
+    // (Re)specify `name`'s whole store at `size` bytes, as buffer_data, where it held `held`: the count follows, and
+    // `held` becomes `size`.
+    void store_data(GLuint name, size_t& held, size_t size, const void* data, GLenum usage)
+    {
+        buffer_data(name, (GLsizeiptr)size, data, usage);
+        sStoreBytes = sStoreBytes - held + size;
+        held        = size;
+    }
+
+    // A store of `held` bytes deleted: out of the count, and `held` 0.
+    void store_deleted(size_t& held)
+    {
+        llassert(held <= sStoreBytes);
+        sStoreBytes -= held;
+        held = 0;
+    }
+
     // Sub-update a buffer range, DSA-aware.
     void buffer_subdata(GLuint name, GLintptr offset, GLsizeiptr size, const void* data)
     {
@@ -701,6 +722,13 @@ namespace
 S32 ALUniformBuffer::sUpdateMode = ALUniformBuffer::UPDATE_ORPHAN;
 
 // static
+U64 ALUniformBuffer::getStoreBytes()
+{
+    // Each orphan-on-wrap ring is respecified only at the size it was made, which changes only as it is torn down.
+    return sStoreBytes + (sRing != 0 ? sRingBytes : 0) + (sScratchOrphan != 0 ? SCRATCH_BYTES : 0);
+}
+
+// static
 S32 ALUniformBuffer::clampUpdateMode(S32 mode)
 {
     if (mode < UPDATE_DIRECT || mode > UPDATE_PERSISTENT_FLUSH)
@@ -784,9 +812,8 @@ void ALUniformBuffer::update(const void* data, size_t bytes, EUsage usage)
 
     // Orphan-and-replace: the whole store is rewritten, so hand the driver a fresh allocation
     // (glBufferData) rather than sub-updating, letting it avoid a sync with in-flight draws.
-    buffer_data(mName, (GLsizeiptr)bytes, data, to_gl_usage(usage));
+    store_data(mName, mSize, bytes, data, to_gl_usage(usage));
 
-    mSize = bytes;
     mSliceRing = mName; // valid data now lives in the own store
 }
 
@@ -880,7 +907,7 @@ void ALUniformBuffer::flush(U32 binding)
             // away from a streaming mode, where the binding point may still reference a ring
             // slice (mSliceRing != mName), which would make draws ignore this upload. Restore
             // the classic attachment in that case only.
-            buffer_data(mName, (GLsizeiptr)mShadow.size(), mShadow.data(), GL_STREAM_DRAW);
+            store_data(mName, mSize, mShadow.size(), mShadow.data(), GL_STREAM_DRAW);
             if (mSliceRing != mName)
             {
                 glBindBufferBase(GL_UNIFORM_BUFFER, binding, mName);
@@ -907,7 +934,7 @@ void ALUniformBuffer::flushPersistent(U32 binding)
         llassert(false);
         LL_WARNS_ONCE("ShaderUniform") << "Persistent UBO block (" << len << " bytes) exceeds segment size "
                                        << seg_bytes << "; falling back to whole-store orphan bind." << LL_ENDL;
-        buffer_data(mName, (GLsizeiptr)len, mShadow.data(), GL_STREAM_DRAW);
+        store_data(mName, mSize, len, mShadow.data(), GL_STREAM_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, binding, mName);
         mSliceRing = mName;
         return;
@@ -967,7 +994,7 @@ void ALUniformBuffer::flushRing(U32 binding)
         llassert(false);
         LL_WARNS_ONCE("ShaderUniform") << "UBO ring block (" << len << " bytes) exceeds ring size "
                                        << sRingBytes << "; falling back to whole-store orphan bind." << LL_ENDL;
-        buffer_data(mName, (GLsizeiptr)len, mShadow.data(), GL_STREAM_DRAW);
+        store_data(mName, mSize, len, mShadow.data(), GL_STREAM_DRAW);
         glBindBufferBase(GL_UNIFORM_BUFFER, binding, mName);
         mSliceRing = mName;
         return;
@@ -1143,8 +1170,8 @@ void ALUniformBuffer::release()
         {
             glDeleteBuffers(1, &mName);
         }
+        store_deleted(mSize);
         mName = 0;
-        mSize = 0;
     }
     mShadow.clear();
     mShadow.shrink_to_fit();

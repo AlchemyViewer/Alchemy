@@ -378,6 +378,8 @@ class LLVBOPool
     virtual void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) = 0;
     virtual void freeVBO(GLenum type, U32 size, GLuint name, U8* data) = 0;
     virtual U64 getVramBytesUsed() = 0;
+    // Of those, the stores kept for reuse.
+    virtual U64 getVramBytesPooled() const = 0;
     virtual LLVertexBuffer::PoolStats getStats() const = 0;
 };
 
@@ -392,6 +394,11 @@ public:
     U64 getVramBytesUsed() override
     {
         return mAllocated;
+    }
+
+    U64 getVramBytesPooled() const override
+    {
+        return 0;
     }
 
     LLVertexBuffer::PoolStats getStats() const override
@@ -491,6 +498,11 @@ public:
     U64 getVramBytesUsed() override
     {
         return mAllocated + mReserved;
+    }
+
+    U64 getVramBytesPooled() const override
+    {
+        return mReserved;
     }
 
     LLVertexBuffer::PoolStats getStats() const override
@@ -785,6 +797,12 @@ void LLVertexBufferData::draw()
 U64 LLVertexBuffer::getBytesAllocated()
 {
     return sVBOPool ? sVBOPool->getVramBytesUsed() : 0;
+}
+
+//static
+U64 LLVertexBuffer::getBytesPooled()
+{
+    return sVBOPool ? sVBOPool->getVramBytesPooled() : 0;
 }
 
 //static

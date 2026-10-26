@@ -20,6 +20,7 @@ set(
   alfontface.cpp
   alfontshaping.cpp
   aluniformbuffer.cpp
+  alvramusage.cpp
   llcubemap.cpp
   llcubemaparray.cpp
   llfontbitmapcache.cpp
@@ -65,6 +66,7 @@ set(
   alfontface.h
   alfontshaping.h
   aluniformbuffer.h
+  alvramusage.h
   llcubemap.h
   llcubemaparray.h
   llfontgl.h
@@ -196,6 +198,7 @@ if(AL_BUILD_TESTS)
       tests/llfontbitmapcache_gl_test.cpp
       tests/llfontfreetype_gl_test.cpp
       tests/llfontregistry_gl_test.cpp
+      tests/llglerrors_gl_test.cpp
       tests/llimagegl_test.cpp
     LIBRARIES llrender ll::icu
     SUPPORT llrender_test_checks llcommon_test_checks
@@ -254,7 +257,9 @@ if(AL_BUILD_TESTS)
   # - LLVertexBuffer: what a buffer draws straight after an upload, after a
   #   second upload and after a new size, and that an upload sends only the
   #   stores its map wrote; and LLRenderSphere's buffer drawn under the debug
-  #   GL checks.
+  #   GL checks;
+  # - ALVRAMUsage: render targets, probes, textures of either kind, buffers
+  #   and geometry each counted in their own figure, and the total the sum.
   al_add_test_binary(
     llrender_gl_shared_tests
     PROJECT llrender
@@ -273,6 +278,7 @@ if(AL_BUILD_TESTS)
       tests/altextureblit_gl_test.cpp
       tests/altexturereadback_gl_test.cpp
       tests/aluniformbuffer_gl_test.cpp
+      tests/alvramusage_gl_test.cpp
       tests/alwindowsdlheadless_test.cpp
       tests/llfontgl_test.cpp
       tests/llfonttextcache_test.cpp

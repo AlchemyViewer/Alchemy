@@ -84,7 +84,7 @@ void LLCubeMap::initGL()
         gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_CUBE_MAP, texname);
         glTexStorage2D(GL_TEXTURE_CUBE_MAP, 1, internal_format, RESOLUTION, RESOLUTION);
         // Recorded once for the whole cube: alloc_tex_image's count of 6 covers its faces.
-        LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, 1);
+        LLImageGLMemory::alloc_tex_image(RESOLUTION, RESOLUTION, internal_format, 6, 1, LLImageGLMemory::OTHER_TEXTURE);
         stop_glerror();
 
         for (int i = 0; i < 6; i++)

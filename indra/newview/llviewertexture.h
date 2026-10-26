@@ -161,6 +161,9 @@ public:
     S32 getNumVolumes(U32 channel) const;
     const ll_volume_list_t* getVolumeList(U32 channel) const { return &mVolumeList[channel]; }
 
+    // Whether a face or a volume in the world uses the texture.
+    bool hasWorldUse() const;
+
     bool isLargeImage() ;
 
     void setParcelMedia(LLViewerMediaTexture* media) {mParcelMedia = media;}
@@ -172,6 +175,9 @@ protected:
     void init(bool firstinit) ;
     void reorganizeFaceList() ;
     void reorganizeVolumeList();
+
+    // Called as the texture gains its first face or volume in the world, and as it loses its last.
+    virtual void onWorldUseChanged() {}
 
 private:
     friend class LLBumpImageList;
@@ -433,10 +439,14 @@ public:
 protected:
     S32 getCurrentDiscardLevelForFetching() ;
     void forceToRefetchTexture(S32 desired_discard = 0, F32 kept_time = 60.f);
+    void onWorldUseChanged() override;
 
 private:
     void init(bool firstinit) ;
     void cleanup() ;
+
+    // Count the storage as the source, the boost and the world's use of it say (vram_class_of).
+    void updateVRAMClass();
 
     bool processFetchResults(S32& desired_discard, S32 current_discard, S32 fetch_discard, F32 decode_priority);
 

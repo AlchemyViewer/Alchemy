@@ -5131,7 +5131,7 @@ void LLPipeline::renderGeomDeferred(LLCamera& camera, bool do_occlusion)
             // The waves this frame: their patches before the cull, and A in centimetres.
             LL_PROFILE_PLOT("water patches", (int64_t)mWaterSurface.patchCount());
             LL_PROFILE_PLOT("water waves cm", (int64_t)(mWaterSurface.maxDisplacement() * 100.f));
-            LL_PROFILE_PLOT("render target MB", (int64_t)(LLRenderTarget::sBytesAllocated >> 20));
+            LL_PROFILE_PLOT("render target MB", (int64_t)(LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET) >> 20));
             // The pool's share of those, and how the last frame's acquisitions found it.
             LL_PROFILE_PLOT("transient target MB", (int64_t)(mTransientTargets.lastFrame().mBytes >> 20));
             LL_PROFILE_PLOT("transient target hits", (int64_t)mTransientTargets.lastFrame().mHits);

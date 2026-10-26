@@ -97,7 +97,7 @@ public:
     /// What the pool holds, and what one frame asked of it.
     struct Stats
     {
-        U64 mBytes    = 0; ///< what its targets hold, counted as LLRenderTarget::sBytesAllocated counts it
+        U64 mBytes    = 0; ///< what its targets hold, counted as LLRenderTarget::bytesFor counts it
         U32 mTargets  = 0; ///< how many targets it holds, acquired or free
         U32 mHits     = 0; ///< acquisitions a free target met
         U32 mMisses   = 0; ///< acquisitions that built one

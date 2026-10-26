@@ -291,7 +291,14 @@ void forget_program_samplers(U32 program);
 
 void assert_glerror();
 
+// Reading the errors waits for a threaded driver's own thread, so it is done only where the answer is needed now, or
+// straight after a call that has waited for that thread already. Each read below takes every flag the context has set
+// and notes a GL_OUT_OF_MEMORY among them for take_gl_out_of_memory.
 void clear_glerror();
+// What the context reported: GL_OUT_OF_MEMORY where that is among its errors, else the first, else GL_NO_ERROR.
+GLenum read_gl_errors();
+// Whether a context reported GL_OUT_OF_MEMORY to any read since the last asking; asking lowers it. Any thread.
+bool take_gl_out_of_memory();
 
 
 # define stop_glerror() assert_glerror()

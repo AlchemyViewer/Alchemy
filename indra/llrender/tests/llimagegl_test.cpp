@@ -36,6 +36,7 @@
 
 #include "../algpubuffer.h"
 #include "../alstagingring.h"
+#include "../alvramusage.h"
 #include "../llimagegl.h"
 #include "../llgl.h"
 #include "../llrender.h"
@@ -281,6 +282,9 @@ namespace
         CHECK(LLImageGL::dataFormatVRAMBits(GL_RGB32F) == 128);
         CHECK(LLImageGL::dataFormatBits(GL_DEPTH_COMPONENT24) == 24);
         CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT24) == 32);
+        UNSCOPED_INFO("the other sized depth formats");
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT16) == 16);
+        CHECK(LLImageGL::dataFormatVRAMBits(GL_DEPTH_COMPONENT32) == 32);
 
         // The VRAM bytes path routes unpadded formats through the host
         // table, so RGBA8 matches between the two where the host
@@ -399,12 +403,18 @@ namespace
             // 4096 + 1024 + 256 + 64 + 16 + 4 + 1 texels
             CHECK(img->getTextureMemory().value() == 5461 * 4);
 
-            // The PBO copy needs no framebuffer of its own.
+            // The PBO copy needs no framebuffer of its own. Its buffer, which each case starts with empty, grows to
+            // the level read back, and is counted with the GPU buffers.
+            const ALVRAMUsage usage = ALVRAMUsage::current();
+            REQUIRE(LLImageGL::getScratchBufferBytes() == 0);
             const GLManagerSetting<U32> pbo(gGLManager.mDownScaleMethod, 1u);
             REQUIRE(img->scaleDown(1));
             // 1024 + 256 + 64 + 16 + 4 + 1
             CHECK(img->getTextureMemory().value() == 1365 * 4);
             CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 1365 * 4);
+            UNSCOPED_INFO("the readback buffer, a 32x32 level of 4 bytes a texel");
+            CHECK(LLImageGL::getScratchBufferBytes() == 32 * 32 * 4);
+            CHECK(ALVRAMUsage::current().mGPUBuffers - usage.mGPUBuffers == 32 * 32 * 4);
         }
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
@@ -467,6 +477,85 @@ namespace
         }
     }
 #endif
+
+    // Each texture's storage is counted in one class: an image's in OTHER_TEXTURE unless it is told otherwise, before its
+    // storage is made or after, when the storage moves with it, and kept by every upload after; allocateTexture2D's in
+    // the class it is given; and each leaves its class as it is deleted. A class told while an upload is in flight
+    // reaches the texture the upload publishes.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: each texture's storage is counted in its class", "[LLImageGL]")
+    {
+        using namespace LLImageGLMemory;
+        U64 before[NUM_CLASSES];
+        for (U32 cls = 0; cls < NUM_CLASSES; ++cls)
+        {
+            before[cls] = LLImageGL::getTextureBytesAllocated((EClass)cls);
+        }
+        auto delta = [&before](EClass cls) { return (S64)(LLImageGL::getTextureBytesAllocated(cls) - before[cls]); };
+
+        LLPointer<LLImageGL> other = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(other->createGLTexture(0, makeRaw(8, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("an image is other unless told");
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(RENDER_TARGET) == 0);
+
+        LLPointer<LLImageGL> streamed = new LLImageGL(/*usemipmaps=*/false);
+        streamed->setVRAMClass(STREAMED_TEXTURE);
+        REQUIRE(streamed->createGLTexture(0, makeRaw(16, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("told before its storage is made");
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+
+        other->setVRAMClass(STREAMED_TEXTURE);
+        UNSCOPED_INFO("told after: the storage moves");
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 8 * 4 + 8 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        REQUIRE(streamed->createGLTexture(0, makeRaw(32, 8, 4, 0x80).get()));
+        UNSCOPED_INFO("a new upload of another size keeps the class");
+        CHECK(delta(STREAMED_TEXTURE) == 32 * 8 * 4 + 8 * 8 * 4);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        U32 name = 0;
+        LLImageGL::generateTextures(1, &name);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA16F, 4, 4, GL_RGBA, GL_FLOAT, nullptr, 1, RENDER_TARGET);
+        gGL.getTextureSlot(0)->unbind();
+        UNSCOPED_INFO("allocateTexture2D in the class it is given");
+        CHECK(delta(RENDER_TARGET) == 4 * 4 * 8);
+
+        LLImageGL::deleteTextures(1, &name);
+        streamed->destroyGLTexture();
+        other->destroyGLTexture();
+        UNSCOPED_INFO("each leaves its class");
+        CHECK(delta(RENDER_TARGET) == 0);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+
+        // An upload in flight that allocated under the class before: told while it is in flight, its texture takes
+        // the class as it publishes, and the texture on screen at once.
+        REQUIRE(other->createGLTexture(0, makeRaw(8, 8, 4, 0x80).get()));
+        other->beginUpload();
+        U32 built = 0;
+        LLImageGL::generateTextures(1, &built);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, built);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 16, 16, GL_RGBA, GL_UNSIGNED_BYTE, nullptr, 1,
+                                     other->getVRAMClass());
+        gGL.getTextureSlot(0)->unbind();
+        other->setVRAMClass(OTHER_TEXTURE);
+        UNSCOPED_INFO("told while in flight: the texture on screen moves");
+        CHECK(delta(OTHER_TEXTURE) == 8 * 8 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 16 * 16 * 4);
+        other->syncTexName(built);
+        UNSCOPED_INFO("the texture it published takes the class");
+        CHECK(delta(OTHER_TEXTURE) == 16 * 16 * 4);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        other->destroyGLTexture();
+        CHECK(delta(RENDER_TARGET) == 0);
+        CHECK(delta(STREAMED_TEXTURE) == 0);
+        CHECK(delta(OTHER_TEXTURE) == 0);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
 
     // A block-compressed texture keeps its sized compressed format as its primary format, and that is its storage: it
     // is counted at its blocks, whatever its internal format names.

@@ -70,7 +70,6 @@ class LLVertexBuffer;
 class LLRenderTarget
 {
 public:
-    static U32 sBytesAllocated;
     static U32 sCurFBO;
     static U32 sCurResX;
     static U32 sCurResY;
@@ -157,8 +156,9 @@ public:
     // it attached from one built since in its place. 0 for none.
     U64 getDepthSerial() const { return mDepthSerial; }
 
-    // What sBytesAllocated counts for a target built from `desc`: each colour attachment's first level and the depth
-    // of its own, not a depth it shares.
+    // What the VRAM accounting counts for a target built from `desc`, as render target storage: every level of each
+    // colour attachment and the depth of its own, not a depth it shares, at the size their formats pad to, and at the
+    // size allocate holds a description to where there is a context.
     static U64 bytesFor(const ALRenderTargetDesc& desc);
 
     // The name debuggers and the GL debug output show for this target: its framebuffer is labelled `label`, the

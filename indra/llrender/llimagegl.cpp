@@ -137,32 +137,37 @@ namespace
 {
     struct TextureAlloc
     {
-        U64  mBytes;
+        U64                     mBytes;
+        LLImageGLMemory::EClass mClass;
         // Deleted, its bytes out of the count, while the name waits in the deferred-delete ring: an allocation on it
         // before GL frees it is an owner using a texture it let go of, which alloc_tex_image catches.
-        bool mDeleted = false;
+        bool                    mDeleted = false;
     };
 }
 static boost::unordered_map<U32, TextureAlloc> sTextureAllocs;
-// Changed under sTexMemMutex, and read by getTextureBytesAllocated without it.
-static std::atomic<U64> sTextureBytes{0};
+// Each class's bytes. Changed under sTexMemMutex, and read by getTextureBytesAllocated without it.
+static std::atomic<U64> sClassBytes[LLImageGLMemory::NUM_CLASSES] = {};
 
 // track a texture alloc on the currently bound texture.
 // asserts that no currently tracked alloc exists
-void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, U32 levels)
+U64 LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 count, U32 levels, EClass cls)
 {
+    llassert(cls < NUM_CLASSES);
     U32 texUnit = gGL.getCurrentTexUnitIndex();
     llassert(texUnit == 0); // allocations should always be done on tex unit 0
     U32 texName = gGL.getTextureSlot(texUnit)->getCurrTexture();
     const U64 size = (U64)LLImageGL::dataFormatVRAMBytes(intformat, width, height, levels) * count;
 
-    LLMutexLock lock(&sTexMemMutex);
+    {
+        LLMutexLock lock(&sTexMemMutex);
 
-    // it is a precondition that no existing allocation exists for this texture, nor a deleted one GL has yet to free
-    llassert(sTextureAllocs.find(texName) == sTextureAllocs.end());
+        // it is a precondition that no existing allocation exists for this texture, nor a deleted one GL has yet to free
+        llassert(sTextureAllocs.find(texName) == sTextureAllocs.end());
 
-    sTextureAllocs[texName] = { size };
-    sTextureBytes += size;
+        sTextureAllocs[texName] = { size, cls };
+        sClassBytes[cls] += size;
+    }
+    return size;
 }
 
 // track texture free on given texName
@@ -174,11 +179,26 @@ void LLImageGLMemory::free_tex_image(U32 texName)
     // stays until the ring frees its name
     if (iter != sTextureAllocs.end() && !iter->second.mDeleted)
     {
-        llassert(iter->second.mBytes <= sTextureBytes); // sTextureBytes MUST NOT go below zero
+        const TextureAlloc& alloc = iter->second;
+        llassert(alloc.mBytes <= sClassBytes[alloc.mClass]); // a class's bytes MUST NOT go below zero
 
-        sTextureBytes -= iter->second.mBytes;
+        sClassBytes[alloc.mClass] -= alloc.mBytes;
 
         sTextureAllocs.erase(iter);
+    }
+}
+
+void LLImageGLMemory::set_tex_class(U32 texName, EClass cls)
+{
+    llassert(cls < NUM_CLASSES);
+    LLMutexLock lock(&sTexMemMutex);
+    auto iter = sTextureAllocs.find(texName);
+    if (iter != sTextureAllocs.end() && !iter->second.mDeleted && iter->second.mClass != cls)
+    {
+        TextureAlloc& alloc = iter->second;
+        sClassBytes[alloc.mClass] -= alloc.mBytes;
+        sClassBytes[cls] += alloc.mBytes;
+        alloc.mClass = cls;
     }
 }
 
@@ -202,8 +222,8 @@ static void retire_tex_images(U32 count, const U32* texNames)
         if (iter != sTextureAllocs.end() && !iter->second.mDeleted)
         {
             TextureAlloc& alloc = iter->second;
-            llassert(alloc.mBytes <= sTextureBytes);
-            sTextureBytes -= alloc.mBytes;
+            llassert(alloc.mBytes <= sClassBytes[alloc.mClass]);
+            sClassBytes[alloc.mClass] -= alloc.mBytes;
             alloc.mBytes   = 0;
             alloc.mDeleted = true;
         }
@@ -238,7 +258,32 @@ using namespace LLImageGLMemory;
 // static
 U64 LLImageGL::getTextureBytesAllocated()
 {
-    return sTextureBytes;
+    U64 bytes = 0;
+    for (const std::atomic<U64>& class_bytes : sClassBytes)
+    {
+        bytes += class_bytes.load(std::memory_order_relaxed);
+    }
+    return bytes;
+}
+
+// static
+U64 LLImageGL::getTextureBytesAllocated(EClass cls)
+{
+    llassert(cls < NUM_CLASSES);
+    return sClassBytes[cls].load(std::memory_order_relaxed);
+}
+
+void LLImageGL::setVRAMClass(EClass cls)
+{
+    // Asked of the same class again and again (a texture's boost renewed every frame), which changes nothing.
+    if (mVRAMClass.load(std::memory_order_relaxed) == cls)
+    {
+        return;
+    }
+    if (mVRAMClass.exchange(cls, std::memory_order_relaxed) != cls && mTexName != 0)
+    {
+        set_tex_class(mTexName, cls);
+    }
 }
 
 //statics
@@ -358,6 +403,8 @@ void LLImageGL::initClass(LLWindow* window, S32 num_catagories, bool skip_analyz
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     sSkipAnalyzeAlpha = skip_analyze_alpha;
 
+    // Made here, at the start, rather than as scaleDown first needs it: making a name waits for a threaded driver's
+    // thread, and the store grows in place.
     if (sScratchPBO == 0)
     {
         glGenBuffers(1, &sScratchPBO);
@@ -403,7 +450,10 @@ void LLImageGL::cleanupClass()
 
     if (sScratchPBO != 0)
     {
-        glDeleteBuffers(1, &sScratchPBO);
+        if (gl_alive)
+        {
+            glDeleteBuffers(1, &sScratchPBO);
+        }
         sScratchPBO = 0;
         sScratchPBOSize = 0;
     }
@@ -518,6 +568,10 @@ static bool isSizedInternalFormat(S32 intformat)
     case GL_SRGB8_ALPHA8:
     case GL_RGB10_A2:
     case GL_R11F_G11F_B10F:
+    case GL_RGB9_E5:
+    case GL_R16:
+    case GL_RG16:
+    case GL_RGB16:
     case GL_RGBA16:
     case GL_R16F:
     case GL_RG16F:
@@ -629,6 +683,7 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_RGB8:                                   return 24;
     case GL_SRGB8:                                  return 24;
     case GL_R11F_G11F_B10F:                         return 32;
+    case GL_RGB9_E5:                                return 32;
     case GL_RGBA:                                   return 32;
     case GL_RGBA8:                                  return 32;
     case GL_RGB10_A2:                               return 32;
@@ -636,10 +691,15 @@ S32 LLImageGL::dataFormatBits(S32 dataformat)
     case GL_SRGB8_ALPHA8:                           return 32;
     case GL_BGRA:                                   return 32;      // Used for QuickTime media textures on the Mac
     case GL_DEPTH_COMPONENT:                        return 24;
+    case GL_DEPTH_COMPONENT16:                      return 16;
     case GL_DEPTH_COMPONENT24:                      return 24;
+    case GL_DEPTH_COMPONENT32:                      return 32;
     case GL_DEPTH_COMPONENT32F:                     return 32;
     case GL_DEPTH24_STENCIL8:                       return 32;
     case GL_DEPTH32F_STENCIL8:                      return 64; // 32 for depth, 8 for stencil, stencil is still allocated as 24+8 internally GL_FLOAT_32_UNSIGNED_INT_24_8_REV
+    case GL_R16:                                    return 16;
+    case GL_RG16:                                   return 32;
+    case GL_RGB16:                                  return 48;
     case GL_RGBA16:                                 return 64;
     case GL_R16F:                                   return 16;
     case GL_RG16F:                                  return 32;
@@ -715,6 +775,7 @@ S32 LLImageGL::dataFormatVRAMBits(S32 dataformat)
     case GL_SRGB8:                  return 32;  // padded, as GL_RGB8
     case GL_RGB8I:                  return 32;  // padded, as GL_RGB8
     case GL_RGB8UI:                 return 32;  // padded, as GL_RGB8
+    case GL_RGB16:                  return 64;  // padded to RGBA16
     case GL_RGB16F:                 return 64;  // padded to RGBA16F
     case GL_RGB16I:                 return 64;  // padded, as GL_RGB16F
     case GL_RGB16UI:                return 64;  // padded, as GL_RGB16F
@@ -1859,6 +1920,10 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
         }
         glGenTextures(pool_size, name_pool.get());
         name_count = pool_size;
+        // The fill has waited for the driver's thread, so reading the errors now waits for nothing: an allocation GL
+        // refused for want of video memory is noted (take_gl_out_of_memory) where nothing else would read it, as on
+        // the LLImageGL thread.
+        read_gl_errors();
     }
 
     if ((U32)numTextures <= name_count)
@@ -1871,6 +1936,7 @@ void LLImageGL::generateTextures(S32 numTextures, U32 *textures)
     {
         LL_PROFILE_ZONE_NAMED("iglgt - pool miss");
         glGenTextures(numTextures, textures);
+        read_gl_errors();
     }
 }
 
@@ -2005,7 +2071,7 @@ static void skipSRGBDecode(U32 target)
 //
 // pixels may be null to allocate without uploading.
 void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 height,
-                                  U32 pixformat, U32 pixtype, const void* pixels, S32 levels)
+                                  U32 pixformat, U32 pixtype, const void* pixels, S32 levels, EClass cls)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
@@ -2028,7 +2094,7 @@ void LLImageGL::allocateTexture2D(U32 target, S32 intformat, S32 width, S32 heig
         }
     }
 
-    alloc_tex_image(width, height, intformat, 1, levels);
+    alloc_tex_image(width, height, intformat, 1, levels, cls);
     stop_glerror();
 }
 
@@ -2539,6 +2605,9 @@ void LLImageGL::syncTexName(LLGLuint texname)
             LLImageGL::deleteTextures(1, &mTexName);
         }
         mTexName = texname;
+
+        // The class may have changed while the upload was in flight, after it allocated under the one before.
+        set_tex_class(texname, mVRAMClass.load(std::memory_order_relaxed));
 
         // Marked bound as it publishes, so it is not thrown out before anything draws it.
         mLastBindTime = sLastFrameTime;
@@ -3725,9 +3794,9 @@ void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
         mStorage.mFormat = getStorageInternalFormat();
     }
 
-    // The texture's bytes and the global count are the same figure, of the storage just made.
-    mTextureMemory = (S64Bytes)dataFormatVRAMBytes(mStorage.mFormat, mStorage.mWidth, mStorage.mHeight, mStorage.mLevels);
-    alloc_tex_image(mStorage.mWidth, mStorage.mHeight, mStorage.mFormat, 1, mStorage.mLevels);
+    // The texture's bytes are what the global count recorded for the storage just made.
+    mTextureMemory = (S64Bytes)(S64)alloc_tex_image(mStorage.mWidth, mStorage.mHeight, mStorage.mFormat, 1,
+                                                    mStorage.mLevels, mVRAMClass.load(std::memory_order_relaxed));
 }
 
 bool LLImageGL::storageFits(S32 width, S32 height) const
@@ -3882,6 +3951,7 @@ bool LLImageGL::scaleDown(S32 desired_discard)
 
         glBindBuffer(GL_PIXEL_PACK_BUFFER, sScratchPBO);
 
+        // Specified again, larger, on the same name, which waits for nothing.
         if (size > sScratchPBOSize)
         {
             glBufferData(GL_PIXEL_PACK_BUFFER, size, NULL, GL_STREAM_COPY);

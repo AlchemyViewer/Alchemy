@@ -218,6 +218,43 @@ namespace
         CHECK(ALGPUBuffer::sBytesAllocated == before);
     }
 
+    // The stores the class makes outside ALGPUBuffer are counted as they are made, specified again and deleted: a
+    // block's own store at the size it was last given, and the ring UPDATE_RING streams into, made at the floor
+    // cleanupClass leaves it at.
+    TEST_CASE_METHOD(aluniformbuffer_data, "aluniformbuffer_gl: the stores made outside ALGPUBuffer are counted as they are made and deleted", "[aluniformbuffer_gl]")
+    {
+        ALUniformBuffer::cleanupClass();
+        const U64 before = ALUniformBuffer::getStoreBytes();
+        const std::vector<U32> words = pattern(WORDS, 5u);
+        {
+            ALUniformBuffer block;
+            block.update(words.data(), BYTES, ALUniformBuffer::EUsage::DYNAMIC);
+            UNSCOPED_INFO("a block's own store");
+            CHECK(ALUniformBuffer::getStoreBytes() - before == BYTES);
+            block.update(words.data(), BYTES / 2, ALUniformBuffer::EUsage::DYNAMIC);
+            UNSCOPED_INFO("specified again at half the size");
+            CHECK(ALUniformBuffer::getStoreBytes() - before == BYTES / 2);
+
+            ALUniformBuffer::sUpdateMode = ALUniformBuffer::UPDATE_RING;
+            ALUniformBuffer shadowed;
+            shadowed.initShadowed(BYTES);
+            memcpy(shadowed.beginWrite(), words.data(), BYTES);
+            shadowed.endWrite(0, BYTES);
+            shadowed.flush(BINDING);
+            // RING_MIN_BYTES, the ring's floor.
+            constexpr U64 RING = 1024 * 1024;
+            UNSCOPED_INFO("a shadowed block's store, and the ring it streamed into");
+            CHECK(ALUniformBuffer::getStoreBytes() - before == BYTES / 2 + BYTES + RING);
+
+            ALUniformBuffer::cleanupClass();
+            UNSCOPED_INFO("the ring deleted by cleanupClass");
+            CHECK(ALUniformBuffer::getStoreBytes() - before == BYTES / 2 + BYTES);
+        }
+        UNSCOPED_INFO("each block's store deleted with it");
+        CHECK(ALUniformBuffer::getStoreBytes() == before);
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
     // The scratch ring: a payload written once is bound by range where it was written, in a coherent immutable store
     // mapped for as long as it lives and accounted with the GPU buffers; the next payload lands past it and leaves it
     // alone.

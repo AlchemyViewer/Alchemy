@@ -886,10 +886,15 @@ void LLViewerTexture::addFace(U32 ch, LLFace* facep)
     {
         mFaceList[ch].resize(2 * mNumFaces[ch] + 1);
     }
+    const bool had_use = hasWorldUse();
     mFaceList[ch][mNumFaces[ch]] = facep;
     facep->setIndexInTex(ch, mNumFaces[ch]);
     mNumFaces[ch]++;
     mLastFaceListUpdateTimer.reset();
+    if (!had_use)
+    {
+        onWorldUseChanged();
+    }
 }
 
 //virtual
@@ -898,6 +903,7 @@ void LLViewerTexture::removeFace(U32 ch, LLFace* facep)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);
 
+    const bool had_use = hasWorldUse();
     if(mNumFaces[ch] > 1)
     {
         S32 index = facep->getIndexInTex(ch);
@@ -912,6 +918,10 @@ void LLViewerTexture::removeFace(U32 ch, LLFace* facep)
         mNumFaces[ch] = 0;
     }
     mLastFaceListUpdateTimer.reset();
+    if (had_use && !hasWorldUse())
+    {
+        onWorldUseChanged();
+    }
 }
 
 S32 LLViewerTexture::getTotalNumFaces() const
@@ -941,16 +951,22 @@ void LLViewerTexture::addVolume(U32 ch, LLVOVolume* volumep)
     {
         mVolumeList[ch].resize(2 * mNumVolumes[ch] + 1);
     }
+    const bool had_use = hasWorldUse();
     mVolumeList[ch][mNumVolumes[ch]] = volumep;
     volumep->setIndexInTex(ch, mNumVolumes[ch]);
     mNumVolumes[ch]++;
     mLastVolumeListUpdateTimer.reset();
+    if (!had_use)
+    {
+        onWorldUseChanged();
+    }
 }
 
 //virtual
 void LLViewerTexture::removeVolume(U32 ch, LLVOVolume* volumep)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    const bool had_use = hasWorldUse();
     if (mNumVolumes[ch] > 1)
     {
         S32 index = volumep->getIndexInTex(ch);
@@ -965,11 +981,31 @@ void LLViewerTexture::removeVolume(U32 ch, LLVOVolume* volumep)
         mNumVolumes[ch] = 0;
     }
     mLastVolumeListUpdateTimer.reset();
+    if (had_use && !hasWorldUse())
+    {
+        onWorldUseChanged();
+    }
 }
 
 S32 LLViewerTexture::getNumVolumes(U32 ch) const
 {
     return mNumVolumes[ch];
+}
+
+bool LLViewerTexture::hasWorldUse() const
+{
+    if (getTotalNumFaces() > 0)
+    {
+        return true;
+    }
+    for (U32 ch = 0; ch < LLRender::NUM_VOLUME_TEXTURE_CHANNELS; ++ch)
+    {
+        if (mNumVolumes[ch] > 0)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void LLViewerTexture::reorganizeFaceList()
@@ -1070,6 +1106,33 @@ LLViewerFetchedTexture* LLViewerFetchedTexture::getSmokeImage()
     return sSmokeImagep;
 }
 
+// What a fetched texture's storage counts as: one fetched by asset ID or from the bake service is the texture
+// streaming's, except where the UI alone holds it -- at one of the UI's boosts (an icon, a thumbnail, a preview, a map, a
+// UI image), with no face or volume using it in the world; a map tile or a local file never is.
+static LLImageGLMemory::EClass vram_class_of(FTType f_type, S32 boost, bool in_world)
+{
+    if (f_type != FTT_DEFAULT && f_type != FTT_SERVER_BAKE)
+    {
+        return LLImageGLMemory::OTHER_TEXTURE;
+    }
+    if (in_world)
+    {
+        return LLImageGLMemory::STREAMED_TEXTURE;
+    }
+    switch (boost)
+    {
+        case LLGLTexture::BOOST_ICON:
+        case LLGLTexture::BOOST_THUMBNAIL:
+        case LLGLTexture::BOOST_UI:
+        case LLGLTexture::BOOST_PREVIEW:
+        case LLGLTexture::BOOST_MAP:
+        case LLGLTexture::BOOST_MAP_VISIBLE:
+            return LLImageGLMemory::OTHER_TEXTURE;
+        default:
+            return LLImageGLMemory::STREAMED_TEXTURE;
+    }
+}
+
 LLViewerFetchedTexture::LLViewerFetchedTexture(const LLUUID& id, FTType f_type, const LLHost& host, bool usemipmaps)
     : LLViewerTexture(id, usemipmaps),
     mTargetHost(host)
@@ -1081,6 +1144,7 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const LLUUID& id, FTType f_type, 
         LL_WARNS() << "Unsupported fetch type " << mFTType << LL_ENDL;
     }
     generateGLTexture();
+    updateVRAMClass();
 }
 
 LLViewerFetchedTexture::LLViewerFetchedTexture(const LLImageRaw* raw, FTType f_type, bool usemipmaps)
@@ -1088,6 +1152,8 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const LLImageRaw* raw, FTType f_t
 {
     init(true);
     mFTType = f_type;
+    // The image made its texture from the raw already; setting the class moves it.
+    updateVRAMClass();
 }
 
 LLViewerFetchedTexture::LLViewerFetchedTexture(const std::string& url, FTType f_type, const LLUUID& id, bool usemipmaps)
@@ -1097,6 +1163,7 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const std::string& url, FTType f_
     init(true);
     mFTType = f_type;
     generateGLTexture();
+    updateVRAMClass();
 }
 
 void LLViewerFetchedTexture::init(bool firstinit)
@@ -1894,11 +1961,26 @@ bool LLViewerFetchedTexture::isActiveFetching()
 void LLViewerFetchedTexture::setBoostLevel(S32 level)
 {
     LLViewerTexture::setBoostLevel(level);
+    updateVRAMClass();
 
     if (level >= LLViewerTexture::BOOST_HIGH)
     {
         mDesiredDiscardLevel = 0;
     }
+}
+
+void LLViewerFetchedTexture::updateVRAMClass()
+{
+    if (mGLTexturep.notNull())
+    {
+        mGLTexturep->setVRAMClass(vram_class_of(mFTType, mBoostLevel, hasWorldUse()));
+    }
+}
+
+//virtual
+void LLViewerFetchedTexture::onWorldUseChanged()
+{
+    updateVRAMClass();
 }
 
 bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 current_discard, S32 fetch_discard, F32 decode_priority)
