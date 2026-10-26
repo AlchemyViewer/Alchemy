@@ -866,15 +866,39 @@ namespace
         return out;
     }
 
+    // How many of a face's triangles have each edge, at its positions.
+    std::map<EdgeKey, S32> edgeUses(const LLVolumeFace& face)
+    {
+        std::map<EdgeKey, S32> uses;
+        for (S32 i = 0; i < face.mNumIndices; i += 3)
+        {
+            for (S32 k = 0; k < 3; ++k)
+            {
+                ++uses[edgeOf(keyOf(face.mPositions[face.mIndices[i + k]]), keyOf(face.mPositions[face.mIndices[i + (k + 1) % 3]]))];
+            }
+        }
+        return uses;
+    }
+
     // Two double-sided faces that meet: each uses every edge of its rim
     // twice, once on each side, and its rim is still its open border, held
-    // where the other meets it.
+    // where the other meets it: each side of each keeps every edge of the
+    // seam.
     TEST_CASE("almeshsimplifier: two double-sided faces simplified face by face still meet", "[almeshsimplifier]")
     {
         ArenaInstalled installed;
         LLPointer<LLVolume> base = volumeOf({ doubleSided(sphereRows(48, 24, 0, 12)), doubleSided(sphereRows(48, 24, 12, 24, 10.f)) });
         const std::set<PositionKey> shared = sharedPositions(*base);
         REQUIRE(shared.size() == 48);
+        std::set<EdgeKey> seam;
+        for (const auto& [edge, uses] : edgeUses(base->getVolumeFace(0)))
+        {
+            if (shared.count(edge.first) && shared.count(edge.second))
+            {
+                seam.insert(edge);
+            }
+        }
+        REQUIRE(seam.size() == 48);
         for (F32 decimator : DECIMATORS)
         {
             for (Seams seams : { Seams::ALL, Seams::UV, Seams::NONE })
@@ -888,6 +912,14 @@ namespace
                     REQUIRE(wellFormed(target->getVolumeFace(f)));
                     const std::set<PositionKey> kept = positionsOf(target->getVolumeFace(f));
                     CHECK(std::includes(kept.begin(), kept.end(), shared.begin(), shared.end()));
+                    const std::map<EdgeKey, S32> uses = edgeUses(target->getVolumeFace(f));
+                    size_t sides_kept = 0;
+                    for (const EdgeKey& edge : seam)
+                    {
+                        const auto found = uses.find(edge);
+                        sides_kept += found != uses.end() && found->second == 2;
+                    }
+                    CHECK(sides_kept == seam.size());
                 }
             }
         }
