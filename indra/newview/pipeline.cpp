@@ -13190,7 +13190,7 @@ namespace
         draw.add((U64)material->mDoubleSided);
         if (textured)
         {
-            add_shadow_texture(casters, draw, material->mBaseColorTexture.get());
+            add_shadow_texture(casters, draw, material->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR));
             draw.add((U64)material->mAlphaMode).add(material->mAlphaCutoff).add(material->mBaseColor.mV[VALPHA]);
             LLGLTFMaterial::TextureTransform::Pack packed;
             material->mTextureTransform[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR].getPacked(packed);

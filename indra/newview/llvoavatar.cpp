@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
+#include "albakeproxies.h"
 #include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
@@ -2852,6 +2853,11 @@ void LLVOAvatar::idleUpdate(LLAgent &agent, const F64 &time)
     {
         LL_INFOS() << "Warning!  Idle on dead avatar" << LL_ENDL;
         return;
+    }
+
+    if (mMeshVisibilityDirty)
+    {
+        updateMeshVisibility();
     }
 
     readProfileQuery();
@@ -9492,15 +9498,15 @@ void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
     }
 }
 
-
 //-----------------------------------------------------------------------------
 // updateMeshVisibility()
 // Hide the mesh joints if attachments are using baked textures
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateMeshVisibility()
 {
-    bool bake_flag[BAKED_NUM_INDICES];
-    memset(bake_flag, 0, BAKED_NUM_INDICES*sizeof(bool));
+    mMeshVisibilityDirty = false;
+
+    ALBakeProxies::bake_set_t bake_flag;
 
     if (getOverallAppearance() == AOA_NORMAL)
     {
@@ -9509,6 +9515,7 @@ void LLVOAvatar::updateMeshVisibility()
             if (!attachment)
                 continue;
 
+            const bool hud = attachment->getIsHUDAttachment();
             for (const auto& objectp : attachment->mAttachedObjects)
             {
                 if (objectp.isNull())
@@ -9516,19 +9523,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                 for (int face_index = 0; face_index < objectp->getNumTEs(); face_index++)
                 {
-                    LLTextureEntry* tex_entry = objectp->getTE(face_index);
-                    const auto& tex_id = tex_entry->getID();
-                    bake_flag[BAKED_HEAD] |= (tex_id == IMG_USE_BAKED_HEAD);
-                    bake_flag[BAKED_EYES] |= (tex_id == IMG_USE_BAKED_EYES);
-                    bake_flag[BAKED_HAIR] |= (tex_id == IMG_USE_BAKED_HAIR);
-                    bake_flag[BAKED_LOWER] |= (tex_id == IMG_USE_BAKED_LOWER);
-                    bake_flag[BAKED_UPPER] |= (tex_id == IMG_USE_BAKED_UPPER);
-                    bake_flag[BAKED_SKIRT] |= (tex_id == IMG_USE_BAKED_SKIRT);
-                    bake_flag[BAKED_LEFT_ARM] |= (tex_id == IMG_USE_BAKED_LEFTARM);
-                    bake_flag[BAKED_LEFT_LEG] |= (tex_id == IMG_USE_BAKED_LEFTLEG);
-                    bake_flag[BAKED_AUX1] |= (tex_id == IMG_USE_BAKED_AUX1);
-                    bake_flag[BAKED_AUX2] |= (tex_id == IMG_USE_BAKED_AUX2);
-                    bake_flag[BAKED_AUX3] |= (tex_id == IMG_USE_BAKED_AUX3);
+                    bake_flag |= ALBakeProxies::drawnBy(*objectp->getTE(face_index), hud);
                 }
 
                 for (const auto& objectchild : objectp->getChildren())
@@ -9538,19 +9533,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                     for (int face_index = 0; face_index < objectchild->getNumTEs(); face_index++)
                     {
-                        LLTextureEntry* tex_entry = objectchild->getTE(face_index);
-                        const auto& tex_id = tex_entry->getID();
-                        bake_flag[BAKED_HEAD] |= (tex_id == IMG_USE_BAKED_HEAD);
-                        bake_flag[BAKED_EYES] |= (tex_id == IMG_USE_BAKED_EYES);
-                        bake_flag[BAKED_HAIR] |= (tex_id == IMG_USE_BAKED_HAIR);
-                        bake_flag[BAKED_LOWER] |= (tex_id == IMG_USE_BAKED_LOWER);
-                        bake_flag[BAKED_UPPER] |= (tex_id == IMG_USE_BAKED_UPPER);
-                        bake_flag[BAKED_SKIRT] |= (tex_id == IMG_USE_BAKED_SKIRT);
-                        bake_flag[BAKED_LEFT_ARM] |= (tex_id == IMG_USE_BAKED_LEFTARM);
-                        bake_flag[BAKED_LEFT_LEG] |= (tex_id == IMG_USE_BAKED_LEFTLEG);
-                        bake_flag[BAKED_AUX1] |= (tex_id == IMG_USE_BAKED_AUX1);
-                        bake_flag[BAKED_AUX2] |= (tex_id == IMG_USE_BAKED_AUX2);
-                        bake_flag[BAKED_AUX3] |= (tex_id == IMG_USE_BAKED_AUX3);
+                        bake_flag |= ALBakeProxies::drawnBy(*objectchild->getTE(face_index), hud);
                     }
                 }
             }

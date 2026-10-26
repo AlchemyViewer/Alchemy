@@ -135,6 +135,7 @@ if(AL_BUILD_VIEWER)
     alassetblocklist.cpp
     alavataractions.cpp
     alavatargroups.cpp
+    albakeproxies.cpp
     alchatautocomplete.cpp
     alchatbar.cpp
     alchatcommand.cpp
@@ -1011,6 +1012,7 @@ if(AL_BUILD_VIEWER)
     alassetblocklist.h
     alavataractions.h
     alavatargroups.h
+    albakeproxies.h
     alchatautocomplete.h
     alchatbar.h
     alchatcommand.h
@@ -2535,6 +2537,7 @@ if(AL_BUILD_TESTS)
     PROJECT ${test_project}
     SOURCES
       tests/alagentlocationformat_test.cpp
+      tests/albakeproxies_test.cpp
       tests/alchattimestamp_test.cpp
       tests/alcolorwheelmodel_test.cpp
       tests/alcrashreporter_test.cpp
@@ -2609,6 +2612,7 @@ if(AL_BUILD_TESTS)
       tests/noise_test.cpp
     UNIT
       alagentlocationformat.cpp
+      albakeproxies.cpp
       alchattimestamp.cpp
       alcolorwheelmodel.cpp
       alcrashreporter.cpp
