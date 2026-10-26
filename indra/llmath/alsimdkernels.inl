@@ -28,6 +28,8 @@
 
 #include "alsimdkernels.h"
 
+#include <algorithm>
+#include <bit>
 #include <cfloat>
 #include <cstring>
 #include <vector>
@@ -643,13 +645,18 @@ void unit_cube_codes_impl(const LLVector4a* src, size_t n, U32* dst)
     }
 }
 
-// A row of quads at a time, four quads a step, eight under AVX2. A step
-// reads its bottom left, bottom right, top left and top right corners'
-// codes four or eight at once, which runs past the row's last quad: the
-// flags past it are cleared.
+// A row of quads at a time and a word of its flags at a time, gathered in
+// registers, four quads a step, eight under AVX2. A step reads its bottom
+// left, bottom right, top left and top right corners' codes four or eight
+// at once, which runs past the row's last quad: the flags past it are
+// cleared.
 template <class W>
-size_t grid_coincident_triangles_impl(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words)
+size_t grid_coincident_triangles_impl(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words, U64* flagged_rows)
 {
+    for (size_t w = 0; w < (rows + 62) / 64; ++w)
+    {
+        flagged_rows[w] = 0;
+    }
     if (columns < 2 || rows < 2)
     {
         return 0;
@@ -662,51 +669,53 @@ size_t grid_coincident_triangles_impl(const U32* codes, size_t columns, size_t r
     {
         const int32_t* bottom = reinterpret_cast<const int32_t*>(codes + columns * t);
         const int32_t* top = bottom + columns;
-        U64* up = upper + words * t;
-        U64* lo = lower + words * t;
+        U64 any = 0;
         for (size_t w = 0; w < words; ++w)
         {
-            up[w] = 0;
-            lo[w] = 0;
-        }
-        size_t s = 0;
+            U64 up = 0;
+            U64 lo = 0;
+            const size_t end = std::min(quads, (w + 1) * 64);
+            size_t s = w * 64;
 #if AL_SIMD_AVX2
-        if constexpr (W::lanes >= 2)
-        {
-            for (; s < quads; s += 8)
+            if constexpr (W::lanes >= 2)
             {
-                const __m256i bl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s));
-                const __m256i br = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s + 1));
-                const __m256i tl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s));
-                const __m256i tr = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s + 1));
-                const __m256i diagonal = _mm256_cmpeq_epi32(bl, tr);
-                const __m256i u = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(tl, tr)), _mm256_cmpeq_epi32(bl, tl));
-                const __m256i l = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(bl, br)), _mm256_cmpeq_epi32(br, tr));
-                up[s / 64] |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(u))) << (s % 64);
-                lo[s / 64] |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(l))) << (s % 64);
+                for (; s < end; s += 8)
+                {
+                    const __m256i bl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s));
+                    const __m256i br = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(bottom + s + 1));
+                    const __m256i tl = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s));
+                    const __m256i tr = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(top + s + 1));
+                    const __m256i diagonal = _mm256_cmpeq_epi32(bl, tr);
+                    const __m256i u = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(tl, tr)), _mm256_cmpeq_epi32(bl, tl));
+                    const __m256i l = _mm256_or_si256(_mm256_or_si256(diagonal, _mm256_cmpeq_epi32(bl, br)), _mm256_cmpeq_epi32(br, tr));
+                    up |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(u))) << (s % 64);
+                    lo |= U64(_mm256_movemask_ps(_mm256_castsi256_ps(l))) << (s % 64);
+                }
             }
-        }
 #endif
-        for (; s < quads; s += 4)
-        {
-            const i32x4 bl = alsimd::loadu_i32(bottom + s);
-            const i32x4 br = alsimd::loadu_i32(bottom + s + 1);
-            const i32x4 tl = alsimd::loadu_i32(top + s);
-            const i32x4 tr = alsimd::loadu_i32(top + s + 1);
-            const mask4 diagonal = alsimd::cmpeq_i32(bl, tr);
-            const mask4 u = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(tl, tr)), alsimd::cmpeq_i32(bl, tl));
-            const mask4 l = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(bl, br)), alsimd::cmpeq_i32(br, tr));
-            up[s / 64] |= U64(alsimd::bits(u)) << (s % 64);
-            lo[s / 64] |= U64(alsimd::bits(l)) << (s % 64);
+            for (; s < end; s += 4)
+            {
+                const i32x4 bl = alsimd::loadu_i32(bottom + s);
+                const i32x4 br = alsimd::loadu_i32(bottom + s + 1);
+                const i32x4 tl = alsimd::loadu_i32(top + s);
+                const i32x4 tr = alsimd::loadu_i32(top + s + 1);
+                const mask4 diagonal = alsimd::cmpeq_i32(bl, tr);
+                const mask4 u = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(tl, tr)), alsimd::cmpeq_i32(bl, tl));
+                const mask4 l = alsimd::or_(alsimd::or_(diagonal, alsimd::cmpeq_i32(bl, br)), alsimd::cmpeq_i32(br, tr));
+                up |= U64(alsimd::bits(u)) << (s % 64);
+                lo |= U64(alsimd::bits(l)) << (s % 64);
+            }
+            if (w == last_word)
+            {
+                up &= last_bits;
+                lo &= last_bits;
+            }
+            upper[words * t + w] = up;
+            lower[words * t + w] = lo;
+            any |= up | lo;
+            flagged += std::popcount(up) + std::popcount(lo);
         }
-        up[last_word] &= last_bits;
-        lo[last_word] &= last_bits;
-        U64 any = 0;
-        for (size_t w = 0; w <= last_word; ++w)
-        {
-            any |= up[w] | lo[w];
-        }
-        flagged += any != 0;
+        flagged_rows[t / 64] |= U64(any != 0) << (t % 64);
     }
     return flagged;
 }

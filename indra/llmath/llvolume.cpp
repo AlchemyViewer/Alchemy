@@ -6774,11 +6774,13 @@ namespace
     // as having two corners in one place. whole(t) is whether every
     // triangle of row t is kept. WHOLE_ROWS is whether rows are whole often
     // enough to write a band's row at once: a sphere's collapsed poles
-    // leave a triangle out of every row.
+    // leave a triangle out of every row. COLUMN_UNITS is whether a grid of
+    // a few rows writes a column at once.
     struct KeepAll
     {
         static constexpr bool ALL = true;
         static constexpr bool WHOLE_ROWS = true;
+        static constexpr bool COLUMN_UNITS = true;
 
         bool upper(S32, S32) const { return true; }
         bool lower(S32, S32) const { return true; }
@@ -6789,6 +6791,7 @@ namespace
     {
         static constexpr bool ALL = false;
         static constexpr bool WHOLE_ROWS = false;
+        static constexpr bool COLUMN_UNITS = false;
 
         bool first_row;
         bool last_row;
@@ -6802,27 +6805,101 @@ namespace
         bool whole(S32 t) const { return !first_column && !last_column && !(first_row && t == 0) && !(last_row && t == last_quad_row); }
     };
 
+    // Bit i of a set held in 64-bit words.
+    LL_FORCE_INLINE bool bit_set(const U64* set, U32 i)
+    {
+        return (set[i / 64] >> (i % 64)) & 1;
+    }
+
+    // A keep that names the rows that are not whole, rather than saying
+    // whole(t) of each: partial_from(t, rows) is the first from row t up,
+    // or rows, and partial_to(t) the last from row t down, or -1. column(s,
+    // rows) is what it keeps of column s, bit 2t for the first triangle of
+    // its quad at row t and 2t + 1 for the second, and column_change(s, end,
+    // rows) the first column from s on that keeps other triangles than the
+    // one before it, or end.
     struct Unpinched
     {
         static constexpr bool ALL = false;
         static constexpr bool WHOLE_ROWS = true;
+        static constexpr bool COLUMN_UNITS = true;
 
-        // Bit s % 64 of word t * words + s / 64 for the quad at column s
-        // and row t.
+        // Bit s of the words from t * words on for the quad at column s and
+        // row t, and bit t of flagged_rows for a row with any of them set.
         const U64* upper_pinched;
         const U64* lower_pinched;
-        S32 words;
+        const U64* flagged_rows;
+        U32 words;
 
-        bool upper(S32 s, S32 t) const { return !((upper_pinched[t * words + s / 64] >> (s % 64)) & 1); }
-        bool lower(S32 s, S32 t) const { return !((lower_pinched[t * words + s / 64] >> (s % 64)) & 1); }
-        bool whole(S32 t) const
+        bool upper(S32 s, S32 t) const { return !bit_set(upper_pinched + (U32)t * words, (U32)s); }
+        bool lower(S32 s, S32 t) const { return !bit_set(lower_pinched + (U32)t * words, (U32)s); }
+
+        S32 partial_from(S32 t, S32 rows) const
         {
-            U64 any = 0;
-            for (S32 w = 0; w < words; ++w)
+            U32 w = (U32)t / 64;
+            U64 bits = flagged_rows[w] & (~U64(0) << ((U32)t % 64));
+            while (bits == 0)
             {
-                any |= upper_pinched[t * words + w] | lower_pinched[t * words + w];
+                if (++w * 64 >= (U32)rows)
+                {
+                    return rows;
+                }
+                bits = flagged_rows[w];
             }
-            return any == 0;
+            return (S32)(w * 64 + std::countr_zero(bits));
+        }
+
+        S32 partial_to(S32 t) const
+        {
+            S32 w = t / 64;
+            U64 bits = flagged_rows[w] & (~U64(0) >> (63 - t % 64));
+            while (bits == 0)
+            {
+                if (--w < 0)
+                {
+                    return -1;
+                }
+                bits = flagged_rows[w];
+            }
+            return w * 64 + 63 - std::countl_zero(bits);
+        }
+
+        U32 column(S32 s, S32 rows) const
+        {
+            const U32 w = (U32)s / 64;
+            const U32 b = (U32)s % 64;
+            U32 kept = 0;
+            for (S32 t = 0; t < rows; ++t)
+            {
+                kept |= (U32)(~(upper_pinched[t * words + w] >> b) & 1) << (2 * t);
+                kept |= (U32)(~(lower_pinched[t * words + w] >> b) & 1) << (2 * t + 1);
+            }
+            return kept;
+        }
+
+        // s is at least 1.
+        S32 column_change(S32 s, S32 end, S32 rows) const
+        {
+            for (U32 w = (U32)s / 64; w * 64 < (U32)end; ++w)
+            {
+                U64 changes = 0;
+                for (S32 t = 0; t < rows; ++t)
+                {
+                    const U64* up = upper_pinched + t * words;
+                    const U64* lo = lower_pinched + t * words;
+                    changes |= up[w] ^ ((up[w] << 1) | (w > 0 ? up[w - 1] >> 63 : 0));
+                    changes |= lo[w] ^ ((lo[w] << 1) | (w > 0 ? lo[w - 1] >> 63 : 0));
+                }
+                if (w == (U32)s / 64)
+                {
+                    changes &= ~U64(0) << ((U32)s % 64);
+                }
+                if (changes != 0)
+                {
+                    return llmin((S32)(w * 64 + std::countr_zero(changes)), end);
+                }
+            }
+            return end;
         }
     };
 
@@ -6884,6 +6961,32 @@ namespace
             std::fill(offsets + length, offsets + vectors * 8, (U16)0);
         }
 
+        // The same quads but for the triangles kept leaves out: bit 2q
+        // keeps quad q's first triangle, and 2q + 1 its second. A unit
+        // that keeps none has no length.
+        QuadUnit(S32 quad_count, S32 step, S32 num_s, U32 kept)
+            : quads(quad_count), length(0)
+        {
+            for (S32 q = 0; q < quads; ++q)
+            {
+                const S32 bottom = q * step;
+                const S32 top = bottom + num_s;
+                if (kept & (1u << (2 * q)))
+                {
+                    offsets[length++] = (U16)bottom;       //bottom left
+                    offsets[length++] = (U16)(top + 1);    //top right
+                    offsets[length++] = (U16)top;          //top left
+                }
+                if (kept & (2u << (2 * q)))
+                {
+                    offsets[length++] = (U16)bottom;       //bottom left
+                    offsets[length++] = (U16)(bottom + 1); //bottom right
+                    offsets[length++] = (U16)(top + 1);    //top right
+                }
+            }
+            vectors = (length + 7) / 8;
+            std::fill(offsets + length, offsets + vectors * 8, (U16)0);
+        }
     };
 
     // A unit while it is written, its offsets held as values: a store of an
@@ -6960,6 +7063,30 @@ namespace
         return out;
     }
 
+    // The first count columns of rows quads, each a unit of what keep keeps
+    // of it: one unit for each run of columns that keep the same
+    // triangles. Nothing is written past limit. Returns the end of what it
+    // wrote.
+    template <class KEEP>
+    VOLUME_NOINLINE U16* kept_columns(U16* out, const U16* limit, S32 count, S32 num_s, S32 rows, const KEEP& keep)
+    {
+        for (S32 q = 0; q < count;)
+        {
+            const QuadUnit column(rows, num_s, num_s, keep.column(q, rows));
+            const UnitWriter writer(column);
+            const S32 end = keep.column_change(q + 1, count, rows);
+            if (column.length == 0)
+            {
+                q = end;
+            }
+            for (; q < end; ++q)
+            {
+                out = writer.write(out, q, limit);
+            }
+        }
+        return out;
+    }
+
     // The quads from grid column begin on in bands, the first wide of them
     // a quad wider than narrow, of rows quads up: each band row by row,
     // every other band down, a unit a band's row where keep keeps the whole
@@ -7006,6 +7133,59 @@ namespace
         return out;
     }
 
+    // The same bands for a keep that names the rows it leaves triangles out
+    // of: the whole rows between them a unit each, in a run.
+    template <class KEEP>
+    VOLUME_NOINLINE U16* kept_bands(U16* out, const U16* limit, S32 begin, S32 bands, S32 narrow, S32 wide, S32 num_s, S32 rows, const KEEP& keep)
+    {
+        const QuadUnit narrow_row(narrow, 1, num_s);
+        const QuadUnit wide_row(wide > 0 ? narrow + 1 : narrow, 1, num_s);
+        S32 first = begin;
+        for (S32 band = 0; band < bands; ++band)
+        {
+            const S32 width = band < wide ? narrow + 1 : narrow;
+            const UnitWriter writer(band < wide ? wide_row : narrow_row);
+            const auto partial_row = [&](U16* at, S32 t)
+            {
+                for (S32 s = first; s < first + width; ++s)
+                {
+                    at = quad_indices<KEEP>(at, s, t, num_s, keep);
+                }
+                return at;
+            };
+            if (band & 1)
+            {
+                for (S32 t = rows - 1; t >= 0;)
+                {
+                    for (const S32 partial = keep.partial_to(t); t > partial; --t)
+                    {
+                        out = writer.write(out, first + num_s * t, limit);
+                    }
+                    if (t >= 0)
+                    {
+                        out = partial_row(out, t--);
+                    }
+                }
+            }
+            else
+            {
+                for (S32 t = 0; t < rows;)
+                {
+                    for (const S32 partial = keep.partial_from(t, rows); t < partial; ++t)
+                    {
+                        out = writer.write(out, first + num_s * t, limit);
+                    }
+                    if (t < rows)
+                    {
+                        out = partial_row(out, t++);
+                    }
+                }
+            }
+            first += width;
+        }
+        return out;
+    }
+
     // A grid of up to COLUMN_ROWS rows, a column of quads at a time: the
     // count columns listed, or the first count. Nothing is written past
     // limit. Returns the end of what it wrote.
@@ -7015,6 +7195,13 @@ namespace
         if (KEEP::ALL && rows >= UNIT_QUADS && count >= UNIT_USES)
         {
             return unit_columns<LISTED>(out, limit, lefts, count, num_s, rows);
+        }
+        if constexpr (!KEEP::ALL && KEEP::COLUMN_UNITS && !LISTED)
+        {
+            if (rows >= UNIT_QUADS && count >= UNIT_USES)
+            {
+                return kept_columns<KEEP>(out, limit, count, num_s, rows, keep);
+            }
         }
         if (rows == 1)
         {
@@ -7049,7 +7236,14 @@ namespace
         {
             if (narrow >= UNIT_QUADS)
             {
-                return unit_bands<KEEP>(out, limit, begin, bands, narrow, wide, num_s, rows, keep);
+                if constexpr (KEEP::ALL)
+                {
+                    return unit_bands<KEEP>(out, limit, begin, bands, narrow, wide, num_s, rows, keep);
+                }
+                else
+                {
+                    return kept_bands<KEEP>(out, limit, begin, bands, narrow, wide, num_s, rows, keep);
+                }
             }
         }
         if (bands == 1)
@@ -7151,6 +7345,74 @@ namespace
             }
         }
         return pinched;
+    }
+
+    // Sets bit t of flagged, and clears the rest of its words, for each of
+    // rows rows of words words whose upper or lower flags have any set.
+    void flag_rows(const U64* upper, const U64* lower, S32 words, S32 rows, U64* flagged)
+    {
+        std::fill(flagged, flagged + (rows + 63) / 64, U64(0));
+        for (S32 t = 0; t < rows; ++t)
+        {
+            U64 any = 0;
+            for (S32 w = 0; w < words; ++w)
+            {
+                any |= upper[t * words + w] | lower[t * words + w];
+            }
+            flagged[t / 64] |= U64(any != 0) << (t % 64);
+        }
+    }
+
+    // Whether a sculpt's points are its map's samples, each axis one of the
+    // 256 values a byte takes it to, mirrored or not. unit_cube_codes gives
+    // such points a code each, so two are one point exactly where their
+    // codes are one code. A shared sculpt's faces are built as
+    // LLVolume::sculpt ends, from the map or from a placeholder, whose
+    // points are not samples.
+    bool points_are_samples(const LLVolume& volume)
+    {
+        return volume.getSculptPixels() > 0 && !volume.isSculptSpherePlaceholder();
+    }
+
+    // A sculpt side's triangles, from its num_s by num_t grid of points, in
+    // the order above, but for those two of whose corners are one point:
+    // they have no area. The points' codes find them, and where the points
+    // are not the map's samples the points confirm them. A side keeps at
+    // least one triangle, of the triangles it has. Nothing is written past
+    // limit. The work space is room where it fits, as it does a small
+    // grid's, and the scratch arena where it does not. Returns the end of
+    // what it wrote.
+    LL_FORCE_INLINE U16* sculpt_indices(U16* out, const U16* limit, const LLVolume& volume, const LLVector4a* pos, S32 num_s, S32 num_t, S32 triangles,
+                                        std::byte* room, size_t room_bytes)
+    {
+        const S32 quads = num_s - 1;
+        const S32 rows = num_t - 1;
+        const S32 num_vertices = num_s * num_t;
+        const S32 words = (quads + 63) / 64;
+        const size_t flag_words = (size_t)words * rows;
+        // The codes, and the eight past them the kernel reads, in whole
+        // words, then the flags and the rows that have any.
+        const size_t code_words = ((size_t)num_vertices + 9) / 2;
+        const size_t block_words = code_words + 2 * flag_words + (rows + 63) / 64;
+        ALScratchArena::Scope scratch;
+        U64* block = block_words * sizeof(U64) <= room_bytes ? reinterpret_cast<U64*>(room) : scratch.allocate<U64>(block_words);
+        U32* codes = reinterpret_cast<U32*>(block);
+        U64* upper = block + code_words;
+        U64* lower = upper + flag_words;
+        U64* flagged_rows = lower + flag_words;
+        alsimd::unit_cube_codes(pos, num_vertices, codes);
+        std::fill(codes + num_vertices, codes + num_vertices + 8, 0u);
+        S32 pinched = (S32)alsimd::grid_coincident_triangles(codes, num_s, num_t, upper, lower, words, flagged_rows);
+        if (pinched > 0 && !points_are_samples(volume))
+        {
+            pinched = confirm_pinches(pos, num_s, num_t, upper, lower, words);
+            flag_rows(upper, lower, words, rows, flagged_rows);
+        }
+        if (pinched > 0 && pinched < triangles)
+        {
+            return grid_indices<false>(out, limit, num_s, num_t, nullptr, quads, Unpinched{ upper, lower, flagged_rows, (U32)words });
+        }
+        return grid_indices<false>(out, limit, num_s, num_t, nullptr, quads, KeepAll());
     }
 
     // The path station a cap closes: the last for a top cap, the first for a
@@ -8118,10 +8380,12 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     Column stack_columns[STACK_COLUMNS];
     std::vector<Column> heap_columns;
     Column* columns = stack_columns;
-    // A flat inner side's quads with area, by their left columns.
-    S32 stack_lefts[STACK_COLUMNS];
+    // A flat inner side's quads with area, by their left columns. A
+    // sculpt's side, which copies no corners, takes the room for its pinch
+    // test instead.
+    alignas(16) std::byte stack_room[STACK_COLUMNS * sizeof(S32)];
     std::vector<S32> heap_lefts;
-    S32* lefts = stack_lefts;
+    S32* lefts = reinterpret_cast<S32*>(stack_room);
     if (mNumS > STACK_COLUMNS)
     {
         heap_columns.resize(mNumS);
@@ -8310,33 +8574,11 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
         }
         else if (sculpt_stitching != LL_SCULPT_TYPE_NONE && !volume->isUnique() && !doubled && quads > 0 && rows > 0)
         {
-            // A sculpt's triangles two of whose corners are one point have
-            // no area, and are left out: the points' codes find them and the
-            // points confirm them. A flexible sculpt's points move after its
-            // full build, and it keeps them. A face keeps at least one
-            // triangle. The flat inner side of a sculpt whose parameters
-            // carry a square or triangle hole has its corners doubled, and
-            // keeps all of its quads.
-            ALScratchArena::Scope scratch;
-            U32* codes = scratch.allocate<U32>(num_vertices + 8);
-            alsimd::unit_cube_codes(pos, num_vertices, codes);
-            std::fill(codes + num_vertices, codes + num_vertices + 8, 0u);
-            const S32 words = (quads + 63) / 64;
-            U64* upper = scratch.allocate<U64>((size_t)words * rows);
-            U64* lower = scratch.allocate<U64>((size_t)words * rows);
-            S32 pinched = 0;
-            if (alsimd::grid_coincident_triangles(codes, mNumS, mNumT, upper, lower, words) > 0)
-            {
-                pinched = confirm_pinches(pos, mNumS, mNumT, upper, lower, words);
-            }
-            if (pinched > 0 && pinched < triangles)
-            {
-                end_index = grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, Unpinched{ upper, lower, words });
-            }
-            else
-            {
-                end_index = grid_indices<false>(mIndices, limit, mNumS, mNumT, lefts, quads, KeepAll());
-            }
+            // A flexible sculpt's points move after its full build, and it
+            // keeps every triangle. The flat inner side of a sculpt whose
+            // parameters carry a square or triangle hole has its corners
+            // doubled, and keeps all of its quads.
+            end_index = sculpt_indices(mIndices, limit, *volume, pos, mNumS, mNumT, triangles, stack_room, sizeof(stack_room));
         }
         else
         {

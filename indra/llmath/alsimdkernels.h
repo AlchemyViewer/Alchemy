@@ -128,9 +128,11 @@ void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst);
 // s + columns * t, that have two corners of one code. The quad at column s
 // and row t is bottom left, top right, top left, flagged in bit s % 64 of
 // upper[t * words + s / 64], and bottom left, bottom right, top right, in
-// lower; words is at least (columns + 62) / 64. codes is read up to eight
-// past its columns * rows. Returns how many rows of quads have a flag.
-size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words);
+// lower; words is at least (columns + 62) / 64. Bit t % 64 of
+// flagged_rows[t / 64] is set where row t of quads has a flag, and the
+// rest of its (rows + 62) / 64 words are cleared. codes is read up to eight
+// past its columns * rows. Returns how many triangles are flagged.
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words, U64* flagged_rows);
 
 // Three little-endian 16-bit values per vertex, six bytes apart, to
 // {x, y, z, 0} * scale + bias; the fourth lane of scale is ignored, so w
