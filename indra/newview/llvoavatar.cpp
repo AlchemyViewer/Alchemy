@@ -38,6 +38,7 @@
 #include "raytrace.h"
 
 #include "alavatargroups.h"
+#include "albakeproxies.h"
 #include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
@@ -9492,45 +9493,13 @@ void LLVOAvatar::debugColorizeSubMeshes(U32 i, const LLColor4& color)
     }
 }
 
-// Add the bake a texture ID names, where it is a bake proxy (IMG_USE_BAKED_*)
-static void add_named_bake(LLVOAvatar::bake_set_t& bakes, const LLUUID& id)
-{
-    const EBakedTextureIndex index = LLAvatarAppearanceDictionary::assetIdToBakedTextureIndex(id);
-    if (index != BAKED_NUM_INDICES)
-    {
-        bakes.set(index);
-    }
-}
-
-// static
-LLVOAvatar::bake_set_t LLVOAvatar::getBakesNamedBy(const LLGLTFMaterial* material)
-{
-    bake_set_t bakes;
-    if (material)
-    {
-        for (const LLUUID& id : material->mTextureId)
-        {
-            add_named_bake(bakes, id);
-        }
-    }
-    return bakes;
-}
-
-// static
-LLVOAvatar::bake_set_t LLVOAvatar::getBakesDrawnBy(const LLTextureEntry& te)
-{
-    bake_set_t bakes = getBakesNamedBy(te.getGLTFRenderMaterial());
-    add_named_bake(bakes, te.getID());
-    return bakes;
-}
-
 //-----------------------------------------------------------------------------
 // updateMeshVisibility()
 // Hide the mesh joints if attachments are using baked textures
 //-----------------------------------------------------------------------------
 void LLVOAvatar::updateMeshVisibility()
 {
-    bake_set_t bake_flag;
+    ALBakeProxies::bake_set_t bake_flag;
 
     if (getOverallAppearance() == AOA_NORMAL)
     {
@@ -9539,6 +9508,7 @@ void LLVOAvatar::updateMeshVisibility()
             if (!attachment)
                 continue;
 
+            const bool hud = attachment->getIsHUDAttachment();
             for (const auto& objectp : attachment->mAttachedObjects)
             {
                 if (objectp.isNull())
@@ -9546,7 +9516,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                 for (int face_index = 0; face_index < objectp->getNumTEs(); face_index++)
                 {
-                    bake_flag |= getBakesDrawnBy(*objectp->getTE(face_index));
+                    bake_flag |= ALBakeProxies::drawnBy(*objectp->getTE(face_index), hud);
                 }
 
                 for (const auto& objectchild : objectp->getChildren())
@@ -9556,7 +9526,7 @@ void LLVOAvatar::updateMeshVisibility()
 
                     for (int face_index = 0; face_index < objectchild->getNumTEs(); face_index++)
                     {
-                        bake_flag |= getBakesDrawnBy(*objectchild->getTE(face_index));
+                        bake_flag |= ALBakeProxies::drawnBy(*objectchild->getTE(face_index), hud);
                     }
                 }
             }

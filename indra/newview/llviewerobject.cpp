@@ -54,6 +54,7 @@
 #include "object_flags.h"
 
 #include "alassetblocklist.h"
+#include "albakeproxies.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -5421,13 +5422,14 @@ void LLViewerObject::updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old
 {
     const LLTextureEntry* tep = getTE(te);
     const LLGLTFMaterial* material = tep ? tep->getGLTFRenderMaterial() : nullptr;
-    if (material == old_material)
+    // a HUD's material draws no bake (ALBakeProxies::drawnBy)
+    if (material == old_material || isHUDAttachment())
     {
         return;
     }
 
     LLVOAvatar* avatar = getAvatar();
-    if (avatar && LLVOAvatar::getBakesNamedBy(material) != LLVOAvatar::getBakesNamedBy(old_material))
+    if (avatar && ALBakeProxies::drawnBy(material) != ALBakeProxies::drawnBy(old_material))
     {
         avatar->updateMeshVisibility();
     }
