@@ -89,6 +89,20 @@ LLKeyboard::LLKeyboard() : mCallbacks(NULL), mNumpadDistinct(ND_NUMLOCK_OFF)
     addKeyName(KEY_F10, "F10" );
     addKeyName(KEY_F11, "F11" );
     addKeyName(KEY_F12, "F12" );
+    // <SK:Nexii> Names for F13-F24 so bindings save and load.
+    addKeyName(KEY_F13, "F13" );
+    addKeyName(KEY_F14, "F14" );
+    addKeyName(KEY_F15, "F15" );
+    addKeyName(KEY_F16, "F16" );
+    addKeyName(KEY_F17, "F17" );
+    addKeyName(KEY_F18, "F18" );
+    addKeyName(KEY_F19, "F19" );
+    addKeyName(KEY_F20, "F20" );
+    addKeyName(KEY_F21, "F21" );
+    addKeyName(KEY_F22, "F22" );
+    addKeyName(KEY_F23, "F23" );
+    addKeyName(KEY_F24, "F24" );
+    // </SK:Nexii>
     addKeyName(KEY_TAB, "Tab" );
     addKeyName(KEY_CONTEXT_MENU, "Menu" );
     addKeyName(KEY_ADD, "Add" );

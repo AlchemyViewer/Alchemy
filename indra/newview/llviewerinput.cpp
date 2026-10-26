@@ -1226,7 +1226,7 @@ bool LLViewerInput::handleKey(KEY translated_key, MASK translated_mask, bool rep
     }
 
     // No repeats of F-keys
-    bool repeatable_key = (translated_key < KEY_F1 || translated_key > KEY_F12);
+    bool repeatable_key = (translated_key < KEY_F1 || translated_key > KEY_F24); // <SK:Nexii> F13-F24 do not repeat either.
     if (!repeatable_key && repeated)
     {
         return false;
@@ -1320,7 +1320,7 @@ bool LLViewerInput::bindKey(const S32 mode, const KEY key, const MASK mask, cons
             int idx = c1;
             if (c2 >= 0)
                 idx = idx*10 + c2;
-            if (idx >=2 && idx <= 12)
+            if (idx >=2 && idx <= 24) // <SK:Nexii> Remap targets include F13-F24.
             {
                 U32 keyidx = ((mask<<16)|key);
                 (mRemapKeys[mode])[keyidx] = ((0<<16)|(KEY_F1+(idx-1)));

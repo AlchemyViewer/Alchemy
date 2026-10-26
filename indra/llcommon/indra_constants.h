@@ -115,6 +115,20 @@ constexpr KEY KEY_F9        = 0xA9;
 constexpr KEY KEY_F10       = 0xAA;
 constexpr KEY KEY_F11       = 0xAB;
 constexpr KEY KEY_F12       = 0xAC;
+// <SK:Nexii> F13-F24 for remapped and macro keys, contiguous after F12.
+constexpr KEY KEY_F13       = 0xAD;
+constexpr KEY KEY_F14       = 0xAE;
+constexpr KEY KEY_F15       = 0xAF;
+constexpr KEY KEY_F16       = 0xB0;
+constexpr KEY KEY_F17       = 0xB1;
+constexpr KEY KEY_F18       = 0xB2;
+constexpr KEY KEY_F19       = 0xB3;
+constexpr KEY KEY_F20       = 0xB4;
+constexpr KEY KEY_F21       = 0xB5;
+constexpr KEY KEY_F22       = 0xB6;
+constexpr KEY KEY_F23       = 0xB7;
+constexpr KEY KEY_F24       = 0xB8;
+// </SK:Nexii>
 
 constexpr KEY KEY_PAD_UP        = 0xC0;
 constexpr KEY KEY_PAD_DOWN      = 0xC1;

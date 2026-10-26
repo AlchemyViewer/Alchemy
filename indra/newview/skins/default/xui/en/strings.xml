@@ -5063,6 +5063,20 @@ Try enclosing path to the editor with double quotes.
   <string name="F10">F10</string>
   <string name="F11">F11</string>
   <string name="F12">F12</string>
+  <!-- <SK:Nexii> F13-F24 key names -->
+  <string name="F13">F13</string>
+  <string name="F14">F14</string>
+  <string name="F15">F15</string>
+  <string name="F16">F16</string>
+  <string name="F17">F17</string>
+  <string name="F18">F18</string>
+  <string name="F19">F19</string>
+  <string name="F20">F20</string>
+  <string name="F21">F21</string>
+  <string name="F22">F22</string>
+  <string name="F23">F23</string>
+  <string name="F24">F24</string>
+  <!-- </SK:Nexii> -->
 
   <string name="Add">Add</string>
   <string name="Subtract">Subtract</string>
