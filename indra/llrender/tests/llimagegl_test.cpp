@@ -43,6 +43,7 @@
 
 #include "llheadlessgl_fixture.h"
 
+#include "altestfatal.h"
 #include "llimage.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -407,6 +408,65 @@ namespace
         }
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
+
+    // A texture deleted or replaced leaves the count as it goes, not once the deferred delete frees its name frames
+    // later: a main-thread upload of another size swaps a new texture in, a publish puts a texture built elsewhere in
+    // place of the one on screen, and destroyGLTexture lets it go.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a replaced or deleted texture leaves the count at once", "[LLImageGL]")
+    {
+        const U64 before = LLImageGL::getTextureBytesAllocated();
+        LLPointer<LLImageGL> img = new LLImageGL(/*usemipmaps=*/false);
+        REQUIRE(img->createGLTexture(0, makeRaw(16, 16, 4, 0x80).get()));
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 16 * 16 * 4);
+
+        UNSCOPED_INFO("swapped for an upload of another size");
+        const U32 first = img->getTexName();
+        REQUIRE(img->createGLTexture(0, makeRaw(32, 8, 4, 0x80).get()));
+        REQUIRE(img->getTexName() != first);
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 32 * 8 * 4);
+
+        UNSCOPED_INFO("replaced by a texture published in its place");
+        U32 published = 0;
+        LLImageGL::generateTextures(1, &published);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, published);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 8, 8, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        gGL.getTextureSlot(0)->unbind();
+        img->beginUpload();
+        img->syncTexName(published);
+        CHECK((S64)(LLImageGL::getTextureBytesAllocated() - before) == 8 * 8 * 4);
+
+        UNSCOPED_INFO("destroyed");
+        img->destroyGLTexture();
+        CHECK(LLImageGL::getTextureBytesAllocated() == before);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+#ifdef SHOW_ASSERT
+    // A deleted texture's name waits in the deferred-delete ring, counted for nothing, until GL frees it: storage
+    // recorded on it before then is an owner using a texture it let go of, and asserts.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: storage recorded on a deleted name asserts until the ring frees it", "[LLImageGL]")
+    {
+        U32 name = 0;
+        LLImageGL::generateTextures(1, &name);
+        gGL.getTextureSlot(0)->bindManual(ALTextureSlot::TT_TEXTURE, name);
+        LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        const U64 allocated = LLImageGL::getTextureBytesAllocated();
+        LLImageGL::deleteTextures(1, &name);
+        UNSCOPED_INFO("out of the count as it is deleted");
+        CHECK(allocated - LLImageGL::getTextureBytesAllocated() == 4 * 4 * 4);
+
+        // Still bound on slot 0. GL refuses the second storage of an immutable texture; the accounting asserts.
+        const auto allocate_again = [] {
+            LLImageGL::allocateTexture2D(GL_TEXTURE_2D, GL_RGBA8, 4, 4, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+        };
+        UNSCOPED_INFO("storage recorded on the deleted name");
+        CHECK_THROWS_AS(allocate_again(), ll_test::FatalError);
+        gGL.getTextureSlot(0)->unbind();
+        for (U32 i = 0; i < 8 && glGetError() != GL_NO_ERROR; ++i)
+        {
+        }
+    }
+#endif
 
     // A block-compressed texture keeps its sized compressed format as its primary format, and that is its storage: it
     // is counted at its blocks, whatever its internal format names.

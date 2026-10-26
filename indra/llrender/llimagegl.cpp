@@ -133,7 +133,17 @@ void LLImageGL::touchContents()
 
 // texture memory accounting (for macOS)
 static LLMutex sTexMemMutex;
-static boost::unordered_map<U32, U64> sTextureAllocs;
+namespace
+{
+    struct TextureAlloc
+    {
+        U64  mBytes;
+        // Deleted, its bytes out of the count, while the name waits in the deferred-delete ring: an allocation on it
+        // before GL frees it is an owner using a texture it let go of, which alloc_tex_image catches.
+        bool mDeleted = false;
+    };
+}
+static boost::unordered_map<U32, TextureAlloc> sTextureAllocs;
 // Changed under sTexMemMutex, and read by getTextureBytesAllocated without it.
 static std::atomic<U64> sTextureBytes{0};
 
@@ -146,32 +156,30 @@ void LLImageGLMemory::alloc_tex_image(U32 width, U32 height, U32 intformat, U32 
     U32 texName = gGL.getTextureSlot(texUnit)->getCurrTexture();
     const U64 size = (U64)LLImageGL::dataFormatVRAMBytes(intformat, width, height, levels) * count;
 
-    sTexMemMutex.lock();
+    LLMutexLock lock(&sTexMemMutex);
 
-    // it is a precondition that no existing allocation exists for this texture
+    // it is a precondition that no existing allocation exists for this texture, nor a deleted one GL has yet to free
     llassert(sTextureAllocs.find(texName) == sTextureAllocs.end());
 
-    sTextureAllocs[texName] = size;
+    sTextureAllocs[texName] = { size };
     sTextureBytes += size;
-
-    sTexMemMutex.unlock();
 }
 
 // track texture free on given texName
 void LLImageGLMemory::free_tex_image(U32 texName)
 {
-    sTexMemMutex.lock();
+    LLMutexLock lock(&sTexMemMutex);
     auto iter = sTextureAllocs.find(texName);
-    if (iter != sTextureAllocs.end()) // sometimes a texName will be "freed" before allocated (e.g. the first allocation on a given texName)
+    // sometimes a texName will be "freed" before allocated (e.g. the first allocation on a given texName); a deleted one
+    // stays until the ring frees its name
+    if (iter != sTextureAllocs.end() && !iter->second.mDeleted)
     {
-        llassert(iter->second <= sTextureBytes); // sTextureBytes MUST NOT go below zero
+        llassert(iter->second.mBytes <= sTextureBytes); // sTextureBytes MUST NOT go below zero
 
-        sTextureBytes -= iter->second;
+        sTextureBytes -= iter->second.mBytes;
 
         sTextureAllocs.erase(iter);
     }
-
-    sTexMemMutex.unlock();
 }
 
 // track texture free on given texNames
@@ -180,6 +188,39 @@ void LLImageGLMemory::free_tex_images(U32 count, const U32* texNames)
     for (U32 i = 0; i < count; ++i)
     {
         free_tex_image(texNames[i]);
+    }
+}
+
+// The names deleteTextures hands to the deferred-delete ring: out of the count now, and kept, marked deleted, until the
+// ring frees them (forget_tex_images).
+static void retire_tex_images(U32 count, const U32* texNames)
+{
+    LLMutexLock lock(&sTexMemMutex);
+    for (U32 i = 0; i < count; ++i)
+    {
+        auto iter = sTextureAllocs.find(texNames[i]);
+        if (iter != sTextureAllocs.end() && !iter->second.mDeleted)
+        {
+            TextureAlloc& alloc = iter->second;
+            llassert(alloc.mBytes <= sTextureBytes);
+            sTextureBytes -= alloc.mBytes;
+            alloc.mBytes   = 0;
+            alloc.mDeleted = true;
+        }
+    }
+}
+
+// The names the deferred-delete ring frees: GL may hand them out again from here on.
+static void forget_tex_images(U32 count, const U32* texNames)
+{
+    LLMutexLock lock(&sTexMemMutex);
+    for (U32 i = 0; i < count; ++i)
+    {
+        auto iter = sTextureAllocs.find(texNames[i]);
+        if (iter != sTextureAllocs.end() && iter->second.mDeleted)
+        {
+            sTextureAllocs.erase(iter);
+        }
     }
 }
 
@@ -343,27 +384,20 @@ void LLImageGL::cleanupClass()
     const bool gl_alive = gGLManager.mInited;
 
     // Uploads handed over and never published. Their thread is gone, and so by now is
-    // whatever was waiting to finish them, so their fences and textures go too. With GL
-    // up the textures join the ring drained below, which releases their accounting; with
-    // it gone deleteTextures drops the name unrecorded, so the accounting is released here
-    // -- left behind, the next context reissuing the name would find it already allocated.
+    // whatever was waiting to finish them, so their fences and textures go too. deleteTextures
+    // releases their accounting whether or not GL is up -- left behind, the next context
+    // reissuing a name would find it already allocated -- and with GL up the names join the
+    // ring drained below.
     for (PendingPublish& pending : sPendingPublishes)
     {
         pending.mImage->mOnPublished.clear();
         pending.mImage->mPublishesPending = 0;
         pending.mImage->endUpload();
-        if (gl_alive)
+        if (gl_alive && pending.mFence)
         {
-            if (pending.mFence)
-            {
-                glDeleteSync(pending.mFence);
-            }
-            deleteTextures(1, &pending.mName);
+            glDeleteSync(pending.mFence);
         }
-        else
-        {
-            free_tex_image(pending.mName);
-        }
+        deleteTextures(1, &pending.mName);
     }
     sPendingPublishes.clear();
 
@@ -374,15 +408,15 @@ void LLImageGL::cleanupClass()
         sScratchPBOSize = 0;
     }
 
-    // Drain the deferred-delete ring so leftover texture names don't dangle
-    // in sTextureAllocs across re-init (the test fixture calls cleanupClass
-    // between tests). Always clear the C++ bookkeeping; only issue
+    // Drain the deferred-delete ring so leftover texture names don't carry
+    // across re-init (the test fixture calls cleanupClass between tests).
+    // Their bytes left the count as they were queued; only issue
     // glDeleteTextures if GL is still around.
     for (S32 i = 0; i < DELETE_DELAY + 1; ++i)
     {
         if (!sFreeList[i].empty())
         {
-            free_tex_images((GLsizei)sFreeList[i].size(), sFreeList[i].data());
+            forget_tex_images((U32)sFreeList[i].size(), sFreeList[i].data());
             if (gl_alive)
             {
                 glDeleteTextures((GLsizei)sFreeList[i].size(), sFreeList[i].data());
@@ -1852,7 +1886,7 @@ void LLImageGL::updateClass()
     if (!sFreeList[idx].empty())
     {
         gGL.forgetTextures((S32)sFreeList[idx].size(), sFreeList[idx].data());
-        free_tex_images((GLsizei) sFreeList[idx].size(), sFreeList[idx].data());
+        forget_tex_images((U32)sFreeList[idx].size(), sFreeList[idx].data());
         glDeleteTextures((GLsizei)sFreeList[idx].size(), sFreeList[idx].data());
         sFreeList[idx].resize(0);
     }
@@ -1864,9 +1898,16 @@ void LLImageGL::updateClass()
 // static
 void LLImageGL::deleteTextures(S32 numTextures, const U32 *textures)
 {
-    if (gGLManager.mInited)
+    // Out of the count now, as nothing uses them any more: the ring keeps the names for the frames the GPU may still
+    // be reading them, and GL frees their storage once it has. With GL gone the names go unrecorded.
+    if (!gGLManager.mInited)
+    {
+        free_tex_images(numTextures, textures);
+    }
+    else
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+        retire_tex_images(numTextures, textures);
         U32 idx = sFrameCount % (DELETE_DELAY+1);
         for (S32 i = 0; i < numTextures; ++i)
         {
@@ -3660,8 +3701,8 @@ S32 LLImageGL::getStorageInternalFormat() const
 }
 
 // Allocate backing storage for the currently-bound texture at the given level-0 size,
-// and record the VRAM accounting for it. Callers replacing an existing texture are
-// responsible for releasing the old accounting (free_tex_image) themselves.
+// and record the VRAM accounting for it. A texture it replaces leaves the count as its
+// owner deletes it (deleteTextures).
 void LLImageGL::allocateTextureStorage(S32 width, S32 height, bool has_mips)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
@@ -3872,9 +3913,8 @@ bool LLImageGL::scaleDown(S32 desired_discard)
         gGL.getTextureSlot(0)->unbind();
     }
 
-    // Retire the old texture and publish the new one. Accounting for the new allocation
-    // is done by allocateTextureStorage.
-    free_tex_image(old_texname);
+    // Retire the old texture and publish the new one. deleteTextures releases the old
+    // texture's accounting; allocateTextureStorage recorded the new one's.
     deleteTextures(1, &old_texname);
     mTexName = new_texname;
 
