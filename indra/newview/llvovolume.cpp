@@ -5105,7 +5105,20 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                 }
 
                 bool no_texture = !face->getTexture() || !face->getTexture()->hasGLTexture();
-                bool mask       = no_texture ? false : face->getTexture()->getMask(face->surfaceToTexture(tc, p, n));
+                bool mask       = false;
+                if (!no_texture)
+                {
+                    // surfaceToTexture takes the hit in agent space, which a
+                    // planar face projects from.
+                    LLVector4a agent_p = p;
+                    LLVector4a agent_n = n;
+                    if (transform)
+                    {
+                        agent_p.load3(volumePositionToAgent(LLVector3(p.getF32ptr())).mV);
+                        agent_n.load3(volumeDirectionToAgent(LLVector3(n.getF32ptr())).mV);
+                    }
+                    mask = face->getTexture()->getMask(face->surfaceToTexture(tc, agent_p, agent_n));
+                }
                 if (face &&
                     (ignore_alpha || pick_transparent || no_texture || mask))
                 {
