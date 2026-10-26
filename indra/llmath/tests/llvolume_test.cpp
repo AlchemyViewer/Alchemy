@@ -67,6 +67,7 @@
 #include <map>
 #include <numeric>
 #include <optional>
+#include <random>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -3475,6 +3476,50 @@ namespace
             INFO(report.text());
             CHECK(report.failures == 0);
         }
+    }
+
+    // A fan of 60,000 triangles round one vertex, in shuffled order: a vertex
+    // cache order would score that vertex's triangles again for each it
+    // takes, some 1.8 billion times, so the face keeps the order it has.
+    TEST_CASE("llvolume: cacheOptimize keeps the order of a face with a vertex under too many triangles", "[llvolume]")
+    {
+        constexpr U32 RIM = 60000;
+        CorpusMesh mesh;
+        mesh.name = "fan";
+        mesh.positions.emplace_back(0.f, 0.f, 0.f);
+        for (U32 i = 0; i < RIM; ++i)
+        {
+            const F32 angle = F_TWO_PI * (F32)i / (F32)RIM;
+            mesh.positions.emplace_back(0.5f * cosf(angle), 0.5f * sinf(angle), 0.f);
+        }
+        for (const LLVector3& p : mesh.positions)
+        {
+            mesh.normals.emplace_back(0.f, 0.f, 1.f);
+            mesh.uvs.emplace_back(p.mV[0] + 0.5f, p.mV[1] + 0.5f);
+        }
+        std::vector<U32> order(RIM);
+        std::iota(order.begin(), order.end(), 0u);
+        std::shuffle(order.begin(), order.end(), std::mt19937(7));
+        for (U32 t : order)
+        {
+            mesh.indices.push_back(0);
+            mesh.indices.push_back((U16)(1 + t));
+            mesh.indices.push_back((U16)(1 + (t + 1) % RIM));
+        }
+
+        const LLVolumeFace before = mesh.face();
+        LLVolumeFace after = mesh.face();
+        REQUIRE(after.cacheOptimize(true));
+        REQUIRE(after.mNumIndices == before.mNumIndices);
+        S32 moved = 0;
+        for (S32 i = 0; i < before.mNumIndices; ++i)
+        {
+            if (bitsOf(after.mPositions[after.mIndices[i]]) != bitsOf(before.mPositions[before.mIndices[i]]))
+            {
+                ++moved;
+            }
+        }
+        CHECK(moved == 0);
     }
 
     TEST_CASE("llvolume: cacheOptimize splits the vertices a mirrored UV seam joins", "[llvolume]")

@@ -5326,6 +5326,36 @@ namespace
         unit.normalize3();
         v.setSelectWithMask(length2.greaterThan(LLVector4a(FLT_MIN)), unit, LLVector4a::getZero());
     }
+
+    // meshoptimizer's vertex cache order scores again every triangle a vertex
+    // in its cache has left whenever it takes a triangle, so a vertex of n
+    // triangles costs it about n squared: one vertex under the most
+    // triangles a decoded face may have would take it minutes. Past this
+    // sum, over the vertices, of each one's triangles squared, some tens of
+    // milliseconds of scoring, a face keeps the order it has. An ordinary face of 65,535
+    // vertices, six triangles each, sums to under 2.4 million.
+    constexpr U64 CACHE_ORDER_BUDGET = 1ull << 26;
+
+    bool cache_order_affordable(const U32* indices, size_t index_count, size_t vertex_count)
+    {
+        ALScratchArena::Scope scratch;
+        U32* triangles = scratch.allocate<U32>(vertex_count);
+        std::fill_n(triangles, vertex_count, 0u);
+        for (size_t i = 0; i < index_count; ++i)
+        {
+            ++triangles[indices[i]];
+        }
+        U64 cost = 0;
+        for (size_t v = 0; v < vertex_count; ++v)
+        {
+            cost += (U64)triangles[v] * triangles[v];
+            if (cost > CACHE_ORDER_BUDGET)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 } // namespace
 
 // A decoded mesh LOD face made ready to draw: MikkTSpace's tangents, as
@@ -5531,7 +5561,14 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         U32* ordered = scratch.allocate<U32>(index_count);
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - cache order");
-            meshopt_optimizeVertexCache(ordered, welded_indices, index_count, welded_count);
+            if (cache_order_affordable(welded_indices, index_count, welded_count))
+            {
+                meshopt_optimizeVertexCache(ordered, welded_indices, index_count, welded_count);
+            }
+            else
+            {
+                std::copy_n(welded_indices, index_count, ordered);
+            }
         }
 
         // Each vertex's final place, in the order the reordered triangles
@@ -5557,18 +5594,27 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         }
 
         resizeVertices((S32)kept);
-        if (!mPositions)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << kept << ")" << LL_ENDL;
-        }
-        if (old_weights)
+        if (mPositions && old_weights)
         {
             allocateWeights((S32)kept);
         }
-        if (tangents || old_tangents)
+        if (mPositions && (tangents || old_tangents))
         {
             allocateTangents((S32)kept);
+        }
+        if (!mPositions || (old_weights && !mWeights) || ((tangents || old_tangents) && !mTangents))
+        {
+            // The face has given up its buffers, and keeps none. This runs on
+            // the mesh threads, where a fatal error may not be raised.
+            ll_aligned_free<64>(old_positions);
+            ll_aligned_free_16(old_weights);
+            ll_aligned_free_16(old_tangents);
+            ll_aligned_free_16(mWeights);
+            mWeights = nullptr;
+            resizeVertices(0);
+            resizeIndices(0);
+            LL_WARNS("LLVolume") << "Failed to allocate memory for " << kept << " vertices in cacheOptimize" << LL_ENDL;
+            return false;
         }
 
         for (size_t u = 0; u < welded_count; ++u)
