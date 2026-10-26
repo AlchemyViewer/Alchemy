@@ -861,6 +861,25 @@ namespace
         }
     }
 
+    // A cap's texture reads the right way round from the side it faces, a
+    // bottom cap's as a top cap's: its triangles wind the same way in UV as
+    // they do seen from in front, whichever way the cap faces.
+    void checkCapUV(const LLVolumeFace& face, Report& report, const std::string& where)
+    {
+        for (S32 t = 0; t + 2 < face.mNumIndices; t += 3)
+        {
+            const LLVector2& a = face.mTexCoords[face.mIndices[t]];
+            const LLVector2& b = face.mTexCoords[face.mIndices[t + 1]];
+            const LLVector2& c = face.mTexCoords[face.mIndices[t + 2]];
+            const F32 area = (b.mV[0] - a.mV[0]) * (c.mV[1] - a.mV[1]) - (c.mV[0] - a.mV[0]) * (b.mV[1] - a.mV[1]);
+            if (area < -1e-6f)
+            {
+                report.fail(fmt::format("{}: triangle {} winds against its UVs: the texture reads mirrored from in front", where, t / 3));
+                return;
+            }
+        }
+    }
+
     // A face whose positions lie in a plane and, for a side, whose every
     // grid quad is a parallelogram, maps its UVs as an affine function of
     // position: least squares over the plane must fit every vertex.
@@ -1628,6 +1647,7 @@ namespace
             if ((state.checks & Checks::CapFacing) && isCap(face))
             {
                 checkCapFacing(volume, face, state.raw, report, where);
+                checkCapUV(face, report, where);
             }
             // A sculpt's UVs are its grid, wherever the map puts the points.
             if ((state.checks & Checks::AffineUV) && !isSculpt(volume))

@@ -7981,6 +7981,16 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     }
 
     const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
+    if (mReversed)
+    {
+        // Seen from the side it faces, a reversed cap is the other cap seen
+        // from its front, and takes that cap's mapping, mirrored in v, so
+        // that its texture reads the right way round as a bottom cap's does.
+        for (S32 i = 0; i < num_vertices; ++i)
+        {
+            mTexCoords[i].mV[1] = 1.f - mTexCoords[i].mV[1];
+        }
+    }
     if (mFlexible)
     {
         // mCapTangent is plain floats, not aligned as a vector stores.
