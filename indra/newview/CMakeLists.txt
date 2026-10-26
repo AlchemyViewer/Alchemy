@@ -2055,7 +2055,6 @@ if(AL_BUILD_VIEWER)
     app_settings/cmd_line.xml
     app_settings/commands.xml
     app_settings/emoji_groups.xml
-    app_settings/foldertypes.xml
     app_settings/grass.xml
     app_settings/ignorable_dialogs.xml
     app_settings/key_bindings.xml
@@ -2069,7 +2068,6 @@ if(AL_BUILD_VIEWER)
     app_settings/std_bump.ini
     app_settings/toolbars.xml
     app_settings/trees.xml
-    app_settings/viewerart.xml
     app_settings/message.xml
     ${SCRIPTS_DIR}/messages/message_template.msg
     featuretable.txt
