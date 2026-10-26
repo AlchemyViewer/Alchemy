@@ -468,7 +468,7 @@ private:
     void removeFromVOCacheTree(LLVOCacheEntry* entry);
     void killCacheEntry(LLVOCacheEntry* entry, bool for_rendering = false); //physically delete the cache entry
     void killInvisibleObjects(F32 max_time);
-    void createVisibleObjects(F32 max_time);
+    void createVisibleObjects();
     void updateVisibleEntries(F32 max_time); //update visible entries
 
     void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
@@ -546,6 +546,17 @@ public:
 
   private:
     static S32  sNewObjectCreationThrottle;
+    // A frame's object creation from the caches, every region's together: the time it may take
+    // (AlchemyObjectCreationTime), what it has taken, and the objects it has made. calcNewObjectCreationThrottle() starts
+    // each frame's afresh.
+    static F32  sObjectCreationSeconds;
+    static F32  sObjectCreationSpent;
+    static U32  sObjectsCreated;
+    // The objects a frame makes whatever they take, so that the caches empty however slowly each is made.
+    static constexpr U32 MIN_OBJECTS_CREATED = 8;
+    // How near the camera a visible group of the cache's must come, in metres past its bounds, for updateVisibleEntries
+    // to walk it every frame; the farther ones take turns in the time the update has.
+    static constexpr F32 WALK_NEAR_RADIUS = 64.f;
     LLViewerRegionImpl * mImpl;
     LLFrameTimer         mRegionTimer;
 

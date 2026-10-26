@@ -1798,7 +1798,8 @@ const   S32   max_format  = (S32)num_formats - 1;
     }
 
     // Bring up the process-shared D3D11 <-> GL interop device once, here on the
-    // main thread with the render context current and the WGL extensions loaded.
+    // main thread with the render context current and the WGL extensions loaded,
+    // where the viewer wants it (LLDXHardware::setGLDXInteropWanted).
     // Zero-copy CEF media surfaces share it instead of each creating a private
     // D3D device. Best-effort - failure just means accelerated paint falls back
     // to the CPU path.
@@ -2013,13 +2014,15 @@ void* LLWindowWin32::createSharedContext()
     return rc;
 }
 
-void LLWindowWin32::makeContextCurrent(void* contextPtr)
+bool LLWindowWin32::makeContextCurrent(void* contextPtr)
 {
     if (!wglMakeCurrent(mhDC, (HGLRC) contextPtr))
     {
         LL_WARNS("Window") << "wglMakeCurrent failed: " << GetLastError() << LL_ENDL;
+        return false;
     }
     LL_PROFILER_GPU_CONTEXT;
+    return true;
 }
 
 void LLWindowWin32::destroySharedContext(void* contextPtr)
@@ -4124,11 +4127,7 @@ void LLWindowWin32::swapBuffers()
         LL_PROFILE_ZONE_SCOPED_CATEGORY_WIN32;
         SwapBuffers(mhDC);
     }
-
-    {
-        LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("GPU Collect");
-        LL_PROFILER_GPU_COLLECT;
-    }
+    // Tracy's GPU zones are collected at LLRender::endFrame, past the pacing wait.
 }
 
 

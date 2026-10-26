@@ -90,7 +90,8 @@ public:
     // or -1 where no triangle was left, in which case target's faces are as
     // they were. A face left with no triangle is one of three indices to a
     // vertex at the origin. Where a face would take more vertices than 16-bit
-    // indices reach, each face is simplified on its own instead.
+    // indices reach, each face is simplified on its own instead, as
+    // simplifyFace simplifies it.
     F32 simplifyModel(LLVolume& target, const Target& goal, Seams seams) const;
 
     // Simplifies base's face on its own into target. A face that shares a
@@ -102,6 +103,11 @@ public:
     // simplifyModel does; where no triangle is left, target is the face of
     // three indices to a vertex at the origin.
     F32 simplifyFace(S32 face, LLVolumeFace& target, const Target& goal, Seams seams) const;
+
+    // Whether a simplification in one mode is the simplification in the
+    // other: UV's is NONE's where every texture seam lies at positions
+    // another face has as well, which both modes hold.
+    bool same(Seams a, Seams b) const;
 
     // The face of base's face's layout that the given triangles make: the
     // vertices they name and no others, each with every attribute it has in

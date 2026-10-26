@@ -133,14 +133,19 @@ bool normalize3_or_mark(LLVector4a* v, size_t n)
     return kernels::normalize3_or_mark_impl<ALSimdLanes>(v, n);
 }
 
+bool swept_normals(const LLVector4a* frames, size_t frame_stride, size_t rows, const F32* const* columns, size_t count, LLVector4a* normals)
+{
+    return kernels::swept_normals_impl<ALSimdLanes>(frames, frame_stride, rows, columns, count, normals);
+}
+
 void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst)
 {
     kernels::unit_cube_codes_impl<ALSimdWide>(src, n, dst);
 }
 
-size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words)
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words, U64* flagged_rows)
 {
-    return kernels::grid_coincident_triangles_impl<ALSimdWide>(codes, columns, rows, upper, lower, words);
+    return kernels::grid_coincident_triangles_impl<ALSimdWide>(codes, columns, rows, upper, lower, words, flagged_rows);
 }
 
 } // namespace alsimd

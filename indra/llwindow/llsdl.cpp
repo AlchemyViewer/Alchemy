@@ -515,19 +515,27 @@ void* sdl_create_shared_context()
     return shared;
 }
 
-void sdl_make_shared_context_current(void* handle)
+bool sdl_make_shared_context_current(void* handle)
 {
-    if (!handle) return;
+    if (!handle) return false;
     auto* s = (LLSDLSharedContext*)handle;
 #if LL_WINDOWS
     if (!wglMakeCurrent(s->dc, s->rc))
     {
         LL_WARNS("Window") << "wglMakeCurrent(shared) failed: " << GetLastError() << LL_ENDL;
+        return false;
     }
 #elif LL_DARWIN
-    CGLSetCurrentContext(s->ctx);
+    if (CGLSetCurrentContext(s->ctx) != kCGLNoError)
+    {
+        LL_WARNS("Window") << "CGLSetCurrentContext(shared) failed" << LL_ENDL;
+        return false;
+    }
 #else // LL_LINUX
-    if (s->egl_ctx)
+    if (!s->egl_ctx)
+    {
+        return false;
+    }
     {
         // eglBindAPI is per-thread, so re-assert OpenGL on the worker before
         // binding the context surfaceless.
@@ -536,13 +544,15 @@ void sdl_make_shared_context_current(void* handle)
         auto egl_bindapi = (fn_bindapi)SDL_EGL_GetProcAddress("eglBindAPI");
         auto egl_makecur = (fn_makecur)SDL_EGL_GetProcAddress("eglMakeCurrent");
         if (egl_bindapi) egl_bindapi(EGL_OPENGL_API);
-        if (egl_makecur && !egl_makecur(s->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, s->egl_ctx))
+        if (!egl_makecur || !egl_makecur(s->egl_dpy, EGL_NO_SURFACE, EGL_NO_SURFACE, s->egl_ctx))
         {
             LL_WARNS("Window") << "eglMakeCurrent(shared, surfaceless) failed" << LL_ENDL;
+            return false;
         }
     }
 #endif // LL_LINUX
     LL_PROFILER_GPU_CONTEXT;
+    return true;
 }
 
 void sdl_destroy_shared_context(void* handle)

@@ -206,7 +206,7 @@ public:
     static LLFontFallbackMatch findFallbackFontForChar(llwchar wch);
 
     void *createSharedContext() override;
-    void makeContextCurrent(void *context) override;
+    bool makeContextCurrent(void *context) override;
     void destroySharedContext(void *context) override;
     void toggleVSync(bool enable_vsync) override;
 

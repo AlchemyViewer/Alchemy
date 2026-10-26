@@ -139,6 +139,12 @@ ALGPUBuffer& ALGPUBuffer::operator=(ALGPUBuffer&& other) noexcept
     return *this;
 }
 
+//static
+bool ALGPUBuffer::canMapPersistently()
+{
+    return can_map_persistent(use_dsa());
+}
+
 bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char* label)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
@@ -464,6 +470,28 @@ ALFrameFences& ALGPUReadback::frames() const
 
 void ALGPUReadback::release()
 {
+    // The requests still in flight write into the store: waited out first, since a driver may hand a deleted store's
+    // memory to the next at once. Not after the context has gone: their writes and fences went with it.
+    if (gGLManager.mInited)
+    {
+        U32 newest = 0;
+        for (U32 pending = 0; pending < mPending; ++pending)
+        {
+            const Slot& slot = mSlots[(mNext + (U32)mSlots.size() - 1 - pending) % (U32)mSlots.size()];
+            newest = llmax(newest, slot.mFrame);
+        }
+        if (mPending > 0)
+        {
+            frames().waitFinished(newest);
+        }
+        for (Slot& slot : mSlots)
+        {
+            if (slot.mFence)
+            {
+                glDeleteSync(static_cast<GLsync>(slot.mFence));
+            }
+        }
+    }
     mSlots.clear();
     mStore.release();
     mSlotBytes  = 0;
@@ -518,11 +546,23 @@ bool ALGPUReadback::requestPixels(S32 x, S32 y, S32 width, S32 height, U32 forma
     return true;
 }
 
+U32 ALGPUReadback::getFences() const
+{
+    U32 fences = 0;
+    for (const Slot& slot : mSlots)
+    {
+        fences += slot.mFence ? 1 : 0;
+    }
+    return fences;
+}
+
 void ALGPUReadback::issueNext(size_t bytes)
 {
     Slot& slot = mSlots[mNext];
     slot.mFrame = frames().frame();
     slot.mBytes = bytes;
+    // A fence of its own behind the copy where a stamp alone would show its frame finished (see the class comment).
+    slot.mFence = frames().willStamp() ? glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0) : nullptr;
 
     mNext = (mNext + 1) % (U32)mSlots.size();
     ++mPending;
@@ -549,6 +589,21 @@ bool ALGPUReadback::collect(void* out, size_t bytes, bool wait)
         }
         // For the open frame this waits for every command issued so far, the copy among them.
         fences.waitFinished(slot.mFrame);
+    }
+    if (slot.mFence)
+    {
+        // Its frame has finished, so it has all but surely signalled, and a poll of a fence that has answers at once.
+        GLenum status = glClientWaitSync(static_cast<GLsync>(slot.mFence), 0, 0);
+        if (status == GL_TIMEOUT_EXPIRED && !wait)
+        {
+            return false;
+        }
+        while (status == GL_TIMEOUT_EXPIRED)
+        {
+            status = glClientWaitSync(static_cast<GLsync>(slot.mFence), GL_SYNC_FLUSH_COMMANDS_BIT, 1000000000ull);
+        }
+        glDeleteSync(static_cast<GLsync>(slot.mFence));
+        slot.mFence = nullptr;
     }
 
     const size_t offset = (size_t)oldest * mSlotStride;
@@ -649,8 +704,10 @@ U8* ALGPUStream::map()
             bool stalled = false;
             if (!fences.wait(mReadIn[region], 1000000000ull /* 1s */, &stalled))
             {
-                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; writing it anyway"
+                // Waited out however long it takes: the reads still in flight would read what is written next.
+                LL_WARNS_ONCE("GPUBuffer") << "A stream region was still in use after a second; waiting for it"
                                            << LL_ENDL;
+                fences.waitFinished(mReadIn[region]);
             }
             if (stalled)
             {

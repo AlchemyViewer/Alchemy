@@ -117,13 +117,23 @@ private:
 /// held -- by another query open on it, or by reserve() -- and the draws run uncounted. Its user takes the missing
 /// result as it would an expired one. A query is begun and ended within one render pass (checkPassBoundary()).
 ///
-/// All operations require the GL context the pool's queries were made in to be current, and `frames` to be ended after
-/// the pool each frame. Non-copyable.
+/// All operations require the GL context the pool's queries were made in to be current, and `frames` to be ended once a
+/// frame, between the pool's closeFrame() and openFrame() (or after its endFrame()). Non-copyable.
 class ALQueryPool
 {
 public:
-    static constexpr U32 FRAMES        = 4;
+    /// Batches of names in flight: as many frames as the frame fences keep, so that a pool may hold a batch back up to
+    /// MIN_RESULT_AGE_LIMIT frames and a frame end paced that deep still waits for no batch it reuses.
+    static constexpr U32 FRAMES        = 8;
     static constexpr U32 RESULT_FRAMES = 64;
+    /// How many frames after its own a batch is read at the soonest, however soon its frame is shown finished, unless
+    /// the pool is set to another (setMinResultAge): a dense scene issues many queries, and results asked for only a few
+    /// frames on are read with neither the CPU nor the GPU waiting on them. At the pacing depth (3) the batch that old
+    /// is the frame the pacing wait has just seen finished.
+    static constexpr U32 MIN_RESULT_AGE = 3;
+    /// The most frames a pool may hold a batch back: a batch is read before its names are begun again.
+    static constexpr U32 MIN_RESULT_AGE_LIMIT = FRAMES - 1;
+    static_assert(MIN_RESULT_AGE <= MIN_RESULT_AGE_LIMIT, "a batch is read before its names are begun again");
 
     enum class Status : U8
     {
@@ -132,9 +142,19 @@ public:
         Expired, ///< no query, or one whose results have been dropped, RESULT_FRAMES frames on, or released
     };
 
-    explicit ALQueryPool(ALFrameFences& frames) : mFrames(frames) {}
+    /// `min_result_age` frames after its own a batch is read at the soonest (setMinResultAge).
+    explicit ALQueryPool(ALFrameFences& frames, U32 min_result_age = MIN_RESULT_AGE)
+    : mFrames(frames)
+    {
+        setMinResultAge(min_result_age);
+    }
     ALQueryPool(const ALQueryPool&) = delete;
     ALQueryPool& operator=(const ALQueryPool&) = delete;
+
+    /// How many frames after its own a batch is read at the soonest, 1 to MIN_RESULT_AGE_LIMIT, from the next retire()
+    /// on: a batch already read stays read, and one held back is read as soon as it is old enough.
+    void setMinResultAge(U32 age) { mMinResultAge = llclamp(age, 1u, MIN_RESULT_AGE_LIMIT); }
+    U32  getMinResultAge() const { return mMinResultAge; }
 
     /// Whether the context can count `kind` at all.
     static bool supports(ALQueryKind kind);
@@ -193,8 +213,18 @@ public:
     /// which returns names, finds a threaded driver's thread caught up.
     void makeRoom();
 
-    /// Closes the frame's batch, and opens the next in the oldest one's place, reading that first: waiting for it only
-    /// when the GPU is FRAMES frames behind. Once a frame, by LLRender::endFrame(), before the frame fences end it.
+    /// Closes the frame's batch, its results written ahead of the fence that follows. Once a frame, by
+    /// LLRender::endFrame(), before the frame fences end it. No query is begun or ended until openFrame().
+    void closeFrame();
+
+    /// Opens the next batch in the oldest one's place, reading that first: waiting for it only when the GPU is FRAMES
+    /// frames behind once the frame fences have ended the frame. LLRender::endFrame() runs it after the fences' end and
+    /// retire(), so that a frame end that paces the CPU has already waited for the batch it reuses, in the pacing wait,
+    /// and retire() has read it: opened before the pacing wait, a batch FRAMES frames old would be waited for first,
+    /// and the pacing would find its frame done and keep no slack.
+    void openFrame();
+
+    /// closeFrame() then openFrame(), for a user that ends no frame fences between them.
     void endFrame();
 
     /// Deletes every query, while the context is current. Every ticket expires.
@@ -269,6 +299,7 @@ private:
     void          read(Batch& batch);
 
     ALFrameFences& mFrames;
+    U32            mMinResultAge = MIN_RESULT_AGE;
     Batch         mBatches[FRAMES];
     Results       mResults[RESULT_FRAMES];
     U32           mSerial = 1;      // the open batch's frame
@@ -276,6 +307,9 @@ private:
     ALQueryTicket mOpen[TARGETS];
     bool          mReserved[TARGETS] = {};
     bool          mConditional = false;
+    // Between closeFrame() and openFrame(): the closed batch is still the open serial's, and a query begun or ended
+    // now would be counted in it.
+    bool          mBetweenFrames = false;
     // A batch's results buffer could not be made: every batch asks GL, until release().
     bool          mWriteFailed = false;
     U32           mStalls = 0;

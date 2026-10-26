@@ -203,9 +203,9 @@ void* ALWindowSDLHeadless::createSharedContext()
     return shared;
 }
 
-void ALWindowSDLHeadless::makeContextCurrent(void* context)
+bool ALWindowSDLHeadless::makeContextCurrent(void* context)
 {
-    sdl_make_shared_context_current(context);
+    return sdl_make_shared_context_current(context);
 }
 
 void ALWindowSDLHeadless::destroySharedContext(void* context)

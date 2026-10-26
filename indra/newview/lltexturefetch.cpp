@@ -1986,6 +1986,21 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 llassert_always(mRawImage.notNull());
                 LL_DEBUGS(LOG_TXT) << mID << ": Decoded. Discard: " << mDecodedDiscard
                                    << " Raw Image: " << llformat("%dx%d",mRawImage->getWidth(),mRawImage->getHeight()) << LL_ENDL;
+                if (mLayout.isValid() && mFormattedImage.notNull())
+                {
+                    // Once a texture: a decode finer than its bytes reach, which decodes what they lack as nothing --
+                    // a codestream with fewer resolutions than the level asked for, or bytes short of the level's target.
+                    const S32 bytes = mFormattedImage->getDataSize();
+                    const S32 reach = mLayout.calcDiscardLevelBytes(bytes);
+                    if (mDecodedDiscard < reach)
+                    {
+                        LL_INFOS_ONCE(LOG_TXT) << mID << " decoded " << mRawImage->getWidth() << "x" << mRawImage->getHeight()
+                                               << " at discard " << mDecodedDiscard << " from " << bytes << " of " << mLayout.mLength
+                                               << " bytes, which reach discard " << reach << " (" << mLayout.mWidth << "x"
+                                               << mLayout.mHeight << ", " << mLayout.mLevels << " levels, " << mLayout.mLayers
+                                               << " layers, all data " << mHaveAllData << ")" << LL_ENDL;
+                    }
+                }
                 setState(WRITE_TO_CACHE);
             }
             // fall through

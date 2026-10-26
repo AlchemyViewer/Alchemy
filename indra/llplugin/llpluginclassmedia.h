@@ -42,6 +42,10 @@ public:
     LLPluginClassMedia(LLPluginClassMediaOwner *owner);
     virtual ~LLPluginClassMedia();
 
+    // While held, idle() keeps the texture's shared memory where it is, a size change waiting: an upload of it read
+    // on another thread reads it after the frame that handed it over.
+    void holdSharedMemory(bool hold) { mHoldSharedMemory = hold; }
+
     // local initialization, called by the media manager when creating a source
     bool init(const std::string &launcher_filename,
                       const std::string &plugin_dir,
@@ -420,6 +424,7 @@ protected:
     void setSizeInternal(void);
 
     bool        mTextureParamsReceived;     // the mRequestedTexture* fields are only valid when this is true
+    bool        mHoldSharedMemory = false;  // holdSharedMemory()
     S32         mRequestedTextureDepth;
     U32         mRequestedTextureInternalFormat;
     U32         mRequestedTextureFormat;

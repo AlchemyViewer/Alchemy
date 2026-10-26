@@ -128,9 +128,11 @@ void unit_cube_codes(const LLVector4a* src, size_t n, U32* dst);
 // s + columns * t, that have two corners of one code. The quad at column s
 // and row t is bottom left, top right, top left, flagged in bit s % 64 of
 // upper[t * words + s / 64], and bottom left, bottom right, top right, in
-// lower; words is at least (columns + 62) / 64. codes is read up to eight
-// past its columns * rows. Returns how many rows of quads have a flag.
-size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words);
+// lower; words is at least (columns + 62) / 64. Bit t % 64 of
+// flagged_rows[t / 64] is set where row t of quads has a flag, and the
+// rest of its (rows + 62) / 64 words are cleared. codes is read up to eight
+// past its columns * rows. Returns how many triangles are flagged.
+size_t grid_coincident_triangles(const U32* codes, size_t columns, size_t rows, U64* upper, U64* lower, size_t words, U64* flagged_rows);
 
 // Three little-endian 16-bit values per vertex, six bytes apart, to
 // {x, y, z, 0} * scale + bias; the fourth lane of scale is ignored, so w
@@ -230,6 +232,25 @@ bool grid_tangents_central(const LLVector4a* positions, const LLVector4a* normal
 // squared length in x, y and z is above FLT_MIN; elsewhere (0, 0, 0, 1),
 // whatever w it had. Returns whether any was set so.
 bool normalize3_or_mark(LLVector4a* v, size_t n);
+
+// The sine of the angle between a swept surface's two derivatives below
+// which their cross product is rounding's, not the surface's.
+constexpr F32 SWEPT_PARALLEL = 1e-4f;
+
+// The normals of a surface swept from a profile along a path, over a grid
+// of count columns, its profile's points, by rows, its path's stations,
+// vertex s + count * t. Row t's frame is the five vectors from
+// frames[frame_stride * t]: the two rows its profile's x and y move the
+// surface by, their rates along the path, and the station's velocity. Column s is (px, py, tx, ty, moves),
+// each from its own array of columns[0] to [4]: its point, its tangent,
+// and how much of the velocity it takes. A vertex's normal is the surface's
+// derivative across, tx row0 + ty row1, crossed with its derivative along,
+// px rate0 + py rate1 + moves velocity, at unit length with a w of 0; or
+// (0, 0, 0, 1), as normalize3_or_mark marks one, where its squared length
+// is FLT_MIN or less, or the two derivatives are within SWEPT_PARALLEL of
+// one line. Returns whether any was. The column arrays are read up to
+// seven floats past count.
+bool swept_normals(const LLVector4a* frames, size_t frame_stride, size_t rows, const F32* const* columns, size_t count, LLVector4a* normals);
 
 } // namespace alsimd
 

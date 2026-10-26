@@ -33,7 +33,7 @@
 
 LLUUID ALShaderInputs::Global::digest() const
 {
-    static_assert(al_render_target_desc::field_count<Global>() == 15,
+    static_assert(al_render_target_desc::field_count<Global>() == 16,
                   "ALShaderInputs::Global gained or lost a field: fold it into digest()");
 
     HBXXH128   hash;
@@ -53,6 +53,7 @@ LLUUID ALShaderInputs::Global::digest() const
     add(mTerrainPBRDetail);
     add(mTerrainHexTiling);
     add(mWaterHextile);
+    add(mObjectSkinBlock);
     return hash.digest();
 }
 
@@ -110,6 +111,9 @@ ALShaderInputs ALShaderInputs::make(const ALShaderSettings& s)
     g.mTerrainPBRDetail         = terrainDetail(s.mTerrainPBRDetail, g.mTerrainPlanarSampleCount, s.mTextureImageUnits);
     g.mTerrainHexTiling         = s.mTerrainHexTiling;
     g.mWaterHextile             = (S32)std::min(s.mWaterHextile, 2u);
+    // The palette is written into the scratch UBO ring once a frame and bound per draw; without persistent maps that
+    // ring maps and unmaps for every palette, and the uniforms are cheaper.
+    g.mObjectSkinBlock          = s.mHasBufferStorage;
 
     l.mHDR              = s.mHDR;
     l.mTransparentWater = s.mTransparentWater;

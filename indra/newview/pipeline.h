@@ -275,6 +275,10 @@ public:
     //  for_profile - if true, a profile is being performed, do not update actual impostor
     //  specific_attachment - specific attachment to profile, or nullptr to profile entire avatar
     void generateImpostor(LLVOAvatar* avatar, bool preview_avatar = false, bool for_profile = false, LLViewerObject* specific_attachment = nullptr);
+    // The avatar's impostor target, made at the size a bake from the viewer's camera now wants where it is not that
+    // already. Making one asks GL for names and errors, which a threaded driver answers only once its thread has run
+    // everything queued before them, so LLVOAvatar::allocateImpostors makes the frame's before its first draw.
+    void allocateImpostorTarget(LLVOAvatar& avatar);
 
     // A full-screen quad at the far plane, depth-tested against the bound
     // target's depth and never writing it: GL_GREATER reaches every texel that
@@ -305,6 +309,12 @@ public:
     // without the screen's stencil, which a blit's matching formats would make them carry. `dst` is cleared to the far
     // plane first, and stays so where the program has not built.
     void copySceneDepth(LLRenderTarget& dst);
+    // `src`'s colour into `dst` through gCopyProgram: a draw, where a framebuffer blit is a pixel transfer NVIDIA's
+    // driver may have to synchronize with the rendering around it. A blit stands in where the program has not built.
+    // Over the whole of `dst`: texel for texel where it is `src`'s size, and stretched by a nearest blit where it is not.
+    void copyColor(LLRenderTarget& dst, LLRenderTarget& src);
+    // Or only `rect` of `src` into the same texels of `dst`, a target of `src`'s size, the rest of `dst` left as it was.
+    void copyColor(LLRenderTarget& dst, LLRenderTarget& src, const LLRect& rect);
     // The scene's depth as a haze pass reads it, with mRT->screen bound and the draws since its binding having written
     // the depth it shares: past a texture barrier, the scene's own (nullptr); without one, a copy from `scope` taken
     // after the screen is let go and bound again, or the scene's own past that change where the pack has no copy.
@@ -793,6 +803,8 @@ private:
     void hideDrawable( LLDrawable *pDrawable );
     void unhideDrawable( LLDrawable *pDrawable );
     void skipRenderingShadows();
+    // allocateImpostorTarget at `res_x` by `res_y`.
+    void allocateImpostorTarget(LLVOAvatar& avatar, U32 res_x, U32 res_y);
 public:
     enum {GPU_CLASS_MAX = 3 };
 

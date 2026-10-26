@@ -37,21 +37,50 @@ namespace
     // size, by which its return is checked to be the last one taken.
     constexpr size_t HEADER = ALScratchArena::ALIGNMENT;
 
+    // The thread's arena. Nothing is done to destroy it, so that it lasts
+    // as long as its thread, past every thread_local's destructor;
+    // ArenaRelease ends it.
     struct Arena
     {
         U8* mBase = nullptr;
         size_t mTop = 0;
-        // The arena could not be made: every block comes from the heap.
+        // The arena could not be made, or its thread has ended: every block
+        // comes from the heap.
         bool mUnavailable = false;
         ALScratchArena::Counters mCounters;
-
-        ~Arena()
-        {
-            ll_aligned_free<64>(mBase);
-        }
     };
 
     thread_local Arena tArena;
+
+    // Frees an arena its thread has ended once no block is out of it.
+    void freeIfEnded(Arena& arena)
+    {
+        if (arena.mUnavailable && arena.mTop == 0)
+        {
+            ll_aligned_free<64>(arena.mBase);
+            arena.mBase = nullptr;
+        }
+    }
+
+    // Ends its thread's arena as the thread ends. It is made with the arena,
+    // so a thread_local made before is destroyed after it: what that takes
+    // then comes from the heap, and a block it holds goes back into the
+    // arena, which is freed once the last is back.
+    struct ArenaRelease
+    {
+        Arena* mArena = nullptr;
+
+        ~ArenaRelease()
+        {
+            if (mArena)
+            {
+                mArena->mUnavailable = true;
+                freeIfEnded(*mArena);
+            }
+        }
+    };
+
+    thread_local ArenaRelease tArenaRelease;
 } // namespace
 
 //static
@@ -62,12 +91,13 @@ void* ALScratchArena::allocate(size_t bytes)
     {
         arena.mBase = static_cast<U8*>(ll_aligned_malloc<64>(CAPACITY));
         arena.mUnavailable = !arena.mBase;
+        tArenaRelease.mArena = &arena;
     }
 
     // Compared before it is rounded, so that a size near the top of size_t,
     // as meshoptimizer asks for when a count overflows, goes to the heap.
     const size_t room = CAPACITY - arena.mTop;
-    if (arena.mBase && room > HEADER && bytes <= room - HEADER)
+    if (!arena.mUnavailable && room > HEADER && bytes <= room - HEADER)
     {
         const size_t size = (bytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
         if (size <= room - HEADER)
@@ -93,8 +123,20 @@ void ALScratchArena::deallocate(void* block)
     U8* p = static_cast<U8*>(block);
     if (arena.mBase && p >= arena.mBase && p < arena.mBase + CAPACITY)
     {
-        llassert(p + *reinterpret_cast<const size_t*>(p - HEADER) == arena.mBase + arena.mTop);
-        arena.mTop = static_cast<size_t>(p - HEADER - arena.mBase);
+        // Only the block on top moves the top down. Moving it down to any
+        // other would hand the blocks above, still in use, to the next
+        // taker, so the top stays, and the block's room is lost to the
+        // thread.
+        const size_t start = static_cast<size_t>(p - arena.mBase);
+        if (start >= HEADER && start <= arena.mTop && *reinterpret_cast<const size_t*>(p - HEADER) == arena.mTop - start)
+        {
+            arena.mTop = start - HEADER;
+            freeIfEnded(arena);
+        }
+        else
+        {
+            LL_WARNS_ONCE("ALScratchArena") << "A block was given back out of order or twice" << LL_ENDL;
+        }
         return;
     }
     ::operator delete(block);

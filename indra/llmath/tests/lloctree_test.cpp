@@ -237,4 +237,194 @@ namespace
 
         delete root;
     }
+
+    // An element of a size, as the viewer's static prims are: the octree files it by its bin radius.
+    struct SizedEntry
+    {
+        LLVector4a mPosition;
+        F32 mRadius = 1.f;
+        S32 mBinIndex = -1;
+        const LLVector4a& getPositionGroup() const { return mPosition; }
+        F32 getBinRadius() const { return mRadius; }
+        S32 getBinIndex() const { return mBinIndex; }
+        void setBinIndex(S32 index) { mBinIndex = index; }
+    };
+
+    using SizedNode = LLOctreeNode<SizedEntry, SizedEntry*>;
+    using SizedRoot = LLOctreeRoot<SizedEntry, SizedEntry*>;
+
+    // The octree's capacity and minimum size are the process's: each case sets its own and puts them back.
+    struct OctreeLimits
+    {
+        OctreeLimits(U32 capacity, F32 min_size) : mCapacity(gOctreeMaxCapacity), mMinSize(gOctreeMinSize)
+        {
+            gOctreeMaxCapacity = capacity;
+            gOctreeMinSize     = min_size;
+        }
+        ~OctreeLimits()
+        {
+            gOctreeMaxCapacity = mCapacity;
+            gOctreeMinSize     = mMinSize;
+        }
+        U32 mCapacity;
+        F32 mMinSize;
+    };
+
+    // Every node under `node`, and it.
+    void collect_nodes(SizedNode* node, std::vector<SizedNode*>& nodes)
+    {
+        nodes.push_back(node);
+        for (U32 i = 0; i < node->getChildCount(); ++i)
+        {
+            collect_nodes(node->getChild(i), nodes);
+        }
+    }
+
+    // Whether `node` can still split: a child of one under twice the minimum size would sit at its own centre, so that
+    // insert keeps whatever comes there (LLOctreeNode::insert).
+    bool can_split(SizedNode* node)
+    {
+        return node->getSize()[0] >= 2.f * gOctreeMinSize;
+    }
+
+    // Many elements of one size crowded into a space smaller than they are, as small prims are filed by a bin radius
+    // of 3 m (LLVOVolume::getBinRadius) and a dense build packs hundreds of them into a few metres: once the node of
+    // their size is full, each node below it takes no more than the capacity either, and gives the rest to its
+    // children in turn.
+    TEST_CASE("LLOctreeNode: no node that can still split holds more than the capacity", "[LLOctree]")
+    {
+        OctreeLimits limits(8, 0.01f);
+        constexpr U32 COUNT = 2000;
+        std::vector<SizedEntry> entries(COUNT);
+        std::mt19937 rng(7);
+        std::uniform_real_distribution<F32> place(0.1f, 3.9f);
+        for (SizedEntry& entry : entries)
+        {
+            entry.mPosition = vec(place(rng), place(rng), place(rng));
+            entry.mRadius   = 3.f;
+        }
+
+        SizedRoot* root = new SizedRoot(vec(0.f, 0.f, 0.f), vec(1.f, 1.f, 1.f), nullptr);
+        for (SizedEntry& entry : entries)
+        {
+            root->insert(&entry);
+        }
+
+        std::vector<SizedNode*> nodes;
+        collect_nodes(root, nodes);
+        U32 held = 0;
+        for (SizedNode* node : nodes)
+        {
+            held += node->getElementCount();
+            if (can_split(node))
+            {
+                CAPTURE(node->getSize()[0]);
+                CHECK(node->getElementCount() <= gOctreeMaxCapacity);
+            }
+        }
+        {
+            INFO("every element is in the tree, once");
+            CHECK(held == COUNT);
+        }
+        for (const SizedEntry& entry : entries)
+        {
+            CHECK(entry.getBinIndex() >= 0);
+        }
+        delete root;
+    }
+
+    // Crowded into a few centimetres, past what the nodes can split to: those that can still split take no more than
+    // the capacity, and those under twice the minimum size, which cannot, take the rest, so that the descent ends.
+    TEST_CASE("LLOctreeNode: a node too small to split takes what comes and every larger one the capacity", "[LLOctree]")
+    {
+        OctreeLimits limits(8, 0.01f);
+        constexpr U32 COUNT = 2000;
+        std::vector<SizedEntry> entries(COUNT);
+        std::mt19937 rng(13);
+        std::uniform_real_distribution<F32> place(0.f, 0.04f);
+        for (SizedEntry& entry : entries)
+        {
+            entry.mPosition = vec(place(rng), place(rng), place(rng));
+            entry.mRadius   = 3.f;
+        }
+
+        SizedRoot* root = new SizedRoot(vec(0.f, 0.f, 0.f), vec(1.f, 1.f, 1.f), nullptr);
+        for (SizedEntry& entry : entries)
+        {
+            root->insert(&entry);
+        }
+
+        std::vector<SizedNode*> nodes;
+        collect_nodes(root, nodes);
+        U32 held = 0;
+        U32 crowded = 0;
+        for (SizedNode* node : nodes)
+        {
+            held += node->getElementCount();
+            if (can_split(node))
+            {
+                CAPTURE(node->getSize()[0]);
+                CHECK(node->getElementCount() <= gOctreeMaxCapacity);
+            }
+            else if (node->getElementCount() > gOctreeMaxCapacity)
+            {
+                ++crowded;
+            }
+        }
+        {
+            INFO("every element is in the tree, once");
+            CHECK(held == COUNT);
+        }
+        {
+            INFO("the crowd reached the nodes that cannot split, and they took it");
+            CHECK(crowded > 0);
+        }
+        delete root;
+    }
+
+    // Taken out through the nodes that hold them, as the viewer takes a drawable out of its group, the elements leave
+    // nothing behind: every node they made goes as it empties, back to the root.
+    TEST_CASE("LLOctreeNode: removing every element leaves an empty root", "[LLOctree]")
+    {
+        OctreeLimits limits(8, 0.01f);
+        constexpr U32 COUNT = 500;
+        std::vector<SizedEntry> entries(COUNT);
+        std::mt19937 rng(11);
+        std::uniform_real_distribution<F32> place(-20.f, 20.f);
+        std::uniform_real_distribution<F32> size(0.5f, 6.f);
+        for (U32 i = 0; i < COUNT; ++i)
+        {
+            // Half crowded into a few metres, half spread out.
+            const F32 spread = i % 2 ? 1.f : 0.1f;
+            entries[i].mPosition = vec(place(rng) * spread, place(rng) * spread, place(rng) * spread);
+            entries[i].mRadius   = i % 2 ? size(rng) : 3.f;
+        }
+
+        SizedRoot* root = new SizedRoot(vec(0.f, 0.f, 0.f), vec(1.f, 1.f, 1.f), nullptr);
+        for (SizedEntry& entry : entries)
+        {
+            root->insert(&entry);
+        }
+
+        std::vector<std::pair<SizedEntry*, SizedNode*>> placed;
+        std::vector<SizedNode*> nodes;
+        collect_nodes(root, nodes);
+        for (SizedNode* node : nodes)
+        {
+            for (auto it = node->getDataBegin(); it != node->getDataEnd(); ++it)
+            {
+                placed.emplace_back(*it, node);
+            }
+        }
+        REQUIRE(placed.size() == COUNT);
+
+        for (auto& [entry, node] : placed)
+        {
+            CHECK(node->remove(entry));
+            CHECK(entry->getBinIndex() == -1);
+        }
+        CHECK(root->getElementCount() == 0);
+        CHECK(root->getChildCount() == 0);
+        delete root;
+    }
 }

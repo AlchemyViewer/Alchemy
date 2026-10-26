@@ -24,6 +24,8 @@
  */
 #include "stdtypes.h"
 
-U32 gOctreeMaxCapacity;
-F32 gOctreeMinSize;
+// The viewer's settings' defaults (OctreeMaxNodeCapacity, OctreeMinimumNodeSize) until it reads them: at 0, an octree
+// built before then would never stop splitting for elements crowded together.
+U32 gOctreeMaxCapacity = 128;
+F32 gOctreeMinSize = 0.01f;
 

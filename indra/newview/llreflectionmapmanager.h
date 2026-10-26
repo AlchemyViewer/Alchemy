@@ -195,8 +195,13 @@ private:
     // Just does a bulk clear of all of the cubemaps.
     void clearCubeMaps();
 
-    // delete the probe with the given index in mProbes
-    void deleteProbe(U32 i);
+    // Let go of every probe no one but the manager holds, the default probe apart, in one pass of mProbes that keeps
+    // the rest in their order.
+    void deleteUnreferencedProbes();
+
+    // What `probe`, about to be deleted, holds of the manager's: its cube slot, the update it is in, its place in its
+    // neighbours' lists.
+    void releaseProbe(LLReflectionMap* probe);
 
     // stop generating mUpdatingProbe partway through, so the next probe starts from its first pass
     void abandonProbeUpdate();
@@ -253,8 +258,8 @@ private:
     // list of active reflection maps
     std::vector<LLPointer<LLReflectionMap> > mProbes;
 
-    // list of reflection maps to kill
-    std::vector<LLPointer<LLReflectionMap> > mKillList;
+    // The placed probes that may evict automatic ones, as the eclipse pass reads them, kept for its room.
+    ALProbeEclipse mEclipse;
 
     // list of reflection maps to create
     std::vector<LLPointer<LLReflectionMap> > mCreateList;

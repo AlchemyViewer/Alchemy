@@ -397,6 +397,38 @@ namespace
         std::uniform_int_distribution<int> byte(0, 255);
         std::uniform_real_distribution<F32> near_cube(-0.7f, 0.7f);
         const U32 UNWRITTEN = 0xDEADBEEFu;
+        // Every byte on each axis, x mirrored and not: a code each, so two
+        // such points have one code only where they are one point.
+        {
+            std::vector<LLVector4a> points(512);
+            std::vector<U32> expected(512);
+            for (int v = 0; v < 256; ++v)
+            {
+                for (int mirrored = 0; mirrored < 2; ++mirrored)
+                {
+                    const int r = v, g = 255 - v, b = (v * 7) & 255;
+                    LLVector4a p((F32)r, (F32)g, (F32)b);
+                    p.mul(1.f / 255.f);
+                    p.sub(LLVector4a(0.5f, 0.5f, 0.5f));
+                    if (mirrored)
+                    {
+                        p.mul(LLVector4a(-1.f, 1.f, 1.f, 1.f));
+                    }
+                    points[2 * v + mirrored] = p;
+                    expected[2 * v + mirrored] = (U32)(mirrored ? 255 - r : r) | ((U32)g << 8) | ((U32)b << 16);
+                }
+            }
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<U32> codes(points.size());
+                unit_cube_codes_impl<W>(points.data(), points.size(), codes.data());
+                for (size_t i = 0; i < points.size(); ++i)
+                {
+                    CAPTURE(width, i);
+                    REQUIRE(codes[i] == expected[i]);
+                }
+            });
+        }
         for (size_t n : COUNTS)
         {
             std::vector<LLVector4a> points(n + 1);
@@ -450,19 +482,20 @@ namespace
     // A grid's triangles with two corners of one code, against every
     // pair of every quad's corners: codes from a few values so that many
     // corners match, rows of quads across one, two and three words, the
-    // flags past the row's last quad and in the words past it clear, and
-    // the rows counted. The codes past the grid are what the kernel may
-    // read and must not flag from.
+    // flags past the row's last quad and in the words past it clear, the
+    // triangles counted and the rows with any marked. The codes past the
+    // grid are what the kernel may read and must not flag from.
     TEST_CASE("alsimdkernels: grid_coincident_triangles flags every triangle with two corners of one code and no other", "[alsimdkernels]")
     {
         std::mt19937 rng(15);
         const size_t columns_tried[] = {2, 3, 4, 5, 8, 9, 16, 17, 33, 64, 65, 66, 70, 129, 130};
-        const size_t rows_tried[] = {2, 3, 8};
+        const size_t rows_tried[] = {2, 3, 8, 66, 130};
         for (size_t columns : columns_tried)
         {
             for (size_t rows : rows_tried)
             {
-                for (int few : {3, 50})
+                // Sparse flags, so that some rows have none, and dense ones.
+                for (int few : {3, 50, 5000})
                 {
                     std::uniform_int_distribution<int> value(0, few);
                     std::vector<U32> codes(columns * rows + 8);
@@ -472,11 +505,11 @@ namespace
                     }
                     const size_t quads = columns - 1;
                     const size_t words = (columns + 62) / 64 + 1;
-                    std::vector<U64> want_upper(words * rows, 0), want_lower(words * rows, 0);
-                    size_t want_rows = 0;
+                    const size_t row_words = (rows + 62) / 64;
+                    std::vector<U64> want_upper(words * rows, 0), want_lower(words * rows, 0), want_rows(row_words, 0);
+                    size_t want_flags = 0;
                     for (size_t t = 0; t + 1 < rows; ++t)
                     {
-                        bool any = false;
                         for (size_t s = 0; s < quads; ++s)
                         {
                             const U32 bl = codes[s + columns * t], br = codes[s + 1 + columns * t];
@@ -485,16 +518,25 @@ namespace
                             const bool lower = bl == br || br == tr || bl == tr;
                             want_upper[words * t + s / 64] |= U64(upper) << (s % 64);
                             want_lower[words * t + s / 64] |= U64(lower) << (s % 64);
-                            any = any || upper || lower;
+                            want_rows[t / 64] |= U64(upper || lower) << (t % 64);
+                            want_flags += (upper ? 1 : 0) + (lower ? 1 : 0);
                         }
-                        want_rows += any ? 1 : 0;
                     }
                     for_each_width([&]<class W>(const char* width)
                     {
                         std::vector<U64> upper(words * rows, ~U64(0)), lower(words * rows, ~U64(0));
-                        const size_t got_rows = grid_coincident_triangles_impl<W>(codes.data(), columns, rows, upper.data(), lower.data(), words);
+                        // A word past the rows' is left as it is.
+                        std::vector<U64> flagged_rows(row_words + 1, ~U64(0));
+                        const size_t got_flags =
+                            grid_coincident_triangles_impl<W>(codes.data(), columns, rows, upper.data(), lower.data(), words, flagged_rows.data());
                         CAPTURE(width, columns, rows, few);
-                        CHECK(got_rows == want_rows);
+                        CHECK(got_flags == want_flags);
+                        for (size_t w = 0; w < row_words; ++w)
+                        {
+                            CAPTURE(w);
+                            CHECK(flagged_rows[w] == want_rows[w]);
+                        }
+                        CHECK(flagged_rows[row_words] == ~U64(0));
                         for (size_t t = 0; t + 1 < rows; ++t)
                         {
                             for (size_t w = 0; w < words; ++w)
@@ -1401,6 +1443,119 @@ namespace
                         });
                     }
                 }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Normals of a swept surface
+
+    // A grid's normals at every width against the cross product worked in
+    // double, over grids that leave every tail: directions to within
+    // rounding at unit length with a w of 0, and (0, 0, 0, 1) where the
+    // product has no length or the derivatives lie along one line, as at a
+    // column whose tangent is nothing and one whose derivative along the
+    // path is a multiple of its derivative across. The column lanes'
+    // padding is read and comes to nothing, and nothing is written past the
+    // grid.
+    TEST_CASE("alsimdkernels: swept_normals against the cross product in double at every width", "[alsimdkernels]")
+    {
+        U32 seed = 300;
+        for (size_t columns : { 1, 2, 3, 7, 8, 9, 16, 17 })
+        {
+            for (size_t rows : { 1, 3 })
+            {
+                std::mt19937 rng(++seed);
+                std::uniform_real_distribution<F32> spread(-2.f, 2.f);
+                std::vector<LLVector4a> frames(5 * rows);
+                for (LLVector4a& row : frames)
+                {
+                    row.set(spread(rng), spread(rng), spread(rng), spread(rng));
+                }
+                const size_t padded = (columns + 7) & ~(size_t)7;
+                std::vector<F32> lanes(5 * padded, std::numeric_limits<F32>::quiet_NaN());
+                F32* const point_x = lanes.data();
+                F32* const point_y = point_x + padded;
+                F32* const tangent_x = point_y + padded;
+                F32* const tangent_y = tangent_x + padded;
+                F32* const moves = tangent_y + padded;
+                for (size_t s = 0; s < columns; ++s)
+                {
+                    point_x[s] = spread(rng);
+                    point_y[s] = spread(rng);
+                    tangent_x[s] = spread(rng);
+                    tangent_y[s] = spread(rng);
+                    moves[s] = s % 4 == 3 ? 0.f : 1.f;
+                }
+                // A column with no tangent, and, where every row's rates are
+                // its rows, one moving only along its own tangent.
+                tangent_x[columns / 2] = tangent_y[columns / 2] = 0.f;
+                const bool along_itself = rows == 1 && columns > 2;
+                if (along_itself)
+                {
+                    frames[2] = frames[0];
+                    frames[3] = frames[1];
+                    const size_t s = columns - 1;
+                    point_x[s] = 3.f * tangent_x[s];
+                    point_y[s] = 3.f * tangent_y[s];
+                    moves[s] = 0.f;
+                }
+
+                const size_t n = columns * rows;
+                std::vector<LLVector4a> expected(n);
+                bool any_expected = false;
+                for (size_t t = 0; t < rows; ++t)
+                {
+                    const LLVector4a* frame = &frames[5 * t];
+                    for (size_t s = 0; s < columns; ++s)
+                    {
+                        F64 across[3], along[3];
+                        for (int k = 0; k < 3; ++k)
+                        {
+                            across[k] = (F64)tangent_x[s] * frame[0][k] + (F64)tangent_y[s] * frame[1][k];
+                            along[k] = (F64)point_x[s] * frame[2][k] + (F64)point_y[s] * frame[3][k] + (F64)moves[s] * frame[4][k];
+                        }
+                        const F64 nx = across[1] * along[2] - across[2] * along[1];
+                        const F64 ny = across[2] * along[0] - across[0] * along[2];
+                        const F64 nz = across[0] * along[1] - across[1] * along[0];
+                        const F64 length2 = nx * nx + ny * ny + nz * nz;
+                        const F64 across2 = across[0] * across[0] + across[1] * across[1] + across[2] * across[2];
+                        const F64 along2 = along[0] * along[0] + along[1] * along[1] + along[2] * along[2];
+                        if (length2 <= std::max((F64)FLT_MIN, 1e-8 * across2 * along2))
+                        {
+                            expected[s + columns * t].set(0.f, 0.f, 0.f, 1.f);
+                            any_expected = true;
+                            continue;
+                        }
+                        const F64 scale = 1.0 / std::sqrt(length2);
+                        expected[s + columns * t].set(F32(nx * scale), F32(ny * scale), F32(nz * scale), 0.f);
+                    }
+                }
+                REQUIRE(any_expected);
+
+                const F32* const column_lanes[5] = { point_x, point_y, tangent_x, tangent_y, moves };
+                for_each_lane_width([&]<class W>(const char* width)
+                {
+                    std::vector<LLVector4a> got(n + 1, SENTINEL);
+                    const bool any = swept_normals_impl<W>(frames.data(), 5, rows, column_lanes, columns, got.data());
+                    CAPTURE(width, columns, rows, along_itself);
+                    REQUIRE(any == any_expected);
+                    require_same_bits("past the grid", got[n], SENTINEL);
+                    for (size_t v = 0; v < n; ++v)
+                    {
+                        CAPTURE(v);
+                        REQUIRE(got[v][3] == expected[v][3]);
+                        if (expected[v][3] == 0.f)
+                        {
+                            REQUIRE(degrees_apart(got[v], expected[v]) <= 1e-3);
+                            REQUIRE(std::fabs(got[v].getLength3().getF32() - 1.f) <= 1e-5f);
+                        }
+                        else
+                        {
+                            require_same_bits("marked", got[v], LLVector4a(0.f, 0.f, 0.f, 1.f));
+                        }
+                    }
+                });
             }
         }
     }

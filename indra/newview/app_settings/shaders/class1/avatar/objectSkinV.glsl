@@ -59,10 +59,26 @@
 
 in vec4 weight4;
 
+#ifdef OBJECT_SKIN_BLOCK
+// The palette and its origin from the ObjectSkin block (LLGLSLShader::UB_OBJECT_SKIN): written once a frame for each
+// avatar's skin into the scratch UBO ring and bound per draw, rather than uploaded to every program that draws it.
+// std140 lays it out as the CPU packs it (LLVOAvatar::MatrixPaletteCache::mGLMp): the origin as a vec4, then each
+// joint's three columns. Only the joints the mesh has are written: a mesh whose weights name a joint past its own reads
+// what follows its palette in the ring, as with uniforms it read what an earlier palette left there.
+layout(std140) uniform ObjectSkin
+{
+    vec4 skin_origin4;
+    mat3x4 matrixPalette[MAX_JOINTS_PER_MESH_OBJECT];
+};
+
+// Agent-space origin the palette translations were rebased against on the CPU.
+#define skin_origin (skin_origin4.xyz)
+#else
 uniform mat3x4 matrixPalette[MAX_JOINTS_PER_MESH_OBJECT];
 
 // Agent-space origin the palette translations were rebased against on the CPU.
 uniform vec3 skin_origin;
+#endif
 
 // Decode weight4 (integer part: joint index, fraction: weight) and blend the three joint
 // lines. Call ONCE per vertex and reuse the result for position, normal and tangent so they

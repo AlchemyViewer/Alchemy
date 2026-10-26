@@ -1,4 +1,4 @@
-version 79
+version 80
 // The version number above should be incremented IF AND ONLY IF some
 // change has been made that is sufficiently important to justify
 // resetting the graphics preferences of all users to the recommended
@@ -424,8 +424,12 @@ RenderDownScaleMethod         1   0
 list AMD
 RenderGLMultiThreadedTextures       1   1
 
+// NVIDIA's driver uploads textures off-thread: from the main thread its
+// threaded optimization copies an upload's pixels there first. What stays
+// on the main thread reads from the staging ring (upload_staged in
+// llimagegl.cpp) where it fits.
 list NVIDIA
-RenderGLMultiThreadedTextures      1   0
+RenderGLMultiThreadedTextures      1   1
 
 // Intel's drivers short of OpenGL 4.6 (LLGLManager::isIntelLegacy):
 // chiefly Haswell and Broadwell, which report 4.3 or 4.4. Every entry is

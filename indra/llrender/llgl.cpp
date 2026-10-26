@@ -48,8 +48,11 @@
 #include "llglslshader.h"
 #include "llimagegl.h"
 #include "llshadermgr.h"
+#include "llthread.h"
+#include "llvertexbuffer.h"
 
 #include <fmt/format.h>
+#include <iterator>
 
 
 #if LL_SDL_WINDOW
@@ -293,15 +296,6 @@ namespace
             && target != GL_TEXTURE_2D_MULTISAMPLE_ARRAY;
     }
 
-    // Re-entrancy latch for gl_debug_callback; see the guard there for why.
-    thread_local bool sInDebugCallback = false;
-
-    struct DebugCallbackGuard
-    {
-        DebugCallbackGuard()  { sInDebugCallback = true;  }
-        ~DebugCallbackGuard() { sInDebugCallback = false; }
-    };
-
     // glGetTexLevelParameteriv describes one IMAGE, and a cube map is six of them -- so it
     // takes a face target and rejects GL_TEXTURE_CUBE_MAP outright ("The cube map target is
     // not available for specifying or querying cube map images", GL_INVALID_ENUM). Every
@@ -447,8 +441,9 @@ void forget_program_samplers(U32 program)
 // is bound is nearly always one specific channel, and hunting it from two bare object names
 // means guessing. Correlating unit -> uniform -> texture -> sampler turns that into reading.
 //
-// Only reports units with something bound, and restores the active unit -- a debug callback
-// must not perturb the state it is describing.
+// Only reports units with something bound, and restores the active unit -- the draw it
+// describes goes on with the state it had. It queries GL, so never from inside a GL call:
+// gl_debug_callback describes the slots as cached instead (log_cached_texture_slots).
 static void log_texture_unit_state()
 {
     GLint max_units = 0;
@@ -581,6 +576,53 @@ static void log_texture_unit_state()
     glActiveTexture(saved_active_unit);
 }
 
+// What this thread's texture slots hold as its gGL caches them, for gl_debug_callback, which may make no GL call (see
+// there). On the main thread a unit is named by the bound program's sampler where validate_bound_samplers has cached
+// the program's bindings; the cache is filled only there, by querying GL.
+static void log_cached_texture_slots()
+{
+    const ProgramSamplerCache* declared = nullptr;
+    if (on_main_thread() && LLGLSLShader::sCurBoundShaderPtr)
+    {
+        const auto found = sProgramSamplerCache.find(LLGLSLShader::sCurBoundShaderPtr->mProgramObject);
+        if (found != sProgramSamplerCache.end())
+        {
+            declared = &found->second;
+        }
+    }
+
+    // In ALTextureSlot::eTextureType's order.
+    static const char* const type_names[] = { "2D", "RECT", "CUBE", "CUBE_ARRAY", "2D_MS", "3D", "NONE" };
+
+    LL_WARNS() << "Texture slots, as cached:" << LL_ENDL;
+    for (U32 unit = 0; unit < AL_NUM_TEXTURE_SLOTS; ++unit)
+    {
+        const ALTextureSlot* slot = gGL.getTextureSlot(unit);
+        if (slot->getCurrTexture() == 0)
+        {
+            continue;
+        }
+
+        std::ostringstream line;
+        line << "  unit " << unit;
+        if (declared)
+        {
+            for (const ProgramSampler& sampler : declared->mSamplers)
+            {
+                if (sampler.mUnit == (GLint)unit)
+                {
+                    line << " (" << sampler.mName << (sampler.mIsShadow ? " : shadow" : " : non-shadow") << " type=0x"
+                         << std::hex << sampler.mType << std::dec << ")";
+                    break;
+                }
+            }
+        }
+        const size_t type = (size_t)slot->getCurrType();
+        line << " " << (type < std::size(type_names) ? type_names[type] : "?") << " tex=" << slot->getCurrTexture()
+             << " sampler=" << slot->getCurrSampler();
+        LL_WARNS() << line.str() << LL_ENDL;
+    }
+}
 
 // Check every sampler and image the bound program declares against what is actually bound.
 //
@@ -762,19 +804,8 @@ void APIENTRY gl_debug_callback(GLenum source,
                                 const GLchar* message,
                                 GLvoid* userParam)
 {
-    // This callback makes GL calls of its own -- the buffer/shader/texture-unit dump below.
-    // Any error one of THOSE raises comes straight back here, which reports it, dumps
-    // again, and raises it again: one real fault turns into a burst of identical messages
-    // whose true origin is buried, and every one of them re-reads the state it is meant to
-    // be describing. That is exactly how the cube-map level query above showed up.
-    //
-    // Per-thread because the texture upload thread has its own context and its own
-    // callback; a shared flag would let one thread silence the other's diagnostics.
-    if (sInDebugCallback)
-    {
-        return;
-    }
-    DebugCallbackGuard reentry_guard;
+    // The callback runs inside the GL call that raised the message, synchronously in a debug session, and a GL call
+    // of its own there is undefined (KHR_debug): it makes none. What is bound is described as llrender caches it.
 
     /*if (severity != GL_DEBUG_SEVERITY_HIGH &&
         severity != GL_DEBUG_SEVERITY_MEDIUM &&
@@ -824,53 +855,26 @@ void APIENTRY gl_debug_callback(GLenum source,
     LL_WARNS() << "Message: " << message << LL_ENDL;
     LL_WARNS() << "-----------------------" << LL_ENDL;
 
-    // The buffer and texture-unit dump below is a few hundred synchronous glGet round
-    // trips. Worth it for anything that might be a defect; not for the notification-level
-    // chatter some drivers emit constantly (buffer migration notes and the like), which
-    // would turn a debug session into a slideshow and bury the messages that matter.
+    // The state below is for anything that might be a defect; not for the notification-level chatter some drivers emit
+    // constantly (buffer migration notes and the like), which would bury the messages that matter.
     if (severity == GL_DEBUG_SEVERITY_NOTIFICATION)
     {
         return;
     }
 
-    GLint vao = 0;
-    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
-    GLint vbo = 0;
-    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &vbo);
-    GLint vbo_size = 0;
-    if (vbo != 0)
+    // The bound shader and buffers are the main thread's caches; another thread's context has its own state, which
+    // they do not describe.
+    if (on_main_thread())
     {
-        glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &vbo_size);
-    }
-    GLint ibo = 0;
-    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &ibo);
-    GLint ibo_size = 0;
-    if (ibo != 0)
-    {
-        glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &ibo_size);
-    }
-    GLint ubo = 0;
-    glGetIntegerv(GL_UNIFORM_BUFFER_BINDING, &ubo);
-    GLint ubo_size = 0;
-    GLint ubo_immutable = 0;
-    if (ubo != 0)
-    {
-        glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_SIZE, &ubo_size);
-        glGetBufferParameteriv(GL_UNIFORM_BUFFER, GL_BUFFER_IMMUTABLE_STORAGE, &ubo_immutable);
+        if (LLGLSLShader::sCurBoundShaderPtr)
+        {
+            LL_WARNS() << "Bound shader: " << LLGLSLShader::sCurBoundShaderPtr->mName << LL_ENDL;
+        }
+        LL_WARNS() << "Bound buffers, as cached: ARRAY_BUFFER=" << LLVertexBuffer::sGLRenderBuffer
+                   << " ELEMENT_ARRAY=" << LLVertexBuffer::sGLRenderIndices << LL_ENDL;
     }
 
-    if (LLGLSLShader::sCurBoundShaderPtr)
-    {
-        LL_WARNS() << "Bound shader: " << LLGLSLShader::sCurBoundShaderPtr->mName << LL_ENDL;
-    }
-
-    LL_WARNS() << "Bound buffers: VAO=" << vao
-               << " ARRAY_BUFFER=" << vbo << " (size " << vbo_size << ")"
-               << " ELEMENT_ARRAY=" << ibo << " (size " << ibo_size << ")"
-               << " UNIFORM_BUFFER=" << ubo << " (size " << ubo_size << ", immutable " << ubo_immutable << ")"
-               << LL_ENDL;
-
-    log_texture_unit_state();
+    log_cached_texture_slots();
 
     // No needs to halt when is called from LLViewerWindow::stopGL()
     if (severity == GL_DEBUG_SEVERITY_HIGH && !gGLManager.mIsDisabled)

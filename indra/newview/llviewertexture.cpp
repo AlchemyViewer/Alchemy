@@ -1287,9 +1287,14 @@ void LLViewerFetchedTexture::setForSculpt()
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
+    // A read of the texture the sculpts asked for, once the GPU has written it.
+    updateSculptReadback();
     // Not while a texture is being created for it: on the LLImageGL thread that would
     // publish its texture after this destroyed the old one. destroyTexture holds off too.
-    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture)
+    // Nor while the sculpts' read of it is on its way: the texture is all that holds what
+    // their copy lacks until the read lands.
+    if(isForSculptOnly() && hasGLTexture() && !getBoundRecently() && !mNeedsCreateTexture &&
+       !(mGLTexturep.notNull() && mGLTexturep->isReadBackRequested()))
     {
         destroyGLTexture(); //sculpt image does not need gl texture.
         mTextureState = ACTIVE;
@@ -1300,6 +1305,19 @@ void LLViewerFetchedTexture::setForSculpt()
 bool LLViewerFetchedTexture::isForSculptOnly() const
 {
     return mForSculpt && !mNeedsGLTexture;
+}
+
+void LLViewerFetchedTexture::rebuildSculptVolumes()
+{
+    for (U32 i = 0; i < mNumVolumes[LLRender::SCULPT_TEX]; ++i)
+    {
+        LLVOVolume* volume = mVolumeList[LLRender::SCULPT_TEX][i];
+        if (volume)
+        {
+            volume->mSculptChanged = true;
+            gPipeline.markRebuild(volume->mDrawable);
+        }
+    }
 }
 
 bool LLViewerFetchedTexture::isDeleted()
@@ -1586,15 +1604,7 @@ void LLViewerFetchedTexture::postCreateTexture()
     setActive();
 
     // rebuild any volumes that are using this texture for sculpts in case their LoD has changed
-    for (U32 i = 0; i < mNumVolumes[LLRender::SCULPT_TEX]; ++i)
-    {
-        LLVOVolume* volume = mVolumeList[LLRender::SCULPT_TEX][i];
-        if (volume)
-        {
-            volume->mSculptChanged = true;
-            gPipeline.markRebuild(volume->mDrawable);
-        }
-    }
+    rebuildSculptVolumes();
 
     if (!needsToSaveRawImage())
     {
@@ -1982,8 +1992,9 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
             && (mRawDiscardLevel < 0 || mRawDiscardLevel == INVALID_DISCARD_LEVEL)
             && mFetchState > 1) // 1 - initial, make sure fetcher did at least something
         {
-            // We finished but received no data
-            if (getDiscardLevel() < 0)
+            // We finished but received no data. A texture whose GL texture went (a sculpt-only map's) still has the
+            // copy saved of it, and is not missing.
+            if (getDiscardLevel() < 0 && mSavedRawImage.isNull())
             {
                 if (getFTType() != FTT_MAP_TILE)
                 {
@@ -2008,8 +2019,10 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
                 }
                 else
                 {
+                    // With no GL level (a sculpt-only map's texture went), the copy's level is the best a fetch
+                    // brings it: updateFetch stops there.
                     S32 dis_level = getDiscardLevel();
-                    mMinDiscardLevel = dis_level;
+                    mMinDiscardLevel = dis_level >= 0 ? dis_level : mSavedRawDiscardLevel;
                     //desired_discard = dis_level;
                 }
             }
@@ -2160,8 +2173,11 @@ bool LLViewerFetchedTexture::updateFetch()
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - create or missing");
         make_request = false;
     }
-    else if (current_discard >= 0 && current_discard <= mMinDiscardLevel)
+    else if (current_discard >= 0 ? current_discard <= mMinDiscardLevel
+                                  : mSavedRawImage.notNull() && mSavedRawDiscardLevel >= 0 &&
+                                        mSavedRawDiscardLevel <= mMinDiscardLevel)
     {
+        // At the best a fetch has brought: the texture's own level, or with none the copy's.
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - current < min");
         make_request = false;
     }
@@ -2397,6 +2413,18 @@ void LLViewerFetchedTexture::setLoadedCallback( loaded_callback_func loaded_call
         mLastReferencedSavedRawImageTime = sCurrentTime;
 }
 
+// No callback is left for a read of the texture still on its way: it goes back to the pool, rather than holding a read
+// of the pool's until it expires. Not a sculpt map's: its volumes take in a read of it as their copy, whoever asked for
+// it (updateSculptReadback), and asked for it themselves only as they built.
+static void cancel_callback_readback(LLViewerFetchedTexture* texture)
+{
+    LLImageGL* image = texture->getGLTexture();
+    if (image && !texture->forSculpt())
+    {
+        image->cancelReadBack();
+    }
+}
+
 void LLViewerFetchedTexture::clearCallbackEntryList()
 {
     if(mLoadedCallbackList.empty())
@@ -2416,6 +2444,7 @@ void LLViewerFetchedTexture::clearCallbackEntryList()
         delete entryp;
     }
     gTextureList.mCallbackList.erase(this);
+    cancel_callback_readback(this);
 
     mLoadedCallbackDesiredDiscardLevel = S8_MAX;
     if(needsToSaveRawImage())
@@ -2464,6 +2493,7 @@ void LLViewerFetchedTexture::deleteCallbackEntry(const LLLoadedCallbackEntry::so
     {
         // If we have no callbacks, take us off of the image callback list.
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
 
         if(needsToSaveRawImage())
         {
@@ -2599,6 +2629,7 @@ bool LLViewerFetchedTexture::doLoadedCallbacks()
 
         // Remove ourself from the global list of textures with callbacks
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
         return false;
     }
 
@@ -2792,6 +2823,7 @@ bool LLViewerFetchedTexture::doLoadedCallbacks()
     if (mLoadedCallbackList.empty())
     {
         gTextureList.mCallbackList.erase(this);
+        cancel_callback_readback(this);
     }
     else if(!res && mForceCallbackFetch && sCurrentTime - mLastCallBackActiveTime > MAX_IDLE_WAIT_TIME && !mIsFetching)
     {
@@ -2893,11 +2925,21 @@ void LLViewerFetchedTexture::saveRawImage()
     }
     else if (mBoostLevel == LLGLTexture::BOOST_SCULPTED)
     {
+        // Within the pixels of the size the sculpts are known to need, at the map's own proportions: a sculpt lays its
+        // mesh out by the map's, so a long, thin map squeezed into that square builds another shape, and one of 512x8
+        // fits the budget sixteen times over as it is.
         S32 expected_width = mKnownDrawWidth > 0 ? mKnownDrawWidth : sMaxSculptRez;
         S32 expected_height = mKnownDrawHeight > 0 ? mKnownDrawHeight : sMaxSculptRez;
-        if (mRawImage->getWidth() > expected_width || mRawImage->getHeight() > expected_height)
+        S32 width = mRawImage->getWidth();
+        S32 height = mRawImage->getHeight();
+        while (width * height > expected_width * expected_height && width > 1 && height > 1)
         {
-            mSavedRawImage = new LLImageRaw(expected_width, expected_height, mRawImage->getComponents());
+            width >>= 1;
+            height >>= 1;
+        }
+        if (width != mRawImage->getWidth() || height != mRawImage->getHeight())
+        {
+            mSavedRawImage = new LLImageRaw(width, height, mRawImage->getComponents());
             mSavedRawImage->copyScaled(mRawImage);
         }
         else
@@ -2916,6 +2958,100 @@ void LLViewerFetchedTexture::saveRawImage()
     }
 
     mLastReferencedSavedRawImageTime = sCurrentTime;
+
+    // The volumes this texture sculpts build from the copy: a better one is theirs to build from, whichever path saved
+    // it -- a texture made, a level the texture on screen already had, a sculpt-only map's decode, a callback's read.
+    rebuildSculptVolumes();
+}
+
+void LLViewerFetchedTexture::getSculptCopySize(S32& width, S32& height, S32& discard) const
+{
+    width   = 0;
+    height  = 0;
+    discard = -1;
+    if (mGLTexturep.isNull() || mGLTexturep->getTexName() == 0)
+    {
+        return;
+    }
+    // The budget saveRawImage keeps a sculpt map's decode within, halved as it halves.
+    const S32 budget = (mKnownDrawWidth > 0 ? mKnownDrawWidth : sMaxSculptRez) *
+                       (mKnownDrawHeight > 0 ? mKnownDrawHeight : sMaxSculptRez);
+    discard = mGLTexturep->getDiscardLevel();
+    width   = mGLTexturep->getWidth(discard);
+    height  = mGLTexturep->getHeight(discard);
+    while (width * height > budget && width > 1 && height > 1)
+    {
+        width >>= 1;
+        height >>= 1;
+        ++discard;
+    }
+}
+
+bool LLViewerFetchedTexture::requestSculptReadback()
+{
+    if (mGLTexturep.isNull() || mGLTexturep->getTexName() == 0 || mNeedsCreateTexture)
+    {
+        return false;
+    }
+    if (mGLTexturep->isReadBackRequested())
+    {
+        return true;
+    }
+    // The level of the copy's size where the texture has it; else the level on screen, scaled down as it comes in.
+    S32 width   = 0;
+    S32 height  = 0;
+    S32 discard = -1;
+    getSculptCopySize(width, height, discard);
+    return mGLTexturep->requestReadBack(discard) ||
+           (discard != mGLTexturep->getDiscardLevel() && mGLTexturep->requestReadBack(-1));
+}
+
+void LLViewerFetchedTexture::updateSculptReadback()
+{
+    if (mGLTexturep.isNull() || !mGLTexturep->isReadBackRequested())
+    {
+        return;
+    }
+    LLPointer<LLImageRaw> raw = new LLImageRaw();
+    S32 discard = INVALID_DISCARD_LEVEL;
+    if (mGLTexturep->collectReadBack(raw, discard) != LLImageGL::READBACK_READY)
+    {
+        return;
+    }
+    // Within the copy's budget, as a decode is kept: a level read larger, where the texture had no smaller one, is
+    // halved to it.
+    S32 width   = 0;
+    S32 height  = 0;
+    S32 wanted  = -1;
+    getSculptCopySize(width, height, wanted);
+    S32 read_width  = raw->getWidth();
+    S32 read_height = raw->getHeight();
+    while (width > 0 && read_width * read_height > width * height && read_width > 1 && read_height > 1)
+    {
+        read_width >>= 1;
+        read_height >>= 1;
+        ++discard;
+    }
+    if (read_width != raw->getWidth() || read_height != raw->getHeight())
+    {
+        LLPointer<LLImageRaw> scaled = new LLImageRaw(read_width, read_height, raw->getComponents());
+        scaled->copyScaled(raw);
+        raw = scaled;
+    }
+    // The decode may have brought as much first.
+    if (mSavedRawImage.notNull() && mSavedRawImage->getWidth() >= raw->getWidth() &&
+        mSavedRawImage->getHeight() >= raw->getHeight())
+    {
+        return;
+    }
+    mSavedRawImage        = raw;
+    mSavedRawDiscardLevel = discard;
+    if (mForceToSaveRawImage && mSavedRawDiscardLevel <= mDesiredSavedRawDiscardLevel)
+    {
+        mForceToSaveRawImage = false;
+    }
+    mLastReferencedSavedRawImageTime = sCurrentTime;
+    rebuildSculptVolumes();
 }
 
 //force to refetch the texture to the discard level
@@ -2963,27 +3099,39 @@ void LLViewerFetchedTexture::readbackRawImage()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
 
-    // readback the raw image from vram if the current raw image is null or smaller than the texture
-    if (mGLTexturep.notNull() && mGLTexturep->getTexName() != 0 &&
-        (mRawImage.isNull() || mRawImage->getWidth() < mGLTexturep->getWidth() || mRawImage->getHeight() < mGLTexturep->getHeight() ))
+    // Reads the texture back from VRAM when there is no raw image, or one smaller than the texture. The read is asked
+    // for here and taken in at a later call, once the GPU has written it (LLImageGL::requestReadBack), so the callbacks
+    // waiting on the pixels run a few frames later instead of this frame waiting for the GPU to finish everything
+    // queued ahead of the read. Until then mIsRawImageValid is as it was.
+    if (mGLTexturep.isNull())
+    {
+        return;
+    }
+    if (mGLTexturep->getTexName() == 0 ||
+        (mRawImage.notNull() && mRawImage->getWidth() >= mGLTexturep->getWidth() &&
+         mRawImage->getHeight() >= mGLTexturep->getHeight()))
+    {
+        mGLTexturep->cancelReadBack();
+        return;
+    }
+
+    if (!mGLTexturep->isReadBackRequested())
+    {
+        mGLTexturep->requestReadBack(-1);
+        return;
+    }
+
+    LLPointer<LLImageRaw> raw = new LLImageRaw();
+    S32 discard = INVALID_DISCARD_LEVEL;
+    if (mGLTexturep->collectReadBack(raw, discard) == LLImageGL::READBACK_READY)
     {
         if (mRawImage.isNull())
         {
             sRawCount++;
         }
-        mRawImage = new LLImageRaw();
-        if (!mGLTexturep->readBackRaw(-1, mRawImage, false))
-        {
-            mRawImage = nullptr;
-            mIsRawImageValid = false;
-            mRawDiscardLevel = INVALID_DISCARD_LEVEL;
-            sRawCount--;
-        }
-        else
-        {
-            mIsRawImageValid = true;
-            mRawDiscardLevel = mGLTexturep->getDiscardLevel();
-        }
+        mRawImage = raw;
+        mIsRawImageValid = true;
+        mRawDiscardLevel = discard;
     }
 }
 

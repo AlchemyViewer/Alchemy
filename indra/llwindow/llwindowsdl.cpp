@@ -623,9 +623,9 @@ void* LLWindowSDL::createSharedContext()
     return shared;
 }
 
-void LLWindowSDL::makeContextCurrent(void* contextPtr)
+bool LLWindowSDL::makeContextCurrent(void* contextPtr)
 {
-    sdl_make_shared_context_current(contextPtr);
+    return sdl_make_shared_context_current(contextPtr);
 }
 
 void LLWindowSDL::destroySharedContext(void* contextPtr)
@@ -1021,7 +1021,7 @@ void LLWindowSDL::swapBuffers()
     {
         SDL_GL_SwapWindow(mWindow);
     }
-    LL_PROFILER_GPU_COLLECT;
+    // Tracy's GPU zones are collected at LLRender::endFrame, past the pacing wait.
 #if LL_LINUX
     checkGraphicsReset();
 #endif
@@ -4502,9 +4502,10 @@ void LLWindowSDL::setUseMultGL(bool use_mult_gl)
 
     sUseMultGL = use_mult_gl;
 
-    if (gGLManager.mInited)
+    // The context current, which createContext calls this with before initGL has run: gGLManager.mInited would skip
+    // the engine at every start, leaving it on only in a session the setting changed in.
+    if (CGLContextObj ctx = CGLGetCurrentContext())
     {
-        CGLContextObj ctx = CGLGetCurrentContext();
         //enable multi-threaded OpenGL (whether or not sUseMultGL actually changed)
         if (sUseMultGL)
         {

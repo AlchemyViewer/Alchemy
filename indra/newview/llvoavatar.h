@@ -753,6 +753,9 @@ public:
     void        cacheImpostorValues();
     void        setImpostorDim(const LLVector2& dim);
     static void resetImpostors();
+    // Makes the impostor targets updateImpostors will bake into this frame, before the frame's first draw
+    // (LLPipeline::allocateImpostorTarget).
+    static void allocateImpostors();
     static void updateImpostors();
     LLRenderTarget mImpostor;
 // [RLVa:KB] - Checked: RLVa-2.4 (@setcam_avdist)
@@ -952,8 +955,16 @@ public:
         // Float array ready to be sent to GL: one vec4 rebase origin (agent space)
         // followed by count mat3x4 lines whose translations are relative to it. The
         // upload splits the two -- AVATAR_MATRIX takes the palette tail, SKIN_ORIGIN
-        // the origin (see apply_matrix_palette).
+        // the origin (see apply_matrix_palette) -- or, under LLRender::sObjectSkinBlock,
+        // writes it whole into the scratch UBO ring as the ObjectSkin block.
         std::vector<F32> mGLMp;
+
+        // Where mGLMp of mScratchFrame was written into the scratch UBO ring, in the
+        // ring's generation mScratchGeneration; -1 for nowhere. Written once a frame,
+        // and bound by every draw of the skin after (apply_matrix_palette).
+        mutable S64 mScratchOffset = -1;
+        mutable U32 mScratchGeneration = 0;
+        mutable U32 mScratchFrame = 0;
 
         MatrixPaletteCache() :
             mFrame(gFrameCount - 1)

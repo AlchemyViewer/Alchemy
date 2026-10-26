@@ -97,7 +97,6 @@
 #include "lltoast.h"
 #include "llsdutil_math.h"
 #include "lllocationhistory.h"
-#include "llmeshoptimizer.h"
 #include "llvector4a.h"
 #include "llviewermenufile.h"
 #include "llvoicechannel.h"
@@ -808,11 +807,9 @@ bool LLAppViewer::init()
     // the translation bridge LLWearableType reads its labels through
     LLTranslationBridge::ptr_t trans = std::make_shared<LLUITranslationBridge>();
 
-    // initialize SSE options
+    // llmath: the floating-point mode, and meshoptimizer's scratch from each
+    // thread's own arena
     LLVector4a::initClass();
-
-    // meshoptimizer's scratch from each thread's own arena
-    LLMeshOptimizer::initClass();
 
     //initialize particle index pool
     LLVOPartGroup::initClass();
@@ -3560,6 +3557,10 @@ bool LLAppViewer::initWindow()
         .ignore_pixel_depth(ignorePixelDepth)
         .first_run(mIsFirstRun);
 
+#if LL_WINDOWS
+    // The window opens the D3D/GL interop device with its context, and only accelerated media paint uses it.
+    gDXHardware.setGLDXInteropWanted(gSavedSettings.getBOOL("ALCefAcceleratedPaint"));
+#endif
     gViewerWindow = new LLViewerWindow(window_params);
 
     LL_INFOS("AppInit") << "gViewerwindow created." << LL_ENDL;

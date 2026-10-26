@@ -178,7 +178,9 @@ public:
         UB_ENVIRONMENT,         // "Environment" (sky/water constants)
         UB_DEFERRED,            // "Deferred" (shadow/SSAO constants)
         UB_LIGHTS,              // "Lights" (forward fixed-function light array state)
-        UB_MATRICES,            // "Matrices" (modelview/projection/derived matrix stack state)
+        UB_MATRICES,            // "Matrices" (the modelview and what is derived from it, a draw's model matrix moves)
+        UB_PROJECTION_MATRICES, // "ProjectionMatrices" (the projection, its inverse and the texture matrix)
+        UB_OBJECT_SKIN,         // "ObjectSkin" (a rigged draw's joint palette, under OBJECT_SKIN_BLOCK)
         NUM_UNIFORM_BLOCKS
     };
 
@@ -195,6 +197,8 @@ public:
         "Deferred",         // UB_DEFERRED
         "Lights",           // UB_LIGHTS
         "Matrices",         // UB_MATRICES
+        "ProjectionMatrices", // UB_PROJECTION_MATRICES
+        "ObjectSkin",       // UB_OBJECT_SKIN
     };
 
     // Expected std140 layout of an engine UBO block, registered by the module that owns the

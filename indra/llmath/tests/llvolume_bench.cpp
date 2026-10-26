@@ -41,7 +41,6 @@
 #include "alscratcharena.h"
 #include "alsimdkernels.h"
 #include "llmath.h"
-#include "llmeshoptimizer.h"
 #include "llquaternion.h"
 #include "m3math.h"
 #include "v2math.h"
@@ -158,6 +157,27 @@ namespace
                 out[0] = toByte(p.mV[0]);
                 out[1] = toByte(p.mV[1]);
                 out[2] = toByte(p.mV[2]);
+            }
+        }
+        return map;
+    }
+
+    // A 64 by 64 plane whose middle rows are one colour: the mesh rows
+    // sampled from them are one place, a thread, and their triangles have
+    // two corners at one point.
+    SculptMap pinchedSculptMap()
+    {
+        SculptMap map;
+        map.rgb.resize((size_t)map.width * map.height * 3);
+        for (U16 y = 0; y < map.height; ++y)
+        {
+            for (U16 x = 0; x < map.width; ++x)
+            {
+                const U16 row = (y >= 16 && y <= 48) ? 16 : y;
+                U8* out = &map.rgb[((size_t)y * map.width + x) * 3];
+                out[0] = toByte((F32)x / (map.width - 1) - 0.5f);
+                out[1] = toByte((F32)row / (map.height - 1) - 0.5f);
+                out[2] = toByte(0.f);
             }
         }
         return map;
@@ -567,7 +587,7 @@ namespace
         static void* MESHOPTIMIZER_ALLOC_CALLCONV newBlock(size_t bytes) { return ::operator new(bytes); }
         static void MESHOPTIMIZER_ALLOC_CALLCONV deleteBlock(void* block) { ::operator delete(block); }
 
-        ArenaInstalled() { LLMeshOptimizer::initClass(); }
+        ArenaInstalled() { meshopt_setAllocator(ALScratchArena::allocate, ALScratchArena::deallocate); }
         ~ArenaInstalled() { meshopt_setAllocator(newBlock, deleteBlock); }
     };
 
@@ -640,6 +660,17 @@ namespace
                     return volume->getNumVolumeFaces();
                 };
             }
+        }
+        const SculptMap pinched = pinchedSculptMap();
+        for (S32 lod = 0; lod < LOD_COUNT; ++lod)
+        {
+            LLPointer<LLVolume> volume = sculptVolume(LL_SCULPT_TYPE_PLANE, lod);
+            volume->sculpt(pinched.width, pinched.height, 3, pinched.rgb.data(), 0, false);
+            BENCHMARK(fmt::format("pinched plane sculpt, LOD {}, 64 by 64 map, {}", lod, counts(*volume)))
+            {
+                volume->sculpt(pinched.width, pinched.height, 3, pinched.rgb.data(), 0, false);
+                return volume->getNumVolumeFaces();
+            };
         }
     }
 

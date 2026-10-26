@@ -1147,8 +1147,10 @@ bool LLOcclusionCullingGroup::checkOcclusion()
         }
         else
         {
-            // Pending until the pool has read the frame it was issued in, a frame or two on. The pool waits for a
-            // frame only once the GPU is ALQueryPool::FRAMES frames behind, which bounds how old the state kept here is.
+            // Pending until the pool has read the frame it was issued in, its age (AlchemyRenderQueryResultAge) frames
+            // on at the soonest, and the group issues no other meanwhile (doOcclusion): one query in flight a group and
+            // camera, however dense the scene. The pool waits for a frame only once the GPU is ALQueryPool::FRAMES
+            // frames behind, which bounds how old the state kept here is.
             U64 passed = 0;
             ALQueryPool::Status status;
             {

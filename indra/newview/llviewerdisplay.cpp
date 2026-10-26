@@ -773,6 +773,14 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
     // Actually push all of our triangles to the screen.
     //
 
+    // The impostor targets the world's bakes draw into below, made before the frame's first draw: made in the bakes,
+    // between the shadows and the scene, each name and error they ask GL for waits for a threaded driver's thread to run
+    // all the frame has queued before it.
+    if (!gDisconnected && !LLApp::isExiting() && !for_snapshot)
+    {
+        LLVOAvatar::allocateImpostors();
+    }
+
     // do render-to-texture stuff here
     if (gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_DYNAMIC_TEXTURES))
     {

@@ -131,6 +131,9 @@ namespace ll_test
             mPrograms.push_back(&program);
         }
 
+        // The full-screen triangle, as LLPipeline's mScreenTriangleVB is.
+        LLVertexBuffer& triangle() { return *mTriangle; }
+
         // The full-screen triangle, into whatever is bound, as LLPipeline's mScreenTriangleVB draws it.
         void drawTriangle()
         {

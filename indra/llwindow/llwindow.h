@@ -94,8 +94,8 @@ public:
     //create a new GL context that shares a namespace with this Window's main GL context and make it current on the current thread
     // returns a pointer to be handed back to destroySharedConext/makeContextCurrent
     virtual void* createSharedContext() = 0;
-    //make the given context current on the current thread
-    virtual void makeContextCurrent(void* context) = 0;
+    //make the given context current on the current thread: whether it is
+    virtual bool makeContextCurrent(void* context) = 0;
     //destroy the given context that was retrieved by createSharedContext()
     //Must be called on the same thread that called createSharedContext()
     virtual void destroySharedContext(void* context) = 0;

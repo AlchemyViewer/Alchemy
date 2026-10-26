@@ -31,6 +31,7 @@
 
 #include "alrendertargetdesc.h"
 #include "llgl.h"
+#include "llrect.h"
 #include "llrender.h"
 
 #include <array>
@@ -62,6 +63,9 @@
     ... <issue drawing commands> ...
 
 */
+
+class LLGLSLShader;
+class LLVertexBuffer;
 
 class LLRenderTarget
 {
@@ -295,6 +299,15 @@ public:
 
     static void copyContentsToFramebuffer(LLRenderTarget& source, S32 srcX0, S32 srcY0, S32 srcX1, S32 srcY1, S32 dstX0, S32 dstY0,
                                           S32 dstX1, S32 dstY1, U32 mask, U32 filter);
+
+    // `source`'s colour into `dest` by a draw rather than a blit, which a driver may run as a pixel transfer it has
+    // to synchronize with the rendering around it: `program`, a copy reading DIFFUSE_MAP at the screen triangle's
+    // coordinates (the viewer's interface/copyF.glsl), over `triangle`, the screen triangle, point sampled, so that each
+    // texel of `dest` takes the one of `source` under its centre. Only over `rect` where there is one, the scissor
+    // keeping the rest of `dest` as it was. No depth is written, nothing blended, and the targets bound before are bound
+    // again after.
+    static void drawCopy(LLRenderTarget& dest, LLRenderTarget& source, const LLRect* rect, LLGLSLShader& program,
+                         LLVertexBuffer& triangle);
 
     // Copies the colour of the rect srcX0..srcX1, srcY0..srcY1 of the framebuffer bound now (the window's where no
     // target is) into this target's rect dstX0..dstX1, dstY0..dstY1, scaled with `filter`, GL_NEAREST or GL_LINEAR.

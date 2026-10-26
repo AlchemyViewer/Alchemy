@@ -135,10 +135,16 @@ TEST_CASE_METHOD(Scene, "allightmapblur_gl: one dispatch blurs texel for texel a
     REQUIRE(blurCompute(kernel));
 
     // The dispatch's store holds the 8 bits nearest the fragment passes' single precision, or at a tie, which their
-    // value lies within a rounding of at a few texels, either of the two.
+    // value lies within a rounding of at a few texels, either of the two. Or the step below, where their value lies
+    // less than a sixteenth of a step past the half: NVIDIA's store to an 8-bit image rounds there, not at the half,
+    // always down, at about one texel in forty.
     const std::vector<F32> fragment = read(mFloatLight);
     const std::vector<F32> compute = read(mBlurred);
-    const auto nearest = [](F32 stored, F32 value) { return std::fabs(stored - value) * 255.f <= 0.5f + 1e-4f; };
+    const auto nearest = [](F32 stored, F32 value)
+    {
+        const F32 above = (value - stored) * 255.f;
+        return above >= -(0.5f + 1e-4f) && above <= 0.5f + 1.f / 16.f + 1e-4f;
+    };
     S32 differ = 0;
     for (S32 y = 0; y < H; ++y)
     {
