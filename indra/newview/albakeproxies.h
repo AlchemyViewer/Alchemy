@@ -1,7 +1,7 @@
 /**
  * @file albakeproxies.h
- * @brief The bakes a face names through bake proxies (IMG_USE_BAKED_*), whose system body parts an avatar
- *        wearing it hides.
+ * @brief The bakes a face names through bake proxies (IMG_USE_BAKED_*): those an avatar wearing it hides
+ *        the system body parts of, and whether its PBR material resolves one for its own avatar.
  *
  * Copyright (c) 2026, Rye Mutt <rye@alchemyviewer.org>
  *
@@ -26,6 +26,10 @@ namespace ALBakeProxies
 {
     // A set of bakes, by EBakedTextureIndex
     typedef std::bitset<LLAvatarAppearanceDefines::BAKED_NUM_INDICES> bake_set_t;
+
+    // Whether any slot of a PBR material names a bake proxy, which the face drawing it resolves for its own
+    // object's avatar, and so draws from a copy of its own (LLViewerObject::initRenderMaterial)
+    bool anyNamedBy(const LLGLTFMaterial& material);
 
     // The bake a PBR material draws a body with: the one its base colour names, the slot that stands for a
     // face's image. A bake in its other slots shades the surface without drawing a body

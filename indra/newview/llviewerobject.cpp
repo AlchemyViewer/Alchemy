@@ -5499,6 +5499,16 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         getTE(te)->setGLTFMaterial(nullptr);
     }
 
+    // The bakes a material names are resolved for this object's avatar, into the face's own copy of the
+    // material (initRenderMaterial): resolved into the material itself, they would be drawn on every face it
+    // is on, whoever wears it. A face still drawing the material itself, as one whose texture entry was
+    // copied (a copied LLTextureEntry keeps no render material), gets its copy here
+    if (mat != nullptr && mat == getTE(te)->getGLTFMaterial() && ALBakeProxies::anyNamedBy(*mat))
+    {
+        initRenderMaterial(te);
+        mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+    }
+
     // A slot naming a bake proxy draws what it resolves to on this object's avatar
     // (LLFetchedGLTFMaterial::mBakedTextures), and fetches nothing; any other fetches its asset
     auto fetch_texture = [this, mat](LLGLTFMaterial::TextureInfo slot)
@@ -5923,18 +5933,7 @@ S32 LLViewerObject::initRenderMaterial(U8 te)
     if (!base_material) { return 0; }
     const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
     LLFetchedGLTFMaterial* render_material = nullptr;
-    bool need_render_material = override_material;
-    if (!need_render_material)
-    {
-        for (const LLUUID& texture_id : base_material->mTextureId)
-        {
-            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(texture_id))
-            {
-                need_render_material = true;
-                break;
-            }
-        }
-    }
+    const bool need_render_material = override_material || ALBakeProxies::anyNamedBy(*base_material);
     if (need_render_material)
     {
         render_material = new LLFetchedGLTFMaterial(*base_material);

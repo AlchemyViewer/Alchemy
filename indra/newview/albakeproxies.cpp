@@ -39,6 +39,18 @@ namespace
 namespace ALBakeProxies
 {
 
+bool anyNamedBy(const LLGLTFMaterial& material)
+{
+    for (const LLUUID& id : material.mTextureId)
+    {
+        if (LLAvatarAppearanceDictionary::isBakedImageId(id))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bake_set_t drawnBy(const LLGLTFMaterial* material)
 {
     return material ? named_by(material->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]) : bake_set_t();

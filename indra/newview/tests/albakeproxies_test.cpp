@@ -74,6 +74,9 @@ namespace
         LLTextureEntry te(IMG_DEFAULT);
         CHECK(drawnBy(te, false).none());
         CHECK(drawnBy(nullptr).none());
+
+        LLPointer<LLGLTFMaterial> material = new LLGLTFMaterial();
+        CHECK_FALSE(anyNamedBy(*material));
     }
 
     TEST_CASE_METHOD(face_data, "ALBakeProxies: a PBR material draws the bake its base colour names", "[ALBakeProxies]")
@@ -95,6 +98,8 @@ namespace
 
         CHECK(drawnBy(mMaterial).none());
         CHECK(drawnBy(mTE, false).none());
+        // but each is resolved for the face's own avatar
+        CHECK(anyNamedBy(*mMaterial));
     }
 
     TEST_CASE_METHOD(face_data, "ALBakeProxies: a HUD's face counts its image and not its material", "[ALBakeProxies]")
