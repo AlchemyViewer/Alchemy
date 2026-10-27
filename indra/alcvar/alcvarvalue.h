@@ -259,4 +259,12 @@ namespace ALCVarValues
     // Neither infinite nor NaN, by its bits: what a build with fast floating
     // point cannot fold away.
     bool finite(F64 value);
+    // Every float in it finite.
+    bool finiteValue(const ALCVarValue& value);
+    // A number, or each component of a vector or a rect, into [lowest,
+    // highest]; where the two leave nothing between them, lowest. Other types
+    // are as they were.
+    ALCVarValue clampNumber(const ALCVarValue& value, F64 lowest, F64 highest);
+    // An integer setting's value.
+    S64 asInteger(const ALCVarValue& value);
 }

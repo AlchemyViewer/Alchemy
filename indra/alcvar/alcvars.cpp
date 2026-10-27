@@ -26,6 +26,8 @@
 
 #include "alcvars.h"
 
+#include "llfile.h"
+
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/smart_ptr/make_shared.hpp>
 
@@ -252,6 +254,7 @@ void ALCVars::registerSchema(const ALCVarSchema& schema)
             {
                 setting.tags.push_back(tags.at(tag));
             }
+            setting.def = defaultOf(desc);
             mSettings.push_back(std::move(setting));
         }
         ALCVarAtomic::storeRelease(&group.state->registered, U32(1));
@@ -260,6 +263,8 @@ void ALCVars::registerSchema(const ALCVarSchema& schema)
     mGenerations.reset(new std::atomic<U32>[mSettings.size()]());
     mGroupGenerations.reset(new std::atomic<U64>[mGroups.size()]());
     mTagGenerations.reset(new std::atomic<U64>[std::max<size_t>(schema.tags.size(), 1)]());
+    mFlags.reset(new std::atomic<U8>[mSettings.size()]());
+    mWriteSeq.reset(new std::atomic<U32>[mSettings.size()]());
 
     // Every slot back to its compiled default: a store made again over the
     // same schema, as each test makes one, starts where a new process does.
@@ -272,11 +277,11 @@ void ALCVars::registerSchema(const ALCVarSchema& schema)
         Setting& setting = mSettings[i];
         if (setting.storage == ALCVarStorage::Boxed)
         {
-            mBoxes.push_back(std::make_unique<LLSD>(defaultOf(*setting.desc).get<LLSD>()));
+            mBoxes.push_back(std::make_unique<LLSD>(setting.def.get<LLSD>()));
             static_cast<ALCVarBoxedSlot*>(setting.slot)->value = mBoxes.back().get();
             continue;
         }
-        publish(i, defaultOf(*setting.desc));
+        publish(i, setting.def);
     }
     for (U32 g = 0; g < U32(mGroups.size()); ++g)
     {
@@ -347,7 +352,10 @@ void ALCVars::publish(U32 index, const ALCVarValue& value)
             auto& slot   = *static_cast<ALCVarSharedSlot*>(setting.slot);
             auto  shared = makeShared(value);
             ALCVarAtomic::storeRelease(&slot.current, shared.get());
-            slot.value.store(std::move(shared));
+            if (auto old = slot.value.exchange(std::move(shared)))
+            {
+                retire(std::move(old));
+            }
             break;
         }
         case ALCVarStorage::Boxed:
@@ -408,12 +416,738 @@ ALCVarValue ALCVars::get(U32 index) const
 
 ALCVarValue ALCVars::defaultValue(U32 index) const
 {
-    return defaultOf(*mSettings[index].desc);
+    return mSettings[index].def;
 }
 
-boost::shared_ptr<const void> ALCVars::sharedValue(const ALCVarValue& value) const
+bool ALCVars::inGroup(U32 index, U32 group) const
 {
-    return makeShared(value);
+    for (U32 g = mSettings[index].group; g != NONE; g = mGroups[g].parent)
+    {
+        if (g == group)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+LLCoros::LockType ALCVars::lockWrites() const
+{
+    mLocks.fetch_add(1, std::memory_order_relaxed);
+    return LLCoros::LockType(mWriteMutex);
+}
+
+bool ALCVars::readsAccount(U32 index) const
+{
+    const ALCVarDesc& desc = *mSettings[index].desc;
+    return desc.scope == ALCVarScope::Account || desc.has(ALCVAR_ACCOUNT_OVERRIDE);
+}
+
+bool ALCVars::readsGlobal(U32 index) const
+{
+    return mSettings[index].desc->scope != ALCVarScope::Account;
+}
+
+ALCVarLayer ALCVars::userLayer(U32 index) const
+{
+    const ALCVarDesc& desc = *mSettings[index].desc;
+    if (desc.scope == ALCVarScope::Account)
+    {
+        return ALCVarLayer::Account;
+    }
+    if (desc.has(ALCVAR_ACCOUNT_OVERRIDE) && layer(ALCVarLayer::Account).contains(index))
+    {
+        return ALCVarLayer::Account;
+    }
+    return ALCVarLayer::Global;
+}
+
+ALCVarValue ALCVars::effective(U32 index) const
+{
+    const ALCVarValue* top = nullptr;
+    if (const auto held = mHolds.find(index); held != mHolds.end() && !held->second.empty())
+    {
+        top = &held->second.back().value;
+    }
+    else
+    {
+        for (const ALCVarLayer which :
+             { ALCVarLayer::Session, ALCVarLayer::Account, ALCVarLayer::Global, ALCVarLayer::Quality })
+        {
+            if ((which == ALCVarLayer::Account && !readsAccount(index)) ||
+                (which == ALCVarLayer::Global && !readsGlobal(index)))
+            {
+                continue;
+            }
+            const Layer& values = layer(which);
+            if (const auto found = values.find(index); found != values.end())
+            {
+                top = &found->second;
+                break;
+            }
+        }
+    }
+    ALCVarValue value = top ? *top : mSettings[index].def;
+
+    // Every owner's bounds, over a hold as over the layers, and kept within
+    // the declared range.
+    const auto clamps = mClamps.find(index);
+    if (clamps == mClamps.end() || clamps->second.empty())
+    {
+        return value;
+    }
+    F64 lowest  = -std::numeric_limits<F64>::max();
+    F64 highest = std::numeric_limits<F64>::max();
+    for (const Clamp& clamp : clamps->second)
+    {
+        lowest  = std::max(lowest, clamp.lowest);
+        highest = std::min(highest, clamp.highest);
+    }
+    value = ALCVarValues::clampNumber(value, lowest, highest);
+    const ALCVarDesc& d = *mSettings[index].desc;
+    return d.ranged ? ALCVarValues::clampNumber(value, d.rangeMin, d.rangeMax) : value;
+}
+
+bool ALCVars::slotHolds(U32 index, const ALCVarValue& value) const
+{
+    const Setting& setting = mSettings[index];
+    if (value.empty() || value.type() != setting.desc->type)
+    {
+        return false;
+    }
+    switch (setting.storage)
+    {
+        case ALCVarStorage::Byte:
+            return ALCVarAtomic::loadRelaxed(static_cast<const U8*>(setting.slot)) == U8(encodeWords(value)[0]);
+        case ALCVarStorage::Word:
+            return ALCVarAtomic::loadRelaxed(static_cast<const U32*>(setting.slot)) == U32(encodeWords(value)[0]);
+        case ALCVarStorage::DWord:
+            return ALCVarAtomic::loadRelaxed(static_cast<const U64*>(setting.slot)) == encodeWords(value)[0];
+        case ALCVarStorage::Pair:
+        {
+            U64 words[2];
+            ALCVarDetail::readWords(*static_cast<const ALCVarSeqSlot<2>*>(setting.slot), words);
+            const auto expected = encodeWords(value);
+            return words[0] == expected[0] && words[1] == expected[1];
+        }
+        case ALCVarStorage::Triple:
+        {
+            U64 words[3];
+            ALCVarDetail::readWords(*static_cast<const ALCVarSeqSlot<3>*>(setting.slot), words);
+            const auto expected = encodeWords(value);
+            return words[0] == expected[0] && words[1] == expected[1] && words[2] == expected[2];
+        }
+        case ALCVarStorage::Shared:
+        {
+            const auto current = static_cast<const ALCVarSharedSlot*>(setting.slot)->value.load();
+            if (!current)
+            {
+                return false;
+            }
+            if (setting.desc->type == ALCVarType::String)
+            {
+                return *static_cast<const std::string*>(current.get()) == value.get<std::string>();
+            }
+            return fromShared(setting.desc->type, current.get()) == value;
+        }
+        case ALCVarStorage::Boxed:
+            return readSlot(index) == value;
+    }
+    return false;
+}
+
+void ALCVars::beginSettingWrite(U32 index)
+{
+    const U32 sequence = mWriteSeq[index].load(std::memory_order_relaxed);
+    mWriteSeq[index].store(sequence + 1, std::memory_order_relaxed);
+    ALCVarAtomic::fenceRelease();
+}
+
+void ALCVars::endSettingWrite(U32 index)
+{
+    mWriteSeq[index].store(mWriteSeq[index].load(std::memory_order_relaxed) + 1, std::memory_order_release);
+}
+
+bool ALCVars::unchanged(U32 index, const ALCVarValue& value, U8 flags) const
+{
+    if (flags & (FLAG_SESSION | FLAG_OWNED))
+    {
+        return false;
+    }
+    // LLSD is the main thread's, and a write of it rare: always the long way.
+    if (mSettings[index].storage == ALCVarStorage::Boxed || !slotHolds(index, value))
+    {
+        return false;
+    }
+    // The value the user layer holds, written again -- unless it is the
+    // default, which a write would drop -- or the default with no layer
+    // below the user's giving another, which a write would not keep.
+    if (flags & FLAG_USER)
+    {
+        return !(value == mSettings[index].def);
+    }
+    return !(flags & FLAG_QUALITY);
+}
+
+bool ALCVars::validate(U32 index, ALCVarValue& value) const
+{
+    const ALCVarDesc& desc = *mSettings[index].desc;
+    if (value.empty() || value.type() != desc.type || !ALCVarValues::finiteValue(value))
+    {
+        return false;
+    }
+    if (desc.ranged)
+    {
+        const ALCVarValue clamped = ALCVarValues::clampNumber(value, desc.rangeMin, desc.rangeMax);
+        if (!(clamped == value))
+        {
+            LL_DEBUGS("ALCVars") << desc.name << ": " << value.describe() << " is outside its range; "
+                                 << clamped.describe() << " kept" << LL_ENDL;
+            value = clamped;
+        }
+    }
+    if (!desc.choices.empty())
+    {
+        bool chosen = false;
+        for (const ALCVarChoice& choice : desc.choices)
+        {
+            chosen = chosen || (desc.type == ALCVarType::String ? value.get<std::string>() == choice.text
+                                                                 : ALCVarValues::asInteger(value) == choice.number);
+        }
+        if (!chosen)
+        {
+            return false;
+        }
+    }
+    if (!desc.asset.empty())
+    {
+        // A file the setting names is a bare name in its kind's folder, and
+        // one Windows opens as a file: not NUL or COM1, whatever follows them.
+        const std::string& name = value.get<std::string>();
+        if (name.find_first_of("/\\:") != std::string::npos || name.find("..") != std::string::npos ||
+            (!name.empty() && (name[0] == '.' || !LLFile::isSafeFileName(name))))
+        {
+            LL_WARNS("ALCVars") << desc.name << ": refused \"" << name << "\", which is not a bare file name"
+                                << LL_ENDL;
+            return false;
+        }
+    }
+    return true;
+}
+
+void ALCVars::updateFlags(U32 index)
+{
+    U8 flags = 0;
+    if (layer(userLayer(index)).contains(index))
+    {
+        flags |= FLAG_USER;
+    }
+    if (layer(ALCVarLayer::Quality).contains(index))
+    {
+        flags |= FLAG_QUALITY;
+    }
+    if (layer(ALCVarLayer::Session).contains(index))
+    {
+        flags |= FLAG_SESSION;
+    }
+    const auto held    = mHolds.find(index);
+    const auto clamped = mClamps.find(index);
+    if ((held != mHolds.end() && !held->second.empty()) || (clamped != mClamps.end() && !clamped->second.empty()))
+    {
+        flags |= FLAG_OWNED;
+    }
+    if (restricted(mDenied, index))
+    {
+        flags |= FLAG_DENIED;
+    }
+    if (restricted(mHidden, index))
+    {
+        flags |= FLAG_HIDDEN;
+    }
+    mFlags[index].store(flags, std::memory_order_relaxed);
+}
+
+void ALCVars::updateAllFlags()
+{
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        beginSettingWrite(i);
+        updateFlags(i);
+        endSettingWrite(i);
+    }
+}
+
+bool ALCVars::restricted(const boost::unordered_flat_map<U64, Owners>& restrictions, U32 index) const
+{
+    if (restrictions.empty())
+    {
+        return false;
+    }
+    if (restrictions.contains(keyOf(ALCVarTarget::setting(index))))
+    {
+        return true;
+    }
+    for (U32 g = mSettings[index].group; g != NONE; g = mGroups[g].parent)
+    {
+        if (restrictions.contains(keyOf(ALCVarTarget::group(g))))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void ALCVars::apply(std::span<const U32> indices)
+{
+    // Each setting's sequence odd from its flags to its slot; the indices
+    // are distinct.
+    std::vector<std::pair<U32, ALCVarValue>> changed;
+    for (const U32 index : indices)
+    {
+        beginSettingWrite(index);
+        updateFlags(index);
+        ALCVarValue now = effective(index);
+        if (!slotHolds(index, now))
+        {
+            changed.emplace_back(index, std::move(now));
+        }
+    }
+    if (changed.empty())
+    {
+        for (const U32 index : indices)
+        {
+            endSettingWrite(index);
+        }
+        return;
+    }
+
+    std::vector<U32> groups;
+    for (const auto& [index, value] : changed)
+    {
+        const U32 group = mSettings[index].group;
+        if (std::find(groups.begin(), groups.end(), group) == groups.end())
+        {
+            groups.push_back(group);
+        }
+    }
+    for (const U32 group : groups)
+    {
+        beginGroupWrite(*mGroups[group].desc->state);
+    }
+    for (const auto& [index, value] : changed)
+    {
+        publish(index, value);
+    }
+    for (const U32 group : groups)
+    {
+        endGroupWrite(*mGroups[group].desc->state);
+    }
+    for (const U32 index : indices)
+    {
+        endSettingWrite(index);
+    }
+    for (const auto& [index, value] : changed)
+    {
+        bump(index);
+    }
+    mChanges.fetch_add(changed.size(), std::memory_order_relaxed);
+}
+
+void ALCVars::bump(U32 index)
+{
+    mGenerations[index].fetch_add(1, std::memory_order_release);
+    for (const U32 tag : mSettings[index].tags)
+    {
+        mTagGenerations[tag].fetch_add(1, std::memory_order_release);
+    }
+    for (U32 g = mSettings[index].group; g != NONE; g = mGroups[g].parent)
+    {
+        mGroupGenerations[g].fetch_add(1, std::memory_order_release);
+    }
+}
+
+void ALCVars::retire(boost::shared_ptr<const void> value)
+{
+    LLCoros::LockType lock(mRetiredMutex);
+    mRetired.push_back(std::move(value));
+}
+
+void ALCVars::endFrame()
+{
+    std::vector<boost::shared_ptr<const void>> retired;
+    {
+        LLCoros::LockType lock(mRetiredMutex);
+        retired.swap(mRetired);
+    }
+}
+
+size_t ALCVars::retiredCount() const
+{
+    LLCoros::LockType lock(mRetiredMutex);
+    return mRetired.size();
+}
+
+ALCVarStats ALCVars::stats() const
+{
+    return { mLocks.load(std::memory_order_relaxed), mChanges.load(std::memory_order_relaxed) };
+}
+
+bool ALCVars::set(U32 index, const ALCVarValue& input)
+{
+    // What can be told before the lock: the flags and the slot, read between
+    // two reads of the setting's write sequence, so that a write under the
+    // lock meanwhile -- a hold, a Session value placed -- sends this one the
+    // long way rather than letting a stale flag pass a fresh value.
+    const U32 sequence = mWriteSeq[index].load(std::memory_order_acquire);
+    const U8  flags    = mFlags[index].load(std::memory_order_relaxed);
+    if (flags & FLAG_DENIED)
+    {
+        return false;
+    }
+    if (!(sequence & 1) && unchanged(index, input, flags))
+    {
+        ALCVarAtomic::fenceAcquire();
+        if (mWriteSeq[index].load(std::memory_order_relaxed) == sequence)
+        {
+            return true;
+        }
+    }
+    ALCVarValue value = input;
+    if (!validate(index, value))
+    {
+        return false;
+    }
+
+    auto lock = lockWrites();
+    if (restricted(mDenied, index))
+    {
+        return false;
+    }
+    const ALCVarLayer user = userLayer(index);
+    layer(ALCVarLayer::Session).erase(index);
+    // The bottom user layer keeps no value the compiled default already
+    // gives; an account's override keeps any.
+    const bool bottom = user == ALCVarLayer::Global || !mSettings[index].desc->has(ALCVAR_ACCOUNT_OVERRIDE);
+    if (bottom && value == mSettings[index].def && !layer(ALCVarLayer::Quality).contains(index))
+    {
+        layer(user).erase(index);
+    }
+    else
+    {
+        layer(user).insert_or_assign(index, std::move(value));
+    }
+    const U32 one[] = { index };
+    apply(one);
+    return true;
+}
+
+void ALCVars::reset(U32 index)
+{
+    auto lock = lockWrites();
+    if (restricted(mDenied, index))
+    {
+        return;
+    }
+    layer(userLayer(index)).erase(index);
+    const U32 one[] = { index };
+    apply(one);
+}
+
+void ALCVars::resetGroup(U32 group)
+{
+    auto             lock = lockWrites();
+    std::vector<U32> touched;
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        if (inGroup(i, group))
+        {
+            if (restricted(mDenied, i))
+            {
+                continue;
+            }
+            layer(userLayer(i)).erase(i);
+            touched.push_back(i);
+        }
+    }
+    apply(touched);
+}
+
+bool ALCVars::isUserSet(U32 index) const
+{
+    return (mFlags[index].load(std::memory_order_relaxed) & FLAG_USER) != 0;
+}
+
+bool ALCVars::setSession(U32 index, const ALCVarValue& input)
+{
+    ALCVarValue value = input;
+    if (!validate(index, value))
+    {
+        return false;
+    }
+    auto lock = lockWrites();
+    layer(ALCVarLayer::Session).insert_or_assign(index, std::move(value));
+    const U32 one[] = { index };
+    apply(one);
+    return true;
+}
+
+void ALCVars::clearSession(U32 index)
+{
+    auto lock = lockWrites();
+    layer(ALCVarLayer::Session).erase(index);
+    const U32 one[] = { index };
+    apply(one);
+}
+
+void ALCVars::setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bool dropUser)
+{
+    auto             lock = lockWrites();
+    std::vector<U32> touched;
+    for (const auto& [index, value] : layer(ALCVarLayer::Quality))
+    {
+        touched.push_back(index);
+    }
+    Layer next;
+    for (const auto& [index, input] : values)
+    {
+        ALCVarValue value = input;
+        if (index >= mSettings.size() || !validate(index, value))
+        {
+            LL_WARNS("ALCVars") << "a quality level's value is refused: "
+                                << (index < mSettings.size() ? desc(index).name : std::string_view("?")) << " = "
+                                << input.describe() << LL_ENDL;
+            continue;
+        }
+        next.insert_or_assign(index, std::move(value));
+        if (dropUser && !restricted(mDenied, index))
+        {
+            layer(ALCVarLayer::Global).erase(index);
+            layer(ALCVarLayer::Account).erase(index);
+        }
+        if (std::find(touched.begin(), touched.end(), index) == touched.end())
+        {
+            touched.push_back(index);
+        }
+    }
+    layer(ALCVarLayer::Quality) = std::move(next);
+    apply(touched);
+}
+
+ALCVarLayer ALCVars::layerOf(U32 index) const
+{
+    auto lock = lockWrites();
+    for (const ALCVarLayer which :
+         { ALCVarLayer::Session, ALCVarLayer::Account, ALCVarLayer::Global, ALCVarLayer::Quality })
+    {
+        if ((which == ALCVarLayer::Account && !readsAccount(index)) ||
+            (which == ALCVarLayer::Global && !readsGlobal(index)))
+        {
+            continue;
+        }
+        if (layer(which).contains(index))
+        {
+            return which;
+        }
+    }
+    return ALCVarLayer::Default;
+}
+
+std::optional<ALCVarValue> ALCVars::layerValue(U32 index, ALCVarLayer which) const
+{
+    if (which == ALCVarLayer::Default)
+    {
+        return mSettings[index].def;
+    }
+    auto         lock   = lockWrites();
+    const Layer& values = layer(which);
+    if (const auto found = values.find(index); found != values.end())
+    {
+        return found->second;
+    }
+    return std::nullopt;
+}
+
+void ALCVars::hold(std::string_view owner, U32 index, const ALCVarValue& value)
+{
+    // Fitted as a write is: a reader indexing by choice never sees another.
+    ALCVarValue held = value;
+    if (!validate(index, held))
+    {
+        LL_WARNS("ALCVars") << owner << " cannot hold " << desc(index).name << " at " << value.describe() << LL_ENDL;
+        return;
+    }
+    auto  lock  = lockWrites();
+    auto& holds = mHolds[index];
+    std::erase_if(holds, [owner](const Hold& hold) { return hold.owner == owner; });
+    holds.push_back({ std::string(owner), std::move(held) });
+    const U32 one[] = { index };
+    apply(one);
+}
+
+void ALCVars::clamp(std::string_view owner, U32 index, F64 lowest, F64 highest)
+{
+    if (!ALCVarTypes::isNumber(desc(index).type))
+    {
+        LL_WARNS("ALCVars") << owner << " cannot clamp " << desc(index).name << ", which is not a number" << LL_ENDL;
+        return;
+    }
+    if (!ALCVarValues::finite(lowest) || !ALCVarValues::finite(highest))
+    {
+        LL_WARNS("ALCVars") << owner << " cannot clamp " << desc(index).name << " to " << lowest << ".." << highest
+                            << ": its bounds are finite" << LL_ENDL;
+        return;
+    }
+    auto  lock   = lockWrites();
+    auto& clamps = mClamps[index];
+    std::erase_if(clamps, [owner](const Clamp& clamp) { return clamp.owner == owner; });
+    clamps.push_back({ std::string(owner), lowest, highest });
+    const U32 one[] = { index };
+    apply(one);
+}
+
+void ALCVars::release(std::string_view owner, U32 index)
+{
+    auto lock = lockWrites();
+    if (const auto holds = mHolds.find(index); holds != mHolds.end())
+    {
+        std::erase_if(holds->second, [owner](const Hold& hold) { return hold.owner == owner; });
+    }
+    if (const auto clamps = mClamps.find(index); clamps != mClamps.end())
+    {
+        std::erase_if(clamps->second, [owner](const Clamp& clamp) { return clamp.owner == owner; });
+    }
+    const U32 one[] = { index };
+    apply(one);
+}
+
+void ALCVars::restrict(boost::unordered_flat_map<U64, Owners>& restrictions, std::string_view owner,
+                       ALCVarTarget target, bool add)
+{
+    auto       lock   = lockWrites();
+    const U64  key    = keyOf(target);
+    Owners&    owners = restrictions[key];
+    const auto found  = std::find(owners.begin(), owners.end(), owner);
+    if (add && found == owners.end())
+    {
+        owners.emplace_back(owner);
+    }
+    else if (!add && found != owners.end())
+    {
+        owners.erase(found);
+    }
+    if (owners.empty())
+    {
+        restrictions.erase(key);
+    }
+    updateAllFlags();
+}
+
+void ALCVars::denyWrite(std::string_view owner, ALCVarTarget target)
+{
+    restrict(mDenied, owner, target, true);
+}
+
+void ALCVars::allowWrite(std::string_view owner, ALCVarTarget target)
+{
+    restrict(mDenied, owner, target, false);
+}
+
+void ALCVars::hide(std::string_view owner, ALCVarTarget target)
+{
+    restrict(mHidden, owner, target, true);
+}
+
+void ALCVars::unhide(std::string_view owner, ALCVarTarget target)
+{
+    restrict(mHidden, owner, target, false);
+}
+
+void ALCVars::releaseAll(std::string_view owner)
+{
+    auto             lock = lockWrites();
+    std::vector<U32> touched;
+    for (auto& [index, holds] : mHolds)
+    {
+        if (std::erase_if(holds, [owner](const Hold& hold) { return hold.owner == owner; }))
+        {
+            touched.push_back(index);
+        }
+    }
+    for (auto& [index, clamps] : mClamps)
+    {
+        if (std::erase_if(clamps, [owner](const Clamp& clamp) { return clamp.owner == owner; }) &&
+            std::find(touched.begin(), touched.end(), index) == touched.end())
+        {
+            touched.push_back(index);
+        }
+    }
+    for (auto* restrictions : { &mDenied, &mHidden })
+    {
+        for (auto& [key, owners] : *restrictions)
+        {
+            std::erase(owners, owner);
+        }
+        boost::unordered::erase_if(*restrictions, [](const auto& entry) { return entry.second.empty(); });
+    }
+    updateAllFlags();
+    apply(touched);
+}
+
+bool ALCVars::isHeld(U32 index) const
+{
+    return (mFlags[index].load(std::memory_order_relaxed) & FLAG_OWNED) != 0;
+}
+
+bool ALCVars::isWriteDenied(U32 index) const
+{
+    return (mFlags[index].load(std::memory_order_relaxed) & FLAG_DENIED) != 0;
+}
+
+bool ALCVars::isHidden(U32 index) const
+{
+    return desc(index).has(ALCVAR_HIDDEN) || (mFlags[index].load(std::memory_order_relaxed) & FLAG_HIDDEN) != 0;
+}
+
+std::vector<std::string> ALCVars::ownersOf(U32 index) const
+{
+    auto                     lock = lockWrites();
+    std::vector<std::string> owners;
+    auto                     add = [&owners](const std::string& owner) {
+        if (std::find(owners.begin(), owners.end(), owner) == owners.end())
+        {
+            owners.push_back(owner);
+        }
+    };
+    if (const auto holds = mHolds.find(index); holds != mHolds.end())
+    {
+        for (const Hold& hold : holds->second)
+        {
+            add(hold.owner);
+        }
+    }
+    if (const auto clamps = mClamps.find(index); clamps != mClamps.end())
+    {
+        for (const Clamp& clamp : clamps->second)
+        {
+            add(clamp.owner);
+        }
+    }
+    for (const auto* restrictions : { &mDenied, &mHidden })
+    {
+        for (const auto& [key, keyOwners] : *restrictions)
+        {
+            const bool group = (key >> 32) != 0;
+            const U32  which = U32(key);
+            if ((!group && which == index) || (group && inGroup(index, which)))
+            {
+                for (const auto& owner : keyOwners)
+                {
+                    add(owner);
+                }
+            }
+        }
+    }
+    return owners;
 }
 
 namespace ALCVarAccess
@@ -426,6 +1160,49 @@ namespace ALCVarAccess
         ALCVars* existing()
         {
             return ALCVars::instanceExists() ? ALCVars::getInstance() : nullptr;
+        }
+
+        // The store, if the handle's setting is the one it has at this
+        // index: a handle's write before registration, or of another schema,
+        // does nothing.
+        ALCVars* storeOf(const ALCVarDesc& desc, U32 index)
+        {
+            ALCVars* store = existing();
+            if (!store || !store->registered() || index >= store->settingCount() || &store->desc(index) != &desc)
+            {
+                LL_WARNS_ONCE("ALCVars") << desc.name << " written before the store has its schema" << LL_ENDL;
+                return nullptr;
+            }
+            return store;
+        }
+    }
+
+    bool set(const ALCVarDesc& desc, U32 index, ALCVarValue value)
+    {
+        ALCVars* store = storeOf(desc, index);
+        return store && store->set(index, value);
+    }
+
+    void reset(const ALCVarDesc& desc, U32 index)
+    {
+        if (ALCVars* store = storeOf(desc, index))
+        {
+            store->reset(index);
+        }
+    }
+
+    bool isUserSet(const ALCVarDesc& desc, U32 index)
+    {
+        ALCVars* store = storeOf(desc, index);
+        return store && store->isUserSet(index);
+    }
+
+    void resetGroup(const ALCVarGroupDesc& desc, U32 group)
+    {
+        ALCVars* store = existing();
+        if (store && store->registered() && group < store->groupCount() && &store->groupDesc(group) == &desc)
+        {
+            store->resetGroup(group);
         }
     }
 

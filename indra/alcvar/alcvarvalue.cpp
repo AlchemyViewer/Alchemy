@@ -32,6 +32,9 @@
 
 #include <fmt/format.h>
 
+#include <cmath>
+#include <limits>
+
 namespace
 {
     template <typename T>
@@ -493,5 +496,128 @@ namespace ALCVarValues
     {
         const U64 bits = __builtin_bit_cast(U64, value);
         return (bits & 0x7ff0000000000000ull) != 0x7ff0000000000000ull;
+    }
+
+    namespace
+    {
+        // Into [lowest, highest]: where the two leave nothing between them,
+        // lowest. An integer's bounds are rounded inward, and a value already
+        // inside keeps its bits.
+        template <typename T>
+        T clampScalar(T value, F64 lowest, F64 highest)
+        {
+            // Both bounds within what the type holds, so that one past it is
+            // made the type's most rather than converted out of range. An
+            // S64's most as a double is 2^63, one past it: the double below.
+            F64 least = F64(std::numeric_limits<T>::lowest());
+            F64 most  = F64(std::numeric_limits<T>::max());
+            if constexpr (std::is_integral_v<T> && std::numeric_limits<T>::digits > std::numeric_limits<F64>::digits)
+            {
+                most = std::nextafter(most, 0.0);
+            }
+            F64 low  = lowest;
+            F64 high = highest;
+            if constexpr (std::is_integral_v<T>)
+            {
+                low  = std::ceil(low);
+                high = std::floor(high);
+            }
+            low  = std::min(std::max(low, least), most);
+            high = std::min(std::max(high, least), most);
+            const F64 v = F64(value);
+            F64       x = v > high ? high : v;
+            x           = x < low ? low : x;
+            return x == v ? value : T(x);
+        }
+
+        template <typename T, size_t N>
+        void clampEach(T (&components)[N], F64 lowest, F64 highest)
+        {
+            for (T& component : components)
+            {
+                component = clampScalar(component, lowest, highest);
+            }
+        }
+
+        template <typename T, size_t N>
+        bool finiteEach(const T (&components)[N])
+        {
+            for (const T component : components)
+            {
+                if (!finite(F64(component)))
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+    }
+
+    ALCVarValue clampNumber(const ALCVarValue& value, F64 lowest, F64 highest)
+    {
+        ALCVarValue out = value;
+        switch (value.type())
+        {
+            case ALCVarType::S32: out = ALCVarValue(clampScalar(value.get<S32>(), lowest, highest)); break;
+            case ALCVarType::U32: out = ALCVarValue(clampScalar(value.get<U32>(), lowest, highest)); break;
+            case ALCVarType::S64: out = ALCVarValue(clampScalar(value.get<S64>(), lowest, highest)); break;
+            case ALCVarType::F32: out = ALCVarValue(clampScalar(value.get<F32>(), lowest, highest)); break;
+            case ALCVarType::F64: out = ALCVarValue(clampScalar(value.get<F64>(), lowest, highest)); break;
+            case ALCVarType::Vec2: clampEach(out.get<LLVector2>().mV, lowest, highest); break;
+            case ALCVarType::Vec3: clampEach(out.get<LLVector3>().mV, lowest, highest); break;
+            case ALCVarType::Vec3d: clampEach(out.get<LLVector3d>().mdV, lowest, highest); break;
+            case ALCVarType::Quat: clampEach(out.get<LLQuaternion>().mQ, lowest, highest); break;
+            case ALCVarType::Color3: clampEach(out.get<LLColor3>().mV, lowest, highest); break;
+            case ALCVarType::Color4: clampEach(out.get<LLColor4>().mV, lowest, highest); break;
+            case ALCVarType::Rect:
+            {
+                LLRect& r = out.get<LLRect>();
+                r.mLeft   = clampScalar(r.mLeft, lowest, highest);
+                r.mTop    = clampScalar(r.mTop, lowest, highest);
+                r.mRight  = clampScalar(r.mRight, lowest, highest);
+                r.mBottom = clampScalar(r.mBottom, lowest, highest);
+                break;
+            }
+            default:
+                break;
+        }
+        return out;
+    }
+
+    bool finiteValue(const ALCVarValue& value)
+    {
+        switch (value.type())
+        {
+            case ALCVarType::F32:    return finite(value.get<F32>());
+            case ALCVarType::F64:    return finite(value.get<F64>());
+            case ALCVarType::Vec2:   return finiteEach(value.get<LLVector2>().mV);
+            case ALCVarType::Vec3:   return finiteEach(value.get<LLVector3>().mV);
+            case ALCVarType::Vec3d:  return finiteEach(value.get<LLVector3d>().mdV);
+            case ALCVarType::Quat:   return finiteEach(value.get<LLQuaternion>().mQ);
+            case ALCVarType::Color3: return finiteEach(value.get<LLColor3>().mV);
+            case ALCVarType::Color4: return finiteEach(value.get<LLColor4>().mV);
+            case ALCVarType::Vec2List:
+                for (const LLVector2& point : value.get<std::vector<LLVector2>>())
+                {
+                    if (!finiteEach(point.mV))
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            default:
+                return true;
+        }
+    }
+
+    S64 asInteger(const ALCVarValue& value)
+    {
+        switch (value.type())
+        {
+            case ALCVarType::S32: return value.get<S32>();
+            case ALCVarType::U32: return value.get<U32>();
+            case ALCVarType::S64: return value.get<S64>();
+            default:              return 0;
+        }
     }
 }
