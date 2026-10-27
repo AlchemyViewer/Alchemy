@@ -121,10 +121,10 @@ endfunction()
 # Generates the schema's code into OUTPUT_DIR and compiles it into <target>:
 # the areas' descriptor tables and the registry as sources, the headers'
 # directory as a PUBLIC include path, and the debugger's formatter of each
-# handle as a link option of whatever links <target>. LOCK_TARGET,
-# <target>_lock unless named, records the schema's changes in LOCK; it
-# builds nothing else. Paths in the schema's descriptors, and in what
-# --where says, are the repository's.
+# handle in the PDB of whatever links <target>. LOCK_TARGET, <target>_lock
+# unless named, records the schema's changes in LOCK; it builds nothing else.
+# Paths in the schema's descriptors, and in what --where says, are the
+# repository's.
 function(al_generate_cvars target)
   cmake_parse_arguments(
     PARSE_ARGV 1
@@ -251,8 +251,11 @@ function(al_generate_cvars target)
   target_sources(${target} PRIVATE ${sources} "${stamp}")
   set_source_files_properties(${sources} PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
   target_include_directories(${target} PUBLIC "${arg_OUTPUT_DIR}/include")
+  # A source of whatever links <target>, which the linker embeds in its
+  # PDB, as Boost's are; a /NATVIS link option the Visual Studio generator
+  # turns into a link setting that MSBuild ignores.
   if(natvis AND MSVC)
-    target_link_options(${target} INTERFACE "/NATVIS:${natvis}")
+    target_sources(${target} INTERFACE "${natvis}")
   endif()
   source_group("Generated" FILES ${sources} "${stamp}")
 

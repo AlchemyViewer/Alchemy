@@ -109,7 +109,16 @@ public:
         constexpr U16 slot = G::slot[KEY];
         if constexpr (storage == ALCVarStorage::Byte)
         {
-            return ALCVAR_LOAD_RELAXED_8(&G::bytes[slot]) != 0;
+            // The byte is 0 or 1, as a bool's own is: read as one.
+            return ALCVAR_LOAD_RELAXED_BOOL(&G::bytes[slot]);
+        }
+        else if constexpr (std::is_same_v<T, F32>)
+        {
+            return ALCVAR_LOAD_RELAXED_F32(&G::words[slot]);
+        }
+        else if constexpr (std::is_same_v<T, F64>)
+        {
+            return ALCVAR_LOAD_RELAXED_F64(&G::dwords[slot]);
         }
         else if constexpr (storage == ALCVarStorage::Word)
         {
@@ -188,7 +197,11 @@ public:
     auto view() const
         requires(storage == ALCVarStorage::Shared)
     {
+        // Checked in the debug configurations alone: the check costs more
+        // than the read.
+#if LL_DEBUG
         llassert(on_main_thread());
+#endif
         constexpr U16 slot    = G::slot[KEY];
         const void*   current = ALCVarAtomic::loadAcquire(&G::shared[slot].current);
         if (!current)

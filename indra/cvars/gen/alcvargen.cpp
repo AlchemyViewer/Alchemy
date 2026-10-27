@@ -4109,7 +4109,7 @@ namespace ALCVarGen
                 ++counts[size_t(ALCVarTypes::storageOf(s->type))];
             }
             out << "    // The group's values, in arrays by size, and its descriptors.\n"
-                << "    struct Group_\n    {\n"
+                << "    struct ALCVAR_GROUP_STORAGE Group_\n    {\n"
                 << "        static constexpr U16 count = " << g.settings.size() << ";\n";
             if (!g.settings.empty())
             {

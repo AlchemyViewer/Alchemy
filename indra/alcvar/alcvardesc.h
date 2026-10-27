@@ -202,6 +202,20 @@ struct ALCVarDesc
     U64  decl() const { return steps.empty() ? 0 : steps.back().decl; }
 };
 
+// What a generated group's storage is declared with: hidden, so that a
+// handle's read on ELF and Mach-O is a load from the slot's own address, not
+// one through an address loaded from the global offset table first. GCC and
+// Clang leave a static member they see only declared at default visibility,
+// whatever -fvisibility says, and position-independent code, which every
+// library here is, reaches such a symbol through the table; Clang does in an
+// executable's code as well. The storage is the executable's own, which no
+// other module reads.
+#if defined(__GNUC__) || defined(__clang__)
+#define ALCVAR_GROUP_STORAGE __attribute__((visibility("hidden")))
+#else
+#define ALCVAR_GROUP_STORAGE
+#endif
+
 // A value of two or three words, with the sequence word a reader checks
 // before and after it: odd while a write is under way.
 template <size_t WORDS>

@@ -68,6 +68,7 @@ if(AL_BUILD_TESTS)
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/schema/render.toml
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/schema/ui.toml
       ${CMAKE_CURRENT_SOURCE_DIR}/tests/schema/chat.toml
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/schema/perf.toml
   )
 
   al_add_test_binary(
@@ -85,6 +86,7 @@ if(AL_BUILD_TESTS)
     LIBRARIES alcvar
     SUPPORT alcvar_test_schema aldb_test_support llcommon_test_checks
     INCLUDES ${INDRA_SOURCE_DIR}/aldb/tests
+    BENCH_SOURCES tests/alcvar_bench.cpp
   )
 
   # alcvar_preview <settings.db>: what an open would do to each row of a
@@ -93,4 +95,58 @@ if(AL_BUILD_TESTS)
   add_executable(alcvar_preview tools/alcvar_preview.cpp)
   target_link_libraries(alcvar_preview PRIVATE al::flags alcvar alcvar_test_schema)
   set_target_properties(alcvar_preview PROPERTIES FOLDER "Tools")
+
+  # A handle's read of each scalar type, compiled with the tree's flags and
+  # read by AlCVarAsmCheck.cmake: one load from the slot's own address and a
+  # return, in the optimised configurations. It takes the schema's headers
+  # alone, linking nothing, and never under link-time optimisation, which
+  # leaves the compiler nothing to list. A sanitized tree's listing is the
+  # sanitizers' as much as the handle's.
+  if(NOT AL_SANITIZING)
+    add_library(alcvar_asm_probe OBJECT tests/alcvar_asm_probe.cpp)
+    target_link_libraries(alcvar_asm_probe PRIVATE al::flags $<COMPILE_ONLY:alcvar_test_schema>)
+    set_target_properties(
+      alcvar_asm_probe
+      PROPERTIES
+        FOLDER "Tests/alcvar"
+        INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO OFF
+        INTERPROCEDURAL_OPTIMIZATION_RELEASE OFF
+    )
+    if(COMPILER_IS_MSVC)
+      target_compile_options(
+        alcvar_asm_probe
+        PRIVATE /FAs "/Fa$<PATH:GET_PARENT_PATH,$<TARGET_OBJECTS:alcvar_asm_probe>>/"
+      )
+      set(alcvar_asm_syntax masm)
+    elseif(COMPILER_IS_CLANG_CL)
+      target_compile_options(alcvar_asm_probe PRIVATE /clang:-save-temps=obj)
+      set(alcvar_asm_syntax gnu)
+    else()
+      target_compile_options(alcvar_asm_probe PRIVATE -save-temps=obj)
+      set(alcvar_asm_syntax gnu)
+    endif()
+    if(BUILD_TARGET_IS_ARM64)
+      set(alcvar_asm_arch arm64)
+    else()
+      set(alcvar_asm_arch x86)
+    endif()
+    add_test(
+      NAME alcvar_asm_probe
+      CONFIGURATIONS RelWithDebInfo Release
+      COMMAND
+        ${CMAKE_COMMAND} -DOBJECT=$<TARGET_OBJECTS:alcvar_asm_probe> -DSYNTAX=${alcvar_asm_syntax}
+        -DARCH=${alcvar_asm_arch} -P ${INDRA_SOURCE_DIR}/cmake/AlCVarAsmCheck.cmake
+    )
+    set_tests_properties(alcvar_asm_probe PROPERTIES LABELS alcvar)
+    add_dependencies(BUILD_TESTS alcvar_asm_probe)
+  endif()
+  # The check itself, given listings it is to pass and to fail.
+  add_test(
+    NAME alcvar_asm_check
+    COMMAND
+      ${CMAKE_COMMAND} -DINDRA_SOURCE_DIR=${INDRA_SOURCE_DIR}
+      -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/asm_check_test -P
+      ${CMAKE_CURRENT_SOURCE_DIR}/tests/alcvar_asm_check_test.cmake
+  )
+  set_tests_properties(alcvar_asm_check PROPERTIES LABELS alcvar)
 endif()

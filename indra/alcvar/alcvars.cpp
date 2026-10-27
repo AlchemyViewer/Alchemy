@@ -1367,7 +1367,11 @@ void ALCVars::markDirty(ALCVarLayer which, U32 index, std::optional<ALCVarValue>
     LLCoros::LockType lock(mPersistMutex);
     Scope&            scope = which == ALCVarLayer::Account ? mAccount : mGlobal;
     const auto        now   = std::chrono::steady_clock::now();
-    if (!mUnflushed)
+    // Only the first change since the last flush brings the flusher's
+    // deadline nearer; a later one only puts it off, which the flusher sees
+    // when it wakes. A writer wakes it once a flush, not once a change.
+    const bool first = !mUnflushed;
+    if (first)
     {
         mFirstDirty = now;
     }
@@ -1380,7 +1384,10 @@ void ALCVars::markDirty(ALCVarLayer which, U32 index, std::optional<ALCVarValue>
     }
     entry->second.after    = std::move(after);
     entry->second.modified = nowMs();
-    mFlushWake.notify_one();
+    if (first)
+    {
+        mFlushWake.notify_one();
+    }
 }
 
 ALCVarRow ALCVars::rowOf(U32 index, const std::optional<ALCVarValue>& value, S64 modified) const

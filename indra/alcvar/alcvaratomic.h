@@ -39,6 +39,33 @@
 #define ALCVAR_LOAD_RELAXED_8(p)  __atomic_load_n((p), __ATOMIC_RELAXED)
 #define ALCVAR_LOAD_RELAXED_32(p) __atomic_load_n((p), __ATOMIC_RELAXED)
 #define ALCVAR_LOAD_RELAXED_64(p) __atomic_load_n((p), __ATOMIC_RELAXED)
+// A float's word read into a float register. Clang folds the integer load
+// and the cast into one float load. GCC's atomic load on arm64 is an
+// integer's, moved across after it (ldr w0, then fmov s0), so GCC reads the
+// word as a volatile float, as MSVC does: an aligned word's one load. The
+// float type may alias the word, so no store of the word as an integer is
+// moved past the read.
+#if defined(__clang__)
+#define ALCVAR_LOAD_RELAXED_F32(p) __builtin_bit_cast(F32, __atomic_load_n((p), __ATOMIC_RELAXED))
+#define ALCVAR_LOAD_RELAXED_F64(p) __builtin_bit_cast(F64, __atomic_load_n((p), __ATOMIC_RELAXED))
+#else
+namespace ALCVarAtomic
+{
+    typedef F32 __attribute__((may_alias)) WordF32;
+    typedef F64 __attribute__((may_alias)) WordF64;
+}
+#define ALCVAR_LOAD_RELAXED_F32(p) (*reinterpret_cast<const volatile ALCVarAtomic::WordF32*>(p))
+#define ALCVAR_LOAD_RELAXED_F64(p) (*reinterpret_cast<const volatile ALCVarAtomic::WordF64*>(p))
+#endif
+// A bool's byte, in the form each compiler reads in one load: Clang masks a
+// byte cast to a bool to its low bit, and takes a bool's own load as 0 or 1;
+// GCC tests a bool's atomic load against zero, and takes the cast byte as it
+// is. The byte is written only as a char type, which every access may alias.
+#if defined(__clang__)
+#define ALCVAR_LOAD_RELAXED_BOOL(p) __atomic_load_n(reinterpret_cast<const bool*>(p), __ATOMIC_RELAXED)
+#else
+#define ALCVAR_LOAD_RELAXED_BOOL(p) __builtin_bit_cast(bool, __atomic_load_n((p), __ATOMIC_RELAXED))
+#endif
 #else
 #include <intrin.h>
 #define ALCVAR_GNU_ATOMICS 0
@@ -46,6 +73,13 @@
 #define ALCVAR_LOAD_RELAXED_32(p) static_cast<U32>(__iso_volatile_load32(reinterpret_cast<const volatile int*>(p)))
 #define ALCVAR_LOAD_RELAXED_64(p) \
     static_cast<U64>(__iso_volatile_load64(reinterpret_cast<const volatile __int64*>(p)))
+// A float's word read as a float, into a float register: the integer
+// intrinsic would load it into an integer register and move it across. An
+// aligned volatile access is one instruction, as the intrinsic's is, and MSVC
+// has no type-based aliasing for it to break.
+#define ALCVAR_LOAD_RELAXED_F32(p) (*reinterpret_cast<const volatile F32*>(p))
+#define ALCVAR_LOAD_RELAXED_F64(p) (*reinterpret_cast<const volatile F64*>(p))
+#define ALCVAR_LOAD_RELAXED_BOOL(p) __builtin_bit_cast(bool, ALCVAR_LOAD_RELAXED_8(p))
 #endif
 
 namespace ALCVarAtomic
