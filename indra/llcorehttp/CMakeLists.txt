@@ -112,6 +112,9 @@ if(AL_BUILD_TESTS)
   #
   # Example Programs
   #
+  # Run from the build tree, as a test binary is, so without vcpkg's
+  # app-local step.
+  set(VCPKG_APPLOCAL_DEPS OFF)
   add_executable(http_texture_load examples/http_texture_load.cpp)
   set_target_properties(
     http_texture_load

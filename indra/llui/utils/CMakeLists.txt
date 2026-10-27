@@ -3,6 +3,11 @@
 # The console utilities over the UI. What each is for, and how it is run,
 # is at the top of its own file.
 if(AL_BUILD_TESTS)
+  # Run from the build tree, as a test binary is, so without vcpkg's
+  # app-local step: it is a run of vcpkg.exe after each link, and runs
+  # started together fail now and then with the file in use.
+  set(VCPKG_APPLOCAL_DEPS OFF)
+
   add_executable(llui_libtest)
 
   target_sources(
