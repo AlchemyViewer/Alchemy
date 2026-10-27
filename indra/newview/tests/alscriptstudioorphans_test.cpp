@@ -29,6 +29,7 @@
 #include "alrecoverystore.h"
 #include "alscriptstudio_fixture.h"
 #include "llbutton.h"
+#include "lllayoutstack.h"
 #include "lltextbox.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -493,6 +494,63 @@ namespace
         a.orphan->kind = Orphan::None;
         unit.refreshNotice();
         CHECK_FALSE(holder->getVisible());
+    }
+
+    // Tapple's: a link's words three times what fitted on one line. They wrap, and the bar is as
+    // tall as they are, up to three lines; all of them are in the tip.
+    TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: the bar grows with its words up to three lines", "[alscriptstudioorphans]")
+    {
+        Orphans&           unit = make();
+        ALScriptNoticeBar* bar  = window.find<ALScriptNoticeBar>("notice");
+        REQUIRE(bar != nullptr);
+        studio.bar             = bar;
+        Doc& a                 = tab("a");
+        services().front       = 0;
+        LLLayoutPanel* holder  = ALViewType::as<LLLayoutPanel>(bar->getParent());
+        LLTextBox*     text    = bar->getChild<LLTextBox>("notice_text");
+        REQUIRE(holder != nullptr);
+        const auto said_at = [&](const std::string& words) {
+            a.offer = Doc::Offer{ words, { "copy" } };
+            unit.refreshNotice();
+            REQUIRE(holder->getVisible());
+            CHECK(text->getToolTip() == words);
+        };
+        const auto repeated = [](size_t times) {
+            std::string out;
+            for (size_t i = 0; i < times; ++i)
+            {
+                out += "These words say what a link of a script to a file does. ";
+            }
+            return out;
+        };
+        said_at("Short.");
+        const S32 one = holder->getTargetDim();
+        {
+            INFO("a line: the bar as tall as it was");
+            CHECK(text->getLineCount() == 1);
+            CHECK(one == 28);
+        }
+        said_at(repeated(2));
+        const S32 lines  = text->getLineCount();
+        const S32 each   = text->getTextPixelHeight() / std::max(1, lines);
+        const S32 margin = bar->getRect().getHeight() - text->getRect().mTop;
+        {
+            INFO("wrapped, the bar as tall as the lines");
+            CAPTURE(lines, each);
+            REQUIRE(lines >= 2);
+            REQUIRE(lines <= 3);
+            CHECK(text->getRect().getHeight() == each * lines);
+            CHECK(holder->getTargetDim() == margin + each * lines + margin);
+        }
+        said_at(repeated(60));
+        {
+            INFO("past three lines: three shown");
+            CHECK(text->getLineCount() > 3);
+            CHECK(text->getRect().getHeight() == each * 3);
+            CHECK(holder->getTargetDim() == margin + each * 3 + margin);
+        }
+        said_at("Short again.");
+        CHECK(holder->getTargetDim() == one);
     }
 
     TEST_CASE_METHOD(alscriptstudioorphans_data, "alscriptstudioorphans: a compiled half the source could not make is compared or kept or taken", "[alscriptstudioorphans]")

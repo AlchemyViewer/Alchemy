@@ -37,8 +37,9 @@ class LLTextBox;
 // front has to reckon with -- a text kept from an earlier session, its
 // object out of sight, its item gone, the connection lost, the file gone
 // from disk -- with up to four things to be done about it and a way to hide
-// it. Its layout panel is shown while it has something to say. What it
-// says is ALScriptStudioOrphans's; what its buttons do is the window's.
+// it. Its layout panel is shown while it has something to say, as tall as
+// its words wrapped, up to three lines. What it says is
+// ALScriptStudioOrphans's; what its buttons do is the window's.
 class ALScriptNoticeBar : public LLPanel
 {
 public:
@@ -68,11 +69,18 @@ public:
     };
 
     bool postBuild() override;
+    void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     void show(const Notice& notice);
     // What each button does now, from the first.
     const std::string& action(size_t which) const { return mActions[which < BUTTONS ? which : 0]; }
 
 private:
+    // The words' lines, and the bar's layout panel as tall as they are.
+    void fitWords();
+
+    static constexpr S32 MAX_LINES  = 3;
+    static constexpr S32 MIN_HEIGHT = 28;
+
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
     LLTextBox*              mText     = nullptr;
