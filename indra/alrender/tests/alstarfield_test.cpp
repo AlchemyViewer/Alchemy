@@ -450,7 +450,7 @@ TEST_CASE("alstarfield: a star's vertex is its centre and its colour's bytes and
 
     std::vector<LLVector4a> vertices(layout.vertices() + 1);
     // Past the last vertex: nothing may be written there.
-    std::memset(&vertices.back(), 0xA5, sizeof(LLVector4a));
+    std::memset(vertices.back().getF32ptr(), 0xA5, sizeof(LLVector4a));
     LLStrider<LLVector4a> strider = vertices.data();
     ALStarField::fillVertices(stars, layout, strider);
 
@@ -472,7 +472,7 @@ TEST_CASE("alstarfield: a star's vertex is its centre and its colour's bytes and
     CHECK(wrong == 0);
     U8 untouched[sizeof(LLVector4a)];
     std::memset(untouched, 0xA5, sizeof(untouched));
-    CHECK(std::memcmp(&vertices.back(), untouched, sizeof(untouched)) == 0);
+    CHECK(std::memcmp(vertices.back().getF32ptr(), untouched, sizeof(untouched)) == 0);
 }
 
 namespace
