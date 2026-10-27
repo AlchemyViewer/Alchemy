@@ -5,7 +5,15 @@
 # schema alcvargen compiles from indra/cvars, whose handles every library
 # above reads.
 
-set(alcvar_SOURCES alcvarconvert.cpp alcvarref.cpp alcvars.cpp alcvarvalue.cpp)
+set(
+  alcvar_SOURCES
+  alcvarconvert.cpp
+  alcvarfile.cpp
+  alcvarpreview.cpp
+  alcvarref.cpp
+  alcvars.cpp
+  alcvarvalue.cpp
+)
 
 set(
   alcvar_HEADERS
@@ -15,6 +23,8 @@ set(
   alcvarconvert.h
   alcvarconvertible.h
   alcvardesc.h
+  alcvarfile.h
+  alcvarpreview.h
   alcvarref.h
   alcvars.h
   alcvartype.h
@@ -23,7 +33,7 @@ set(
 
 add_library(alcvar STATIC)
 target_sources(alcvar PRIVATE ${alcvar_SOURCES} PUBLIC FILE_SET HEADERS FILES ${alcvar_HEADERS})
-target_link_libraries(alcvar PRIVATE al::flags PUBLIC llcommon llmath)
+target_link_libraries(alcvar PRIVATE al::flags PUBLIC llcommon llmath aldb)
 target_precompile_headers(alcvar REUSE_FROM llprecompiled)
 
 include(ALCVarGen)
@@ -67,7 +77,17 @@ if(AL_BUILD_TESTS)
       tests/alcvarlisteners_test.cpp
       tests/alcvarthreads_test.cpp
       tests/alcvarconvert_test.cpp
+      tests/alcvarfile_test.cpp
+      tests/alcvarpreview_test.cpp
     LIBRARIES alcvar
-    SUPPORT alcvar_test_schema llcommon_test_checks
+    SUPPORT alcvar_test_schema aldb_test_support llcommon_test_checks
+    INCLUDES ${INDRA_SOURCE_DIR}/aldb/tests
   )
+
+  # alcvar_preview <settings.db>: what an open would do to each row of a
+  # settings file, writing nothing. Built with the tests' schema until the
+  # viewer's declares settings.
+  add_executable(alcvar_preview tools/alcvar_preview.cpp)
+  target_link_libraries(alcvar_preview PRIVATE al::flags alcvar alcvar_test_schema)
+  set_target_properties(alcvar_preview PROPERTIES FOLDER "Tools")
 endif()

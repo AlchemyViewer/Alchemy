@@ -26,15 +26,29 @@
 
 #include "alcvars.h"
 
+#include "lldate.h"
 #include "llfile.h"
+#include "threadpool.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_node_map.hpp>
 #include <boost/smart_ptr/make_shared.hpp>
 
 #include <fmt/format.h>
 
 namespace
 {
+    // The calendar time in milliseconds: a change's `modified`, and the
+    // session a history row names.
+    S64 nowMs()
+    {
+        return S64(LLDate::now().secondsSinceEpoch() * 1000.0);
+    }
+
+    // A name of its own for each flusher a store starts: a pool's name is its
+    // key, and its queue's, among the live ones, and a second is fatal.
+    std::atomic<U32> sFlushers{ 0 };
+
     template <size_t N>
     void writeWords(ALCVarSeqSlot<N>& slot, const U64* words)
     {
@@ -158,6 +172,26 @@ namespace
     }
 }
 
+// The flusher's thread: a pool of one, whose run() is the flusher's loop.
+// The store closes it after its last flush, not the viewer's quitting, which
+// would leave changes unwritten.
+class ALCVars::Flusher final : public LL::ThreadPool
+{
+public:
+    Flusher(const std::string& name, ALCVars& store)
+    :   LL::ThreadPool(name, 1, 1, /*auto_shutdown*/ false, /*fixed_width*/ true),
+        mStore(store)
+    {
+    }
+
+    ~Flusher() override { close(); }
+
+    void run() override { mStore.flusherLoop(); }
+
+private:
+    ALCVars& mStore;
+};
+
 namespace
 {
     // Every store's own number: a batch kept past its store ends nothing on
@@ -166,12 +200,15 @@ namespace
 }
 
 ALCVars::ALCVars()
-:   mSerial(++sStores)
+:   mSerial(++sStores),
+    mSession(nowMs())
 {
 }
 
 ALCVars::~ALCVars()
 {
+    close();
+
     // The listeners go first, while the store is whole: one that owns
     // another's connection lets it go here, and its disconnect finds the
     // store tearing down rather than half destroyed.
@@ -892,11 +929,11 @@ bool ALCVars::set(U32 index, const ALCVarValue& input)
         const bool bottom = user == ALCVarLayer::Global || !mSettings[index].desc->has(ALCVAR_ACCOUNT_OVERRIDE);
         if (bottom && value == mSettings[index].def && !layer(ALCVarLayer::Quality).contains(index))
         {
-            layer(user).erase(index);
+            putUser(user, index, std::nullopt);
         }
         else
         {
-            layer(user).insert_or_assign(index, std::move(value));
+            putUser(user, index, std::move(value));
         }
         const U32 one[] = { index };
         apply(one, &changes);
@@ -919,7 +956,7 @@ void ALCVars::reset(U32 index)
         {
             return;
         }
-        layer(userLayer(index)).erase(index);
+        putUser(userLayer(index), index, std::nullopt);
         const U32 one[] = { index };
         apply(one, &changes);
     }
@@ -943,7 +980,7 @@ void ALCVars::resetGroup(U32 group)
                 post(i, PostedWrite::Kind::Reset);
                 continue;
             }
-            layer(userLayer(i)).erase(i);
+            putUser(userLayer(i), i, std::nullopt);
             touched.push_back(i);
         }
         apply(touched, &changes);
@@ -1023,8 +1060,8 @@ void ALCVars::setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bo
         next.insert_or_assign(index, std::move(value));
         if (dropUser && !restricted(mDenied, index))
         {
-            layer(ALCVarLayer::Global).erase(index);
-            layer(ALCVarLayer::Account).erase(index);
+            putUser(ALCVarLayer::Global, index, std::nullopt);
+            putUser(ALCVarLayer::Account, index, std::nullopt);
         }
         if (std::find(touched.begin(), touched.end(), index) == touched.end())
         {
@@ -1266,6 +1303,783 @@ std::vector<std::string> ALCVars::ownersOf(U32 index) const
         }
     }
     return owners;
+}
+
+// ---- files ----------------------------------------------------------------
+
+namespace
+{
+    // A scope move applied to an account, as its meta records it.
+    std::string movedKey(std::string_view name)
+    {
+        return "moved:" + std::string(name);
+    }
+}
+
+void ALCVars::putUser(ALCVarLayer which, U32 index, std::optional<ALCVarValue> value)
+{
+    Layer&                     values = layer(which);
+    std::optional<ALCVarValue> before;
+    if (const auto found = values.find(index); found != values.end())
+    {
+        before = found->second;
+    }
+    if (value)
+    {
+        values.insert_or_assign(index, *value);
+    }
+    else
+    {
+        values.erase(index);
+    }
+    if (before.has_value() != value.has_value() || (before && !(*before == *value)))
+    {
+        markDirty(which, index, std::move(before), std::move(value));
+    }
+}
+
+void ALCVars::markDirty(ALCVarLayer which, U32 index, std::optional<ALCVarValue> before,
+                        std::optional<ALCVarValue> after)
+{
+    if (desc(index).scope == ALCVarScope::Runtime)
+    {
+        return;
+    }
+    // An account's value before its login succeeds is kept for that login.
+    if (which == ALCVarLayer::Account && !mAccountConfirmed)
+    {
+        mAccountPending.insert(index);
+        return;
+    }
+    if (before)
+    {
+        before = ALCVarFile::persisted(*before);
+    }
+    if (after)
+    {
+        after = ALCVarFile::persisted(*after);
+    }
+    LLCoros::LockType lock(mPersistMutex);
+    Scope&            scope = which == ALCVarLayer::Account ? mAccount : mGlobal;
+    const auto        now   = std::chrono::steady_clock::now();
+    if (!mUnflushed)
+    {
+        mFirstDirty = now;
+    }
+    mUnflushed                = true;
+    mLastDirty                = now;
+    const auto [entry, added] = scope.dirty.try_emplace(index);
+    if (added)
+    {
+        entry->second.before = std::move(before);
+    }
+    entry->second.after    = std::move(after);
+    entry->second.modified = nowMs();
+    mFlushWake.notify_one();
+}
+
+ALCVarRow ALCVars::rowOf(U32 index, const std::optional<ALCVarValue>& value, S64 modified) const
+{
+    const ALCVarDesc& d = desc(index);
+    ALCVarRow         row;
+    row.name      = std::string(d.name);
+    row.type      = S32(d.type);
+    row.unit      = std::string(ALCVarUnits::nameOf(d.unit));
+    row.decl      = d.decl();
+    row.tombstone = !value;
+    row.value     = value ? ALCVarFile::persisted(*value) : ALCVarValue();
+    row.modified  = modified;
+    return row;
+}
+
+ALCVars::Loaded ALCVars::load(const std::vector<ALCVarRow>& rows, const std::vector<ALCVarRow>& prior,
+                              ALCVarLayer which) const
+{
+    Loaded                                                  loaded;
+    boost::unordered_flat_map<std::string_view, const ALCVarRow*> byName;
+    for (const ALCVarRow& row : rows)
+    {
+        byName.emplace(row.name, &row);
+        loaded.rows.insert(row.name);
+    }
+    // What a hook reads, by any name -- a setting's sources among them: each
+    // kept where it is for the whole load, under a name of its own, so that
+    // what a hook was given stays valid through its later lookups.
+    boost::unordered_node_map<std::string, ALCVarStored> stored;
+    const ALCVarStoredLookup lookup = [&](std::string_view name) -> const ALCVarStored* {
+        const auto row = byName.find(name);
+        if (row == byName.end())
+        {
+            return nullptr;
+        }
+        if (const auto cached = stored.find(row->second->name); cached != stored.end())
+        {
+            return &cached->second;
+        }
+        const auto value = row->second->stored();
+        return value ? &stored.emplace(row->second->name, *value).first->second : nullptr;
+    };
+    const ALCVarMigrationLookup migrations = [this](std::string_view name) { return migration(name); };
+
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        const ALCVarDesc& d = desc(i);
+        if (d.scope == ALCVarScope::Runtime)
+        {
+            continue;
+        }
+        const bool mine = which == ALCVarLayer::Global ? d.scope == ALCVarScope::Global
+                                                       : d.scope == ALCVarScope::Account || d.has(ALCVAR_ACCOUNT_OVERRIDE);
+
+        // The newest of its own row and its old names': a value the user
+        // reset does not come back through an old name, and a change an
+        // older viewer made since does.
+        const ALCVarRow*   winner = nullptr;
+        const ALCVarAlias* via    = nullptr;
+        if (const auto own = byName.find(d.name); own != byName.end())
+        {
+            winner = own->second;
+        }
+        for (const ALCVarAlias& alias : d.aliases)
+        {
+            const auto old = byName.find(alias.name);
+            if (old != byName.end() && (!winner || old->second->modified > winner->modified))
+            {
+                winner = old->second;
+                via    = &alias;
+            }
+        }
+
+        std::optional<ALCVarValue> value;
+        S64                        modified = 0;
+        bool                       rewrite  = false;
+        ALCVarConvert::Path        path;
+        if (!winner)
+        {
+            // Nothing of its own: only its sources give it a value.
+            if (d.from.empty() || !mine)
+            {
+                continue;
+            }
+            value    = ALCVarConvert::fromStored(nullptr, d, nullptr, migrations, lookup, &path);
+            modified = nowMs();
+            rewrite  = path.known;
+        }
+        else if (winner->tombstone)
+        {
+            continue;
+        }
+        else
+        {
+            const auto row = winner->stored();
+            if (!row)
+            {
+                continue;
+            }
+            // A current row is fitted as it is read and never written back:
+            // a newer viewer's wider range or added choice is not a step,
+            // and writing the fitted value would clamp its value for good.
+            const bool current = !via && winner->type == S32(d.type) && winner->decl == d.decl() &&
+                                 winner->unit == ALCVarUnits::nameOf(d.unit);
+            value    = current ? ALCVarConvert::fit(row->value, d)
+                               : ALCVarConvert::fromStored(&*row, d, via, migrations, lookup, &path);
+            modified = winner->modified;
+            // A row of a step this build does not know -- a newer viewer's,
+            // another branch's -- is left as it was written: nothing
+            // converts backwards, and the viewer that wrote it would bring a
+            // rewrite forward a second time. Where that viewer ran a migrate
+            // it kept the row from before it, which this build reads if it
+            // knows that row's step.
+            if (!current && !via && !path.known)
+            {
+                const ALCVarRow* known = nullptr;
+                for (const ALCVarRow& kept : prior)
+                {
+                    if (kept.name == d.name && ALCVarConvert::stepOf(d, kept.decl) &&
+                        (!known || kept.modified > known->modified))
+                    {
+                        known = &kept;
+                    }
+                }
+                const auto earlier = known ? known->stored() : std::nullopt;
+                if (earlier)
+                {
+                    ALCVarConvert::Path unused;
+                    value = ALCVarConvert::fromStored(&*earlier, d, nullptr, migrations, lookup, &unused);
+                }
+            }
+            // Written forward only where its step moved: an old name's row
+            // under the new name, the old row kept for older viewers.
+            rewrite = path.known && path.moved;
+            if (!value)
+            {
+                LL_INFOS("ALCVars") << winner->name << " does not convert into " << d.name
+                                    << ", which takes its default; the row is left as it was" << LL_ENDL;
+            }
+        }
+        if (!value)
+        {
+            continue;
+        }
+        if (mine)
+        {
+            if (rewrite)
+            {
+                loaded.rewrites.push_back(rowOf(i, *value, modified));
+                ALCVarHistory entry;
+                entry.at      = nowMs();
+                entry.session = mSession;
+                entry.name    = std::string(d.name);
+                entry.kind    = ALCVarHistory::MIGRATED;
+                if (!d.has(ALCVAR_SENSITIVE))
+                {
+                    entry.before = winner ? std::optional<ALCVarValue>(winner->value) : std::nullopt;
+                    entry.after  = ALCVarFile::persisted(*value);
+                }
+                loaded.history.push_back(std::move(entry));
+                // A migrate's rewrite keeps the row it replaces, for a
+                // viewer that knows only that row's step.
+                if (path.migrated && winner && !via)
+                {
+                    loaded.prior.push_back(*winner);
+                }
+            }
+            loaded.values.insert_or_assign(i, std::move(*value));
+        }
+        else
+        {
+            loaded.others.emplace_back(i, std::make_pair(std::move(*value), modified));
+        }
+    }
+    return loaded;
+}
+
+namespace
+{
+    // A flush the writer is done with: what it dropped, of the settings no
+    // later flush carries, is kept for the next.
+    template <typename Posted, typename Entries>
+    void settle(Posted& posted, U64 flush, Entries& entries, bool committed)
+    {
+        LLCoros::LockType lock(posted.mutex);
+        for (auto& [index, dirty] : entries)
+        {
+            const auto last = posted.last.find(index);
+            if (last == posted.last.end() || last->second != flush)
+            {
+                continue;
+            }
+            posted.last.erase(last);
+            if (!committed)
+            {
+                posted.dropped.insert_or_assign(index, std::move(dirty));
+            }
+        }
+    }
+}
+
+void ALCVars::attach(Scope& scope, std::shared_ptr<ALCVarFile> file)
+{
+    scope.file     = std::move(file);
+    scope.readOnly = scope.file->readOnly();
+    scope.posted   = std::make_shared<Posted>();
+}
+
+bool ALCVars::pendingIn(const Scope& scope, U32 index) const
+{
+    if (scope.dirty.contains(index))
+    {
+        return true;
+    }
+    if (!scope.posted)
+    {
+        return false;
+    }
+    LLCoros::LockType lock(scope.posted->mutex);
+    return scope.posted->dropped.contains(index);
+}
+
+void ALCVars::writeDirty(Scope& scope)
+{
+    // With no file, or one that may only be read, it waits in memory.
+    if (!scope.file || scope.readOnly)
+    {
+        return;
+    }
+    Posted&           posted = *scope.posted;
+    LLCoros::LockType lock(posted.mutex);
+    // What a dropped flush carried goes again, under anything newer.
+    for (auto& [index, lost] : posted.dropped)
+    {
+        const auto [entry, added] = scope.dirty.try_emplace(index, std::move(lost));
+        if (!added)
+        {
+            entry->second.before = std::move(lost.before);
+        }
+    }
+    posted.dropped.clear();
+    if (scope.dirty.empty())
+    {
+        return;
+    }
+
+    const U64                  flush = ++posted.flushes;
+    std::vector<ALCVarRow>     rows;
+    std::vector<ALCVarHistory> history;
+    for (const auto& [index, dirty] : scope.dirty)
+    {
+        posted.last.insert_or_assign(index, flush);
+        rows.push_back(rowOf(index, dirty.after, dirty.modified));
+        scope.rows.insert(rows.back().name);
+        if (dirty.before.has_value() == dirty.after.has_value() && (!dirty.before || *dirty.before == *dirty.after))
+        {
+            continue;
+        }
+        // Of a sensitive setting, only that it changed.
+        const bool sensitive = desc(index).has(ALCVAR_SENSITIVE);
+        history.push_back({ dirty.modified, mSession, rows.back().name, sensitive ? std::nullopt : dirty.before,
+                            sensitive ? std::nullopt : dirty.after });
+    }
+    lock.unlock();
+
+    // The changes are kept until the writer says whether they committed.
+    auto entries = std::make_shared<boost::unordered_flat_map<U32, Dirty>>(std::move(scope.dirty));
+    scope.dirty.clear();
+    if (!scope.file->write(std::move(rows), std::move(history), {},
+                           [posted = scope.posted, flush, entries](bool committed) {
+                               settle(*posted, flush, *entries, committed);
+                           }))
+    {
+        settle(posted, flush, *entries, false);
+    }
+}
+
+void ALCVars::startFlusher()
+{
+    if (!mFlusher)
+    {
+        mFlusher = std::make_unique<Flusher>(fmt::format("ALCVars:flush#{}", ++sFlushers), *this);
+        mFlusher->start();
+    }
+}
+
+void ALCVars::flusherLoop()
+{
+    LLCoros::LockType lock(mPersistMutex);
+    while (!mStopping)
+    {
+        if (!mUnflushed)
+        {
+            mFlushWake.wait(lock);
+            continue;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        const auto due = std::min(mLastDirty + mQuiet, mFirstDirty + mLongest);
+        if (now < due)
+        {
+            mFlushWake.wait_until(lock, due);
+            continue;
+        }
+        if (mBatchesOpen.load(std::memory_order_relaxed) > 0)
+        {
+            mFlushWake.wait_for(lock, std::chrono::milliseconds(10));
+            continue;
+        }
+        mUnflushed = false;
+        writeDirty(mGlobal);
+        writeDirty(mAccount);
+    }
+}
+
+void ALCVars::stopFlusher()
+{
+    {
+        LLCoros::LockType lock(mPersistMutex);
+        mStopping = true;
+    }
+    mFlushWake.notify_all();
+    // Its loop ends at the stop: closing the pool joins the thread, which
+    // only this thread, not the pool's own, may do.
+    mFlusher.reset();
+    mStopping = false;
+}
+
+void ALCVars::setFlushDelays(std::chrono::milliseconds quiet, std::chrono::milliseconds longest)
+{
+    LLCoros::LockType lock(mPersistMutex);
+    mQuiet   = quiet;
+    mLongest = longest;
+    mFlushWake.notify_one();
+}
+
+namespace
+{
+    // Whether a file just opened is one the store can keep: on disk, and
+    // opened.
+    bool keepable(ALCVarFile& file)
+    {
+        const ALDbOpenResult& result = file.open();
+        if (result.usable() && !file.database().transient())
+        {
+            return true;
+        }
+        LL_WARNS("ALCVars") << file.path() << " cannot be used: " << result.message << LL_ENDL;
+        return false;
+    }
+
+    void unreadable(ALCVarFile& file)
+    {
+        LL_WARNS("ALCVars") << file.path() << " could not be read whole; it is left as it is, and nothing is written to it"
+                            << LL_ENDL;
+    }
+}
+
+bool ALCVars::openGlobal(const std::string& path, const ALCVarFileOptions& options)
+{
+    llassert(on_main_thread() && registered());
+    auto file = std::make_shared<ALCVarFile>(path, options);
+    if (!keepable(*file))
+    {
+        file->close();
+        return false;
+    }
+    const auto rows  = file->readRows();
+    const auto prior = rows ? file->readPrior() : std::nullopt;
+    if (!prior)
+    {
+        unreadable(*file);
+        file->close();
+        return false;
+    }
+    Loaded loaded = load(*rows, *prior, ALCVarLayer::Global);
+
+    std::vector<Change> changes;
+    {
+        auto             lock = lockWrites();
+        std::vector<U32> touched;
+        // A value written before the file opened is newer than the file's.
+        for (auto& [index, value] : loaded.values)
+        {
+            if (!layer(ALCVarLayer::Global).contains(index))
+            {
+                layer(ALCVarLayer::Global).insert_or_assign(index, std::move(value));
+                touched.push_back(index);
+            }
+        }
+        mGlobalForAccounts.clear();
+        for (auto& [index, value] : loaded.others)
+        {
+            mGlobalForAccounts.insert_or_assign(index, std::move(value));
+        }
+        apply(touched, &changes);
+    }
+    {
+        LLCoros::LockType lock(mPersistMutex);
+        attach(mGlobal, std::move(file));
+        mGlobal.rows = std::move(loaded.rows);
+        if (!mGlobal.readOnly)
+        {
+            mGlobal.file->bringForward(std::move(loaded.rewrites), std::move(loaded.prior),
+                                       std::move(loaded.history), {});
+        }
+        startFlusher();
+    }
+    noteChanges(changes);
+    return true;
+}
+
+bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& options)
+{
+    llassert(on_main_thread() && registered());
+    auto file = std::make_shared<ALCVarFile>(path, options);
+    std::optional<boost::unordered_flat_map<std::string, std::string>> meta;
+    std::optional<std::vector<ALCVarRow>>                              rows;
+    std::optional<std::vector<ALCVarRow>>                              prior;
+    const bool                                                         opened = keepable(*file);
+    if (opened)
+    {
+        meta = file->readMeta();
+        if (meta)
+        {
+            rows = file->readRows();
+        }
+        if (rows)
+        {
+            prior = file->readPrior();
+        }
+    }
+    if (!prior)
+    {
+        if (opened)
+        {
+            unreadable(*file);
+        }
+        file->close();
+        // The account open before this one is not the one logging in.
+        if (accountOpen())
+        {
+            closeAccount();
+        }
+        return false;
+    }
+    Loaded loaded = load(*rows, *prior, ALCVarLayer::Account);
+
+    std::shared_ptr<ALCVarFile>                      previous;
+    std::vector<std::pair<std::string, std::string>> moved;
+    std::vector<Change>                              changes;
+    {
+        auto lock = lockWrites();
+
+        // Global to account: each account takes the global value of a
+        // setting now an account's, once, where it has no row of its own.
+        for (const auto& [index, value] : mGlobalForAccounts)
+        {
+            const ALCVarDesc& d   = desc(index);
+            bool              has = loaded.rows.contains(std::string(d.name));
+            for (const ALCVarAlias& alias : d.aliases)
+            {
+                has = has || loaded.rows.contains(std::string(alias.name));
+            }
+            if (has || meta->contains(movedKey(d.name)))
+            {
+                continue;
+            }
+            loaded.values.insert_or_assign(index, value.first);
+            loaded.rewrites.push_back(rowOf(index, value.first, value.second));
+            moved.emplace_back(movedKey(d.name), "1");
+        }
+
+        // What was written to account settings since the last login attempt
+        // is laid over the account's own.
+        Layer next = std::move(loaded.values);
+        for (const U32 index : mAccountPending)
+        {
+            const auto written = layer(ALCVarLayer::Account).find(index);
+            if (written != layer(ALCVarLayer::Account).end())
+            {
+                next.insert_or_assign(index, written->second);
+            }
+            else
+            {
+                next.erase(index);
+            }
+        }
+        std::vector<U32> touched;
+        for (const auto& [index, value] : layer(ALCVarLayer::Account))
+        {
+            touched.push_back(index);
+        }
+        for (const auto& [index, value] : next)
+        {
+            if (!layer(ALCVarLayer::Account).contains(index))
+            {
+                touched.push_back(index);
+            }
+        }
+        layer(ALCVarLayer::Account) = std::move(next);
+        mAccountOpen                = true;
+        mAccountConfirmed           = false;
+        updateAllFlags();
+        apply(touched, &changes);
+
+        // Account to global: the first account opened with a value of a
+        // setting now global gives it to the global layer, if that has no
+        // row.
+        LLCoros::LockType persist(mPersistMutex);
+        for (auto& [index, value] : loaded.others)
+        {
+            const ALCVarDesc& d   = desc(index);
+            bool              has = layer(ALCVarLayer::Global).contains(index) ||
+                       mGlobal.rows.contains(std::string(d.name)) || pendingIn(mGlobal, index);
+            for (const ALCVarAlias& alias : d.aliases)
+            {
+                has = has || mGlobal.rows.contains(std::string(alias.name));
+            }
+            if (!has)
+            {
+                layer(ALCVarLayer::Global).insert_or_assign(index, value.first);
+                const auto [entry, added] = mGlobal.dirty.try_emplace(index);
+                entry->second.after       = ALCVarFile::persisted(value.first);
+                entry->second.modified    = value.second;
+                mLastDirty = mFirstDirty = std::chrono::steady_clock::now();
+                mUnflushed                = true;
+                const U32 one[]           = { index };
+                apply(one, &changes);
+            }
+        }
+
+        // The account before this one is written and closed.
+        writeDirty(mAccount);
+        previous = std::move(mAccount.file);
+        attach(mAccount, std::move(file));
+        mAccount.rows = std::move(loaded.rows);
+        mAccount.dirty.clear();
+        if (!mAccount.readOnly)
+        {
+            mAccount.file->bringForward(std::move(loaded.rewrites), std::move(loaded.prior), std::move(loaded.history),
+                                        std::move(moved));
+        }
+        startFlusher();
+        mFlushWake.notify_one();
+    }
+    if (previous)
+    {
+        previous->close();
+    }
+    noteChanges(changes);
+    return true;
+}
+
+void ALCVars::confirmAccount()
+{
+    llassert(on_main_thread());
+    auto lock = lockWrites();
+    if (!mAccountOpen)
+    {
+        return;
+    }
+    mAccountConfirmed = true;
+    for (const U32 index : mAccountPending)
+    {
+        const auto written = layer(ALCVarLayer::Account).find(index);
+        markDirty(ALCVarLayer::Account, index, std::nullopt,
+                  written != layer(ALCVarLayer::Account).end() ? std::optional<ALCVarValue>(written->second)
+                                                               : std::nullopt);
+    }
+    mAccountPending.clear();
+}
+
+void ALCVars::closeAccount()
+{
+    llassert(on_main_thread());
+    std::shared_ptr<ALCVarFile> file;
+    std::vector<Change>         changes;
+    {
+        auto             lock = lockWrites();
+        std::vector<U32> touched;
+        for (const auto& [index, value] : layer(ALCVarLayer::Account))
+        {
+            touched.push_back(index);
+        }
+        layer(ALCVarLayer::Account).clear();
+        mAccountPending.clear();
+        mAccountOpen      = false;
+        mAccountConfirmed = false;
+        updateAllFlags();
+        apply(touched, &changes);
+
+        LLCoros::LockType persist(mPersistMutex);
+        writeDirty(mAccount);
+        file = std::move(mAccount.file);
+        mAccount.dirty.clear();
+        mAccount.posted.reset();
+        mAccount.readOnly = false;
+        mAccount.rows.clear();
+    }
+    // Its close writes what was posted, within the file's bounded wait.
+    if (file)
+    {
+        file->close();
+    }
+    noteChanges(changes);
+}
+
+bool ALCVars::accountOpen() const
+{
+    auto lock = lockWrites();
+    return mAccountOpen;
+}
+
+void ALCVars::moveToAccount(U32 index)
+{
+    llassert(desc(index).has(ALCVAR_ACCOUNT_OVERRIDE));
+    std::vector<Change> changes;
+    {
+        auto lock = lockWrites();
+        if (restricted(mDenied, index))
+        {
+            return;
+        }
+        const auto global = layer(ALCVarLayer::Global).find(index);
+        putUser(ALCVarLayer::Account, index,
+                global != layer(ALCVarLayer::Global).end() ? global->second : mSettings[index].def);
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
+}
+
+void ALCVars::moveToGlobal(U32 index)
+{
+    std::vector<Change> changes;
+    {
+        auto lock = lockWrites();
+        if (restricted(mDenied, index))
+        {
+            return;
+        }
+        putUser(ALCVarLayer::Account, index, std::nullopt);
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
+}
+
+void ALCVars::flushNow()
+{
+    // Waited for by what the writers tell, not by the files, which a close
+    // while this waits may let go.
+    std::vector<LLCoros::Future<bool>> written;
+    {
+        LLCoros::LockType lock(mPersistMutex);
+        mUnflushed = false;
+        for (Scope* scope : { &mGlobal, &mAccount })
+        {
+            writeDirty(*scope);
+            if (scope->file && !scope->readOnly)
+            {
+                written.push_back(scope->file->flushed());
+            }
+        }
+    }
+    // Both files within one wait: a writer that cannot write -- a disk that
+    // hangs, a file another process holds locked -- goes on trying alone.
+    const auto deadline = std::chrono::steady_clock::now() + ALCVarFile::CLOSE_WAIT;
+    for (auto& result : written)
+    {
+        if (result.wait_until(deadline) != boost::fibers::future_status::ready)
+        {
+            LL_WARNS("ALCVars") << "settings not written within " << ALCVarFile::CLOSE_WAIT.count()
+                                << " ms; the writer goes on trying" << LL_ENDL;
+            return;
+        }
+    }
+}
+
+void ALCVars::close()
+{
+    stopFlusher();
+    std::shared_ptr<ALCVarFile> global;
+    std::shared_ptr<ALCVarFile> account;
+    {
+        LLCoros::LockType lock(mPersistMutex);
+        writeDirty(mGlobal);
+        writeDirty(mAccount);
+        global  = std::move(mGlobal.file);
+        account = std::move(mAccount.file);
+        for (Scope* scope : { &mGlobal, &mAccount })
+        {
+            scope->posted.reset();
+            scope->readOnly = false;
+        }
+    }
+    for (auto* file : { account.get(), global.get() })
+    {
+        if (file)
+        {
+            file->close();
+        }
+    }
 }
 
 // ---- names ----------------------------------------------------------------
@@ -1601,11 +2415,14 @@ void ALCVars::beginBatch()
 {
     llassert(on_main_thread());
     ++mBatchDepth;
+    mBatchesOpen.fetch_add(1, std::memory_order_relaxed);
 }
 
 void ALCVars::endBatch(bool deliverNow)
 {
     llassert(on_main_thread() && mBatchDepth > 0);
+    mBatchesOpen.fetch_sub(1, std::memory_order_relaxed);
+    mFlushWake.notify_one();
     if (--mBatchDepth == 0 && !mInPass && deliverNow)
     {
         drainQueued();

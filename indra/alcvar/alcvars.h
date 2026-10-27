@@ -27,16 +27,20 @@
 
 #include "alcvar.h"
 #include "alcvarconvert.h"
+#include "alcvarfile.h"
 #include "alcvarref.h"
 
 #include "llcoros.h"
 #include "llsingleton.h"
 
 #include LLCOROS_MUTEX_HEADER
+#include LLCOROS_CONDVAR_HEADER
 
 #include <boost/unordered/unordered_flat_map.hpp>
+#include <boost/unordered/unordered_flat_set.hpp>
 
 #include <atomic>
+#include <chrono>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -91,8 +95,9 @@ struct ALCVarStats
 // reader on any thread sees the value whole as soon as set() returns. A
 // write that would change nothing returns before the lock. Its locks are
 // the coroutines' own, so a write may come from any coroutine: one that
-// waits for a lock gives the rest of its thread's coroutines their turn
-// rather than stopping the thread.
+// waits for a lock -- the flusher's, while it hands a flush to the file --
+// gives the rest of its thread's coroutines their turn rather than stopping
+// the thread.
 class ALCVars : public LLSingleton<ALCVars>
 {
     LLSINGLETON(ALCVars);
@@ -281,6 +286,62 @@ public:
     // after, so read with no lock. Empty where nothing has the name.
     ALCVarRef find(std::string_view name) const;
 
+    // ---- files ------------------------------------------------------------
+
+    // Opens the global settings file and takes its rows into the Global
+    // layer, each converted into its setting as it is declared now, and
+    // waits. Rows a rename, a conversion or a scope move touches are
+    // written back; rows of settings this build does not know, and those
+    // that do not convert, are left as they were. False when the file is
+    // not kept: it cannot be opened, is another kind of file, could be used
+    // only in memory this session, or could not be read whole -- then it is
+    // left as it is and the store runs on what it holds in memory. A file
+    // that may only be read is read, and kept, and nothing is written to
+    // it; options.onFailure is told so.
+    //
+    // From then on, each change of a user value is written to its file in
+    // one transaction with every other since the last: QUIET after the last
+    // change, at most LONGEST after the first, or at flushNow(). A slider
+    // dragged through a hundred values writes one row once. A transaction
+    // the file's writer drops is tried again with the next.
+    bool openGlobal(const std::string& path, const ALCVarFileOptions& options = {});
+    // The account's file, at each login attempt: its rows replace the
+    // Account layer under one write, every group's sequence held odd until
+    // the last slot is written, so no thread sees a default between two
+    // accounts' values, and every setting whose value moved is told once.
+    // What was written to account settings before it is laid over its rows,
+    // and kept only if the login succeeds. False as openGlobal is; then an
+    // account open before it is closed, as closeAccount() closes it.
+    bool openAccount(const std::string& path, const ALCVarFileOptions& options = {});
+    // The login succeeded: what was written to account settings since the
+    // last login attempt is this account's, and written.
+    void confirmAccount();
+    // Logout, or a login that failed: the account's values go, and what was
+    // written before a login that never came is dropped.
+    void closeAccount();
+    bool accountOpen() const;
+
+    // An account_override setting's "This account only": the value the
+    // global layer gives moved into this account's own; and "All
+    // accounts": the account's own dropped.
+    void moveToAccount(U32 index);
+    void moveToGlobal(U32 index);
+
+    // Writes every change now and waits for it, within the files' bounded
+    // wait, both files at once: at login, logout, after Preferences' OK,
+    // before the steps most likely to crash.
+    void flushNow();
+    // Writes every change, waits for it within the files' bounded wait, and
+    // closes them. Nothing else is written at exit.
+    void close();
+
+    static constexpr std::chrono::milliseconds QUIET{ 250 };
+    static constexpr std::chrono::milliseconds LONGEST{ 1000 };
+    // For the tests: shorter waits.
+    void setFlushDelays(std::chrono::milliseconds quiet, std::chrono::milliseconds longest);
+    // Which run of the viewer made a change, as its history says.
+    S64 session() const { return mSession; }
+
     // ---- frames ---------------------------------------------------------
 
     // On the main thread, at the end of each frame: frees the strings and
@@ -447,6 +508,79 @@ private:
     void restrict(boost::unordered_flat_map<U64, Owners>& restrictions, std::string_view owner,
                   ALCVarTarget target, bool add);
 
+    // A user layer's value of a setting set, or removed, and marked to be
+    // written to its file: under the write lock.
+    void putUser(ALCVarLayer which, U32 index, std::optional<ALCVarValue> value);
+    void markDirty(ALCVarLayer which, U32 index, std::optional<ALCVarValue> before,
+                   std::optional<ALCVarValue> after);
+
+    // A user value's change still to be written: its oldest old value and
+    // newest new one, an LLSD setting's as its text (ALCVarFile::persisted).
+    struct Dirty
+    {
+        std::optional<ALCVarValue> before;
+        std::optional<ALCVarValue> after;
+        S64                        modified = 0;
+    };
+
+    // A file's flushes its writer has not finished, shared with each one's
+    // completion, which the writer may tell after the store has let the file
+    // go: what a dropped flush carried, for the next to write.
+    struct Posted
+    {
+        LLCoros::Mutex                        mutex;
+        U64                                   flushes = 0;
+        // Each setting's last flush posted.
+        boost::unordered_flat_map<U32, U64>   last;
+        // The changes of dropped flushes that nothing posted since replaces.
+        boost::unordered_flat_map<U32, Dirty> dropped;
+    };
+
+    // One file's: the file, what is to be written to it, and every name it
+    // has a row of or is being given one, tombstones included.
+    struct Scope
+    {
+        std::shared_ptr<ALCVarFile>            file;
+        // Open only for reading: what is dirty stays in memory.
+        bool                                   readOnly = false;
+        std::shared_ptr<Posted>                posted;
+        boost::unordered_flat_map<U32, Dirty>  dirty;
+        boost::unordered_flat_set<std::string> rows;
+    };
+
+    // A file's rows, resolved into the settings they are now.
+    struct Loaded
+    {
+        Layer                                  values;
+        // Rows to write back: renamed, brought forward, or moved in; the
+        // rows a migrate replaced, kept; and the history of each.
+        std::vector<ALCVarRow>                 rewrites;
+        std::vector<ALCVarRow>                 prior;
+        std::vector<ALCVarHistory>             history;
+        boost::unordered_flat_set<std::string> rows;
+        // Values of settings of the other scope, with when they were written.
+        std::vector<std::pair<U32, std::pair<ALCVarValue, S64>>> others;
+    };
+    Loaded load(const std::vector<ALCVarRow>& rows, const std::vector<ALCVarRow>& prior, ALCVarLayer which) const;
+    ALCVarRow rowOf(U32 index, const std::optional<ALCVarValue>& value, S64 modified) const;
+    // A file just opened, checked and read: kept, or closed and false. An
+    // open account is closed with it.
+    bool usableFile(ALCVarFile& file, const ALCVarFileOptions& options, ALCVarLayer which);
+    // Under the persistence lock: the scope's file becomes this one.
+    void attach(Scope& scope, std::shared_ptr<ALCVarFile> file);
+    // Under the persistence lock: posts what is dirty, with what a dropped
+    // flush left.
+    void writeDirty(Scope& scope);
+    // Whether a change of the setting is waiting to be written to the
+    // scope's file.
+    bool pendingIn(const Scope& scope, U32 index) const;
+    class Flusher;
+    // Under the persistence lock: the flusher started, for whichever file
+    // opens first.
+    void startFlusher();
+    void flusherLoop();
+    void stopFlusher();
+
     // Writes a value into a setting's slot, as a reader on any thread may see
     // it at any moment: whole, and never torn. The group's sequence is the
     // caller's to hold odd around it.
@@ -519,6 +653,36 @@ private:
     std::vector<Change>                          mQueued;
     boost::unordered_flat_map<U32, size_t>       mQueuedAt;
     std::vector<PostedWrite>                     mPosted;
+
+    // Under the write lock: whether an account's file is open, whether its
+    // login succeeded, and the account writes kept for a login to come; and
+    // the global file's values of settings that are now an account's, for
+    // each account to take once.
+    bool                                                         mAccountOpen      = false;
+    bool                                                         mAccountConfirmed = false;
+    boost::unordered_flat_set<U32>                               mAccountPending;
+    boost::unordered_flat_map<U32, std::pair<ALCVarValue, S64>>  mGlobalForAccounts;
+
+    // Under the persistence lock, which is taken inside the write lock and
+    // never the other way.
+    LLCoros::Mutex                             mPersistMutex;
+    LLCoros::ConditionVariable                 mFlushWake;
+    Scope                                      mGlobal;
+    Scope                                      mAccount;
+    // A change made since the last flush: what the flusher waits for.
+    // What a dropped flush left waits for the next one, not a flush of its
+    // own, which would drop it again as fast as the writer can.
+    bool                                       mUnflushed = false;
+    std::chrono::steady_clock::time_point      mFirstDirty;
+    std::chrono::steady_clock::time_point      mLastDirty;
+    std::chrono::milliseconds                  mQuiet   = QUIET;
+    std::chrono::milliseconds                  mLongest = LONGEST;
+    bool                                       mStopping = false;
+    std::unique_ptr<Flusher>                   mFlusher;
+    // Batches open on the main thread: a batch's writes go in one
+    // transaction, so none is flushed while one is open.
+    std::atomic<U32>                           mBatchesOpen{ 0 };
+    S64                                        mSession = 0;
 
     mutable LLCoros::Mutex                     mRetiredMutex;
     std::vector<boost::shared_ptr<const void>> mRetired;
