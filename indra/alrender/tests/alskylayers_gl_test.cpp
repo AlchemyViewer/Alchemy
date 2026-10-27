@@ -992,9 +992,9 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the aurora along the view
 TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the meteors at each pixel are the meteors' quads", "[alskylayers_gl]")
 {
     // Every corner of a meteor's quad lies at the depth of its midpoint, so the quad interpolated its coordinates
-    // linearly on the screen, as the loop over the packed streaks solves them. The meteor behind the camera is left out
-    // of the loop, and drew nothing before; the one end on to the camera is a sliver both ways. The fireball passes 1,
-    // which the 8-bit albedo clamped (D6).
+    // linearly on the screen, as the loop over the packed streaks solves them. The meteors behind the camera and end on
+    // to it are left out of the loop: the one drew nothing before, and the other a sliver that covers no pixel. The
+    // fireball passes 1, which the 8-bit albedo clamped (D6).
     setUp();
     S32 clamped_pixels = 0;
     for (S32 path = 0; path < 2; ++path)
@@ -1003,7 +1003,7 @@ TEST_CASE_METHOD(alskylayers_gl_data, "alskylayers_gl: the meteors at each pixel
         CAPTURE(emissive);
         U32 packed = 0;
         const std::vector<F32> ray = rayMeteors(emissive, packed);
-        CHECK(packed == 5);
+        CHECK(packed == 4);
         check(ray, oldMeteors(emissive, false), oldMeteors(emissive, true), emissive, METEOR_MATHS, clamped_pixels,
               true);
     }

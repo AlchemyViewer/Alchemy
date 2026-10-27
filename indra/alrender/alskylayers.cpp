@@ -171,6 +171,16 @@ U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 w
         const F32 mid_y    = clip_mid[VY] / clip_mid[VW];
         const F32 streak_x = clip_head[VX] / clip_head[VW] - mid_x;
         const F32 streak_y = clip_head[VY] / clip_head[VW] - mid_y;
+
+        // A streak shorter on the screen than a hundredth of a pixel each way is one seen end on, its ends apart by
+        // rounding alone, and its quad covers no pixel's centre but by chance.
+        const F32 streak_px_x = streak_x * width * 0.5f;
+        const F32 streak_px_y = streak_y * height * 0.5f;
+        if (streak_px_x * streak_px_x + streak_px_y * streak_px_y < 1e-4f)
+        {
+            continue;
+        }
+
         F32 perp_x = -streak_y;
         F32 perp_y = streak_x;
         const F32 perp_len = llmax(sqrtf(perp_x * perp_x + perp_y * perp_y), 1e-5f);

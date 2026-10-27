@@ -233,8 +233,12 @@ TEST_CASE("alskylayers: a meteor's streak is packed as its quad on the screen", 
     ALSkyLayers::Meteor end_on = ahead;
     end_on.mHalf = ahead.mMidpoint * 0.1f;
 
+    // One end on whose ends lie apart by what rounding moves a point, a few millionths of a pixel on the screen.
+    ALSkyLayers::Meteor rounded = end_on;
+    rounded.mHalf.mV[VX] += 1e-5f;
+
     std::vector<LLVector4> out;
-    const U32 count = ALSkyLayers::packMeteors({ behind, ahead, aside, end_on }, mvp, WIDTH, HEIGHT, 1.5f, out);
+    const U32 count = ALSkyLayers::packMeteors({ behind, ahead, aside, end_on, rounded }, mvp, WIDTH, HEIGHT, 1.5f, out);
     REQUIRE(count == 1);
     REQUIRE(out.size() == ALSkyLayers::METEOR_VECTORS);
 

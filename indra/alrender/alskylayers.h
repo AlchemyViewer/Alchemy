@@ -162,7 +162,8 @@ struct Meteor
 ///
 /// Each streak is a quad on the screen of @a width_px pixels a side for each unit of width, through @a mvp (the
 /// agent's frame about the camera to clip space) onto a @a width by @a height viewport. A streak with an end at or
-/// behind the camera, one wholly off the screen, and one with no area are left out. Returns how many are in @a out.
+/// behind the camera, one seen end on (shorter on the screen than a hundredth of a pixel each way), one wholly off the
+/// screen, and one with no area are left out. Returns how many are in @a out.
 U32 packMeteors(const std::vector<Meteor>& meteors, const LLMatrix4a& mvp, F32 width, F32 height, F32 width_px,
                 std::vector<LLVector4>& out);
 
