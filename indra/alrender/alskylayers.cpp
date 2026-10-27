@@ -152,7 +152,9 @@ bool quadCoord(const std::array<LLVector3, 3>& quad, const LLVector3& dir, F32& 
 {
     const LLVector3 normal = quad[1] % quad[2];
     const F32 facing = dir * normal;
-    if (fabsf(facing) < 1e-12f)
+    // Parallel to within rounding, measured against the normal's own length, which the quad's axes set: a ray along
+    // the plane leaves its dot product with the normal a few ulps of that length off zero, one way or the other.
+    if (fabsf(facing) <= 1e-5f * normal.length() * dir.length())
     {
         return false;
     }
