@@ -34,6 +34,8 @@
 
 #include <fmt/format.h>
 
+#include <bit>
+
 namespace
 {
     using namespace al_sky_test;
@@ -1112,7 +1114,12 @@ TEST_CASE_METHOD(alskycomposite_gl_data, "alskycomposite_gl: the composite is th
             }
             const Difference maths = compare(composite, sphere, unclamped_hdri, emissive, MATHS, 1.f, hdri);
             const S32 clamp_count = (S32)std::count(clamps.begin(), clamps.end(), true);
-            const Difference stored = compare(composite, sphere_8bit, unclamped, emissive, MATHS, 2.f, hdri);
+            // The old sky stored the dome and then each layer over what was stored. 8 bits round each store to the
+            // nearest step; R11G11B10F may round it toward zero, as GL allows and llvmpipe does, so there the old sky
+            // may lie up to a step under the composite for every store.
+            const S32 stores = 1 + std::popcount((U32)(scene.mLayers & ~L::HDRI));
+            const Difference stored = compare(composite, sphere_8bit, unclamped, emissive, MATHS,
+                                              emissive ? (F32)stores : 2.f, hdri);
             const Difference clamp_diff = compare(composite, sphere_8bit, clamps, emissive, 0.f, 0.f, hdri);
 
             // The dome's mesh: above the camera's level its facets, below it its skirt (D7).
