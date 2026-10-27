@@ -31,6 +31,8 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 #include <boost/smart_ptr/make_shared.hpp>
 
+#include <fmt/format.h>
+
 namespace
 {
     template <size_t N>
@@ -156,10 +158,29 @@ namespace
     }
 }
 
-ALCVars::ALCVars() = default;
+namespace
+{
+    // Every store's own number: a batch kept past its store ends nothing on
+    // the next one.
+    std::atomic<U64> sStores{ 0 };
+}
+
+ALCVars::ALCVars()
+:   mSerial(++sStores)
+{
+}
 
 ALCVars::~ALCVars()
 {
+    // The listeners go first, while the store is whole: one that owns
+    // another's connection lets it go here, and its disconnect finds the
+    // store tearing down rather than half destroyed.
+    mTearingDown = true;
+    {
+        auto listeners      = std::move(mListeners);
+        auto groupListeners = std::move(mGroupListeners);
+    }
+
     // The LLSD the boxed slots point to goes with the store; a read after
     // it reads undefined LLSD rather than freed memory.
     for (const Setting& setting : mSettings)
@@ -265,6 +286,9 @@ void ALCVars::registerSchema(const ALCVarSchema& schema)
     mTagGenerations.reset(new std::atomic<U64>[std::max<size_t>(schema.tags.size(), 1)]());
     mFlags.reset(new std::atomic<U8>[mSettings.size()]());
     mWriteSeq.reset(new std::atomic<U32>[mSettings.size()]());
+    mListened.reset(new std::atomic<U8>[mSettings.size()]());
+    mListeners.resize(mSettings.size());
+    mGroupListeners.resize(mGroups.size());
 
     // Every slot back to its compiled default: a store made again over the
     // same schema, as each test makes one, starts where a new process does.
@@ -697,7 +721,7 @@ bool ALCVars::restricted(const boost::unordered_flat_map<U64, Owners>& restricti
     return false;
 }
 
-void ALCVars::apply(std::span<const U32> indices)
+void ALCVars::apply(std::span<const U32> indices, std::vector<Change>* changes)
 {
     // Each setting's sequence odd from its flags to its slot; the indices
     // are distinct.
@@ -736,6 +760,10 @@ void ALCVars::apply(std::span<const U32> indices)
     }
     for (const auto& [index, value] : changed)
     {
+        if (changes && listened(index))
+        {
+            changes->push_back({ index, readSlot(index) });
+        }
         publish(index, value);
     }
     for (const U32 group : groups)
@@ -751,6 +779,11 @@ void ALCVars::apply(std::span<const U32> indices)
         bump(index);
     }
     mChanges.fetch_add(changed.size(), std::memory_order_relaxed);
+    // Off the main thread, queued now, under the lock: in the order made.
+    if (changes && !changes->empty() && !on_main_thread())
+    {
+        queueChanges(*changes);
+    }
 }
 
 void ALCVars::bump(U32 index)
@@ -797,14 +830,17 @@ bool ALCVars::set(U32 index, const ALCVarValue& input)
     // What can be told before the lock: the flags and the slot, read between
     // two reads of the setting's write sequence, so that a write under the
     // lock meanwhile -- a hold, a Session value placed -- sends this one the
-    // long way rather than letting a stale flag pass a fresh value.
-    const U32 sequence = mWriteSeq[index].load(std::memory_order_acquire);
-    const U8  flags    = mFlags[index].load(std::memory_order_relaxed);
+    // long way rather than letting a stale flag pass a fresh value. A write
+    // posted to the main thread never takes this way: it would pass the
+    // writes posted before it.
+    const bool posts    = postsToMain(index);
+    const U32  sequence = mWriteSeq[index].load(std::memory_order_acquire);
+    const U8   flags    = mFlags[index].load(std::memory_order_relaxed);
     if (flags & FLAG_DENIED)
     {
         return false;
     }
-    if (!(sequence & 1) && unchanged(index, input, flags))
+    if (!posts && !(sequence & 1) && unchanged(index, input, flags))
     {
         ALCVarAtomic::fenceAcquire();
         if (mWriteSeq[index].load(std::memory_order_relaxed) == sequence)
@@ -817,59 +853,88 @@ bool ALCVars::set(U32 index, const ALCVarValue& input)
     {
         return false;
     }
-
-    auto lock = lockWrites();
-    if (restricted(mDenied, index))
+    llassert(mSettings[index].storage != ALCVarStorage::Boxed || on_main_thread());
+    if (posts)
+    {
+        post(index, PostedWrite::Kind::Set, std::move(value));
+        return true;
+    }
+    if (!runValidator(index, value))
     {
         return false;
     }
-    const ALCVarLayer user = userLayer(index);
-    layer(ALCVarLayer::Session).erase(index);
-    // The bottom user layer keeps no value the compiled default already
-    // gives; an account's override keeps any.
-    const bool bottom = user == ALCVarLayer::Global || !mSettings[index].desc->has(ALCVAR_ACCOUNT_OVERRIDE);
-    if (bottom && value == mSettings[index].def && !layer(ALCVarLayer::Quality).contains(index))
+
+    std::vector<Change> changes;
     {
-        layer(user).erase(index);
+        auto lock = lockWrites();
+        if (restricted(mDenied, index))
+        {
+            return false;
+        }
+        const ALCVarLayer user = userLayer(index);
+        layer(ALCVarLayer::Session).erase(index);
+        // The bottom user layer keeps no value the compiled default already
+        // gives; an account's override keeps any.
+        const bool bottom = user == ALCVarLayer::Global || !mSettings[index].desc->has(ALCVAR_ACCOUNT_OVERRIDE);
+        if (bottom && value == mSettings[index].def && !layer(ALCVarLayer::Quality).contains(index))
+        {
+            layer(user).erase(index);
+        }
+        else
+        {
+            layer(user).insert_or_assign(index, std::move(value));
+        }
+        const U32 one[] = { index };
+        apply(one, &changes);
     }
-    else
-    {
-        layer(user).insert_or_assign(index, std::move(value));
-    }
-    const U32 one[] = { index };
-    apply(one);
+    noteChanges(changes);
     return true;
 }
 
 void ALCVars::reset(U32 index)
 {
-    auto lock = lockWrites();
-    if (restricted(mDenied, index))
+    if (postsToMain(index))
     {
+        post(index, PostedWrite::Kind::Reset);
         return;
     }
-    layer(userLayer(index)).erase(index);
-    const U32 one[] = { index };
-    apply(one);
+    std::vector<Change> changes;
+    {
+        auto lock = lockWrites();
+        if (restricted(mDenied, index))
+        {
+            return;
+        }
+        layer(userLayer(index)).erase(index);
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
 }
 
 void ALCVars::resetGroup(U32 group)
 {
-    auto             lock = lockWrites();
-    std::vector<U32> touched;
-    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    std::vector<Change> changes;
     {
-        if (inGroup(i, group))
+        auto             lock = lockWrites();
+        std::vector<U32> touched;
+        for (U32 i = 0; i < U32(mSettings.size()); ++i)
         {
-            if (restricted(mDenied, i))
+            if (!inGroup(i, group) || restricted(mDenied, i))
             {
+                continue;
+            }
+            if (postsToMain(i))
+            {
+                post(i, PostedWrite::Kind::Reset);
                 continue;
             }
             layer(userLayer(i)).erase(i);
             touched.push_back(i);
         }
+        apply(touched, &changes);
     }
-    apply(touched);
+    noteChanges(changes);
 }
 
 bool ALCVars::isUserSet(U32 index) const
@@ -884,24 +949,47 @@ bool ALCVars::setSession(U32 index, const ALCVarValue& input)
     {
         return false;
     }
-    auto lock = lockWrites();
-    layer(ALCVarLayer::Session).insert_or_assign(index, std::move(value));
-    const U32 one[] = { index };
-    apply(one);
+    if (postsToMain(index))
+    {
+        post(index, PostedWrite::Kind::Session, std::move(value));
+        return true;
+    }
+    if (!runValidator(index, value))
+    {
+        return false;
+    }
+    std::vector<Change> changes;
+    {
+        auto lock = lockWrites();
+        layer(ALCVarLayer::Session).insert_or_assign(index, std::move(value));
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
     return true;
 }
 
 void ALCVars::clearSession(U32 index)
 {
-    auto lock = lockWrites();
-    layer(ALCVarLayer::Session).erase(index);
-    const U32 one[] = { index };
-    apply(one);
+    if (postsToMain(index))
+    {
+        post(index, PostedWrite::Kind::ClearSession);
+        return;
+    }
+    std::vector<Change> changes;
+    {
+        auto lock = lockWrites();
+        layer(ALCVarLayer::Session).erase(index);
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
 }
 
 void ALCVars::setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bool dropUser)
 {
-    auto             lock = lockWrites();
+    std::vector<Change> changes;
+    auto                lock = lockWrites();
     std::vector<U32> touched;
     for (const auto& [index, value] : layer(ALCVarLayer::Quality))
     {
@@ -930,7 +1018,9 @@ void ALCVars::setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bo
         }
     }
     layer(ALCVarLayer::Quality) = std::move(next);
-    apply(touched);
+    apply(touched, &changes);
+    lock.unlock();
+    noteChanges(changes);
 }
 
 ALCVarLayer ALCVars::layerOf(U32 index) const
@@ -976,12 +1066,16 @@ void ALCVars::hold(std::string_view owner, U32 index, const ALCVarValue& value)
         LL_WARNS("ALCVars") << owner << " cannot hold " << desc(index).name << " at " << value.describe() << LL_ENDL;
         return;
     }
-    auto  lock  = lockWrites();
-    auto& holds = mHolds[index];
-    std::erase_if(holds, [owner](const Hold& hold) { return hold.owner == owner; });
-    holds.push_back({ std::string(owner), std::move(held) });
-    const U32 one[] = { index };
-    apply(one);
+    std::vector<Change> changes;
+    {
+        auto  lock  = lockWrites();
+        auto& holds = mHolds[index];
+        std::erase_if(holds, [owner](const Hold& hold) { return hold.owner == owner; });
+        holds.push_back({ std::string(owner), std::move(held) });
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
 }
 
 void ALCVars::clamp(std::string_view owner, U32 index, F64 lowest, F64 highest)
@@ -997,17 +1091,22 @@ void ALCVars::clamp(std::string_view owner, U32 index, F64 lowest, F64 highest)
                             << ": its bounds are finite" << LL_ENDL;
         return;
     }
-    auto  lock   = lockWrites();
-    auto& clamps = mClamps[index];
-    std::erase_if(clamps, [owner](const Clamp& clamp) { return clamp.owner == owner; });
-    clamps.push_back({ std::string(owner), lowest, highest });
-    const U32 one[] = { index };
-    apply(one);
+    std::vector<Change> changes;
+    {
+        auto  lock   = lockWrites();
+        auto& clamps = mClamps[index];
+        std::erase_if(clamps, [owner](const Clamp& clamp) { return clamp.owner == owner; });
+        clamps.push_back({ std::string(owner), lowest, highest });
+        const U32 one[] = { index };
+        apply(one, &changes);
+    }
+    noteChanges(changes);
 }
 
 void ALCVars::release(std::string_view owner, U32 index)
 {
-    auto lock = lockWrites();
+    std::vector<Change> changes;
+    auto                lock = lockWrites();
     if (const auto holds = mHolds.find(index); holds != mHolds.end())
     {
         std::erase_if(holds->second, [owner](const Hold& hold) { return hold.owner == owner; });
@@ -1017,7 +1116,9 @@ void ALCVars::release(std::string_view owner, U32 index)
         std::erase_if(clamps->second, [owner](const Clamp& clamp) { return clamp.owner == owner; });
     }
     const U32 one[] = { index };
-    apply(one);
+    apply(one, &changes);
+    lock.unlock();
+    noteChanges(changes);
 }
 
 void ALCVars::restrict(boost::unordered_flat_map<U64, Owners>& restrictions, std::string_view owner,
@@ -1064,7 +1165,8 @@ void ALCVars::unhide(std::string_view owner, ALCVarTarget target)
 
 void ALCVars::releaseAll(std::string_view owner)
 {
-    auto             lock = lockWrites();
+    std::vector<Change> changes;
+    auto                lock = lockWrites();
     std::vector<U32> touched;
     for (auto& [index, holds] : mHolds)
     {
@@ -1090,7 +1192,9 @@ void ALCVars::releaseAll(std::string_view owner)
         boost::unordered::erase_if(*restrictions, [](const auto& entry) { return entry.second.empty(); });
     }
     updateAllFlags();
-    apply(touched);
+    apply(touched, &changes);
+    lock.unlock();
+    noteChanges(changes);
 }
 
 bool ALCVars::isHeld(U32 index) const
@@ -1150,6 +1254,448 @@ std::vector<std::string> ALCVars::ownersOf(U32 index) const
     return owners;
 }
 
+// ---- listeners ------------------------------------------------------------
+
+namespace
+{
+    // Ids of every store's listeners: a connection kept past its store names
+    // nothing the next store has.
+    std::atomic<U64> sNextListener{ 1 };
+}
+
+ALCVarConnection ALCVars::listen(U32 index, ALCVarListener listener)
+{
+    llassert(on_main_thread());
+    auto& list = mListeners[index];
+    if (!list)
+    {
+        list = std::make_unique<Listeners<ALCVarListener>>();
+    }
+    const U64 id = sNextListener.fetch_add(1, std::memory_order_relaxed);
+    list->entries.push_back(std::make_unique<Listeners<ALCVarListener>::Entry>(id, std::move(listener)));
+    mListened[index].store(1, std::memory_order_relaxed);
+    return ALCVarConnection(ALCVarConnection::Kind::Setting, index, id);
+}
+
+ALCVarConnection ALCVars::listenGroup(U32 group, ALCVarGroupListener listener)
+{
+    llassert(on_main_thread());
+    auto& list = mGroupListeners[group];
+    if (!list)
+    {
+        list = std::make_unique<Listeners<ALCVarGroupListener>>();
+    }
+    const U64 id = sNextListener.fetch_add(1, std::memory_order_relaxed);
+    list->entries.push_back(std::make_unique<Listeners<ALCVarGroupListener>::Entry>(id, std::move(listener)));
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        if (inGroup(i, group))
+        {
+            mListened[i].store(1, std::memory_order_relaxed);
+        }
+    }
+    return ALCVarConnection(ALCVarConnection::Kind::Group, group, id);
+}
+
+void ALCVars::disconnect(ALCVarConnection::Kind kind, U32 index, U64 id)
+{
+    llassert(on_main_thread());
+    if (mTearingDown)
+    {
+        return;
+    }
+    auto drop = [this, id](auto& list) {
+        if (!list)
+        {
+            return;
+        }
+        for (auto& entry : list->entries)
+        {
+            if (entry->id == id)
+            {
+                entry->alive = false;
+                mSwept       = false;
+            }
+        }
+    };
+    if (kind == ALCVarConnection::Kind::Setting && index < mListeners.size())
+    {
+        drop(mListeners[index]);
+    }
+    else if (kind == ALCVarConnection::Kind::Group && index < mGroupListeners.size())
+    {
+        drop(mGroupListeners[index]);
+    }
+    if (!mInPass)
+    {
+        sweep();
+    }
+}
+
+bool ALCVars::connected(ALCVarConnection::Kind kind, U32 index, U64 id) const
+{
+    if (mTearingDown)
+    {
+        return false;
+    }
+    auto has = [id](const auto& list) {
+        if (!list)
+        {
+            return false;
+        }
+        for (const auto& entry : list->entries)
+        {
+            if (entry->id == id && entry->alive)
+            {
+                return true;
+            }
+        }
+        return false;
+    };
+    if (kind == ALCVarConnection::Kind::Setting && index < mListeners.size())
+    {
+        return has(mListeners[index]);
+    }
+    if (kind == ALCVarConnection::Kind::Group && index < mGroupListeners.size())
+    {
+        return has(mGroupListeners[index]);
+    }
+    return false;
+}
+
+void ALCVars::sweep()
+{
+    if (mSwept || mSweeping)
+    {
+        return;
+    }
+    // The dead are taken out of the lists first and let go after: a listener
+    // that owns another's connection disconnects it as it goes, and that
+    // disconnect's sweep is this one's next round, not one inside it.
+    mSweeping = true;
+    std::vector<std::unique_ptr<Listeners<ALCVarListener>::Entry>>      dead;
+    std::vector<std::unique_ptr<Listeners<ALCVarGroupListener>::Entry>> deadGroup;
+    auto prune = [](auto& list, auto& out) {
+        if (!list)
+        {
+            return;
+        }
+        auto& entries = list->entries;
+        for (auto& entry : entries)
+        {
+            if (!entry->alive)
+            {
+                out.push_back(std::move(entry));
+            }
+        }
+        std::erase_if(entries, [](const auto& entry) { return !entry; });
+        if (entries.empty())
+        {
+            list.reset();
+        }
+    };
+    while (!mSwept)
+    {
+        mSwept = true;
+        for (auto& list : mListeners)
+        {
+            prune(list, dead);
+        }
+        for (auto& list : mGroupListeners)
+        {
+            prune(list, deadGroup);
+        }
+        updateListened();
+        dead.clear();
+        deadGroup.clear();
+    }
+    mSweeping = false;
+}
+
+void ALCVars::updateListened()
+{
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        bool listened = mListeners[i] != nullptr;
+        for (U32 g = mSettings[i].group; g != NONE && !listened; g = mGroups[g].parent)
+        {
+            listened = mGroupListeners[g] != nullptr;
+        }
+        mListened[i].store(listened ? 1 : 0, std::memory_order_relaxed);
+        if (!listened)
+        {
+            mTold.erase(i);
+        }
+    }
+}
+
+void ALCVars::addPending(Change&& change)
+{
+    // Coalesced: a setting changed twice before listeners hear of it is told
+    // once, from the value they were last given.
+    if (mPendingAt.contains(change.index))
+    {
+        return;
+    }
+    mPendingAt.emplace(change.index, mPending.size());
+    mPending.push_back(std::move(change));
+}
+
+void ALCVars::drainQueued()
+{
+    std::vector<Change> queued;
+    {
+        LLCoros::LockType lock(mQueueMutex);
+        queued.swap(mQueued);
+        mQueuedAt.clear();
+    }
+    for (Change& change : queued)
+    {
+        addPending(std::move(change));
+    }
+}
+
+void ALCVars::queueChanges(std::vector<Change>& changes)
+{
+    LLCoros::LockType lock(mQueueMutex);
+    for (Change& change : changes)
+    {
+        if (!mQueuedAt.contains(change.index))
+        {
+            mQueuedAt.emplace(change.index, mQueued.size());
+            mQueued.push_back(std::move(change));
+        }
+    }
+    changes.clear();
+}
+
+void ALCVars::noteChanges(std::vector<Change>& changes)
+{
+    if (changes.empty())
+    {
+        return;
+    }
+    llassert(on_main_thread());
+    // What changed off the main thread first: its old values are older.
+    drainQueued();
+    for (Change& change : changes)
+    {
+        addPending(std::move(change));
+    }
+    if (mBatchDepth == 0 && !mInPass)
+    {
+        deliver();
+    }
+}
+
+void ALCVars::deliver()
+{
+    struct Pass
+    {
+        explicit Pass(ALCVars& store) : mStore(store) { mStore.mInPass = true; }
+        ~Pass()
+        {
+            mStore.mInPass = false;
+            mStore.sweep();
+        }
+        ALCVars& mStore;
+    } pass(*this);
+
+    for (U32 round = 0; !mPending.empty(); ++round)
+    {
+        if (round >= MAX_PASS_ROUNDS)
+        {
+            std::string names;
+            for (size_t i = 0; i < mPending.size() && i < 8; ++i)
+            {
+                names += (i ? ", " : "") + std::string(desc(mPending[i].index).name);
+            }
+            mPending.clear();
+            mPendingAt.clear();
+            LL_ERRS("ALCVars") << "listeners kept changing settings for " << MAX_PASS_ROUNDS
+                               << " rounds of one pass: " << names << LL_ENDL;
+            return;
+        }
+
+        std::vector<Change> changes;
+        changes.swap(mPending);
+        mPendingAt.clear();
+        for (const Change& change : changes)
+        {
+            // From the value listeners were last given, where they have been
+            // given one: a change queued before a value this pass read is not
+            // news, nor is a write in this round of a setting told in it.
+            const ALCVarValue now  = get(change.index);
+            const auto        told = mTold.try_emplace(change.index, change.old).first;
+            if (now == told->second)
+            {
+                continue;
+            }
+            const ALCVarValue old = std::exchange(told->second, now);
+            // By index: a listener connected meanwhile may grow the list.
+            if (const auto& list = mListeners[change.index])
+            {
+                for (size_t i = 0, count = list->entries.size(); i < count; ++i)
+                {
+                    auto* entry = list->entries[i].get();
+                    if (entry->alive)
+                    {
+                        entry->fn(now, old);
+                    }
+                }
+            }
+            const ALCVarDesc& changed = desc(change.index);
+            for (U32 g = mSettings[change.index].group; g != NONE; g = mGroups[g].parent)
+            {
+                if (const auto& list = mGroupListeners[g])
+                {
+                    for (size_t i = 0, count = list->entries.size(); i < count; ++i)
+                    {
+                        auto* entry = list->entries[i].get();
+                        if (entry->alive)
+                        {
+                            entry->fn(changed);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void ALCVars::beginBatch()
+{
+    llassert(on_main_thread());
+    ++mBatchDepth;
+}
+
+void ALCVars::endBatch(bool deliverNow)
+{
+    llassert(on_main_thread() && mBatchDepth > 0);
+    if (--mBatchDepth == 0 && !mInPass && deliverNow)
+    {
+        drainQueued();
+        deliver();
+    }
+}
+
+ALCVars::Batch::Batch()
+:   mStore(ALCVars::instance().serial()),
+    mUnwinding(std::uncaught_exceptions())
+{
+    ALCVars::instance().beginBatch();
+}
+
+ALCVars::Batch::~Batch() noexcept(false)
+{
+    if (!ALCVars::instanceExists() || ALCVars::instance().serial() != mStore)
+    {
+        return;
+    }
+    ALCVars::instance().endBatch(std::uncaught_exceptions() == mUnwinding);
+}
+
+void ALCVars::pump()
+{
+    llassert(on_main_thread());
+    std::vector<PostedWrite> posted;
+    {
+        LLCoros::LockType lock(mQueueMutex);
+        posted.swap(mPosted);
+    }
+    for (const PostedWrite& write : posted)
+    {
+        switch (write.kind)
+        {
+            case PostedWrite::Kind::Set:          set(write.index, write.value); break;
+            case PostedWrite::Kind::Reset:        reset(write.index); break;
+            case PostedWrite::Kind::Session:      setSession(write.index, write.value); break;
+            case PostedWrite::Kind::ClearSession: clearSession(write.index); break;
+        }
+    }
+    drainQueued();
+    if (mBatchDepth == 0 && !mInPass && !mPending.empty())
+    {
+        deliver();
+    }
+}
+
+// ---- hooks ----------------------------------------------------------------
+
+void ALCVars::registerValidator(std::string_view name, Validator validator, HookThread thread)
+{
+    llassert(on_main_thread());
+    U32 hook = NONE;
+    for (U32 i = 0; i < U32(mValidators.size()); ++i)
+    {
+        if (mValidators[i].name == name)
+        {
+            hook = i;
+        }
+    }
+    if (hook == NONE)
+    {
+        hook = U32(mValidators.size());
+        mValidators.push_back({ std::string(name), {}, thread });
+    }
+    mValidators[hook].fn     = std::move(validator);
+    mValidators[hook].thread = thread;
+    for (Setting& setting : mSettings)
+    {
+        if (setting.desc->validate == name)
+        {
+            setting.validator = hook;
+        }
+    }
+}
+
+bool ALCVars::runValidator(U32 index, ALCVarValue& value)
+{
+    const U32 hook = mSettings[index].validator;
+    if (hook == NONE)
+    {
+        return true;
+    }
+    // What the validator adjusts is fitted to the setting again.
+    return mValidators[hook].fn(desc(index), value) && validate(index, value);
+}
+
+bool ALCVars::postsToMain(U32 index) const
+{
+    // Validators are registered before any other thread writes, so this
+    // reads them with no lock.
+    const U32 hook = mSettings[index].validator;
+    return hook != NONE && mValidators[hook].thread == HookThread::Main && !on_main_thread();
+}
+
+void ALCVars::post(U32 index, PostedWrite::Kind kind, ALCVarValue value)
+{
+    LLCoros::LockType lock(mQueueMutex);
+    mPosted.push_back({ index, kind, std::move(value) });
+}
+
+void ALCVars::checkHooks() const
+{
+    std::vector<std::string> missing;
+    for (const Setting& setting : mSettings)
+    {
+        const ALCVarDesc& desc = *setting.desc;
+        if (!desc.validate.empty() && setting.validator == NONE)
+        {
+            missing.push_back(fmt::format("{} (validate {})", desc.name, desc.validate));
+        }
+    }
+    if (!missing.empty())
+    {
+        std::string names;
+        for (const auto& name : missing)
+        {
+            names += (names.empty() ? "" : ", ") + name;
+        }
+        LL_ERRS("ALCVars") << "the schema names hooks nothing registered: " << names << LL_ENDL;
+    }
+}
+
 namespace ALCVarAccess
 {
     namespace
@@ -1205,6 +1751,22 @@ namespace ALCVarAccess
             store->resetGroup(group);
         }
     }
+    ALCVarConnection listen(const ALCVarDesc& desc, U32 index, ALCVarListener listener)
+    {
+        ALCVars* store = storeOf(desc, index);
+        return store ? store->listen(index, std::move(listener)) : ALCVarConnection();
+    }
+
+    ALCVarConnection listenGroup(const ALCVarGroupDesc& desc, U32 group, ALCVarGroupListener listener)
+    {
+        ALCVars* store = existing();
+        if (store && store->registered() && group < store->groupCount() && &store->groupDesc(group) == &desc)
+        {
+            return store->listenGroup(group, std::move(listener));
+        }
+        return {};
+    }
+
 
     // 0 with no store, or none registered: nothing has changed.
     U32 generation(U32 index)
@@ -1238,4 +1800,18 @@ namespace ALCVarAccess
         }
         return value;
     }
+}
+
+bool ALCVarConnection::connected() const
+{
+    return mKind != Kind::None && ALCVars::instanceExists() && ALCVars::instance().connected(mKind, mIndex, mId);
+}
+
+void ALCVarConnection::disconnect()
+{
+    if (mKind != Kind::None && ALCVars::instanceExists())
+    {
+        ALCVars::instance().disconnect(mKind, mIndex, mId);
+    }
+    mKind = Kind::None;
 }

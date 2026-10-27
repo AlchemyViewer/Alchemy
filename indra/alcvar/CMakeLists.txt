@@ -59,7 +59,11 @@ if(AL_BUILD_TESTS)
   al_add_test_binary(
     alcvar_tests
     PROJECT alcvar
-    SOURCES tests/alcvarschema_test.cpp tests/alcvarlayers_test.cpp
+    SOURCES
+      tests/alcvarschema_test.cpp
+      tests/alcvarlayers_test.cpp
+      tests/alcvarlisteners_test.cpp
+      tests/alcvarthreads_test.cpp
     LIBRARIES alcvar
     SUPPORT alcvar_test_schema llcommon_test_checks
   )

@@ -35,6 +35,7 @@
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -152,6 +153,7 @@ public:
     // ---- the layers the user does not write ----------------------------
 
     // A Session value: over the user's, until the user writes the setting.
+    // Validated as set() validates, its validator's verdict included.
     bool setSession(U32 index, const ALCVarValue& value);
     void clearSession(U32 index);
     // Replaces the Quality layer: what the feature table gives for the
@@ -200,6 +202,72 @@ public:
     // clamped into the range, false when it is refused.
     bool validate(U32 index, ALCVarValue& value) const;
 
+    // ---- listeners --------------------------------------------------------
+
+    // Listeners are the main thread's: connected, told and disconnected
+    // there. A change made on the main thread outside a batch is told before
+    // set() returns; one made off it is queued, coalesced by setting, and
+    // told at the next pump. A listener is given the new value and the last
+    // one listeners were given, and is told only of a real change, after the
+    // slot holds the new value. A listener may write settings: what that
+    // changes is told in the same pass, which asserts past MAX_PASS_ROUNDS
+    // rounds of changes feeding changes.
+    ALCVarConnection listen(U32 index, ALCVarListener listener);
+    // Told of a change anywhere in the group or below it.
+    ALCVarConnection listenGroup(U32 group, ALCVarGroupListener listener);
+    void disconnect(ALCVarConnection::Kind kind, U32 index, U64 id);
+    bool connected(ALCVarConnection::Kind kind, U32 index, U64 id) const;
+
+    static constexpr U32 MAX_PASS_ROUNDS = 16;
+
+    // Writes on the main thread whose listeners are told of nothing until the
+    // outermost batch ends, then of each setting that changed once, in one
+    // pass: a preset, a Look, a quality level, Preferences' OK and Cancel.
+    // Its end asserts as a write's does when that pass keeps feeding itself,
+    // except while an exception unwinds it: then its pass waits for the next
+    // one. A batch that outlives its store ends nothing.
+    class Batch
+    {
+    public:
+        Batch();
+        ~Batch() noexcept(false);
+        Batch(const Batch&)            = delete;
+        Batch& operator=(const Batch&) = delete;
+
+    private:
+        U64 mStore     = 0;
+        int mUnwinding = 0;
+    };
+
+    // On the main thread, once a frame: makes the writes posted to it for a
+    // validator of its own, and tells listeners of what changed off it since
+    // the last pump.
+    void pump();
+
+    // ---- hooks ------------------------------------------------------------
+
+    // A validator a declaration names by its validate field: may adjust the
+    // value it is given, and refuses it with false.
+    using Validator = std::function<bool(const ALCVarDesc& desc, ALCVarValue& value)>;
+
+    enum class HookThread : U8
+    {
+        Any,
+        // The rule reads the main thread's state: a write from another
+        // thread is posted to the main thread and validated there.
+        Main,
+    };
+
+    // Registered by the code that owns the rule, at init, before any thread
+    // but the main one writes. Every write of a Main-validated setting from
+    // another thread -- set, reset, a Session value set or cleared -- is
+    // posted, unchanged ones included, so the main thread makes them in the
+    // order they were made.
+    void registerValidator(std::string_view name, Validator validator, HookThread thread = HookThread::Any);
+    // Asserts, once startup is done, that every hook the schema names has
+    // been registered.
+    void checkHooks() const;
+
     // ---- frames ---------------------------------------------------------
 
     // On the main thread, at the end of each frame: frees the strings and
@@ -241,6 +309,35 @@ private:
         // The schema's tags it carries, by index.
         std::vector<U32>       tags;
         ALCVarValue            def;
+        // Its validator, among those registered.
+        U32                    validator = NONE;
+    };
+
+    // A change of an effective value, with the value before it.
+    struct Change
+    {
+        U32         index = 0;
+        ALCVarValue old;
+    };
+
+    template <typename F>
+    struct Listeners
+    {
+        struct Entry
+        {
+            U64  id    = 0;
+            F    fn;
+            bool alive = true;
+        };
+        // Each entry where it is for as long as a pass may be calling it.
+        std::vector<std::unique_ptr<Entry>> entries;
+    };
+
+    struct ValidatorHook
+    {
+        std::string name;
+        Validator   fn;
+        HookThread  thread = HookThread::Any;
     };
 
     struct Group
@@ -282,7 +379,45 @@ private:
     // lock, and publishes those that changed, each touched group's sequence
     // held odd until the last is written, so that its read() sees all of the
     // change or none.
-    void apply(std::span<const U32> indices);
+    // The changes of settings anyone listens to are added to `changes`.
+    void apply(std::span<const U32> indices, std::vector<Change>* changes);
+    // After the write lock is let go, on the main thread: tells listeners of
+    // the changes. Changes made on another thread are queued by apply(),
+    // under the lock, so the queue holds them in the order they were made.
+    void noteChanges(std::vector<Change>& changes);
+    void queueChanges(std::vector<Change>& changes);
+    void addPending(Change&& change);
+    // The changes written off the main thread, into this pass.
+    void drainQueued();
+    void deliver();
+    // Removes the listeners disconnected during a pass.
+    void sweep();
+    bool listened(U32 index) const { return mListened[index].load(std::memory_order_relaxed) != 0; }
+    void updateListened();
+    void beginBatch();
+    // `deliver`: tell the pass now, or leave it for the next.
+    void endBatch(bool deliver);
+    // Which store this is: a batch begun on one is not ended on another.
+    U64 serial() const { return mSerial; }
+    // The validator's verdict on a write, and true for a setting with none.
+    bool runValidator(U32 index, ALCVarValue& value);
+    // A write the main thread is to make, from another thread, for a
+    // setting whose validator is the main thread's.
+    struct PostedWrite
+    {
+        enum class Kind : U8
+        {
+            Set,
+            Reset,
+            Session,
+            ClearSession,
+        };
+        U32         index = 0;
+        Kind        kind  = Kind::Set;
+        ALCVarValue value;
+    };
+    bool postsToMain(U32 index) const;
+    void post(U32 index, PostedWrite::Kind kind, ALCVarValue value = {});
     void updateFlags(U32 index);
     void updateAllFlags();
     // A setting's write sequence held odd while a write under the lock
@@ -310,6 +445,7 @@ private:
     // Moves the generations of a setting whose effective value changed.
     void bump(U32 index);
 
+    const U64                             mSerial;
     const ALCVarSchema*                   mSchema = nullptr;
     std::vector<Setting>                  mSettings;
     std::vector<Group>                    mGroups;
@@ -330,6 +466,34 @@ private:
     boost::unordered_flat_map<U32, std::vector<Clamp>> mClamps;
     boost::unordered_flat_map<U64, Owners>             mDenied;
     boost::unordered_flat_map<U64, Owners>             mHidden;
+
+    // The main thread's: listeners by setting and by group, null for none,
+    // what is still to be told, and whether a pass or a batch is open.
+    std::vector<std::unique_ptr<Listeners<ALCVarListener>>>      mListeners;
+    std::vector<std::unique_ptr<Listeners<ALCVarGroupListener>>> mGroupListeners;
+    // Whether anyone listens to a setting, or to a group it is in: what a
+    // write off the main thread reads to know whether to queue its change.
+    std::unique_ptr<std::atomic<U8>[]>                           mListened;
+    std::vector<Change>                                          mPending;
+    boost::unordered_flat_map<U32, size_t>                       mPendingAt;
+    // The value each listened setting's listeners were last given: what a
+    // change is told from, so that one told already, or made again before it
+    // was told, is not told twice.
+    boost::unordered_flat_map<U32, ALCVarValue>                  mTold;
+    U32                                                          mBatchDepth = 0;
+    bool                                                         mInPass     = false;
+    bool                                                         mSwept      = true;
+    bool                                                         mSweeping   = false;
+    // The store is going: its listeners are being let go, and what they own
+    // disconnects from nothing.
+    bool                                                         mTearingDown = false;
+    std::vector<ValidatorHook>                                   mValidators;
+
+    // Changes made off the main thread, and writes posted to it.
+    LLCoros::Mutex                               mQueueMutex;
+    std::vector<Change>                          mQueued;
+    boost::unordered_flat_map<U32, size_t>       mQueuedAt;
+    std::vector<PostedWrite>                     mPosted;
 
     mutable LLCoros::Mutex                     mRetiredMutex;
     std::vector<boost::shared_ptr<const void>> mRetired;
