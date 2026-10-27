@@ -574,8 +574,17 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
     const std::weak_ptr<bool> alive = mAlive;
     mWindow.loadWorldText(ref, [this, alive, id](const ALScriptLoaded& loaded) {
         Doc* found = alive.lock() ? mServices.findDoc(id) : nullptr;
-        if (!found || !loaded.error.empty())
+        if (!found)
         {
+            return;
+        }
+        // Not read: said, rather than the button having done nothing.
+        if (!loaded.error.empty())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = loaded.name.empty() ? found->name : loaded.name;
+            args["[WHY]"]  = loaded.error;
+            mServices.report(mServices.words("MasterWorldNotRead", args), true, found);
             return;
         }
         // The author's text as it is in the world, out of its envelope.

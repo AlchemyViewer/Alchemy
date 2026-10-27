@@ -673,6 +673,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterExperienceChosen">From [NAME]'s next save, its script runs under [EXPERIENCE].</floater.string>
     <floater.string name="MasterExperienceCleared">From [NAME]'s next save, its script runs under no experience.</floater.string>
     <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
+    <floater.string name="MasterWorldNotRead">[NAME] could not be read in-world to compare: [WHY]</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
     <floater.string name="LinkHeadMatchingA">Looking on disk for the file of 1 script...</floater.string>

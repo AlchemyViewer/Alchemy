@@ -552,6 +552,44 @@ namespace
             CHECK(said().doc == lamp->id);
             CHECK(said().actions == Names{ "master_send", "master_compare" });
         }
+
+        // Tapple's: Compare did nothing but close the notice. What the world holds, read, is
+        // compared; where it cannot be read, said.
+        const size_t loads    = studio->loads.size();
+        const size_t compared = studio->compared.size();
+        unit->offer(*lamp, "master_compare");
+        {
+            INFO("the script in-world asked for");
+            REQUIRE(studio->loads.size() == loads + 1);
+            CHECK(studio->loads.back() == other_ref);
+            REQUIRE(studio->toLoad);
+        }
+        ALScriptLoaded refused;
+        refused.ref   = other_ref;
+        refused.name  = "lamp";
+        refused.error = "no such item";
+        studio->toLoad(refused);
+        {
+            INFO("not read: said on the file's tab, nothing compared");
+            CHECK(studio->compared.size() == compared);
+            CHECK(says(said().text, "MasterWorldNotRead"));
+            CHECK(said().text.find("no such item") != std::string::npos);
+            CHECK(said().failure);
+            CHECK(said().doc == lamp->id);
+        }
+        unit->offer(*lamp, "master_compare");
+        ALScriptLoaded read;
+        read.ref  = other_ref;
+        read.name = "lamp";
+        read.text = "default { state_entry() {} }\n";
+        studio->toLoad(read);
+        {
+            INFO("read: the file's tab beside what the world holds");
+            REQUIRE(studio->compared.size() == compared + 1);
+            CHECK(studio->compared.back().doc == lamp->id);
+            CHECK(studio->compared.back().left == "default {}\n");
+            CHECK(studio->compared.back().right == "default { state_entry() {} }\n");
+        }
     }
 
     // A tab with unsaved changes linked is asked first: Cancel links nothing, Discard holds the
