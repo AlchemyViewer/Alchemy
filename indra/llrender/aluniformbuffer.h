@@ -195,6 +195,10 @@ public:
     static const RingStats& lastFrameRingStats();
     static const RingStats& lastFrameScratchStats();
 
+    // The bytes of the stores this class makes itself, outside ALGPUBuffer: each block's own store, at the size it
+    // was last specified, and the orphan-on-wrap rings. The persistently mapped rings are ALGPUBuffers, counted there.
+    static U64 getStoreBytes();
+
     // --- Scratch ring: per-draw ranged engine-block payloads ------------------------
     // (rigged-mesh skinning palettes at UB_OBJECT_SKIN). A caller writes a payload
     // once per frame (scratchWrite -> ring offset) and re-binds its range cheaply on

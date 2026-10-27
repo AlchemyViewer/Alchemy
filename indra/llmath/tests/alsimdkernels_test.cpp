@@ -429,6 +429,31 @@ namespace
                 }
             });
         }
+        // Far outside the cube, past what a 32-bit integer holds and at
+        // infinity, a coordinate still clamps to its end.
+        {
+            const F32 inf = std::numeric_limits<F32>::infinity();
+            const F32 outside[] = { 1e7f, -1e7f, 3e9f, -3e9f, inf, -inf, 0.6f, -0.6f };
+            std::vector<LLVector4a> points;
+            std::vector<U32> expected;
+            for (size_t i = 0; i < 24; ++i)
+            {
+                const F32 x = outside[i % 8], y = outside[(i * 3 + 1) % 8], z = outside[(i * 5 + 2) % 8];
+                points.emplace_back(x, y, z);
+                const auto end = [](F32 v) { return v > 0.f ? 255u : 0u; };
+                expected.push_back(end(x) | (end(y) << 8) | (end(z) << 16));
+            }
+            for_each_width([&]<class W>(const char* width)
+            {
+                std::vector<U32> codes(points.size());
+                unit_cube_codes_impl<W>(points.data(), points.size(), codes.data());
+                for (size_t i = 0; i < points.size(); ++i)
+                {
+                    CAPTURE(width, i);
+                    REQUIRE(codes[i] == expected[i]);
+                }
+            });
+        }
         for (size_t n : COUNTS)
         {
             std::vector<LLVector4a> points(n + 1);

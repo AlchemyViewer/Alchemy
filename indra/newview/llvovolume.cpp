@@ -316,6 +316,8 @@ void LLVOVolume::markDead()
             mLightTexture->removeVolume(LLRender::LIGHT_TEX, this);
         }
 
+        mHUDBoosts.clear();
+
         if (mIsHeroProbe)
         {
             gPipeline.mHeroProbeManager.unregisterViewerObject(this);
@@ -865,6 +867,10 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
     F32 min_vsize=999999999.f, max_vsize=0.f;
     LLViewerCamera* camera = LLViewerCamera::getInstance();
     std::stringstream debug_text;
+    // The textures this holds at BOOST_HUD from here on: those its faces have now, while it is a HUD, one hold a
+    // texture. Each is held in the place the last pass held its face's, so a texture held by both keeps its boost
+    // unchanged.
+    size_t hud_held = 0;
     for (S32 i = 0; i < num_faces; i++)
     {
         LLFace* face = mDrawable->getFace(i);
@@ -902,7 +908,20 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
         {
             F32 area = (F32) camera->getScreenPixelArea();
             vsize = area;
-            imagep->setBoostLevel(LLGLTexture::BOOST_HUD);
+            const auto held_end = mHUDBoosts.begin() + hud_held;
+            if (std::find_if(mHUDBoosts.begin(), held_end, [imagep](const ALTextureBoost& boost)
+                             { return boost.get() == imagep; }) == held_end)
+            {
+                if (hud_held < mHUDBoosts.size())
+                {
+                    mHUDBoosts[hud_held].hold(imagep, LLGLTexture::BOOST_HUD);
+                }
+                else
+                {
+                    mHUDBoosts.emplace_back(imagep, LLGLTexture::BOOST_HUD);
+                }
+                ++hud_held;
+            }
             face->setPixelArea(area); // treat as full screen
             face->setVirtualSize(vsize);
         }
@@ -964,6 +983,8 @@ void LLVOVolume::updateTextureVirtualSize(bool forced)
             if (pri > max_vsize) max_vsize = pri;
         }
     }
+    // What the last pass held past this pass's textures goes.
+    mHUDBoosts.erase(mHUDBoosts.begin() + hud_held, mHUDBoosts.end());
 
     if (isSculpted())
     {
@@ -1504,13 +1525,14 @@ void LLVOVolume::sculpt()
         // Until then the volume builds from the image there is, and the read, with more pixels at the same level,
         // builds it again below. A texture with nothing on screen to read builds from the copy there is, which the
         // decode setForSculpt asks for brings up to size.
-        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept.
+        // The copy the texture on screen makes is within the sculpts' budget, as a decode's is kept. A map of fewer than
+        // three components is no map a sculpt builds from, and reads nothing back.
         S32 copy_width   = 0;
         S32 copy_height  = 0;
         S32 copy_discard = -1;
         mSculptTexture->getSculptCopySize(copy_width, copy_height, copy_discard);
         const S32 copy_pixels = copy_width * copy_height;
-        if ((!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
+        if (mSculptTexture->getComponents() >= 3 && (!raw_image || raw_image->getWidth() * raw_image->getHeight() < copy_pixels) &&
             getVolume()->getSculptPixels() < copy_pixels)
         {
             mSculptTexture->requestSculptReadback();
@@ -2505,6 +2527,15 @@ void LLVOVolume::changeTEImage(S32 index, LLViewerTexture* imagep)
         gPipeline.markTextured(mDrawable);
         mFaceMappingChanged = true;
     }
+}
+
+//virtual
+void LLVOVolume::changeTEMaterialTextures(S32 index)
+{
+    LLViewerObject::changeTEMaterialTextures(index);
+    // the rebuild hands the faces' texture channels what the material now draws
+    gPipeline.markTextured(mDrawable);
+    mFaceMappingChanged = true;
 }
 
 void LLVOVolume::setTEImage(const U8 te, LLViewerTexture *imagep)
@@ -5105,7 +5136,20 @@ bool LLVOVolume::lineSegmentIntersect(const LLVector4a& start, const LLVector4a&
                 }
 
                 bool no_texture = !face->getTexture() || !face->getTexture()->hasGLTexture();
-                bool mask       = no_texture ? false : face->getTexture()->getMask(face->surfaceToTexture(tc, p, n));
+                bool mask       = false;
+                if (!no_texture)
+                {
+                    // surfaceToTexture takes the hit in agent space, which a
+                    // planar face projects from.
+                    LLVector4a agent_p = p;
+                    LLVector4a agent_n = n;
+                    if (transform)
+                    {
+                        agent_p.load3(volumePositionToAgent(LLVector3(p.getF32ptr())).mV);
+                        agent_n.load3(volumeDirectionToAgent(LLVector3(n.getF32ptr())).mV);
+                    }
+                    mask = face->getTexture()->getMask(face->surfaceToTexture(tc, agent_p, agent_n));
+                }
                 if (face &&
                     (ignore_alpha || pick_transparent || no_texture || mask))
                 {
@@ -6313,10 +6357,10 @@ void LLVolumeGeometryManager::rebuildGeom(LLSpatialGroup* group)
                     facep->setTexture(LLRender::SPECULAR_MAP, nullptr);
 
                     // let texture streaming system know about PBR textures
-                    facep->setTexture(LLRender::BASECOLOR_MAP, gltf_mat->mBaseColorTexture);
-                    facep->setTexture(LLRender::GLTF_NORMAL_MAP, gltf_mat->mNormalTexture);
-                    facep->setTexture(LLRender::METALLIC_ROUGHNESS_MAP, gltf_mat->mMetallicRoughnessTexture);
-                    facep->setTexture(LLRender::EMISSIVE_MAP, gltf_mat->mEmissiveTexture);
+                    facep->setTexture(LLRender::BASECOLOR_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR));
+                    facep->setTexture(LLRender::GLTF_NORMAL_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL));
+                    facep->setTexture(LLRender::METALLIC_ROUGHNESS_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS));
+                    facep->setTexture(LLRender::EMISSIVE_MAP, gltf_mat->getRenderTexture(LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE));
                 }
 
                 //ALWAYS null out vertex buffer on rebuild -- if the face lands in a render

@@ -4479,11 +4479,9 @@ U64 LLWindowSDL::getVramSize()
     CGLError the_err = CGLQueryRendererInfo (CGDisplayIDToOpenGLDisplayMask(kCGDirectMainDisplay), &info, &num_renderers);
     if(0 == the_err)
     {
-        // The name, uses, and other platform definitions of gGLManager.mVRAM suggest that this is supposed to be total vram in MB,
-        // rather than, say, just the texture memory. The two exceptions are:
-        // 1. LLAppViewer::getViewerInfo() puts the value in a field labeled "TEXTURE_MEMORY"
-        // 2. For years, this present function used kCGLRPTextureMemoryMegabytes
-        // Now we use kCGLRPVideoMemoryMegabytes to bring it in line with everything else (except thatone label).
+        // gGLManager.mVRAM is the total video memory in MB, as its name, its uses and the other platforms' definitions
+        // have it, and as LLAppViewer::getViewerInfo() labels it ("VIDEO_MEMORY"): kCGLRPVideoMemoryMegabytes, not the
+        // texture memory kCGLRPTextureMemoryMegabytes reports.
         CGLDescribeRenderer (info, 0, kCGLRPVideoMemoryMegabytes, &vram_megabytes);
         CGLDestroyRendererInfo (info);
     }

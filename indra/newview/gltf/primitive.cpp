@@ -374,6 +374,23 @@ bool Primitive::prep(Asset& asset)
         }
     }
 
+    // Every attribute is read at each position's index, and skinning takes
+    // joints and weights together.
+    for (size_t count : { mNormals.size(), mTangents.size(), mColors.size(), mTexCoords0.size(), mTexCoords1.size(), mJoints.size(),
+                          mWeights.size() })
+    {
+        if (count != 0 && count != mPositions.size())
+        {
+            LL_WARNS("GLTF") << "Attribute of " << count << " elements for " << mPositions.size() << " positions" << LL_ENDL;
+            return false;
+        }
+    }
+    if (mJoints.empty() != mWeights.empty())
+    {
+        LL_WARNS("GLTF") << "Joints and weights not given together" << LL_ENDL;
+        return false;
+    }
+
     // copy index buffer
     if (mIndices != INVALID_INDEX)
     {

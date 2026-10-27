@@ -52,6 +52,7 @@
     "openssl": { "holder": "Copyright (c) The OpenSSL Project Authors" },
     "opus": { "holder": "Copyright 2001-2023 Xiph.Org, Skype Limited, Octasic, Jean-Marc Valin, Timothy B. Terriberry, CSIRO, Gregory Maxwell, Mark Borgerding, Erik de Castro Lopo, Mozilla, Amazon" },
     "pffft": { "license": "LicenseRef-FFTPACK" },
+    "stb": { "license": "MIT OR Unlicense" },
     "tinyexr": { "holder": "Copyright (c) 2014-2021 Syoyo Fujita and many contributors" },
     "tailslide": { "holder": "Copyright (c) the Tailslide authors, after pclewis's lslint; the bitstream code Copyright (c) Kai Mast" },
     "tinygltf": { "license": "MIT" },

@@ -54,6 +54,7 @@
 #include "object_flags.h"
 
 #include "alassetblocklist.h"
+#include "albakeproxies.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -4551,7 +4552,7 @@ void LLViewerObject::boostTexturePriority(bool boost_children /* = true */)
     S32 tex_count = getNumTEs();
     for (i = 0; i < tex_count; i++)
     {
-        getTEImage(i)->setBoostLevel(LLGLTexture::BOOST_SELECTED);
+        getTEImage(i)->boostThisFrame(LLGLTexture::BOOST_SELECTED);
     }
 
     if (isSculpted() && !isMesh())
@@ -4560,7 +4561,7 @@ void LLViewerObject::boostTexturePriority(bool boost_children /* = true */)
         if (sculpt_params)
         {
             LLUUID sculpt_id = sculpt_params->getSculptTexture();
-            LLViewerTextureManager::getFetchedTexture(sculpt_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE)->setBoostLevel(LLGLTexture::BOOST_SELECTED);
+            LLViewerTextureManager::getFetchedTexture(sculpt_id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE)->boostThisFrame(LLGLTexture::BOOST_SELECTED);
         }
     }
 
@@ -5413,7 +5414,24 @@ void LLViewerObject::updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& 
     LLVOAvatar* avatar = getAvatar();
     if (avatar)
     {
-        avatar->updateMeshVisibility();
+        avatar->dirtyMeshVisibility();
+    }
+}
+
+void LLViewerObject::updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old_material)
+{
+    const LLTextureEntry* tep = getTE(te);
+    const LLGLTFMaterial* material = tep ? tep->getGLTFRenderMaterial() : nullptr;
+    // a HUD's material draws no bake (ALBakeProxies::drawnBy)
+    if (material == old_material || isHUDAttachment())
+    {
+        return;
+    }
+
+    LLVOAvatar* avatar = getAvatar();
+    if (avatar && ALBakeProxies::drawnBy(material) != ALBakeProxies::drawnBy(old_material))
+    {
+        avatar->dirtyMeshVisibility();
     }
 }
 
@@ -5457,17 +5475,21 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(gGLTFMaterialList.getMaterial(mat_id)) != nullptr);
         if (mat->isFetching())
         { // material is not loaded yet, rebuild draw info when the object finishes loading
-            mat->onMaterialComplete([id=getID()]
+            mat->onMaterialComplete([id=getID(), te]
                 {
                     LLViewerObject* obj = gObjectList.findObject(id);
                     if (obj)
                     {
+                        obj->onRenderMaterialFetched(te);
                         obj->markForUpdate();
                     }
                 });
         }
         getTE(te)->setGLTFMaterial(mat);
         initRenderMaterial(te);
+        // initRenderMaterial compared the face's copy with the material just set on it, which names the
+        // same bakes: the face had no material before
+        updateAvatarMeshVisibility(te, nullptr);
         mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
         llassert(mat == nullptr || dynamic_cast<LLFetchedGLTFMaterial*>(getTE(te)->getGLTFRenderMaterial()) != nullptr);
     }
@@ -5477,22 +5499,28 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
         getTE(te)->setGLTFMaterial(nullptr);
     }
 
-    auto fetch_texture = [this](const LLUUID& id)
+    // The bakes a material names are resolved for this object's avatar, into the face's own copy of the
+    // material (initRenderMaterial): resolved into the material itself, they would be drawn on every face it
+    // is on, whoever wears it. A face still drawing the material itself, as one whose texture entry was
+    // copied (a copied LLTextureEntry keeps no render material), gets its copy here
+    if (mat != nullptr && mat == getTE(te)->getGLTFMaterial() && ALBakeProxies::anyNamedBy(*mat))
     {
+        initRenderMaterial(te);
+        mat = (LLFetchedGLTFMaterial*) getTE(te)->getGLTFRenderMaterial();
+    }
+
+    // A slot naming a bake proxy draws what it resolves to on this object's avatar
+    // (LLFetchedGLTFMaterial::mBakedTextures), and fetches nothing; any other fetches its asset
+    auto fetch_texture = [this, mat](LLGLTFMaterial::TextureInfo slot)
+    {
+        const LLUUID& id = mat->mTextureId[slot];
+        mat->mBakedTextures[slot] = getBakedTextureForMagicId(id);
+
         LLViewerFetchedTexture* img = nullptr;
-        if (id.notNull())
+        if (id.notNull() && mat->mBakedTextures[slot].isNull())
         {
-            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(id))
-            {
-                 // TODO -- fall back to LLTextureEntry::mGLTFRenderMaterial when overriding with baked texture
-                LLViewerTexture* viewerTexture = getBakedTextureForMagicId(id);
-                img = viewerTexture ? dynamic_cast<LLViewerFetchedTexture*>(viewerTexture) : nullptr;
-            }
-            else
-            {
-                img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-                img->addTextureStats(64.f * 64.f, true);
-            }
+            img = LLViewerTextureManager::getFetchedTexture(id, FTT_DEFAULT, true, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
+            img->addTextureStats(64.f * 64.f, true);
         }
 
         return img;
@@ -5500,10 +5528,10 @@ void LLViewerObject::updateTEMaterialTextures(U8 te)
 
     if (mat != nullptr)
     {
-        mat->mBaseColorTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR]);
-        mat->mNormalTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL]);
-        mat->mMetallicRoughnessTexture = fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS]);
-        mat->mEmissiveTexture= fetch_texture(mat->mTextureId[LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE]);
+        mat->mBaseColorTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_BASE_COLOR);
+        mat->mNormalTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_NORMAL);
+        mat->mMetallicRoughnessTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_METALLIC_ROUGHNESS);
+        mat->mEmissiveTexture = fetch_texture(LLGLTFMaterial::GLTF_TEXTURE_INFO_EMISSIVE);
     }
 }
 
@@ -5512,11 +5540,32 @@ void LLViewerObject::refreshBakeTexture()
     for (int face_index = 0; face_index < getNumTEs(); face_index++)
     {
         LLTextureEntry* tex_entry = getTE(face_index);
-        if (tex_entry && LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(tex_entry->getID()))
+        if (!tex_entry)
+        {
+            continue;
+        }
+
+        if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(tex_entry->getID()))
         {
             const LLUUID& image_id = tex_entry->getID();
             LLViewerTexture* bakedTexture = getBakedTextureForMagicId(image_id);
             changeTEImage(face_index, bakedTexture);
+        }
+
+        // A PBR face draws the bake proxies its render material names from what the material holds
+        // for them, resolved when the face was last built: resolve them again where one now resolves
+        // to another texture, whatever the face's own image names
+        const LLFetchedGLTFMaterial* mat = static_cast<const LLFetchedGLTFMaterial*>(tex_entry->getGLTFRenderMaterial());
+        if (mat != nullptr)
+        {
+            for (U32 slot = 0; slot < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++slot)
+            {
+                if (getBakedTextureForMagicId(mat->mTextureId[slot]) != mat->mBakedTextures[slot].get())
+                {
+                    changeTEMaterialTextures(face_index);
+                    break;
+                }
+            }
         }
     }
 }
@@ -5615,6 +5664,16 @@ void LLViewerObject::changeTEImage(S32 index, LLViewerTexture* new_image)
         return ;
     }
     mTEImages[index] = new_image ;
+}
+
+//virtual
+void LLViewerObject::changeTEMaterialTextures(S32 index)
+{
+    if (index < 0 || index >= getNumTEs())
+    {
+        return;
+    }
+    updateTEMaterialTextures((U8)index);
 }
 
 void LLViewerObject::changeTENormalMap(S32 index, LLViewerTexture* new_image)
@@ -5874,25 +5933,33 @@ S32 LLViewerObject::initRenderMaterial(U8 te)
     if (!base_material) { return 0; }
     const LLGLTFMaterial* override_material = tep->getGLTFMaterialOverride();
     LLFetchedGLTFMaterial* render_material = nullptr;
-    bool need_render_material = override_material;
-    if (!need_render_material)
-    {
-        for (const LLUUID& texture_id : base_material->mTextureId)
-        {
-            if (LLAvatarAppearanceDefines::LLAvatarAppearanceDictionary::isBakedImageId(texture_id))
-            {
-                need_render_material = true;
-                break;
-            }
-        }
-    }
+    const bool need_render_material = override_material || ALBakeProxies::anyNamedBy(*base_material);
     if (need_render_material)
     {
         render_material = new LLFetchedGLTFMaterial(*base_material);
         if (override_material) { render_material->applyOverride(*override_material); }
         render_material->clearFetchedTextures();
     }
-    return tep->setGLTFRenderMaterial(render_material);
+
+    // held, as setting the new one may release it
+    const LLPointer<LLGLTFMaterial> old_material = tep->getGLTFRenderMaterial();
+    const S32 changed = tep->setGLTFRenderMaterial(render_material);
+    updateAvatarMeshVisibility(te, old_material);
+    return changed;
+}
+
+void LLViewerObject::onRenderMaterialFetched(U8 te)
+{
+    const LLTextureEntry* tep = getTE(te);
+    if (!tep || !tep->getGLTFMaterial())
+    { // the face lost its material while it fetched
+        return;
+    }
+
+    initRenderMaterial(te);
+    // The material named no bake when the face took it and has filled in its textures since, so
+    // initRenderMaterial saw none of them change: look from nothing
+    updateAvatarMeshVisibility(te, nullptr);
 }
 
 S32 LLViewerObject::setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* override_mat)
@@ -7793,6 +7860,8 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     for (S32 te = start_idx; te < end_idx; ++te)
     {
         LLTextureEntry* tep = getTE(te);
+        // held, as clearing the render material may release it
+        const LLPointer<LLGLTFMaterial> old_material = tep->getGLTFRenderMaterial();
 
         // If local_origin=false (i.e. it's from the server), we know the
         // material has updated or been created, because extra params are
@@ -7822,6 +7891,8 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             tep->setGLTFMaterial(new_material, !update_server);
         }
 
+        updateAvatarMeshVisibility((U8)te, old_material);
+
         if (material_changed && new_material)
         {
             // Sometimes, the material may change out from underneath the overrides.
@@ -7832,11 +7903,18 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             // Also, sometimes, the material has baked textures, which requires
             // a copy unique to this object.
             // Currently, we do not deduplicate render materials.
-            new_material->onMaterialComplete([obj_id = getID(), te]()
+            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching()]()
             {
                 LLViewerObject* obj = gObjectList.findObject(obj_id);
                 if (!obj) { return; }
-                obj->initRenderMaterial(te);
+                if (fetching)
+                {
+                    obj->onRenderMaterialFetched((U8)te);
+                }
+                else
+                {
+                    obj->initRenderMaterial(te);
+                }
             });
         }
     }

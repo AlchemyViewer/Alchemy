@@ -27,8 +27,6 @@
 					<stat_bar label="Conteggio grezzo" name="numrawimagesstat"/>
 					<stat_bar label="Memoria GL" name="gltexmemstat"/>
 					<stat_bar label="Memoria formattata" name="formattedmemstat"/>
-					<stat_bar label="Memoria complessiva" name="rawmemstat"/>
-					<stat_bar label="Memoria impegnata" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Rete" name="network">
 					<stat_bar label="Pacchetti in ingresso" name="packetsinstat"/>

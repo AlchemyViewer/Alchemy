@@ -380,6 +380,19 @@ namespace ll_test
         slot->unbind();
     }
 
+    // The levels of the 2D texture bound on the active unit that hold an image, counted by their widths:
+    // GL_TEXTURE_IMMUTABLE_LEVELS would say it in one query, but it is GL 4.3's, past the floor's 4.1.
+    inline S32 boundTextureLevels()
+    {
+        S32 levels = 0;
+        for (GLint width = 1; width > 0; ++levels)
+        {
+            width = 0;
+            glGetTexLevelParameteriv(GL_TEXTURE_2D, levels, GL_TEXTURE_WIDTH, &width);
+        }
+        return levels - 1;
+    }
+
     // Read back the framebuffer's color buffer as RGBA8 (tightly
     // packed, row 0 = bottom of GL viewport). Tests use this to assert
     // pixel-level invariants — alignment column position, drop-shadow

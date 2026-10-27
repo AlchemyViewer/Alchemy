@@ -50,7 +50,7 @@ namespace LLPerfStats
     U32 lastGlobalPrefChange{0};
     U32 lastSleepedFrame{0};
     U64 meanFrameTime{0};
-    std::mutex bufferToggleLock{};
+    LLMutex bufferToggleLock;
 
     F64 clock_hertz{0.0};
     U32 vsync_max_fps{60};
@@ -208,7 +208,7 @@ namespace LLPerfStats
         // swap the buffers
         if(enabled())
         {
-            std::lock_guard<std::mutex> lock{bufferToggleLock};
+            LLMutexLock lock(&bufferToggleLock);
             writeBuffer ^= 1;
         }; // note we are relying on atomic updates here. The risk is low and would cause minor errors in the stats display.
 
@@ -263,7 +263,7 @@ namespace LLPerfStats
         // swap the clean buffers in
         if(enabled())
         {
-            std::lock_guard<std::mutex> lock{bufferToggleLock};
+            LLMutexLock lock(&bufferToggleLock);
             writeBuffer ^= 1;
         };
         // repeat before we start processing new stuff

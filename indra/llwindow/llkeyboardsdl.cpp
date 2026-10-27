@@ -121,6 +121,20 @@ LLKeyboardSDL::LLKeyboardSDL()
     mTranslateKeyMap[SDLK_F10] = KEY_F10;
     mTranslateKeyMap[SDLK_F11] = KEY_F11;
     mTranslateKeyMap[SDLK_F12] = KEY_F12;
+    // <SK:Nexii> Map SDLK_F13-SDLK_F24 for remapped and macro keys.
+    mTranslateKeyMap[SDLK_F13] = KEY_F13;
+    mTranslateKeyMap[SDLK_F14] = KEY_F14;
+    mTranslateKeyMap[SDLK_F15] = KEY_F15;
+    mTranslateKeyMap[SDLK_F16] = KEY_F16;
+    mTranslateKeyMap[SDLK_F17] = KEY_F17;
+    mTranslateKeyMap[SDLK_F18] = KEY_F18;
+    mTranslateKeyMap[SDLK_F19] = KEY_F19;
+    mTranslateKeyMap[SDLK_F20] = KEY_F20;
+    mTranslateKeyMap[SDLK_F21] = KEY_F21;
+    mTranslateKeyMap[SDLK_F22] = KEY_F22;
+    mTranslateKeyMap[SDLK_F23] = KEY_F23;
+    mTranslateKeyMap[SDLK_F24] = KEY_F24;
+    // </SK:Nexii>
     mTranslateKeyMap[SDLK_APPLICATION] = KEY_CONTEXT_MENU;
     mTranslateKeyMap[SDLK_MENU] = KEY_CONTEXT_MENU;
     mTranslateKeyMap[SDLK_PLUS]   = '=';
@@ -745,6 +759,17 @@ U32 LLKeyboardSDL::mapSDLtoWin( U32 aSymbol )
         m[ SDLK_F13 ] = (U32)WindowsVK::LL_VK_F13;
         m[ SDLK_F14 ] = (U32)WindowsVK::LL_VK_F14;
         m[ SDLK_F15 ] = (U32)WindowsVK::LL_VK_F15;
+        // <SK:Nexii> F16-F24 for remapped and macro keys.
+        m[ SDLK_F16 ] = (U32)WindowsVK::LL_VK_F16;
+        m[ SDLK_F17 ] = (U32)WindowsVK::LL_VK_F17;
+        m[ SDLK_F18 ] = (U32)WindowsVK::LL_VK_F18;
+        m[ SDLK_F19 ] = (U32)WindowsVK::LL_VK_F19;
+        m[ SDLK_F20 ] = (U32)WindowsVK::LL_VK_F20;
+        m[ SDLK_F21 ] = (U32)WindowsVK::LL_VK_F21;
+        m[ SDLK_F22 ] = (U32)WindowsVK::LL_VK_F22;
+        m[ SDLK_F23 ] = (U32)WindowsVK::LL_VK_F23;
+        m[ SDLK_F24 ] = (U32)WindowsVK::LL_VK_F24;
+        // </SK:Nexii>
 
         // Modifiers — left and right collapse to a single VK
         m[ SDLK_RSHIFT ] = (U32)WindowsVK::LL_VK_SHIFT;

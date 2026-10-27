@@ -30,6 +30,11 @@
 #include "llunits.h"
 #include <catch2/catch_test_macros.hpp>
 
+#include <fmt/format.h>
+
+#include <string_view>
+#include <type_traits>
+
 namespace LLUnits
 {
     namespace
@@ -38,12 +43,15 @@ namespace LLUnits
         LL_DECLARE_BASE_UNIT(Quatloos, "Quat");
         LL_DECLARE_DERIVED_UNIT(Latinum, "Lat", Quatloos, / 4);
         LL_DECLARE_DERIVED_UNIT(Solari, "Sol", Latinum, * 16);
+        // a multiplication after a division, which must keep the division's divisor
+        LL_DECLARE_DERIVED_UNIT(Ducats, "Duc", Quatloos, / 4 * 2);
     } // anonymous namespace
 }
 
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Quatloos);
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Latinum);
 LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Solari);
+LL_DECLARE_UNIT_TYPEDEFS(LLUnits, Ducats);
 
 namespace LLUnits
 {
@@ -376,5 +384,248 @@ namespace
 
         int_celcius = int_fahrenheit;
         CHECK(int_celcius.value() == 100);
+    }
+
+    // a conversion's operations after a division are applied over the division's divisor
+    TEST_CASE("LLUnit: a conversion that multiplies after dividing keeps its divisor", "[LLUnit]")
+    {
+        F32Ducats ducats = F32Quatloos(8.f);
+        CHECK(ducats.value() == 4.f);
+
+        F32Quatloos quatloos = F32Ducats(4.f);
+        CHECK(quatloos.value() == 8.f);
+
+        S32Ducats int_ducats = S32Quatloos(8);
+        CHECK(int_ducats.value() == 4);
+    }
+
+    // comparisons
+    TEST_CASE("LLUnit: comparisons convert the right operand into the storage of the left", "[LLUnit]")
+    {
+        // 1.5 truncates to 1 in S32 storage, so which operand is converted decides each answer
+        S32Quatloos int_quatloos(1);
+        F32QuatloosImplicit float_quatloos(1.5f);
+
+        CHECK(int_quatloos == float_quatloos);
+        CHECK_FALSE(int_quatloos != float_quatloos);
+        CHECK_FALSE(int_quatloos < float_quatloos);
+        CHECK(int_quatloos >= float_quatloos);
+
+        CHECK(float_quatloos != int_quatloos);
+        CHECK(float_quatloos > int_quatloos);
+    }
+
+    constexpr F32Quatloos accumulate_quatloos()
+    {
+        F32Quatloos quatloos;
+        quatloos += S32Latinum(1);
+        quatloos *= 2.f;
+        quatloos -= F32Quatloos(1.f);
+        quatloos /= 7.f;
+        quatloos.valueInUnits<Latinum>(quatloos.value());
+        return quatloos;
+    }
+
+    constexpr F32QuatloosImplicit accumulate_implicit_quatloos()
+    {
+        F32QuatloosImplicit quatloos;
+        quatloos += 2;
+        quatloos += F32Quatloos(4.f);
+        quatloos += F32LatinumImplicit(1.f);
+        quatloos -= 4;
+        quatloos -= F32LatinumImplicit(1.f);
+        return quatloos;
+    }
+
+    // constant expressions
+    TEST_CASE("LLUnit: conversions and arithmetic are constant expressions", "[LLUnit]")
+    {
+        constexpr F32Quatloos quatloos(1024.f);
+        STATIC_REQUIRE(F32Solari(quatloos).value() == 4096.f);
+        STATIC_REQUIRE(F32Latinum(quatloos) == S32Latinum(256));
+        STATIC_REQUIRE(F32Quatloos(S32Solari(1)) == F32Quatloos(0.25f));
+        STATIC_REQUIRE(quatloos.valueInUnits<Latinum>() == 256.f);
+        STATIC_REQUIRE(U32Kilobytes(U32Gigabytes(1)).value() == 1024 * 1024);
+        STATIC_REQUIRE(S32Fahrenheit(S32Celcius(100)).value() == 212);
+        STATIC_REQUIRE(S32Celcius(S32Fahrenheit(212)).value() == 100);
+        STATIC_REQUIRE(F32Ducats(F32Quatloos(8.f)).value() == 4.f);
+        STATIC_REQUIRE(Ratio::fromValue(0.5f) == F32Percent(50.f));
+
+        STATIC_REQUIRE(F32Seconds(1.f) + F32Milliseconds(500.f) == F32Seconds(1.5f));
+        STATIC_REQUIRE(F32Seconds(1.f) - F32Milliseconds(250.f) == F32Milliseconds(750.f));
+        STATIC_REQUIRE(F32Seconds(2.f) * 3 == F32Seconds(6.f));
+        STATIC_REQUIRE(3 * F32Seconds(2.f) == F32Seconds(6.f));
+        STATIC_REQUIRE(F32Seconds(2.f) / 4 == F32Seconds(0.5f));
+        STATIC_REQUIRE(F32Seconds(1.f) / F32Milliseconds(250.f) == 4.f);
+        STATIC_REQUIRE(accumulate_quatloos() == F32Quatloos(4.f));
+
+        STATIC_REQUIRE(F32QuatloosImplicit(1.f) + 3 == 4);
+        STATIC_REQUIRE(10 - F32QuatloosImplicit(4.f) == 6);
+        STATIC_REQUIRE(2 * F32QuatloosImplicit(4.f) / 4 == 2);
+        STATIC_REQUIRE(F32QuatloosImplicit(4.f) / F32LatinumImplicit(1.f) == 1);
+        STATIC_REQUIRE(accumulate_implicit_quatloos() == 2);
+
+        constexpr F32 plain = F32QuatloosImplicit(4.f);
+        STATIC_REQUIRE(plain == 4.f);
+    }
+
+    TEST_CASE("LLUnit: comparisons are constant expressions", "[LLUnit]")
+    {
+        STATIC_REQUIRE(S32Quatloos(1) < S32Latinum(1));
+        STATIC_REQUIRE(S32Latinum(1) > S32Quatloos(1));
+        STATIC_REQUIRE(S32Quatloos(4) <= S32Latinum(1));
+        STATIC_REQUIRE(S32Quatloos(4) >= F32Latinum(1.f));
+        STATIC_REQUIRE(F32Quatloos(1.f) != F32Latinum(1.f));
+        STATIC_REQUIRE(F32QuatloosImplicit(4.f) == F32Latinum(1.f));
+
+        STATIC_REQUIRE(F32QuatloosImplicit(1.f) < 2);
+        STATIC_REQUIRE(F32QuatloosImplicit(2.f) >= 2);
+        STATIC_REQUIRE(1 == F32QuatloosImplicit(1.f));
+        STATIC_REQUIRE(1 != F32QuatloosImplicit(2.f));
+        STATIC_REQUIRE(2 > F32QuatloosImplicit(1.f));
+    }
+
+    TEST_CASE("LLUnit: unit labels and levels are constant expressions", "[LLUnit]")
+    {
+        STATIC_REQUIRE(std::string_view(Quatloos::getUnitLabel()) == "Quat");
+        STATIC_REQUIRE(std::string_view(LLGetUnitLabel<F32Solari>::getUnitLabel()) == "Sol");
+        STATIC_REQUIRE(std::string_view(LLGetUnitLabel<F32>::getUnitLabel()).empty());
+        STATIC_REQUIRE(std::string_view(Microseconds::getUnitLabel()) == "\xC2\xB5s");
+    }
+
+    // result types
+    TEST_CASE("LLUnit: arithmetic promotes storage as the storage types promote", "[LLUnit]")
+    {
+        STATIC_REQUIRE(std::is_same_v<decltype(S32Bytes(1) + F32Megabytes(1.f)), F32Bytes>);
+        STATIC_REQUIRE(std::is_same_v<decltype(U32Quatloos(1) - S32Quatloos(1)), U32Quatloos>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32Quatloos(1) * 2.0), F64Quatloos>);
+        STATIC_REQUIRE(std::is_same_v<decltype(2.0 * S32Quatloos(1)), F64Quatloos>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32Quatloos(1) / 2.f), F32Quatloos>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32Quatloos(1) / F64Quatloos(1.0)), F64>);
+
+        STATIC_REQUIRE(std::is_same_v<decltype(S32Quatloos(1) + S32QuatloosImplicit(1)), S32QuatloosImplicit>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32QuatloosImplicit(1) + F64QuatloosImplicit(1.0)), F64QuatloosImplicit>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32QuatloosImplicit(1) + 1.5f), F32QuatloosImplicit>);
+        STATIC_REQUIRE(std::is_same_v<decltype(1.5f - S32QuatloosImplicit(1)), F32QuatloosImplicit>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32QuatloosImplicit(1) * 2.0), F64QuatloosImplicit>);
+        STATIC_REQUIRE(std::is_same_v<decltype(S32QuatloosImplicit(1) / S32LatinumImplicit(1)), S32>);
+    }
+
+    // conversions through the root unit
+    TEST_CASE("LLUnit: a conversion between two derived units applies both offsets", "[LLUnit]")
+    {
+        // Fahrenheit to Kelvin goes through Celsius, with an offset each way
+        F32Kelvin kelvin = F32Fahrenheit(212.f);
+        CHECK(value_near(kelvin.value(), 373.15f, 0.01f));
+
+        F32Fahrenheit fahrenheit = F32Kelvin(273.15f);
+        CHECK(value_near(fahrenheit.value(), 32.f, 0.01f));
+    }
+
+    TEST_CASE("LLUnit: an integer conversion divides by a divisor its storage cannot hold", "[LLUnit]")
+    {
+        // a day is 86400000000 microseconds, more than a U32 holds
+        CHECK(U32Days(U32Microseconds(U32_MAX)).value() == 0);
+        CHECK(U32Microseconds(U32Seconds(4000)).value() == 4000000000u);
+        CHECK(S64Microseconds(S32Days(1)).value() == 86400000000);
+    }
+
+    TEST_CASE("LLUnit: adding an explicit unit to an implicit one keeps the explicit one's fraction", "[LLUnit]")
+    {
+        // 0.375 latinum is 1.5 quatloos, which S32 storage would truncate to 1
+        F32 sum = S32QuatloosImplicit(1) + F32Latinum(0.375f);
+        CHECK(sum == 2.5f);
+
+        F32 difference = S32QuatloosImplicit(1) - F32Latinum(0.375f);
+        CHECK(difference == -0.5f);
+    }
+
+    // what the units reject, asked of a concept, since an expression that does not compile cannot be tested otherwise
+    template<typename A, typename B>
+    concept CanAdd = requires (const A& a, const B& b) { a + b; };
+
+    template<typename A, typename B>
+    concept CanSubtract = requires (const A& a, const B& b) { a - b; };
+
+    template<typename A, typename B>
+    concept CanMultiply = requires (const A& a, const B& b) { a * b; };
+
+    template<typename A, typename B>
+    concept CanDivide = requires (const A& a, const B& b) { a / b; };
+
+    template<typename A, typename B>
+    concept CanOrder = requires (const A& a, const B& b) { a < b; };
+
+    template<typename A, typename B>
+    concept CanEqual = requires (const A& a, const B& b) { a == b; };
+
+    template<typename A, typename B>
+    concept CanAddTo = requires (A& a, const B& b) { a += b; };
+
+    template<typename A, typename B>
+    concept CanMultiplyBy = requires (A& a, const B& b) { a *= b; };
+
+    TEST_CASE("LLUnit: units of different dimensions do not mix", "[LLUnit]")
+    {
+        STATIC_REQUIRE(CanAdd<F32Seconds, F32Milliseconds>);
+        STATIC_REQUIRE_FALSE(CanAdd<F32Seconds, F32Bytes>);
+        STATIC_REQUIRE_FALSE(CanAdd<F32SecondsImplicit, F32BytesImplicit>);
+        STATIC_REQUIRE_FALSE(CanSubtract<F32Seconds, F32BytesImplicit>);
+        STATIC_REQUIRE_FALSE(CanDivide<F32Seconds, F32Bytes>);
+        STATIC_REQUIRE_FALSE(CanOrder<F32Seconds, F32Bytes>);
+        STATIC_REQUIRE_FALSE(CanEqual<F32SecondsImplicit, F32Bytes>);
+        STATIC_REQUIRE_FALSE(CanAddTo<F32Seconds, F32Bytes>);
+        STATIC_REQUIRE_FALSE(CanAddTo<F32SecondsImplicit, F32Bytes>);
+
+        STATIC_REQUIRE(std::is_constructible_v<F32Seconds, F32Milliseconds>);
+        STATIC_REQUIRE_FALSE(std::is_constructible_v<F32Seconds, F32Bytes>);
+        STATIC_REQUIRE_FALSE(std::is_constructible_v<F32SecondsImplicit, F32Bytes>);
+        STATIC_REQUIRE_FALSE(std::is_convertible_v<F32Bytes, F32SecondsImplicit>);
+    }
+
+    TEST_CASE("LLUnit: an explicit unit takes a plain value only as a factor", "[LLUnit]")
+    {
+        STATIC_REQUIRE_FALSE(CanAdd<F32Seconds, F32>);
+        STATIC_REQUIRE_FALSE(CanAdd<F32, F32Seconds>);
+        STATIC_REQUIRE_FALSE(CanSubtract<F32Seconds, S32>);
+        STATIC_REQUIRE(CanMultiply<F32Seconds, F32>);
+        STATIC_REQUIRE(CanMultiply<S32, F32Seconds>);
+        STATIC_REQUIRE(CanDivide<F32Seconds, F32>);
+        STATIC_REQUIRE(CanMultiplyBy<F32Seconds, F32>);
+        STATIC_REQUIRE_FALSE(std::is_convertible_v<F32, F32Seconds>);
+
+        STATIC_REQUIRE(CanAdd<F32SecondsImplicit, F32>);
+        STATIC_REQUIRE(CanSubtract<S32, F32SecondsImplicit>);
+        STATIC_REQUIRE(std::is_convertible_v<F32, F32SecondsImplicit>);
+    }
+
+    TEST_CASE("LLUnit: a product of units is not a unit", "[LLUnit]")
+    {
+        STATIC_REQUIRE_FALSE(CanMultiply<F32Seconds, F32Seconds>);
+        STATIC_REQUIRE_FALSE(CanMultiply<F32SecondsImplicit, F32MillisecondsImplicit>);
+        STATIC_REQUIRE_FALSE(CanMultiplyBy<F32Seconds, F32Seconds>);
+        STATIC_REQUIRE_FALSE(CanMultiplyBy<F32SecondsImplicit, F32Seconds>);
+    }
+
+    TEST_CASE("LLUnit: compound assignments return the unit", "[LLUnit]")
+    {
+        F32QuatloosImplicit quatloos(1.f);
+        (quatloos += 1) *= 3;
+        CHECK(quatloos == 6);
+        STATIC_REQUIRE(std::is_same_v<decltype(quatloos += F32Latinum(1.f)), F32QuatloosImplicit&>);
+        STATIC_REQUIRE(std::is_same_v<decltype(quatloos /= 2), F32QuatloosImplicit&>);
+
+        F32Quatloos explicit_quatloos(1.f);
+        STATIC_REQUIRE(std::is_same_v<decltype(explicit_quatloos -= S32Latinum(1)), F32Quatloos&>);
+    }
+
+    // formatting
+    TEST_CASE("LLUnit: fmt formats the value as its storage type then the label", "[LLUnit]")
+    {
+        CHECK(fmt::format("{}", F32Seconds(1.5f)) == "1.5s");
+        CHECK(fmt::format("{:.2f}", F32Seconds(1.5f)) == "1.50s");
+        CHECK(fmt::format("{:>4}", S32Bytes(12)) == "  12B");
+        CHECK(fmt::format("{}", F32QuatloosImplicit(2.f)) == "2Quat");
+        CHECK(fmt::format("{}", U32Microseconds(3)) == "3\xC2\xB5s");
     }
 }

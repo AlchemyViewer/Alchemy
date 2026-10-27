@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include "altextureboost.h"
 #include "llvisualeffect.h"
 #include "rlvhelper.h"
 
@@ -59,7 +60,7 @@ protected:
     LLTweenableValueLerp<LLColor3> m_Color;
 
     LLPointer<LLViewerFetchedTexture> m_pImage = nullptr;
-    int      m_nImageOrigBoost = 0;
+    ALTextureBoost m_ImageBoost;
 };
 
 // ====================================================================================

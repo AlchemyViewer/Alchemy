@@ -31,6 +31,7 @@
 #include "llbutton.h"
 #include "llfloater.h"
 #include "llfontgl.h"
+#include "lllayoutstack.h"
 #include "lltextbox.h"
 
 static LLPanelInjector<ALScriptNoticeBar> t_script_studio_notice("script_studio_notice");
@@ -98,4 +99,40 @@ void ALScriptNoticeBar::show(const Notice& notice)
     }
     const LLRect words = mText->getRect();
     mText->setShape(LLRect(words.mLeft, words.mTop, llmax(words.mLeft + 40, right - 6), words.mBottom));
+    fitWords();
+}
+
+void ALScriptNoticeBar::reshape(S32 width, S32 height, bool called_from_parent)
+{
+    const bool resized = width != getRect().getWidth();
+    LLPanel::reshape(width, height, called_from_parent);
+    // The words wrap again at the width they follow.
+    if (resized && mText && getParent() && getParent()->getVisible())
+    {
+        fitWords();
+    }
+}
+
+void ALScriptNoticeBar::fitWords()
+{
+    // As many lines as the words take at their width, up to MAX_LINES; the
+    // rest is in the tip.
+    const LLRect words = mText->getRect();
+    const S32    full  = mText->getTextPixelHeight();
+    const S32    lines = llmax(1, mText->getLineCount());
+    const S32    tall  = llmax(1, full / lines) * llmin(lines, MAX_LINES);
+    if (tall != words.getHeight())
+    {
+        mText->setShape(LLRect(words.mLeft, words.mTop, words.mRight, words.mTop - tall));
+    }
+    // The bar as far above the words as below them.
+    if (LLLayoutPanel* holder = ALViewType::as<LLLayoutPanel>(getParent()))
+    {
+        const S32 margin = getRect().getHeight() - words.mTop;
+        const S32 wanted = llmax(MIN_HEIGHT, margin + tall + margin);
+        if (wanted != holder->getTargetDim())
+        {
+            holder->setTargetDim(wanted);
+        }
+    }
 }

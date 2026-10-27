@@ -175,17 +175,11 @@
                     label="Raw Count"
                     stat="numrawimagesstat"/>
           <stat_bar name="gltexmemstat"
-                    label="GL Mem"
+                    label="Texture VRAM"
                     stat="gltexmemstat"/>
           <stat_bar name="formattedmemstat"
                     label="Formatted Mem"
                     stat="formattedmemstat"/>
-          <stat_bar name="rawmemstat"
-                    label="Raw Mem"
-                    stat="rawmemstat"/>
-          <stat_bar name="glboundmemstat"
-                    label="Bound Mem"
-                    stat="glboundmemstat"/>
         </stat_view>
        <stat_view name="material"
                   label="Material">

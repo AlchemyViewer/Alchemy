@@ -387,6 +387,10 @@ public:
     /*virtual*/ S32     setTEMaterialID(const U8 te, const LLMaterialID& pMaterialID);
     /*virtual*/ S32     setTEMaterialParams(const U8 te, const LLMaterialPtr pMaterialParams);
     S32 initRenderMaterial(const U8 te);
+    // The material face te took while it was still fetching has completed: give the face its own
+    // copy where it needs one (initRenderMaterial), so the bakes it names are resolved for this
+    // object's avatar and not into the material every object using it shares
+    void onRenderMaterialFetched(const U8 te);
     virtual     S32     setTEGLTFMaterialOverride(U8 te, LLGLTFMaterial* mat);
 
     // Used by Materials update functions to properly kick off rebuilds
@@ -399,6 +403,9 @@ public:
     virtual     void    changeTEImage(S32 index, LLViewerTexture* new_image)  ;
     virtual     void    changeTENormalMap(S32 index, LLViewerTexture* new_image)  ;
     virtual     void    changeTESpecularMap(S32 index, LLViewerTexture* new_image)  ;
+    // Resolve a face's render material textures again (updateTEMaterialTextures), as when a bake
+    // proxy it names resolves to another texture
+    virtual     void    changeTEMaterialTextures(S32 index);
     LLViewerTexture     *getTEImage(const U8 te) const;
     LLViewerTexture     *getTENormalMap(const U8 te) const;
     LLViewerTexture     *getTESpecularMap(const U8 te) const;
@@ -692,6 +699,8 @@ public:
 public:
     LLViewerTexture* getBakedTextureForMagicId(const LLUUID& id);
     void updateAvatarMeshVisibility(const LLUUID& id, const LLUUID& old_id);
+    // As above, for a face's PBR material: old_material is the render material it had before
+    void updateAvatarMeshVisibility(U8 te, const LLGLTFMaterial* old_material);
     void refreshBakeTexture();
 public:
     static void unpackVector3(LLDataPackerBinaryBuffer* dp, LLVector3& value, std::string name);

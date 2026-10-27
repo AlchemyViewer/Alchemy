@@ -28,14 +28,16 @@
 #include "linden_common.h"
 
 #include "llinitparam.h"
+#include "llcoros.h"
 #include "llformat.h"
 
 #include <algorithm>
 #include <atomic>
 #include <memory>
-#include <mutex>
 #include <sstream>
 #include <unordered_set>
+
+#include LLCOROS_MUTEX_HEADER
 
 
 namespace LLInitParam
@@ -135,16 +137,16 @@ namespace LLInitParam
         //
         // The lock is not for contention -- a descriptor is allocated once,
         // during a block type's first construction -- but because which thread
-        // that happens on is not ours to say.
+        // that happens on is not ours to say, nor whether it is in a coroutine.
         constexpr std::size_t DESCRIPTORS_PER_CHUNK = 64;
 
         ParamDescriptor* allocateDescriptor()
         {
-            static std::mutex sChunkMutex;
+            static LLCoros::Mutex sChunkMutex;
             static std::vector<std::unique_ptr<ParamDescriptor[]> > sChunks;
             static std::size_t sUsedInChunk = DESCRIPTORS_PER_CHUNK;
 
-            std::lock_guard<std::mutex> lock(sChunkMutex);
+            LLCoros::LockType lock(sChunkMutex);
             if (sUsedInChunk == DESCRIPTORS_PER_CHUNK)
             {
                 sChunks.push_back(std::make_unique<ParamDescriptor[]>(DESCRIPTORS_PER_CHUNK));

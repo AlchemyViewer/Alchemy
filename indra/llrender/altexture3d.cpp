@@ -83,7 +83,7 @@ bool ALTexture3D::allocate(U32 width, U32 height, U32 depth,
 
     // Accounted as depth slices of a width*height surface, matching how the cube map
     // paths account their faces.
-    alloc_tex_image(width, height, internal_format, depth, false);
+    alloc_tex_image(width, height, internal_format, depth, 1, OTHER_TEXTURE);
 
 
     gGL.getTextureSlot(0)->unbind();

@@ -3641,31 +3641,77 @@ void sculpt_calc_mesh_resolution(U16 width, U16 height, U8 type, F32 detail, S32
 // A sculpt map averaged down by two along x, y or both: each pixel the rounded mean of the two or four it covers.
 static std::vector<U8> sculpt_map_averaged_down(const U8* data, U16 width, U16 height, S8 components, bool along_x, bool along_y)
 {
-    const S32 step_x = along_x ? 2 : 1;
-    const S32 step_y = along_y ? 2 : 1;
-    const S32 out_width = width / step_x;
-    const S32 out_height = height / step_y;
-    std::vector<U8> out((size_t)out_width * out_height * components);
-    for (S32 y = 0; y < out_height; ++y)
+    const size_t pixel = (size_t)components;
+    const size_t out_width = along_x ? width / 2 : width;
+    const size_t out_height = along_y ? height / 2 : height;
+    const size_t in_row = (size_t)width * pixel;
+    const size_t out_row = out_width * pixel;
+    std::vector<U8> out(out_row * out_height);
+    for (size_t y = 0; y < out_height; ++y)
     {
-        for (S32 x = 0; x < out_width; ++x)
+        const U8* upper = data + (along_y ? 2 * y : y) * in_row;
+        const U8* lower = along_y ? upper + in_row : upper;
+        U8* to = out.data() + y * out_row;
+        if (along_x && along_y)
         {
-            for (S32 c = 0; c < components; ++c)
+            for (size_t x = 0; x < out_width; ++x, upper += 2 * pixel, lower += 2 * pixel)
             {
-                S32 sum = 0;
-                for (S32 dy = 0; dy < step_y; ++dy)
+                for (size_t c = 0; c < pixel; ++c)
                 {
-                    for (S32 dx = 0; dx < step_x; ++dx)
-                    {
-                        sum += data[((size_t)(y * step_y + dy) * width + (x * step_x + dx)) * components + c];
-                    }
+                    *to++ = (U8)((upper[c] + upper[pixel + c] + lower[c] + lower[pixel + c] + 2) >> 2);
                 }
-                const S32 count = step_x * step_y;
-                out[((size_t)y * out_width + x) * components + c] = (U8)((sum + count / 2) / count);
+            }
+        }
+        else if (along_x)
+        {
+            for (size_t x = 0; x < out_width; ++x, upper += 2 * pixel)
+            {
+                for (size_t c = 0; c < pixel; ++c)
+                {
+                    *to++ = (U8)((upper[c] + upper[pixel + c] + 1) >> 1);
+                }
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < out_row; ++i)
+            {
+                to[i] = (U8)((upper[i] + lower[i] + 1) >> 1);
             }
         }
     }
     return out;
+}
+
+// Whether every pixel of each row of a sculpt map is its row's first, or, where the stitching does not pinch its first
+// and last rows to their middle pixels, every row is the first: each mesh row of such a map samples one point, or
+// every mesh row the same points, and so does each of the map averaged down any number of times, which has each row one
+// colour or its rows alike as it does.
+static bool sculpt_map_has_no_area_at_any_size(const U8* data, U16 width, U16 height, S8 components, U8 sculpt_stitching)
+{
+    const size_t row = (size_t)width * components;
+    if (sculpt_stitching != LL_SCULPT_TYPE_SPHERE)
+    {
+        bool rows_alike = true;
+        for (U16 y = 1; y < height && rows_alike; ++y)
+        {
+            rows_alike = std::memcmp(data + y * row, data, row) == 0;
+        }
+        if (rows_alike)
+        {
+            return true;
+        }
+    }
+    for (U16 y = 0; y < height; ++y)
+    {
+        // Each pixel the one before it: the row from its second pixel on is the row up to its last.
+        const U8* start = data + y * row;
+        if (std::memcmp(start + components, start, row - components) != 0)
+        {
+            return false;
+        }
+    }
+    return true;
 }
 
 // sculpt replaces generate() for sculpted surfaces
@@ -3687,10 +3733,13 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
     // detail nothing but the collapsed lines, and no area. Where the samples have no area, the map averaged down by
     // two along each such axis is sampled instead, as the level below it would be, until one has or no axis is left
     // to average; a map whose samples have their area builds as it always has.
+    // A map that no averaging down gives area is not averaged, and the sizes it would go through are taken as they
+    // would be, so that the sphere it ends as is the one it would.
     U16 width = sculpt_width;
     U16 height = sculpt_height;
     const U8* data = sculpt_data;
     std::vector<U8> averaged;
+    bool never_has_area = false;
     while (true)
     {
         S32 requested_sizeS = 0;
@@ -3718,7 +3767,10 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             break;
         }
 
-        sculptGenerateMapVertices(width, height, sculpt_components, data, sculpt_type);
+        if (!never_has_area)
+        {
+            sculptGenerateMapVertices(width, height, sculpt_components, data, sculpt_type);
+        }
 
         // don't test lowest LOD to support legacy content DEV-33670
         if (mDetail <= SCULPT_MIN_AREA_DETAIL)
@@ -3726,7 +3778,7 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             break;
         }
 
-        F32 area = sculptGetSurfaceArea();
+        F32 area = never_has_area ? 0.f : sculptGetSurfaceArea();
 
         mSurfaceArea = area;
 
@@ -3747,8 +3799,13 @@ void LLVolume::sculpt(U16 sculpt_width, U16 sculpt_height, S8 sculpt_components,
             visible_placeholder = true;
             break;
         }
-        averaged = sculpt_map_averaged_down(data, width, height, sculpt_components, along_x, along_y);
-        data = averaged.data();
+        never_has_area =
+            never_has_area || sculpt_map_has_no_area_at_any_size(data, width, height, sculpt_components, sculpt_type & LL_SCULPT_TYPE_MASK);
+        if (!never_has_area)
+        {
+            averaged = sculpt_map_averaged_down(data, width, height, sculpt_components, along_x, along_y);
+            data = averaged.data();
+        }
         width = along_x ? width / 2 : width;
         height = along_y ? height / 2 : height;
     }
@@ -5326,6 +5383,36 @@ namespace
         unit.normalize3();
         v.setSelectWithMask(length2.greaterThan(LLVector4a(FLT_MIN)), unit, LLVector4a::getZero());
     }
+
+    // meshoptimizer's vertex cache order scores again every triangle a vertex
+    // in its cache has left whenever it takes a triangle, so a vertex of n
+    // triangles costs it about n squared: one vertex under the most
+    // triangles a decoded face may have would take it minutes. Past this
+    // sum, over the vertices, of each one's triangles squared, some tens of
+    // milliseconds of scoring, a face keeps the order it has. An ordinary face of 65,535
+    // vertices, six triangles each, sums to under 2.4 million.
+    constexpr U64 CACHE_ORDER_BUDGET = 1ull << 26;
+
+    bool cache_order_affordable(const U32* indices, size_t index_count, size_t vertex_count)
+    {
+        ALScratchArena::Scope scratch;
+        U32* triangles = scratch.allocate<U32>(vertex_count);
+        std::fill_n(triangles, vertex_count, 0u);
+        for (size_t i = 0; i < index_count; ++i)
+        {
+            ++triangles[indices[i]];
+        }
+        U64 cost = 0;
+        for (size_t v = 0; v < vertex_count; ++v)
+        {
+            cost += (U64)triangles[v] * triangles[v];
+            if (cost > CACHE_ORDER_BUDGET)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 } // namespace
 
 // A decoded mesh LOD face made ready to draw: MikkTSpace's tangents, as
@@ -5531,7 +5618,14 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         U32* ordered = scratch.allocate<U32>(index_count);
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_VOLUME("cacheOptimize - cache order");
-            meshopt_optimizeVertexCache(ordered, welded_indices, index_count, welded_count);
+            if (cache_order_affordable(welded_indices, index_count, welded_count))
+            {
+                meshopt_optimizeVertexCache(ordered, welded_indices, index_count, welded_count);
+            }
+            else
+            {
+                std::copy_n(welded_indices, index_count, ordered);
+            }
         }
 
         // Each vertex's final place, in the order the reordered triangles
@@ -5557,18 +5651,27 @@ bool LLVolumeFace::cacheOptimize(bool gen_tangents)
         }
 
         resizeVertices((S32)kept);
-        if (!mPositions)
-        {
-            LLError::LLUserWarningMsg::showOutOfMemory();
-            LL_ERRS("LLVolume") << "Failed to allocate memory for resizeVertices(" << kept << ")" << LL_ENDL;
-        }
-        if (old_weights)
+        if (mPositions && old_weights)
         {
             allocateWeights((S32)kept);
         }
-        if (tangents || old_tangents)
+        if (mPositions && (tangents || old_tangents))
         {
             allocateTangents((S32)kept);
+        }
+        if (!mPositions || (old_weights && !mWeights) || ((tangents || old_tangents) && !mTangents))
+        {
+            // The face has given up its buffers, and keeps none. This runs on
+            // the mesh threads, where a fatal error may not be raised.
+            ll_aligned_free<64>(old_positions);
+            ll_aligned_free_16(old_weights);
+            ll_aligned_free_16(old_tangents);
+            ll_aligned_free_16(mWeights);
+            mWeights = nullptr;
+            resizeVertices(0);
+            resizeIndices(0);
+            LL_WARNS("LLVolume") << "Failed to allocate memory for " << kept << " vertices in cacheOptimize" << LL_ENDL;
+            return false;
         }
 
         for (size_t u = 0; u < welded_count; ++u)
@@ -6350,8 +6453,12 @@ namespace
         // The rows' frames, each in its station.
         static_assert(sizeof(LLPath::PathFrame) == 5 * sizeof(LLVector4a), "a frame is five vectors");
         static_assert(sizeof(LLPath::PathPt) % sizeof(LLVector4a) == 0, "stations are a whole number of vectors apart");
+        static_assert(offsetof(LLPath::PathPt, mFrame) % sizeof(LLVector4a) == 0, "a frame starts on a vector");
         constexpr size_t STRIDE = sizeof(LLPath::PathPt) / sizeof(LLVector4a);
-        const LLVector4a* const frames = stations[begin_t].mFrame.mRow;
+        // A run of vectors over the stations, taken from the station rather
+        // than its frame's two rows, which the reads run past.
+        const LLVector4a* const frames =
+            reinterpret_cast<const LLVector4a*>(stations + begin_t) + offsetof(LLPath::PathPt, mFrame) / sizeof(LLVector4a);
 
         // A first or last row the path's scale narrows to a line or a point
         // takes its frame a step into the face.
@@ -7935,6 +8042,16 @@ bool LLVolumeFace::createCap(LLVolume* volume, bool partial_build)
     }
 
     const LLVector4a normal = cap_normal(volume, mTypeMask & TOP_MASK, !partial_build, mReversed);
+    if (mReversed)
+    {
+        // Seen from the side it faces, a reversed cap is the other cap seen
+        // from its front, and takes that cap's mapping, mirrored in v, so
+        // that its texture reads the right way round as a bottom cap's does.
+        for (S32 i = 0; i < num_vertices; ++i)
+        {
+            mTexCoords[i].mV[1] = 1.f - mTexCoords[i].mV[1];
+        }
+    }
     if (mFlexible)
     {
         // mCapTangent is plain floats, not aligned as a vector stores.
@@ -8457,9 +8574,10 @@ bool LLVolumeFace::createSide(LLVolume* volume, bool partial_build)
     // quad's two triangles, bottom left, top right, top left has two corners
     // on its left column and on its top row, and bottom left, bottom right,
     // top right on its right column and its bottom row. A face that would be
-    // left with none keeps them all.
+    // left with none keeps them all. A sculpt of no stitching is built from
+    // its map, whatever its parameters would make.
     Collapse collapse;
-    if (!volume->isUnique() && sculpt_stitching == LL_SCULPT_TYPE_NONE)
+    if (!volume->isUnique() && sculpt_stitching == LL_SCULPT_TYPE_NONE && volume->getParams().getSculptID().isNull())
     {
         collapse = collapse_of(volume, mTypeMask & INNER_MASK);
         if (mTypeMask & END_MASK)

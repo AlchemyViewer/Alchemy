@@ -234,7 +234,7 @@ bool ALGPUBuffer::allocate(size_t bytes, U32 flags, const void* data, const char
         make_store(name, dsa, size, data, dynamic | (stream ? GL_DYNAMIC_STORAGE_BIT : 0), 0, usage);
     }
 
-    if (const GLenum error = glGetError(); error != GL_NO_ERROR)
+    if (const GLenum error = read_gl_errors(); error != GL_NO_ERROR)
     {
         LL_WARNS("GPUBuffer") << "Could not allocate " << bytes << " bytes for " << (label ? label : "a GPU buffer")
                               << " (GL error 0x" << std::hex << error << std::dec << ")" << LL_ENDL;

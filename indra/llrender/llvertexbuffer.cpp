@@ -77,6 +77,8 @@ struct CompareMappedRegion
 
 #if ENABLE_GL_WORK_QUEUE
 
+#include "llmutex.h"
+
 #define THREAD_COUNT 1
 
 //============================================================================
@@ -111,8 +113,8 @@ public:
     void syncGL();
 
 private:
-    std::mutex mMutex;
-    std::condition_variable mCondition;
+    // Guards mQueue and mClosed, and the workers sleep on it.
+    LLCondition mCondition;
     std::queue<Work> mQueue;
     bool mClosed = false;
 };
@@ -126,7 +128,7 @@ void GLWorkQueue::syncGL()
 {
     /*if (mSync)
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         glWaitSync(mSync, 0, GL_TIMEOUT_IGNORED);
         mSync = 0;
     }*/
@@ -135,7 +137,7 @@ void GLWorkQueue::syncGL()
 size_t GLWorkQueue::size()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::lock_guard<std::mutex> lock(mMutex);
+    LLMutexLock lock(&mCondition);
     return mQueue.size();
 }
 
@@ -148,42 +150,35 @@ void GLWorkQueue::post(const GLWorkQueue::Work& value)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         mQueue.push(std::move(value));
     }
 
-    mCondition.notify_one();
+    mCondition.signal();
 }
 
 // Get the next element from the queue
 GLWorkQueue::Work GLWorkQueue::pop()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    // Lock the mutex
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-
-        // Wait for a new element to become available or for the queue to close
-        {
-            mCondition.wait(lock, [=] { return !mQueue.empty() || mClosed; });
-        }
-    }
-
     Work ret;
 
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+    // Wait for a new element to become available or for the queue to close,
+    // and take the next element under the same hold
+    mCondition.wait([&]
+        {
+            if (mQueue.size() > 0)
+            {
+                ret = mQueue.front();
+                mQueue.pop();
+                return true;
+            }
+            return mClosed;
+        });
 
-        // Get the next element from the queue
-        if (mQueue.size() > 0)
-        {
-            ret = mQueue.front();
-            mQueue.pop();
-        }
-        else
-        {
-            ret = []() {};
-        }
+    if (!ret)
+    {
+        ret = []() {};
     }
 
     return ret;
@@ -209,17 +204,17 @@ void GLWorkQueue::close()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         mClosed = true;
     }
 
-    mCondition.notify_all();
+    mCondition.broadcast();
 }
 
 bool GLWorkQueue::isClosed()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::lock_guard<std::mutex> lock(mMutex);
+    LLMutexLock lock(&mCondition);
     return mClosed;
 }
 
@@ -378,6 +373,8 @@ class LLVBOPool
     virtual void allocateVBO(GLenum type, U32 size, GLuint& name, U8*& data) = 0;
     virtual void freeVBO(GLenum type, U32 size, GLuint name, U8* data) = 0;
     virtual U64 getVramBytesUsed() = 0;
+    // Of those, the stores kept for reuse.
+    virtual U64 getVramBytesPooled() const = 0;
     virtual LLVertexBuffer::PoolStats getStats() const = 0;
 };
 
@@ -392,6 +389,11 @@ public:
     U64 getVramBytesUsed() override
     {
         return mAllocated;
+    }
+
+    U64 getVramBytesPooled() const override
+    {
+        return 0;
     }
 
     LLVertexBuffer::PoolStats getStats() const override
@@ -491,6 +493,11 @@ public:
     U64 getVramBytesUsed() override
     {
         return mAllocated + mReserved;
+    }
+
+    U64 getVramBytesPooled() const override
+    {
+        return mReserved;
     }
 
     LLVertexBuffer::PoolStats getStats() const override
@@ -785,6 +792,12 @@ void LLVertexBufferData::draw()
 U64 LLVertexBuffer::getBytesAllocated()
 {
     return sVBOPool ? sVBOPool->getVramBytesUsed() : 0;
+}
+
+//static
+U64 LLVertexBuffer::getBytesPooled()
+{
+    return sVBOPool ? sVBOPool->getVramBytesPooled() : 0;
 }
 
 //static

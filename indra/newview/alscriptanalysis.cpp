@@ -33,13 +33,15 @@
 #include "llviewercontrol.h"
 #include "llsyntaxid.h"
 #include "alsaid.h"
+#include "llcoros.h"
 #include "lltrans.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <algorithm>
-#include <mutex>
 #include <optional>
+
+#include LLCOROS_MUTEX_HEADER
 
 namespace
 {
@@ -202,12 +204,13 @@ std::string alScriptKeyedWordsAnyThread(const std::string& key, const std::vecto
     // reads them from are parsed once, at startup, and only read after,
     // so its own lookup is safe from any thread; what it finds kept here,
     // under a lock, for the several hundred notes a conversion may write.
-    static std::mutex lock;
+    // Any thread, a coroutine on the main one too.
+    static LLCoros::Mutex lock;
     static boost::unordered_flat_map<std::string, std::optional<std::string>, ll::string_hash, std::equal_to<>> found;
     std::optional<std::string> text;
     {
-        const std::lock_guard<std::mutex> held(lock);
-        auto                              it = found.find(key);
+        const LLCoros::LockType held(lock);
+        auto                    it = found.find(key);
         if (it == found.end())
         {
             std::string skin;

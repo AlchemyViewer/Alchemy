@@ -214,6 +214,7 @@ public:
     /*virtual*/ void    setScale(const LLVector3 &scale, bool damped) override;
 
     /*virtual*/ void    changeTEImage(S32 index, LLViewerTexture* new_image) override;
+    /*virtual*/ void    changeTEMaterialTextures(S32 index) override;
     /*virtual*/ void    setNumTEs(const U8 num_tes) override;
     /*virtual*/ void    setTEImage(const U8 te, LLViewerTexture *imagep) override;
     /*virtual*/ S32     setTETexture(const U8 te, const LLUUID &uuid) override;
@@ -487,6 +488,7 @@ private:
     LLVolumeInterface *mVolumeImpl;
     LLPointer<LLViewerFetchedTexture> mSculptTexture;
     LLPointer<LLViewerFetchedTexture> mLightTexture;
+    std::vector<ALTextureBoost> mHUDBoosts; // BOOST_HUD on its faces' textures, held while it is a HUD
     media_list_t mMediaImplList;
     S32         mLastFetchedMediaVersion; // as fetched from the server, starts as -1
     U32         mServerDrawableUpdateCount;

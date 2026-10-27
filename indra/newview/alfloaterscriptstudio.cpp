@@ -896,11 +896,13 @@ void ALFloaterScriptStudio::listenToWorkspace()
     // A file's tab says how many scripts it is the master of, which links
     // made and let go of change.
     mLinkBadgesConnection = ALScriptLinkBadges::instance().onChanged([this]() { fillTabs(); });
-    // A file's tab stands in for the one script it masters, which links
-    // made and let go of change.
+    // A file's tab stands in for the one script it masters, and keeps the
+    // prims of every script it masters listed, which links made and let go
+    // of change.
     mMastersConnection = ALScriptDiskMasters::instance().onChanged([this]() {
         restandAll();
         refreshToolbar();
+        relistExplorer();
     });
     // New definitions from the region: the analyzers reload, the words
     // are rebuilt, and every script is checked again.

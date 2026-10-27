@@ -27,8 +27,6 @@
 					<stat_bar label="Nombre brut" name="numrawimagesstat"/>
 					<stat_bar label="Mém GL" name="gltexmemstat"/>
 					<stat_bar label="Mém formatée" name="formattedmemstat"/>
-					<stat_bar label="Mém brute" name="rawmemstat"/>
-					<stat_bar label="Mém liée" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="Réseau" name="network">
 					<stat_bar label="Paquets en entrée" name="packetsinstat"/>

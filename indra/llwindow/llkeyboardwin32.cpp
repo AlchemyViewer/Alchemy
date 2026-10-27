@@ -111,6 +111,20 @@ LLKeyboardWin32::LLKeyboardWin32()
     mTranslateKeyMap[VK_F10] = KEY_F10;
     mTranslateKeyMap[VK_F11] = KEY_F11;
     mTranslateKeyMap[VK_F12] = KEY_F12;
+    // <SK:Nexii> Map VK_F13-VK_F24 for remapped and macro keys.
+    mTranslateKeyMap[VK_F13] = KEY_F13;
+    mTranslateKeyMap[VK_F14] = KEY_F14;
+    mTranslateKeyMap[VK_F15] = KEY_F15;
+    mTranslateKeyMap[VK_F16] = KEY_F16;
+    mTranslateKeyMap[VK_F17] = KEY_F17;
+    mTranslateKeyMap[VK_F18] = KEY_F18;
+    mTranslateKeyMap[VK_F19] = KEY_F19;
+    mTranslateKeyMap[VK_F20] = KEY_F20;
+    mTranslateKeyMap[VK_F21] = KEY_F21;
+    mTranslateKeyMap[VK_F22] = KEY_F22;
+    mTranslateKeyMap[VK_F23] = KEY_F23;
+    mTranslateKeyMap[VK_F24] = KEY_F24;
+    // </SK:Nexii>
     mTranslateKeyMap[VK_CLEAR] = KEY_PAD_CENTER;
     mTranslateKeyMap[VK_APPS] = KEY_CONTEXT_MENU;
 

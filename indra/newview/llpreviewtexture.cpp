@@ -83,8 +83,7 @@ LLPreviewTexture::LLPreviewTexture(const LLSD& key)
       mLastWidth(0),
       mAspectRatio(0.f),
       mPreviewToSave(false),
-      mImage(NULL),
-      mImageOldBoostLevel(LLGLTexture::BOOST_NONE)
+      mImage(NULL)
 {
     updateImageID();
     if (key.has("save_as"))
@@ -102,11 +101,8 @@ LLPreviewTexture::~LLPreviewTexture()
         getWindow()->decBusyCount();
     }
 
-    if (mImage.notNull())
-    {
-        mImage->setBoostLevel(mImageOldBoostLevel);
-        mImage = NULL;
-    }
+    mImageBoost.release();
+    mImage = NULL;
 }
 
 void LLPreviewTexture::populateRatioList()
@@ -665,8 +661,7 @@ void LLPreviewTexture::onAspectRatioCommit(LLUICtrl* ctrl, void* userdata)
 void LLPreviewTexture::loadAsset()
 {
     mImage = LLViewerTextureManager::getFetchedTexture(mImageID, FTT_DEFAULT, MIPMAP_TRUE, LLGLTexture::BOOST_NONE, LLViewerTexture::LOD_TEXTURE);
-    mImageOldBoostLevel = mImage->getBoostLevel();
-    mImage->setBoostLevel(LLGLTexture::BOOST_PREVIEW);
+    mImageBoost.hold(mImage, LLGLTexture::BOOST_PREVIEW);
     mImage->forceToSaveRawImage(0) ;
     mAssetStatus = PREVIEW_ASSET_LOADING;
     mUpdateDimensions = true;

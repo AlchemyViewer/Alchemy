@@ -38,6 +38,7 @@
 #include "llagentcamera.h"
 #include "llappviewer.h"
 #include "llavatarpropertiesprocessor.h"
+#include "llfetchedgltfmaterial.h"
 #include "llhudobject.h"
 #include "llnotifications.h"
 #include "llnotificationsutil.h"
@@ -48,6 +49,7 @@
 #include "llviewerobject.h"
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
+#include "llviewertexturelist.h"
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 
@@ -381,7 +383,9 @@ namespace
         if (id.isNull() || id == IMG_DEFAULT
             || id == IMG_TRANSPARENT|| id == "8dcd4a48-2d37-4909-9f78-f7a9eb4ef903")
             return;
-        LLViewerFetchedTexture* texture = LLViewerTextureManager::getFetchedTexture(id);
+        // Looked up, not created: an ID no fetched texture has, such as a dynamic texture's, has
+        // nothing to clear, and creating one would start a download nothing draws
+        LLViewerFetchedTexture* texture = gTextureList.findImage(id, TEX_LIST_STANDARD);
         if (texture)
             texture->clearFetchedResults();
         LLAppViewer::getTextureCache()->removeFromCache(id);
@@ -412,12 +416,16 @@ namespace
                 faces_per_tex[spec_img->getID()].push_back(i);
                 }
 
-                LLPointer<LLGLTFMaterial> mat = node->getObject()->getTE(i)->getGLTFRenderMaterial();
-                if (mat.notNull())
+                // What each slot draws, as getTEImage is for the image: a bake proxy's bake, not the
+                // proxy's own ID. A copy of the material not yet built since it was made
+                // (initRenderMaterial) draws nothing yet, and its slots' own IDs are what it will draw
+                const auto* mat = static_cast<const LLFetchedGLTFMaterial*>(node->getObject()->getTE(i)->getGLTFRenderMaterial());
+                if (mat)
                 {
                     for (U32 j = 0; j < LLGLTFMaterial::GLTF_TEXTURE_INFO_COUNT; ++j)
                     {
-                        faces_per_tex[mat->mTextureId[j]].push_back(i);
+                        const LLViewerTexture* tex = mat->getRenderTexture((LLGLTFMaterial::TextureInfo)j);
+                        faces_per_tex[tex ? tex->getID() : mat->mTextureId[j]].push_back(i);
                     }
                 }
             }

@@ -550,7 +550,74 @@ namespace
             REQUIRE(lamp);
             CHECK(says(said().text, "MasterLinkDiffers"));
             CHECK(said().doc == lamp->id);
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
+        }
+
+        // Tapple's: Compare did nothing but close the notice. What the world holds, read, is
+        // compared; where it cannot be read, said.
+        const size_t loads    = studio->loads.size();
+        const size_t compared = studio->compared.size();
+        unit->offer(*lamp, "master_compare");
+        {
+            INFO("the script in-world asked for");
+            REQUIRE(studio->loads.size() == loads + 1);
+            CHECK(studio->loads.back() == other_ref);
+            REQUIRE(studio->toLoad);
+        }
+        ALScriptLoaded refused;
+        refused.ref   = other_ref;
+        refused.name  = "lamp";
+        refused.error = "no such item";
+        studio->toLoad(refused);
+        {
+            INFO("not read: said on the file's tab, nothing compared");
+            CHECK(studio->compared.size() == compared);
+            CHECK(says(said().text, "MasterWorldNotRead"));
+            CHECK(said().text.find("no such item") != std::string::npos);
+            CHECK(said().failure);
+            CHECK(said().doc == lamp->id);
+        }
+        unit->offer(*lamp, "master_compare");
+        ALScriptLoaded read;
+        read.ref  = other_ref;
+        read.name = "lamp";
+        read.text = "default { state_entry() {} }\n";
+        studio->toLoad(read);
+        {
+            INFO("read: the file's tab beside what the world holds");
+            REQUIRE(studio->compared.size() == compared + 1);
+            CHECK(studio->compared.back().doc == lamp->id);
+            CHECK(studio->compared.back().left == "default {}\n");
+            CHECK(studio->compared.back().right == "default { state_entry() {} }\n");
+        }
+
+        // Tapple's: Update File, the other way: what the world holds put in the file's tab, a step
+        // to undo, the file on disk written only by a save.
+        unit->offer(*lamp, "master_take_world");
+        studio->toLoad(read);
+        {
+            INFO("the file's tab holds the world's text, not saved");
+            CHECK(lamp->editor->wholeText() == "default { state_entry() {} }\n");
+            CHECK(lamp->editor->isDirty());
+            CHECK(says(said().text, "MasterTookWorld"));
+            CHECK_FALSE(said().failure);
+            std::string on_disk;
+            REQUIRE(ALFileRead::whole(in("lamp.lsl"), on_disk, ALDiskIncludes::MAX_BYTES));
+            CHECK(on_disk == "default {}\n");
+        }
+        lamp->editor->undo();
+        {
+            INFO("undone: the file's text again");
+            CHECK(lamp->editor->wholeText() == "default {}\n");
+        }
+        lamp->editor->redo();
+        unit->offer(*lamp, "master_take_world");
+        studio->toLoad(read);
+        {
+            INFO("already the same: said, nothing more to undo");
+            CHECK(says(said().text, "MasterTookSame"));
+            lamp->editor->undo();
+            CHECK(lamp->editor->wholeText() == "default {}\n");
         }
     }
 
@@ -614,7 +681,7 @@ namespace
             REQUIRE(link);
             CHECK(link->stamp == 0);
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
         }
 
         // Write: what was typed in the file first, which the world does not
@@ -636,7 +703,7 @@ namespace
             REQUIRE(link);
             CHECK(link->stamp == 0);
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
         }
         UNSCOPED_INFO("its tab gone");
         REQUIRE_FALSE(services.findDoc(bell_ref));
@@ -745,7 +812,7 @@ namespace
             REQUIRE(said().doc == tab->id);
             CHECK(says(said().text, "MasterGaveWay"));
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
             CHECK(tab->master->offerFor == door_ref);
         }
 

@@ -234,6 +234,13 @@ private:
     // and its master on disk beside what was typed in the item's.
     void compareWithWorld(Doc& doc, const ALScriptRef& ref);
     void compareWithFile(Doc& doc, const ALScriptRef& ref);
+    // The world's text of a script put in its master's tab, as one step to
+    // undo, for a save of the file to write.
+    void takeWorld(Doc& doc, const ALScriptRef& ref);
+    // The world's text of a script, out of its envelope, given to `then`
+    // with the master's tab where both are still there; a read that failed
+    // said on the tab.
+    void loadWorld(Doc& doc, const ALScriptRef& ref, std::function<void(Doc& tab, const std::string& theirs, const std::string& name)> then);
 
     ALScriptStudioServices&            mServices;
     ALScriptStudioAnalysis&            mAnalysis;

@@ -66,7 +66,7 @@ private:
 private:
     LLPointer<LLViewerFetchedTexture> mImage;
     LLUUID mImageID;
-    S32 mImageOldBoostLevel;
+    ALTextureBoost mImageBoost;
     bool mWasNoDelete;
     image_loaded_signal_t* mImageLoadedSignal;
     LLLoadedCallbackEntry::source_callback_list_t mCallbackTextureList;

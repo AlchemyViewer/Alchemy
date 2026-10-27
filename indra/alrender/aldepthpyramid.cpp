@@ -77,7 +77,8 @@ bool ALDepthPyramid::build(LLGLSLShader& program, LLRenderTarget& depth)
         {
             return false;
         }
-        if (!mTexture.allocate(base_x, base_y, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL))
+        if (!mTexture.allocate(base_x, base_y, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL,
+                               LLRenderTarget::DEPTH_FMT_24, LEVELS))
         {
             mTexture.release();
             mFailedX = base_x;

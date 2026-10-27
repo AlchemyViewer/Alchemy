@@ -61,7 +61,7 @@ Sichtweite: [DRAW_DISTANCE] m
 Bandbreite: [NET_BANDWITH] kbit/s
 LOD-Faktor: [LOD_FACTOR]
 Darstellungsqualität: [RENDER_QUALITY]
-Texturspeicher: [TEXTURE_MEMORY] MB
+Grafikspeicher: [VIDEO_MEMORY] MB
 	</string>
 	<string name="AboutOSXHiDPI">
 		HiDPI-Anzeigemodus: [HIDPI]

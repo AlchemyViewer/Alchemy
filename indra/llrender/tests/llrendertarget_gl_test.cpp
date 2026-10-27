@@ -156,24 +156,40 @@ namespace
             return names;
         }
 
-        // What LLRenderTarget counts for a target `desc` describes, from the bytes each format takes a pixel.
-        U32 bytes_of(const ALRenderTargetDesc& desc)
+        // What a target `desc` describes holds, from the bytes each format takes a texel: every level of each colour
+        // attachment, each level's sides halved and held at 1, and the one level of its depth.
+        U64 bytes_of(const ALRenderTargetDesc& desc)
         {
-            U32 per_pixel = 0;
+            U64 chain = 0;
+            for (U32 w = desc.width, h = desc.height;; w = std::max(w / 2, 1u), h = std::max(h / 2, 1u))
+            {
+                chain += (U64)w * h;
+                if (desc.mips == Mips::None || (w == 1 && h == 1))
+                {
+                    break;
+                }
+            }
+            U64 bytes = 0;
             for (U32 attachment = 0; attachment < desc.colorCount(); ++attachment)
             {
                 switch (desc.color[attachment])
                 {
-                    case GL_RGBA16F: per_pixel += 8; break;
-                    case GL_R8: per_pixel += 1; break;
-                    default: per_pixel += 4; break;
+                    case GL_RGBA16F: bytes += chain * 8; break;
+                    case GL_R8: bytes += chain; break;
+                    default: bytes += chain * 4; break;
                 }
             }
             if (desc.depth != Depth::None)
             {
-                per_pixel += desc.depth == Depth::D32F && desc.stencil ? 8 : 4;
+                bytes += (U64)desc.width * desc.height * (desc.depth == Depth::D32F && desc.stencil ? 8 : 4);
             }
-            return desc.width * desc.height * per_pixel;
+            return bytes;
+        }
+
+        // What the VRAM accounting counts as render target storage.
+        U64 rt_bytes()
+        {
+            return LLImageGL::getTextureBytesAllocated(LLImageGLMemory::RENDER_TARGET);
         }
 
         // The storage GL holds for the texture `name`.
@@ -192,13 +208,7 @@ namespace
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &storage.width);
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &storage.height);
             glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &storage.format);
-            // The levels with an image, counted by their widths: GL_TEXTURE_IMMUTABLE_LEVELS would say it in one query,
-            // but it is GL 4.3's, past the floor's 4.1.
-            for (S32 width = storage.width; width > 0; ++storage.levels)
-            {
-                width = 0;
-                glGetTexLevelParameteriv(GL_TEXTURE_2D, storage.levels + 1, GL_TEXTURE_WIDTH, &width);
-            }
+            storage.levels = ll_test::boundTextureLevels();
             gGL.getTextureSlot(0)->unbind();
             return storage;
         }
@@ -688,16 +698,58 @@ namespace
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
+    // A target allocated with mips holds the levels asked for: every level to 1x1 where none are asked, and no more
+    // than that where more are. Resized, it holds every level of the new size.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: allocate holds the mip levels asked for", "[llrendertarget_gl]")
+    {
+        struct Case
+        {
+            const char* what;
+            U32         asked;
+            S32         levels;
+        };
+        // 64x40: 7 levels to 1x1.
+        const Case cases[] = { { "every level", 0, 7 }, { "three", 3, 3 }, { "more than the chain", 20, 7 } };
+        for (const Case& c : cases)
+        {
+            CAPTURE(c.what);
+            REQUIRE(mTarget.allocate(64, 40, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL,
+                                     LLRenderTarget::DEPTH_FMT_24, c.asked));
+            CHECK(storage_of(mTarget.getTexture()).levels == c.levels);
+        }
+
+        REQUIRE(mTarget.allocate(64, 40, GL_R32F, false, false, ALTextureSlot::TT_TEXTURE, LLRenderTarget::MIPS_MANUAL,
+                                 LLRenderTarget::DEPTH_FMT_24, 3));
+        UNSCOPED_INFO("a chain of three, resized to 32x20: its 6 levels");
+        mTarget.resize(32, 20);
+        CHECK(storage_of(mTarget.getTexture()).levels == 6);
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
+    // bytesFor counts every format a target may have at its texels' size, as the accounting records it: RG16 and R16
+    // built and counted, RGB16 padded to RGBA16's 8 bytes and RGB9_E5 at 4.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: bytesFor counts every format at its texels' size", "[llrendertarget_gl]")
+    {
+        const ALRenderTargetDesc norm16{ .width = 8, .height = 4, .color = { GL_RG16, GL_R16 } };
+        const U64 before = rt_bytes();
+        REQUIRE(mOwner.ensure(norm16) == EnsureResult::Built);
+        CHECK(LLRenderTarget::bytesFor(norm16) == 8 * 4 * (4 + 2));
+        CHECK(rt_bytes() - before == LLRenderTarget::bytesFor(norm16));
+        const ALRenderTargetDesc shared_exponent{ .width = 8, .height = 4, .color = { GL_RGB16, GL_RGB9_E5 } };
+        CHECK(LLRenderTarget::bytesFor(shared_exponent) == 8 * 4 * (8 + 4));
+        CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
+    }
+
     // ensure builds a target once and keeps it after: the same description again keeps every GL name and what the
     // target holds, and counts no more bytes. A description wider than the context's largest texture is kept as the
     // size allocate holds it to, and a target allocate built is kept by the description it was built as.
     TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure keeps a target that already matches its description", "[llrendertarget_gl]")
     {
-        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        const U64 bytes = rt_bytes();
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
         CHECK(mOwner.desc() == GBUFFER);
         require_storage(mOwner, GBUFFER);
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK(rt_bytes() - bytes == bytes_of(GBUFFER));
 
         const Names built = names_of(mOwner);
         mOwner.bindTarget();
@@ -710,14 +762,17 @@ namespace
         CHECK(names_of(mOwner) == built);
         UNSCOPED_INFO("what the target held");
         CHECK(pixel_of(mOwner) == LLColor4U(255, 0, 255, 255));
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK(rt_bytes() - bytes == bytes_of(GBUFFER));
 
         const U32 max_size = (U32)gGLManager.mGLMaxTextureSize;
         const ALRenderTargetDesc too_wide{ .width = max_size + 3, .height = 1, .color = { GL_R8 } };
+        const U64 before_wide = rt_bytes();
         REQUIRE(mWide.ensure(too_wide) == EnsureResult::Built);
         CHECK(mWide.getWidth() == max_size);
-        UNSCOPED_INFO("a width past the largest texture, held to it");
+        UNSCOPED_INFO("a width past the largest texture, held to it, and counted at that size");
         CHECK(mWide.ensure(too_wide) == EnsureResult::Kept);
+        CHECK(LLRenderTarget::bytesFor(too_wide) == (U64)max_size);
+        CHECK(rt_bytes() - before_wide == LLRenderTarget::bytesFor(too_wide));
 
         REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8, /*depth=*/true, /*stencil=*/true, ALTextureSlot::TT_TEXTURE,
                                  LLRenderTarget::MIPS_AUTO, LLRenderTarget::DEPTH_FMT_32F));
@@ -733,7 +788,7 @@ namespace
     // description says and the byte count follows it. Asked again, it is kept.
     TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure builds a target again when its size or a format changes", "[llrendertarget_gl]")
     {
-        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        const U64 bytes = rt_bytes();
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
 
         const NamedDesc changes[] = {
@@ -754,7 +809,8 @@ namespace
             REQUIRE(mOwner.ensure(desc) == EnsureResult::Built);
             CHECK(mOwner.desc() == desc);
             require_storage(mOwner, desc);
-            CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(desc));
+            CHECK(rt_bytes() - bytes == bytes_of(desc));
+            CHECK(LLRenderTarget::bytesFor(desc) == bytes_of(desc));
             CHECK(mOwner.ensure(desc) == EnsureResult::Kept);
         }
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
@@ -765,7 +821,7 @@ namespace
     // target was built. After either, the target builds as before.
     TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a failed ensure leaves the target released and the byte count right", "[llrendertarget_gl]")
     {
-        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        const U64 bytes = rt_bytes();
         {
             MaxTextureSizeRestore restore;
             const U32 max_size = (U32)restore.mSaved;
@@ -780,7 +836,7 @@ namespace
                 REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
                 CHECK(mOwner.ensure(desc) == EnsureResult::Failed);
                 require_released(mOwner);
-                CHECK(LLRenderTarget::sBytesAllocated == bytes);
+                CHECK(rt_bytes() == bytes);
             }
         }
 
@@ -798,12 +854,12 @@ namespace
             REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
             CHECK(mOwner.ensure(desc) == EnsureResult::Failed);
             require_released(mOwner);
-            CHECK(LLRenderTarget::sBytesAllocated == bytes);
+            CHECK(rt_bytes() == bytes);
         }
 
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
         require_storage(mOwner, GBUFFER);
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK(rt_bytes() - bytes == bytes_of(GBUFFER));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -814,13 +870,13 @@ namespace
     TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: ensure re-points a depth sharer when its owner is built again", "[llrendertarget_gl]")
     {
         const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
-        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        const U64 bytes = rt_bytes();
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
         REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
         CHECK(mSharer.sharesDepth());
         CHECK(mSharer.desc() == sharer);
         UNSCOPED_INFO("the sharer counts its colour alone");
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER) + bytes_of(sharer));
+        CHECK(rt_bytes() - bytes == bytes_of(GBUFFER) + bytes_of(sharer));
         CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
         CHECK(attached_at(mSharer, GL_STENCIL_ATTACHMENT) == mOwner.getDepth());
         clear_depth(mOwner, 0.25);
@@ -871,7 +927,7 @@ namespace
         CHECK(attached_at(mSharer, GL_DEPTH_ATTACHMENT) == mOwner.getDepth());
         clear_depth(mOwner, 0.875);
         CHECK(std::abs(depth_through(mSharer) - 0.875f) < 1.e-4f);
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(owner_resized) + bytes_of(sharer_resized));
+        CHECK(rt_bytes() - bytes == bytes_of(owner_resized) + bytes_of(sharer_resized));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 
@@ -933,7 +989,7 @@ namespace
     TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: a sharer that cannot share fails released", "[llrendertarget_gl]")
     {
         const ALRenderTargetDesc sharer{ .width = GBUFFER.width, .height = GBUFFER.height, .color = { GL_RGBA16F } };
-        const U32 bytes = LLRenderTarget::sBytesAllocated;
+        const U64 bytes = rt_bytes();
         REQUIRE(mOwner.ensure(GBUFFER) == EnsureResult::Built);
 
         const NamedDesc refused[] = {
@@ -949,7 +1005,7 @@ namespace
             REQUIRE(mSharer.ensure(sharer, mOwner) == EnsureResult::Built);
             CHECK(mSharer.ensure(desc, mOwner) == EnsureResult::Failed);
             require_released(mSharer);
-            CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+            CHECK(rt_bytes() - bytes == bytes_of(GBUFFER));
         }
 
         UNSCOPED_INFO("its own owner");
@@ -971,7 +1027,7 @@ namespace
         UNSCOPED_INFO("its owner's depth is what it renders into");
         CHECK(mSharer.isComplete());
         CHECK(mSharer.ensure(depth_only, mOwner) == EnsureResult::Kept);
-        CHECK(LLRenderTarget::sBytesAllocated - bytes == bytes_of(GBUFFER));
+        CHECK(rt_bytes() - bytes == bytes_of(GBUFFER));
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 

@@ -46,7 +46,9 @@
 #include "llnotificationsutil.h"
 
 // viewer includes
+#include "alvramusage.h"
 #include "llimagegl.h"
+#include "llviewerstats.h"
 #include "lldrawpool.h"
 #include "lltexturefetch.h"
 #include "llviewertexturelist.h"
@@ -102,7 +104,6 @@ F64 LLViewerTexture::sCurrentTime = 0.0;
 
 constexpr F32 MEMORY_CHECK_WAIT_TIME = 1.0f;
 constexpr F32 MIN_VRAM_BUDGET = 768.f;
-F32 LLViewerTexture::sFreeVRAMMegabytes = MIN_VRAM_BUDGET;
 
 LLViewerTexture::EDebugTexels LLViewerTexture::sDebugTexelsMode = LLViewerTexture::DEBUG_TEXELS_OFF;
 
@@ -470,12 +471,8 @@ void LLViewerTexture::initClass()
 }
 
 //static
-void LLViewerTexture::updateClass()
+void LLViewerTexture::getVRAMBudget(F32& budget, F32& target)
 {
-    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    sCurrentTime = gFrameTimeSeconds;
-
-    LLViewerMediaTexture::updateClass();
     // This is a divisor used to determine how much VRAM from our overall VRAM budget to use.
     // This is **cumulative** on whatever the detected or manually set VRAM budget is.
     // If we detect 2048MB of VRAM, this will, by default, only use 1024.
@@ -484,26 +481,60 @@ void LLViewerTexture::updateClass()
     static LLCachedControl<U32> tex_vram_divisor(gSavedSettings, "RenderTextureVRAMDivisor", 2);
     static LLCachedControl<U32> max_vram_budget(gSavedSettings, "RenderMaxVRAMBudget", 0);
 
-    F64 texture_bytes_alloc = LLImageGL::getTextureBytesAllocated() / 1024.0 / 1024.0;
-    F64 vertex_bytes_alloc = LLVertexBuffer::getBytesAllocated() / 1024.0 / 512.0;
-
-    // get an estimate of how much video memory we're using
-    // NOTE: our metrics miss about half the vram we use, so this biases high but turns out to typically be within 5% of the real number
-    F32 used = (F32)ll_round(texture_bytes_alloc + vertex_bytes_alloc);
-
     // For debugging purposes, it's useful to be able to set the VRAM budget manually.
     // But when manual control is not enabled, use the VRAM divisor.
     // While we're at it, assume we have 1024 to play with at minimum when the divisor is in use.  Works more elegantly with the logic below this.
     // -Geenz 2025-03-21
-    F32 budget = max_vram_budget == 0 ? llmax(1024, (F32)gGLManager.mVRAM / tex_vram_divisor) : (F32)max_vram_budget;
+    budget = max_vram_budget == 0 ? llmax(1024, (F32)gGLManager.mVRAM / tex_vram_divisor) : (F32)max_vram_budget;
 
     // Try to leave at least half a GB for everyone else and for bias,
     // but keep at least 768MB for ourselves
     // Viewer can 'overshoot' target when scene changes, if viewer goes over budget it
     // can negatively impact performance, so leave 20% of a breathing room for
     // 'bias' calculation to kick in.
-    F32 target = llmax(llmin(budget - 512.f, budget * 0.8f), MIN_VRAM_BUDGET);
-    sFreeVRAMMegabytes = target - used;
+    target = llmax(llmin(budget - 512.f, budget * 0.8f), MIN_VRAM_BUDGET);
+}
+
+//static
+void LLViewerTexture::updateClass()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    sCurrentTime = gFrameTimeSeconds;
+
+    LLViewerMediaTexture::updateClass();
+
+    // What the budget counts as used: everything the viewer holds in video memory, each allocation once, at its size.
+    const ALVRAMUsage usage = ALVRAMUsage::current();
+    F32 used = (F32)ll_round((F64)usage.total() / (1024.0 * 1024.0));
+
+    F32 budget = 0.f;
+    F32 target = 0.f;
+    getVRAMBudget(budget, target);
+
+    sample(LLStatViewer::GL_TEX_MEM, F64Bytes((F64)usage.textures()));
+    LL_PROFILE_PLOT("VRAM used MB", (int64_t)used);
+    LL_PROFILE_PLOT("VRAM target MB", (int64_t)target);
+    LL_PROFILE_PLOT("VRAM budget MB", (int64_t)budget);
+    LL_PROFILE_PLOT("VRAM streamed textures MB", (int64_t)(usage.mStreamedTextures >> 20));
+    LL_PROFILE_PLOT("VRAM other textures MB", (int64_t)(usage.mOtherTextures >> 20));
+    LL_PROFILE_PLOT("VRAM render targets MB", (int64_t)(usage.mRenderTargets >> 20));
+    LL_PROFILE_PLOT("VRAM reflection probes MB", (int64_t)(usage.mReflectionProbes >> 20));
+    LL_PROFILE_PLOT("VRAM geometry MB", (int64_t)(usage.mGeometry >> 20));
+    LL_PROFILE_PLOT("VRAM GPU buffers MB", (int64_t)(usage.mGPUBuffers >> 20));
+
+    // GL said it ran out of video memory. Storage it refused stays counted, so used reads high while that lasts.
+    const bool out_of_memory = take_gl_out_of_memory();
+    LL_PROFILE_PLOT("GL out of video memory", (int64_t)out_of_memory);
+    if (out_of_memory)
+    {
+        static F64 next_warning = 0.0;
+        if (const F64 now = LLFrameTimer::getTotalSeconds(); now >= next_warning)
+        {
+            next_warning = now + 60.0;
+            LL_WARNS("Texture") << "GL ran out of video memory, at " << used << " MB used of a " << target
+                                << " MB target." << LL_ENDL;
+        }
+    }
 
     F32 over_pct = (used - target) / target;
 
@@ -764,7 +795,45 @@ void LLViewerTexture::dump()
 
 void LLViewerTexture::setBoostLevel(S32 level)
 {
-    if(mBoostLevel != level)
+    mBoostLevels.setOwn(level);
+    updateBoost();
+}
+
+void LLViewerTexture::addBoostHold(S32 level)
+{
+    mBoostLevels.addHold(level);
+    updateBoost();
+}
+
+void LLViewerTexture::removeBoostHold(S32 level)
+{
+    const bool held = mBoostLevels.removeHold(level);
+    llassert_msg(held, "a boost hold let go of that was not held");
+    if (held)
+    {
+        updateBoost();
+    }
+}
+
+void LLViewerTexture::boostThisFrame(S32 level)
+{
+    mBoostLevels.askForFrame(level, LLFrameTimer::getFrameCount());
+    updateBoost();
+}
+
+void LLViewerTexture::lapseFrameBoost()
+{
+    if (mBoostLevels.lapse(LLFrameTimer::getFrameCount()))
+    {
+        updateBoost();
+    }
+}
+
+void LLViewerTexture::updateBoost()
+{
+    const S32 level = mBoostLevels.level();
+    const bool changed = mBoostLevel != level;
+    if (changed)
     {
         mBoostLevel = level;
         if(mBoostLevel != LLViewerTexture::BOOST_NONE &&
@@ -776,10 +845,19 @@ void LLViewerTexture::setBoostLevel(S32 level)
         }
     }
 
-    // strongly encourage anything boosted to load at full res
+    // strongly encourage anything boosted to load at full res. Its largest wanted size stays that once the boost ends,
+    // as any texture's largest stays, until the bias brings it down under pressure: brought down as the boost ends,
+    // each end would queue a downscale, and letting go of a selection or closing a picker a burst of them. A texture
+    // larger than RenderMaxTextureResolution, which a boost lifts, still comes back to the cap as its boost ends, one
+    // downscale each, which the downscale queue takes within its time a frame.
     if (mBoostLevel >= LLViewerTexture::BOOST_HIGH)
     {
         mMaxVirtualSize = 2048.f * 2048.f;
+    }
+    // A level asked for again, as selection and swatches ask every frame, changes nothing that follows from it.
+    if (changed)
+    {
+        onBoostUpdated();
     }
 }
 
@@ -886,10 +964,15 @@ void LLViewerTexture::addFace(U32 ch, LLFace* facep)
     {
         mFaceList[ch].resize(2 * mNumFaces[ch] + 1);
     }
+    const bool had_use = hasWorldUse();
     mFaceList[ch][mNumFaces[ch]] = facep;
     facep->setIndexInTex(ch, mNumFaces[ch]);
     mNumFaces[ch]++;
     mLastFaceListUpdateTimer.reset();
+    if (!had_use)
+    {
+        onWorldUseChanged();
+    }
 }
 
 //virtual
@@ -898,6 +981,7 @@ void LLViewerTexture::removeFace(U32 ch, LLFace* facep)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);
 
+    const bool had_use = hasWorldUse();
     if(mNumFaces[ch] > 1)
     {
         S32 index = facep->getIndexInTex(ch);
@@ -912,6 +996,10 @@ void LLViewerTexture::removeFace(U32 ch, LLFace* facep)
         mNumFaces[ch] = 0;
     }
     mLastFaceListUpdateTimer.reset();
+    if (had_use && !hasWorldUse())
+    {
+        onWorldUseChanged();
+    }
 }
 
 S32 LLViewerTexture::getTotalNumFaces() const
@@ -941,16 +1029,22 @@ void LLViewerTexture::addVolume(U32 ch, LLVOVolume* volumep)
     {
         mVolumeList[ch].resize(2 * mNumVolumes[ch] + 1);
     }
+    const bool had_use = hasWorldUse();
     mVolumeList[ch][mNumVolumes[ch]] = volumep;
     volumep->setIndexInTex(ch, mNumVolumes[ch]);
     mNumVolumes[ch]++;
     mLastVolumeListUpdateTimer.reset();
+    if (!had_use)
+    {
+        onWorldUseChanged();
+    }
 }
 
 //virtual
 void LLViewerTexture::removeVolume(U32 ch, LLVOVolume* volumep)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    const bool had_use = hasWorldUse();
     if (mNumVolumes[ch] > 1)
     {
         S32 index = volumep->getIndexInTex(ch);
@@ -965,11 +1059,31 @@ void LLViewerTexture::removeVolume(U32 ch, LLVOVolume* volumep)
         mNumVolumes[ch] = 0;
     }
     mLastVolumeListUpdateTimer.reset();
+    if (had_use && !hasWorldUse())
+    {
+        onWorldUseChanged();
+    }
 }
 
 S32 LLViewerTexture::getNumVolumes(U32 ch) const
 {
     return mNumVolumes[ch];
+}
+
+bool LLViewerTexture::hasWorldUse() const
+{
+    if (getTotalNumFaces() > 0)
+    {
+        return true;
+    }
+    for (U32 ch = 0; ch < LLRender::NUM_VOLUME_TEXTURE_CHANNELS; ++ch)
+    {
+        if (mNumVolumes[ch] > 0)
+        {
+            return true;
+        }
+    }
+    return false;
 }
 
 void LLViewerTexture::reorganizeFaceList()
@@ -1070,6 +1184,33 @@ LLViewerFetchedTexture* LLViewerFetchedTexture::getSmokeImage()
     return sSmokeImagep;
 }
 
+// What a fetched texture's storage counts as: one fetched by asset ID or from the bake service is the texture
+// streaming's, except where the UI alone holds it -- at one of the UI's boosts (an icon, a thumbnail, a preview, a map, a
+// UI image), with no face or volume using it in the world; a map tile or a local file never is.
+static LLImageGLMemory::EClass vram_class_of(FTType f_type, S32 boost, bool in_world)
+{
+    if (f_type != FTT_DEFAULT && f_type != FTT_SERVER_BAKE)
+    {
+        return LLImageGLMemory::OTHER_TEXTURE;
+    }
+    if (in_world)
+    {
+        return LLImageGLMemory::STREAMED_TEXTURE;
+    }
+    switch (boost)
+    {
+        case LLGLTexture::BOOST_ICON:
+        case LLGLTexture::BOOST_THUMBNAIL:
+        case LLGLTexture::BOOST_UI:
+        case LLGLTexture::BOOST_PREVIEW:
+        case LLGLTexture::BOOST_MAP:
+        case LLGLTexture::BOOST_MAP_VISIBLE:
+            return LLImageGLMemory::OTHER_TEXTURE;
+        default:
+            return LLImageGLMemory::STREAMED_TEXTURE;
+    }
+}
+
 LLViewerFetchedTexture::LLViewerFetchedTexture(const LLUUID& id, FTType f_type, const LLHost& host, bool usemipmaps)
     : LLViewerTexture(id, usemipmaps),
     mTargetHost(host)
@@ -1081,6 +1222,7 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const LLUUID& id, FTType f_type, 
         LL_WARNS() << "Unsupported fetch type " << mFTType << LL_ENDL;
     }
     generateGLTexture();
+    updateVRAMClass();
 }
 
 LLViewerFetchedTexture::LLViewerFetchedTexture(const LLImageRaw* raw, FTType f_type, bool usemipmaps)
@@ -1088,6 +1230,8 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const LLImageRaw* raw, FTType f_t
 {
     init(true);
     mFTType = f_type;
+    // The image made its texture from the raw already; setting the class moves it.
+    updateVRAMClass();
 }
 
 LLViewerFetchedTexture::LLViewerFetchedTexture(const std::string& url, FTType f_type, const LLUUID& id, bool usemipmaps)
@@ -1097,6 +1241,7 @@ LLViewerFetchedTexture::LLViewerFetchedTexture(const std::string& url, FTType f_
     init(true);
     mFTType = f_type;
     generateGLTexture();
+    updateVRAMClass();
 }
 
 void LLViewerFetchedTexture::init(bool firstinit)
@@ -1283,7 +1428,7 @@ void LLViewerFetchedTexture::setForSculpt()
 
     forceToSaveRawImage(0, F32_MAX);
 
-    setBoostLevel(llmax((S32)getBoostLevel(),
+    setBoostLevel(llmax(mBoostLevels.own(),
         (S32)LLGLTexture::BOOST_SCULPTED));
 
     mForSculpt = true;
@@ -1772,6 +1917,8 @@ void LLViewerFetchedTexture::processTextureStats()
     llassert(!gCubeSnapshot);  // should only be called when the main camera is active
     llassert(!LLPipeline::sShadowRender);
 
+    lapseFrameBoost();
+
     if(mFullyLoaded)
     {
         if(mDesiredDiscardLevel > mMinDesiredDiscardLevel)//need to load more
@@ -1891,14 +2038,29 @@ bool LLViewerFetchedTexture::isActiveFetching()
     return mFetchState > 7 && mFetchState < 10 && monitor_enabled; //in state of WAIT_HTTP_REQ or DECODE_IMAGE.
 }
 
-void LLViewerFetchedTexture::setBoostLevel(S32 level)
+//virtual
+void LLViewerFetchedTexture::onBoostUpdated()
 {
-    LLViewerTexture::setBoostLevel(level);
+    updateVRAMClass();
 
-    if (level >= LLViewerTexture::BOOST_HIGH)
+    if (mBoostLevel >= LLViewerTexture::BOOST_HIGH)
     {
         mDesiredDiscardLevel = 0;
     }
+}
+
+void LLViewerFetchedTexture::updateVRAMClass()
+{
+    if (mGLTexturep.notNull())
+    {
+        mGLTexturep->setVRAMClass(vram_class_of(mFTType, mBoostLevel, hasWorldUse()));
+    }
+}
+
+//virtual
+void LLViewerFetchedTexture::onWorldUseChanged()
+{
+    updateVRAMClass();
 }
 
 bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 current_discard, S32 fetch_discard, F32 decode_priority)
@@ -3247,6 +3409,7 @@ bool LLViewerLODTexture::isUpdateFrozen()
 void LLViewerLODTexture::processTextureStats()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
+    lapseFrameBoost();
     updateVirtualSize();
 
     bool did_downscale = false;
@@ -3352,13 +3515,6 @@ void LLViewerLODTexture::processTextureStats()
     if(mForceToSaveRawImage && mDesiredSavedRawDiscardLevel >= 0)
     {
         mDesiredDiscardLevel = llmin(mDesiredDiscardLevel, (S8)mDesiredSavedRawDiscardLevel);
-    }
-
-    // selection manager will immediately reset BOOST_SELECTED but never unsets it
-    // unset it immediately after we consume it
-    if (getBoostLevel() == BOOST_SELECTED)
-    {
-        setBoostLevel(BOOST_NONE);
     }
 }
 

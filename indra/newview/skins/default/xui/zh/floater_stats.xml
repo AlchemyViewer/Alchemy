@@ -27,8 +27,6 @@
 					<stat_bar label="原始計數" name="numrawimagesstat"/>
 					<stat_bar label="GL 記憶" name="gltexmemstat"/>
 					<stat_bar label="格式化記憶" name="formattedmemstat"/>
-					<stat_bar label="原始記憶" name="rawmemstat"/>
-					<stat_bar label="界限記憶" name="glboundmemstat"/>
 				</stat_view>
 				<stat_view label="網路" name="network">
 					<stat_bar label="進入封包" name="packetsinstat"/>

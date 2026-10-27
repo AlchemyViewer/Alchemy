@@ -28,13 +28,13 @@
 #include "../alserialworker.h"
 
 #include "../llevents.h"
+#include "../llmutex.h"
 #include "../llsdutil.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
-#include <mutex>
 #include <thread>
 #include <vector>
 
@@ -43,13 +43,13 @@ namespace
     struct alserialworker_data
     {
         // What the jobs did, in the order they did it, and where.
-        std::mutex               mutex;
+        LLMutex                  mutex;
         std::vector<int>         done;
         std::vector<std::thread::id> where;
 
         void note(int n)
         {
-            const std::lock_guard<std::mutex> lock(mutex);
+            LLMutexLock lock(&mutex);
             done.push_back(n);
             where.push_back(std::this_thread::get_id());
         }
@@ -60,7 +60,7 @@ namespace
             for (int tries = 0; tries < 2000; ++tries)
             {
                 {
-                    const std::lock_guard<std::mutex> lock(mutex);
+                    LLMutexLock lock(&mutex);
                     if (done.size() >= count)
                     {
                         return true;
