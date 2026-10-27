@@ -501,7 +501,9 @@ void main()
         }
 
         // The sun by its old program, as LLDrawPoolWLSky::renderHeavenlyBodies drew it: its quad about the camera,
-        // alpha blended, the texture pair bound only where the sky blends between them.
+        // alpha blended, the texture pair bound only where the sky blends between them. The program reads the second
+        // map even where it weighs it by zero, and that draw emptied its unit first, as this does: an infinite texel
+        // weighed by zero is not zero.
         std::vector<F32> oldSun(const BodyCase& sun, bool emissive, bool stored)
         {
             LLPointer<LLVertexBuffer> quad = bodyQuad(sunCorners(sun));
@@ -514,6 +516,10 @@ void main()
                 if (sun.mBlend > 0.f)
                 {
                     bindMap(program, LLShaderMgr::SKY_SUN_MAP_NEXT, mSunTextureNext, ALSamplers::AnisoClamp);
+                }
+                else
+                {
+                    program.unbindTexture(LLShaderMgr::SKY_SUN_MAP_NEXT);
                 }
                 program.uniform1f(LLShaderMgr::BLEND_FACTOR, sun.mBlend);
                 drawQuad(quad);
@@ -704,8 +710,9 @@ void main()
             }, sky);
         }
 
-        // How pictures @a a and @a b differ where either differs from the background, each channel allowed
-        // @a allowance plus @a steps of the path's storage at the larger value; pixels @a skip marks are left out.
+        // How pictures @a a and @a b differ where either differs from the background, as a NaN does, each channel
+        // allowed @a allowance plus @a steps of the path's storage at the larger value, a NaN past any; pixels @a skip
+        // marks are left out.
         static Difference compare(const std::vector<F32>& a, const std::vector<F32>& b, bool emissive, F32 allowance,
                                   F32 steps, const std::vector<bool>& skip = {}, F32 dithered = 0.f)
         {
@@ -724,10 +731,11 @@ void main()
                 {
                     const F32 diff = fabsf(pa[c] - pb[c]);
                     d.mMost = llmax(d.mMost, diff);
-                    lit = lit || fabsf(pa[c] - BACKGROUND[emissive][c]) > 1e-6f || fabsf(pb[c] - BACKGROUND[emissive][c]) > 1e-6f;
+                    lit = lit || !(fabsf(pa[c] - BACKGROUND[emissive][c]) <= 1e-6f) ||
+                          !(fabsf(pb[c] - BACKGROUND[emissive][c]) <= 1e-6f);
                     const F32 larger = llmax(pa[c], pb[c]);
                     beyond = beyond ||
-                             diff > allowance + steps * storageStep(larger, emissive, c) + dithered * ditherReach(c) * larger;
+                             !(diff <= allowance + steps * storageStep(larger, emissive, c) + dithered * ditherReach(c) * larger);
                 }
                 d.mLit += lit;
                 d.mBeyond += beyond;
