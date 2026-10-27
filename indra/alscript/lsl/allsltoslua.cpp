@@ -506,6 +506,10 @@ namespace
         // key of it than LSL's held: no text, which is NULL_KEY, and a key
         // with capitals, which it writes small. Whether it said either.
         bool keyText(LSLExpression* at, std::string_view text);
+        // What a variable declared with nothing starts as: its type's empty
+        // value, and for a key held as a uuid NULL_KEY, which is said, as
+        // LSL's held "", which no uuid holds.
+        std::string declaredWithNothing(LSLIdentifier* id, LSLIType type);
         // Why a list is shared, as SluaListCopy says it.
         std::string sharedWords(Shared why) const;
 
@@ -2743,6 +2747,17 @@ namespace
             body += "{" + (!made.text.empty() && made.text.front() == '{' ? "(" + made.text + ")" : made.text) + "}";
         }
         return Expr{ "`" + body + "`" };
+    }
+
+    std::string Writer::declaredWithNothing(LSLIdentifier* id, LSLIType type)
+    {
+        if (type == LST_KEY)
+        {
+            noteOnce(id, "SluaKeyDeclared",
+                     "A key declared with nothing is NULL_KEY here, where LSL's held \"\": it equals NULL_KEY and reads as NULL_KEY's "
+                     "text, where LSL's did neither.");
+        }
+        return defaultOf(type);
     }
 
     bool Writer::keyText(LSLExpression* at, std::string_view text)
@@ -5364,7 +5379,7 @@ namespace
                 }
                 else
                 {
-                    line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
+                    line("local " + name + typed(type) + " = " + (isNull(init) ? declaredWithNothing(id, type) : oneValue(coerced(init, type)).text));
                 }
                 writeSteps(steps.after);
                 return;
@@ -7766,20 +7781,11 @@ namespace
         });
         // What each key variable is given, and each key function of the
         // script's own returns; each that is given text, until none more
-        // is. One declared with nothing holds LSL's "", no UUID, which a
-        // uuid cannot: uuid("") is NULL_KEY.
+        // is. One declared with nothing is NULL_KEY, as Tapple asked, though
+        // LSL's held "" (Writer::declaredWithNothing).
         std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
-        std::vector<LSLSymbol*>                            unset;
         const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
-            if (id->getIType() != LST_KEY || !id->getSymbol())
-            {
-                return;
-            }
-            if (isNull(init))
-            {
-                unset.push_back(id->getSymbol());
-            }
-            else
+            if (id->getIType() == LST_KEY && id->getSymbol() && !isNull(init))
             {
                 given.emplace_back(id->getSymbol(), init);
             }
@@ -7876,8 +7882,7 @@ namespace
         // written out -- a variable's, a call's -- or given such a key.
         // Given on to a key held as text, uuid() would have made "" NULL_KEY
         // on the way, so such a key holds text too.
-        boost::unordered_flat_set<LSLSymbol*> loose(unset.begin(), unset.end());
-        mTextKeys.insert(unset.begin(), unset.end());
+        boost::unordered_flat_set<LSLSymbol*> loose;
         const auto loosely = [&](LSLExpression* e) {
             e = unbracketed(e);
             if (e && e->getIType() == LST_STRING)
@@ -7942,7 +7947,7 @@ namespace
             else
             {
                 const LSLIType type = varType(id->getSymbol(), id->getIType());
-                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
+                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? declaredWithNothing(id, type) : oneValue(coerced(init, type)).text));
             }
             commentsAfter(global, from);
             lined(global, from);
