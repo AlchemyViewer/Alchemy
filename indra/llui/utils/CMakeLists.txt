@@ -3,68 +3,73 @@
 # The console utilities over the UI. What each is for, and how it is run,
 # is at the top of its own file.
 if(AL_BUILD_TESTS)
-    add_executable(llui_libtest)
+  # Run from the build tree, as a test binary is, so without vcpkg's
+  # app-local step: it is a run of vcpkg.exe after each link, and runs
+  # started together fail now and then with the file in use.
+  set(VCPKG_APPLOCAL_DEPS OFF)
 
-    target_sources(
-      llui_libtest
-      PRIVATE
-        alparamfingerprint.cpp
-        llui_libtest.cpp
-        llwidgetreg.cpp
-        alparamfingerprint.h
-        llui_libtest.h
-        llwidgetreg.h
-    )
+  add_executable(llui_libtest)
 
-    target_link_libraries(
-      llui_libtest
-      PRIVATE al::flags llui llinventory llmessage llrender llimage
-    )
+  target_sources(
+    llui_libtest
+    PRIVATE
+      alparamfingerprint.cpp
+      llui_libtest.cpp
+      llwidgetreg.cpp
+      alparamfingerprint.h
+      llui_libtest.h
+      llwidgetreg.h
+  )
 
-    set_target_properties(
-      llui_libtest
-      PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
-    )
+  target_link_libraries(
+    llui_libtest
+    PRIVATE al::flags llui llinventory llmessage llrender llimage
+  )
 
-    # The app-data directory used to be reached with a relative path guessed from
-    # the executable's location, which stopped matching the build layout long ago.
-    # Bake in the real one instead.
-    target_compile_definitions(
-      llui_libtest
-      PRIVATE "LLUI_LIBTEST_APP_RO_DIR=\"${INDRA_SOURCE_DIR}/newview\""
-    )
+  set_target_properties(
+    llui_libtest
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
+  )
 
-    # The viewer used to depend on this one, from a directory configured after
-    # newview; beside the library it is about, that target does not exist yet.
-    # It builds with the tests instead, which is where it is run from.
+  # The app-data directory used to be reached with a relative path guessed from
+  # the executable's location, which stopped matching the build layout long ago.
+  # Bake in the real one instead.
+  target_compile_definitions(
+    llui_libtest
+    PRIVATE "LLUI_LIBTEST_APP_RO_DIR=\"${INDRA_SOURCE_DIR}/newview\""
+  )
 
-    # The overlay census: the viewer's own merge over every skin and language
-    # of the source tree, printed by language and gated by the committed
-    # baseline. It writes nothing but its own report, so it is the ctest that
-    # guards the merge as well as the instrument a repair pass is measured
-    # with.
-    add_executable(xui_overlay_check xui_overlay_check.cpp)
-    target_link_libraries(
-      xui_overlay_check
-      PRIVATE al::flags llxml llmessage llcorehttp llcommon
-    )
-    set_target_properties(
-      xui_overlay_check
-      PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
-    )
+  # The viewer used to depend on this one, from a directory configured after
+  # newview; beside the library it is about, that target does not exist yet.
+  # It builds with the tests instead, which is where it is run from.
 
-    # The translation repair over a whole language, which is XUI Studio's
-    # own action from a console: a repair pass is then a command and the diff
-    # it leaves.
-    add_executable(xui_translate_repair xui_translate_repair.cpp)
-    target_link_libraries(
-      xui_translate_repair
-      PRIVATE al::flags llui llmessage llcorehttp llxml llrender llcommon
-    )
-    set_target_properties(
-      xui_translate_repair
-      PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
-    )
+  # The overlay census: the viewer's own merge over every skin and language
+  # of the source tree, printed by language and gated by the committed
+  # baseline. It writes nothing but its own report, so it is the ctest that
+  # guards the merge as well as the instrument a repair pass is measured
+  # with.
+  add_executable(xui_overlay_check xui_overlay_check.cpp)
+  target_link_libraries(
+    xui_overlay_check
+    PRIVATE al::flags llxml llmessage llcorehttp llcommon
+  )
+  set_target_properties(
+    xui_overlay_check
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
+  )
+
+  # The translation repair over a whole language, which is XUI Studio's
+  # own action from a console: a repair pass is then a command and the diff
+  # it leaves.
+  add_executable(xui_translate_repair xui_translate_repair.cpp)
+  target_link_libraries(
+    xui_translate_repair
+    PRIVATE al::flags llui llmessage llcorehttp llxml llrender llcommon
+  )
+  set_target_properties(
+    xui_translate_repair
+    PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${EXE_STAGING_DIR}" FOLDER "Utils"
+  )
 
   add_dependencies(BUILD_TESTS llui_libtest xui_overlay_check xui_translate_repair)
   add_test(

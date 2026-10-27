@@ -2,6 +2,9 @@
 
 # Integration tests of the llimage library (JPEG2000, PNG, jpeg, etc... images reading and writing)
 if(AL_BUILD_TESTS)
+  # Run from the build tree, as a test binary is, so without vcpkg's
+  # app-local step.
+  set(VCPKG_APPLOCAL_DEPS OFF)
   add_executable(llimage_libtest)
 
   target_sources(llimage_libtest PRIVATE llimage_libtest.cpp llimage_libtest.h)
