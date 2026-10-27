@@ -26,6 +26,8 @@
 #pragma once
 
 #include "alcvar.h"
+#include "alcvarconvert.h"
+#include "alcvarref.h"
 
 #include "llcoros.h"
 #include "llsingleton.h"
@@ -264,9 +266,20 @@ public:
     // posted, unchanged ones included, so the main thread makes them in the
     // order they were made.
     void registerValidator(std::string_view name, Validator validator, HookThread thread = HookThread::Any);
+    // A migration a declaration's migrate names by its fn, registered as a
+    // validator is.
+    void registerMigration(std::string_view name, ALCVarMigration migration);
+    const ALCVarMigration* migration(std::string_view name) const;
     // Asserts, once startup is done, that every hook the schema names has
     // been registered.
     void checkHooks() const;
+
+    // ---- names ------------------------------------------------------------
+
+    // The setting of a name or an old name, from any thread: made once at
+    // registration over the descriptors' names and aliases and never changed
+    // after, so read with no lock. Empty where nothing has the name.
+    ALCVarRef find(std::string_view name) const;
 
     // ---- frames ---------------------------------------------------------
 
@@ -488,6 +501,18 @@ private:
     // disconnects from nothing.
     bool                                                         mTearingDown = false;
     std::vector<ValidatorHook>                                   mValidators;
+    std::vector<std::pair<std::string, ALCVarMigration>>         mMigrations;
+
+    // Every name and old name, to its setting.
+    struct Named
+    {
+        U32                index = 0;
+        const ALCVarAlias* alias = nullptr;
+        // The alias's place among all of them, for its use to be said once.
+        U32                ordinal = 0;
+    };
+    boost::unordered_flat_map<std::string_view, Named> mNames;
+    std::unique_ptr<std::atomic<U8>[]>                 mAliasSaid;
 
     // Changes made off the main thread, and writes posted to it.
     LLCoros::Mutex                               mQueueMutex;

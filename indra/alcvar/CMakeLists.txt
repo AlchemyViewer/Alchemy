@@ -5,15 +5,17 @@
 # schema alcvargen compiles from indra/cvars, whose handles every library
 # above reads.
 
-set(alcvar_SOURCES alcvars.cpp alcvarvalue.cpp)
+set(alcvar_SOURCES alcvarconvert.cpp alcvarref.cpp alcvars.cpp alcvarvalue.cpp)
 
 set(
   alcvar_HEADERS
   alcvar.h
   alcvaratomic.h
   alcvarconnection.h
+  alcvarconvert.h
   alcvarconvertible.h
   alcvardesc.h
+  alcvarref.h
   alcvars.h
   alcvartype.h
   alcvarvalue.h
@@ -64,6 +66,7 @@ if(AL_BUILD_TESTS)
       tests/alcvarlayers_test.cpp
       tests/alcvarlisteners_test.cpp
       tests/alcvarthreads_test.cpp
+      tests/alcvarconvert_test.cpp
     LIBRARIES alcvar
     SUPPORT alcvar_test_schema llcommon_test_checks
   )

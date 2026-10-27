@@ -221,6 +221,17 @@ namespace
         ALCVars& cvars = store();
         REQUIRE_THROWS_AS(cvars.checkHooks(), ll_test::FatalError);
         cvars.registerValidator("maturity", [](const ALCVarDesc&, ALCVarValue&) { return true; });
+        REQUIRE_THROWS_AS(cvars.checkHooks(), ll_test::FatalError);
+        const ALCVarMigration nothing = [](const ALCVarDesc&, const ALCVarStored*, const ALCVarStoredLookup&) {
+            return std::optional<ALCVarValue>();
+        };
+        cvars.registerMigration("fog_from_old", nothing);
+        // A setting's sources' hooks too.
+        REQUIRE_THROWS_AS(cvars.checkHooks(), ll_test::FatalError);
+        for (const char* hook : { "sky_tint_from_two", "azimuth_from_angles", "elevation_from_angles", "gust_from_wind" })
+        {
+            cvars.registerMigration(hook, nothing);
+        }
         CHECK_NOTHROW(cvars.checkHooks());
     }
 

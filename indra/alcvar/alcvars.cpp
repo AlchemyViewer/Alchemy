@@ -290,6 +290,20 @@ void ALCVars::registerSchema(const ALCVarSchema& schema)
     mListeners.resize(mSettings.size());
     mGroupListeners.resize(mGroups.size());
 
+    U32 aliases = 0;
+    for (U32 i = 0; i < U32(mSettings.size()); ++i)
+    {
+        const ALCVarDesc& desc = *mSettings[i].desc;
+        const bool        added = mNames.emplace(desc.name, Named{ i, nullptr, 0 }).second;
+        llassert_always_msg(added, "a setting's name is its alone");
+        for (const ALCVarAlias& alias : desc.aliases)
+        {
+            const bool aliased = mNames.emplace(alias.name, Named{ i, &alias, aliases++ }).second;
+            llassert_always_msg(aliased, "an old name is one setting's");
+        }
+    }
+    mAliasSaid.reset(new std::atomic<U8>[std::max<U32>(aliases, 1)]());
+
     // Every slot back to its compiled default: a store made again over the
     // same schema, as each test makes one, starts where a new process does.
     for (U32 g = 0; g < U32(mGroups.size()); ++g)
@@ -1254,6 +1268,26 @@ std::vector<std::string> ALCVars::ownersOf(U32 index) const
     return owners;
 }
 
+// ---- names ----------------------------------------------------------------
+
+ALCVarRef ALCVars::find(std::string_view name) const
+{
+    const auto found = mNames.find(name);
+    if (found == mNames.end())
+    {
+        return {};
+    }
+    const Named& named = found->second;
+#if LL_DEBUG
+    if (named.alias && !mAliasSaid[named.ordinal].exchange(1, std::memory_order_relaxed))
+    {
+        LL_DEBUGS("ALCVars") << named.alias->name << " is an old name of " << desc(named.index).name
+                             << ", still used" << LL_ENDL;
+    }
+#endif
+    return ALCVarRef(named.index, named.alias);
+}
+
 // ---- listeners ------------------------------------------------------------
 
 namespace
@@ -1674,6 +1708,32 @@ void ALCVars::post(U32 index, PostedWrite::Kind kind, ALCVarValue value)
     mPosted.push_back({ index, kind, std::move(value) });
 }
 
+void ALCVars::registerMigration(std::string_view name, ALCVarMigration migration)
+{
+    llassert(on_main_thread());
+    for (auto& [registered, fn] : mMigrations)
+    {
+        if (registered == name)
+        {
+            fn = std::move(migration);
+            return;
+        }
+    }
+    mMigrations.emplace_back(std::string(name), std::move(migration));
+}
+
+const ALCVarMigration* ALCVars::migration(std::string_view name) const
+{
+    for (const auto& [registered, fn] : mMigrations)
+    {
+        if (registered == name)
+        {
+            return &fn;
+        }
+    }
+    return nullptr;
+}
+
 void ALCVars::checkHooks() const
 {
     std::vector<std::string> missing;
@@ -1683,6 +1743,27 @@ void ALCVars::checkHooks() const
         if (!desc.validate.empty() && setting.validator == NONE)
         {
             missing.push_back(fmt::format("{} (validate {})", desc.name, desc.validate));
+        }
+        for (const ALCVarMigrate& migrate : desc.migrates)
+        {
+            if (migrate.kind == ALCVarMigrate::Kind::Hook && !migration(migrate.hook))
+            {
+                missing.push_back(fmt::format("{} (migrate fn {})", desc.name, migrate.hook));
+            }
+            for (const ALCVarJoin& join : migrate.join)
+            {
+                if (join.kind == ALCVarMigrate::Kind::Hook && !migration(join.hook))
+                {
+                    missing.push_back(fmt::format("{} (join fn {})", desc.name, join.hook));
+                }
+            }
+        }
+        for (const ALCVarFrom& from : desc.from)
+        {
+            if (!migration(from.hook))
+            {
+                missing.push_back(fmt::format("{} (from {} fn {})", desc.name, from.name, from.hook));
+            }
         }
     }
     if (!missing.empty())
