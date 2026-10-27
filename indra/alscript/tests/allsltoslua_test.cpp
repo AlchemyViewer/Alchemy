@@ -4946,10 +4946,15 @@ namespace
         const ALLSLToSLua::Result uuids = require_converted(lsl);
         CAPTURE(uuids.text);
         {
-            INFO("uuids by default: List2Key's uuid");
-            CHECK(has(uuids, "local msg = tostring(llcompat.List2Key(l, 0))"));
+            INFO("uuids by default: List2Key's uuid for a key");
             CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
-            CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
+        }
+        {
+            INFO("and its item's text where it is made text, which tostring of List2Key's NULL_KEY was not (QJ1)");
+            CHECK(has(uuids, "local msg = l[1] or \"\"\n"));
+            CHECK(has(uuids, "print(llcompat.List2String(gMixed, 0))"));
+            CHECK(noted(uuids, "SluaList2KeyText"));
+            CHECK_FALSE(has(uuids, "tostring(llcompat.List2Key("));
         }
     }
 
@@ -5119,5 +5124,50 @@ namespace
         UNSCOPED_INFO("the script's _ read after them");
         CHECK(has(r, "print(tostring(_))\n"));
         require_checks_clean(r);
+    }
+
+
+    // Tapple's: a key held as text given llList2Key of a list of "" took
+    // tostring of SLua's List2Key, whose "" is NULL_KEY, so it was no
+    // longer "" and went into the list.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key held as text given llList2Key's item holds the item's text", "[ALLSLToSLua]")
+    {
+        const std::string body = "    list newlyStood = [];\n"
+                                 "    list newAssignments = [\"\", \"\", \"\", \"\"];\n"
+                                 "    av = llList2Key(newAssignments, 0);\n"
+                                 "    if (av != \"\") {\n"
+                                 "        newlyStood += [av];\n"
+                                 "    }\n"
+                                 "    llOwnerSay(llList2Json(JSON_ARRAY, newlyStood));\n"
+                                 "    seated(llList2Key(newAssignments, 1));\n"
+                                 "} }\n";
+        const std::string seated = "seated(key who) { if (who == \"\") llOwnerSay(\"empty\"); }\n";
+        ALLSLToSLua::Options o;
+        o.types = true;
+        for (const char* decl : { "key av;\n", "key av = \"\";\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(seated + "default { state_entry() {\n    " + decl + body, o);
+            CAPTURE(decl, r.text);
+            REQUIRE(r.converted);
+            CHECK(has(r, "local av: string = \"\"\n"));
+            CHECK(has(r, "\nav = newAssignments[1] or \"\"\n"));
+            CHECK(has(r, "\nif av ~= \"\" then\n"));
+            UNSCOPED_INFO("a parameter held as a uuid keeps List2Key's uuid, which equals \"\" as LSL's did");
+            CHECK(has(r, "local function seated(who: uuid)"));
+            CHECK(has(r, "seated(llcompat.List2Key(newAssignments, 1))"));
+            CHECK(has(r, "if who == uuid(\"\") then"));
+            CHECK_FALSE(has(r, "tostring(llcompat.List2Key("));
+            require_checks_clean(r);
+        }
+        {
+            INFO("a uuid key keeps List2Key, as Tapple asked");
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert("default { state_entry() {\n    key av = NULL_KEY;\n" + body.substr(0, body.find("    seated")) + "} }\n", o);
+            CAPTURE(r.text);
+            REQUIRE(r.converted);
+            CHECK(has(r, "local av: uuid = NULL_KEY\n"));
+            CHECK(has(r, "\nav = llcompat.List2Key(newAssignments, 0)\n"));
+            CHECK(has(r, "\nif av ~= uuid(\"\") then\n"));
+            require_checks_clean(r);
+        }
     }
 }

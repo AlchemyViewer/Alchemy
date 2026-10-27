@@ -992,12 +992,13 @@ namespace
         // Whether listItem writes a call as an index into its list: its
         // items already what is asked for.
         bool listItemFits(LSLFunctionExpression* e);
-        // llList2Key where keys are held as text: its item read as text, as
-        // LSL gave it -- a string's, a key's -- where SLua's List2Key
-        // answers NULL_KEY for text that is no UUID.
+        // llList2Key where keys are held as text, or where what it gives is
+        // made text (Writer::coerced): its item read as text, as LSL gave
+        // it -- a string's, a key's -- where SLua's List2Key answers
+        // NULL_KEY for text that is no UUID.
         bool textKeyItem(LSLFunctionExpression* e) const
         {
-            return !mOptions.uuidKeys && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
+            return (!mOptions.uuidKeys || mTextItems.contains(e)) && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
         }
 
         // --- keys that hold text -----------------------------------------------------
@@ -1186,6 +1187,8 @@ namespace
         // Comparisons written the other way round, a not before them.
         boost::unordered_flat_set<LSLASTNode*> mFlipped;
         boost::unordered_flat_set<LSLSymbol*>  mTextKeys;
+        // llList2Key's calls whose key is made text (textKeyItem).
+        boost::unordered_flat_set<LSLASTNode*> mTextItems;
     };
 
     std::string Writer::said(const char* key, const char* english, const std::vector<std::string>& args) const
@@ -2764,6 +2767,13 @@ namespace
 
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
+        // llList2Key's key made text: its item read as text instead, as LSL
+        // gave it, where the text of SLua's List2Key of "" is NULL_KEY's.
+        if (LSLExpression* inner = unbracketed(e); to == LST_STRING && inner && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+                                                     std::string_view(static_cast<LSLFunctionExpression*>(inner)->getIdentifier()->getName()) == "llList2Key")
+        {
+            mTextItems.insert(inner);
+        }
         Expr           out  = value(e);
         const LSLIType from = slType(e);
         if (to == LST_KEY && from == LST_STRING)
@@ -3852,7 +3862,7 @@ namespace
                 return *written;
             }
         }
-        // llList2Key's item as text, where keys are held as text: as
+        // llList2Key's item as text, where its key is made text: as
         // List2String reads it, which differs only for an item neither a
         // string nor a key.
         if (textKeyItem(e))
@@ -3860,7 +3870,7 @@ namespace
             if ((itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemKey)) != 0)
             {
                 noteOnce(e, "SluaList2KeyText",
-                         "Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
+                         "Its key is made text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
                          "List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave \"\".");
             }
             lsl  = "llList2String";
@@ -7699,12 +7709,16 @@ namespace
             return LST_KEY;
         }
         LSLExpression* inner = unbracketed(e);
-        // Where the script's keys are held as text: a cast to a key, a call
-        // of its own that gives one, and llList2Key's item (textKeyItem).
+        // Where the script's keys are held as text: a cast to a key, and a
+        // call of its own that gives one.
         if (!mOptions.uuidKeys && inner && e->getIType() == LST_KEY &&
-            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION ||
-             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-              (readOf(inner) || textKeyItem(static_cast<LSLFunctionExpression*>(inner))))))
+            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION || (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(inner))))
+        {
+            return LST_STRING;
+        }
+        // llList2Key's item, read as text (textKeyItem).
+        if (inner && e->getIType() == LST_KEY && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+            textKeyItem(static_cast<LSLFunctionExpression*>(inner)))
         {
             return LST_STRING;
         }
