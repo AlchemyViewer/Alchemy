@@ -29,11 +29,13 @@
 #include "Luau/Ast.h"
 #include "Luau/Parser.h"
 #include "alscriptlexicon.h"
+#include "llcoros.h"
 
 #include <algorithm>
 #include <deque>
 #include <functional>
-#include <mutex>
+
+#include LLCOROS_MUTEX_HEADER
 
 namespace
 {
@@ -219,7 +221,8 @@ namespace ALLuauExports
     namespace
     {
         // What each module checked was found to export, by its key and its
-        // text's length and hash, the latest last.
+        // text's length and hash, the latest last: kept and asked on any
+        // thread, and in a coroutine.
         struct Checked
         {
             std::string              key;
@@ -228,14 +231,14 @@ namespace ALLuauExports
             std::vector<std::string> names;
         };
         constexpr size_t    CHECKED_KEPT = 256;
-        std::mutex          sCheckedMutex;
+        LLCoros::Mutex      sCheckedMutex;
         std::deque<Checked> sChecked;
     }
 
     void checked(const std::string& key, std::string_view text, std::vector<std::string> names)
     {
-        const size_t                      hash = std::hash<std::string_view>()(text);
-        const std::lock_guard<std::mutex> lock(sCheckedMutex);
+        const size_t            hash = std::hash<std::string_view>()(text);
+        const LLCoros::LockType lock(sCheckedMutex);
         sChecked.erase(std::remove_if(sChecked.begin(), sChecked.end(), [&key](const Checked& one) { return one.key == key; }), sChecked.end());
         sChecked.push_back({ key, text.size(), hash, std::move(names) });
         if (sChecked.size() > CHECKED_KEPT)
@@ -246,8 +249,8 @@ namespace ALLuauExports
 
     std::optional<std::vector<std::string>> checkedOf(const std::string& key, std::string_view text)
     {
-        const size_t                      hash = std::hash<std::string_view>()(text);
-        const std::lock_guard<std::mutex> lock(sCheckedMutex);
+        const size_t            hash = std::hash<std::string_view>()(text);
+        const LLCoros::LockType lock(sCheckedMutex);
         for (const Checked& one : sChecked)
         {
             if (one.key == key && one.size == text.size() && one.hash == hash)

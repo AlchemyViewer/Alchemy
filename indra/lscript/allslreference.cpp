@@ -27,6 +27,7 @@
 #include "allslreference.h"
 
 #include "llapp.h"
+#include "llmutex.h"
 #include "lscript_byteformat.h"
 #include "lscript_rt_interface.h"
 
@@ -43,7 +44,6 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
-#include <mutex>
 #include <system_error>
 
 namespace
@@ -129,8 +129,8 @@ namespace
 ALLSLReference::Result ALLSLReference::compile(const std::string& text, Target target)
 {
     // LL's compiler keeps the parse, its scopes and its errors in globals.
-    static std::mutex one_at_a_time;
-    std::lock_guard   lock(one_at_a_time);
+    static LLMutex one_at_a_time;
+    LLMutexLock    lock(&one_at_a_time);
 
     // A folder of this compile's own for the files LL's compiler reads and
     // writes, gone however the compile ends: an LL_ERRS inside it is thrown

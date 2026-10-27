@@ -36,6 +36,7 @@
 #include "allsltraits.h"
 #include "alscriptlexicon.h"
 
+#include "llcoros.h"
 #include "llfile.h"
 
 #include "Luau/LSLBuiltins.h"
@@ -47,10 +48,12 @@
 
 #include <algorithm>
 #include <cstring>
-#include <mutex>
+#include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
+
+#include LLCOROS_MUTEX_HEADER
 
 namespace
 {
@@ -1110,33 +1113,38 @@ namespace
     }
 
     // The builtins of a kind: its functions, or its constants; none of any
-    // other kind.
-    const std::vector<std::string>& builtinNames(Tailslide::LSLSymbolTable* builtins, Tailslide::LSLSymbolType wanted)
+    // other kind. Asked on any thread, and in a coroutine: each list is
+    // handed out shared, and made anew rather than changed where the table
+    // changes, so that one being read outlives its place here.
+    typedef std::shared_ptr<const std::vector<std::string>> names_t;
+    names_t builtinNames(Tailslide::LSLSymbolTable* builtins, Tailslide::LSLSymbolType wanted)
     {
-        static std::mutex                                 lock;
-        static Tailslide::LSLSymbolTable*                 listed = nullptr;
-        static size_t                                     count  = 0;
-        static std::vector<std::string>                   functions;
-        static std::vector<std::string>                   variables;
-        static const std::vector<std::string>             none;
-        const std::lock_guard<std::mutex>                 guard(lock);
+        static LLCoros::Mutex                             lock;
+        static Tailslide::LSLSymbolTable*                 listed    = nullptr;
+        static size_t                                     count     = 0;
+        static names_t                                    functions = std::make_shared<const std::vector<std::string>>();
+        static names_t                                    variables = functions;
+        static const names_t                              none      = functions;
+        const LLCoros::LockType                           guard(lock);
         if (builtins && (builtins != listed || builtins->getMap().size() != count))
         {
-            functions.clear();
-            variables.clear();
+            auto made_functions = std::make_shared<std::vector<std::string>>();
+            auto made_variables = std::make_shared<std::vector<std::string>>();
             for (auto& [name, symbol] : builtins->getMap())
             {
                 if (symbol->getSymbolType() == Tailslide::SYM_FUNCTION)
                 {
-                    functions.emplace_back(symbol->getName());
+                    made_functions->emplace_back(symbol->getName());
                 }
                 else if (symbol->getSymbolType() == Tailslide::SYM_VARIABLE)
                 {
-                    variables.emplace_back(symbol->getName());
+                    made_variables->emplace_back(symbol->getName());
                 }
             }
-            listed = builtins;
-            count  = builtins->getMap().size();
+            functions = std::move(made_functions);
+            variables = std::move(made_variables);
+            listed    = builtins;
+            count     = builtins->getMap().size();
         }
         return wanted == Tailslide::SYM_FUNCTION ? functions : wanted == Tailslide::SYM_VARIABLE ? variables : none;
     }
@@ -1661,7 +1669,7 @@ ALScriptProblems ALLSLService::check(std::string_view source, bool mono)
                 // the handler it is in, nor a variable to a label.
                 const Tailslide::LSLSymbolType wanted = kindWantedAt(script, problem.line, problem.column);
                 ALScriptFixes::offerNames(problem, lines, problem.args[0], namesAt(script, problem.line, problem.column, wanted),
-                                          builtinNames(parser.context.builtins, wanted));
+                                          *builtinNames(parser.context.builtins, wanted));
             }
         }
     }
