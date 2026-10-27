@@ -1172,7 +1172,11 @@ TEST_CASE_METHOD(alskycomposite_gl_data,
         const Picture layers    = drawComposite(under, emissive);
         const Picture dome_only = drawComposite(dome, emissive);
 
-        // Where the deck is opaque the composite is the cloud exactly, and elsewhere exactly the layers in order.
+        // Where the deck is opaque the composite is the cloud, and elsewhere the layers in order, both but for rounding:
+        // GLSL holds no two programs to round the same expressions alike, and llvmpipe's compiler leaves the
+        // composite's clouds up to a millionth of their value from the reference's (NVIDIA's, none). A layer the
+        // composite dropped or laid out of order would move a pixel by far more.
+        constexpr F32 ROUNDING = 1e-5f;
         S32 opaque = 0;
         S32 through = 0;
         S32 hidden = 0;
@@ -1189,8 +1193,9 @@ TEST_CASE_METHOD(alskycomposite_gl_data,
             {
                 const F32 v = composite[px * 4 + c];
                 const F32 expected = solid ? clouds[px * 4 + c] : in_order[px * 4 + c];
-                (solid ? opaque_differ : through_differ) += v != expected;
-                most = llmax(most, fabsf(v - expected) / llmax(fabsf(expected), 1e-3f));
+                const F32 off = fabsf(v - expected) / llmax(fabsf(expected), 1e-3f);
+                (solid ? opaque_differ : through_differ) += off > ROUNDING;
+                most = llmax(most, off);
                 shows = shows || layers[px * 4 + c] != dome_only[px * 4 + c];
             }
             hidden += solid && shows;
