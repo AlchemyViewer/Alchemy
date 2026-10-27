@@ -1435,21 +1435,21 @@ void LLFloaterIMSessionTab::sessionRemoved(const LLUUID& session_id)
 }
 
 // <SK:Nexii> MU* pose emoticons: a colon that starts a text emoticon or an emoji shortcode is not a pose.
-static bool sk_starts_with_emoticon(const std::string& text)
+static bool sk_starts_with_emoticon(std::string_view text)
 {
     const size_t len = text.length();
     // ":D", ":P,", ":o hello": a single letter and then nothing, a space or punctuation.
-    if (len >= 2 && LLStringOps::isAlpha(text.at(1)) && (len == 2 || LLStringOps::isSpace(text.at(2)) || LLStringOps::isPunct(text.at(2))))
+    if (len >= 2 && LLStringOps::isAlpha(text[1]) && (len == 2 || LLStringOps::isSpace(text[2]) || LLStringOps::isPunct(text[2])))
     {
         return true;
     }
     // ":smile:", ":+1:": an emoji shortcode.
     size_t i = 1;
-    while (i < len && (LLStringOps::isAlnum(text.at(i)) || text.at(i) == '_' || text.at(i) == '+' || text.at(i) == '-'))
+    while (i < len && (LLStringOps::isAlnum(text[i]) || text[i] == '_' || text[i] == '+' || text[i] == '-'))
     {
         ++i;
     }
-    return i > 1 && i < len && text.at(i) == ':';
+    return i > 1 && i < len && text[i] == ':';
 }
 // </SK:Nexii>
 
@@ -1464,7 +1464,7 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
         && !sk_starts_with_emoticon(text)) // <SK:Nexii> MU* pose emoticons
     {
         // <SK:Nexii> MU* pose emoticons: ":'s" is a possessive pose, ":'(" a tear.
-        if (text.find(":'") == 0 && LLStringOps::isAlpha(text.at(2)))
+        if (text.find(":'") == 0 && LLStringOps::isAlpha(text[2]))
         // </SK:Nexii>
         {
             text.replace(0, 1, "/me");
