@@ -27,6 +27,7 @@
 #include "altextsearch.h"
 
 #include "altextchars.h"
+#include "llcoros.h"
 
 #include <boost/regex/icu.hpp>
 
@@ -35,10 +36,11 @@
 #include <functional>
 #include <iterator>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string_view>
 #include <vector>
+
+#include LLCOROS_MUTEX_HEADER
 
 namespace
 {
@@ -205,8 +207,9 @@ namespace
     // replace-all asks for the same one once per match, a find bar once a
     // key, and a whole-word vim pattern asks for two in turn, which one
     // kept alone recompiled both every time. Behind a lock, since a search
-    // over many scripts may run off the main thread; each handed out
-    // shared, so that one being used outlives its place here.
+    // over many scripts may run off the main thread, and on it a coroutine
+    // may ask; each handed out shared, so that one being used outlives its
+    // place here.
     std::shared_ptr<const boost::u32regex> compiledOnce(std::string_view query, const ALTextSearchOptions& options, std::string* error)
     {
         struct Kept
@@ -217,9 +220,9 @@ namespace
             std::string                            error;
         };
         constexpr size_t         KEPT = 4;
-        static std::mutex        lock;
+        static LLCoros::Mutex    lock;
         static std::vector<Kept> kept;
-        std::lock_guard<std::mutex> guard(lock);
+        LLCoros::LockType        guard(lock);
         auto found = std::find_if(kept.begin(), kept.end(), [&](const Kept& one) { return one.caseSensitive == options.caseSensitive && one.query == query; });
         if (found == kept.end())
         {

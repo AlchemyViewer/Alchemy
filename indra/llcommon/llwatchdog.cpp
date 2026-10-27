@@ -125,38 +125,38 @@ LLWatchdogTimeout::~LLWatchdogTimeout()
 
 bool LLWatchdogTimeout::isAlive() const
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     return (mTimer.getStarted() && !mTimer.hasExpired());
 }
 
 bool LLWatchdogTimeout::hasExpired() const
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     return mTimer.hasExpired();
 }
 
 bool LLWatchdogTimeout::started() const
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     return mTimer.getStarted();
 }
 
 void LLWatchdogTimeout::reset()
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     mTimer.setTimerExpirySec(mTimeout);
 }
 
 void LLWatchdogTimeout::setTimeout(F32 d)
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     mTimeout = d;
 }
 
 void LLWatchdogTimeout::start(std::string_view state)
 {
     {
-        std::lock_guard lock(mMutex);
+        LLMutexLock lock(&mMutex);
         if (mTimeout == 0)
         {
             LL_WARNS() << "Cant' start watchdog entry - no timeout set" << LL_ENDL;
@@ -177,13 +177,13 @@ void LLWatchdogTimeout::start(std::string_view state)
 void LLWatchdogTimeout::stop()
 {
     LLWatchdogEntry::stop();
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     mTimer.stop();
 }
 
 void LLWatchdogTimeout::ping(std::string_view state)
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     if (!state.empty())
     {
         mPingState = state;
@@ -193,7 +193,7 @@ void LLWatchdogTimeout::ping(std::string_view state)
 
 std::string LLWatchdogTimeout::getLastState() const
 {
-    std::lock_guard lock(mMutex);
+    LLMutexLock lock(&mMutex);
     return mPingState;
 }
 

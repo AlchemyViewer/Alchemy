@@ -31,12 +31,14 @@
 #include "alserialworker.h"
 #include "aluploadheader.h"
 #include "fsyspath.h"
+#include "llcoros.h"
 #include "llsdserialize.h"
 
-#include <condition_variable>
 #include <filesystem>
-#include <mutex>
 #include <sstream>
+
+#include LLCOROS_MUTEX_HEADER
+#include LLCOROS_CONDVAR_HEADER
 
 namespace
 {
@@ -61,7 +63,8 @@ namespace
 // all of it -- and whether one is being written now, by the writer's thread
 // or by the index's. One write at a time, whichever thread makes it, so
 // that two never meet in the file put beside the index on the way. What
-// could not be written waits still, to be tried again.
+// could not be written waits still, to be tried again. The index's thread
+// may be the main one, and a coroutine there what waits.
 struct ALMasterIndex::Writer
 {
     struct Text
@@ -69,13 +72,13 @@ struct ALMasterIndex::Writer
         std::string path;
         std::string text;
     };
-    std::mutex              mutex;
-    std::condition_variable changed;
-    std::optional<Text>     waiting;
+    LLCoros::Mutex             mutex;
+    LLCoros::ConditionVariable changed;
+    std::optional<Text>        waiting;
     // Whether what waits is what a write of failed, kept for the next
     // drain: the next change's, which is all of it and more, or a flush's.
-    bool                    failed = false;
-    bool                    busy   = false;
+    bool                       failed = false;
+    bool                       busy   = false;
 
     // What waits written, and what comes meanwhile, on whichever thread
     // asks: one being written already by another is waited for first, so
@@ -83,7 +86,7 @@ struct ALMasterIndex::Writer
     // that cannot be written is tried once here, said, and left waiting.
     void drain()
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        LLCoros::LockType lock(mutex);
         for (;;)
         {
             changed.wait(lock, [this] { return !busy; });
@@ -123,7 +126,7 @@ struct ALMasterIndex::Writer
     // for first, so that the answer is the write's.
     bool unwritten()
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        LLCoros::LockType lock(mutex);
         changed.wait(lock, [this] { return !busy; });
         return failed;
     }
@@ -534,7 +537,7 @@ void ALMasterIndex::handOver()
     mDirty = false;
     std::ostringstream out;
     LLSDSerialize::toPrettyXML(mLinks.toLLSD(), out);
-    const std::lock_guard<std::mutex> lock(mWriter->mutex);
+    const LLCoros::LockType lock(mWriter->mutex);
     mWriter->waiting = Writer::Text{ mPath, out.str() };
     mWriter->failed  = false;
 }

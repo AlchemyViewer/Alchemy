@@ -219,7 +219,7 @@ std::vector<ALSavedText> ALSaveHistory::listLocked(const std::string& key) const
 bool ALSaveHistory::keep(ALSavedText saved)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     if (saved.key.empty())
     {
         return false;
@@ -255,19 +255,19 @@ bool ALSaveHistory::keep(ALSavedText saved)
 
 std::vector<ALSavedText> ALSaveHistory::list(const std::string& key) const
 {
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     return listLocked(key);
 }
 
 size_t ALSaveHistory::count(const std::string& key) const
 {
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     return key.empty() ? 0 : savesIn(folderOf(key)).size();
 }
 
 bool ALSaveHistory::load(ALSavedText& saved) const
 {
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     ALSavedText     read;
     if (saved.path.empty() || !readSaved(saved.path, read, true))
     {
@@ -280,7 +280,7 @@ bool ALSaveHistory::load(ALSavedText& saved) const
 
 bool ALSaveHistory::holds(const std::string& key, const LLUUID& asset, const std::string& text, size_t newest) const
 {
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     if (key.empty() || newest == 0)
     {
         return false;
@@ -306,7 +306,7 @@ bool ALSaveHistory::holds(const std::string& key, const LLUUID& asset, const std
 
 bool ALSaveHistory::rekey(const std::string& from, const std::string& to)
 {
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     if (from == to || from.empty() || to.empty())
     {
         return false;
@@ -360,7 +360,7 @@ void ALSaveHistory::trim(const std::string& folder, const LLDate& now)
 void ALSaveHistory::prune(const LLDate& now)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
-    std::lock_guard lock(mLock);
+    LLCoros::LockType lock(mLock);
     struct Save
     {
         S64            at = 0;

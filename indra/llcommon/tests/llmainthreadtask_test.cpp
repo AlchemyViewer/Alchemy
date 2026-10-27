@@ -22,6 +22,7 @@
 #include "../test/sync.h"
 #include "llthread.h"               // on_main_thread()
 #include "lleventtimer.h"
+#include "llmutex.h"
 #include "lockstatic.h"
 
 /*****************************************************************************
@@ -58,7 +59,7 @@ namespace
     // in an anonymous namespace, so the name is this test's own.
     struct MainThreadTaskStatic
     {
-        std::mutex mMutex;          // LockStatic looks for mMutex
+        LLMutex mMutex;             // LockStatic looks for mMutex
         bool ran{false};
     };
     typedef llthread::LockStatic<MainThreadTaskStatic> LockStatic;

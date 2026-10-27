@@ -27,26 +27,31 @@
 #ifndef LLCOREINT_MUTEX_H_
 #define LLCOREINT_MUTEX_H_
 
-#include <condition_variable>
-#include <mutex>
+#include "llcoros.h"
+#include LLCOROS_MUTEX_HEADER
+#include LLCOROS_CONDVAR_HEADER
 
 namespace LLCoreInt
 {
 
+// Requests are queued from coroutines on the main thread, and the worker
+// waits on the queue: a coroutine that has to wait for one of these parks
+// alone rather than holding up its thread.
+
 // MUTEX TYPES
 
 // unique mutex type
-typedef std::mutex HttpMutex;
+typedef LLCoros::Mutex HttpMutex;
 
 // CONDITION VARIABLES
 
 // standard condition variable
-typedef std::condition_variable HttpConditionVariable;
+typedef LLCoros::ConditionVariable HttpConditionVariable;
 
 // LOCKS AND FENCES
 
 // scoped unique lock
-typedef std::unique_lock<HttpMutex> HttpScopedLock;
+typedef LLCoros::LockType HttpScopedLock;
 
 }
 

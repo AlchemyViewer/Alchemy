@@ -30,14 +30,16 @@
 #include "Luau/Compiler.h"
 #include "lua.h"
 #include "lualib.h"
+#include "llcoros.h"
 
 #include <algorithm>
 #include <string_view>
 #include <chrono>
 #include <cstdlib>
 #include <memory>
-#include <mutex>
 #include <vector>
+
+#include LLCOROS_MUTEX_HEADER
 
 LUAU_FASTFLAG(LuauIntegerLibrary)
 
@@ -377,7 +379,7 @@ namespace
     // than its text: a thread held up elsewhere would otherwise see a good
     // configuration refused until the text changed. Kept a while all the
     // same, not run again at every ask, so that one that never ends costs
-    // its time only so often.
+    // its time only so often. Asked on any thread, and in a coroutine.
     struct Ran
     {
         std::string                           source;
@@ -387,7 +389,7 @@ namespace
     };
     constexpr size_t               RAN_KEPT  = 32;
     constexpr std::chrono::seconds LATE_KEPT = std::chrono::seconds(10);
-    std::mutex                     sRanMutex;
+    LLCoros::Mutex                 sRanMutex;
     std::vector<Ran>               sRan;
 }
 
@@ -395,7 +397,7 @@ namespace
 bool ALLuauConfigScript::asLuaurc(const std::string& source, std::string& json, std::string& error)
 {
     {
-        const std::lock_guard<std::mutex> lock(sRanMutex);
+        const LLCoros::LockType lock(sRanMutex);
         const auto found = std::find_if(sRan.begin(), sRan.end(), [&source](const Ran& ran) { return ran.source == source; });
         if (found != sRan.end() && std::chrono::steady_clock::now() < found->until)
         {
@@ -423,7 +425,7 @@ bool ALLuauConfigScript::asLuaurc(const std::string& source, std::string& json, 
     {
         ran.until = std::chrono::steady_clock::now() + LATE_KEPT;
     }
-    const std::lock_guard<std::mutex> lock(sRanMutex);
+    const LLCoros::LockType lock(sRanMutex);
     sRan.insert(sRan.begin(), std::move(ran));
     if (sRan.size() > RAN_KEPT)
     {
