@@ -1,0 +1,9 @@
+# Taplo, and the editors built on it (Even Better TOML), check and complete
+# the settings schema's declarations by the JSON Schema alcvargen writes for
+# them. doc/CVARS.md says how to write one.
+
+[[rule]]
+include = ["indra/cvars/*.toml", "indra/alcvar/tests/schema/*.toml"]
+
+[rule.schema]
+path = "./indra/cvars/cvars.schema.json"

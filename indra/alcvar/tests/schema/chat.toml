@@ -1,0 +1,105 @@
+# The store's test schema: an account's settings, hooks the schema names by
+# string, migrations, and settings that are never kept or never shared.
+
+[chat]
+label = "Chat"
+scope = "account"
+
+[chat.font_size]
+type    = "S32"
+default = 1
+range   = [0, 3]
+alias   = "ChatFontSize"
+help    = "The size of chat's text"
+
+[chat.show_timestamps]
+type    = "bool"
+default = true
+help    = "Show when each line was said"
+
+[chat.log_folder]
+type    = "uuid"
+default = "00000000-0000-0000-0000-000000000000"
+refers  = "inventory_folder"
+help    = "Where saved logs go"
+
+[world]
+label = "World"
+
+[world.maturity]
+type     = "S32"
+default  = 13
+choices  = { 13 = "General", 21 = "Moderate", 42 = "Adult" }
+validate = "maturity"
+help     = "The most mature content shown"
+
+[world.detail_level]
+type    = "S32"
+default = 4
+range   = [0, 8]
+alias   = "TerrainDetail"
+migrate = [{ step = 2, map = { 0 = 0, 1 = 2, 2 = 4, 3 = 6 }, else = "keep" }]
+help    = "Terrain detail; its levels doubled"
+
+[world.wind_scale]
+type    = "F32"
+default = 1.0
+range   = [0.0, 4.0]
+migrate = [{ step = 2, scale = 0.01 }]
+help    = "Wind's strength; a percentage before"
+
+[world.sky_tint]
+type    = "color3"
+default = [1.0, 1.0, 1.0]
+from    = [{ name = "world.sky_tint_red", fn = "sky_tint_from_two" },
+           { name = "world.sky_tint_blue", fn = "sky_tint_from_two" }]
+help    = "The sky's tint, once two settings"
+
+[world.cloud_style]
+type    = "S32"
+default = 0
+migrate = [{ step = 2, reset = true }]
+help    = "Clouds' look; its old values mean nothing now"
+
+[world.fog_density]
+type    = "F32"
+default = 0.5
+migrate = [{ step = 2, fn = "fog_from_old" }]
+help    = "How thick the fog is; worked out from its old value by a hook"
+
+[world.sun_azimuth]
+type    = "F32"
+default = 0.0
+from    = [{ name = "world.sun_angles", fn = "azimuth_from_angles" }]
+help    = "The sun's bearing, once half of one setting"
+
+[world.sun_elevation]
+type    = "F32"
+default = 45.0
+from    = [{ name = "world.sun_angles", fn = "elevation_from_angles" }]
+help    = "The sun's height, once half of one setting"
+
+[world.gust_scale]
+type    = "F32"
+default = 1.0
+from    = [{ name = "world.wind_scale", fn = "gust_from_wind" }]
+help    = "Gusts' strength, taken first from the wind's"
+
+[net]
+label = "Network"
+
+[net.translate]
+label = "Translation"
+
+[net.translate.api_key]
+type    = "string"
+default = ""
+flags   = ["sensitive"]
+backup  = "ask"
+help    = "The translation service's key"
+
+[net.translate.proxy]
+type    = "string"
+default = ""
+flags   = ["dangerous"]
+help    = "Where translation requests go"

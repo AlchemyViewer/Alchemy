@@ -34,6 +34,11 @@ option(
   OFF
 )
 option(AL_BUILD_DOCS "Add the doc target that generates the API documentation with Doxygen" OFF)
+option(
+  AL_CVARS_STRICT
+  "Fail the configure, as the build fails, on a settings lock the schema has moved past"
+  OFF
+)
 cmake_dependent_option(
   AL_ENABLE_GL_TESTS
   "Run the tests that stand up a GL context on a hidden window; off, they are built and registered disabled"
@@ -572,6 +577,10 @@ if(AL_BUILD_TESTS)
   endif()
 endif()
 add_subdirectory(aldb)
+# The settings schema's generator, then the settings store, which compiles
+# what it generates.
+add_subdirectory(cvars/gen)
+add_subdirectory(alcvar)
 add_subdirectory(alrender)
 add_subdirectory(llaudio)
 add_subdirectory(llappearance)
