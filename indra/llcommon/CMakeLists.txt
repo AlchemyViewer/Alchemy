@@ -136,6 +136,7 @@ target_sources(
         alscratcharena.h
         alsharedmutex.h
         alsimd.h
+        alunitconversion.h
         alwatchedfile.h
         always_return.h
         apply.h
@@ -319,6 +320,7 @@ if(AL_BUILD_TESTS)
       tests/alserialworker_test.cpp
       tests/alsharedmutex_test.cpp
       tests/alsimd_test.cpp
+      tests/alunitconversion_test.cpp
       tests/alwatchedfile_test.cpp
       tests/apply_test.cpp
       tests/bitpack_test.cpp
