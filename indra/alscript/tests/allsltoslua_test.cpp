@@ -1210,8 +1210,8 @@ namespace
         {
             INFO("compared as text");
             CHECK(has(r, "if id == DOMAIN then"));
-            // gOwner declared with nothing holds text, as LSL's "" did.
-            CHECK(has(r, "if id == gOwner then"));
+            // gOwner declared with nothing is NULL_KEY, a uuid, made text.
+            CHECK(has(r, "if id == tostring(gOwner) then"));
         }
         {
             INFO("a key given the id, text");
@@ -1956,13 +1956,8 @@ namespace
             CHECK(has(r, "table.insert(params, n)"));
         }
         {
-            // LSL's key declared with nothing holds "", not NULL_KEY, and
-            // is printed as no text; a uuid cannot hold it.
-            INFO("a key given nothing, no text");
-            CHECK(has(r, "local gSitter = \"\""));
-            CHECK(has(r, "{gSitter}`)"));
-            CHECK_FALSE(has(r, "tostring(gSitter)"));
-            CHECK_FALSE(has(r, "NULL_KEY"));
+            INFO("the null key, for a key declared with nothing (QJ1)");
+            CHECK(has(r, "local gSitter = NULL_KEY"));
             CHECK_FALSE(has(r, "uuid(\"\")"));
         }
         {
@@ -4361,7 +4356,7 @@ namespace
             INFO("a call that changes the world, named with the other");
             CHECK(noted(r, "SluaRightFirstWorld", "say()"));
             CHECK(has(r, "-- LSL: LSL ran the right side of this before the left, and Luau runs the left first: say() may change what "
-                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender :: any) .. say())"));
+                      "llKey2Name() does or finds outside the script.\n    print(ll.Key2Name(gSender) .. say())"));
         }
         {
             INFO("a call that sets what the other's reads");
@@ -4499,14 +4494,14 @@ namespace
             CHECK_FALSE(has(r, "{ uuid("));
         }
         {
-            // LSL's key declared with nothing holds "", which a uuid cannot:
-            // uuid("") is NULL_KEY, and d == NULL_KEY was FALSE.
-            INFO("a key given nothing, no text, against text as text");
-            CHECK(has(r, "local d = \"\""));
-            CHECK(has(r, "if d == \"\" then"));
-            CHECK(has(r, "if \"\" ~= d then"));
-            CHECK(has(r, "if d == tostring(NULL_KEY) then"));
-            CHECK_FALSE(has(r, "local d = NULL_KEY"));
+            // Tapple's (QJ1): as `key d = NULL_KEY;`, said; d == NULL_KEY,
+            // FALSE in LSL, is true now, as the note says.
+            INFO("a key given nothing, NULL_KEY, against no text as a uuid");
+            CHECK(has(r, "local d = NULL_KEY"));
+            CHECK(noted(r, "SluaKeyDeclared"));
+            CHECK(has(r, "if d == uuid(\"\") then"));
+            CHECK(has(r, "if uuid(\"\") ~= d then"));
+            CHECK(has(r, "if d == NULL_KEY then"));
         }
         UNSCOPED_INFO("a uuid key against a UUID written out, a uuid");
         CHECK(has(r, "if u == uuid(\"a2e76fcd-9360-4f6d-a924-938f923df11d\") then"));
@@ -4604,10 +4599,9 @@ namespace
         const ALLSLToSLua::Result uuids = require_converted(lsl);
         CAPTURE(uuids.text);
         {
-            // A key declared with nothing holds LSL's "" either way, which
-            // no uuid holds.
+            // A key declared with nothing is NULL_KEY, as Tapple asked.
             INFO("uuids by default");
-            CHECK(has(uuids, "local gOwner = \"\"\n"));
+            CHECK(has(uuids, "local gOwner = NULL_KEY\n"));
             CHECK(has(uuids, "local cast = uuid(s)"));
         }
     }
@@ -4705,7 +4699,7 @@ namespace
                                  "}\n";
         ALLSLToSLua::Options o;
         o.types = true;
-        for (const char* global : { "key driver = \"\";\n", "key driver;\n" })
+        for (const char* global : { "key driver = \"\";\n" })
         {
             const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
             CAPTURE(global, r.text);
@@ -4739,7 +4733,8 @@ namespace
             }
             require_checks_clean(r);
         }
-        for (const char* global : { "key driver = NULL_KEY;\n", "key driver = \"00000000-0000-0000-0000-000000000000\";\n" })
+        // Declared with nothing, NULL_KEY too (QJ1).
+        for (const char* global : { "key driver = NULL_KEY;\n", "key driver = \"00000000-0000-0000-0000-000000000000\";\n", "key driver;\n" })
         {
             const ALLSLToSLua::Result r = ALLSLToSLua::convert(global + body, o);
             CAPTURE(global, r.text);
@@ -4946,10 +4941,15 @@ namespace
         const ALLSLToSLua::Result uuids = require_converted(lsl);
         CAPTURE(uuids.text);
         {
-            INFO("uuids by default: List2Key's uuid");
-            CHECK(has(uuids, "local msg = tostring(llcompat.List2Key(l, 0))"));
+            INFO("uuids by default: List2Key's uuid for a key");
             CHECK(has(uuids, "local k = llcompat.List2Key(l, 0)"));
-            CHECK_FALSE(noted(uuids, "SluaList2KeyText"));
+        }
+        {
+            INFO("and its item's text where it is made text, which tostring of List2Key's NULL_KEY was not (QJ1)");
+            CHECK(has(uuids, "local msg = l[1] or \"\"\n"));
+            CHECK(has(uuids, "print(llcompat.List2String(gMixed, 0))"));
+            CHECK(noted(uuids, "SluaList2KeyText"));
+            CHECK_FALSE(has(uuids, "tostring(llcompat.List2Key("));
         }
     }
 
@@ -4980,27 +4980,48 @@ namespace
         require_checks_clean(close);
     }
 
-    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key declared with nothing holds no text, as LSL's did, not NULL_KEY", "[ALLSLToSLua]")
+    // Tapple's (QA8, and again in QJ1): a key declared with nothing is NULL_KEY where keys are
+    // uuids, as `key k = NULL_KEY;` is, though LSL's held "" -- said at the declaration.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key declared with nothing is NULL_KEY, and said so", "[ALLSLToSLua]")
     {
-        const ALLSLToSLua::Result r = require_converted("key gTarget;\n"
-                                                        "default { touch_start(integer n) {\n"
-                                                        "    if (gTarget == NULL_KEY) llOwnerSay(\"null\");\n"
-                                                        "    else llOwnerSay(\"none yet: \" + (string)gTarget);\n"
-                                                        "    gTarget = llDetectedKey(0);\n"
-                                                        "    if (gTarget) llOwnerSay(\"set\");\n"
-                                                        "} }\n");
+        const std::string lsl = "key gTarget;\n"
+                                "default { touch_start(integer n) {\n"
+                                "    key other;\n"
+                                "    if (gTarget == NULL_KEY) llOwnerSay(\"null\");\n"
+                                "    else llOwnerSay(\"none yet: \" + (string)gTarget);\n"
+                                "    gTarget = llDetectedKey(0);\n"
+                                "    if (gTarget) llOwnerSay(\"set\");\n"
+                                "    other = gTarget;\n"
+                                "} }\n";
+        const ALLSLToSLua::Result r = require_converted(lsl);
         CAPTURE(r.text);
-        UNSCOPED_INFO("held as text, no text");
-        CHECK(has(r, "local gTarget = \"\"\n"));
-        UNSCOPED_INFO("against NULL_KEY as text: FALSE, as LSL's");
-        CHECK(has(r, "if gTarget == tostring(NULL_KEY) then"));
-        UNSCOPED_INFO("printed as it is");
-        CHECK(has(r, "\"none yet: \" .. gTarget"));
-        UNSCOPED_INFO("a key given it, as text");
-        CHECK(has(r, "gTarget = tostring(detected[1]:getKey())"));
-        UNSCOPED_INFO("its truth as LSL's key's");
-        CHECK(has(r, "if (touuid(gTarget) or NULL_KEY).istruthy then"));
+        UNSCOPED_INFO("a uuid, NULL_KEY");
+        CHECK(has(r, "local gTarget = NULL_KEY\n"));
+        CHECK(has(r, "local other = NULL_KEY\n"));
+        CHECK(noted(r, "SluaKeyDeclared"));
+        {
+            INFO("said once, over the first");
+            const size_t said = r.text.find("A key declared with nothing is NULL_KEY here");
+            REQUIRE(said != std::string::npos);
+            CHECK(said < r.text.find("local gTarget = NULL_KEY"));
+            CHECK(r.text.find("A key declared with nothing", said + 1) == std::string::npos);
+        }
+        UNSCOPED_INFO("against NULL_KEY as a uuid");
+        CHECK(has(r, "if gTarget == NULL_KEY then"));
+        UNSCOPED_INFO("a key given it as it is");
+        CHECK(has(r, "gTarget = detected[1]:getKey()"));
+        CHECK(has(r, "if gTarget.istruthy then"));
         require_checks_clean(r);
+
+        ALLSLToSLua::Options text;
+        text.uuidKeys                   = false;
+        const ALLSLToSLua::Result as_text = ALLSLToSLua::convert(lsl, text);
+        CAPTURE(as_text.text);
+        REQUIRE(as_text.converted);
+        UNSCOPED_INFO("keys as text: no text, as LSL's held, and nothing said");
+        CHECK(has(as_text, "local gTarget = \"\"\n"));
+        CHECK_FALSE(noted(as_text, "SluaKeyDeclared"));
+        require_checks_clean(as_text);
     }
 
     TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a loop body's local is named apart from what its check or steps read after it", "[ALLSLToSLua]")
@@ -5119,5 +5140,52 @@ namespace
         UNSCOPED_INFO("the script's _ read after them");
         CHECK(has(r, "print(tostring(_))\n"));
         require_checks_clean(r);
+    }
+
+    // Tapple's: a key held as text given llList2Key of a list of "" took
+    // tostring of SLua's List2Key, whose "" is NULL_KEY, so it was no
+    // longer "" and went into the list. Declared with nothing, the key is
+    // NULL_KEY, as Tapple asked, and keeps List2Key's uuid.
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a key held as text given llList2Key's item holds the item's text", "[ALLSLToSLua]")
+    {
+        const std::string body = "    list newlyStood = [];\n"
+                                 "    list newAssignments = [\"\", \"\", \"\", \"\"];\n"
+                                 "    av = llList2Key(newAssignments, 0);\n"
+                                 "    if (av != \"\") {\n"
+                                 "        newlyStood += [av];\n"
+                                 "    }\n"
+                                 "    llOwnerSay(llList2Json(JSON_ARRAY, newlyStood));\n"
+                                 "    seated(llList2Key(newAssignments, 1));\n"
+                                 "} }\n";
+        const std::string seated = "seated(key who) { if (who == \"\") llOwnerSay(\"empty\"); }\n";
+        ALLSLToSLua::Options o;
+        o.types = true;
+        for (const char* decl : { "key av = \"\";\n" })
+        {
+            const ALLSLToSLua::Result r = ALLSLToSLua::convert(seated + "default { state_entry() {\n    " + decl + body, o);
+            CAPTURE(decl, r.text);
+            REQUIRE(r.converted);
+            CHECK(has(r, "local av: string = \"\"\n"));
+            CHECK(has(r, "\nav = newAssignments[1] or \"\"\n"));
+            CHECK(has(r, "\nif av ~= \"\" then\n"));
+            UNSCOPED_INFO("a parameter held as a uuid keeps List2Key's uuid, which equals \"\" as LSL's did");
+            CHECK(has(r, "local function seated(who: uuid)"));
+            CHECK(has(r, "seated(llcompat.List2Key(newAssignments, 1))"));
+            CHECK(has(r, "if who == uuid(\"\") then"));
+            CHECK_FALSE(has(r, "tostring(llcompat.List2Key("));
+            require_checks_clean(r);
+        }
+        for (const char* decl : { "key av;\n", "key av = NULL_KEY;\n" })
+        {
+            INFO("a uuid key keeps List2Key, as Tapple asked");
+            const ALLSLToSLua::Result r =
+                ALLSLToSLua::convert(std::string("default { state_entry() {\n    ") + decl + body.substr(0, body.find("    seated")) + "} }\n", o);
+            CAPTURE(decl, r.text);
+            REQUIRE(r.converted);
+            CHECK(has(r, "local av: uuid = NULL_KEY\n"));
+            CHECK(has(r, "\nav = llcompat.List2Key(newAssignments, 0)\n"));
+            CHECK(has(r, "\nif av ~= uuid(\"\") then\n"));
+            require_checks_clean(r);
+        }
     }
 }

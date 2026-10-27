@@ -1831,6 +1831,31 @@ namespace
         }
         return true;
     }
+
+    // A field's type as the table or extern type it is on has it, where the
+    // field itself was given none.
+    std::optional<Luau::TypeId> fieldTypeOf(const Luau::Module& module, const Luau::AstExprIndexName& field)
+    {
+        const Luau::TypeId* table = module.astTypes.find(field.expr);
+        if (!table)
+        {
+            return std::nullopt;
+        }
+        const Luau::TypeId type = Luau::follow(*table);
+        if (const Luau::TableType* t = Luau::getTableType(type))
+        {
+            const auto it = t->props.find(field.index.value);
+            return it == t->props.end() ? std::nullopt : it->second.readTy;
+        }
+        if (const Luau::ExternType* cls = Luau::get<Luau::ExternType>(type))
+        {
+            if (const Luau::Property* prop = Luau::lookupExternTypeProp(cls, field.index.value))
+            {
+                return prop->readTy;
+            }
+        }
+        return std::nullopt;
+    }
 }
 
 ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column)
@@ -1875,6 +1900,42 @@ ALScriptHover ALLuauService::hover(std::string_view source, S32 line, S32 column
             if (const std::optional<Luau::TypeId> bound = scope->lookup(Luau::Symbol(local)))
             {
                 type = bound;
+            }
+        }
+    }
+    // A field a function statement gives a function -- `function
+    // LLEvents.on_rez(n)` -- which the old solver types only the table of:
+    // the field as the table has it. And a field that holds a function or
+    // nil, as an event's handler does, by its function: what is written
+    // there, and what is said of it.
+    if (Luau::AstExprIndexName* field = expr ? expr->as<Luau::AstExprIndexName>() : nullptr)
+    {
+        if (!type)
+        {
+            type = fieldTypeOf(*module, *field);
+        }
+        if (type)
+        {
+            if (const Luau::UnionType* either = Luau::get<Luau::UnionType>(Luau::follow(*type)))
+            {
+                std::optional<Luau::TypeId> function;
+                bool                        other = false;
+                for (Luau::TypeId option : either->options)
+                {
+                    const Luau::TypeId one = Luau::follow(option);
+                    if (Luau::get<Luau::FunctionType>(one) && !function)
+                    {
+                        function = one;
+                    }
+                    else if (!Luau::isNil(one))
+                    {
+                        other = true;
+                    }
+                }
+                if (function && !other)
+                {
+                    type = function;
+                }
             }
         }
     }

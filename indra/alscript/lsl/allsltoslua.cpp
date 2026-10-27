@@ -506,6 +506,10 @@ namespace
         // key of it than LSL's held: no text, which is NULL_KEY, and a key
         // with capitals, which it writes small. Whether it said either.
         bool keyText(LSLExpression* at, std::string_view text);
+        // What a variable declared with nothing starts as: its type's empty
+        // value, and for a key held as a uuid NULL_KEY, which is said, as
+        // LSL's held "", which no uuid holds.
+        std::string declaredWithNothing(LSLIdentifier* id, LSLIType type);
         // Why a list is shared, as SluaListCopy says it.
         std::string sharedWords(Shared why) const;
 
@@ -992,12 +996,13 @@ namespace
         // Whether listItem writes a call as an index into its list: its
         // items already what is asked for.
         bool listItemFits(LSLFunctionExpression* e);
-        // llList2Key where keys are held as text: its item read as text, as
-        // LSL gave it -- a string's, a key's -- where SLua's List2Key
-        // answers NULL_KEY for text that is no UUID.
+        // llList2Key where keys are held as text, or where what it gives is
+        // made text (Writer::coerced): its item read as text, as LSL gave
+        // it -- a string's, a key's -- where SLua's List2Key answers
+        // NULL_KEY for text that is no UUID.
         bool textKeyItem(LSLFunctionExpression* e) const
         {
-            return !mOptions.uuidKeys && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
+            return (!mOptions.uuidKeys || mTextItems.contains(e)) && std::string_view(e->getIdentifier()->getName()) == "llList2Key";
         }
 
         // --- keys that hold text -----------------------------------------------------
@@ -1186,6 +1191,8 @@ namespace
         // Comparisons written the other way round, a not before them.
         boost::unordered_flat_set<LSLASTNode*> mFlipped;
         boost::unordered_flat_set<LSLSymbol*>  mTextKeys;
+        // llList2Key's calls whose key is made text (textKeyItem).
+        boost::unordered_flat_set<LSLASTNode*> mTextItems;
     };
 
     std::string Writer::said(const char* key, const char* english, const std::vector<std::string>& args) const
@@ -2742,6 +2749,17 @@ namespace
         return Expr{ "`" + body + "`" };
     }
 
+    std::string Writer::declaredWithNothing(LSLIdentifier* id, LSLIType type)
+    {
+        if (type == LST_KEY)
+        {
+            noteOnce(id, "SluaKeyDeclared",
+                     "A key declared with nothing is NULL_KEY here, where LSL's held \"\": it equals NULL_KEY and reads as NULL_KEY's "
+                     "text, where LSL's did neither.");
+        }
+        return defaultOf(type);
+    }
+
     bool Writer::keyText(LSLExpression* at, std::string_view text)
     {
         if (text.empty())
@@ -2764,6 +2782,13 @@ namespace
 
     Expr Writer::coerced(LSLExpression* e, LSLIType to)
     {
+        // llList2Key's key made text: its item read as text instead, as LSL
+        // gave it, where the text of SLua's List2Key of "" is NULL_KEY's.
+        if (LSLExpression* inner = unbracketed(e); to == LST_STRING && inner && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+                                                     std::string_view(static_cast<LSLFunctionExpression*>(inner)->getIdentifier()->getName()) == "llList2Key")
+        {
+            mTextItems.insert(inner);
+        }
         Expr           out  = value(e);
         const LSLIType from = slType(e);
         if (to == LST_KEY && from == LST_STRING)
@@ -3852,7 +3877,7 @@ namespace
                 return *written;
             }
         }
-        // llList2Key's item as text, where keys are held as text: as
+        // llList2Key's item as text, where its key is made text: as
         // List2String reads it, which differs only for an item neither a
         // string nor a key.
         if (textKeyItem(e))
@@ -3860,7 +3885,7 @@ namespace
             if ((itemTypes(argumentAt(e, 0)) & ~(ItemString | ItemKey)) != 0)
             {
                 noteOnce(e, "SluaList2KeyText",
-                         "Keys are held as text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
+                         "Its key is made text, so llList2Key's item is read as List2String reads it, as LSL gave it, where SLua's "
                          "List2Key answers NULL_KEY for text that is no UUID; a number's or a vector's text is given, where LSL gave \"\".");
             }
             lsl  = "llList2String";
@@ -5354,7 +5379,7 @@ namespace
                 }
                 else
                 {
-                    line("local " + name + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
+                    line("local " + name + typed(type) + " = " + (isNull(init) ? declaredWithNothing(id, type) : oneValue(coerced(init, type)).text));
                 }
                 writeSteps(steps.after);
                 return;
@@ -7699,12 +7724,16 @@ namespace
             return LST_KEY;
         }
         LSLExpression* inner = unbracketed(e);
-        // Where the script's keys are held as text: a cast to a key, a call
-        // of its own that gives one, and llList2Key's item (textKeyItem).
+        // Where the script's keys are held as text: a cast to a key, and a
+        // call of its own that gives one.
         if (!mOptions.uuidKeys && inner && e->getIType() == LST_KEY &&
-            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION ||
-             (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
-              (readOf(inner) || textKeyItem(static_cast<LSLFunctionExpression*>(inner))))))
+            (inner->getNodeSubType() == NODE_TYPECAST_EXPRESSION || (inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION && readOf(inner))))
+        {
+            return LST_STRING;
+        }
+        // llList2Key's item, read as text (textKeyItem).
+        if (inner && e->getIType() == LST_KEY && inner->getNodeSubType() == NODE_FUNCTION_EXPRESSION &&
+            textKeyItem(static_cast<LSLFunctionExpression*>(inner)))
         {
             return LST_STRING;
         }
@@ -7752,20 +7781,11 @@ namespace
         });
         // What each key variable is given, and each key function of the
         // script's own returns; each that is given text, until none more
-        // is. One declared with nothing holds LSL's "", no UUID, which a
-        // uuid cannot: uuid("") is NULL_KEY.
+        // is. One declared with nothing is NULL_KEY, as Tapple asked, though
+        // LSL's held "" (Writer::declaredWithNothing).
         std::vector<std::pair<LSLSymbol*, LSLExpression*>> given;
-        std::vector<LSLSymbol*>                            unset;
         const auto key = [&](LSLIdentifier* id, LSLExpression* init) {
-            if (id->getIType() != LST_KEY || !id->getSymbol())
-            {
-                return;
-            }
-            if (isNull(init))
-            {
-                unset.push_back(id->getSymbol());
-            }
-            else
+            if (id->getIType() == LST_KEY && id->getSymbol() && !isNull(init))
             {
                 given.emplace_back(id->getSymbol(), init);
             }
@@ -7862,8 +7882,7 @@ namespace
         // written out -- a variable's, a call's -- or given such a key.
         // Given on to a key held as text, uuid() would have made "" NULL_KEY
         // on the way, so such a key holds text too.
-        boost::unordered_flat_set<LSLSymbol*> loose(unset.begin(), unset.end());
-        mTextKeys.insert(unset.begin(), unset.end());
+        boost::unordered_flat_set<LSLSymbol*> loose;
         const auto loosely = [&](LSLExpression* e) {
             e = unbracketed(e);
             if (e && e->getIType() == LST_STRING)
@@ -7928,7 +7947,7 @@ namespace
             else
             {
                 const LSLIType type = varType(id->getSymbol(), id->getIType());
-                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? defaultOf(type) : oneValue(coerced(init, type)).text));
+                line("local " + nameOf(id) + typed(type) + " = " + (isNull(init) ? declaredWithNothing(id, type) : oneValue(coerced(init, type)).text));
             }
             commentsAfter(global, from);
             lined(global, from);
