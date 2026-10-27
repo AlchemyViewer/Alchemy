@@ -47,7 +47,6 @@
 #include "llmorphview.h"
 #include "llresmgr.h"
 #include "llselectmgr.h"
-#include "llsky.h"
 #include "lltexlayer.h"
 #include "lltoolmgr.h"
 #include "llui.h"

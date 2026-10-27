@@ -1656,7 +1656,6 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("clipSign");
 
     mReservedUniforms.push_back("diffuseMap");
-    mReservedUniforms.push_back("altDiffuseMap");
     mReservedUniforms.push_back("specularMap");
     mReservedUniforms.push_back("metallicRoughnessMap");
     mReservedUniforms.push_back("normalMap");
@@ -1677,6 +1676,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("sky_hdr_scale");
     mReservedUniforms.push_back("sky_sunlight_scale");
     mReservedUniforms.push_back("sky_ambient_scale");
+    mReservedUniforms.push_back("sky_classic_scale");
     mReservedUniforms.push_back("blue_horizon");
     mReservedUniforms.push_back("blue_density");
     mReservedUniforms.push_back("haze_horizon");
@@ -1998,11 +1998,11 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("hdri_split_screen");
     mReservedUniforms.push_back("meter_params");
     mReservedUniforms.push_back("meterMap");
+    mReservedUniforms.push_back("meterWaterMap");
     mReservedUniforms.push_back("exposureHistogram");
 
     // Stars/Aurora/Meteors
     mReservedUniforms.push_back("custom_alpha");
-    mReservedUniforms.push_back("meteor_width_pixels");
     mReservedUniforms.push_back("aurora_intensity");
     mReservedUniforms.push_back("aurora_time");
     llassert(mReservedUniforms.size() == LLShaderMgr::AURORA_TIME + 1);
@@ -2187,7 +2187,7 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("waterRim");
 
     mReservedUniforms.push_back("eyeToSky");
-    mReservedUniforms.push_back("skyBehindMap");
+    mReservedUniforms.push_back("skyDomeRadius");
 
     mReservedUniforms.push_back("haze_extinction");
     mReservedUniforms.push_back("blue_weight");
@@ -2208,6 +2208,27 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("moonQuadCenter");
     mReservedUniforms.push_back("moonQuadU");
     mReservedUniforms.push_back("moonQuadV");
+
+    mReservedUniforms.push_back("skySunMap");
+    mReservedUniforms.push_back("skySunMapNext");
+    mReservedUniforms.push_back("skySunBlend");
+    mReservedUniforms.push_back("skySunQuad");
+    mReservedUniforms.push_back("skyMoonMap");
+    mReservedUniforms.push_back("skyMoonQuad");
+    mReservedUniforms.push_back("skyMoonFade");
+    mReservedUniforms.push_back("skyBloomMap");
+    mReservedUniforms.push_back("skyBloomMapNext");
+    mReservedUniforms.push_back("skyBloomBlend");
+    mReservedUniforms.push_back("skyBloomQuad");
+    mReservedUniforms.push_back("skyBloomColor");
+    mReservedUniforms.push_back("skyCloudBlend");
+    mReservedUniforms.push_back("skyMeteorData");
+    mReservedUniforms.push_back("skyMeteorCount");
+    mReservedUniforms.push_back("skyLayers");
+    mReservedUniforms.push_back("skyHdriMap");
+    mReservedUniforms.push_back("skyHdriRotation");
+    mReservedUniforms.push_back("skyHdriScale");
+    mReservedUniforms.push_back("skyCubeFace");
 
     // Selection outlines, hover glow and wireframe (ALSelectionOutline)
     mReservedUniforms.push_back("selection_id");

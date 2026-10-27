@@ -1869,8 +1869,6 @@
   <string>Clipe de distância de renderização.</string>
   <key>RenderFlexTimeFactor</key>
   <string>Controla o nível de detalhe de objetos flexíveis (multiplicador para o tempo gasto processando objetos flex).</string>
-  <key>RenderFogRatio</key>
-  <string>OBSOLETO - Distância da câmera onde a névoa atinge densidade máxima (fração ou múltiplo da distância de far clip).</string>
   <key>RenderGLContextCoreProfile</key>
   <string>Não usar um contexto OpenGL de perfil de compatibilidade. Requer reinício. Apenas Windows.</string>
   <key>RenderGLMultiThreadedMedia</key>
@@ -2423,12 +2421,8 @@
   <string>Nome do arquivo de configuração de cor do skin do cliente (por instalação).</string>
   <key>SkipBenchmark</key>
   <string>Se verdadeiro, desativa a execução do benchmark de GPU na inicialização (padrão para classe 1).</string>
-  <key>SkyAmbientScale</key>
-  <string>Controla a intensidade da luz ambiente, ou não direcional, do sol e da lua (fração ou múltiplo do nível de ambiente padrão).</string>
   <key>SkyMoonDefaultPosition</key>
   <string>Posição padrão do sol no céu (direção em coordenadas do mundo).</string>
-  <key>SkyNightColorShift</key>
-  <string>Controla a cor do luar (cor base aplicada à lua como fonte de luz).</string>
   <key>SkyOverrideSimSunPosition</key>
   <string>Substituir a posição do sol do simulador pela posição local definida.</string>
   <key>SkySunDefaultPosition</key>
@@ -2875,10 +2869,6 @@
   <string>Controla se o temporizador watchdog de threads é ativado. O valor é S32. Defina -1 para usar o padrão embutido.</string>
   <key>WaterGLFogDensityScale</key>
   <string>Mapeia a densidade da névoa de água do shader para a densidade da névoa do gl.</string>
-  <key>WaterGLFogDepthFloor</key>
-  <string>Controla quão escura a névoa de água do gl pode ficar.</string>
-  <key>WaterGLFogDepthScale</key>
-  <string>Controla quão rapidamente a névoa do gl escurece debaixo d'água.</string>
   <key>WearFolderLimit</key>
   <string>Limita o número de itens na pasta que podem ser substituídos/adicionados ao visual atual.</string>
   <key>WearablesEveryoneCopy</key>

@@ -266,7 +266,6 @@ bool LLFeatureManager::loadFeatureTables()
     // correctly
     mSkippedFeatures.insert("RenderGamma");
     mSkippedFeatures.insert("RenderVBOEnable");
-    mSkippedFeatures.insert("RenderFogRatio");
 
     // first table is install with app
     std::string app_path = gDirUtilp->getAppRODataDir();

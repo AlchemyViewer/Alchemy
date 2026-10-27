@@ -168,20 +168,6 @@ namespace
 LLGLSLShader    gUIProgram;
 LLGLSLShader    gSolidColorProgram;
 
-// NOTE: Keep gShaderConsts* and LLGLSLShader::ShaderConsts_e in sync!
-const std::string gShaderConstsKey[LLGLSLShader::NUM_SHADER_CONSTS] =
-{
-      "LL_SHADER_CONST_CLOUD_MOON_DEPTH"
-    , "LL_SHADER_CONST_STAR_DEPTH"
-};
-
-// NOTE: Keep gShaderConsts* and LLGLSLShader::ShaderConsts_e in sync!
-const std::string gShaderConstsVal[LLGLSLShader::NUM_SHADER_CONSTS] =
-{
-      "0.99998" // SHADER_CONST_CLOUD_MOON_DEPTH // SL-14113
-    , "0.99999" // SHADER_CONST_STAR_DEPTH       // SL-14113
-};
-
 namespace
 {
     // The bits a component is uploaded as, which is what the uniform value cache compares: an int or a uint as
@@ -1416,11 +1402,6 @@ void LLGLSLShader::addPermutation(std::string name, std::string value)
     mPermutationsAdded = true;
 }
 
-void LLGLSLShader::addConstant(const LLGLSLShader::eShaderConsts shader_const)
-{
-    addPermutation(gShaderConstsKey[shader_const], gShaderConstsVal[shader_const]);
-}
-
 void LLGLSLShader::removePermutation(std::string name)
 {
     mDefines.erase(name);
@@ -2032,7 +2013,15 @@ S32 LLGLSLShader::bindTexture(S32 uniform, LLRenderTarget* texture, ALSampler ke
 
     if (uniform > -1)
     {
-        texture->bindTexture(index, uniform, key);
+        if (texture)
+        {
+            texture->bindTexture(index, uniform, key);
+        }
+        else
+        {
+            // No target binds nothing, and the unit is let go of what an earlier bind left there.
+            gGL.getTextureSlot(uniform)->unbind();
+        }
     }
 
     return uniform;
@@ -2055,7 +2044,12 @@ S32 LLGLSLShader::bindDepthTexture(S32 uniform, LLRenderTarget* texture, ALSampl
 
     uniform = getTextureChannel(uniform);
 
-    if (uniform > -1)
+    if (uniform > -1 && !texture)
+    {
+        // No target binds nothing, and the unit is let go of what an earlier bind left there.
+        gGL.getTextureSlot(uniform)->unbind();
+    }
+    else if (uniform > -1)
     {
         // Clamp by default, and a shadow-compare sampler is never wanted here -- this is a
         // plain depth fetch. A repeat wrap on depth returns the opposite edge of the screen

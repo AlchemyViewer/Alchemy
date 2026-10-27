@@ -31,7 +31,6 @@
 #include "llviewercamera.h"
 #include "lldrawable.h"
 #include "llface.h"
-#include "llsky.h"
 #include "pipeline.h"
 #include "llspatialpartition.h"
 #include "llviewershadermgr.h"

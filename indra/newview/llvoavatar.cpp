@@ -103,7 +103,6 @@
 #include "llworld.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
-#include "llsky.h"
 #include "llanimstatelabels.h"
 #include "lltrans.h"
 #include "llappearancemgr.h"

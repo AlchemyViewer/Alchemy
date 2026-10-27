@@ -163,7 +163,6 @@ extern LLGLSLShader         gUnderWaterOpaqueProgram;
 extern LLGLSLShader         gWaterWavesProgram;
 extern LLGLSLShader         gUnderWaterWavesProgram;
 extern LLGLSLShader         gWaterExclusionProgram;
-extern LLGLSLShader         gWaterFieldProgram;
 // One level of ALDepthPyramid; built where the session computes.
 extern LLGLSLShader         gDepthPyramidProgram;
 extern LLGLSLShader         gGlowProgram;
@@ -205,8 +204,6 @@ extern LLGLSLShader         gSelectionGlowReachProgram;
 extern LLGLSLShader         gSelectionGlowRowProgram;
 extern LLGLSLShader         gSelectionBackdropMaskProgram;
 
-extern LLGLSLShader         gDeferredHighlightProgram;
-
 extern LLGLSLShader         gPathfindingProgram;
 extern LLGLSLShader         gPathfindingNoNormalsProgram;
 
@@ -238,7 +235,7 @@ extern LLGLSLShader         gDeferredBlurLightProgram;
 extern LLGLSLShader         gDeferredBlurLightComputeProgram;
 extern LLGLSLShader         gDeferredAvatarProgram;
 extern LLGLSLShader         gDeferredSoftenProgram;
-extern LLGLSLShader         gDeferredSoftenSkyProgram;
+extern LLGLSLShader         gDeferredSkyCompositeProgram;
 extern LLGLSLShader         gDeferredShadowProgram;
 extern LLGLSLShader         gDeferredTerrainShadowProgram;
 extern LLGLSLShader         gDeferredShadowCubeProgram;
@@ -285,14 +282,9 @@ extern LLGLSLShader         gHUDFullbrightAlphaMaskAlphaProgram;
 extern LLGLSLShader         gDeferredEmissiveProgram;
 extern LLGLSLShader         gDeferredEmissiveIndexedProgram; // multi-material indexed legacy glow
 extern LLGLSLShader         gDeferredAvatarAlphaProgram;
-extern LLGLSLShader         gEnvironmentMapProgram;
-extern LLGLSLShader         gDeferredWLSkyProgram;
-extern LLGLSLShader         gDeferredWLCloudProgram;
-extern LLGLSLShader         gDeferredWLSunProgram;
-extern LLGLSLShader         gDeferredWLMoonProgram;
 extern LLGLSLShader         gDeferredStarProgram;
-extern LLGLSLShader         gDeferredMeteorProgram;
-extern LLGLSLShader         gDeferredAuroraProgram;
+extern LLGLSLShader         gDeferredStarQuadProgram;
+extern LLGLSLShader         gDeferredSkyCubeProgram;
 extern LLGLSLShader         gDeferredFullbrightShinyProgram;
 extern LLGLSLShader         gHUDFullbrightShinyProgram;
 extern LLGLSLShader         gNormalMapGenProgram;

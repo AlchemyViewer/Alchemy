@@ -210,7 +210,7 @@ namespace
             { "RenderBloomHalation", no_change, [](Inputs& in) { in.mBloomHalation = true; },
               [](const Plan& before) { return wanted(before, bloom({ Pack::Main })); } },
             { "RenderEnableEmissiveBuffer", no_change, [](Inputs& in) { in.mEmissive = false; },
-              [](const Plan&) { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer, Id::SkyBehind }); } },
+              [](const Plan&) { return of({ Id::MainGBuffer, Id::ProbeGBuffer, Id::HeroGBuffer }); } },
             { "RenderHDREnabled", no_change, hdr_off,
               [](const Plan& before)
               {
@@ -218,7 +218,7 @@ namespace
                          in_packs({ Pack::Main, Pack::Hero }, { Slot::Water }) |
                          in_packs({ Pack::Main }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main })) |
-                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "RenderHDREnabled under a material preview", previewed, hdr_off,
               [](const Plan& before)
@@ -227,7 +227,7 @@ namespace
                          in_packs({ Pack::Main, Pack::Hero }, { Slot::Water }) |
                          in_packs({ Pack::Main, Pack::Probe }, { Slot::PostPing, Slot::PostPong }) |
                          wanted(before, bloom({ Pack::Main, Pack::Probe })) |
-                         of({ Id::SkyBehind, Id::Glow0, Id::Glow1, Id::Glow2 });
+                         of({ Id::Glow0, Id::Glow1, Id::Glow2 });
               } },
             { "a material preview made", no_change, previewed,
               [](const Plan&)
@@ -298,7 +298,8 @@ namespace
             { "RenderReflectionProbeResolution", no_change, [](Inputs& in) { in.mProbeResolution = 256; },
               [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe)); } },
             { "RenderReflectionsEnabled", no_change, [](Inputs& in) { in.mProbes = false; },
-              [](const Plan& before) { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)); } },
+              [](const Plan& before)
+              { return wanted(before, Plan::idsOf(Pack::Probe) | Plan::idsOf(Pack::Hero)) | of({ Id::EnvironmentCube }); } },
             { "RenderScreenSpaceReflections", no_change, [](Inputs& in) { in.mSSR = true; },
               [](const Plan&) { return of({ Id::SSRScene }); } },
             { "RenderScreenSpaceReflections without probes", [](Inputs& in) { in.mProbes = false; },
@@ -1177,7 +1178,7 @@ namespace
             CHECK(!Plan::drivesRenderSize(id));
         }
         for (Id id : { Id::MainGBuffer, Id::MainScreen, Id::MainLight, Id::MainPostPing, Id::SMAABlend,
-                       Id::MainWater, Id::MainDepthCopy, Id::SkyBehind, Id::SSRScene, Id::MainLightBlurred })
+                       Id::MainWater, Id::MainDepthCopy, Id::SSRScene, Id::MainLightBlurred })
         {
             INFO(Plan::name(id));
             CHECK(Plan::drivesRenderSize(id));
@@ -1200,8 +1201,8 @@ namespace
         const IdSet transient = in_packs({ Pack::Main, Pack::Probe, Pack::Hero },
                                          { Slot::Light, Slot::PostPing, Slot::PostPong, Slot::Water, Slot::DepthCopy }) |
                                 bloom({ Pack::Main, Pack::Probe, Pack::Hero }) |
-                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::SkyBehind,
-                                     Id::MainLightBlurred, Id::Preview, Id::Bake });
+                                of({ Id::SMAAEdges, Id::SMAABlend, Id::Glow0, Id::Glow1, Id::Glow2, Id::MainLightBlurred,
+                                     Id::Preview, Id::Bake });
         CHECK(names(Plan::idsWhere(Plan::isTransient)) == names(transient));
 
         // What holds anything across frames, or between the phases of one, is built to keep.
@@ -1264,7 +1265,6 @@ namespace
         U32 mTargets    = 0;
         U32 mLastMisses = 0; ///< acquisitions the last frame had to build for
         bool mWaterIsBloom     = false;
-        bool mSkyBehindIsBloom = false;
         bool mDefocusedIsLight = false; ///< depth of field's defocused scene took a target the lighting used
     };
 
@@ -1290,10 +1290,6 @@ namespace
         for (int frame = 0; frame < 2; ++frame)
         {
             pool.beginFrame();
-
-            // The sky pool draws the sky behind (LLDrawPoolWLSky), held to the end of the deferred lighting.
-            ALTransientTargets sky(pool);
-            LLRenderTarget*    sky_behind = acquire(sky, Id::SkyBehind);
 
             LLRenderTarget* light   = nullptr;
             LLRenderTarget* scratch = nullptr;
@@ -1321,7 +1317,6 @@ namespace
                 water = acquire(pass, Id::MainWater);
                 acquire(pass, Id::MainDepthCopy);
             }
-            sky.releaseAll();
 
             // renderFinalize: depth of field's defocused scene, in the screen's description, and its blur at
             // CameraDoFResScale in bloom level 0's format (the post chain's without HDR), given back before the bloom
@@ -1330,7 +1325,6 @@ namespace
             // does, as the blit sharpens the frame itself. All but the blur held until the frame is presented.
             LLRenderTarget* defocused = nullptr;
             LLRenderTarget* bloom0    = nullptr;
-            LLRenderTarget* bloom1    = nullptr;
             {
                 ALTransientTargets post(pool);
                 if (dof)
@@ -1348,7 +1342,6 @@ namespace
                 {
                     LLRenderTarget* level = acquire(post, Plan::bloomMip(Pack::Main, mip));
                     bloom0 = mip == 0 ? level : bloom0;
-                    bloom1 = mip == 1 ? level : bloom1;
                 }
                 acquire(post, Id::MainPostPing);
                 if (in.mFSAAType != 0 || !in.mHDR)
@@ -1358,7 +1351,6 @@ namespace
             }
 
             set.mWaterIsBloom     = water && water == bloom0;
-            set.mSkyBehindIsBloom = sky_behind && sky_behind == bloom1;
             set.mDefocusedIsLight = defocused && (defocused == light || defocused == scratch);
             set.mLastMisses       = pool.stats().mMisses;
         }
@@ -1368,7 +1360,7 @@ namespace
         set.mPersistent = LLRenderTarget::bytesFor(*plan.desc(Id::MainGBuffer)) + LLRenderTarget::bytesFor(*plan.desc(Id::MainScreen));
         set.mOneEach    = set.mPersistent;
         for (Id id : { Id::MainLight, Id::MainLightBlurred, Id::MainWater, Id::MainDepthCopy, Id::MainPostPing,
-                       Id::MainPostPong, Id::SkyBehind })
+                       Id::MainPostPong })
         {
             set.mOneEach += plan.wants(id) ? LLRenderTarget::bytesFor(*plan.desc(id)) : 0;
         }
@@ -1389,18 +1381,17 @@ namespace
         const WorkingSet set = main_view_frame(defaults());
         CHECK(set.mPersistent == 36 * PIXELS);
 
-        UNSCOPED_INFO("exact-description reuse finds the plan's two matches by itself");
+        UNSCOPED_INFO("exact-description reuse finds the plan's match by itself");
         CHECK(set.mWaterIsBloom);
-        CHECK(set.mSkyBehindIsBloom);
         UNSCOPED_INFO("a frame finds what it needs where the last one left it");
         CHECK(set.mLastMisses == 0);
 
-        // The light map, SSAO's blurred light map, the depth copy, bloom mip 0 with the water's copy and mips 2 to
-        // 4, mip 1 with the sky behind, and the post chain's first: 4 + 2 + 4 + 4 + 1 + 0.33 + 4 B/px.
+        // The light map, SSAO's blurred light map, the depth copy, bloom mip 0 with the water's copy, mips 1 to 4, and
+        // the post chain's first: 4 + 2 + 4 + 4 + 1 + 0.33 + 4 B/px.
         CHECK(set.mTargets == 9);
         CHECK(set.mPooled == 71251200);
-        // Each its own target, as each was: 64.3 B/px, 226.2 MiB.
-        CHECK(set.mOneEach == 237139200);
+        // Each its own target: 63.3 B/px, 222.6 MiB.
+        CHECK(set.mOneEach == 233452800);
         CHECK(set.mPersistent + set.mPooled == 203961600); // 194.5 MiB
 
         // Without compute, the fragment passes blur through a scratch of the light map's description: two of it
@@ -1409,9 +1400,8 @@ namespace
         fragment.mCompute = false;
         const WorkingSet passes = main_view_frame(fragment);
         CHECK(passes.mWaterIsBloom);
-        CHECK(passes.mSkyBehindIsBloom);
         CHECK(passes.mTargets == 9);
-        CHECK(passes.mOneEach == 229766400); // 219.1 MiB
+        CHECK(passes.mOneEach == 226080000); // 215.6 MiB
         CHECK(passes.mPersistent + passes.mPooled == 211334400); // 201.5 MiB
 
         // Without SSAO the lighting needs one target of the light map's description, and no blurred one.
@@ -1419,8 +1409,7 @@ namespace
         no_ssao.mSSAO  = false;
         const WorkingSet without = main_view_frame(no_ssao);
         CHECK(without.mWaterIsBloom);
-        CHECK(without.mSkyBehindIsBloom);
-        CHECK(without.mOneEach == 229766400);
+        CHECK(without.mOneEach == 226080000);
         CHECK(without.mPersistent + without.mPooled == 196588800); // 187.5 MiB
 
         // With antialiasing the post chain's other target is drawn into, and pooled beside the first: 4 B/px more.
@@ -1454,6 +1443,7 @@ namespace
         CHECK(Plan::name(Id::SMAAEdges) == "smaa.edges");
         CHECK(Plan::name(Id::LensFlareB) == "lens.flare.b");
         CHECK(Plan::name(Id::ToneCurve) == "tone.curve");
+        CHECK(Plan::name(Id::EnvironmentCube) == "sky.cube");
 
         std::set<std::string_view> seen;
         for (size_t i = 0; i < Plan::ID_COUNT; ++i)
@@ -1463,5 +1453,28 @@ namespace
             CHECK(!name.empty());
             CHECK(seen.insert(name).second);
         }
+    }
+
+    TEST_CASE("alrenderresourceplan: the sky's environment cube is wanted only without probes", "[alrenderresourceplan]")
+    {
+        CHECK_FALSE(Plan::make(defaults()).wants(Id::EnvironmentCube));
+
+        // Probes off, whatever else the inputs say: the low feature class, every Intel legacy session and the setting.
+        for (const bool hdr : { true, false })
+        {
+            INFO("HDR " << hdr);
+            Inputs in = defaults();
+            in.mProbes = false;
+            in.mHDR    = hdr;
+            const Plan plan = Plan::make(in);
+            REQUIRE(plan.wants(Id::EnvironmentCube));
+            CHECK(plan.desc(Id::EnvironmentCube)->color[0] == GL_RGBA8);
+            CHECK(plan.desc(Id::EnvironmentCube)->mips == ALRenderTargetDesc::Mips::Manual);
+        }
+
+        // A texture of the pipeline's own, which the reconcile keeps rather than the transient pool lending it.
+        CHECK(Plan::isTexture(Id::EnvironmentCube));
+        CHECK_FALSE(Plan::isTransient(Id::EnvironmentCube));
+        CHECK_FALSE(Plan::followsRenderSize(Id::EnvironmentCube));
     }
 }

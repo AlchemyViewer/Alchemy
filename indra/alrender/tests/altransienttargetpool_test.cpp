@@ -461,7 +461,7 @@ namespace
 
         UNSCOPED_INFO("a target held across the change is freed as it is released, and never lent again");
         ALTransientTargets scope(pool);
-        LLRenderTarget* held = scope.acquire(HALF, "sky.behind");
+        LLRenderTarget* held = scope.acquire(HALF, "half.held");
         REQUIRE(held);
         pool.setMainSize(1920, 1080);
         CHECK(pool.stats().mTargets == 1);

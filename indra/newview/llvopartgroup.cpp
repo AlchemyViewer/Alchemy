@@ -36,7 +36,6 @@
 #include "llagentcamera.h"
 #include "lldrawable.h"
 #include "llface.h"
-#include "llsky.h"
 #include "llviewercamera.h"
 #include "llviewerpartsim.h"
 #include "llviewerregion.h"

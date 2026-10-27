@@ -778,9 +778,7 @@ public:
     {
         LL_VO_CLOUDS =              LL_PCODE_APP | 0x20, // no longer used
         LL_VO_SURFACE_PATCH =       LL_PCODE_APP | 0x30,
-        LL_VO_WL_SKY =              LL_PCODE_APP | 0x40,
         LL_VO_SQUARE_TORUS =        LL_PCODE_APP | 0x50,
-        LL_VO_SKY =                 LL_PCODE_APP | 0x60,
         LL_VO_PART_GROUP =          LL_PCODE_APP | 0xa0,
         LL_VO_TRIANGLE_TORUS =      LL_PCODE_APP | 0xb0,
         LL_VO_HUD_PART_GROUP =      LL_PCODE_APP | 0xc0,

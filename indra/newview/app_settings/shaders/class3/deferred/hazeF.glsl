@@ -45,18 +45,30 @@ uniform vec4 waterPlane;
 uniform int cube_snapshot;
 
 #ifdef HAZE_ON_WATER
-// The sky dome behind everything (LLPipeline::mSkyBehind), as the sky writes it, before srgb_to_linear and
-// sky_hdr_scale. WindLight's in-scatter converges on a colour of its own, up to two stops off the dome's
-// toward a low sun and half a stop at night, which leaves a seam where far water meets the sky. The water surface
-// converges on the sky behind it instead: it lies below the horizon, where the dome is the horizon's own colour turned
-// only by the sun's glow. Nothing else does, since a few degrees above the horizon the dome changes fast (at dusk, from
-// no sunlight to the sun's glow), and a mountain took the glow of a sun behind it. This variant draws only where the
-// water marked its pixels in the stencil (ALWaterStencil::SURFACE_BIT), seen from above.
-uniform sampler2D skyBehindMap;
+// WindLight's dome along the view ray (windlight/windlightDomeF.glsl), as the sky program writes it, before
+// srgb_to_linear and sky_hdr_scale. WindLight's in-scatter converges on a colour of its own, up to two stops off the
+// dome's toward a low sun and half a stop at night, which leaves a seam where far water meets the sky. The water
+// surface converges on the dome behind it instead: it lies below the horizon, where the dome is the horizon's own
+// colour turned only by the sun's glow. Nothing else does, since a few degrees above the horizon the dome changes fast
+// (at dusk, from no sunlight to the sun's glow), and a mountain took the glow of a sun behind it. This variant draws
+// only where the water marked its pixels in the stencil (ALWaterStencil::SURFACE_BIT), seen from above.
+vec3 windlightDome(vec3 dir);
+
+// The rotation from eye space to the dome's frame, eyeToSky, spliced from class1/deferred/environmentBlock.glsl and
+// bound at UB_ENVIRONMENT.
+//[ENGINE_BLOCK Environment]
 
 // How far the water has faded into the sky behind it, seen from high above (ALFarPlane::groundFade): 1 by the height it
 // is no longer drawn from, where the sky is all there is to see.
 uniform float waterGroundFade;
+
+// The weight, 1 - atten, below which in every channel the water's in-scatter is left as WindLight's and the dome is not
+// worked out. At a weight w the convergence moves additive by w (sky w - additive), sky being the halved dome, at most
+// 2.5, so leaving it changes additive by at most 1/256 of itself plus 2.5 / 256^2, in the display-encoded units it is
+// worked in. atmosFragLighting doubles and decodes it into linear HDR, the frame exposed from there: at most 0.94% of
+// the in-scatter's own value at any exposure (the decode's 2.4 power over 256), or 2e-5 times sky_hdr_scale where it is
+// too faint for the power. windlightDome reads its maps at an explicit level, so it may run under this per-pixel test.
+const float HAZE_DOME_MIN_WEIGHT = 1.0 / 256.0;
 #endif
 
 void main()
@@ -99,9 +111,15 @@ void main()
     {
 #ifdef HAZE_ON_WATER
         atten *= 1.0 - waterGroundFade;
-        // atmosFragLighting doubles additive, so the sky is halved
-        vec3 sky = texture(skyBehindMap, tc).rgb * 0.5;
-        additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);
+        vec3 weight = vec3(1.0) - atten;
+        if (max(weight.r, max(weight.g, weight.b)) >= HAZE_DOME_MIN_WEIGHT)
+        {
+            // The dome as the sky above the water has it, unclamped on every path.
+            vec3 dome = windlightDome(eyeToSky * normalize(pos.xyz));
+            // atmosFragLighting doubles additive, so the sky is halved
+            vec3 sky = dome * 0.5;
+            additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);
+        }
 #endif
 
         // the in-scatter alone: the blend multiplies what is already lit by alpha

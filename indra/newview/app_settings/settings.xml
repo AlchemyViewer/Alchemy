@@ -9035,17 +9035,6 @@
       <key>Value</key>
       <real>1.0</real>
     </map>
-    <key>RenderFogRatio</key>
-    <map>
-      <key>Comment</key>
-      <string>DEPRECATED - Distance from camera where fog reaches maximum density (fraction or multiple of far clip distance)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>4.0</real>
-    </map>
     <key>RenderGamma</key>
     <map>
       <key>Comment</key>
@@ -11784,17 +11773,6 @@
       <key>Value</key>
       <string />
     </map>
-    <key>SkyAmbientScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Controls strength of ambient, or non-directional light from the sun and moon (fraction or multiple of default ambient level)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.300000011921</real>
-    </map>
     <key>SkyMoonDefaultPosition</key>
     <map>
       <key>Comment</key>
@@ -11808,21 +11786,6 @@
         <real>-1.0</real>
         <real>0.0</real>
         <real>-0.1</real>
-      </array>
-    </map>
-    <key>SkyNightColorShift</key>
-    <map>
-      <key>Comment</key>
-      <string>Controls moonlight color (base color applied to moon as light source)</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>Color3</string>
-      <key>Value</key>
-      <array>
-        <real>0.67</real>
-        <real>0.67</real>
-        <real>1.0</real>
       </array>
     </map>
     <key>SkyOverrideSimSunPosition</key>
@@ -14012,28 +13975,6 @@
       <string>F32</string>
       <key>Value</key>
       <real>0.02</real>
-    </map>
-    <key>WaterGLFogDepthFloor</key>
-    <map>
-      <key>Comment</key>
-      <string>Controls how dark water gl fog can get</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>0.25</real>
-    </map>
-    <key>WaterGLFogDepthScale</key>
-    <map>
-      <key>Comment</key>
-      <string>Controls how quickly gl fog gets dark under water</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>50.0</real>
     </map>
     <key>FlashCount</key>
     <map>

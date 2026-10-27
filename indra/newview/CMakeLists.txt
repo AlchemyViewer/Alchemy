@@ -250,6 +250,7 @@ if(AL_BUILD_VIEWER)
     alscripttypes.cpp
     alscriptweightspane.cpp
     alscriptworkspace.cpp
+    alsky.cpp
     alterrainsurfacemaps.cpp
     altextureboost.cpp
     alwatersurface.cpp
@@ -392,11 +393,9 @@ if(AL_BUILD_VIEWER)
     lldrawpoolmaterials.cpp
     lldrawpoolpbropaque.cpp
     lldrawpoolsimple.cpp
-    lldrawpoolsky.cpp
     lldrawpoolterrain.cpp
     lldrawpooltree.cpp
     lldrawpoolwater.cpp
-    lldrawpoolwlsky.cpp
     lldrawpoolwaterexclusion.cpp
     lldynamictexture.cpp
     lleasymessagelogentry.cpp
@@ -824,7 +823,6 @@ if(AL_BUILD_VIEWER)
     llsidepaneltaskinfo.cpp
     llsidetraypanelcontainer.cpp
     llskinningutil.cpp
-    llsky.cpp
     llslurl.cpp
     llsnapshotlivepreview.cpp
     llspatialpartition.cpp
@@ -969,11 +967,9 @@ if(AL_BUILD_VIEWER)
     llvoicewebrtc.cpp
     llvoinventorylistener.cpp
     llvopartgroup.cpp
-    llvosky.cpp
     llvosurfacepatch.cpp
     llvotree.cpp
     llvovolume.cpp
-    llvowlsky.cpp
     llwearableitemslist.cpp
     llwearablelist.cpp
     llweb.cpp
@@ -1133,6 +1129,7 @@ if(AL_BUILD_VIEWER)
     alscripttypes.h
     alscriptweightspane.h
     alscriptworkspace.h
+    alsky.h
     alterrainsurfacemaps.h
     alwatersurface.h
     altextureboost.h
@@ -1276,11 +1273,9 @@ if(AL_BUILD_VIEWER)
     lldrawpoolmaterials.h
     lldrawpoolpbropaque.h
     lldrawpoolsimple.h
-    lldrawpoolsky.h
     lldrawpoolterrain.h
     lldrawpooltree.h
     lldrawpoolwater.h
-    lldrawpoolwlsky.h
     lldrawpoolwaterexclusion.h
     lldynamictexture.h
     lleasymessagelogentry.h
@@ -1699,7 +1694,6 @@ if(AL_BUILD_VIEWER)
     llsidepaneltaskinfo.h
     llsidetraypanelcontainer.h
     llskinningutil.h
-    llsky.h
     llslurl.h
     llsnapshotlivepreview.h
     llsnapshotmodel.h
@@ -1847,11 +1841,9 @@ if(AL_BUILD_VIEWER)
     llvoicewebrtc.h
     llvoinventorylistener.h
     llvopartgroup.h
-    llvosky.h
     llvosurfacepatch.h
     llvotree.h
     llvovolume.h
-    llvowlsky.h
     llwearableitemslist.h
     llwearablelist.h
     llweb.h
@@ -2699,10 +2691,11 @@ if(AL_BUILD_TESTS)
   )
 
   # The selection outline's id and edge passes, the shadow samplers over a
-  # map the pass has none of, and the post chain's passes held against what
-  # they replaced: the viewer's own shader files read from the source tree,
-  # on llrender's shared hidden window. The post chain's passes are timed
-  # there too, by the GPU's own clock.
+  # map the pass has none of, the exposure meter over the water, and the
+  # post chain's passes held against what they replaced: the viewer's own
+  # shader files read from the source tree, on llrender's shared hidden
+  # window. The post chain's passes are timed there too, by the GPU's own
+  # clock.
   al_add_test_binary(
     newview_gl_tests
     PROJECT ${test_project}
@@ -2711,12 +2704,13 @@ if(AL_BUILD_TESTS)
       tests/aldof_gl_test.cpp
       tests/alselectionoutline_gl_test.cpp
       tests/copycolor_gl_test.cpp
+      tests/luminance_gl_test.cpp
       tests/objectskinblock_gl_test.cpp
       tests/shadowutil_gl_test.cpp
     BENCH_SOURCES tests/alcasfold_bench.cpp tests/aldof_bench.cpp tests/alssrhistory_bench.cpp
     LIBRARIES llrender
     SUPPORT llrender_test_checks llcommon_test_checks
-    INCLUDES ${INDRA_SOURCE_DIR}/llprimitive
+    INCLUDES ${INDRA_SOURCE_DIR}/llprimitive ${INDRA_SOURCE_DIR}/alrender
     DEFINES "AL_TEST_SHADER_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/app_settings/shaders\""
     GL
   )

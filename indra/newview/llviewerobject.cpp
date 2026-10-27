@@ -86,7 +86,6 @@
 #include "llvoavatar.h"
 #include "llvoavatarself.h"
 #include "llvograss.h"
-#include "llvosky.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
 #include "llvopartgroup.h"
@@ -97,7 +96,6 @@
 #include "llui.h"
 #include "pipeline.h"
 #include "llviewernetwork.h"
-#include "llvowlsky.h"
 #include "llmanip.h"
 #include "lltrans.h"
 #include "llsdutil.h"
@@ -163,8 +161,6 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
     if (gNonInteractive
         && pcode != LL_PCODE_LEGACY_AVATAR
         && pcode != LL_VO_SURFACE_PATCH
-        && pcode != LL_VO_WL_SKY
-        && pcode != LL_VO_SKY
         && pcode != LL_VO_PART_GROUP
         )
     {
@@ -230,14 +226,10 @@ LLViewerObject *LLViewerObject::createObject(const LLUUID &id, const LLPCode pco
       res = NULL; break;
     case LL_VO_SURFACE_PATCH:
       res = new LLVOSurfacePatch(id, pcode, regionp); break;
-    case LL_VO_SKY:
-      res = new LLVOSky(id, pcode, regionp); break;
     case LL_VO_PART_GROUP:
       res = new LLVOPartGroup(id, pcode, regionp); break;
     case LL_VO_HUD_PART_GROUP:
       res = new LLVOHUDPartGroup(id, pcode, regionp); break;
-    case LL_VO_WL_SKY:
-      res = new LLVOWLSky(id, pcode, regionp); break;
     default:
       LL_WARNS() << "Unknown object pcode " << (S32)pcode << LL_ENDL;
       res = NULL; break;

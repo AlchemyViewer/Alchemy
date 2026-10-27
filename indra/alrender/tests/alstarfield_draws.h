@@ -1,9 +1,10 @@
 /**
- * @file highlightF.glsl
+ * @file alstarfield_draws.h
+ * @brief What the star field's tests read of a view's draws besides the runs themselves.
  *
- * $LicenseInfo:firstyear=2007&license=viewerlgpl$
- * Second Life Viewer Source Code
- * Copyright (C) 2007, Linden Research, Inc.
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -18,25 +19,23 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
- *
- * Linden Research, Inc., 945 Battery Street, San Francisco, CA  94111  USA
  * $/LicenseInfo$
  */
 
-out vec4 frag_data[4];
+#pragma once
 
-uniform vec4 color;
-uniform sampler2D diffuseMap;
+#include "../alstarfield.h"
 
-in vec2 vary_texcoord0;
-
-void main()
+namespace al_star_test
 {
-    frag_data[0] = color*texture(diffuseMap, vary_texcoord0.xy);
-    frag_data[1] = vec4(0.0);
-    frag_data[2] = vec4(0.0, 1.0, 0.0, GBUFFER_FLAG_SKIP_ATMOS);
-
-#if defined(HAS_EMISSIVE)
-    frag_data[3] = vec4(0);
-#endif
+    // The points @a draws draws in all: its runs' counts summed.
+    inline U32 drawnPoints(const ALStarField::Draws& draws)
+    {
+        U32 points = 0;
+        for (const S32 count : draws.mCount)
+        {
+            points += (U32)count;
+        }
+        return points;
+    }
 }

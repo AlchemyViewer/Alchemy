@@ -468,28 +468,6 @@ namespace
             REQUIRE(mTarget.allocate(SIZE, SIZE, GL_RGBA8));
         }
 
-        // What the target holds after the triangle draws into it, its draw buffers set to output `output`, or left as
-        // bindTarget sets them when it is negative.
-        LLColor4U drawn(S32 output)
-        {
-            mTarget.bindTarget();
-            gGL.setClearColor(LLColor4::transparent);
-            mTarget.clear();
-            if (output >= 0)
-            {
-                mTarget.setDrawOutput((U32)output);
-            }
-            glUseProgram(mProgram);
-            glBindVertexArray(mVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 3);
-            glBindVertexArray(0);
-            glUseProgram(0);
-            U8 pixel[4] = { 0 };
-            glReadPixels(SIZE / 2, SIZE / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
-            mTarget.flush();
-            return LLColor4U(pixel[0], pixel[1], pixel[2], pixel[3]);
-        }
-
         ll_test::SharedGLScope mGL;
         LLRenderTarget mTarget;
         LLRenderTarget mInteger;
@@ -507,20 +485,69 @@ namespace
     };
 
 
-    // setDrawOutput: a single-attachment target takes the output it names and none of the others, and the next
-    // bindTarget gives it output 0 again.
-    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: setDrawOutput sends the named output to a single-attachment target", "[llrendertarget_gl]")
+    // setDrawAttachment: a four-attachment target takes into the named attachment the output of the same index and
+    // leaves the others as they were, a clear clears that one alone, and setDrawBuffers() gives every attachment its
+    // output again.
+    TEST_CASE_METHOD(llrendertarget_data, "llrendertarget_gl: setDrawAttachment draws one attachment of a G-buffer from its own output", "[llrendertarget_gl]")
     {
         setUp();
-        UNSCOPED_INFO("bound: output 0");
-        CHECK(drawn(-1) == OUTPUT_COLOURS[0]);
-        for (S32 output = 0; output < 4; ++output)
+        LLRenderTarget gbuffer;
+        REQUIRE(gbuffer.allocate(SIZE, SIZE, GL_RGBA8));
+        for (S32 a = 1; a < 4; ++a)
         {
-            CAPTURE(output);
-            REQUIRE(drawn(output) == OUTPUT_COLOURS[output]);
+            REQUIRE(gbuffer.addColorAttachment(GL_RGBA8));
         }
-        UNSCOPED_INFO("rebound: output 0 again");
-        CHECK(drawn(-1) == OUTPUT_COLOURS[0]);
+        const auto read = [](S32 attachment)
+        {
+            U8 pixel[4] = { 0 };
+            glReadBuffer(GL_COLOR_ATTACHMENT0 + attachment);
+            glReadPixels(SIZE / 2, SIZE / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+            return LLColor4U(pixel[0], pixel[1], pixel[2], pixel[3]);
+        };
+        const LLColor4U cleared(26, 51, 77, 102);
+        const LLColor4U recleared(0, 0, 0, 0);
+        for (S32 attachment = 0; attachment < 4; ++attachment)
+        {
+            CAPTURE(attachment);
+            gbuffer.bindTarget();
+            gGL.setClearColor(LLColor4(cleared));
+            gbuffer.clear();
+            gbuffer.setDrawAttachment((U32)attachment);
+            glUseProgram(mProgram);
+            glBindVertexArray(mVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+            glUseProgram(0);
+            for (S32 a = 0; a < 4; ++a)
+            {
+                CAPTURE(a);
+                CHECK(read(a) == (a == attachment ? OUTPUT_COLOURS[a] : cleared));
+            }
+            gGL.setClearColor(LLColor4(recleared));
+            gbuffer.clear();
+            for (S32 a = 0; a < 4; ++a)
+            {
+                CAPTURE(a);
+                UNSCOPED_INFO("a clear takes the drawn attachment alone");
+                CHECK(read(a) == (a == attachment ? recleared : cleared));
+            }
+            gbuffer.setDrawBuffers();
+            glUseProgram(mProgram);
+            glBindVertexArray(mVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glBindVertexArray(0);
+            glUseProgram(0);
+            for (S32 a = 0; a < 4; ++a)
+            {
+                CAPTURE(a);
+                UNSCOPED_INFO("restored: every output to its attachment");
+                CHECK(read(a) == OUTPUT_COLOURS[a]);
+            }
+            glReadBuffer(GL_COLOR_ATTACHMENT0);
+            gbuffer.flush();
+        }
+        gGL.setClearColor(LLColor4::transparent);
+        gbuffer.release();
         CHECK((U32)glGetError() == (U32)GL_NO_ERROR);
     }
 

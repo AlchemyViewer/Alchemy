@@ -2465,6 +2465,17 @@
             <key>Value</key>
             <integer>2048</integer>
         </map>
+        <key>AlchemyRenderSunBloom</key>
+        <map>
+            <key>Comment</key>
+            <string>Draw the sky's sun bloom, the halo its bloom texture paints around the sun disc. The bloom textures are fetched only while this is on.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyRenderTerrainHexTiling</key>
         <map>
             <key>Comment</key>

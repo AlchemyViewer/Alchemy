@@ -51,7 +51,6 @@
 #include "llflexibleobject.h"
 #include "llviewertextureanim.h"
 #include "xform.h"
-#include "llsky.h"
 #include "llviewercamera.h"
 #include "llselectmgr.h"
 #include "llresmgr.h"

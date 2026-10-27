@@ -91,7 +91,6 @@
 #include "llscriptruntimeperms.h"
 #include "llselectmgr.h"
 #include "llstartup.h"
-#include "llsky.h"
 #include "llslurl.h"
 #include "llstatenums.h"
 #include "llstatusbar.h"

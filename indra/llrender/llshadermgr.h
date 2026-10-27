@@ -105,7 +105,6 @@ public:
         CLIP_PLANE,                         //  "clipPlane"
         CLIP_SIGN,                          //  "clipSign"
         DIFFUSE_MAP,                        //  "diffuseMap"
-        ALTERNATE_DIFFUSE_MAP,              //  "altDiffuseMap"
         SPECULAR_MAP,                       //  "specularMap"
         METALLIC_ROUGHNESS_MAP,             //  "metallicRoughnessMap"
         NORMAL_MAP,                         //  "normalMap"
@@ -126,6 +125,7 @@ public:
         SKY_HDR_SCALE,                      //  "sky_hdr_scale"
         SKY_SUNLIGHT_SCALE,                 //  "sky_sunlight_scale"
         SKY_AMBIENT_SCALE,                  //  "sky_ambient_scale"
+        SKY_CLASSIC_SCALE,                  //  "sky_classic_scale"  the classic sky's gain on the lit screen (deferred/skyCompositeMainF.glsl)
         BLUE_HORIZON,                       //  "blue_horizon"
         BLUE_DENSITY,                       //  "blue_density"
         HAZE_HORIZON,                       //  "haze_horizon"
@@ -429,11 +429,11 @@ public:
         HDRI_SPLIT_SCREEN,                  //  "hdri_split_screen"
         METER_PARAMS,                       //  "meter_params"          the exposure meter's per-pass parameters
         METER_MAP,                          //  "meterMap"              the exposure meter's grid
+        METER_WATER_MAP,                    //  "meterWaterMap"         the G-buffer's normals under the water, for the meter
         EXPOSURE_HISTOGRAM,                 //  "exposureHistogram"     64x1, per bin (weight, weight * log2 luminance)
 
         // Alchemy-specific uniforms for Sky
         CUSTOM_ALPHA,                       //  "custom_alpha"
-        METEOR_WIDTH_PIXELS,                //  "meteor_width_pixels"
         AURORA_INTENSITY,                   //  "aurora_intensity"
         AURORA_TIME,                        //  "aurora_time"
 
@@ -621,7 +621,7 @@ public:
         WATER_RIM,                          //  "waterRim"  the edge water's outer rectangle relative to the camera
 
         EYE_TO_SKY,                         //  "eyeToSky"  eye space to the sky dome's (north, up, east)
-        SKY_BEHIND_MAP,                     //  "skyBehindMap"  the sky dome behind everything, for the haze pass
+        SKY_DOME_RADIUS,                    //  "skyDomeRadius"  the sky dome's radius, about its frame's origin
 
         // The WindLight atmospherics' terms that only the sky settings set, Environment block members
         // (LLSettingsVOSky::applySpecial, LLEnvironment::packAtmosphericTerms)
@@ -644,6 +644,28 @@ public:
         MOON_QUAD_CENTER,                   //  "moonQuadCenter"  the moon quad's centre direction, for the stars it covers
         MOON_QUAD_U,                        //  "moonQuadU"  its right half-extent over its squared length
         MOON_QUAD_V,                        //  "moonQuadV"  its up half-extent over its squared length
+
+        // The sky's layers along the view ray (deferred/skyBodiesF.glsl), each quad as ALSkyLayers::rayQuad gives it
+        SKY_SUN_MAP,                        //  "skySunMap"  the sun disc's texture
+        SKY_SUN_MAP_NEXT,                   //  "skySunMapNext"  the sun disc's texture the sky blends toward
+        SKY_SUN_BLEND,                      //  "skySunBlend"  how far the sky has blended toward it, 0 for one texture
+        SKY_SUN_QUAD,                       //  "skySunQuad"  vec3[3], the sun's quad: its centre, and its axes over their squared lengths
+        SKY_MOON_MAP,                       //  "skyMoonMap"  the moon's texture
+        SKY_MOON_QUAD,                      //  "skyMoonQuad"  vec3[3], the moon's quad
+        SKY_MOON_FADE,                      //  "skyMoonFade"  the moon's opacity toward the horizon (ALSkyLayers::moonFade)
+        SKY_BLOOM_MAP,                      //  "skyBloomMap"  the sun bloom's texture
+        SKY_BLOOM_MAP_NEXT,                 //  "skyBloomMapNext"  the sun bloom's texture the sky blends toward
+        SKY_BLOOM_BLEND,                    //  "skyBloomBlend"  how far the sky has blended toward it, 0 for one texture
+        SKY_BLOOM_QUAD,                     //  "skyBloomQuad"  vec3[3], the bloom's square (ALSkyLayers::bloomCorners)
+        SKY_BLOOM_COLOR,                    //  "skyBloomColor"  the sun's colour the bloom is tinted by
+        SKY_CLOUD_BLEND,                    //  "skyCloudBlend"  how far the clouds have blended toward the next noise (deferred/skyCloudsF.glsl)
+        SKY_METEOR_DATA,                    //  "skyMeteorData"  vec4[], the meteors' streaks on the screen (ALSkyLayers::packMeteors)
+        SKY_METEOR_COUNT,                   //  "skyMeteorCount"  how many streaks skyMeteorData holds
+        SKY_LAYERS,                         //  "skyLayers"  the layers the sky's composite draws (ALSkyLayers::Layer)
+        SKY_HDRI_MAP,                       //  "skyHdriMap"  the HDRI sky, wrapped about the dome's sphere
+        SKY_HDRI_ROTATION,                  //  "skyHdriRotation"  the HDRI's turn about the vertical (RenderHDRIRotation)
+        SKY_HDRI_SCALE,                     //  "skyHdriScale"  the HDRI's exposure (RenderHDRIExposure)
+        SKY_CUBE_FACE,                      //  "skyCubeFace"  vec3[18], each environment cube face's forward, right and up (ALSkyCube::bake)
 
         // Selection outlines, hover glow and wireframe (ALSelectionOutline)
         SELECTION_ID,                       //  "selection_id"  the object's id, 1 to 65535
