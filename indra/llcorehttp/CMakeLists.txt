@@ -79,7 +79,10 @@ if(AL_BUILD_TESTS)
   # The state guard's checks on what llcorehttp keeps for the process, for
   # every test binary that links it.
   add_library(llcorehttp_test_checks OBJECT tests/llcorehttp_test_checks.cpp)
-  target_link_libraries(llcorehttp_test_checks PRIVATE al::flags al_test_support llcorehttp llmessage)
+  target_link_libraries(
+    llcorehttp_test_checks
+    PRIVATE al::flags al_test_support llcorehttp llmessage
+  )
   set_target_properties(llcorehttp_test_checks PROPERTIES FOLDER "Tests/llcorehttp")
 
   # The suites run under a Python peer that serves the requests they make.
