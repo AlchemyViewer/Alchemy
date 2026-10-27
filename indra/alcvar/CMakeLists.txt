@@ -13,6 +13,7 @@ set(
   alcvarref.cpp
   alcvars.cpp
   alcvarvalue.cpp
+  alcvarxmlimport.cpp
 )
 
 set(
@@ -29,6 +30,7 @@ set(
   alcvars.h
   alcvartype.h
   alcvarvalue.h
+  alcvarxmlimport.h
 )
 
 add_library(alcvar STATIC)
@@ -78,6 +80,7 @@ if(AL_BUILD_TESTS)
       tests/alcvarthreads_test.cpp
       tests/alcvarconvert_test.cpp
       tests/alcvarfile_test.cpp
+      tests/alcvarxmlimport_test.cpp
       tests/alcvarpreview_test.cpp
     LIBRARIES alcvar
     SUPPORT alcvar_test_schema aldb_test_support llcommon_test_checks

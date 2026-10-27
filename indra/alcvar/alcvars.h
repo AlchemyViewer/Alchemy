@@ -166,6 +166,13 @@ public:
     // Replaces the Quality layer: what the feature table gives for the
     // quality level in use. With `dropUser`, the user's values of every
     // setting it names are dropped too, as choosing a level does.
+    //
+    // The first level after a file imported an LLControlGroup's XML -- or the
+    // import itself, where a level is in place already -- settles what the
+    // XML could not say: a value it held that the level gives is the feature
+    // table's, not the user's, and goes; a setting of the file's own scope
+    // the level names that the XML did not hold was at its default, which
+    // LLControlGroup never saves, and the default is kept as the user's.
     void setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bool dropUser);
 
     // The top layer the setting has a value in.
@@ -546,6 +553,10 @@ private:
         std::shared_ptr<Posted>                posted;
         boost::unordered_flat_map<U32, Dirty>  dirty;
         boost::unordered_flat_set<std::string> rows;
+        // The stamp of an import a quality level has yet to settle, 0 for
+        // none, and the settings whose user value is still the import's.
+        S64                                    importPending = 0;
+        boost::unordered_flat_set<U32>         imported;
     };
 
     // A file's rows, resolved into the settings they are now.
@@ -560,8 +571,19 @@ private:
         boost::unordered_flat_set<std::string> rows;
         // Values of settings of the other scope, with when they were written.
         std::vector<std::pair<U32, std::pair<ALCVarValue, S64>>> others;
+        // The settings whose value is the row an import wrote at `stamp`.
+        boost::unordered_flat_set<U32>         imported;
     };
-    Loaded load(const std::vector<ALCVarRow>& rows, const std::vector<ALCVarRow>& prior, ALCVarLayer which) const;
+    Loaded load(const std::vector<ALCVarRow>& rows, const std::vector<ALCVarRow>& prior, ALCVarLayer which,
+                S64 stamp = 0) const;
+    // Under the write lock: settles a scope's pending import against the
+    // Quality layer, adding what it changes to `touched`.
+    void settleImport(ALCVarLayer which, bool dropUser, std::vector<U32>& touched);
+    // Imports an LLControlGroup settings file into a file that has imported
+    // none.
+    void importXml(ALCVarFile& file, const std::string& xml, ALCVarLayer which);
+    // An import's stamp the file's meta records as pending, or 0.
+    static S64 importPending(const boost::unordered_flat_map<std::string, std::string>& meta);
     ALCVarRow rowOf(U32 index, const std::optional<ALCVarValue>& value, S64 modified) const;
     // A file just opened, checked and read: kept, or closed and false. An
     // open account is closed with it.
@@ -659,6 +681,8 @@ private:
     // the global file's values of settings that are now an account's, for
     // each account to take once.
     bool                                                         mAccountOpen      = false;
+    // A quality level has been applied this session.
+    bool                                                         mQualityApplied   = false;
     bool                                                         mAccountConfirmed = false;
     boost::unordered_flat_set<U32>                               mAccountPending;
     boost::unordered_flat_map<U32, std::pair<ALCVarValue, S64>>  mGlobalForAccounts;

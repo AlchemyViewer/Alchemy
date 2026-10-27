@@ -91,6 +91,9 @@ struct ALCVarFileOptions
     bool        mayQuarantine = true;
     // A VFS of SQLite's registry, for the tests.
     std::string vfs;
+    // An LLControlGroup settings file to import, if this file has imported
+    // none before (ALCVarXmlImport).
+    std::string importXml;
     // Told of a failure the file could not get past -- the disk full, the
     // file locked by another process, damage found while writing, a file
     // that may only be read -- for the viewer to say so: on the file's
@@ -148,6 +151,12 @@ public:
     // longer the user's latest.
     bool bringForward(std::vector<ALCVarRow> rows, std::vector<ALCVarRow> prior, std::vector<ALCVarHistory> history,
                       std::vector<std::pair<std::string, std::string>> meta);
+    // Writes rows imported from `source` unless the file records an import
+    // already: the check and the rows in one transaction, so two viewers
+    // starting at once import once, the import recorded as pending at
+    // `stamp` until a quality level settles it. Waits; true when this call
+    // imported.
+    bool importRows(std::vector<ALCVarRow> rows, const std::string& source, S64 stamp);
     // Waits for everything posted before it, for CLOSE_WAIT at most.
     bool flush();
     // Ready once everything posted before it has been written or dropped,

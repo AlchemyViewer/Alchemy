@@ -408,6 +408,48 @@ std::optional<std::vector<ALCVarRow>> ALCVarFile::readPrior()
     return std::move(*rows);
 }
 
+bool ALCVarFile::importRows(std::vector<ALCVarRow> rows, const std::string& source, S64 stamp)
+{
+    auto imported = std::make_shared<bool>(false);
+    const bool written = mDatabase.postAndWait([imported, rows = std::move(rows), source,
+                                                stamp](ALDbConnection& connection) {
+        *imported = false;
+        ALDbStatement check = connection.prepare("SELECT count(*) FROM meta WHERE key = 'imported_xml'");
+        if (!check.step() || check.columnInt(0) != 0)
+        {
+            return;
+        }
+        ALDbStatement insert = connection.prepare(
+            "INSERT OR IGNORE INTO settings(name, type, unit, decl, value, tombstone, modified) "
+            "VALUES (?1, ?2, ?3, ?4, ?5, 0, ?6)");
+        for (const ALCVarRow& row : rows)
+        {
+            insert.bind(1, std::string_view(row.name)).bind(2, row.type);
+            if (row.unit.empty())
+            {
+                insert.bindNull(3);
+            }
+            else
+            {
+                insert.bind(3, std::string_view(row.unit));
+            }
+            insert.bind(4, S64(row.decl));
+            bindValue(insert, 5, row.value);
+            insert.bind(6, row.modified).run();
+            insert.reset();
+        }
+        connection.prepare("INSERT INTO meta(key, value) VALUES ('imported_xml', ?1)")
+            .bind(1, std::string_view(source))
+            .run();
+        connection.prepare("INSERT INTO meta(key, value) VALUES ('import_pending', ?1) "
+                           "ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+            .bind(1, std::string_view(std::to_string(stamp)))
+            .run();
+        *imported = true;
+    });
+    return written && *imported;
+}
+
 bool ALCVarFile::flush()
 {
     return mDatabase.flush();

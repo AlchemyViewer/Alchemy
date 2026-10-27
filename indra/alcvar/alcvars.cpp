@@ -26,6 +26,8 @@
 
 #include "alcvars.h"
 
+#include "alcvarxmlimport.h"
+
 #include "lldate.h"
 #include "llfile.h"
 #include "threadpool.h"
@@ -1069,6 +1071,9 @@ void ALCVars::setQuality(std::span<const std::pair<U32, ALCVarValue>> values, bo
         }
     }
     layer(ALCVarLayer::Quality) = std::move(next);
+    mQualityApplied             = true;
+    settleImport(ALCVarLayer::Global, dropUser, touched);
+    settleImport(ALCVarLayer::Account, dropUser, touched);
     apply(touched, &changes);
     lock.unlock();
     noteChanges(changes);
@@ -1393,7 +1398,7 @@ ALCVarRow ALCVars::rowOf(U32 index, const std::optional<ALCVarValue>& value, S64
 }
 
 ALCVars::Loaded ALCVars::load(const std::vector<ALCVarRow>& rows, const std::vector<ALCVarRow>& prior,
-                              ALCVarLayer which) const
+                              ALCVarLayer which, S64 stamp) const
 {
     Loaded                                                  loaded;
     boost::unordered_flat_map<std::string_view, const ALCVarRow*> byName;
@@ -1543,6 +1548,10 @@ ALCVars::Loaded ALCVars::load(const std::vector<ALCVarRow>& rows, const std::vec
                 {
                     loaded.prior.push_back(*winner);
                 }
+            }
+            if (stamp != 0 && winner && winner->modified == stamp)
+            {
+                loaded.imported.insert(i);
             }
             loaded.values.insert_or_assign(i, std::move(*value));
         }
@@ -1743,7 +1752,9 @@ bool ALCVars::openGlobal(const std::string& path, const ALCVarFileOptions& optio
         file->close();
         return false;
     }
-    const auto rows  = file->readRows();
+    importXml(*file, options.importXml, ALCVarLayer::Global);
+    const auto meta  = file->readMeta();
+    const auto rows  = meta ? file->readRows() : std::nullopt;
     const auto prior = rows ? file->readPrior() : std::nullopt;
     if (!prior)
     {
@@ -1751,13 +1762,15 @@ bool ALCVars::openGlobal(const std::string& path, const ALCVarFileOptions& optio
         file->close();
         return false;
     }
-    Loaded loaded = load(*rows, *prior, ALCVarLayer::Global);
+    const S64 pending = importPending(*meta);
+    Loaded    loaded  = load(*rows, *prior, ALCVarLayer::Global, pending);
 
     std::vector<Change> changes;
     {
         auto             lock = lockWrites();
         std::vector<U32> touched;
-        // A value written before the file opened is newer than the file's.
+        // A value written before the file opened is newer than the file's,
+        // and not the import's.
         for (auto& [index, value] : loaded.values)
         {
             if (!layer(ALCVarLayer::Global).contains(index))
@@ -1765,24 +1778,35 @@ bool ALCVars::openGlobal(const std::string& path, const ALCVarFileOptions& optio
                 layer(ALCVarLayer::Global).insert_or_assign(index, std::move(value));
                 touched.push_back(index);
             }
+            else
+            {
+                loaded.imported.erase(index);
+            }
         }
         mGlobalForAccounts.clear();
         for (auto& [index, value] : loaded.others)
         {
             mGlobalForAccounts.insert_or_assign(index, std::move(value));
         }
-        apply(touched, &changes);
-    }
-    {
-        LLCoros::LockType lock(mPersistMutex);
-        attach(mGlobal, std::move(file));
-        mGlobal.rows = std::move(loaded.rows);
-        if (!mGlobal.readOnly)
         {
-            mGlobal.file->bringForward(std::move(loaded.rewrites), std::move(loaded.prior),
-                                       std::move(loaded.history), {});
+            LLCoros::LockType persist(mPersistMutex);
+            attach(mGlobal, std::move(file));
+            mGlobal.rows          = std::move(loaded.rows);
+            mGlobal.importPending = pending;
+            mGlobal.imported      = std::move(loaded.imported);
+            if (!mGlobal.readOnly)
+            {
+                mGlobal.file->bringForward(std::move(loaded.rewrites), std::move(loaded.prior),
+                                           std::move(loaded.history), {});
+            }
+            startFlusher();
         }
-        startFlusher();
+        // A level in place already settles the import now.
+        if (mQualityApplied)
+        {
+            settleImport(ALCVarLayer::Global, false, touched);
+        }
+        apply(touched, &changes);
     }
     noteChanges(changes);
     return true;
@@ -1798,6 +1822,7 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
     const bool                                                         opened = keepable(*file);
     if (opened)
     {
+        importXml(*file, options.importXml, ALCVarLayer::Account);
         meta = file->readMeta();
         if (meta)
         {
@@ -1822,7 +1847,8 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
         }
         return false;
     }
-    Loaded loaded = load(*rows, *prior, ALCVarLayer::Account);
+    const S64 pending = importPending(*meta);
+    Loaded    loaded  = load(*rows, *prior, ALCVarLayer::Account, pending);
 
     std::shared_ptr<ALCVarFile>                      previous;
     std::vector<std::pair<std::string, std::string>> moved;
@@ -1863,6 +1889,7 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
             {
                 next.erase(index);
             }
+            loaded.imported.erase(index);
         }
         std::vector<U32> touched;
         for (const auto& [index, value] : layer(ALCVarLayer::Account))
@@ -1912,7 +1939,9 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
         writeDirty(mAccount);
         previous = std::move(mAccount.file);
         attach(mAccount, std::move(file));
-        mAccount.rows = std::move(loaded.rows);
+        mAccount.rows          = std::move(loaded.rows);
+        mAccount.importPending = pending;
+        mAccount.imported      = std::move(loaded.imported);
         mAccount.dirty.clear();
         if (!mAccount.readOnly)
         {
@@ -1921,6 +1950,15 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
         }
         startFlusher();
         mFlushWake.notify_one();
+        persist.unlock();
+
+        // A level in place already settles the import now.
+        if (mQualityApplied)
+        {
+            std::vector<U32> settled;
+            settleImport(ALCVarLayer::Account, false, settled);
+            apply(settled, &changes);
+        }
     }
     if (previous)
     {
@@ -1928,6 +1966,94 @@ bool ALCVars::openAccount(const std::string& path, const ALCVarFileOptions& opti
     }
     noteChanges(changes);
     return true;
+}
+
+void ALCVars::importXml(ALCVarFile& file, const std::string& xml, ALCVarLayer which)
+{
+    if (xml.empty())
+    {
+        return;
+    }
+    const auto meta = file.readMeta();
+    if (!meta || meta->contains(ALCVarXmlImport::META_KEY))
+    {
+        return;
+    }
+    std::vector<ALCVarRow>   rows;
+    ALCVarXmlImport::Counts counts;
+    const S64               stamp = nowMs();
+    if (ALCVarXmlImport::read(xml, *this, which, stamp, rows, counts) &&
+        file.importRows(std::move(rows), xml, stamp))
+    {
+        LL_INFOS("ALCVars") << "imported " << xml << " into " << file.path() << ": " << counts.imported
+                            << " values, " << counts.others << " of the other scope's settings, " << counts.unknown
+                            << " of names this build does not know; " << counts.refused
+                            << " that do not convert left out" << LL_ENDL;
+    }
+}
+
+S64 ALCVars::importPending(const boost::unordered_flat_map<std::string, std::string>& meta)
+{
+    const auto found = meta.find(ALCVarXmlImport::PENDING_KEY);
+    if (found == meta.end() || found->second.empty())
+    {
+        return 0;
+    }
+    return S64(std::strtoll(found->second.c_str(), nullptr, 10));
+}
+
+void ALCVars::settleImport(ALCVarLayer which, bool dropUser, std::vector<U32>& touched)
+{
+    Scope&                         scope = which == ALCVarLayer::Account ? mAccount : mGlobal;
+    boost::unordered_flat_set<U32> imported;
+    {
+        LLCoros::LockType persist(mPersistMutex);
+        if (!scope.importPending)
+        {
+            return;
+        }
+        scope.importPending = 0;
+        imported            = std::move(scope.imported);
+        scope.imported.clear();
+        if (scope.file && !scope.readOnly)
+        {
+            scope.file->write({}, {}, { { ALCVarXmlImport::PENDING_KEY, "" } });
+        }
+    }
+    // A level chosen drops the user's values it names, whatever they were.
+    if (dropUser)
+    {
+        return;
+    }
+    const ALCVarScope own  = which == ALCVarLayer::Account ? ALCVarScope::Account : ALCVarScope::Global;
+    const Layer&      user = layer(which);
+    for (const auto& [index, level] : layer(ALCVarLayer::Quality))
+    {
+        const auto held = user.find(index);
+        if (imported.contains(index))
+        {
+            // Saved by LLControlGroup because the feature table had put it
+            // off its default: the table's, which the layer gives again.
+            if (held == user.end() || !(held->second == level))
+            {
+                continue;
+            }
+            putUser(which, index, std::nullopt);
+        }
+        else if (held == user.end() && desc(index).scope == own && !(level == mSettings[index].def))
+        {
+            // At its default, which LLControlGroup never saves: the user's.
+            putUser(which, index, mSettings[index].def);
+        }
+        else
+        {
+            continue;
+        }
+        if (std::find(touched.begin(), touched.end(), index) == touched.end())
+        {
+            touched.push_back(index);
+        }
+    }
 }
 
 void ALCVars::confirmAccount()
