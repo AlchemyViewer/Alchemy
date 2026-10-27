@@ -550,7 +550,7 @@ namespace
             REQUIRE(lamp);
             CHECK(says(said().text, "MasterLinkDiffers"));
             CHECK(said().doc == lamp->id);
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
         }
 
         // Tapple's: Compare did nothing but close the notice. What the world holds, read, is
@@ -589,6 +589,35 @@ namespace
             CHECK(studio->compared.back().doc == lamp->id);
             CHECK(studio->compared.back().left == "default {}\n");
             CHECK(studio->compared.back().right == "default { state_entry() {} }\n");
+        }
+
+        // Tapple's: Update File, the other way: what the world holds put in the file's tab, a step
+        // to undo, the file on disk written only by a save.
+        unit->offer(*lamp, "master_take_world");
+        studio->toLoad(read);
+        {
+            INFO("the file's tab holds the world's text, not saved");
+            CHECK(lamp->editor->wholeText() == "default { state_entry() {} }\n");
+            CHECK(lamp->editor->isDirty());
+            CHECK(says(said().text, "MasterTookWorld"));
+            CHECK_FALSE(said().failure);
+            std::string on_disk;
+            REQUIRE(ALFileRead::whole(in("lamp.lsl"), on_disk, ALDiskIncludes::MAX_BYTES));
+            CHECK(on_disk == "default {}\n");
+        }
+        lamp->editor->undo();
+        {
+            INFO("undone: the file's text again");
+            CHECK(lamp->editor->wholeText() == "default {}\n");
+        }
+        lamp->editor->redo();
+        unit->offer(*lamp, "master_take_world");
+        studio->toLoad(read);
+        {
+            INFO("already the same: said, nothing more to undo");
+            CHECK(says(said().text, "MasterTookSame"));
+            lamp->editor->undo();
+            CHECK(lamp->editor->wholeText() == "default {}\n");
         }
     }
 
@@ -652,7 +681,7 @@ namespace
             REQUIRE(link);
             CHECK(link->stamp == 0);
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
         }
 
         // Write: what was typed in the file first, which the world does not
@@ -674,7 +703,7 @@ namespace
             REQUIRE(link);
             CHECK(link->stamp == 0);
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
         }
         UNSCOPED_INFO("its tab gone");
         REQUIRE_FALSE(services.findDoc(bell_ref));
@@ -783,7 +812,7 @@ namespace
             REQUIRE(said().doc == tab->id);
             CHECK(says(said().text, "MasterGaveWay"));
             CHECK(says(said().text, "MasterLinkDiffers"));
-            CHECK(said().actions == Names{ "master_send", "master_compare" });
+            CHECK(said().actions == Names{ "master_send", "master_take_world", "master_compare" });
             CHECK(tab->master->offerFor == door_ref);
         }
 

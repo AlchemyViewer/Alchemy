@@ -673,7 +673,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterExperienceChosen">From [NAME]'s next save, its script runs under [EXPERIENCE].</floater.string>
     <floater.string name="MasterExperienceCleared">From [NAME]'s next save, its script runs under no experience.</floater.string>
     <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
-    <floater.string name="MasterWorldNotRead">[NAME] could not be read in-world to compare: [WHY]</floater.string>
+    <floater.string name="MasterWorldNotRead">[NAME] could not be read in-world: [WHY]</floater.string>
+    <floater.string name="MasterTookWorld">[FILE] now holds what [NAME] holds in-world, not saved yet: undo takes it back.</floater.string>
+    <floater.string name="MasterTookSame">[FILE] already holds what [NAME] holds in-world.</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
     <floater.string name="LinkHeadMatchingA">Looking on disk for the file of 1 script...</floater.string>
@@ -752,6 +754,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeMasterLinkTip">Link this script to the file it names: from then on it is changed through the file</floater.string>
     <floater.string name="NoticeMasterSend">Send File</floater.string>
     <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
+    <floater.string name="NoticeMasterTakeWorld">Update File</floater.string>
+    <floater.string name="NoticeMasterTakeWorldTip">Put what the script holds in-world in the file's tab, as one step to undo; saving writes the file</floater.string>
     <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
     <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
     <floater.string name="NoticeMasterGiveWay">Switch to File</floater.string>
@@ -766,6 +770,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionMasterLinkTip">Link [NAME] to the file it names</floater.string>
     <floater.string name="ActionMasterSend">Send file</floater.string>
     <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
+    <floater.string name="ActionMasterTakeWorld">Update file</floater.string>
+    <floater.string name="ActionMasterTakeWorldTip">Put what the script holds in-world in [NAME]'s tab</floater.string>
     <floater.string name="ActionMasterCompare">Compare</floater.string>
     <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
     <floater.string name="ActionMasterGiveWay">Switch to file</floater.string>
