@@ -105,6 +105,29 @@ public:
     // llcommon's oversleep bench.
     static constexpr F64 MARGIN_SEED = 0.001;
 
+    // How late a waiter's timed waits woke, and the margin that comes of it:
+    // the 99th percentile of the last SAMPLES of them, from 0 to MARGIN_MAX,
+    // worked out when it is asked for after new waits, and MARGIN_SEED until
+    // there are MIN_SAMPLES. A waiter that never asks never sorts. One thread
+    // notes and asks.
+    class LL_COMMON_API Lateness
+    {
+    public:
+        static constexpr U32 SAMPLES     = 256;
+        static constexpr U32 MIN_SAMPLES = 32;
+
+        // A timed wait woke `ticks` of the counter past its deadline.
+        void note(U64 ticks);
+        F64 margin() const;
+
+    private:
+        U32          mTicks[SAMPLES] = {};
+        U32          mNext   = 0; // where the next goes
+        U32          mCount  = 0; // how many there are, up to SAMPLES
+        mutable F64  mMargin = MARGIN_SEED;
+        mutable bool mStale  = false;
+    };
+
     ALPreciseWaiter();
     ~ALPreciseWaiter();
     ALPreciseWaiter(const ALPreciseWaiter&)            = delete;
@@ -134,9 +157,10 @@ public:
 
     // How long before a deadline a wait that has to end on it stops waiting
     // and spins: the 99th percentile of how late this waiter's recent timed
-    // waits woke, from 0 to MARGIN_MAX. Until it has timed enough of them,
-    // what an idle machine's waits come to.
-    F64 margin() const { return mMargin; }
+    // waits woke, from 0 to MARGIN_MAX (Lateness). Until it has timed enough
+    // of them, what an idle machine's waits come to. From the thread that
+    // waits.
+    F64 margin() const { return mLateness.margin(); }
 
     // Spins until `deadline`, or until `done()` is true, which it asks between
     // pauses: the time it stopped. It keeps its core, never yielding round
@@ -179,14 +203,7 @@ private:
     // yield. `yielded` is when the last yield was.
     static void spinRound(time_point now, time_point deadline, U64& yielded);
 
-    // A timed wait woke `ticks` past its deadline.
-    void noteLateness(U64 ticks);
-
-    // The recent waits' lateness, in ticks.
-    static constexpr U32 LATENESS_SAMPLES = 256;
-    U32 mLateness[LATENESS_SAMPLES] = {};
-    U32 mLatenessCount = 0;
-    F64 mMargin;
+    Lateness mLateness;
 
 #if LL_WINDOWS
     void* mWake  = nullptr; // auto-reset event

@@ -365,30 +365,68 @@ namespace
         }
     }
 
-    TEST_CASE("alprecisewaiter: the margin is the 99th percentile of the recent waits' lateness", "[alprecisewaiter]")
+    TEST_CASE("alprecisewaiter: the margin is the 99th percentile of the recent lateness", "[alprecisewaiter]")
+    {
+        using Lateness = ALPreciseWaiter::Lateness;
+        // Lateness in whole microseconds, as the counter's ticks.
+        const auto us = [](U32 microseconds) { return time_point{ 0 }.plus(F64(microseconds) * 1.0e-6).ticks; };
+        const auto seconds = [](U64 ticks) { return time_point{ ticks }.since(time_point{ 0 }); };
+
+        Lateness lateness;
+        CHECK(lateness.margin() == ALPreciseWaiter::MARGIN_SEED);
+        for (U32 i = 1; i < Lateness::MIN_SAMPLES; ++i)
+        {
+            lateness.note(us(i));
+        }
+        // Too few to say yet.
+        CHECK(lateness.margin() == ALPreciseWaiter::MARGIN_SEED);
+        lateness.note(us(Lateness::MIN_SAMPLES));
+        // 1 to 32 us: the ceiling of 99% of 32 is the 32nd.
+        CHECK(lateness.margin() == seconds(us(32)));
+        // Each wait counts from the next ask on, not every so many waits.
+        lateness.note(us(1500));
+        CHECK(lateness.margin() == seconds(us(1500)));
+
+        // A full window of 0 to 255 us, after waits a second late that it has let go of: the 254th of the 256.
+        for (U32 i = 0; i < 40; ++i)
+        {
+            lateness.note(us(1000000));
+        }
+        for (U32 i = 0; i < Lateness::SAMPLES; ++i)
+        {
+            lateness.note(us((i * 37) % Lateness::SAMPLES));
+        }
+        CHECK(lateness.margin() == seconds(us(253)));
+
+        // No more than MARGIN_MAX, however late, and past what a sample holds.
+        for (U32 i = 0; i < Lateness::SAMPLES; ++i)
+        {
+            lateness.note(i % 2 ? us(5000) : (std::numeric_limits<U64>::max)());
+        }
+        CHECK(lateness.margin() == ALPreciseWaiter::MARGIN_MAX);
+        for (U32 i = 0; i < Lateness::SAMPLES; ++i)
+        {
+            lateness.note(0);
+        }
+        CHECK(lateness.margin() == 0.0);
+    }
+
+    TEST_CASE("alprecisewaiter: a waiter's margin comes from its own timed waits", "[alprecisewaiter]")
     {
         ALPreciseWaiter waiter;
         CHECK(waiter.margin() == ALPreciseWaiter::MARGIN_SEED);
 
-        // As many waits as the waiter keeps and then some, each one's lateness as the clock it returns shows it.
-        std::vector<F64> late;
+        // Each wait's lateness as the clock it returns shows it. A wait whose deadline passed before it could look
+        // notes nothing, so the margin is of some of these, which bounds it by the latest of all of them.
+        F64 latest = 0.0;
         for (int i = 0; i < 320; ++i)
         {
             const time_point deadline = time_point::after(0.0005);
-            late.push_back(waiter.waitUntil(deadline).since(deadline));
+            latest = (std::max)(latest, waiter.waitUntil(deadline).since(deadline));
         }
-        // The waiter's are the last 256. One whose deadline passed before it could wait notes nothing, which the
-        // bounds allow for: no lower than the 97th percentile, and no higher than the latest.
-        std::vector<F64> recent(late.end() - 256, late.end());
-        std::sort(recent.begin(), recent.end());
-        const F64 p97 = (std::min)(recent[248], ALPreciseWaiter::MARGIN_MAX);
-        const F64 top = (std::min)(recent.back(), ALPreciseWaiter::MARGIN_MAX);
-        INFO("lateness: median " << recent[128] * 1000.0 << " ms, p97 " << recent[248] * 1000.0 << " ms, max "
-             << recent.back() * 1000.0 << " ms; margin " << waiter.margin() * 1000.0 << " ms");
-        CHECK(waiter.margin() >= p97 - 1.0e-9);
-        CHECK(waiter.margin() <= top + 1.0e-9);
+        INFO("latest " << latest * 1000.0 << " ms; margin " << waiter.margin() * 1000.0 << " ms");
+        CHECK(waiter.margin() <= (std::min)(latest, ALPreciseWaiter::MARGIN_MAX));
         CHECK(waiter.margin() >= 0.0);
-        CHECK(waiter.margin() <= ALPreciseWaiter::MARGIN_MAX);
     }
 
 #if LL_WINDOWS

@@ -57,11 +57,6 @@
 
 namespace
 {
-    // The timed waits a waiter notes before its own lateness sets margin(), and how often after that it works margin()
-    // out again.
-    constexpr U32 MARGIN_MIN_SAMPLES = 32;
-    constexpr U32 MARGIN_EVERY       = 16;
-
     // A spin yields only while more than the longest margin is left of it, so that the spin at the end of a wait never
     // does, and no more often than this.
     constexpr F64 SPIN_YIELD_LEFT  = ALPreciseWaiter::MARGIN_MAX;
@@ -231,28 +226,33 @@ void ALPreciseWaiter::spinRound(time_point now, time_point deadline, U64& yielde
     alsimd::pause();
 }
 
-void ALPreciseWaiter::noteLateness(U64 ticks)
+void ALPreciseWaiter::Lateness::note(U64 ticks)
 {
-    mLateness[mLatenessCount % LATENESS_SAMPLES] = U32((std::min)(ticks, U64((std::numeric_limits<U32>::max)())));
-    ++mLatenessCount;
-    if (mLatenessCount < MARGIN_MIN_SAMPLES || mLatenessCount % MARGIN_EVERY != 0)
+    mTicks[mNext] = U32((std::min)(ticks, U64((std::numeric_limits<U32>::max)())));
+    mNext         = (mNext + 1) % SAMPLES;
+    mCount        = (std::min)(mCount + 1, SAMPLES);
+    mStale        = true;
+}
+
+F64 ALPreciseWaiter::Lateness::margin() const
+{
+    if (mStale && mCount >= MIN_SAMPLES)
     {
-        return;
+        U32 sorted[SAMPLES];
+        std::copy_n(mTicks, mCount, sorted);
+        // The ceiling of 99% of the count, as an index.
+        const U32 p99 = (mCount * 99 + 99) / 100 - 1;
+        std::nth_element(sorted, sorted + p99, sorted + mCount);
+        mMargin = std::clamp(F64(sorted[p99]) / ticksPerSecond(), 0.0, MARGIN_MAX);
+        mStale  = false;
     }
-    const U32 count = (std::min)(mLatenessCount, LATENESS_SAMPLES);
-    U32 sorted[LATENESS_SAMPLES];
-    std::copy_n(mLateness, count, sorted);
-    // The ceiling of 99% of the count, as an index.
-    const U32 p99 = (count * 99 + 99) / 100 - 1;
-    std::nth_element(sorted, sorted + p99, sorted + count);
-    mMargin = std::clamp(F64(sorted[p99]) / ticksPerSecond(), 0.0, MARGIN_MAX);
+    return mMargin;
 }
 
 #if LL_WINDOWS
 
 ALPreciseWaiter::ALPreciseWaiter()
-:   mMargin(MARGIN_SEED),
-    mWake(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
+:   mWake(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
     mTimer(makeTimer())
 {
 }
@@ -295,7 +295,7 @@ ALPreciseWaiter::time_point ALPreciseWaiter::waitUntil(time_point deadline)
         {
             if (timed)
             {
-                noteLateness(now - deadline.ticks);
+                mLateness.note(now - deadline.ticks);
             }
             return { now };
         }
@@ -359,8 +359,7 @@ ALPreciseWaiter::time_point ALPreciseWaiter::sleepUntil(time_point deadline)
 #elif LL_LINUX
 
 ALPreciseWaiter::ALPreciseWaiter()
-:   mMargin(MARGIN_SEED),
-    mWake(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)),
+:   mWake(eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK)),
     mTimer(timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK))
 {
 }
@@ -407,7 +406,7 @@ ALPreciseWaiter::time_point ALPreciseWaiter::waitUntil(time_point deadline)
         {
             if (timed)
             {
-                noteLateness(now - deadline.ticks);
+                mLateness.note(now - deadline.ticks);
             }
             return { now };
         }
@@ -485,8 +484,7 @@ ALPreciseWaiter::time_point ALPreciseWaiter::sleepUntil(time_point deadline)
 #elif LL_DARWIN
 
 ALPreciseWaiter::ALPreciseWaiter()
-:   mMargin(MARGIN_SEED),
-    mQueue(kqueue())
+:   mQueue(kqueue())
 {
     if (mQueue >= 0)
     {
@@ -540,7 +538,7 @@ ALPreciseWaiter::time_point ALPreciseWaiter::waitUntil(time_point deadline)
         {
             if (timed)
             {
-                noteLateness(now - deadline.ticks);
+                mLateness.note(now - deadline.ticks);
             }
             return { now };
         }
