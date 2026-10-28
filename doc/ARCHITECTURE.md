@@ -5,6 +5,7 @@
 - **llmath** - Math primitives: vectors, matrices, quaternions, bounding boxes. Also includes meshoptimizer
 
 **Data/IO layer:**
+- **aldb** - SQLite files (`ALDatabase`): each file's writes are jobs a thread of its own commits together, each in a savepoint, so a job that fails is dropped alone and a failure that may pass is tried again; a profile by what losing the last writes would cost (Durable, Journal, Regenerable), tables made by migrations on `user_version`, a check after a crash that moves a damaged file aside and salvages it, and reads on a pool of read-only connections. `ALDbConnection` caches statements and reads a file from someone else with SQLite's defensive settings and limits. Depends on llcommon
 - **llfilesystem** - Virtual filesystem and asset cache
 - **llxml** - XML parsing utilities (depends on llfilesystem)
 - **llimage** - Image decoding/encoding (JPEG, PNG, TGA, J2C via OpenJPEG or KDU)

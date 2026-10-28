@@ -147,6 +147,13 @@
     "simdjson",
     "simdutf",
     "slua",
+    {
+      "name": "sqlite3",
+      "features": [
+        "fts5",
+        "omit-load-extension"
+      ]
+    },
     "tinyexr",
     "tinygltf",
     "v-hacd",
