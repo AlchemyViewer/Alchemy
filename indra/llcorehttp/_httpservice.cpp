@@ -321,8 +321,9 @@ void HttpService::threadRun(LLCoreInt::HttpThread * thread)
 
             // Determine whether to go round at once, wait on the
             // transfers until the policy's next deadline, or sleep
-            // for next request
-            if (NORMAL == loop)
+            // for next request.  A stop staged this pass ends the
+            // loop now: nothing would wake the wait for it.
+            if (NORMAL == loop && ! mExitRequested)
             {
                 long timeout_ms(HTTP_SERVICE_LOOP_WAIT_MAX_MS);
                 const HttpTime wake_at(mPolicy->getWakeAt());

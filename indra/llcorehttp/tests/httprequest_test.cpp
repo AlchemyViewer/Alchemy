@@ -1426,6 +1426,84 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
 }
 
 
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a stop request ends the worker without waiting on a held GET", "[HttpRequest_Tests]")
+{
+    ScopedCurlInit ready;
+
+    // The stop is staged in the middle of a pass, on the worker itself,
+    // with nothing to wake a wait on the held GET's socket.  The worker
+    // should end that pass and stop, not wait out its longest wait first.
+    HoldingPort holding;
+    REQUIRE(holding.isListening());
+    TestHandler2 handler(this, "handler");
+    LLCore::HttpHandler::ptr_t handlerp(&handler, NoOpDeletor);
+    mHandlerCalls = 0;
+
+    HttpRequest * req = NULL;
+    HttpOptions::ptr_t opts;
+
+    try
+    {
+        HttpRequest::createService();
+        HttpRequest::startThread();
+        req = new HttpRequest();
+
+        opts = HttpOptions::ptr_t(new HttpOptions);
+        opts->setRetries(0);
+        opts->setTimeout(10);
+
+        HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
+                                                     holding.url(),
+                                                     0,
+                                                     0,
+                                                     opts,
+                                                     HttpHeaders::ptr_t(),
+                                                     handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        // Long enough for the GET to be sent and held
+        LLTimer settle;
+        while (settle.getElapsedTimeF64() < 0.3)
+        {
+            req->update(0);
+            ms_sleep(10);
+        }
+        REQUIRE(mHandlerCalls == 0);
+
+        // Stopping cancels the held GET
+        mStatus = HttpStatus(HttpStatus::LLCORE, HE_OP_CANCELED);
+        LLTimer stopping;
+        handle = req->requestStopThread(LLCore::HttpHandler::ptr_t());
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+        while (! HttpService::isStopped() && stopping.getElapsedTimeF64() < 5.0)
+        {
+            LLThread::yield();
+        }
+        const F64 stopped_after(stopping.getElapsedTimeF64());
+        CAPTURE(stopped_after);
+        CHECK(HttpService::isStopped());
+        // Waiting first takes the longest wait, 100 ms; stopping at once,
+        // a fraction of a millisecond
+        CHECK(stopped_after < 0.08);
+
+        req->update(0);
+        CHECK(mHandlerCalls == 1);
+
+        opts.reset();
+        delete req;
+        req = NULL;
+        HttpRequest::destroyService();
+    }
+    catch (...)
+    {
+        stop_thread(req);
+        opts.reset();
+        delete req;
+        HttpRequest::destroyService();
+        throw;
+    }
+}
+
 TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a held GET and answers NoOps queued meanwhile", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
