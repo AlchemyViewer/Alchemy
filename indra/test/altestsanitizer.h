@@ -65,6 +65,22 @@ namespace ll_test
 #else
     inline constexpr bool SANITIZER_ALLOCATOR = false;
 #endif
+
+    // Whether every memory access goes through a sanitizer's checks, as
+    // AddressSanitizer's and ThreadSanitizer's do: a run several times slower,
+    // which CI runs beside other such tests, so a case that times something
+    // against the wall clock passes its bound over under it.
+#if defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
+    inline constexpr bool SLOW_SANITIZER = true;
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer) || __has_feature(thread_sanitizer)
+    inline constexpr bool SLOW_SANITIZER = true;
+#else
+    inline constexpr bool SLOW_SANITIZER = false;
+#endif
+#else
+    inline constexpr bool SLOW_SANITIZER = false;
+#endif
 }
 
 #endif // AL_ALTESTSANITIZER_H

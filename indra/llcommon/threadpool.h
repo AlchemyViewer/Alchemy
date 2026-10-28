@@ -59,6 +59,18 @@ namespace LL
          */
         void close();
 
+        /**
+         * abandon() lets a pool go whose threads may not finish soon -- one
+         * stuck in a call that does not return, on a disk that does not
+         * answer -- where close() and destroying it would wait for them. It
+         * closes the queue and stops listening for the viewer's shutdown;
+         * then, if every thread has finished, it destroys the pool at once,
+         * and otherwise the pool is its threads', and the last of them to
+         * finish destroys it, touching nothing of it after. Call it in place
+         * of destroying the pool, on the thread that would have.
+         */
+        static void abandon(std::unique_ptr<ThreadPoolBase> pool);
+
         std::string getName() const { return mName; }
         size_t getWidth() const { return mThreads.size(); }
 
@@ -95,10 +107,20 @@ namespace LL
         bool mAutomaticShutdown;
 
     private:
+        // What a pool's threads share with it, and keep once it is gone: a
+        // pool's own run() may destroy it, as the Win32 window's does.
+        struct RunState;
+
         void run(const std::string& name);
+        // Each thread's last call, which touches nothing of the pool but
+        // what abandon() left it to destroy.
+        static void threadDone(const std::shared_ptr<RunState>& state);
+        void stopListening();
 
         std::string mName;
         size_t mThreadCount;
+        std::shared_ptr<RunState> mRunState;
+        bool mListening = false;
     };
 
     /**

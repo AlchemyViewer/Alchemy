@@ -18,11 +18,13 @@
 // external library headers
 // other Linden headers
 #include "commoncontrol.h"
+#include "llcoros.h"
 #include "llerror.h"
 #include "llevents.h"
 #include "llsd.h"
 #include "stringize.h"
 
+#include LLCOROS_MUTEX_HEADER
 #include <boost/fiber/algo/round_robin.hpp>
 
 #include <algorithm>
@@ -141,6 +143,15 @@ private:
 /*****************************************************************************
 *   ThreadPoolBase
 *****************************************************************************/
+struct LL::ThreadPoolBase::RunState
+{
+    LLCoros::Mutex mMutex;
+    // The threads started and not yet done.
+    size_t mRunning = 0;
+    // Set by abandon(): the pool, for the last of them to destroy.
+    ThreadPoolBase* mOrphan = nullptr;
+};
+
 LL::ThreadPoolBase::ThreadPoolBase(const std::string& name,
                                    size_t threads,
                                    WorkQueueBase* queue,
@@ -150,7 +161,8 @@ LL::ThreadPoolBase::ThreadPoolBase(const std::string& name,
     mName("ThreadPool:" + name),
     mThreadCount(fixed_width ? threads : getConfiguredWidth(name, threads)),
     mQueue(queue),
-    mAutomaticShutdown(auto_shutdown)
+    mAutomaticShutdown(auto_shutdown),
+    mRunState(std::make_shared<RunState>())
 {}
 
 void LL::ThreadPoolBase::start()
@@ -172,15 +184,32 @@ void LL::ThreadPoolBase::start()
         std::string os_name{ mThreadCount > 1 ? stringize(':', (i+1)) : std::string() };
         os_name.insert(0, getKey().substr(0, OS_NAME_MAX - os_name.size()));
 #endif
-        mThreads.emplace_back(tname, [this, tname, os_name]()
-            {
-                // Tracy names the OS thread too, cut to the same fifteen
-                // bytes, so it goes first and the short name is the one left
-                LL_PROFILER_SET_THREAD_NAME(tname.c_str());
-                set_thread_name(os_name.c_str());
-                set_thread_fp_mode();
-                run(tname);
-            });
+        // Counted before it starts, so that it cannot be done before it is
+        // counted, and not counted if it never starts.
+        {
+            LLCoros::LockType lock(mRunState->mMutex);
+            ++mRunState->mRunning;
+        }
+        try
+        {
+            mThreads.emplace_back(tname, [this, tname, os_name, state = mRunState]()
+                {
+                    // Tracy names the OS thread too, cut to the same fifteen
+                    // bytes, so it goes first and the short name is the one left
+                    LL_PROFILER_SET_THREAD_NAME(tname.c_str());
+                    set_thread_name(os_name.c_str());
+                    set_thread_fp_mode();
+                    run(tname);
+                    // The pool may be gone by now.
+                    threadDone(state);
+                });
+        }
+        catch (...)
+        {
+            LLCoros::LockType lock(mRunState->mMutex);
+            --mRunState->mRunning;
+            throw;
+        }
     }
 
     if (!mAutomaticShutdown)
@@ -192,6 +221,7 @@ void LL::ThreadPoolBase::start()
 
     // Listen on "LLApp", and when the app is shutting down, close the queue
     // and join the workers.
+    mListening = true;
     LLEventPumps::instance().obtain("LLApp").listen(
         mName,
         [this](const LLSD& stat)
@@ -210,10 +240,69 @@ void LL::ThreadPoolBase::start()
 LL::ThreadPoolBase::~ThreadPoolBase()
 {
     close();
-    if (!LLEventPumps::wasDeleted())
+    stopListening();
+}
+
+void LL::ThreadPoolBase::stopListening()
+{
+    if (mListening && !LLEventPumps::wasDeleted())
     {
         LLEventPumps::instance().obtain("LLApp").stopListening(mName);
     }
+    mListening = false;
+}
+
+void LL::ThreadPoolBase::abandon(std::unique_ptr<ThreadPoolBase> pool)
+{
+    if (!pool)
+    {
+        return;
+    }
+    pool->mQueue->close();
+    // Here, not on the pool's last thread: the event pumps are the main
+    // thread's.
+    pool->stopListening();
+    {
+        // The state outlives the pool, which its last thread may destroy as
+        // soon as this lets go of the lock.
+        const std::shared_ptr<RunState> state = pool->mRunState;
+        LLCoros::LockType               lock(state->mMutex);
+        if (state->mRunning > 0)
+        {
+            LL_DEBUGS("ThreadPool") << pool->mName << " abandoned to its threads" << LL_ENDL;
+            for (auto& pair: pool->mThreads)
+            {
+                pair.second.detach();
+            }
+            state->mOrphan = pool.release();
+            return;
+        }
+    }
+    // Every thread has finished. close() joins only while the queue is
+    // open, so they are joined here, and the pool destroyed as it would
+    // have been.
+    for (auto& pair: pool->mThreads)
+    {
+        if (pair.second.joinable())
+        {
+            pair.second.join();
+        }
+    }
+}
+
+//static
+void LL::ThreadPoolBase::threadDone(const std::shared_ptr<RunState>& state)
+{
+    ThreadPoolBase* orphan = nullptr;
+    {
+        LLCoros::LockType lock(state->mMutex);
+        if (--state->mRunning == 0)
+        {
+            orphan = state->mOrphan;
+        }
+    }
+    // An abandoned pool's threads were let go, so none is joined.
+    delete orphan;
 }
 
 void LL::ThreadPoolBase::close()
