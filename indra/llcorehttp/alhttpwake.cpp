@@ -183,8 +183,6 @@ void ALHttpWake::drain()
     {
         return;
     }
-    // Cleared before reading, so that a signal from here on writes again.
-    mSignalled = false;
     char bytes[64];
 #if LL_WINDOWS
     while (recv(mReader, bytes, sizeof(bytes), 0) > 0)
@@ -201,6 +199,12 @@ void ALHttpWake::drain()
         break;
     }
 #endif
+    // Cleared only once the reading end is empty: a signal between a clear
+    // and the read would write a byte the read takes, leaving the flag set
+    // with nothing to read, and no later signal would write again. A signal
+    // while the flag is still set writes nothing; the request it was for was
+    // queued before it, for the worker's next pass to find.
+    mSignalled = false;
 }
 
 }  // end namespace LLCore

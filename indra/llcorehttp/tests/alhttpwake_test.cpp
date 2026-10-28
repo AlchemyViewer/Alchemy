@@ -27,10 +27,14 @@
 #include "alhttpwake.h"
 #include "_httpoperation.h"
 #include "_httprequestqueue.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <curl/curl.h>
+
+#include <atomic>
+#include <future>
 
 #if ! LL_WINDOWS
 #include <poll.h>
@@ -77,6 +81,12 @@ namespace
             opened = wake.open();
         }
 
+        ~WakeFixture()
+        {
+            wake.close();
+            curl_global_cleanup();
+        }
+
         ALHttpWake wake;
         bool       opened = false;
     };
@@ -105,6 +115,40 @@ namespace
         wake.signal();
         REQUIRE(readable(wake, 5000));
         CHECK(waiting(wake) == 1);
+    }
+
+    TEST_CASE_METHOD(WakeFixture, "alhttpwake: a signal racing a drain is never lost", "[alhttpwake]")
+    {
+        // Another thread signals as fast as it can while this one drains
+        // whenever the wake is readable. A signal that lands inside a drain
+        // must not leave the wake marked signalled with nothing to read:
+        // then no later signal would make it readable again.
+        REQUIRE(opened);
+        std::atomic<bool> stop{ false };
+        auto signaller = std::async(std::launch::async, [&]()
+            {
+                while (! stop.load())
+                {
+                    wake.signal();
+                }
+            });
+        LLTimer racing;
+        while (racing.getElapsedTimeF64() < 1.0)
+        {
+            if (readable(wake, 0))
+            {
+                wake.drain();
+            }
+        }
+        stop = true;
+        signaller.get();
+
+        if (readable(wake, 100))
+        {
+            wake.drain();
+        }
+        wake.signal();
+        CHECK(readable(wake, 5000));
     }
 
     TEST_CASE_METHOD(WakeFixture, "alhttpwake: a closed wake signals nothing and can be opened again", "[alhttpwake]")

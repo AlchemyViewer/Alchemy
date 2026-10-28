@@ -71,8 +71,8 @@ public:
     void signal();
 
     // Empties the reading end, so that the next poll waits again. The
-    // polling thread only. A signal() racing it at worst leaves a byte for
-    // the next poll to wake on at once.
+    // polling thread only, and only before it looks for the work the
+    // signals were for: a signal() racing it writes nothing.
     void drain();
 
 private:
