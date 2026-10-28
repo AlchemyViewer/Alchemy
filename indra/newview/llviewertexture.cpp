@@ -940,6 +940,9 @@ void LLViewerTexture::resetTextureStats()
 {
     mMaxVirtualSize = 0.0f;
     mMaxVirtualSizeResetCounter = 0;
+    // The sliced face walk's carried maxima would put the old sizes back on its next visit.
+    mFaceWalkMax = 0.f;
+    mFaceWalkRotationMax = 0.f;
 }
 
 //virtual
