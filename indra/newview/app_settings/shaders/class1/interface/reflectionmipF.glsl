@@ -29,8 +29,16 @@ uniform sampler2D diffuseRect;
 
 in vec2 vary_texcoord0;
 
+// deferred/deferredUtil.glsl
+vec3 clampRadiance(vec3 c, float ceiling);
+
 void main()
 {
     vec3 col = texture(diffuseRect, vary_texcoord0.xy).rgb;
+    // Every mip of a probe, and its radiance and irradiance, are made from these, and each coarser
+    // mip spreads a texel wider, so one NaN or infinity captured into a face would reach the whole
+    // probe. A NaN goes to zero and the rest to R11F_G11F_B10F's largest finite value, which holds
+    // an infinity as one.
+    col = clampRadiance(col, 65024.0);
     frag_color = vec4(col, 0.0);
 }

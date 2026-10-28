@@ -558,6 +558,14 @@ vec3 evalSHIrradiance(vec3 n, int layer)
 // i - index of probe
 vec3 probeIrradiance(int i, vec3 pos, vec3 box_pos, vec3 dir, vec3 amblit, bool water)
 {
+    // A scale of zero, which the irradiance half of a probe capture gives every probe, is the sky's
+    // ambient alone. Mixed in at weight 0 the probe's irradiance would still reach it as a NaN were
+    // it infinite, and its four fetches would be spent for nothing.
+    if (refParams[i].x <= 0.0)
+    {
+        return amblit;
+    }
+
     // pad the box for a manual probe extending into automatic probe space
     vec3 v = probeSampleDir(i, pos, box_pos, dir, 3.0, water);
 
