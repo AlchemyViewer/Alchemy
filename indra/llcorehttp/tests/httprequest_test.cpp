@@ -1426,7 +1426,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
 }
 
 
-TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a held GET and a NoOp queued meanwhile ends the wait", "[HttpRequest_Tests]")
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a held GET and answers NoOps queued meanwhile", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;
 
@@ -1434,8 +1434,9 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a 
     // seconds.  All that while the transfer has nothing to do, so the worker
     // should be waiting on its socket, libcurl's timeout and its request
     // queue, not coming round every couple of milliseconds to ask libcurl
-    // whether anything happened.  A request queued meanwhile ends the wait,
-    // and is answered at once rather than when the wait would have ended.
+    // whether anything happened.  Requests queued meanwhile are still
+    // answered; that one ends the wait at once is alhttpwake_test's to
+    // check, since a wait's bound would answer it here too.
     HoldingPort holding;
     REQUIRE(holding.isListening());
     TestHandler2 get_handler(this, "get handler");
@@ -1472,8 +1473,7 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a 
                                                      get_handlerp);
         REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
 
-        // Five NoOps while the GET is held, a quarter second apart, each
-        // answered well inside the worker's longest wait
+        // Five NoOps while the GET is held, a quarter second apart
         for (int i(0); i < 5; ++i)
         {
             while (held.getElapsedTimeF64() < 0.25 * (i + 1))
@@ -1493,7 +1493,6 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a 
                 LLThread::yield();
             }
             CHECK(noop_state.mHandlerCalls == answered + 1);
-            CHECK(noop.getElapsedTimeF64() < 0.05);
         }
 
         // Run the notification pump until the GET gives up
