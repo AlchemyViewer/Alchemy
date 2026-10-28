@@ -56,6 +56,7 @@ elseif(WINDOWS)
     ll::oslibraries
     INTERFACE
       advapi32
+      bcrypt
       shlwapi
       shell32
       wbemuuid
