@@ -134,7 +134,9 @@ namespace
     }
 
     // The plain sleep's timer: one for each thread that sleeps, made at its first sleep and closed with the thread,
-    // since a handle belongs to the process and would outlive it.
+    // since a handle belongs to the process and would outlive it. Closed, it forgets the handle: a sleep later in
+    // the thread's end, from a destructor that runs after this one, takes the fallback rather than arming a handle
+    // the system may since have given to something else.
     struct SleepTimer
     {
         HANDLE mHandle = makeTimer();
@@ -144,6 +146,7 @@ namespace
             if (mHandle)
             {
                 CloseHandle(mHandle);
+                mHandle = nullptr;
             }
         }
     };
@@ -259,10 +262,12 @@ ALPreciseWaiter::~ALPreciseWaiter()
     if (mTimer)
     {
         CloseHandle(mTimer);
+        mTimer = nullptr;
     }
     if (mWake)
     {
         CloseHandle(mWake);
+        mWake = nullptr;
     }
 }
 
@@ -365,10 +370,12 @@ ALPreciseWaiter::~ALPreciseWaiter()
     if (mTimer >= 0)
     {
         close(mTimer);
+        mTimer = -1;
     }
     if (mWake >= 0)
     {
         close(mWake);
+        mWake = -1;
     }
 }
 
@@ -498,6 +505,7 @@ ALPreciseWaiter::~ALPreciseWaiter()
     if (mQueue >= 0)
     {
         close(mQueue);
+        mQueue = -1;
     }
 }
 
