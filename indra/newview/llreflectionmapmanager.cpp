@@ -1977,6 +1977,9 @@ void LLReflectionMapManager::doOcclusion()
             continue;
         }
 
+        // Back in view, the scheduler takes it again: the query clears occlusion only with the camera inside the
+        // probe, so a probe the view came back to from outside would otherwise be passed over for good.
+        probe->mOutOfView = false;
         probe->doOcclusion(eye);
     }
 }
