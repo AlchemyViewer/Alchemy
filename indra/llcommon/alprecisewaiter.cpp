@@ -28,6 +28,7 @@
 #include "alprecisewaiter.h"
 
 #include "alsimd.h"
+#include "llthread.h"
 #include "lltimer.h"
 
 #include <algorithm>
@@ -43,7 +44,6 @@
 #   include <cerrno>
 #   include <climits>
 #   include <ctime>
-#   include <sched.h>
 #   include <unistd.h>
 #   if LL_LINUX
 #       include <poll.h>
@@ -76,15 +76,6 @@ namespace
     U64 ticksIn(F64 seconds)
     {
         return U64(std::ceil(seconds * ticksPerSecond()));
-    }
-
-    void yieldCore()
-    {
-#if LL_WINDOWS
-        SwitchToThread();
-#else
-        sched_yield();
-#endif
     }
 
 #if LL_WINDOWS
@@ -220,7 +211,7 @@ void ALPreciseWaiter::spinRound(time_point now, time_point deadline, U64& yielde
     if (deadline.ticks - now.ticks > yield_left && now.ticks - yielded > yield_every)
     {
         yielded = now.ticks;
-        yieldCore();
+        LLThread::yield();
         return;
     }
     alsimd::pause();

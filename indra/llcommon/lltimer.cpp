@@ -29,6 +29,7 @@
 #include "lltimer.h"
 
 #include "alprecisewaiter.h"
+#include "llthread.h"
 #include "u64.h"
 
 #include <chrono>
@@ -36,7 +37,6 @@
 #if LL_WINDOWS
 #   include "llwin32headers.h"
 #elif LL_LINUX || LL_DARWIN
-#   include <sched.h>
 #   include <time.h>
 #   if LL_DARWIN
 #       include <mach/mach_time.h>
@@ -67,30 +67,17 @@ LLTimer* LLTimer::sTimer = NULL;
 // Implementation
 //---------------------------------------------------------------------------
 
-namespace
-{
-    // What a sleep of nothing does: gives the rest of the thread's slice to
-    // any thread that is ready, which a caller asking for 0 ms counts on.
-    void yield_slice()
-    {
-#if LL_WINDOWS
-        Sleep(0);
-#else
-        sched_yield();
-#endif
-    }
-}
-
 // Both sleep to a deadline on the native counter, on the high-resolution
 // timer where the system has one (ALPreciseWaiter::sleepFor()): the system
 // timer's tick does not round them, and a signal that cuts one short loses
-// nothing when it sleeps again.
+// nothing when it sleeps again. A sleep of nothing is a yield, which a caller
+// asking for 0 ms counts on.
 void micro_sleep(U64 us)
 {
     LL_PROFILE_ZONE_SCOPED;
     if (us == 0)
     {
-        yield_slice();
+        LLThread::yield();
         return;
     }
     ALPreciseWaiter::sleepFor(F64(us) * 1.0e-6);
@@ -101,7 +88,7 @@ void ms_sleep(U32 ms)
     LL_PROFILE_ZONE_SCOPED;
     if (ms == 0)
     {
-        yield_slice();
+        LLThread::yield();
         return;
     }
     ALPreciseWaiter::sleepFor(F64(ms) * 1.0e-3);
