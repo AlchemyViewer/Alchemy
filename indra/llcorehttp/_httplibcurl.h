@@ -232,6 +232,7 @@ protected:
     int *               mActiveHandles;     // Active count per policy class
     bool *              mDirtyPolicy;       // Dirty policy update waiting for stall (per pc)
     std::vector<pollfd> mPollFds;           // The wait's sockets, kept to reuse their storage
+    int                 mZeroWaits;         // Waits in a row asked not to wait at all
 
 }; // end class HttpLibcurl
 

@@ -65,7 +65,8 @@ HttpLibcurl::HttpLibcurl(HttpService * service)
       mPolicyCount(0),
       mMultiHandles(NULL),
       mActiveHandles(NULL),
-      mDirtyPolicy(NULL)
+      mDirtyPolicy(NULL),
+      mZeroWaits(0)
 {}
 
 
@@ -293,8 +294,16 @@ void HttpLibcurl::wait(long timeout_ms, ALHttpWake & wake)
     }
     if (timeout_ms <= 0)
     {
-        return;
+        // libcurl or the policy wants another pass at once.  A second
+        // such pass in a row waits a millisecond, so that a timer that
+        // never clears cannot spin the worker.
+        if (++mZeroWaits < 2)
+        {
+            return;
+        }
+        timeout_ms = 1;
     }
+    mZeroWaits = 0;
     if (wake.isOpen())
     {
         pollfd wake_fd = {};
