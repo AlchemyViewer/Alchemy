@@ -46,7 +46,10 @@
 // A durable write is forced out to the disk before it is put in place, so
 // that the power going leaves the old text or the new rather than a file
 // of nothing; and it is never written in place, where it could be caught
-// half written. What the viewer keeps against a crash is written so.
+// half written. A program on Windows holding the file is waited for
+// instead, half a second at most, since a virus scanner opens what was
+// just written for a moment. What the viewer keeps against a crash is
+// written so.
 namespace ALFileWrite
 {
     // False, and the file as it was, where it could not be written.

@@ -35,7 +35,11 @@
 #include <fstream>
 
 #if LL_WINDOWS
+#include "llwin32headers.h"
+
+#include <chrono>
 #include <io.h>
+#include <thread>
 #else
 #include <cerrno>
 #include <fcntl.h>
@@ -75,6 +79,40 @@ namespace
         }
         all = fclose(out) == 0 && all;
         return all ? Wrote::Done : Wrote::Failed;
+    }
+
+#if LL_WINDOWS
+    // The longest of the waits a durable replace makes for a program
+    // holding the file, each twice the last from a millisecond: half a
+    // second in all.
+    constexpr U32 REPLACE_WAIT_MOST_MS = 256;
+
+    // Whether a replace was refused because another program has the file
+    // open.
+    bool heldOpen(const std::error_code& ec)
+    {
+        const int error = ec.value();
+        return error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION || error == ERROR_LOCK_VIOLATION;
+    }
+#endif
+
+    // `beside` put in the place of `target`. On Windows a file another
+    // program has open cannot be replaced, and a virus scanner or an indexer
+    // opens one for a moment once it is written: a durable write, which has
+    // nowhere else to go, waits for it to be let go of, half a second at
+    // most. Anything else refused is refused at once.
+    bool replace(const std::filesystem::path& beside, const std::filesystem::path& target, [[maybe_unused]] bool durable)
+    {
+        std::error_code ec;
+        std::filesystem::rename(beside, target, ec);
+#if LL_WINDOWS
+        for (U32 wait_ms = 1; ec && durable && heldOpen(ec) && wait_ms <= REPLACE_WAIT_MOST_MS; wait_ms *= 2)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(wait_ms));
+            std::filesystem::rename(beside, target, ec);
+        }
+#endif
+        return !ec;
     }
 }
 
@@ -125,8 +163,7 @@ bool whole(const std::string& path, std::string_view text, bool durable)
         {
             std::filesystem::permissions(beside, was.permissions(), ec);
         }
-        std::filesystem::rename(beside, target, ec);
-        if (!ec)
+        if (replace(beside, target, durable))
         {
             return true;
         }

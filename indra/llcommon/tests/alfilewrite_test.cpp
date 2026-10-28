@@ -36,7 +36,12 @@
 #include <fstream>
 #include <sstream>
 
-#if !LL_WINDOWS
+#if LL_WINDOWS
+#include "llwin32headers.h"
+
+#include <chrono>
+#include <thread>
+#else
 #include <sys/stat.h>
 #include <unistd.h>
 #endif
@@ -207,6 +212,55 @@ namespace
         CHECK_FALSE(ALFileWrite::whole(file, "three", /*durable*/ true));
         UNSCOPED_INFO("the old text, whole");
         CHECK(read(file) == std::string("two"));
+    }
+
+    TEST_CASE_METHOD(alfilewrite_data, "alfilewrite: a durable write waits a moment for a program holding the file", "[alfilewrite]")
+    {
+#if !LL_WINDOWS
+        SKIP("only Windows keeps a file another program holds from being replaced");
+#else
+        const std::string file = in("held.llsd");
+        put(file, "old");
+        // Open as a virus scanner opens what was just written: to read,
+        // letting others read and write it but not take it away.
+        const auto hold = [&file]()
+        {
+            return CreateFileW(fsyspath(file).c_str(), GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_EXISTING,
+                               FILE_ATTRIBUTE_NORMAL, nullptr);
+        };
+
+        HANDLE held = hold();
+        REQUIRE(held != INVALID_HANDLE_VALUE);
+        const bool lost = ALFileWrite::whole(file, "lost", /*durable*/ true);
+        CloseHandle(held);
+        UNSCOPED_INFO("held throughout: not written, the old text whole");
+        CHECK_FALSE(lost);
+        CHECK(read(file) == std::string("old"));
+        std::error_code ec;
+        CHECK_FALSE(fs::exists(fsyspath(ALFileWrite::besideOf(file)), ec));
+
+        held = hold();
+        REQUIRE(held != INVALID_HANDLE_VALUE);
+        std::thread let_go(
+            [held]()
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                CloseHandle(held);
+            });
+        const bool written = ALFileWrite::whole(file, "new", /*durable*/ true);
+        let_go.join();
+        UNSCOPED_INFO("let go of a moment later: written");
+        CHECK(written);
+        CHECK(read(file) == std::string("new"));
+
+        held = hold();
+        REQUIRE(held != INVALID_HANDLE_VALUE);
+        const bool in_place = ALFileWrite::whole(file, "in place");
+        CloseHandle(held);
+        UNSCOPED_INFO("not durable: written in place at once");
+        CHECK(in_place);
+        CHECK(read(file) == std::string("in place"));
+#endif
     }
 
     TEST_CASE_METHOD(alfilewrite_data, "alfilewrite: ALFileRead reads an ordinary file up to a limit and no folder or pipe", "[alfilewrite]")
