@@ -373,6 +373,8 @@ float boxDistanceWeight(float d, float fade)
 //  r - radius of probe influence volume
 // i - index of probe in refSphere
 // dw - distance weight
+// ALProbeEclipse::sphereFullWeightRadius mirrors dw: where it reaches 1 decides which automatic probes a manual sphere
+// evicts, so the two change together.
 float sphereWeight(vec3 pos, vec3 dir, vec3 origin, float r, vec4 i, out float dw)
 {
     float r1 = r * 0.5; // 50% of radius (outer sphere to start interpolating down)
@@ -663,7 +665,10 @@ vec3 probeMix(vec3 col0, vec3 col1, ProbeSums s, bool automatic)
         if (s.wsum1 > 0.0)
         { //some manual probes were sampled, mix between the two
             col1 *= 1.0/s.wsum1;
-            col1 = mix(col0, col1, min(s.dwsum1, 1.0));
+            // Selected where the manual probes weigh fully, not mixed at 1: the automatic probes
+            // then contribute exactly nothing, which ALProbeEclipse evicts them on, and an
+            // infinity among them cannot come through as a NaN.
+            col1 = s.dwsum1 >= 1.0 ? col1 : mix(col0, col1, s.dwsum1);
             col0 = vec3(0);
         }
     }

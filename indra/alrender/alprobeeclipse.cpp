@@ -39,6 +39,16 @@ namespace
     }
 }
 
+F32 ALProbeEclipse::sphereFullWeightRadius(F32 radius)
+{
+    if (radius <= 0.f)
+    {
+        return 0.f;
+    }
+    const F32 m = std::max(radius, 1.f);
+    return 8.f * m * radius / (radius + 8.f * m);
+}
+
 void ALProbeEclipse::clear(F32 max_margin)
 {
     mEclipsers.clear();
@@ -70,7 +80,7 @@ void ALProbeEclipse::addSphere(const LLVector3& centre, F32 radius)
 {
     Eclipser sphere;
     sphere.mCentre = centre;
-    sphere.mInner  = radius * SPHERE_FULL_WEIGHT_FRACTION;
+    sphere.mInner  = sphereFullWeightRadius(radius);
     const F32 reach = std::max(0.f, sphere.mInner + mMaxMargin);
     sphere.mReachSquared = slack(reach * reach);
     mEclipsers.push_back(sphere);
