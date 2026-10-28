@@ -31,6 +31,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
 #include <functional>
 #include <string>
 #include <vector>
@@ -61,10 +62,28 @@ namespace
     class TestQueuedThread : public LLQueuedThread
     {
     public:
-        TestQueuedThread() : LLQueuedThread("llqueuedthread_test") {}
+        explicit TestQueuedThread(bool should_pause = false) : LLQueuedThread("llqueuedthread_test", true, should_pause) {}
 
         using LLQueuedThread::addRequest;
         using LLQueuedThread::generateHandle;
+    };
+
+    // A queued thread with an update of its own to run each update().
+    class UpdatingQueuedThread : public LLQueuedThread
+    {
+    public:
+        UpdatingQueuedThread() : LLQueuedThread("llqueuedthread_test updating") {}
+
+        std::atomic<int>           mUpdates{ 0 };
+        std::atomic<LLThread::id_t> mUpdatedOn{};
+
+    private:
+        void threadedUpdate() override
+        {
+            mUpdatedOn = LLThread::currentID();
+            ++mUpdates;
+        }
+        bool hasThreadedUpdate() const override { return true; }
     };
 
     // A request that runs `work` each time the queue gives it a turn, and is
@@ -139,5 +158,34 @@ namespace
         {
             WARN("B was added after A's retry was due; the order says nothing");
         }
+    }
+
+    TEST_CASE("llqueuedthread: update leaves a queue with no update of its own asleep", "[llqueuedthread]")
+    {
+        // Made paused, the thread waits until something is pending. A queue
+        // whose threadedUpdate() is the base's empty one has nothing to post,
+        // so update() finds nothing pending and leaves it paused.
+        TestQueuedThread thread(true);
+        thread.start();
+        for (int i(0); i < 3; ++i)
+        {
+            thread.update(0.f);
+        }
+        CHECK(thread.getPending() == 0);
+        CHECK(thread.isPaused());
+    }
+
+    TEST_CASE("llqueuedthread: update runs a queue's own update on its thread", "[llqueuedthread]")
+    {
+        UpdatingQueuedThread thread;
+        thread.start();
+        LLTimer clock;
+        thread.update(0.f);
+        while (thread.mUpdates.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        CHECK(thread.mUpdates.load() == 1);
+        CHECK(thread.mUpdatedOn.load() != LLThread::currentID());
     }
 }

@@ -163,8 +163,9 @@ size_t LLQueuedThread::updateQueue(F32 max_time_ms)
     // Frame Update
     if (mThreaded)
     {
-        // schedule a call to threadedUpdate for every call to updateQueue
-        if (!isQuitting())
+        // schedule a call to threadedUpdate for every call to updateQueue,
+        // unless it has nothing to do: then the post only wakes the thread
+        if (!isQuitting() && hasThreadedUpdate())
         {
             mRequestQueue.post([=, this]()
                 {

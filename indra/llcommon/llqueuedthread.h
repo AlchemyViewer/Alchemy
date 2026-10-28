@@ -133,6 +133,9 @@ private:
     virtual void startThread(void);
     virtual void endThread(void);
     virtual void threadedUpdate(void);
+    // Whether threadedUpdate() does anything, so that each update() posts it
+    // to the thread. A subclass that overrides threadedUpdate() says yes here.
+    virtual bool hasThreadedUpdate() const { return false; }
 
 protected:
     handle_t generateHandle();
