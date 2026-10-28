@@ -27,6 +27,7 @@ target_sources(
     alsanitizer.cpp
     alsavehistory.cpp
     alscratcharena.cpp
+    altimerresolutionscope.cpp
     alwatchedfile.cpp
     apply.cpp
     commoncontrol.cpp
@@ -138,6 +139,7 @@ target_sources(
         alscratcharena.h
         alsharedmutex.h
         alsimd.h
+        altimerresolutionscope.h
         alunitconversion.h
         alwatchedfile.h
         always_return.h
@@ -323,6 +325,7 @@ if(AL_BUILD_TESTS)
       tests/alserialworker_test.cpp
       tests/alsharedmutex_test.cpp
       tests/alsimd_test.cpp
+      tests/altimerresolutionscope_test.cpp
       tests/alunitconversion_test.cpp
       tests/alwatchedfile_test.cpp
       tests/apply_test.cpp

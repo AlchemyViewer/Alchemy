@@ -49,13 +49,9 @@
 #include "linden_common.h"
 
 #include "alprecisewaiter.h"
+#include "altimerresolutionscope.h"
 #include "lltimer.h"
 #include "threadpool.h"
-
-#if LL_WINDOWS
-#include "llwin32headers.h"
-#include <timeapi.h>
-#endif
 
 #include "altestbenchmark.h"
 
@@ -226,12 +222,9 @@ namespace
 
         runTables("the default timer resolution");
 #if LL_WINDOWS
-        TIMECAPS caps;
-        REQUIRE(timeGetDevCaps(&caps, sizeof(caps)) == TIMERR_NOERROR);
-        const UINT period = (std::max)(1u, caps.wPeriodMin);
-        REQUIRE(timeBeginPeriod(period) == TIMERR_NOERROR);
+        const ALTimerResolutionScope resolution(1);
+        REQUIRE(resolution.period() == 1);
         runTables("a 1 ms timer resolution held");
-        timeEndPeriod(period);
 #endif
     }
 }
