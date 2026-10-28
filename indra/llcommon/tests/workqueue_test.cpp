@@ -104,7 +104,7 @@ namespace
              data.get([](const Shared& data){ return data.size(); }) < 3; )
         {
             queue.runPending();
-            ALPreciseWaiter::sleepFor(interval / 10);
+            ALPreciseWaiter::sleepFor(interval / 10.0);
         }
         // Take a copy of the captured deque.
         Shared result = data.get();
