@@ -350,6 +350,13 @@ public:
     // Of those, the ones it keeps for reuse.
     static U64 getBytesPooled();
 
+    // Lets the stores the pool keeps go over the next few seconds, rather than at its next clean, once they have been
+    // kept a second and the GPU is done with them: for when a lot of geometry has just been freed, a removed region's
+    // or the place a teleport left. A frame's budget at a time, in updatePoolTrim.
+    static void trimPoolSoon();
+    // Once a frame, on the main thread.
+    static void updatePoolTrim();
+
     // What the buffer pool has handed out since it was made: stores it had to make, stores it reused, and of those the
     // ones freed in a frame the GPU had not been shown finished with, which it gave a new store under the same name.
     struct PoolStats

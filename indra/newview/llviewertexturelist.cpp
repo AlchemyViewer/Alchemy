@@ -1108,7 +1108,8 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     S32 num_refs = imagep->getNumRefs();
     if (num_refs <= min_refs && flush_images)
     {
-        if (imagep->getLastReferencedTimer()->getElapsedTimeF32() > lazy_flush_timeout)
+        const F64 unreferenced = imagep->getLastReferencedTimer()->getElapsedTimeF64();
+        if (unreferenced > lazy_flush_timeout || imagep->releasedWithRegionWithin(2.0 * lazy_flush_timeout))
         {
             // Remove the unused image from the image list
             deleteImage(imagep);

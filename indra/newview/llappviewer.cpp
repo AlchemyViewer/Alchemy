@@ -32,6 +32,7 @@
 
 // Viewer includes
 #include "llversioninfo.h"
+#include "llvertexbuffer.h"
 #include "llfeaturemanager.h"
 #include "lluictrlfactory.h"
 #include "lltexteditor.h"
@@ -5833,6 +5834,8 @@ void LLAppViewer::idle()
         {
             LLDrawable::cleanupDeadDrawables();
         }
+        // what the dead drawables' geometry left in the buffer pool, after a region went
+        LLVertexBuffer::updatePoolTrim();
     }
 
     //

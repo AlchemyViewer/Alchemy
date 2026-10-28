@@ -36,6 +36,7 @@
 #include "llvoavatar.h"
 #include "message.h"
 #include "llviewerregion.h"
+#include "llvertexbuffer.h"
 #include "llviewertexturelist.h"
 #include "llworld.h"
 
@@ -90,6 +91,9 @@ void ALRegionRetirement::update()
                                    (S32)gTextureList.mCreateTextureList.size()))
     {
         mArrivalPending = false;
+        // What the teleport freed waits in the buffer pool otherwise. Not before now: the arrival's own geometry, built
+        // meanwhile, takes those stores back.
+        LLVertexBuffer::trimPoolSoon();
         if (retire_departed)
         {
             chooseRegions();
@@ -202,6 +206,7 @@ void ALRegionRetirement::killSome()
             if (!objectp->isDead() && objectp->getRegion() == mRegionp && !objectp->getParent()
                 && !(avatarp && avatarp->isControlAvatar()))
             {
+                gObjectList.noteReleasedTextures(objectp, true);
                 gObjectList.killObject(objectp);
                 ++killed;
             }

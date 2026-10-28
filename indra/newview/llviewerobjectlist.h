@@ -80,6 +80,9 @@ public:
 
     bool killObject(LLViewerObject *objectp);
     void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
+    // Marks the textures objectp shows, and with_children its children's, as let go with a region (the lazy flush
+    // takes them at once).
+    void noteReleasedTextures(LLViewerObject* objectp, bool with_children);
     // The live objects of regionp, for a caller that kills them a few at a time.
     void getRegionObjects(const LLViewerRegion* regionp, std::vector<LLPointer<LLViewerObject>>& objects) const;
 

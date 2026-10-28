@@ -41,6 +41,7 @@
 #include "llregionhandle.h"
 #include "llsurface.h"
 #include "lltrans.h"
+#include "llvertexbuffer.h"
 #include "llviewercamera.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
@@ -287,6 +288,9 @@ void LLWorld::removeRegion(const LLHost &host)
     //llassert_always(!gObjectList.hasMapObjectInRegion(regionp)) ;
 
     delete regionp; // Delete last to prevent use after free
+
+    // The geometry only the region held goes now rather than at the pool's next clean.
+    LLVertexBuffer::trimPoolSoon();
 }
 
 

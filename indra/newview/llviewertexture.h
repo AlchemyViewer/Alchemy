@@ -350,6 +350,14 @@ public:
 
     void destroyTexture() ;
 
+    // An object showing it died with its region (LLViewerObjectList::noteReleasedTextures): once unreferenced, soon
+    // after, the lazy flush takes it without its wait.
+    void noteReleasedWithRegion() { mReleasedWithRegion = (F64)LLFrameTimer::getUptimeSeconds(); }
+    bool releasedWithRegionWithin(F64 seconds) const
+    {
+        return mReleasedWithRegion >= 0.0 && (F64)LLFrameTimer::getUptimeSeconds() - mReleasedWithRegion < seconds;
+    }
+
     virtual void processTextureStats() ;
 
     bool needsAux() const { return mNeedsAux; }
@@ -503,6 +511,7 @@ protected:
     S32 mMinDiscardLevel;
     S8  mDesiredDiscardLevel;           // The discard level we'd LIKE to have - if we have it and there's space
     S8  mMinDesiredDiscardLevel;    // The minimum discard level we'd like to have
+    F64 mReleasedWithRegion = -1.0; // LLFrameTimer::getUptimeSeconds() when noteReleasedWithRegion last ran, or -1
 
     bool mNeedsAux;                 // We need to decode the auxiliary channels
     bool mHasAux;                    // We have aux channels

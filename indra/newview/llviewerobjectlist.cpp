@@ -67,6 +67,7 @@
 #include "llmeshrepository.h"
 #include "u64.h"
 #include "llviewertexturelist.h"
+#include "llfetchedgltfmaterial.h"
 #include "lldatapacker.h"
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
 #include "alderenderlist.h"
@@ -1498,6 +1499,7 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
 
         if (objectp->mRegionp == regionp)
         {
+            noteReleasedTextures(objectp, false);
             killObject(objectp);
         }
     }
@@ -1505,6 +1507,40 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
     // The region's dead objects leave now, whatever the budget: its partitions, which hold their drawables, go
     // next, and so does the region their mRegionp points at.
     mObjects.drainIf([regionp](LLViewerObject* objectp) { return objectp->mRegionp == regionp; });
+}
+
+void LLViewerObjectList::noteReleasedTextures(LLViewerObject* objectp, bool with_children)
+{
+    for (U8 te = 0; te < objectp->getNumTEs(); ++te)
+    {
+        for (LLViewerTexture* tex : { objectp->getTEImage(te), objectp->getTENormalMap(te), objectp->getTESpecularMap(te) })
+        {
+            if (LLViewerFetchedTexture* fetched = LLViewerTextureManager::staticCastToFetchedTexture(tex))
+            {
+                fetched->noteReleasedWithRegion();
+            }
+        }
+        const LLTextureEntry* tep = objectp->getTE(te);
+        const auto* mat = tep ? static_cast<const LLFetchedGLTFMaterial*>(tep->getGLTFRenderMaterial()) : nullptr;
+        if (mat)
+        {
+            for (const LLPointer<LLViewerFetchedTexture>& tex :
+                 { mat->mBaseColorTexture, mat->mNormalTexture, mat->mMetallicRoughnessTexture, mat->mEmissiveTexture })
+            {
+                if (tex.notNull())
+                {
+                    tex->noteReleasedWithRegion();
+                }
+            }
+        }
+    }
+    if (with_children)
+    {
+        for (LLViewerObject* childp : objectp->getChildren())
+        {
+            noteReleasedTextures(childp, true);
+        }
+    }
 }
 
 void LLViewerObjectList::getRegionObjects(const LLViewerRegion* regionp, std::vector<LLPointer<LLViewerObject>>& objects) const
