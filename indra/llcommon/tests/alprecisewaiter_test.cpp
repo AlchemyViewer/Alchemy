@@ -32,8 +32,10 @@
 #include "../llwin32headers.h"
 #elif LL_DARWIN
 #include <mach/mach_time.h>
+#include <unistd.h>
 #else
 #include <time.h>
+#include <unistd.h>
 #endif
 
 #include <catch2/catch_test_macros.hpp>
@@ -44,6 +46,57 @@
 #include <cmath>
 #include <limits>
 #include <vector>
+
+namespace ll_test
+{
+    // Takes what a waiter waits on away from it, so that its tests run on the fallbacks a system short of it leaves.
+    struct PreciseWaiterProbe
+    {
+#if LL_WINDOWS
+        // An ordinary waitable timer in place of the high-resolution one, as before Windows 10 1803.
+        static bool ordinaryTimer(ALPreciseWaiter& waiter)
+        {
+            HANDLE timer = CreateWaitableTimerExW(nullptr, nullptr, 0, TIMER_ALL_ACCESS);
+            if (!timer)
+            {
+                return false;
+            }
+            CloseHandle(waiter.mTimer);
+            waiter.mTimer = timer;
+            return true;
+        }
+#endif
+
+#if !LL_DARWIN
+        // No timer at all: a timed wait is a timeout of the wait's own.
+        static void noTimer(ALPreciseWaiter& waiter)
+        {
+#if LL_WINDOWS
+            CloseHandle(waiter.mTimer);
+            waiter.mTimer = nullptr;
+#else
+            close(waiter.mTimer);
+            waiter.mTimer = -1;
+#endif
+        }
+#endif
+
+        // Nothing to wake it.
+        static void noWake(ALPreciseWaiter& waiter)
+        {
+#if LL_WINDOWS
+            CloseHandle(waiter.mWake);
+            waiter.mWake = nullptr;
+#elif LL_LINUX
+            close(waiter.mWake);
+            waiter.mWake = -1;
+#else
+            close(waiter.mQueue);
+            waiter.mQueue = -1;
+#endif
+        }
+    };
+}
 
 namespace
 {
@@ -338,6 +391,70 @@ namespace
         rescued(waiter, [&waiter]() { return waiter.waitFor(std::chrono::seconds::zero()); }, was_rescued);
         CHECK_FALSE(was_rescued);
         CHECK(time_point::now().since(start) < LATE);
+    }
+
+    // Timed waits that end no sooner than their deadlines, and one that a wake during it ends, on `waiter` however it
+    // was left.
+    void checkDeadlinesAndWake(ALPreciseWaiter& waiter)
+    {
+        for (F64 seconds : { 0.0005, 0.002, 0.0105 })
+        {
+            INFO("a wait of " << seconds * 1000.0 << " ms");
+            for (int i = 0; i < 4; ++i)
+            {
+                const time_point deadline = time_point::after(seconds);
+                const time_point woke     = waiter.waitUntil(deadline);
+                CHECK(woke >= deadline);
+                CHECK(woke.since(deadline) < LATE);
+            }
+        }
+        Wake  wake;
+        Waker waker;
+        waker.post([&waiter, &wake]() { wakeWhenWaiting(waiter, wake, 0.02); });
+        wake.mWaiting = true;
+        const time_point woke = waiter.waitUntil(time_point::after(2.0 * LOST));
+        wake.mReturned = true;
+        CHECK_FALSE(wake.mRescued);
+        CHECK(woke.ticks >= wake.mAt.load());
+        CHECK(woke.since(time_point{ wake.mAt.load() }) < LATE);
+    }
+
+#if LL_WINDOWS
+    TEST_CASE("alprecisewaiter: with an ordinary timer a waiter keeps to its deadlines and its wakes", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        REQUIRE(ll_test::PreciseWaiterProbe::ordinaryTimer(waiter));
+        checkDeadlinesAndWake(waiter);
+    }
+#endif
+
+#if !LL_DARWIN
+    TEST_CASE("alprecisewaiter: with no timer a waiter keeps to its deadlines and its wakes", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        ll_test::PreciseWaiterProbe::noTimer(waiter);
+        REQUIRE(waiter.canWake());
+        checkDeadlinesAndWake(waiter);
+    }
+#endif
+
+    TEST_CASE("alprecisewaiter: with nothing to wake it a waiter sleeps its timed waits and does not hang", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        ll_test::PreciseWaiterProbe::noWake(waiter);
+        CHECK_FALSE(waiter.canWake());
+        // A wake goes nowhere.
+        waiter.wake();
+        for (F64 seconds : { 0.0005, 0.002 })
+        {
+            const time_point deadline = time_point::after(seconds);
+            const time_point woke     = waiter.waitUntil(deadline);
+            CHECK(woke >= deadline);
+            CHECK(woke.since(deadline) < LATE);
+        }
+        // Untimed, with nothing that could end it: at once.
+        const time_point start = time_point::now();
+        CHECK(waiter.waitUntil(time_point::max()).since(start) < LATE);
     }
 
     TEST_CASE("alprecisewaiter: a saturated duration has no deadline", "[alprecisewaiter]")

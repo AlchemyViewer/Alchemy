@@ -32,6 +32,8 @@
 #include <concepts>
 #include <limits>
 
+namespace ll_test { struct PreciseWaiterProbe; }
+
 // A wait until a deadline that another thread can end early: one thread
 // waits on it, and any thread wakes it.
 //
@@ -210,6 +212,8 @@ public:
     static time_point sleepFor(INT) = delete;
 
 private:
+    friend struct ll_test::PreciseWaiterProbe;
+
     // One round of a spin, short of `deadline`: a pause, or now and then a
     // yield. `yielded` is when the last yield was.
     static void spinRound(time_point now, time_point deadline, U64& yielded);
