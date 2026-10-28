@@ -44,7 +44,6 @@ LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool shou
     mRequestQueue(name, 1024 * 1024)
 {
     llassert(threaded); // not threaded implementation is deprecated
-    mMainQueue = LL::WorkQueue::getInstance("mainloop");
 
     // The thread starts when the owner calls start(), once the object is made.
     if (mThreaded && should_pause)

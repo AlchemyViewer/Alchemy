@@ -177,7 +177,6 @@ protected:
     //request_queue_t mRequestQueue;
     // A schedule, so that a request to retry later waits its turn without holding the thread.
     LL::WorkSchedule mRequestQueue;
-    LL::WorkQueue::weak_t mMainQueue;
 
     enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2
     typedef LLSimpleHash<handle_t, REQUEST_HASH_SIZE> request_hash_t;
