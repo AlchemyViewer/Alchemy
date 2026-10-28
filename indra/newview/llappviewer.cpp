@@ -5836,8 +5836,10 @@ void LLAppViewer::idle()
     }
 
     //
-    // After this point, in theory we should never see a dead object
-    // in the various object/drawable lists.
+    // After this point, in theory we should never see a dead drawable
+    // in the drawable lists. The object list keeps dead objects until
+    // cleanDeadObjects reaches them, a frame's budget at a time; every
+    // lookup lost them when they died.
     //
 
     //////////////////////////////////////

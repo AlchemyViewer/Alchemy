@@ -102,7 +102,6 @@ LLViewerObjectList::LLViewerObjectList()
 {
     mCurLazyUpdateIndex = 0;
     mCurBin = 0;
-    mNumDeadObjects = 0;
     mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
@@ -122,7 +121,6 @@ void LLViewerObjectList::destroy()
 
     resetObjectBeacons();
     mActiveObjects.clear();
-    mDeadObjects.clear();
     mMapObjects.clear();
     mUUIDObjectMap.clear();
 }
@@ -637,16 +635,6 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 mesgsys->getU8Fast(_PREHASH_ObjectData, _PREHASH_PCode, pcode, i);
 
             }
-#ifdef IGNORE_DEAD
-            if (mDeadObjects.find(fullid) != mDeadObjects.end())
-            {
-                mNumDeadObjectUpdates++;
-                //LL_INFOS() << "update for a dead object:" << fullid << LL_ENDL;
-                recorder.objectUpdateFailure();
-                continue;
-            }
-#endif
-
 // [SL:KB] - Patch: World-Derender | Checked: 2012-06-08 (Catznip-3.3)
             // Don't recreate derendered objects (update the core object information so we'll have enough information to rerequest it later if needed)
             if ( (OUT_FULL == update_type) || (OUT_FULL_COMPRESSED == update_type) )
@@ -783,9 +771,12 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
 
 void LLViewerObjectList::dirtyAllObjectInventory()
 {
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
-        (*iter)->dirtyInventory();
+        if (!(*iter)->isDead())
+        {
+            (*iter)->dirtyInventory();
+        }
     }
 }
 
@@ -1106,7 +1097,8 @@ void LLViewerObjectList::update(LLAgent &agent)
     }
     */
 
-    sample(LLStatViewer::NUM_OBJECTS, mObjects.size());
+    // the dead waiting for cleanDeadObjects are no longer objects
+    sample(LLStatViewer::NUM_OBJECTS, mObjects.size() - llmin(mObjects.size(), mObjects.queued()));
     sample(LLStatViewer::NUM_ACTIVE_OBJECTS, idle_count);
 }
 
@@ -1393,9 +1385,13 @@ void LLViewerObjectList::fetchPhisicsFlagsCoro(std::string url)
 
 void LLViewerObjectList::clearDebugText()
 {
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
-        (*iter)->restoreHudText();
+        // a dead object would get its floating text back until it is destroyed
+        if (!(*iter)->isDead())
+        {
+            (*iter)->restoreHudText();
+        }
     }
 }
 
@@ -1404,15 +1400,11 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
 
-    bool new_dead_object = true;
-    if (mDeadObjects.find(objectp->mID) != mDeadObjects.end())
+    // Queued by the object itself, not by its id: an id killed, created again and killed again before the queue
+    // reaches it is two objects, each queued once.
+    if (!mObjects.queueRemoval(objectp))
     {
         LL_INFOS() << "Object " << objectp->mID << " already on dead list!" << LL_ENDL;
-        new_dead_object = false;
-    }
-    else
-    {
-        mDeadObjects.insert(objectp->mID);
     }
 
     // Cleanup any references we have to this object
@@ -1444,12 +1436,7 @@ void LLViewerObjectList::cleanupReferences(LLViewerObject *objectp)
         removeFromMap(objectp);
     }
 
-    // Don't clean up mObject references, these will be cleaned up more efficiently later!
-
-    if(new_dead_object)
-    {
-        mNumDeadObjects++;
-    }
+    // mObjects keeps the object until cleanDeadObjects reaches it in the queue.
 }
 
 bool LLViewerObjectList::killObject(LLViewerObject *objectp)
@@ -1493,7 +1480,7 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
     LLViewerObject *objectp;
 
 
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
         objectp = *iter;
 
@@ -1503,8 +1490,20 @@ void LLViewerObjectList::killObjects(LLViewerRegion *regionp)
         }
     }
 
-    // Have to clean right away because the region is becoming invalid.
-    cleanDeadObjects(false);
+    // The region's dead objects leave now, whatever the budget: its partitions, which hold their drawables, go
+    // next, and so does the region their mRegionp points at.
+    mObjects.drainIf([regionp](LLViewerObject* objectp) { return objectp->mRegionp == regionp; });
+}
+
+void LLViewerObjectList::getRegionObjects(const LLViewerRegion* regionp, std::vector<LLPointer<LLViewerObject>>& objects) const
+{
+    for (const LLPointer<LLViewerObject>& objectp : mObjects)
+    {
+        if (objectp->mRegionp == regionp && !objectp->isDead())
+        {
+            objects.push_back(objectp);
+        }
+    }
 }
 
 void LLViewerObjectList::killAllObjects()
@@ -1526,7 +1525,7 @@ void LLViewerObjectList::killAllObjects()
     mMapObjects.clear();
 
     LLViewerObject *objectp;
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
         objectp = *iter;
         objectp->setOnActiveList(false);
@@ -1542,8 +1541,6 @@ void LLViewerObjectList::killAllObjects()
 
     // Direct clear instead of cleanDeadObjects - all objects are already dead
     mObjects.clear();
-    mDeadObjects.clear();
-    mNumDeadObjects = 0;
 
     if(!mObjects.empty())
     {
@@ -1552,59 +1549,24 @@ void LLViewerObjectList::killAllObjects()
     }
 }
 
-void LLViewerObjectList::cleanDeadObjects(bool use_timer)
+void LLViewerObjectList::cleanDeadObjects()
 {
-    if (!mNumDeadObjects)
+    if (!mObjects.queued())
     {
-        // No dead objects, don't need to scan object list.
         return;
     }
 
     LL_PROFILE_ZONE_SCOPED;
 
-    S32 num_removed = 0;
-    LLViewerObject *objectp;
-
-    vobj_list_t::reverse_iterator target = mObjects.rbegin();
-
-    vobj_list_t::iterator iter = mObjects.begin();
-    for ( ; iter != mObjects.end(); )
-    {
-        // Scan for all of the dead objects and put them all on the end of the list with no ref count ops
-        objectp = *iter;
-        if (objectp == NULL)
-        { //we caught up to the dead tail
-            break;
-        }
-
-        if (objectp->isDead())
-        {
-            LLPointer<LLViewerObject>::swap(*iter, *target);
-            *target = NULL;
-            ++target;
-            num_removed++;
-
-            if (num_removed == mNumDeadObjects || iter->isNull())
-            {
-                // We've cleaned up all of the dead objects or caught up to the dead tail
-                break;
-            }
-        }
-        else
-        {
-            ++iter;
-        }
-    }
-
-    llassert(num_removed == mNumDeadObjects);
-
-    //erase as a block
-    mObjects.erase(mObjects.begin()+(mObjects.size()-mNumDeadObjects), mObjects.end());
-
-    // We've cleaned the global object list, now let's do some paranoia testing on objects
-    // before blowing away the dead list.
-    mDeadObjects.clear();
-    mNumDeadObjects = 0;
+    // Each destructor releases the object's volume, texture references and the rest it holds, so the deaths of a
+    // crowd or a region are spread over frames. Every object is out of every lookup from the moment it died.
+    constexpr F64 DEAD_OBJECT_BUDGET = 0.0005;
+    const size_t min_count = ALObjectRoster<LLViewerObject>::drainFloor(mObjects.queued());
+    const F64 start = LLTimer::getTotalSeconds();
+    const size_t destroyed = mObjects.drain(
+        [&](size_t removed) { return removed < min_count || LLTimer::getTotalSeconds() - start < DEAD_OBJECT_BUDGET; });
+    LL_PROFILE_ZONE_NUM(destroyed);
+    LL_PROFILE_PLOT("ObjectList: dead objects queued", (int64_t)mObjects.queued());
 }
 
 void LLViewerObjectList::removeFromActiveList(LLViewerObject* objectp)
@@ -1778,7 +1740,7 @@ void LLViewerObjectList::shiftObjects(const LLVector3 &offset)
 
 
     LLViewerObject *objectp;
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
         objectp = *iter;
         // There could be dead objects on the object list, so don't update stuff if the object is dead.
@@ -1800,7 +1762,7 @@ void LLViewerObjectList::shiftObjects(const LLVector3 &offset)
 
 void LLViewerObjectList::repartitionObjects()
 {
-    for (vobj_list_t::iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
+    for (vobj_list_t::const_iterator iter = mObjects.begin(); iter != mObjects.end(); ++iter)
     {
         LLViewerObject* objectp = *iter;
         if (!objectp->isDead())
@@ -2066,7 +2028,7 @@ LLViewerObject *LLViewerObjectList::createObjectViewer(const LLPCode pcode, LLVi
     mUUIDObjectMap[fullid] = objectp;
     mPresenceSignal(fullid, true);
 
-    mObjects.push_back(objectp);
+    mObjects.add(objectp);
 
     updateActive(objectp);
 
@@ -2094,7 +2056,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
                     regionp->getHost().getAddress(),
                     regionp->getHost().getPort(),
                     objectp);
-    mObjects.push_back(objectp);
+    mObjects.add(objectp);
 
     updateActive(objectp);
 
@@ -2135,7 +2097,7 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
                     gMessageSystem->getSenderPort(),
                     objectp);
 
-    mObjects.push_back(objectp);
+    mObjects.add(objectp);
 
     updateActive(objectp);
 
