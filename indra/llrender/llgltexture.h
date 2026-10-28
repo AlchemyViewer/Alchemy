@@ -97,6 +97,9 @@ public:
 
     virtual void dump();    // debug info to LL_INFOS()
 
+    // The GL texture's alpha mask answer changed (LLImageGL::getIsAlphaMask), on the main thread.
+    virtual void onAlphaMaskChanged() {}
+
     virtual const LLUUID& getID() const;
 
     void setBoostLevel(S32 level);

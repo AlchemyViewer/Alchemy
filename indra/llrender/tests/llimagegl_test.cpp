@@ -37,6 +37,7 @@
 #include "../algpubuffer.h"
 #include "../alstagingring.h"
 #include "../alvramusage.h"
+#include "../llgltexture.h"
 #include "../llimagegl.h"
 #include "../llgl.h"
 #include "../llrender.h"
@@ -1958,5 +1959,55 @@ namespace
             INFO("pixel format " << entry.first);
             REQUIRE(LLImageGL::dataFormatComponents(entry.first) == entry.second);
         }
+    }
+
+    // A texture that counts what its GL texture tells it of the mask answer.
+    struct MaskWatcher : public LLGLTexture
+    {
+        MaskWatcher() : LLGLTexture(32, 32, 4, false) {}
+        void onAlphaMaskChanged() override { ++mChanges; }
+        S32 mChanges = 0;
+    };
+
+    // An RGBA image whose alpha is 0 in its top half and opaque below (a mask), or 128 everywhere (no mask).
+    LLPointer<LLImageRaw> makeAlphaRaw(bool mask)
+    {
+        constexpr U16 SIDE = 32;
+        LLPointer<LLImageRaw> raw = new LLImageRaw(SIDE, SIDE, 4);
+        U8* data = raw->getData();
+        for (U32 i = 0; i < (U32)SIDE * SIDE; ++i)
+        {
+            data[i * 4 + 0] = data[i * 4 + 1] = data[i * 4 + 2] = 0x80;
+            data[i * 4 + 3] = mask ? (i < (U32)SIDE * SIDE / 2 ? 0 : 255) : 128;
+        }
+        return raw;
+    }
+
+    // The faces of a texture are built into pools by its mask answer, so the texture hears of every change of it, and
+    // only of a change; once it is gone, the GL texture it made tells nobody.
+    TEST_CASE_METHOD(llimagegl_data, "LLImageGL: the texture it was made for hears each change of its mask answer", "[LLImageGL]")
+    {
+        LLPointer<MaskWatcher> owner = new MaskWatcher();
+        owner->generateGLTexture();
+        LLPointer<LLImageGL> img = owner->getGLTexture();
+        REQUIRE(img->getOwner() == owner.get());
+
+        // Small enough to be analysed as it uploads, not on a worker.
+        REQUIRE(img->createGLTexture(0, makeAlphaRaw(true).get()));
+        CHECK(img->getIsAlphaMask());
+        CHECK(owner->mChanges == 1);
+
+        UNSCOPED_INFO("the same answer again is no change");
+        REQUIRE(img->createGLTexture(0, makeAlphaRaw(true).get()));
+        CHECK(owner->mChanges == 1);
+
+        REQUIRE(img->createGLTexture(0, makeAlphaRaw(false).get()));
+        CHECK_FALSE(img->getIsAlphaMask());
+        CHECK(owner->mChanges == 2);
+
+        owner = nullptr;
+        CHECK(img->getOwner() == nullptr);
+        REQUIRE(img->createGLTexture(0, makeAlphaRaw(true).get()));
+        CHECK(img->getIsAlphaMask());
     }
 }

@@ -33,6 +33,7 @@
 #include "linden_common.h"
 
 #include "llimagegl.h"
+#include "llgltexture.h"
 
 #include "llerror.h"
 #include "llimage.h"
@@ -2655,16 +2656,28 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
         return;
     }
 
-    mIsMask = analysis.mIsMask;
+    setIsMask(analysis.mIsMask);
     mMaxAlpha = analysis.mMaxAlpha;
     mMinAlpha = analysis.mMinAlpha;
 }
 
 void LLImageGL::clearAlphaAnalysis()
 {
-    mIsMask = false;
+    setIsMask(false);
     mMaxAlpha = 255;
     mMinAlpha = 0;
+}
+
+void LLImageGL::setIsMask(bool is_mask)
+{
+    if (mIsMask != is_mask)
+    {
+        mIsMask = is_mask;
+        if (mOwner && on_main_thread())
+        {
+            mOwner->onAlphaMaskChanged();
+        }
+    }
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2679,7 +2692,7 @@ void LLImageGL::publishPendingAlpha()
     }
     if (mPendingAlpha.mHasAnalysis)
     {
-        mIsMask = mPendingAlpha.mAnalysis.mIsMask;
+        setIsMask(mPendingAlpha.mAnalysis.mIsMask);
         mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
         mMinAlpha = mPendingAlpha.mAnalysis.mMinAlpha;
     }
@@ -3563,7 +3576,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             // Only apply if no newer analysis has been requested
             if (mAlphaAnalysisSerial == request_serial)
             {
-                mIsMask = analysis.mIsMask;
+                setIsMask(analysis.mIsMask);
                 mMaxAlpha = analysis.mMaxAlpha;
                 mMinAlpha = analysis.mMinAlpha;
             }

@@ -2248,6 +2248,32 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
     return true;
 }
 
+void LLViewerFetchedTexture::onAlphaMaskChanged()
+{
+    if (mGLTexturep.isNull() || !mGLTexturep->getIsAlphaMask())
+    {
+        return;
+    }
+
+    // A face built while a deferred analysis was out found the texture no mask (clearAlphaAnalysis) and went into the
+    // blend pool; only a rebuild of its group moves it to a mask pass.
+    for (U32 i = 0; i < mNumFaces[LLRender::DIFFUSE_MAP]; ++i)
+    {
+        LLFace* facep = mFaceList[LLRender::DIFFUSE_MAP][i];
+        if (!facep || !facep->isInAlphaPool() || !facep->canRenderAsMask())
+        {
+            continue;
+        }
+        LLDrawable* drawablep = facep->getDrawable();
+        LLSpatialGroup* group = drawablep ? drawablep->getSpatialGroup() : nullptr;
+        if (group && !group->isDead())
+        {
+            group->dirtyGeom();
+            gPipeline.markRebuild(group);
+        }
+    }
+}
+
 bool LLViewerFetchedTexture::updateFetch()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
