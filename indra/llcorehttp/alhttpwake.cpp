@@ -52,9 +52,13 @@ void close_socket(curl_socket_t & sock)
     }
 }
 
+// Non-blocking, and kept from any child process the viewer starts.
 bool set_nonblocking(curl_socket_t sock)
 {
 #if LL_WINDOWS
+    // A socket that refuses (one an LSP hands out) stays inheritable, which
+    // costs a child a stray handle and is no reason to go without the wake.
+    SetHandleInformation(reinterpret_cast<HANDLE>(sock), HANDLE_FLAG_INHERIT, 0);
     u_long on(1);
     return 0 == ioctlsocket(sock, FIONBIO, &on);
 #else
@@ -71,7 +75,7 @@ bool set_nonblocking(curl_socket_t sock)
 // the accepted socket has to be the writer's peer.
 bool make_loopback_pair(curl_socket_t & reader, curl_socket_t & writer)
 {
-    SOCKET listener(socket(AF_INET, SOCK_STREAM, IPPROTO_TCP));
+    SOCKET listener(WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_NO_HANDLE_INHERIT));
     if (INVALID_SOCKET == listener)
     {
         return false;
@@ -88,7 +92,7 @@ bool make_loopback_pair(curl_socket_t & reader, curl_socket_t & writer)
             && 0 == listen(listener, 1));
     if (ok)
     {
-        writer = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        writer = WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_NO_HANDLE_INHERIT);
         ok = INVALID_SOCKET != writer && 0 == connect(writer, reinterpret_cast<sockaddr *>(&addr), sizeof(addr));
     }
     if (ok)

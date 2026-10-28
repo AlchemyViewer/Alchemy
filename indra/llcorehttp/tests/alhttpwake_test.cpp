@@ -37,6 +37,7 @@
 #include <future>
 
 #if ! LL_WINDOWS
+#include <fcntl.h>
 #include <poll.h>
 #include <sys/ioctl.h>
 #endif
@@ -149,6 +150,20 @@ namespace
         }
         wake.signal();
         CHECK(readable(wake, 5000));
+    }
+
+    TEST_CASE_METHOD(WakeFixture, "alhttpwake: a child process does not inherit the wake", "[alhttpwake]")
+    {
+        REQUIRE(opened);
+#if LL_WINDOWS
+        DWORD flags(0);
+        REQUIRE(GetHandleInformation(reinterpret_cast<HANDLE>(wake.readSocket()), &flags));
+        CHECK(0 == (flags & HANDLE_FLAG_INHERIT));
+#else
+        const int flags(fcntl(wake.readSocket(), F_GETFD));
+        REQUIRE(-1 != flags);
+        CHECK(0 != (flags & FD_CLOEXEC));
+#endif
     }
 
     TEST_CASE_METHOD(WakeFixture, "alhttpwake: a closed wake signals nothing and can be opened again", "[alhttpwake]")
