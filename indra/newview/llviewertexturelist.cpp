@@ -1106,10 +1106,12 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     // Flush formatted images using a lazy flush
     //
     S32 num_refs = imagep->getNumRefs();
-    if (num_refs <= min_refs && flush_images)
+    if (num_refs <= min_refs)
     {
+        // Unreferenced: without flush_images (the emergency purge) it neither goes nor has its wait restarted.
         const F64 unreferenced = imagep->getLastReferencedTimer()->getElapsedTimeF64();
-        if (unreferenced > lazy_flush_timeout || imagep->releasedWithRegionWithin(2.0 * lazy_flush_timeout))
+        if (flush_images
+            && (unreferenced > lazy_flush_timeout || imagep->releasedWithRegionWithin(2.0 * lazy_flush_timeout)))
         {
             // Remove the unused image from the image list
             deleteImage(imagep);
