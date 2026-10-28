@@ -29,6 +29,7 @@
 #include "stdtypes.h"
 
 #include <chrono>
+#include <concepts>
 #include <limits>
 
 // A wait until a deadline that another thread can end early: one thread
@@ -79,12 +80,18 @@ public:
         {
             return after(std::chrono::duration<F64>(duration).count());
         }
+        // A whole number of seconds reads too easily as the milliseconds
+        // ms_sleep() takes: seconds are F64, or a duration says what it is.
+        template <std::integral INT>
+        static time_point after(INT) = delete;
 
         // `seconds` later, or earlier where negative, rounded away from this
         // moment to a tick: max() where that is past the clock's end, and the
         // clock's start where it is before it. max() stays max(), and NaN
         // moves nothing.
         time_point plus(F64 seconds) const;
+        template <std::integral INT>
+        time_point plus(INT) const = delete;
         // The seconds from `earlier` to this moment, negative where this is
         // the earlier.
         F64 since(time_point earlier) const;
@@ -150,6 +157,8 @@ public:
     {
         return waitUntil(time_point::after(duration));
     }
+    template <std::integral INT>
+    time_point waitFor(INT) = delete;
 
     // Ends the wait in progress, or else the next one. From any thread, any
     // number of times: the wakes that come before a wait are one wake.
@@ -197,6 +206,8 @@ public:
     {
         return sleepUntil(time_point::after(duration));
     }
+    template <std::integral INT>
+    static time_point sleepFor(INT) = delete;
 
 private:
     // One round of a spin, short of `deadline`: a pause, or now and then a

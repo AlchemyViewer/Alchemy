@@ -44,6 +44,25 @@ namespace
 {
     using time_point = ALPreciseWaiter::time_point;
 
+    // Seconds are F64 or a duration that says what it is; a whole number, which reads as the milliseconds ms_sleep()
+    // takes, does not compile.
+    template <typename T>
+    concept TakesAfter = requires(T t) { time_point::after(t); };
+    template <typename T>
+    concept TakesPlus = requires(time_point p, T t) { p.plus(t); };
+    template <typename T>
+    concept TakesWaitFor = requires(ALPreciseWaiter& waiter, T t) { waiter.waitFor(t); };
+    template <typename T>
+    concept TakesSleepFor = requires(T t) { ALPreciseWaiter::sleepFor(t); };
+    static_assert(!TakesAfter<int> && !TakesAfter<U32> && !TakesAfter<S64>);
+    static_assert(!TakesPlus<int> && !TakesPlus<U64>);
+    static_assert(!TakesWaitFor<int> && !TakesWaitFor<U32>);
+    static_assert(!TakesSleepFor<int> && !TakesSleepFor<U32> && !TakesSleepFor<long long>);
+    static_assert(TakesAfter<F64> && TakesAfter<F32> && TakesAfter<std::chrono::milliseconds>);
+    static_assert(TakesPlus<F64>);
+    static_assert(TakesWaitFor<F64> && TakesWaitFor<std::chrono::microseconds>);
+    static_assert(TakesSleepFor<F64> && TakesSleepFor<std::chrono::seconds>);
+
     // Every wait is checked against the clock: it ends no sooner than it may, which is exact, and no later than LATE
     // past that, which only a wait that did not end of itself comes near, however loaded the machine.
     constexpr F64 LATE = 1.0;
