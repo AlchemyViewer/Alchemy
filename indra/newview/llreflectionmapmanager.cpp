@@ -218,6 +218,13 @@ struct CompareProbeDistance
     }
 };
 
+// The mips a probe's chain makes, from its resolution down to 2x2, which are the levels of the cube array the probes are
+// written into and sampled from: 7 at 128.
+static U32 probe_mip_count(U32 resolution)
+{
+    return (U32)(log2((F32)resolution) + 0.5f);
+}
+
 // Whether the camera's view holds any of the box an occlusion query of `probe` draws (LLReflectionMap::doOcclusion): a
 // probe outside it cannot hold a pixel the view shows. Against the frustum without its far plane, as the infinite
 // projection draws terrain and water past it.
@@ -347,7 +354,7 @@ void LLReflectionMapManager::update()
     if (mMipChain.empty())
     {
         U32 res = mProbeResolution;
-        U32 count = (U32)(log2((F32)res) + 0.5f);
+        U32 count = probe_mip_count(res);
 
         mMipChain.resize(count);
         for (U32 i = 0; i < count; ++i)
@@ -1085,7 +1092,7 @@ void LLReflectionMapManager::updateProbeFace(LLReflectionMap* probe, U32 face)
         }
 
 
-        S32 mips = (S32)(log2((F32)mProbeResolution) + 0.5f);
+        S32 mips = (S32)probe_mip_count(mProbeResolution);
 
         gReflectionMipProgram.bind();
         S32 diffuseChannel = gReflectionMipProgram.enableTexture(LLShaderMgr::DEFERRED_DIFFUSE);
@@ -1797,9 +1804,10 @@ void LLReflectionMapManager::initReflectionMaps()
                 mTexture = new LLCubeMapArray();
 
                 // store mReflectionProbeCount+2 cube maps, final two cube maps are used for render target and radiance map generation
-                // source)
+                // source). Only the levels the mip chain writes: a 1x1 level would hold nothing, and a tap at
+                // max_probe_lod filters toward it.
                 mTexture->allocate(mProbeResolution, 3, mReflectionProbeCount + 2, LLImageGLMemory::REFLECTION_PROBE, true,
-                                   mHDR);
+                                   mHDR, probe_mip_count(mProbeResolution));
                 new_texture = true;
             }
         }
