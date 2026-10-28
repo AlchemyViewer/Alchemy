@@ -111,6 +111,47 @@ namespace
         CHECK(counted < std::chrono::duration<F64>(outer_end - outer_start).count() + 0.001);
     }
 
+    TEST_CASE_METHOD(timer_data, "LLTimer: ms_sleep and micro_sleep sleep no less than they are asked", "[LLTimer]")
+    {
+        // In the counter's ticks, which the sleeps keep to: no fewer than the
+        // time asked comes to, rounded up as the sleep rounds it, and no more
+        // than a second past it, which only a sleep that lost its wake comes
+        // near. Below a millisecond as well, where a sleep in whole
+        // milliseconds would not sleep at all.
+        const F64 hz = get_timer_info().mClockFrequency.value();
+        const auto slept = [](auto sleep)
+            {
+                const U64 start = get_clock_count();
+                sleep();
+                return get_clock_count() - start;
+            };
+        for (U32 ms : { 1u, 2u, 5u })
+        {
+            INFO("ms_sleep(" << ms << ")");
+            const U64 asked = U64(std::ceil(F64(ms) * 1.0e-3 * hz));
+            for (int i = 0; i < 4; ++i)
+            {
+                const U64 ticks = slept([ms]() { ms_sleep(ms); });
+                CHECK(ticks >= asked);
+                CHECK(ticks < asked + U64(hz));
+            }
+        }
+        for (U64 us : { 1ull, 100ull, 500ull, 999ull, 1500ull })
+        {
+            INFO("micro_sleep(" << us << ")");
+            const U64 asked = U64(std::ceil(F64(us) * 1.0e-6 * hz));
+            for (int i = 0; i < 4; ++i)
+            {
+                const U64 ticks = slept([us]() { micro_sleep(us); });
+                CHECK(ticks >= asked);
+                CHECK(ticks < asked + U64(hz));
+            }
+        }
+        // Nothing asked is a yield.
+        CHECK(slept([]() { ms_sleep(0); }) < U64(hz));
+        CHECK(slept([]() { micro_sleep(0); }) < U64(hz));
+    }
+
     TEST_CASE_METHOD(timer_data, "LLTimer: total time read on many threads never steps back or runs fast", "[LLTimer]")
     {
         const auto steady_start = std::chrono::steady_clock::now();
