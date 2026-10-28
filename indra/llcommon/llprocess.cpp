@@ -32,6 +32,7 @@
 #include "llstring.h"
 #include "llevents.h"
 #include "llexception.h"
+#include "lltimer.h"
 #include "stringize.h"
 
 #include <boost/process/v2/process.hpp>
@@ -47,10 +48,8 @@
 #include <limits>
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstring>
 #include <errno.h>
-#include <thread>
 #include <vector>
 #include <typeinfo>
 #include <signal.h>
@@ -507,7 +506,7 @@ LLProcess::~LLProcess()
                 }
                 // Sleep before next poll: applies to both EINTR and
                 // still-running (w == 0) cases.
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                ms_sleep(100);
             }
 
             // Force kill if still running

@@ -15,6 +15,8 @@
 #include "linden_common.h"
 
 #include "alsharedmutex.h"
+#include "alprecisewaiter.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -69,7 +71,7 @@ namespace
                 {
                     return false;
                 }
-                std::this_thread::sleep_for(1ms);
+                ms_sleep(1);
             }
             return true;
         }
@@ -179,14 +181,14 @@ namespace
             while (!*stop)
             {
                 std::shared_lock<ALSharedMutex> lock(shared->mMutex);
-                std::this_thread::sleep_for(1ms);
+                ms_sleep(1);
             }
         };
         Worker reader1(read);
         Worker reader2(read);
         Worker reader3(read);
         Worker reader4(read);
-        std::this_thread::sleep_for(BLOCKED);
+        ALPreciseWaiter::sleepFor(BLOCKED);
 
         Worker waiting = writer();
         UNSCOPED_INFO("the readers kept the writer out");

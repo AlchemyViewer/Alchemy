@@ -31,17 +31,16 @@
 #include "llfontgl.h"
 #include "lllineeditor.h"
 #include "lltextbox.h"
+#include "lltimer.h"
 
 #include "alscriptstudio_fixture.h"
 #include "lltabcontainer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
 #include <map>
 #include <memory>
 #include <string>
-#include <thread>
 #include <vector>
 
 namespace
@@ -343,7 +342,7 @@ namespace
         REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("not at once");
         CHECK(out.search().found()[0].places[0].begin.column == 1);
-        std::this_thread::sleep_for(std::chrono::milliseconds(700));
+        ms_sleep(700);
         LLTabContainer* tabs = window.find<LLTabContainer>("bottom_tabs");
         REQUIRE(tabs != nullptr);
         tabs->selectTabByName("problems_tab");
@@ -684,7 +683,7 @@ namespace
         door.editor->setCaret(ALTextPos(0, 0));
         door.editor->insertText("x");
         out.typedIn(door);
-        std::this_thread::sleep_for(std::chrono::milliseconds(700));
+        ms_sleep(700);
         out.pump();
         REQUIRE_FALSE(out.search().found()[0].places.empty());
         UNSCOPED_INFO("typed in: searched again");

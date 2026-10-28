@@ -13,6 +13,7 @@
 #include "linden_common.h"
 // associated header
 #include "workqueue.h"
+#include "alprecisewaiter.h"
 // STL headers
 // std headers
 #include <chrono>
@@ -103,7 +104,9 @@ namespace
              data.get([](const Shared& data){ return data.size(); }) < 3; )
         {
             queue.runPending();
-            std::this_thread::sleep_for(interval/10);
+            // Often enough that a run is noted well inside the half
+            // interval it may be late, without spinning between looks.
+            ALPreciseWaiter::sleepFor(interval / 100.0);
         }
         // Take a copy of the captured deque.
         Shared result = data.get();

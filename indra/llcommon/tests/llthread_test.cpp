@@ -25,12 +25,12 @@
 #include "linden_common.h"
 
 #include "llthread.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
-#include <thread>
 
 namespace
 {
@@ -85,7 +85,7 @@ namespace
             {
                 return false;
             }
-            std::this_thread::yield();
+            LLThread::yield();
         }
         return true;
     }
@@ -128,7 +128,7 @@ namespace
         thread.pause();
         thread.start();
 
-        std::this_thread::sleep_for(50ms);
+        ms_sleep(50);
         UNSCOPED_INFO("a paused thread ran");
         CHECK(thread.mPasses.load() == 0);
 

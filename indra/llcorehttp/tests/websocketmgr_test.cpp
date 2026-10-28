@@ -30,6 +30,7 @@
 #include "llwebsocketmgr.h"
 #include "lljsonrpcws.h"
 #include "llsdjson.h"
+#include "lltimer.h"
 #include "workqueue.h"
 
 #include <boost/asio/io_context.hpp>
@@ -344,7 +345,7 @@ namespace
             {
                 return false;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            ms_sleep(10);
         }
         return true;
     }
@@ -1098,7 +1099,7 @@ namespace
                 const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
                 while (!mRelease && std::chrono::steady_clock::now() < deadline)
                 {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                    ms_sleep(1);
                 }
             }
             void onConnectionClosed(const LLWebsocketMgr::WSConnection::ptr_t&) override { ++mClosed; }

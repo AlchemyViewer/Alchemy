@@ -36,6 +36,7 @@
 
 #include <WERAPI.H>     // for WerAddExcludedApplication()
 
+#include "altimerresolutionscope.h"
 #include "llviewercontrol.h"
 #include "lldxhardware.h"
 
@@ -562,6 +563,10 @@ bool LLAppViewerWin32::init()
 {
     // Platform specific initialization.
 
+    // What a sleep, a wait's timeout or a timed condition variable of the
+    // system's own rounds to, for the whole run.
+    mTimerResolution = std::make_unique<ALTimerResolutionScope>(1);
+
 #ifndef LL_RELEASE_FOR_DOWNLOAD
     // Merely requesting the LLSingleton instance initializes it.
     LLWinDebug::instance();
@@ -581,6 +586,8 @@ bool LLAppViewerWin32::cleanup()
 
     gDXHardware.cleanup();
     cleanupConsole();
+
+    mTimerResolution.reset();
 
     return result;
 }

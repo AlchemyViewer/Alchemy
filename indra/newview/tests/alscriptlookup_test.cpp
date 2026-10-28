@@ -33,6 +33,7 @@
 #include "almainloop.h"
 #include "alteststateguard.h"
 #include "llfile.h"
+#include "lltimer.h"
 #include "workqueue.h"
 
 #include "../alscriptstudiowords.h"
@@ -46,7 +47,6 @@
 #include <chrono>
 #include <filesystem>
 #include <sstream>
-#include <thread>
 
 // A script's id, and what the preprocessor calls a script and a file, as
 // the studio's tests' stubs of the viewer's spell them
@@ -1425,7 +1425,7 @@ namespace
                 {
                     return true;
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                ms_sleep(5);
             }
             return false;
         };
