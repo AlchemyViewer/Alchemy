@@ -89,7 +89,15 @@ namespace
             });
         llcoro::suspend();
         queue.push(Queue::Clock::now() + 50ms, "later"s);
-        REQUIRE(finished.wait_for(15s));
+        const bool finished_in_time(finished.wait_for(15s));
+        if (! finished_in_time)
+        {
+            // The coroutine holds this case's locals: closing the queue
+            // ends its wait, so it is done with them before they go.
+            queue.close();
+            finished.wait();
+        }
+        REQUIRE(finished_in_time);
         CHECK(popped);
         CHECK(got == "later"s);
         CHECK(popped_at >= 0.05);
