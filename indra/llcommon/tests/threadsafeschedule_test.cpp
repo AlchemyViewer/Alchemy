@@ -19,6 +19,10 @@
 // external library headers
 // other Linden headers
 #include <catch2/catch_test_macros.hpp>
+#include "llcond.h"
+#include "llcoros.h"
+#include "lleventcoro.h"
+#include "lltimer.h"
 
 using namespace std::literals::chrono_literals; // ms suffix
 using namespace std::literals::string_literals; // s suffix
@@ -63,5 +67,32 @@ namespace
         UNSCOPED_INFO("queue not empty");
         CHECK_FALSE(popped);
         CHECK(queue.done());
+    }
+
+    TEST_CASE_METHOD(threadsafeschedule_data, "threadsafeschedule: a consumer already waiting pops an entry pushed for later at its time", "[threadsafeschedule]")
+    {
+        // The consumer, a coroutine, is waiting on the empty queue for up to
+        // ten seconds when the entry is pushed, due 50 ms on. Coroutines on
+        // one thread take turns only when one suspends, so it is certainly
+        // waiting by then. Its wait has to end at the entry's time, not run
+        // on to its own limit.
+        LLTimer       waited;
+        std::string   got;
+        bool          popped{ false };
+        F64           popped_at{ 0.0 };
+        LLOneShotCond finished;
+        LLCoros::instance().launch("threadsafeschedule consumer", [&]()
+            {
+                popped = queue.tryPopFor(10s, got);
+                popped_at = waited.getElapsedTimeF64();
+                finished.set_one();
+            });
+        llcoro::suspend();
+        queue.push(Queue::Clock::now() + 50ms, "later"s);
+        REQUIRE(finished.wait_for(15s));
+        CHECK(popped);
+        CHECK(got == "later"s);
+        CHECK(popped_at >= 0.05);
+        CHECK(popped_at < 5.0);
     }
 } // anonymous namespace

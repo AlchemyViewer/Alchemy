@@ -323,26 +323,25 @@ namespace LL
         pop_result tryPopUntil_(lock_t& lock, const TimePoint& until, TimeTuple& tuple)
         {
             LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-            TimePoint adjusted = until;
-            if (! super::mStorage.empty())
+            while (true)
             {
-                LL_PROFILE_ZONE_NAMED("tpu - adjust");
-                // use whichever is earlier: the head item's timestamp, or
-                // the caller's limit
-                adjusted = min(std::get<0>(super::mStorage.front()), adjusted);
-            }
-            // now delegate to base-class tryPopUntil_()
-            pop_result popped;
-            {
-                LL_PROFILE_ZONE_NAMED("tpu - super");
-                while ((popped = pop_result(super::tryPopUntil_(lock, adjusted, tuple))) == WAITING)
+                pop_result popped = pop_result(super::pop_(lock, tuple));
+                if (popped == POPPED || popped == DONE || Clock::now() >= until)
                 {
-                    // If super::tryPopUntil_() returns WAITING, it means there's
-                    // a head item, but it's not yet time. But it's worth looping
-                    // back to recheck.
+                    return popped;
                 }
+                // EMPTY, or WAITING for the head item's timestamp. Wait no
+                // later than whichever is earlier, that or the caller's limit,
+                // worked out again after every wake: a push may have put an
+                // earlier item at the head, which waiting on to the time
+                // worked out before it would miss.
+                TimePoint adjusted = until;
+                if (! super::mStorage.empty())
+                {
+                    adjusted = min(std::get<0>(super::mStorage.front()), adjusted);
+                }
+                super::mEmptyCond.wait_until(lock, adjusted);
             }
-            return popped;
         }
 
         /// tryPopUntil(DataTuple&)
