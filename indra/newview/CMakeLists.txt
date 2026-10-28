@@ -265,6 +265,7 @@ if(AL_BUILD_VIEWER)
     allightboxdirectory.cpp
     almotionpredictor.cpp
     alobjectproperties.cpp
+    alregionretirement.cpp
     alagentlocationformat.cpp
     alcrashreporter.cpp
     alcrashreporter_run.cpp
@@ -1146,6 +1147,7 @@ if(AL_BUILD_VIEWER)
     almotionpredictor.h
     alobjectproperties.h
     alobjectroster.h
+    alregionretirement.h
     alagentlocationformat.h
     alcrashreporter.h
     alfeedback.h
@@ -2540,6 +2542,7 @@ if(AL_BUILD_TESTS)
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
+      tests/alregionretirement_test.cpp
       tests/alrecoverykeeper_test.cpp
       tests/alsceneexplorerpredicate_test.cpp
       tests/alscopedata_test.cpp

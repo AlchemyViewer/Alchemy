@@ -462,6 +462,12 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         return;
     }
 
+    if (regionp->isRetiring())
+    {
+        // its objects are being killed, and nothing new of it is wanted
+        return;
+    }
+
     // A variable block can be as large as the packet that carried it, and the
     // message reader never yields a packet larger than MAX_BUFFER_SIZE.
     U8 compressed_dpbuffer[MAX_BUFFER_SIZE];
@@ -737,6 +743,12 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
     if (!regionp)
     {
         LL_WARNS() << "Object update from unknown region! " << region_handle << LL_ENDL;
+        return;
+    }
+
+    if (regionp->isRetiring())
+    {
+        // its objects are being killed, and nothing new of it is wanted
         return;
     }
 
