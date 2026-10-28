@@ -368,6 +368,7 @@ if(AL_BUILD_TESTS)
       tests/lluri_test.cpp
       tests/lluuid_test.cpp
       tests/stringize_test.cpp
+      tests/threadpool_test.cpp
       tests/threadsafeschedule_test.cpp
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
