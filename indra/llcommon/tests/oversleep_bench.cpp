@@ -200,6 +200,12 @@ namespace
         std::atomic<bool> stop{ false };
         LL::ThreadPool load("oversleep_bench_load", cores, 64, false, true);
         load.start();
+        // However the table ends, a check that throws among them, the load stops before the pool joins its threads.
+        struct StopLoad
+        {
+            std::atomic<bool>& mStop;
+            ~StopLoad() { mStop = true; }
+        } stop_load{ stop };
         for (size_t i = 0; i < cores; ++i)
         {
             REQUIRE(load.getQueue().post([&stop]()
@@ -213,7 +219,6 @@ namespace
         }
         std::snprintf(condition, sizeof(condition), "%zu logical processors busy, %s", cores, resolution);
         runTable(condition, rows);
-        stop = true;
     }
 
     TEST_CASE("oversleep_bench: each wait idle and with every core busy", "[oversleep_bench][!benchmark]")
@@ -222,9 +227,12 @@ namespace
 
         runTables("the default timer resolution");
 #if LL_WINDOWS
+        // 1 ms, as the viewer asks, or the finest the system can do.
         const ALTimerResolutionScope resolution(1);
-        REQUIRE(resolution.period() == 1);
-        runTables("a 1 ms timer resolution held");
+        REQUIRE(resolution.period() != 0);
+        char held[64];
+        std::snprintf(held, sizeof(held), "a %u ms timer resolution held", resolution.period());
+        runTables(held);
 #endif
     }
 }
