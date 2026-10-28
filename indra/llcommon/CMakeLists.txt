@@ -376,8 +376,9 @@ if(AL_BUILD_TESTS)
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
     # The viewer's own patterns under Boost.Regex and under RE2, side by
-    # side, over the text each is run on; and the cost of its locks.
-    BENCH_SOURCES tests/alregex_bench.cpp tests/llmutex_bench.cpp
+    # side, over the text each is run on; the cost of its locks; and how late
+    # its waits wake.
+    BENCH_SOURCES tests/alregex_bench.cpp tests/llmutex_bench.cpp tests/oversleep_bench.cpp
     SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )
