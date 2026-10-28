@@ -174,6 +174,11 @@ protected:
     // checkWork(): if doWork is complete or aborted, call endWork() and return true
     bool checkWork(bool aborting = false);
 
+    // wakeWork(): any thread, with no lock needed: what doWork() returned
+    // false to wait on has happened, so it runs again now rather than at its
+    // next retry
+    void wakeWork();
+
 private:
     // Each is one atomic read-modify-write. The flags are written from the work thread without
     // mMutex (WorkRequest::finishRequest) and from the main thread with and without it, so a
@@ -192,7 +197,9 @@ private:
 protected:
     LLWorkerThread* mWorkerThread;
     std::string mWorkerClassName;
-    handle_t mRequestHandle;
+    // Written under mMutex; atomic so that wakeWork() can read it from a
+    // callback without taking a lock in the callback's own lock order.
+    std::atomic<handle_t> mRequestHandle;
 
 private:
     LLMutex mMutex;

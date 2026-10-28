@@ -327,6 +327,15 @@ void LLWorkerClass::abortWork(bool autocomplete)
     mMutex.unlock();
 }
 
+void LLWorkerClass::wakeWork()
+{
+    const handle_t handle(mRequestHandle.load());
+    if (handle != LLWorkerThread::nullHandle())
+    {
+        mWorkerThread->wakeRequest(handle);
+    }
+}
+
 // if doWork is complete or aborted, call endWork() and return true
 bool LLWorkerClass::checkWork(bool aborting)
 {

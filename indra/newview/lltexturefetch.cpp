@@ -2121,6 +2121,10 @@ void LLTextureFetchWorker::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRe
 
     mHttpActive = false;
 
+    // Whichever way this ends, doWork has something to act on. This runs on
+    // the fetch thread, so it runs again once this returns.
+    wakeWork();
+
     if (log_to_viewer_log || log_to_sim)
     {
         mFetcher->mTextureInfo.setRequestStartTime(mID, mMetricsStartTime.value());
@@ -2473,6 +2477,7 @@ void LLTextureFetchWorker::callbackCacheRead(bool success, LLImageFormatted* ima
         }
     }
     mLoaded = true;
+    wakeWork();
 }                                                                       // -Mw
 
 // Threads:  Ttc
@@ -2485,6 +2490,7 @@ void LLTextureFetchWorker::callbackCacheWrite(bool success)
         return;
     }
     mWritten = true;
+    wakeWork();
 }                                                                       // -Mw
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2534,6 +2540,7 @@ void LLTextureFetchWorker::callbackDecoded(bool success, const std::string &erro
         mDecodedDiscard = -1; // Redundant, here for clarity and paranoia
     }
     mDecoded = true;
+    wakeWork();
 //  LL_INFOS(LOG_TXT) << mID << " : DECODE COMPLETE " << LL_ENDL;
 }                                                                       // -Mw
 
