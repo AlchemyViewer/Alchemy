@@ -41,18 +41,11 @@
 #include <intrin.h>     // __umulh
 #endif
 
-class LLMutex;
-
 const S32 UUID_BYTES = 16;
 const S32 UUID_WORDS = 4;
 const S32 UUID_STR_LENGTH = 37; // number of bytes needed to store a UUID as a string
 const S32 UUID_STR_SIZE = 36; // .size() of a UUID in a std::string
 const S32 UUID_BASE85_LENGTH = 21; // including the trailing NULL.
-
-struct uuid_time_t {
-    U32 high;
-    U32 low;
-        };
 
 class LL_COMMON_API LLUUID
 {
@@ -83,7 +76,9 @@ public:
     //
     // MANIPULATORS
     //
-    void    generate();                 // Generate a new UUID
+    // A random UUID, version 4 as RFC 9562 lays it out, on any thread
+    // without a lock.
+    void    generate();
     void    generate(const std::string& stream); //Generate a new UUID based on hash of input stream
 
     //static versions of above for use in initializer expressions such as constructor params, etc.
@@ -93,10 +88,6 @@ public:
     bool    set(const char *in_string, bool emit = true);   // Convert from string, if emit is false, do not emit warnings
     bool    set(const std::string& in_string, bool emit = true);    // Convert from string, if emit is false, do not emit warnings
     void    setNull();                  // Faster than setting to LLUUID::null.
-
-    S32     cmpTime(uuid_time_t *t1, uuid_time_t *t2);
-    static void    getSystemTime(uuid_time_t *timestamp);
-    void    getCurrentTime(uuid_time_t *timestamp);
 
     //
     // ACCESSORS
@@ -142,7 +133,6 @@ public:
     static bool validate(const std::string& in_string); // Validate that the UUID string is legal.
 
     static const LLUUID null;
-    static LLMutex * mMutex;
 
     static S32 getNodeID(unsigned char * node_id);
 

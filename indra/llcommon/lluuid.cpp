@@ -30,10 +30,15 @@
 
 #if LL_WINDOWS
 #include "llwin32headers.h"
+#include <bcrypt.h>
 #include <iphlpapi.h>
+#elif LL_DARWIN
+#include <stdlib.h>
+#else
+#include <errno.h>
+#include <sys/random.h>
 #endif
 
-#include "llapp.h"
 #include "lldefs.h"
 #include "llerror.h"
 
@@ -42,15 +47,69 @@
 #include "llerror.h"
 #include "llrand.h"
 #include "llstring.h"
-#include "lltimer.h"
-#include "llthread.h"
-#include "llmutex.h"
 #include "llmd5.h"
 
 #include <array>
 
-// static
-LLMutex* LLUUID::mMutex = NULL;
+namespace
+{
+    // Bytes from the system's cryptographic generator, a thread's buffer
+    // at a time: nothing shared between threads to lock, and a call into
+    // the system for every sixteen UUIDs rather than every one.
+    struct RandomBuffer
+    {
+        std::array<U8, UUID_BYTES * 16> mBytes{};
+        size_t                          mUsed = UUID_BYTES * 16;
+    };
+    thread_local RandomBuffer tRandom;
+
+    bool systemRandom(U8* out, size_t count)
+    {
+#if LL_WINDOWS
+        return BCRYPT_SUCCESS(BCryptGenRandom(nullptr, out, static_cast<ULONG>(count), BCRYPT_USE_SYSTEM_PREFERRED_RNG));
+#elif LL_DARWIN
+        arc4random_buf(out, count);
+        return true;
+#else
+        while (count > 0)
+        {
+            const ssize_t got = getrandom(out, count, 0);
+            if (got < 0)
+            {
+                if (errno == EINTR)
+                {
+                    continue;
+                }
+                return false;
+            }
+            out += got;
+            count -= static_cast<size_t>(got);
+        }
+        return true;
+#endif
+    }
+
+    // At most the buffer's size.
+    void randomBytes(U8* out, size_t count)
+    {
+        RandomBuffer& buffer = tRandom;
+        if (buffer.mBytes.size() - buffer.mUsed < count)
+        {
+            if (!systemRandom(buffer.mBytes.data(), buffer.mBytes.size()))
+            {
+                LL_WARNS_ONCE("LLUUID") << "The system's random generator failed; UUIDs come from ll_rand" << LL_ENDL;
+                for (size_t i = 0; i < buffer.mBytes.size(); i += sizeof(U32))
+                {
+                    const U32 bits = ll_rand_u32();
+                    memcpy(buffer.mBytes.data() + i, &bits, sizeof(bits)); /* Flawfinder: ignore */
+                }
+            }
+            buffer.mUsed = 0;
+        }
+        memcpy(out, buffer.mBytes.data() + buffer.mUsed, count); /* Flawfinder: ignore */
+        buffer.mUsed += count;
+    }
+}
 
 // Defined here rather than as an inline constexpr in lluuid.h: LLUUID /
 // LLTransactionID are exported (LL_COMMON_API), so these static members are
@@ -426,17 +485,6 @@ std::istream& operator>>(std::istream& s, LLUUID& uuid)
     return s;
 }
 
-static void get_random_bytes(void* buf, int nbytes)
-{
-    U8*          cp    = static_cast<U8*>(buf);
-    const size_t count = static_cast<size_t>(nbytes);
-    for (size_t i = 0; i < count; i += sizeof(U32))
-    {
-        const U32 bits = ll_rand_u32();
-        memcpy(cp + i, &bits, std::min(sizeof(bits), count - i)); /* Flawfinder: ignore */
-    }
-}
-
 #if LL_WINDOWS
 
 // static
@@ -699,181 +747,14 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
 
 #endif
 
-S32 LLUUID::cmpTime(uuid_time_t* t1, uuid_time_t* t2)
-{
-    // Compare two time values.
-
-    if (t1->high < t2->high) return -1;
-    if (t1->high > t2->high) return 1;
-    if (t1->low < t2->low)  return -1;
-    if (t1->low > t2->low)  return 1;
-    return 0;
-}
-
-void LLUUID::getSystemTime(uuid_time_t* timestamp)
-{
-    // Get system time with 100ns precision. Time is since Oct 15, 1582.
-#if LL_WINDOWS
-    ULARGE_INTEGER time;
-    GetSystemTimeAsFileTime((FILETIME*)&time);
-    // NT keeps time in FILETIME format which is 100ns ticks since
-    // Jan 1, 1601. UUIDs use time in 100ns ticks since Oct 15, 1582.
-    // The difference is 17 Days in Oct + 30 (Nov) + 31 (Dec)
-    // + 18 years and 5 leap days.
-    time.QuadPart +=
-        (unsigned __int64)(1000 * 1000 * 10)       // seconds
-        * (unsigned __int64)(60 * 60 * 24)       // days
-        * (unsigned __int64)(17 + 30 + 31 + 365 * 18 + 5); // # of days
-
-    timestamp->high = time.HighPart;
-    timestamp->low = time.LowPart;
-#else
-    struct timeval tp;
-    gettimeofday(&tp, 0);
-
-    // Offset between UUID formatted times and Unix formatted times.
-    // UUID UTC base time is October 15, 1582.
-    // Unix base time is January 1, 1970.
-    U64 uuid_time = ((U64)tp.tv_sec * 10000000) + (tp.tv_usec * 10) +
-        U64L(0x01B21DD213814000);
-    timestamp->high = (U32)(uuid_time >> 32);
-    timestamp->low = (U32)(uuid_time & 0xFFFFFFFF);
-#endif
-}
-
-void LLUUID::getCurrentTime(uuid_time_t* timestamp)
-{
-    // Get current time as 60 bit 100ns ticks since whenever.
-    // Compensate for the fact that real clock resolution is less
-    // than 100ns.
-
-    const U32 uuids_per_tick = 1024;
-
-    static uuid_time_t time_last;
-    static U32    uuids_this_tick;
-    static bool     init = false;
-
-    if (!init) {
-        getSystemTime(&time_last);
-        uuids_this_tick = uuids_per_tick;
-        init = true;
-        mMutex = new LLMutex();
-    }
-
-    uuid_time_t time_now = { 0,0 };
-
-    while (1) {
-        getSystemTime(&time_now);
-
-        // if clock reading changed since last UUID generated
-        if (cmpTime(&time_last, &time_now)) {
-            // reset count of uuid's generated with this clock reading
-            uuids_this_tick = 0;
-            break;
-        }
-        if (uuids_this_tick < uuids_per_tick) {
-            uuids_this_tick++;
-            break;
-        }
-        // going too fast for our clock; spin
-    }
-
-    time_last = time_now;
-
-    if (uuids_this_tick != 0) {
-        if (time_now.low & 0x80000000) {
-            time_now.low += uuids_this_tick;
-            if (!(time_now.low & 0x80000000))
-                time_now.high++;
-        }
-        else
-            time_now.low += uuids_this_tick;
-    }
-
-    timestamp->high = time_now.high;
-    timestamp->low = time_now.low;
-}
-
 void LLUUID::generate()
 {
-    // Create a UUID.
-    uuid_time_t timestamp;
-
-    static unsigned char node_id[6];    /* Flawfinder: ignore */
-    static int has_init = 0;
-
-    // Create a UUID.
-    static uuid_time_t time_last = { 0,0 };
-    static U16 clock_seq = 0;
-
-    if (!has_init)
-    {
-        has_init = 1;
-        if (getNodeID(node_id) <= 0)
-        {
-            get_random_bytes(node_id, 6);
-            /*
-             * Set multicast bit, to prevent conflicts
-             * with IEEE 802 addresses obtained from
-             * network cards: the least significant bit
-             * of the first octet (RFC 4122, 4.5).
-             */
-            node_id[0] |= 0x01;
-        }
-
-        getCurrentTime(&time_last);
-
-        clock_seq = (U16)ll_rand(0x4000);
-    }
-
-    // get current time
-    getCurrentTime(&timestamp);
-    U16 our_clock_seq = clock_seq;
-
-    // if clock hasn't changed or went backward, change clockseq
-    if (cmpTime(&timestamp, &time_last) != 1)
-    {
-        LLMutexLock lock(mMutex);
-        clock_seq = (clock_seq + 1) & 0x3FFF;
-        if (clock_seq == 0)
-            clock_seq++;
-        our_clock_seq = clock_seq;  // Ensure we're using a different clock_seq value from previous time
-    }
-
-    time_last = timestamp;
-
-    memcpy(mData + 10, node_id, 6);     /* Flawfinder: ignore */
-    U32 tmp;
-    tmp = timestamp.low;
-    mData[3] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[2] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[1] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[0] = (unsigned char)tmp;
-
-    tmp = (U16)timestamp.high;
-    mData[5] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[4] = (unsigned char)tmp;
-
-    tmp = (timestamp.high >> 16) | 0x1000;
-    mData[7] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[6] = (unsigned char)tmp;
-
-    tmp = our_clock_seq;
-
-    mData[9] = (unsigned char)tmp;
-    tmp >>= 8;
-    mData[8] = (unsigned char)tmp;
-
-    LLMD5 md5_uuid;
-
-    md5_uuid.update(mData, 16);
-    md5_uuid.finalize();
-    md5_uuid.raw_digest(mData);
+    // 122 random bits, with the version and variant RFC 9562 gives a random
+    // UUID. Nothing of the time or the machine is in it, and nothing is
+    // shared between threads that make them.
+    randomBytes(mData, UUID_BYTES);
+    mData[6] = (mData[6] & 0x0F) | 0x40;
+    mData[8] = (mData[8] & 0x3F) | 0x80;
 }
 
 void LLUUID::generate(const std::string& hash_string)
