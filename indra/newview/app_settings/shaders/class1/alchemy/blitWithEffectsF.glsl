@@ -61,7 +61,7 @@ uniform float     uRefWipePos;      // Seam position, 0..1 across the frame.
 // Forward Declarations
 // =============================================================================
 
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 
 // From postEffectUtilsF.glsl (auto-linked via mFeatures.hasPostEffects).
 vec2  applyLensDistortion(vec2 uv);
@@ -209,7 +209,7 @@ void main()
     diff.rgb = applyPreview(diff.rgb);   // debug only — no-op when uPreviewMode == 0
     diff.rgb = applyWipeSeam(diff.rgb, vary_fragcoord.xy);
 
-    diff.rgb = clampHDRRange(diff.rgb);
+    diff.rgb = clampRadiance(diff.rgb, MAX_SCENE_RADIANCE);
     frag_color = diff;
 
     // Reverse-Z neutral: copies the raw stored depth value verbatim, no convention math.

@@ -41,17 +41,22 @@
 /// - A box's influence volume is what the shader tests against, and inside it the shader samples no automatic probe at
 ///   all, so containment in the box is the whole condition: the automatic probe's bounding sphere clears all three axes
 ///   of the box, in its own frame, where it is an axis-aligned box of its half-scale.
-/// - A sphere does not exclude automatic probes; it blends against them, weighted by sphereWeight's dw, which saturates
-///   to fully placed everywhere inside half its radius, where the attenuation ramp begins (r1 = r * 0.5 in
-///   class3/deferred/reflectionProbeF.glsl; the two have to agree, or this evicts a probe still contributing).
-///   Containment in that inner half is the condition under which dropping the automatic probe cannot change a pixel.
+/// - A sphere does not exclude automatic probes; it blends against them by sphereWeight's dw, and probeMix takes the
+///   placed probes alone wherever their dw reaches 1 (class3/deferred/reflectionProbeF.glsl). For a probe faded fully
+///   in that is everywhere within sphereFullWeightRadius(), which mirrors dw, and the two have to agree, or this evicts
+///   a probe still contributing. Toward the sphere's edge, past that radius, the automatic probes show through, so a
+///   sphere merely enclosing one does not hide it: containment within that radius is the condition under which
+///   dropping the automatic probe cannot change a pixel.
 ///
 /// A margin is metres of slack added to the placed probe's volume, for hysteresis. Values only; no GL.
 class ALProbeEclipse
 {
 public:
-    /// The fraction of a sphere's radius inside which it weighs fully against the automatic probes.
-    static constexpr F32 SPHERE_FULL_WEIGHT_FRACTION = 0.5f;
+    /// The radius within which a sphere probe of `radius`, faded fully in, weighs fully against the automatic probes:
+    /// where sphereWeight's dw, 4 max(r, 1) (1 - max(d - r/2, 0) / (r/2)) / d, is at least 1. That is everywhere within
+    /// half the radius, where the attenuation has not begun, and out to 8 m r / (r + 8 m) with m = max(r, 1): eight
+    /// ninths of the radius from a metre up.
+    static F32 sphereFullWeightRadius(F32 radius);
 
     /// Forgets the placed probes, keeping the room they took. `max_margin` is the largest margin eclipses() will be
     /// asked with.

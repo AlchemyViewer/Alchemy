@@ -66,7 +66,6 @@ uniform vec3  halation_tint;
 // =============================================================================
 
 vec3 linear_to_srgb(vec3 cl);
-vec3 clampHDRRange(vec3 color);
 
 #ifdef TONEMAP
 vec3 applyExposure(vec3 color);

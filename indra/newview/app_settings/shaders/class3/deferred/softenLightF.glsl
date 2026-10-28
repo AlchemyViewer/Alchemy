@@ -109,7 +109,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
 
 GBufferInfo getGBuffer(vec2 screenpos);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
 {
@@ -154,7 +154,8 @@ void writeColor(vec3 color)
     if (classic_mode > 0)
         final_scale = 1.1;
 
-    frag_color.rgb = clampHDRRange(color.rgb * final_scale); //output linear since local lights will be added to this shader's results
+    // Output linear, held to half the scene's range: the local lights add onto it (MAX_SURFACE_RADIANCE).
+    frag_color.rgb = clampRadiance(color.rgb * final_scale, MAX_SURFACE_RADIANCE);
     frag_color.a = 0.0;
 }
 

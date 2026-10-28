@@ -808,15 +808,28 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     // local lights' 3.25 would have moved the sun across the whole opaque scene in order to
     // settle a disagreement between two local-light paths. Only the deferred local lights move.
     extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
-    // A guard against a divide that ran away, not a look control. At 10.0 it was neither: the
-    // peak of F*Vis*D at the roughness floor is about 776 for a dielectric and 19400 for a
-    // white metal, so a ceiling of 10 flat-topped the highlight on every dielectric below
-    // roughness 0.13 and every metal below 0.30 -- most polished material in a scene -- and did
-    // it in linear space ahead of exposure, pre-empting the tonemapper that exists to compress
-    // exactly these values. This sits above anything the roughness floor permits, so it now
-    // only catches a NaN or an infinity. Bloom's exposure to sub-pixel glints is bounded at
-    // bloomExtractF instead, which is where that artifact is actually made.
-    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     65504.0\n");
+    // The ceilings of clampRadiance (deferredUtil.glsl), the one clamp the passes share. Each is a
+    // share of the RGBA16F scene, whose largest value is 65504 and which stores anything past it as
+    // an infinity: one infinite pixel becomes a NaN that bloom's pyramid spreads over the whole frame
+    // and a probe capture over its whole probe. Bounds on the target, not look controls.
+    //
+    // MAX_PUNCTUAL_RADIANCE is the most a punctual light adds to a pixel, intensity included, and
+    // the most a light pass writes. It flattens nothing the frame can show: at the meter's darkest
+    // default (EV 2, a quarter) it is still 128, past ACES's white, and bloom takes far less of it
+    // (bloomExtractF's firefly clamp). The lobe alone goes past it -- the peak of F*Vis*D at the
+    // roughness floor is about 776 for a dielectric and 19400 for a white metal, before a light's
+    // intensity of up to six times its colour -- while a ceiling as low as 10 would flat-top most
+    // polished material ahead of exposure.
+    //
+    // MAX_SURFACE_RADIANCE is the most the soften pass writes, which the light passes then add onto:
+    // half the scene's range, so that it and 63 light passes at MAX_PUNCTUAL_RADIANCE on one pixel
+    // still fit.
+    //
+    // MAX_SCENE_RADIANCE is the most anything else written whole into the scene carries: the sky,
+    // forward alpha and the post passes, which no light pass adds onto.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     512.0\n");
+    extra_code_text[extra_code_count++] = strdup("#define MAX_SURFACE_RADIANCE      32752.0\n");
+    extra_code_text[extra_code_count++] = strdup("#define MAX_SCENE_RADIANCE        65504.0\n");
 
     // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of
     // any one program, so it is injected here instead of riding a defines map. The map

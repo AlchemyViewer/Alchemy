@@ -89,6 +89,12 @@ void main()
     float ev = target;
 #ifdef USE_LAST_EXPOSURE
     float prev = texture(exposureMap, vec2(0.5, 0.5)).g;
+    // The history adapts from itself, so a frame that ever wrote a non-finite EV would keep it
+    // for good; start again from this frame's instead.
+    if (isnan(prev) || isinf(prev))
+    {
+        prev = target;
+    }
     float rate = target > prev ? dynamic_exposure_params2.z : dynamic_exposure_params2.w;
     ev = mix(prev, target, 1.0 - exp(-rate * dt));
 #endif

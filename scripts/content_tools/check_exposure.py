@@ -121,6 +121,8 @@ def exposure(bins, params, params2, prev=None, dt=0.0):
 
     ev = target
     if prev is not None:
+        if not math.isfinite(prev):
+            prev = target
         rate = params2[2] if target > prev else params2[3]
         ev = prev + (target - prev) * (1.0 - math.exp(-rate * dt))
 
@@ -247,6 +249,16 @@ def check_black(ck):
     ck.expect("a black frame opens up to the minimum EV", ev == DEFAULTS["min_ev"], "EV %.3f" % ev)
 
 
+def check_broken_history(ck):
+    print("(f) a non-finite history")
+    grid = uniform_grid(KEY * 2.0)
+    _, fresh, target = meter(grid)
+    for bad in (float("nan"), float("inf"), float("-inf")):
+        _, ev, _ = meter(grid, prev=bad, dt=1.0 / 60)
+        ck.expect("a %s history starts again from the frame's own EV" % bad, ev == target and ev == fresh,
+                  "EV %.3f, target %.3f" % (ev, target))
+
+
 def main():
     ck = Checker()
     check_calibration(ck)
@@ -254,6 +266,7 @@ def main():
     check_trim(ck)
     check_adaptation(ck)
     check_black(ck)
+    check_broken_history(ck)
     print("RESULT: %s" % ("OK" if ck.failures == 0 else "MISMATCH"))
     return 0 if ck.failures == 0 else 1
 

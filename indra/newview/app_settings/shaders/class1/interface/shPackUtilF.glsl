@@ -110,7 +110,9 @@ uvec4 shPackTexel(int t, vec3 sums[4])
     {
         int k    = 8 * t + j;  // the half's place in the row
         int coef = k / 3;
-        h[j] = (coef < 9) ? sums[coef - first][k - 3 * coef] : 0.0;
+        // Held to a half's range, which would store anything past it as an infinity, and an
+        // infinity reconstructs as a NaN where a band of the other sign meets it.
+        h[j] = (coef < 9) ? clamp(sums[coef - first][k - 3 * coef], -65504.0, 65504.0) : 0.0;
     }
 
     return uvec4(shPackHalves(vec2(h[0], h[1])), shPackHalves(vec2(h[2], h[3])),

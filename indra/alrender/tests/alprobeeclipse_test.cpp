@@ -29,6 +29,7 @@
 
 #include "../alprobeeclipse.h"
 
+#include <algorithm>
 #include <cmath>
 #include <random>
 #include <vector>
@@ -50,7 +51,7 @@ namespace
     };
 
     // That test, as it was: the box in its own frame, the offset turned back by the probe's rotation; the sphere's
-    // inner half.
+    // fully weighted radius.
     bool pairwise(const Placed& placed, const LLVector3& centre, F32 radius, F32 margin)
     {
         const LLVector3 delta = centre - placed.mCentre;
@@ -62,7 +63,7 @@ namespace
                 && std::fabs(local.mV[1]) + radius <= placed.mHalf.mV[1] + margin
                 && std::fabs(local.mV[2]) + radius <= placed.mHalf.mV[2] + margin;
         }
-        return delta.length() + radius <= placed.mRadius * ALProbeEclipse::SPHERE_FULL_WEIGHT_FRACTION + margin;
+        return delta.length() + radius <= ALProbeEclipse::sphereFullWeightRadius(placed.mRadius) + margin;
     }
 
     // How near `centre` lies to the edge of the pairwise test, in metres: within a rounding of it, that test's arithmetic
@@ -81,7 +82,7 @@ namespace
             }
             return nearest;
         }
-        return std::fabs(placed.mRadius * ALProbeEclipse::SPHERE_FULL_WEIGHT_FRACTION + margin - delta.length() - radius);
+        return std::fabs(ALProbeEclipse::sphereFullWeightRadius(placed.mRadius) + margin - delta.length() - radius);
     }
 
     void add(ALProbeEclipse& eclipse, const Placed& placed)
@@ -128,16 +129,54 @@ TEST_CASE("alprobeeclipse: a turned box swallows along its own axes", "[alprobee
     }
 }
 
-// A sphere swallows only what lies within the half of its radius it weighs fully against the automatic probes.
-TEST_CASE("alprobeeclipse: a sphere swallows within its fully weighted half", "[alprobeeclipse]")
+// The fully weighted radius is where sphereWeight's distance weight (class3/deferred/reflectionProbeF.glsl), for a probe
+// faded fully in, reaches 1, at every radius: inside it probeMix takes the placed probes alone.
+TEST_CASE("alprobeeclipse: a sphere weighs fully exactly within its fully weighted radius", "[alprobeeclipse]")
+{
+    const auto shader_dw = [](F32 d, F32 r)
+    {
+        const F32 r1    = r * 0.5f;
+        const F32 d2    = std::max(d, 0.001f);
+        const F32 atten = 1.f - std::max(d2 - r1, 0.f) / std::max(r - r1, 0.001f);
+        return (1.f / d2) * atten * std::max(r, 1.f) * 4.f;
+    };
+
+    for (const F32 r : { 0.25f, 0.5f, 1.f, 2.f, 4.f, 20.f, 64.f })
+    {
+        const F32 full = ALProbeEclipse::sphereFullWeightRadius(r);
+        INFO("radius " << r << " fully weighted to " << full);
+        CHECK(full >= r * 0.5f);
+        CHECK(full < r);
+        for (U32 i = 1; i <= 1000; ++i)
+        {
+            const F32 d = r * (F32)i / 1000.f;
+            if (std::fabs(d - full) < r * 1e-4f)
+            {
+                continue;
+            }
+            INFO("at " << d);
+            CHECK((shader_dw(d, r) >= 1.f) == (d <= full));
+        }
+    }
+    CHECK(ALProbeEclipse::sphereFullWeightRadius(0.f) == 0.f);
+}
+
+// A sphere swallows what lies within the radius it weighs fully against the automatic probes, and not what only lies
+// within the sphere.
+TEST_CASE("alprobeeclipse: a sphere swallows within its fully weighted radius", "[alprobeeclipse]")
 {
     ALProbeEclipse eclipse;
     eclipse.clear(HYSTERESIS);
+    // Fully weighted to 160/9, about 17.8 m.
     eclipse.addSphere(LLVector3(0.f, 0.f, 0.f), 20.f);
     CHECK(eclipse.eclipses(LLVector3(5.f, 0.f, 0.f), 4.f, 0.f));
     {
-        INFO("inside the sphere, but not inside its half");
-        CHECK_FALSE(eclipse.eclipses(LLVector3(9.f, 0.f, 0.f), 4.f, 0.f));
+        INFO("past half the radius, within the fully weighted one");
+        CHECK(eclipse.eclipses(LLVector3(9.f, 0.f, 0.f), 4.f, 0.f));
+    }
+    {
+        INFO("inside the sphere, but reaching past its fully weighted radius");
+        CHECK_FALSE(eclipse.eclipses(LLVector3(13.f, 0.f, 0.f), 6.f, 0.f));
     }
     {
         INFO("nothing placed swallows nothing");
