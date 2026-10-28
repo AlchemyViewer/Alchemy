@@ -1044,6 +1044,27 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
 U32 AISUpdate::sBatchFrameCount = 0;
 LLTimer AISUpdate::sBatchTimer;
 
+// Coalesces the deferred gInventory::notifyObservers() calls issued below
+// when the change backlog exceeds MAX_UPDATE_BACKLOG, so repeated iterations
+// while the backlog remains large don't flood gMainloopWork with duplicate
+// postToMainCoro callbacks. Cleared once the posted callback actually runs
+// notifyObservers().
+static bool sAISNotifyObserversPending = false;
+
+static void aisScheduleNotifyObservers()
+{
+    if (!sAISNotifyObserversPending)
+    {
+        sAISNotifyObserversPending = true;
+        LLAppViewer::instance()->postToMainCoro(
+            []()
+            {
+                gInventory.notifyObservers();
+                sAISNotifyObserversPending = false;
+            });
+    }
+}
+
 AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body)
 : mType(type)
 {
@@ -1701,7 +1722,7 @@ void AISUpdate::doUpdate()
         // fetching can receive massive amount of items and folders
         if (gInventory.getChangedIDs().size() > MAX_UPDATE_BACKLOG)
         {
-            gInventory.notifyObservers();
+            aisScheduleNotifyObservers();
             checkTimeout();
         }
     }
@@ -1762,7 +1783,7 @@ void AISUpdate::doUpdate()
         // fetching can receive massive amount of items and folders
         if (gInventory.getChangedIDs().size() > MAX_UPDATE_BACKLOG)
         {
-            gInventory.notifyObservers();
+            aisScheduleNotifyObservers();
             checkTimeout();
         }
     }
@@ -1839,6 +1860,12 @@ void AISUpdate::doUpdate()
 
     checkTimeout();
 
-    gInventory.notifyObservers();
+    if (!sAISNotifyObserversPending)
+    {
+        LLAppViewer::instance()->postToMainCoro(
+            []()
+            {
+                gInventory.notifyObservers();
+            });
+    }
 }
-
