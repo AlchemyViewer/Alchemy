@@ -101,9 +101,9 @@ const float ONE_OVER_PI = 0.3183098861;
 // real angular size, which is a physical bound rather than an invented one.
 const float MIN_PBR_ROUGHNESS = 0.045;
 
-// PUNCTUAL_LIGHT_SCALE, MAX_PUNCTUAL_RADIANCE and MAX_SCENE_RADIANCE are injected by llshadermgr.cpp
-// alongside the GBuffer flags. They have to hold across separately compiled objects, which a
-// global const cannot do.
+// PUNCTUAL_LIGHT_SCALE and the radiance ceilings (MAX_PUNCTUAL_RADIANCE, MAX_SURFACE_RADIANCE,
+// MAX_SCENE_RADIANCE) are injected by llshadermgr.cpp alongside the GBuffer flags. They have to
+// hold across separately compiled objects, which a global const cannot do.
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
@@ -483,7 +483,8 @@ vec3 gtaoMultiBounce(float visibility, vec3 albedo)
 
 // Clamp radiance to `ceiling` without turning it a different colour on the way: the one clamp the
 // passes share. The ceiling says what the value is a part of -- MAX_PUNCTUAL_RADIANCE for what one
-// light or light pass adds to the scene, MAX_SCENE_RADIANCE for what is written into it whole.
+// light or light pass adds to the scene, MAX_SURFACE_RADIANCE for the soften pass the lights add
+// onto, MAX_SCENE_RADIANCE for anything else written into it whole (llshadermgr.cpp says why each).
 //
 // A per-channel clamp lets one channel saturate while the others keep climbing, so a highlight
 // pushed past the ceiling drifts toward whichever primary saturated first -- a bright warm

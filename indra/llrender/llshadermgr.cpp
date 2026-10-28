@@ -808,22 +808,27 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     // local lights' 3.25 would have moved the sun across the whole opaque scene in order to
     // settle a disagreement between two local-light paths. Only the deferred local lights move.
     extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
-    // The most a punctual light adds to a pixel, intensity included, and the most a light pass
-    // writes. A bound on the target, not a look control: the light passes blend into the RGBA16F
-    // scene, whose largest value is 65504 and which stores anything past it as an infinity, and
-    // one infinite pixel becomes a NaN that bloom's pyramid spreads over the whole frame and a
-    // probe capture over its whole probe. This is a sixteenth of that range, so sixteen passes at
-    // the ceiling on one pixel still fit. It flattens nothing the frame can show: at the meter's
-    // darkest default (EV 4, a sixteenth) it is still 256, white under every tonemapper. The
-    // lobe alone goes past it -- the peak of F*Vis*D at the roughness floor is about 776 for a
-    // dielectric and 19400 for a white metal, before a light's intensity of up to six times its
-    // colour -- and a ceiling as low as 10 would flat-top most polished material ahead of
-    // exposure. Bloom's exposure to sub-pixel glints is bounded at bloomExtractF.
-    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     4094.0\n");
-    // The most anything written whole into the scene may carry: its RGBA16F target's largest value,
-    // past which a store is an infinity. It bounds the soften pass's total, the sky, forward alpha
-    // and the post passes, where MAX_PUNCTUAL_RADIANCE bounds one light's share of the same target.
-    // Both are ceilings of clampRadiance (deferredUtil.glsl), the one clamp the passes share.
+    // The ceilings of clampRadiance (deferredUtil.glsl), the one clamp the passes share. Each is a
+    // share of the RGBA16F scene, whose largest value is 65504 and which stores anything past it as
+    // an infinity: one infinite pixel becomes a NaN that bloom's pyramid spreads over the whole frame
+    // and a probe capture over its whole probe. Bounds on the target, not look controls.
+    //
+    // MAX_PUNCTUAL_RADIANCE is the most a punctual light adds to a pixel, intensity included, and
+    // the most a light pass writes. It flattens nothing the frame can show: at the meter's darkest
+    // default (EV 2, a quarter) it is still 128, past ACES's white, and bloom takes far less of it
+    // (bloomExtractF's firefly clamp). The lobe alone goes past it -- the peak of F*Vis*D at the
+    // roughness floor is about 776 for a dielectric and 19400 for a white metal, before a light's
+    // intensity of up to six times its colour -- while a ceiling as low as 10 would flat-top most
+    // polished material ahead of exposure.
+    //
+    // MAX_SURFACE_RADIANCE is the most the soften pass writes, which the light passes then add onto:
+    // half the scene's range, so that it and 63 light passes at MAX_PUNCTUAL_RADIANCE on one pixel
+    // still fit.
+    //
+    // MAX_SCENE_RADIANCE is the most anything else written whole into the scene carries: the sky,
+    // forward alpha and the post passes, which no light pass adds onto.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     512.0\n");
+    extra_code_text[extra_code_count++] = strdup("#define MAX_SURFACE_RADIANCE      32752.0\n");
     extra_code_text[extra_code_count++] = strdup("#define MAX_SCENE_RADIANCE        65504.0\n");
 
     // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of

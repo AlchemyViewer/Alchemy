@@ -154,7 +154,8 @@ void writeColor(vec3 color)
     if (classic_mode > 0)
         final_scale = 1.1;
 
-    frag_color.rgb = clampRadiance(color.rgb * final_scale, MAX_SCENE_RADIANCE); //output linear since local lights will be added to this shader's results
+    // Output linear, held to half the scene's range: the local lights add onto it (MAX_SURFACE_RADIANCE).
+    frag_color.rgb = clampRadiance(color.rgb * final_scale, MAX_SURFACE_RADIANCE);
     frag_color.a = 0.0;
 }
 
