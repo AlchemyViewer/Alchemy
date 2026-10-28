@@ -37,6 +37,7 @@
 #include "httprequest.h"
 #include "_httppolicyglobal.h"
 #include "_httppolicyclass.h"
+#include "alhttpwake.h"
 
 
 namespace LLCoreInt
@@ -105,7 +106,8 @@ public:
     // requests.
     enum ELoopSpeed
     {
-        NORMAL,                 ///< continuous polling of request, ready, active queues
+        IMMEDIATE,              ///< go round again at once: a slot came free or a policy change applied
+        NORMAL,                 ///< wait for the transfers, a request or the policy's next deadline
         REQUEST_SLEEP           ///< can sleep indefinitely waiting for request queue write
     };
 
@@ -178,6 +180,15 @@ public:
     /// Threading:  callable by consumer thread.
     HttpRequest::policy_t createPolicyClass();
 
+    /// How many times the worker's loop has come round since
+    /// the service was made.
+    ///
+    /// Threading:  callable by any thread.
+    U64 getLoopCount() const
+        {
+            return mLoopCount.load(std::memory_order_relaxed);
+        }
+
 protected:
     void threadRun(LLCoreInt::HttpThread * thread);
 
@@ -222,6 +233,8 @@ protected:
     HttpRequestQueue *                  mRequestQueue;  // Refcounted
     LLAtomicU32                         mExitRequested;
     std::unique_ptr<LLCoreInt::HttpThread>      mThread;
+    std::atomic<U64>                    mLoopCount;
+    ALHttpWake                          mWake;          // Signalled through mRequestQueue
 
     // === working-thread-only data ===
     HttpPolicy *                        mPolicy;        // Simple pointer, has ownership
