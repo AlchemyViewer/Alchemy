@@ -401,7 +401,8 @@ ALPreciseWaiter::time_point ALPreciseWaiter::waitUntil(time_point deadline)
             }
             return { now };
         }
-        // The counter is CLOCK_MONOTONIC in nanoseconds, so the deadline arms the timer as it is.
+        // The counter is CLOCK_MONOTONIC in nanoseconds, so the deadline arms the timer as it is; the tests hold the
+        // counter to that clock.
         pollfd waits[] = { { mWake, POLLIN, 0 }, { mTimer, POLLIN, 0 } };
         nfds_t count   = 1;
         int    timeout = -1;
@@ -533,8 +534,9 @@ ALPreciseWaiter::time_point ALPreciseWaiter::waitUntil(time_point deadline)
             }
             return { now };
         }
-        // The counter is mach absolute time, which NOTE_MACHTIME with NOTE_ABSOLUTE takes as it is. An absolute
-        // timer goes once it has fired; NOTE_CRITICAL keeps the system from coalescing it with others.
+        // The counter is mach absolute time, which NOTE_MACHTIME with NOTE_ABSOLUTE takes as it is; the tests hold the
+        // counter to that clock. An absolute timer goes once it has fired; NOTE_CRITICAL keeps the system from
+        // coalescing it with others.
         struct kevent timer;
         EV_SET(&timer, TIMER_EVENT, EVFILT_TIMER, EV_ADD | EV_ONESHOT, NOTE_MACHTIME | NOTE_ABSOLUTE | NOTE_CRITICAL,
                intptr_t(deadline.ticks), nullptr);

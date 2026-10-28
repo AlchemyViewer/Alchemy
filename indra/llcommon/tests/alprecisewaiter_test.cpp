@@ -25,10 +25,15 @@
 #include "linden_common.h"
 
 #include "../alprecisewaiter.h"
+#include "../lltimer.h"
 #include "../threadpool.h"
 
 #if LL_WINDOWS
 #include "../llwin32headers.h"
+#elif LL_DARWIN
+#include <mach/mach_time.h>
+#else
+#include <time.h>
 #endif
 
 #include <catch2/catch_test_macros.hpp>
@@ -153,6 +158,35 @@ namespace
         was_rescued = wake.mRescued;
         return woke;
     }
+
+#if !LL_WINDOWS
+    // The clock the waiter's timers are armed on: CLOCK_MONOTONIC in nanoseconds, for the timerfd and
+    // clock_nanosleep, and mach absolute time, for the kqueue timer and mach_wait_until.
+    U64 timerClock()
+    {
+#if LL_DARWIN
+        return mach_absolute_time();
+#else
+        timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        return U64(now.tv_sec) * 1000000000ull + U64(now.tv_nsec);
+#endif
+    }
+
+    TEST_CASE("alprecisewaiter: the counter is the clock its timers are armed on", "[alprecisewaiter]")
+    {
+        // A deadline goes to the timer as the counter's ticks, unconverted: a counter with an origin or a rate of
+        // its own would arm every timer at another time. Each read of the counter lies between two of the clock's.
+        for (int i = 0; i < 1000; ++i)
+        {
+            const U64 before  = timerClock();
+            const U64 counter = get_clock_count();
+            const U64 after   = timerClock();
+            CHECK(counter >= before);
+            CHECK(counter <= after);
+        }
+    }
+#endif
 
     TEST_CASE("alprecisewaiter: a timed wait ends no sooner than its deadline", "[alprecisewaiter]")
     {
