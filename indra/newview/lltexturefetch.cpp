@@ -1327,6 +1327,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
         }
         else
         {
+            // callbackCacheRead wakes this
+            waitForWake();
             return false;
         }
     }
@@ -1491,6 +1493,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
             setState(WAIT_HTTP_RESOURCE2);
             mFetcher->addHttpWaiter(this->mID);
             ++mResourceWaitCount;
+            // releaseHttpWaiters wakes this
+            waitForWake();
             return false;
         }
 
@@ -1503,7 +1507,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
     if (mState == WAIT_HTTP_RESOURCE2)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("tfwdw - WAIT_HTTP_RESOURCE2");
-        // Just idle it if we make it to the head...
+        // Just idle it if we make it to the head... releaseHttpWaiters wakes this
+        waitForWake();
         return false;
     }
 
@@ -1868,6 +1873,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
             // various possible timeout components (total request time, connection
             // time, I/O time, with and without retries, etc.) in the future.
 
+            // onCompleted wakes this
+            waitForWake();
             return false;
         }
     }
@@ -2007,6 +2014,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
         }
         else
         {
+            // callbackDecoded wakes this
+            waitForWake();
             return false;
         }
     }
@@ -2078,6 +2087,11 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 // (we can't touch mFormattedImage until the write completes)
                 // Prioritize the write
                 mFetcher->mTextureCache->prioritizeWrite(mCacheWriteHandle);
+            }
+            if (!mWritten)
+            {
+                // callbackCacheWrite wakes this
+                waitForWake();
             }
             return false;
         }
@@ -3513,6 +3527,7 @@ void LLTextureFetch::releaseHttpWaiters()
         }
 
         worker->setState(LLTextureFetchWorker::SEND_HTTP_REQ);
+        worker->wakeWork();
         worker->unlockWorkMutex();                                      // -Mw
 
         removeHttpWaiter(worker->mID);

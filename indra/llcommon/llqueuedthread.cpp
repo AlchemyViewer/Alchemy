@@ -381,11 +381,17 @@ void LLQueuedThread::abortRequest(handle_t handle, bool autocomplete)
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     lockData();
     QueuedRequest* req = (QueuedRequest*)mRequestHash.find(handle);
+    const bool found(req != NULL);
     if (req)
     {
         req->setFlags(FLAG_ABORT | (autocomplete ? FLAG_AUTO_COMPLETE : 0));
     }
     unlockData();
+    // A request waiting for a wake sees the abort now, not at its fallback
+    if (found)
+    {
+        wakeRequest(handle);
+    }
 }
 
 // MAIN thread
@@ -513,9 +519,12 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 // Try again in 16 ms, running whatever else is ready
                 // meanwhile, or sooner if wakeRequest() says what it waits
-                // on has happened. Posted from this thread between requests,
-                // so the wait for the next one already knows this one's time.
+                // on has happened. A request that waits for that wake is
+                // tried again only as a fallback, in case it never comes.
+                // Posted from this thread between requests, so the wait for
+                // the next one already knows this one's time.
                 using namespace std::chrono_literals;
+                const auto delay(req->waitsForWake() ? 250ms : 16ms);
                 const handle_t handle(req->getHashKey());
                 const U32 generation(++req->mRetryGeneration);
                 req->mRetryPending = true;
@@ -524,7 +533,7 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
                         LL_PROFILE_ZONE_NAMED("processRequest - retry");
                         retryRequest(handle, generation);
                     },
-                    LL::WorkSchedule::TimePoint::clock::now() + 16ms);
+                    LL::WorkSchedule::TimePoint::clock::now() + delay);
             }
         }
     }

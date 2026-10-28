@@ -95,17 +95,20 @@ namespace
     class TestRequest : public LLQueuedThread::QueuedRequest
     {
     public:
-        TestRequest(LLQueuedThread::handle_t handle, std::function<bool()> work) :
+        TestRequest(LLQueuedThread::handle_t handle, std::function<bool()> work, bool waits_for_wake = false) :
             QueuedRequest(handle, LLQueuedThread::FLAG_AUTO_COMPLETE),
-            mWork(std::move(work))
+            mWork(std::move(work)),
+            mWaitsForWake(waits_for_wake)
         {
         }
 
     protected:
         bool processRequest() override { return mWork(); }
+        bool waitsForWake() override { return mWaitsForWake; }
 
     private:
         std::function<bool()> mWork;
+        bool                  mWaitsForWake;
     };
 
     TEST_CASE("llqueuedthread: a request that asks to retry lets one queued after it run first", "[llqueuedthread]")
@@ -223,6 +226,79 @@ namespace
         {
             WARN("A was woken after its retry was due; which ran it says nothing");
         }
+    }
+
+    TEST_CASE("llqueuedthread: a request waiting for a wake is retried only as a fallback", "[llqueuedthread]")
+    {
+        // A waits for a wake every turn. Over 100 ms, well inside its
+        // fallback, it is not run again; a request retried every 16 ms would
+        // have been several times. Woken, it runs again at once.
+        TestQueuedThread thread;
+        thread.start();
+        LLTimer clock;
+        std::atomic<int> turns{ 0 };
+        std::atomic<bool> done{ false };
+        const LLQueuedThread::handle_t handle(thread.generateHandle());
+        thread.addRequest(new TestRequest(handle, [&]()
+            {
+                ++turns;
+                return done.load();
+            }, true));
+        while (turns.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(turns.load() == 1);
+
+        ms_sleep(100);
+        CHECK(turns.load() == 1);
+
+        thread.wakeRequest(handle);
+        std::atomic<int> after_wake{ -1 };
+        thread.post([&]()
+            {
+                after_wake = turns.load();
+                done = true;
+            });
+        while (after_wake.load() < 0 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        CHECK(after_wake.load() == 2);
+    }
+
+    TEST_CASE("llqueuedthread: an abort reaches a request waiting for a wake at once", "[llqueuedthread]")
+    {
+        // Aborted while waiting for a wake, A is run, sees the abort and is
+        // gone before a check posted after the abort, not at its fallback.
+        TestQueuedThread thread;
+        thread.start();
+        LLTimer clock;
+        std::atomic<int> turns{ 0 };
+        const LLQueuedThread::handle_t handle(thread.generateHandle());
+        thread.addRequest(new TestRequest(handle, [&turns]()
+            {
+                ++turns;
+                return false;
+            }, true));
+        while (turns.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(turns.load() == 1);
+
+        thread.abortRequest(handle, true);
+        std::atomic<int> status_after{ -100 };
+        thread.post([&]()
+            {
+                status_after = thread.getRequestStatus(handle);
+            });
+        while (-100 == status_after.load() && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        CHECK(LLQueuedThread::STATUS_EXPIRED == status_after.load());
+        CHECK(turns.load() == 1);
     }
 
     TEST_CASE("llqueuedthread: shutdown with a request retrying does not wait out its timeout", "[llqueuedthread]")

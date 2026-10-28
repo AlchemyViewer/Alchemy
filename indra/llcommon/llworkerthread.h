@@ -70,6 +70,7 @@ public:
 
         /*virtual*/ bool processRequest();
         /*virtual*/ void finishRequest(bool completed);
+        /*virtual*/ bool waitsForWake();
         /*virtual*/ void deleteRequest();
 
     private:
@@ -179,6 +180,11 @@ protected:
     // next retry
     void wakeWork();
 
+    // waitForWake(): from doWork() only, before it returns false to wait on
+    // something that calls wakeWork() when it happens: its retry is then only
+    // a fallback, in case the wake never comes
+    void waitForWake() { mWaitsForWake = true; }
+
 private:
     // Each is one atomic read-modify-write. The flags are written from the work thread without
     // mMutex (WorkRequest::finishRequest) and from the main thread with and without it, so a
@@ -204,6 +210,7 @@ protected:
 private:
     LLMutex mMutex;
     std::atomic<U32> mWorkFlags;
+    bool mWaitsForWake = false; // the work thread only: set by doWork() for its last turn
 };
 
 //============================================================================

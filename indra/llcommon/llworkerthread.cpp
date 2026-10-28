@@ -183,9 +183,16 @@ bool LLWorkerThread::WorkRequest::processRequest()
     LL_PROFILE_ZONE_SCOPED;
     LLWorkerClass* workerclass = getWorkerClass();
     workerclass->setWorking(true);
+    workerclass->mWaitsForWake = false;
     bool complete = workerclass->doWork(getParam());
     workerclass->setWorking(false);
     return complete;
+}
+
+// virtual
+bool LLWorkerThread::WorkRequest::waitsForWake()
+{
+    return getWorkerClass()->mWaitsForWake;
 }
 
 // virtual

@@ -101,6 +101,9 @@ public:
         virtual bool processRequest() = 0; // Return true when request has completed
         virtual void finishRequest(bool completed); // Always called from thread after request has completed or aborted
         virtual void deleteRequest(); // Only method to delete a request
+        // Whether processRequest() last returned false to wait on something
+        // that wakes it (wakeRequest()), so that its retry is only a fallback
+        virtual bool waitsForWake() { return false; }
 
     protected:
         LLAtomicBase<status_t> mStatus;
