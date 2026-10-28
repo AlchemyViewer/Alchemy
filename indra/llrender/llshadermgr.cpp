@@ -808,15 +808,23 @@ GLuint LLShaderMgr::compileShaderFile(const std::string& filename, S32 & shader_
     // local lights' 3.25 would have moved the sun across the whole opaque scene in order to
     // settle a disagreement between two local-light paths. Only the deferred local lights move.
     extra_code_text[extra_code_count++] = strdup("#define PUNCTUAL_LIGHT_SCALE      3.0\n");
-    // A guard against a divide that ran away, not a look control. At 10.0 it was neither: the
-    // peak of F*Vis*D at the roughness floor is about 776 for a dielectric and 19400 for a
-    // white metal, so a ceiling of 10 flat-topped the highlight on every dielectric below
-    // roughness 0.13 and every metal below 0.30 -- most polished material in a scene -- and did
-    // it in linear space ahead of exposure, pre-empting the tonemapper that exists to compress
-    // exactly these values. This sits above anything the roughness floor permits, so it now
-    // only catches a NaN or an infinity. Bloom's exposure to sub-pixel glints is bounded at
-    // bloomExtractF instead, which is where that artifact is actually made.
-    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     65504.0\n");
+    // The most a punctual light adds to a pixel, intensity included, and the most a light pass
+    // writes. A bound on the target, not a look control: the light passes blend into the RGBA16F
+    // scene, whose largest value is 65504 and which stores anything past it as an infinity, and
+    // one infinite pixel becomes a NaN that bloom's pyramid spreads over the whole frame and a
+    // probe capture over its whole probe. This is a sixteenth of that range, so sixteen passes at
+    // the ceiling on one pixel still fit. It flattens nothing the frame can show: at the meter's
+    // darkest default (EV 4, a sixteenth) it is still 256, white under every tonemapper. The
+    // lobe alone goes past it -- the peak of F*Vis*D at the roughness floor is about 776 for a
+    // dielectric and 19400 for a white metal, before a light's intensity of up to six times its
+    // colour -- and a ceiling as low as 10 would flat-top most polished material ahead of
+    // exposure. Bloom's exposure to sub-pixel glints is bounded at bloomExtractF.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_PUNCTUAL_RADIANCE     4094.0\n");
+    // The most anything written whole into the scene may carry: its RGBA16F target's largest value,
+    // past which a store is an infinity. It bounds the soften pass's total, the sky, forward alpha
+    // and the post passes, where MAX_PUNCTUAL_RADIANCE bounds one light's share of the same target.
+    // Both are ceilings of clampRadiance (deferredUtil.glsl), the one clamp the passes share.
+    extra_code_text[extra_code_count++] = strdup("#define MAX_SCENE_RADIANCE        65504.0\n");
 
     // Reverse-Z is a property of the depth convention the whole tree rasterizes against, not of
     // any one program, so it is injected here instead of riding a defines map. The map

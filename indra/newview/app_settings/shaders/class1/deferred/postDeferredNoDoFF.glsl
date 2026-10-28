@@ -71,7 +71,7 @@ float noise(vec2 x) {
 
 //=============================
 
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 
 
 void main()
@@ -85,7 +85,7 @@ void main()
     diff.rgb += nz*0.003;
 #endif
 
-    diff.rgb = clampHDRRange(diff.rgb);
+    diff.rgb = clampRadiance(diff.rgb, MAX_SCENE_RADIANCE);
     frag_color = diff;
 
     // Reverse-Z neutral: copies the raw stored depth value verbatim, no convention math.

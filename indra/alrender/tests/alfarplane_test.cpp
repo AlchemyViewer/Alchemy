@@ -247,8 +247,8 @@ namespace
         }
         const std::string sky = shader_source("class1/deferred/skyCompositeMainF.glsl");
         UNSCOPED_INFO("the sky's pass lights nothing: it composites the sky along the view ray");
-        REQUIRE(sky.find("frag_color.rgb = min(clampHDRRange(skyComposite(vary_fragcoord) * sky_classic_scale), "
-                         "vec3(65504.0));") != std::string::npos);
+        REQUIRE(sky.find("frag_color.rgb = clampRadiance(skyComposite(vary_fragcoord) * sky_classic_scale, "
+                         "MAX_SCENE_RADIANCE);") != std::string::npos);
         UNSCOPED_INFO("haze takes geometry where it is");
         REQUIRE(haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
         UNSCOPED_INFO("void water fog keys on the far depth");

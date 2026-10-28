@@ -107,8 +107,7 @@ void waterClip(vec3 pos);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
 float filterSpecularRoughness(float perceptualRoughness, vec3 n);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
-vec3 clampRadiance(vec3 c);
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
 
 vec3 pbrBaseLight(vec3 diffuseColor,
@@ -294,7 +293,7 @@ void main()
     // it passes an infinity through unchanged, and its answer for a NaN is undefined. This path
     // runs the same unbounded punctual lobe the opaque one does, so it can produce the same
     // values -- and whatever it writes goes on to the bloom pyramid.
-    frag_color = max(vec4(clampHDRRange(color.rgb), a), vec4(0));
+    frag_color = max(vec4(clampRadiance(color.rgb, MAX_SCENE_RADIANCE), a), vec4(0));
 #endif // FOR_IMPOSTOR
 }
 
