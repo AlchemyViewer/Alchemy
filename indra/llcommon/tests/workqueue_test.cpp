@@ -18,6 +18,7 @@
 // std headers
 #include <chrono>
 #include <deque>
+#include <future>
 // external library headers
 // other Linden headers
 #include <catch2/catch_test_macros.hpp>
@@ -27,6 +28,7 @@
 #include "llcoros.h"
 #include "lleventcoro.h"
 #include "llstring.h"
+#include "lltimer.h"
 #include "stringize.h"
 
 using namespace LL;
@@ -62,6 +64,37 @@ namespace
         CHECK_FALSE(wasRun);
         queue.runUntilClose();
         CHECK(wasRun);
+    }
+
+    TEST_CASE_METHOD(workqueue_data, "workqueue: runNext waits for work not yet due and runs it", "[workqueue]")
+    {
+        bool wasRun{ false };
+        LLTimer waited;
+        queue.post([&wasRun](){ wasRun = true; }, WorkSchedule::TimePoint::clock::now() + 50ms);
+        CHECK(queue.runNext());
+        CHECK(wasRun);
+        CHECK(waited.getElapsedTimeF64() >= 0.05);
+        CHECK(waited.getElapsedTimeF64() < 5.0);
+    }
+
+    TEST_CASE_METHOD(workqueue_data, "workqueue: runNext runs what a closed queue holds and then returns false", "[workqueue]")
+    {
+        int runs{ 0 };
+        queue.post([&runs](){ ++runs; });
+        queue.close();
+        CHECK_FALSE(queue.runNext());
+        CHECK(runs == 1);
+        CHECK_FALSE(queue.runNext());
+        CHECK(runs == 1);
+    }
+
+    TEST_CASE_METHOD(workqueue_data, "workqueue: closing an empty queue from another thread ends runNext's wait", "[workqueue]")
+    {
+        LLTimer waited;
+        auto closer = std::async(std::launch::async, [this]() { queue.close(); });
+        CHECK_FALSE(queue.runNext());
+        closer.get();
+        CHECK(waited.getElapsedTimeF64() < 5.0);
     }
 
     TEST_CASE_METHOD(workqueue_data, "workqueue: postEvery repeats at its interval until the work returns false", "[workqueue]")

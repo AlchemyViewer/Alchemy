@@ -166,6 +166,15 @@ namespace LL
         bool runOne();
 
         /**
+         * runNext() waits until a TimedWork item is ready, then runs it. It
+         * returns true if the queue remains open, false if the queue has been
+         * closed, which also ends the wait. This could be used by a thread
+         * that serves the queue alongside some other source of work, at a
+         * time the queue is its only one.
+         */
+        bool runNext();
+
+        /**
          * runFor() runs a subset of ready TimedWork items, until the
          * timeslice has been exceeded. It returns true if the queue remains
          * open, false if the queue has been closed. This could be used by a
