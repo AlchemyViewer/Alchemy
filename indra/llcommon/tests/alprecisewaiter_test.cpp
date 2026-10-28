@@ -393,6 +393,8 @@ namespace
         CHECK(time_point::now().since(start) < LATE);
     }
 
+    // macOS's waiter holds its timer and its wake in one kqueue, so there is no timer to take from it alone.
+#if !LL_DARWIN
     // Timed waits that end no sooner than their deadlines, and one that a wake during it ends, on `waiter` however it
     // was left.
     void checkDeadlinesAndWake(ALPreciseWaiter& waiter)
@@ -428,7 +430,6 @@ namespace
     }
 #endif
 
-#if !LL_DARWIN
     TEST_CASE("alprecisewaiter: with no timer a waiter keeps to its deadlines and its wakes", "[alprecisewaiter]")
     {
         ALPreciseWaiter waiter;
