@@ -66,6 +66,10 @@ namespace
 
         using LLQueuedThread::addRequest;
         using LLQueuedThread::generateHandle;
+        using LLQueuedThread::retryRequest;
+
+        // Runs `work` on the queue's thread, in turn with its requests.
+        void post(std::function<void()> work) { mRequestQueue.post(std::move(work)); }
     };
 
     // A queued thread with an update of its own to run each update().
@@ -160,6 +164,64 @@ namespace
         else
         {
             WARN("B was added after A's retry was due; the order says nothing");
+        }
+    }
+
+    TEST_CASE("llqueuedthread: a woken request runs at once and a stale retry runs nothing", "[llqueuedthread]")
+    {
+        // A asks to retry every turn until it is told it is done. Woken
+        // after its first turn, it runs again ahead of the retry due 16 ms
+        // on, so a check posted after the wake finds its second turn run.
+        // That first retry is then stale: run there and then, it does not
+        // run A again.
+        TestQueuedThread thread;
+        thread.start();
+        LLTimer clock;
+        std::atomic<int> turns{ 0 };
+        std::atomic<bool> done{ false };
+        F64 first_turn(0.0);
+        const LLQueuedThread::handle_t handle(thread.generateHandle());
+        thread.addRequest(new TestRequest(handle, [&]()
+            {
+                if (0 == turns.load())
+                {
+                    first_turn = clock.getElapsedTimeF64();
+                }
+                ++turns;
+                return done.load();
+            }));
+        while (turns.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(turns.load() == 1);
+
+        const F64 woken(clock.getElapsedTimeF64());
+        thread.wakeRequest(handle);
+        std::atomic<int> after_wake{ -1 };
+        std::atomic<int> after_stale{ -1 };
+        thread.post([&]()
+            {
+                after_wake = turns.load();
+                thread.retryRequest(handle, 1); // the first retry's generation
+                after_stale = turns.load();
+                done = true;
+            });
+        while (after_stale.load() < 0 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(after_stale.load() >= 0);
+        CAPTURE(after_wake.load(), after_stale.load());
+
+        CHECK(after_stale.load() == after_wake.load());
+        if (woken - first_turn < 0.016)
+        {
+            CHECK(after_wake.load() == 2);
+        }
+        else
+        {
+            WARN("A was woken after its retry was due; which ran it says nothing");
         }
     }
 

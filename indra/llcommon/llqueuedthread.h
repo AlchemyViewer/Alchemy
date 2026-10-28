@@ -105,6 +105,10 @@ public:
     protected:
         LLAtomicBase<status_t> mStatus;
         U32 mFlags;
+        // The queue's thread only: whether a retry is due, and which one,
+        // so that a retry woken early leaves its timed one with nothing to do.
+        bool mRetryPending = false;
+        U32 mRetryGeneration = 0;
     };
 
     //------------------------------------------------------------------------
@@ -141,6 +145,9 @@ protected:
     handle_t generateHandle();
     bool addRequest(QueuedRequest* req);
     void processRequest(QueuedRequest* req);
+    // Runs the request's pending retry, if it is still the one asked for.
+    // A generation of 0 runs whichever retry is pending.
+    void retryRequest(handle_t handle, U32 generation);
     void incQueue();
 
 public:
@@ -158,6 +165,10 @@ public:
 
     // Request accessors
     status_t getRequestStatus(handle_t handle);
+    // Any thread: what a request asked to retry for has happened, so its
+    // retry runs now rather than when it falls due. Nothing, for a request
+    // with no retry pending.
+    void wakeRequest(handle_t handle);
     void abortRequest(handle_t handle, bool autocomplete);
     void setFlags(handle_t handle, U32 flags);
     bool completeRequest(handle_t handle);

@@ -366,6 +366,16 @@ LLQueuedThread::status_t LLQueuedThread::getRequestStatus(handle_t handle)
     return res;
 }
 
+// Any thread
+void LLQueuedThread::wakeRequest(handle_t handle)
+{
+    mRequestQueue.post([this, handle]
+        {
+            LL_PROFILE_ZONE_NAMED("processRequest - wake");
+            retryRequest(handle, 0);
+        });
+}
+
 void LLQueuedThread::abortRequest(handle_t handle, bool autocomplete)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
@@ -502,13 +512,17 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
                 llassert(!mRunCondition->isSelfLocked());
 
                 // Try again in 16 ms, running whatever else is ready
-                // meanwhile. Posted from this thread between requests, so
-                // the wait for the next one already knows this one's time.
+                // meanwhile, or sooner if wakeRequest() says what it waits
+                // on has happened. Posted from this thread between requests,
+                // so the wait for the next one already knows this one's time.
                 using namespace std::chrono_literals;
-                mRequestQueue.post([=, this]
+                const handle_t handle(req->getHashKey());
+                const U32 generation(++req->mRetryGeneration);
+                req->mRetryPending = true;
+                mRequestQueue.post([this, handle, generation]
                     {
                         LL_PROFILE_ZONE_NAMED("processRequest - retry");
-                        processRequest(req);
+                        retryRequest(handle, generation);
                     },
                     LL::WorkSchedule::TimePoint::clock::now() + 16ms);
             }
@@ -516,6 +530,21 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
     }
 
     mIdleThread = true;
+}
+
+// Runs on its OWN thread. Found by handle, since a retry already run may
+// have finished the request and deleted it. While a retry is pending the
+// request is queued, which nothing else deletes.
+void LLQueuedThread::retryRequest(handle_t handle, U32 generation)
+{
+    lockData();
+    QueuedRequest* req = (QueuedRequest*)mRequestHash.find(handle);
+    unlockData();
+    if (req && req->mRetryPending && (0 == generation || req->mRetryGeneration == generation))
+    {
+        req->mRetryPending = false;
+        processRequest(req);
+    }
 }
 
 // virtual
