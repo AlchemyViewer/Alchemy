@@ -1,0 +1,434 @@
+/**
+ * @file alprecisewaiter_test.cpp
+ * @brief A wait ends at its deadline and no sooner, or at a wake.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "../alprecisewaiter.h"
+#include "../threadpool.h"
+
+#if LL_WINDOWS
+#include "../llwin32headers.h"
+#endif
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cmath>
+#include <limits>
+#include <vector>
+
+namespace
+{
+    using time_point = ALPreciseWaiter::time_point;
+
+    // Every wait is checked against the clock: it ends no sooner than it may, which is exact, and no later than LATE
+    // past that, which only a wait that did not end of itself comes near, however loaded the machine.
+    constexpr F64 LATE = 1.0;
+    // A wait still going this long after the wake that should have ended it has lost the wake.
+    constexpr F64 LOST = 5.0;
+
+    // The other side of a case, on a thread of its own: a pool of one, closed with the case once what it was given
+    // has returned.
+    class Waker
+    {
+    public:
+        Waker()
+        : mPool("alprecisewaiter_test_waker", 1, 64, false, true)
+        {
+            mPool.start();
+        }
+
+        template <typename FUNC>
+        void post(FUNC&& body)
+        {
+            REQUIRE(mPool.getQueue().post(std::forward<FUNC>(body)));
+        }
+
+    private:
+        LL::ThreadPool mPool;
+    };
+
+    // One wake, as the waiter and the waker each saw it.
+    struct Wake
+    {
+        std::atomic<bool> mWaiting{ false };  // the waiter is about to wait
+        std::atomic<bool> mReturned{ false }; // the waiter's wait has returned
+        std::atomic<bool> mWoken{ false };    // the waker has called wake()
+        std::atomic<bool> mRescued{ false };  // the wake was lost, and a second one ended the wait
+        std::atomic<U64>  mAt{ time_point::max().ticks }; // the clock just before wake(), and no time before it
+    };
+
+    // The waker's side. Once the waiter says it is about to wait, `into` seconds on, wakes it, noting the clock just
+    // before. A wait that wake has not ended LOST seconds later gets a second wake, and the case is told, so that a
+    // lost wake fails the case rather than hanging it.
+    void wakeWhenWaiting(ALPreciseWaiter& waiter, Wake& wake, F64 into)
+    {
+        ALPreciseWaiter::spinUntil(time_point::after(LOST), [&wake]() { return wake.mWaiting.load(); });
+        if (into > 0.0)
+        {
+            // Long enough that the waiter has gone into its wait; one that has not yet is ended the same way, by the
+            // wake it is given before it.
+            ALPreciseWaiter::sleepFor(into);
+        }
+        wake.mAt = time_point::now().ticks;
+        waiter.wake();
+        wake.mWoken = true;
+        const time_point lost = time_point::after(LOST);
+        while (!wake.mReturned && time_point::now() < lost)
+        {
+            ALPreciseWaiter::sleepFor(0.001);
+        }
+        if (!wake.mReturned)
+        {
+            wake.mRescued = true;
+            waiter.wake();
+        }
+    }
+
+    // A wait that should end of itself, run with a wake LOST seconds on in case it does not.
+    template <typename WAIT>
+    time_point rescued(ALPreciseWaiter& waiter, WAIT&& wait, bool& was_rescued)
+    {
+        Wake  wake;
+        Waker waker;
+        waker.post([&waiter, &wake]()
+            {
+                ALPreciseWaiter::spinUntil(time_point::after(LOST), [&wake]() { return wake.mWaiting.load(); });
+                const time_point lost = time_point::after(LOST);
+                while (!wake.mReturned && time_point::now() < lost)
+                {
+                    ALPreciseWaiter::sleepFor(0.001);
+                }
+                if (!wake.mReturned)
+                {
+                    wake.mRescued = true;
+                    waiter.wake();
+                }
+            });
+        wake.mWaiting = true;
+        const time_point woke = wait();
+        wake.mReturned = true;
+        was_rescued = wake.mRescued;
+        return woke;
+    }
+
+    TEST_CASE("alprecisewaiter: a timed wait ends no sooner than its deadline", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        REQUIRE(waiter.canWake());
+        for (F64 seconds : { 0.0001, 0.0005, 0.001, 0.002, 0.005, 0.0105 })
+        {
+            INFO("a wait of " << seconds * 1000.0 << " ms");
+            for (int i = 0; i < 8; ++i)
+            {
+                const time_point deadline = time_point::after(seconds);
+                const time_point woke     = waiter.waitUntil(deadline);
+                const time_point after    = time_point::now();
+                CHECK(woke >= deadline);
+                CHECK(woke.since(deadline) < LATE);
+                CHECK(after >= woke);
+            }
+        }
+    }
+
+    TEST_CASE("alprecisewaiter: a deadline already past returns at once and leaves a wake for the next wait", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        const time_point start = time_point::now();
+        bool was_rescued = false;
+        const time_point woke = rescued(waiter, [&waiter]() { return waiter.waitUntil(time_point{ 0 }); }, was_rescued);
+        CHECK_FALSE(was_rescued);
+        CHECK(woke >= start);
+        CHECK(woke.since(start) < LATE);
+
+        const time_point earlier = time_point::now().plus(-0.001);
+        const time_point woke_earlier = rescued(waiter, [&waiter, earlier]() { return waiter.waitUntil(earlier); }, was_rescued);
+        CHECK_FALSE(was_rescued);
+        CHECK(woke_earlier.since(earlier) < LATE);
+
+        // A wake given before a wait that did not wait is the next wait's.
+        waiter.wake();
+        CHECK(waiter.waitUntil(time_point::now()) >= start);
+        const time_point next = time_point::now();
+        const time_point woke_next = waiter.waitUntil(time_point::after(LOST));
+        CHECK(woke_next.since(next) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: a wake before the wait ends it at once and is used up", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        waiter.wake();
+        waiter.wake();
+        const time_point start = time_point::now();
+        const time_point woke  = waiter.waitUntil(time_point::after(LOST));
+        CHECK(woke >= start);
+        CHECK(woke.since(start) < LATE);
+
+        // Two wakes before a wait are one: the next timed wait runs to its deadline.
+        const time_point deadline = time_point::after(0.002);
+        const time_point timed    = waiter.waitUntil(deadline);
+        CHECK(timed >= deadline);
+        CHECK(timed.since(deadline) < LATE);
+
+        // Untimed alike.
+        waiter.wake();
+        bool was_rescued = false;
+        rescued(waiter, [&waiter]() { return waiter.waitUntil(time_point::max()); }, was_rescued);
+        CHECK_FALSE(was_rescued);
+    }
+
+    TEST_CASE("alprecisewaiter: a wake during a timed wait ends it", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        Wake  wake;
+        Waker waker;
+        waker.post([&waiter, &wake]() { wakeWhenWaiting(waiter, wake, 0.02); });
+        wake.mWaiting = true;
+        const time_point woke = waiter.waitUntil(time_point::after(2.0 * LOST));
+        wake.mReturned = true;
+        CHECK_FALSE(wake.mRescued);
+        CHECK(woke.ticks >= wake.mAt.load());
+        CHECK(woke.since(time_point{ wake.mAt.load() }) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: an untimed wait ends at a wake", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        Wake  wake;
+        Waker waker;
+        waker.post([&waiter, &wake]() { wakeWhenWaiting(waiter, wake, 0.02); });
+        wake.mWaiting = true;
+        const time_point woke = waiter.waitUntil(time_point::max());
+        wake.mReturned = true;
+        CHECK_FALSE(wake.mRescued);
+        CHECK(woke.ticks >= wake.mAt.load());
+        CHECK(woke.since(time_point{ wake.mAt.load() }) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: a timer and a wake that race leave the next wait whole", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        Waker waker;
+        for (int i = 0; i < 200; ++i)
+        {
+            // The wake aimed at the deadline, a little either side of it from one round to the next.
+            Wake wake;
+            const time_point deadline = time_point::after(0.001);
+            const time_point aim      = deadline.plus(F64(i % 5 - 2) * 0.0001);
+            waker.post([&waiter, &wake, aim]()
+                {
+                    ALPreciseWaiter::spinUntil(aim);
+                    wake.mAt = time_point::now().ticks;
+                    waiter.wake();
+                    wake.mWoken = true;
+                });
+            const time_point woke = waiter.waitUntil(deadline);
+            // Ended by the timer, or by the wake once it was given.
+            CHECK((woke >= deadline || woke.ticks >= wake.mAt.load()));
+            CHECK(woke.since(deadline) < LATE);
+
+            ALPreciseWaiter::spinUntil(time_point::after(LOST), [&wake]() { return wake.mWoken.load(); });
+            REQUIRE(wake.mWoken);
+            // The wake given, the next wait either has it still, or runs to its deadline: the timer the race left
+            // behind ends nothing early.
+            const time_point next_deadline = time_point::after(0.002);
+            const time_point next          = waiter.waitUntil(next_deadline);
+            CHECK(next.since(next_deadline) < LATE);
+            if (woke < deadline)
+            {
+                // The wake ended the race, and was used up there.
+                CHECK(next >= next_deadline);
+            }
+        }
+    }
+
+    TEST_CASE("alprecisewaiter: zero negative and NaN durations do not wait", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        const time_point start = time_point::now();
+        for (F64 seconds : { 0.0, -0.0, -1.0, -1.0e300, -std::numeric_limits<F64>::infinity(),
+                             std::numeric_limits<F64>::quiet_NaN() })
+        {
+            INFO("a wait of " << seconds << " s");
+            bool was_rescued = false;
+            const time_point woke = rescued(waiter, [&waiter, seconds]() { return waiter.waitFor(seconds); }, was_rescued);
+            CHECK_FALSE(was_rescued);
+            CHECK(woke.since(start) < LATE);
+            CHECK(ALPreciseWaiter::sleepFor(seconds).since(start) < LATE);
+        }
+        bool was_rescued = false;
+        rescued(waiter, [&waiter]() { return waiter.waitFor(std::chrono::nanoseconds::min()); }, was_rescued);
+        CHECK_FALSE(was_rescued);
+        rescued(waiter, [&waiter]() { return waiter.waitFor(std::chrono::seconds::zero()); }, was_rescued);
+        CHECK_FALSE(was_rescued);
+        CHECK(time_point::now().since(start) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: a saturated duration has no deadline", "[alprecisewaiter]")
+    {
+        CHECK(time_point::after(std::chrono::seconds::max()) == time_point::max());
+        CHECK(time_point::after(1.0e300) == time_point::max());
+        CHECK(time_point::after(std::numeric_limits<F64>::infinity()) == time_point::max());
+        CHECK(time_point::max().plus(-1.0) == time_point::max());
+        CHECK(time_point::max().plus(1.0) == time_point::max());
+        CHECK(time_point{ 5 }.plus(-1.0e300) == time_point{ 0 });
+        CHECK(time_point{ (std::numeric_limits<U64>::max)() - 5 }.plus(1.0) == time_point::max());
+        CHECK(time_point{ 5 }.plus(std::numeric_limits<F64>::quiet_NaN()) == time_point{ 5 });
+
+        // An hour is no saturation, and a day from now is a day from now.
+        const time_point now = time_point::now();
+        const time_point day = now.plus(86400.0);
+        CHECK(day != time_point::max());
+        CHECK(day.since(now) >= 86400.0);
+        CHECK(day.since(now) < 86400.001);
+        CHECK(now.since(day) <= -86400.0);
+
+        // A wait with no deadline, which a wake ends.
+        ALPreciseWaiter waiter;
+        Wake  wake;
+        Waker waker;
+        waker.post([&waiter, &wake]() { wakeWhenWaiting(waiter, wake, 0.02); });
+        wake.mWaiting = true;
+        const time_point woke = waiter.waitFor(std::chrono::seconds::max());
+        wake.mReturned = true;
+        CHECK_FALSE(wake.mRescued);
+        CHECK(woke.ticks >= wake.mAt.load());
+        CHECK(woke.since(time_point{ wake.mAt.load() }) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: a spin ends at its deadline or once it is done", "[alprecisewaiter]")
+    {
+        for (F64 seconds : { 0.0, 0.0001, 0.001, 0.003 })
+        {
+            INFO("a spin of " << seconds * 1000.0 << " ms");
+            const time_point deadline = time_point::after(seconds);
+            const time_point stopped  = ALPreciseWaiter::spinUntil(deadline);
+            CHECK(stopped >= deadline);
+            CHECK(stopped.since(deadline) < LATE);
+        }
+
+        int asked = 0;
+        const time_point start   = time_point::now();
+        const time_point stopped = ALPreciseWaiter::spinUntil(time_point::after(LOST), [&asked]() { return ++asked == 1000; });
+        CHECK(asked == 1000);
+        CHECK(stopped.since(start) < LATE);
+    }
+
+    TEST_CASE("alprecisewaiter: a plain sleep ends no sooner than its deadline", "[alprecisewaiter]")
+    {
+        for (F64 seconds : { 0.0001, 0.0005, 0.001, 0.002, 0.005 })
+        {
+            INFO("a sleep of " << seconds * 1000.0 << " ms");
+            for (int i = 0; i < 8; ++i)
+            {
+                const time_point deadline = time_point::after(seconds);
+                const time_point woke     = ALPreciseWaiter::sleepUntil(deadline);
+                CHECK(woke >= deadline);
+                CHECK(woke.since(deadline) < LATE);
+                CHECK(time_point::now() >= woke);
+            }
+        }
+        const time_point start = time_point::now();
+        CHECK(ALPreciseWaiter::sleepUntil(time_point{ 0 }).since(start) < LATE);
+        CHECK(ALPreciseWaiter::sleepUntil(start.plus(-1.0)).since(start) < LATE);
+
+        // A duration of the standard library's, in the counter's ticks as the sleep rounds it.
+        for (const auto duration : { std::chrono::microseconds(500), std::chrono::microseconds(2000) })
+        {
+            const time_point before = time_point::now();
+            const time_point woke   = ALPreciseWaiter::sleepFor(duration);
+            CHECK(woke.ticks - before.ticks >= time_point{ 0 }.plus(std::chrono::duration<F64>(duration).count()).ticks);
+            CHECK(woke.since(before) < LATE);
+        }
+    }
+
+    TEST_CASE("alprecisewaiter: the margin is the 99th percentile of the recent waits' lateness", "[alprecisewaiter]")
+    {
+        ALPreciseWaiter waiter;
+        CHECK(waiter.margin() == ALPreciseWaiter::MARGIN_SEED);
+
+        // As many waits as the waiter keeps and then some, each one's lateness as the clock it returns shows it.
+        std::vector<F64> late;
+        for (int i = 0; i < 320; ++i)
+        {
+            const time_point deadline = time_point::after(0.0005);
+            late.push_back(waiter.waitUntil(deadline).since(deadline));
+        }
+        // The waiter's are the last 256. One whose deadline passed before it could wait notes nothing, which the
+        // bounds allow for: no lower than the 97th percentile, and no higher than the latest.
+        std::vector<F64> recent(late.end() - 256, late.end());
+        std::sort(recent.begin(), recent.end());
+        const F64 p97 = (std::min)(recent[248], ALPreciseWaiter::MARGIN_MAX);
+        const F64 top = (std::min)(recent.back(), ALPreciseWaiter::MARGIN_MAX);
+        INFO("lateness: median " << recent[128] * 1000.0 << " ms, p97 " << recent[248] * 1000.0 << " ms, max "
+             << recent.back() * 1000.0 << " ms; margin " << waiter.margin() * 1000.0 << " ms");
+        CHECK(waiter.margin() >= p97 - 1.0e-9);
+        CHECK(waiter.margin() <= top + 1.0e-9);
+        CHECK(waiter.margin() >= 0.0);
+        CHECK(waiter.margin() <= ALPreciseWaiter::MARGIN_MAX);
+    }
+
+#if LL_WINDOWS
+    TEST_CASE("alprecisewaiter: every handle a waiter or a sleep makes is closed", "[alprecisewaiter]")
+    {
+        // A cycle first, so that what the pool and the log make once is made before the count.
+        const auto cycle = []()
+            {
+                LL::ThreadPool pool("alprecisewaiter_test_sleeper", 1, 64, false, true);
+                pool.start();
+                std::atomic<bool> slept{ false };
+                REQUIRE(pool.getQueue().post([&slept]()
+                    {
+                        ALPreciseWaiter::sleepFor(0.0001);
+                        slept = true;
+                    }));
+                ALPreciseWaiter::spinUntil(time_point::after(LOST), [&slept]() { return slept.load(); });
+                REQUIRE(slept);
+            };
+        cycle();
+        ALPreciseWaiter::sleepFor(0.0001);
+
+        DWORD before = 0;
+        DWORD after  = 0;
+        REQUIRE(GetProcessHandleCount(GetCurrentProcess(), &before));
+        for (int i = 0; i < 64; ++i)
+        {
+            ALPreciseWaiter waiter;
+            waiter.wake();
+            waiter.waitFor(0.0001);
+        }
+        // A thread that sleeps makes a timer of its own for it, which goes with the thread.
+        for (int i = 0; i < 16; ++i)
+        {
+            cycle();
+        }
+        REQUIRE(GetProcessHandleCount(GetCurrentProcess(), &after));
+        INFO("handles before " << before << ", after " << after);
+        // Two a waiter and one a thread, were they kept: a few either way are the process's own comings and goings.
+        CHECK(after < before + 8);
+    }
+#endif
+}

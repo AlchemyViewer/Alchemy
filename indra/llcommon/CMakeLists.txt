@@ -21,6 +21,7 @@ target_sources(
     almainloop.cpp
     alserialworker.cpp
     alparamtype.cpp
+    alprecisewaiter.cpp
     alrecoverystore.cpp
     alregex.cpp
     alsanitizer.cpp
@@ -128,6 +129,7 @@ target_sources(
         almainloop.h
         alserialworker.h
         alparamtype.h
+        alprecisewaiter.h
         alrandmap.h
         alrecoverystore.h
         alregex.h
@@ -313,6 +315,7 @@ if(AL_BUILD_TESTS)
       tests/alcompact_test.cpp
       tests/alenumtable_test.cpp
       tests/alfilewrite_test.cpp
+      tests/alprecisewaiter_test.cpp
       tests/alrecoverystore_test.cpp
       tests/alregex_test.cpp
       tests/alsavehistory_test.cpp
