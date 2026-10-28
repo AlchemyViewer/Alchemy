@@ -105,6 +105,7 @@ public:
     void clearOcclusion()
     {
         mOccluded       = false;
+        mOutOfView      = false;
         mOcclusionQuery = {};
     }
 
@@ -177,6 +178,10 @@ public:
     // occlusion culling state: the last query of gGL's pool, and what the last one read said
     ALQueryTicket mOcclusionQuery;
     bool mOccluded = false;
+
+    // outside the main view when its occlusion was last asked, which takes no query: the update scheduler passes it
+    // over as it does an occluded probe, and getReflectionMaps judges the view on its own frame instead
+    bool mOutOfView = false;
 
     ProbeType mType;
 };
