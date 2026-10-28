@@ -132,12 +132,15 @@ namespace
         thread.addRequest(new TestRequest(thread.generateHandle(), [&]()
             {
                 log.note("C");
-                b_added = clock.getElapsedTimeF64();
                 thread.addRequest(new TestRequest(thread.generateHandle(), [&]()
                     {
                         log.note("B");
                         return true;
                     }));
+                // Read once B is posted, so no earlier than B's time in the
+                // schedule. A's retry is due no sooner than 16 ms after
+                // retry_asked.
+                b_added = clock.getElapsedTimeF64();
                 return true;
             }));
 
