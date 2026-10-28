@@ -101,6 +101,7 @@ if(AL_BUILD_TESTS)
       tests/httpoperation_test.cpp
       tests/httprequest_test.cpp
       tests/httprequestqueue_test.cpp
+      tests/httpretryqueue_test.cpp
       tests/httpstatus_test.cpp
       tests/jsonrpcws_test.cpp
       tests/refcounted_test.cpp

@@ -3252,7 +3252,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are 
         CHECK(mHandlerCalls == url_limit);
 
         // Each GET was retried once, as a 503, whatever its Retry-After said,
-        // and the retry of the one with "Retry-After: 2" came no sooner than that
+        // and the retry of the one with "Retry-After: 2" came no sooner than that.
+        // The others retried after the default backoff of one second, not held
+        // back to the latest retry due.  libcurl's clock on Windows is the tick
+        // count, so a second can end a tick short.
         for (int i(0); i < url_limit; ++i)
         {
             CAPTURE(i);
@@ -3263,6 +3266,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are 
             if (0 == i)
             {
                 CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(1900));
+            }
+            else
+            {
+                CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(900));
+                CHECK(delivery->second.mAt - issued < std::chrono::milliseconds(1800));
             }
         }
 

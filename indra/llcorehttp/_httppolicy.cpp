@@ -369,7 +369,7 @@ bool HttpPolicy::cancel(HttpHandle handle)
             if ((*cur)->getHandle() == handle)
             {
                 HttpOpRequest::ptr_t op(*cur);
-                c1.erase(cur);                                  // All iterators are now invalidated
+                state.mRetryQueue.erase(cur);                   // All iterators are now invalidated
                 op->cancel();
                 return true;
             }
