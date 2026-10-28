@@ -28,6 +28,8 @@
 #include "../lluictrlfactory.h"
 
 #include "alheadlessui_fixture.h"
+#include "llthread.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -79,10 +81,10 @@ namespace
             {
                 while (!updating)
                 {
-                    std::this_thread::yield();
+                    LLThread::yield();
                 }
                 // Well into the layout: taking the lines out is all that comes first.
-                std::this_thread::sleep_for(5ms);
+                ms_sleep(5);
                 const auto start = std::chrono::steady_clock::now();
                 c->addLine("added during the layout");
                 add_ms = std::chrono::duration<F64, std::milli>(std::chrono::steady_clock::now() - start).count();

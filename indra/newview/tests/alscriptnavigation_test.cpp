@@ -29,11 +29,10 @@
 #include "alpanelist.h"
 #include "alscriptstudio_fixture.h"
 #include "llfocusmgr.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <chrono>
-#include <thread>
 
 namespace
 {
@@ -127,7 +126,7 @@ namespace
             l->setFocus(true);
             return l;
         }
-        static void waitToSettle() { std::this_thread::sleep_for(std::chrono::milliseconds(400)); }
+        static void waitToSettle() { ms_sleep(400); }
     };
 
     // A view of a line is a place of its own, and a place noted drops the

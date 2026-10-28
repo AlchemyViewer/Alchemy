@@ -5535,7 +5535,7 @@ void LLWindowWin32::LLWindowWin32Thread::run()
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_WIN32("w32t - Sleep");
             logger.always("sleep(1)");
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
 #endif
     }

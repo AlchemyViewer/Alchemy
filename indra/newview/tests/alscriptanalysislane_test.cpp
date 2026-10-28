@@ -28,6 +28,7 @@
 #include "../alscriptanalyzers.h"
 
 #include "llmutex.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -36,7 +37,6 @@
 #include <chrono>
 #include <functional>
 #include <memory>
-#include <thread>
 
 namespace
 {
@@ -244,7 +244,7 @@ namespace
         CHECK(gate->waitEntered(2));
         CHECK(post(luau, job("again", ALScriptAnalysis::Kind::Hover, true)));
         // A moment, in which a question that stopped it would be answered.
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        ms_sleep(200);
         UNSCOPED_INFO("the second question waits for the check");
         CHECK(answers.all() == std::string("front/1"));
         UNSCOPED_INFO("not started over");

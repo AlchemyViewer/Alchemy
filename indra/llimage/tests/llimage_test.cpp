@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "llimage.h"
+#include "lltimer.h"
 
 #include "altestfatal.h"
 
@@ -86,7 +87,7 @@ namespace
                 {
                     return false;
                 }
-                std::this_thread::sleep_for(1ms);
+                ms_sleep(1);
             }
             return true;
         }

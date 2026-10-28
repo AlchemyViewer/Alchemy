@@ -25,6 +25,7 @@
 #include "linden_common.h"
 
 #include "../threadpool.h"
+#include "../lltimer.h"
 
 #if LL_WINDOWS
 #include "../llwin32headers.h"
@@ -38,7 +39,6 @@
 #include <atomic>
 #include <chrono>
 #include <memory>
-#include <thread>
 #include <vector>
 
 namespace
@@ -56,7 +56,7 @@ namespace
             {
                 return false;
             }
-            std::this_thread::sleep_for(1ms);
+            ms_sleep(1);
         }
         return true;
     }
@@ -110,12 +110,12 @@ namespace
             }));
         REQUIRE(waitFor([&worker]() { return worker.load() != nullptr; }));
         // Back to waiting for the next.
-        std::this_thread::sleep_for(50ms);
+        ms_sleep(50);
 
         ULONG64 before = 0;
         ULONG64 after  = 0;
         REQUIRE(QueryThreadCycleTime(worker, &before));
-        std::this_thread::sleep_for(250ms);
+        ms_sleep(250);
         REQUIRE(QueryThreadCycleTime(worker, &after));
         CloseHandle(worker);
         INFO("cycles while idle: " << (after - before));

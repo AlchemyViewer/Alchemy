@@ -32,6 +32,7 @@
 #include <boost/unordered/unordered_flat_set.hpp>
 
 #include "../lluuid.h"
+#include "../llthread.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -404,7 +405,7 @@ namespace
                 {
                     while (!go)
                     {
-                        std::this_thread::yield();
+                        LLThread::yield();
                     }
                     made[t].reserve(EACH);
                     for (size_t i = 0; i < EACH; ++i)

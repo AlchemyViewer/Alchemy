@@ -13,13 +13,14 @@
 #include "linden_common.h"
 // associated header
 #include "llprocess.h"
+#include "alprecisewaiter.h"
+#include "lltimer.h"
 // STL headers
 #include <vector>
 #include <list>
 // std headers
 #include <chrono>
 #include <fstream>
-#include <thread>
 // external library headers
 #include "llapr.h"
 #include "apr_thread_proc.h"
@@ -1465,7 +1466,7 @@ namespace
         // (20 * 50 ms) until it arrives.
         for (int i = 0; i < EOF_EVENT_RETRY_COUNT && listener.mHistory.empty(); ++i)
         {
-            std::this_thread::sleep_for(EOF_EVENT_RETRY_DELAY);
+            ALPreciseWaiter::sleepFor(EOF_EVENT_RETRY_DELAY);
             LLEventPumps::instance().obtain("mainloop").post(LLSD());
         }
         // We can't be positive there will only be a single event, if the OS
@@ -1934,7 +1935,7 @@ namespace
              (outListener.mHistory.empty() || errListener.mHistory.empty());
              ++i)
         {
-            std::this_thread::sleep_for(EOF_EVENT_RETRY_DELAY);
+            ALPreciseWaiter::sleepFor(EOF_EVENT_RETRY_DELAY);
             LLEventPumps::instance().obtain("mainloop").post(LLSD());
         }
 
@@ -1986,7 +1987,7 @@ namespace
         // Sleep longer than the tick threshold to ensure the child has had
         // time to exit at the OS level, so the next tick is likely to enter
         // the "process just exited" code path that used to block for 100 ms.
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ms_sleep(100);
 
         // Time a single mainloop tick: it must not block
         auto start = std::chrono::steady_clock::now();

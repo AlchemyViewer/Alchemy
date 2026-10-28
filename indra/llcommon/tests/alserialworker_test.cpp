@@ -26,6 +26,7 @@
 #include "linden_common.h"
 
 #include "../alserialworker.h"
+#include "../lltimer.h"
 
 #include "../llevents.h"
 #include "../llmutex.h"
@@ -34,7 +35,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
-#include <chrono>
 #include <thread>
 #include <vector>
 
@@ -66,7 +66,7 @@ namespace
                         return true;
                     }
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                ms_sleep(1);
             }
             return false;
         }
@@ -101,7 +101,7 @@ namespace
             running = true;
             while (!stopped)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                ms_sleep(1);
             }
             note(0);
         });
@@ -111,7 +111,7 @@ namespace
         }
         for (int tries = 0; tries < 2000 && !running; ++tries)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         UNSCOPED_INFO("the first is running");
         CHECK(running.load());
