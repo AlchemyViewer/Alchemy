@@ -28,9 +28,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <thread>
 #include <vector>
 
@@ -147,9 +149,19 @@ namespace
                 CHECK(ticks < asked + U64(hz));
             }
         }
-        // Nothing asked is a yield.
-        CHECK(slept([]() { ms_sleep(0); }) < U64(hz));
-        CHECK(slept([]() { micro_sleep(0); }) < U64(hz));
+        // Nothing asked is a yield, not a sleep however short: the quickest of many comes back inside 50 us, which
+        // no timed sleep does, Linux's timer slack alone being 50 us. Any one yield may wait out another thread's
+        // turn on the core, so the quickest, not each.
+        U64 quickest_ms = (std::numeric_limits<U64>::max)();
+        U64 quickest_us = (std::numeric_limits<U64>::max)();
+        for (int i = 0; i < 50; ++i)
+        {
+            quickest_ms = (std::min)(quickest_ms, slept([]() { ms_sleep(0); }));
+            quickest_us = (std::min)(quickest_us, slept([]() { micro_sleep(0); }));
+        }
+        CAPTURE(quickest_ms, quickest_us, hz);
+        CHECK(F64(quickest_ms) < 0.00005 * hz);
+        CHECK(F64(quickest_us) < 0.00005 * hz);
     }
 
     TEST_CASE_METHOD(timer_data, "LLTimer: total time read on many threads never steps back or runs fast", "[LLTimer]")
