@@ -32,11 +32,10 @@
 //   waiter + spin    the same to margin() before the deadline, then
 //                    spinUntil(): a wait that has to end on its deadline
 //     time spun      how long that spin ran, which is what it costs
-//   plain sleep      ALPreciseWaiter::sleepFor()
+//   plain sleep      ALPreciseWaiter::sleepFor(), which ALFrameFences' wait
+//                    for a frame's stamp sleeps on
 //   ms_sleep         whole milliseconds only
 //   micro_sleep
-//   stamp wait sleep ALFrameFences' sleep in the wait for a frame's stamp: a
-//                    relative high-resolution waitable timer for each thread
 //   pool timed wait  a thread pool worker's boost::this_fiber::sleep_for(),
 //                    which on Windows is the pool's scheduler's timed wait
 //
@@ -56,9 +55,6 @@
 #if LL_WINDOWS
 #include "llwin32headers.h"
 #include <timeapi.h>
-#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
-#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-#endif
 #endif
 
 #include "altestbenchmark.h"
@@ -85,36 +81,6 @@ namespace
     int samplesFor(F64 seconds)
     {
         return seconds <= 0.002 ? 400 : 200;
-    }
-
-    // ALFrameFences' sleep in its wait for a frame's stamp, as alframefences.cpp has it.
-    void stampWaitSleep(F64 seconds)
-    {
-#if LL_WINDOWS
-        struct WaitTimer
-        {
-            HANDLE mHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-            ~WaitTimer()
-            {
-                if (mHandle)
-                {
-                    CloseHandle(mHandle);
-                }
-            }
-        };
-        thread_local WaitTimer timer;
-        if (timer.mHandle)
-        {
-            LARGE_INTEGER due;
-            due.QuadPart = -std::max<LONGLONG>(1, LONGLONG(seconds * 1e7));
-            if (SetWaitableTimer(timer.mHandle, &due, 0, nullptr, nullptr, FALSE))
-            {
-                WaitForSingleObject(timer.mHandle, INFINITE);
-                return;
-            }
-        }
-#endif
-        std::this_thread::sleep_for(std::chrono::duration<F64>(seconds));
     }
 
     // One wait of `seconds`, however the row waits: how far past them it came back.
@@ -210,12 +176,6 @@ namespace
                 {
                     const time_point start = time_point::now();
                     micro_sleep(U64(seconds * 1.0e6 + 0.5));
-                    return time_point::now().since(start) - seconds;
-                } },
-            { "stamp wait sleep", [](F64 seconds)
-                {
-                    const time_point start = time_point::now();
-                    stampWaitSleep(seconds);
                     return time_point::now().since(start) - seconds;
                 } },
             { "pool timed wait", [&pool, &pool_done](F64 seconds)
