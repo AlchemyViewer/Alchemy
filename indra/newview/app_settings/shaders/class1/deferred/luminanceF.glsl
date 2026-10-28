@@ -75,8 +75,10 @@ void main()
         for (int i = 0; i < taps.x; ++i)
         {
             vec2 px = patch_origin + (vec2(i, j) + 0.5) * tap_step;
-            // R16F tops out at 65504; the sun disc can be brighter
-            float L = min(lum(textureLod(diffuseRect, px / scene_size, 0.0).rgb), 60000.0);
+            // R16F tops out at 65504; the sun disc can be brighter. A NaN reads as the black the
+            // frame shows it as, not as whatever min makes of it.
+            float L = lum(textureLod(diffuseRect, px / scene_size, 0.0).rgb);
+            L = isnan(L) ? 0.0 : min(L, 60000.0);
             if (isFarDepth(texelFetch(depthMap, ivec2(px), 0).r) || waterOverSky(ivec2(px), water_size))
             {
                 sky += L;
