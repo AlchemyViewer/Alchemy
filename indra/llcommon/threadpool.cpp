@@ -17,6 +17,7 @@
 // std headers
 // external library headers
 // other Linden headers
+#include "alprecisewaiter.h"
 #include "commoncontrol.h"
 #include "llerror.h"
 #include "llevents.h"
@@ -24,9 +25,6 @@
 #include "stringize.h"
 
 #include <boost/fiber/algo/round_robin.hpp>
-
-#include <algorithm>
-#include <iterator>
 
 /*****************************************************************************
 *   Custom fiber scheduler for worker threads
@@ -37,104 +35,48 @@
 // tasks should sleep until there is one. Override the default fiber scheduler
 // to implement that.
 #if LL_WINDOWS
-#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
-#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-#endif
-
 struct sleepy_robin: public boost::fibers::algo::round_robin
 {
-    sleepy_robin():
-        mWake(CreateEventW(nullptr, FALSE, FALSE, nullptr)),
-        mTimer(CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS))
-    {
-        if (!mWake || !mTimer)
-        {
-            // Short of either, round_robin's own wait, for the waits and the
-            // wakes alike.
-            closeHandles();
-        }
-    }
-
-    ~sleepy_robin() override
-    {
-        closeHandles();
-    }
-
     // round_robin holds a std::condition_variable, and
     // round_robin::suspend_until() calls
     // std::condition_variable::wait_until(). On Windows, that call seems
-    // busier than it ought to be. This waits on an event instead, which a
-    // fiber made ready from another thread sets; and, where a fiber's timed
-    // wait sets a deadline, on a high resolution waitable timer, which the
-    // system timer's tick does not round as it does Sleep() and a wait's
-    // timeout -- to a whole 15.6 ms on Windows 11 for a process whose window
-    // is hidden, whatever resolution it asked for.
+    // busier than it ought to be. This waits on a waiter instead, which a
+    // fiber made ready from another thread wakes, and whose timer, where a
+    // fiber's timed wait sets a deadline, the system timer's tick does not
+    // round as it does Sleep() and a wait's timeout -- to a whole 15.6 ms on
+    // Windows 11 for a process whose window is hidden, whatever resolution it
+    // asked for.
     void suspend_until(std::chrono::steady_clock::time_point const& until) noexcept override
     {
-        if (!mWake)
+        if (!mWaiter.canWake())
         {
             round_robin::suspend_until(until);
             return;
         }
         if (until == (std::chrono::steady_clock::time_point::max)())
         {
-            WaitForSingleObject(mWake, INFINITE);
+            mWaiter.waitUntil(ALPreciseWaiter::time_point::max());
             return;
         }
-        const auto left = until - std::chrono::steady_clock::now();
-        if (left <= left.zero())
-        {
-            return;
-        }
-        // Relative, in the timer's 100 ns units, rounded up: a wait that
-        // ended early would only come back here.
-        LARGE_INTEGER due;
-        due.QuadPart = -(std::max)(LONGLONG(1),
-            LONGLONG(std::chrono::ceil<std::chrono::duration<LONGLONG, std::ratio<1, 10000000>>>(left).count()));
-        if (!SetWaitableTimerEx(mTimer, &due, 0, nullptr, nullptr, nullptr, 0))
-        {
-            // A timer that would not be set: a wait the tick rounds, which a
-            // wake still ends at once.
-            WaitForSingleObject(mWake, DWORD((std::min)(std::chrono::ceil<std::chrono::milliseconds>(left).count(),
-                                                        static_cast<long long>(INFINITE - 1))));
-            return;
-        }
-        const HANDLE waits[] = { mWake, mTimer };
-        if (WaitForMultipleObjects(DWORD(std::size(waits)), waits, FALSE, INFINITE) == WAIT_OBJECT_0)
-        {
-            // Woken before the deadline, which nothing waits for now.
-            CancelWaitableTimer(mTimer);
-        }
+        // The fibers' deadlines are on the standard library's steady clock
+        // and the waiter's on the native counter: what is left of the wait
+        // goes across, not the deadline.
+        mWaiter.waitFor(until - std::chrono::steady_clock::now());
     }
 
-    // Auto-reset: a notify that comes before the wait is kept for it.
+    // A wake that comes before the wait is kept for it.
     void notify() noexcept override
     {
-        if (!mWake)
+        if (!mWaiter.canWake())
         {
             round_robin::notify();
             return;
         }
-        SetEvent(mWake);
+        mWaiter.wake();
     }
 
 private:
-    void closeHandles()
-    {
-        if (mTimer)
-        {
-            CloseHandle(mTimer);
-            mTimer = nullptr;
-        }
-        if (mWake)
-        {
-            CloseHandle(mWake);
-            mWake = nullptr;
-        }
-    }
-
-    HANDLE mWake;
-    HANDLE mTimer;
+    ALPreciseWaiter mWaiter;
 };
 #endif // LL_WINDOWS
 
