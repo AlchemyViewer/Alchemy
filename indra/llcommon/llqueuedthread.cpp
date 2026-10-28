@@ -80,10 +80,10 @@ void LLQueuedThread::shutdown()
     unpause(); // MAIN THREAD
     if (mThreaded)
     {
-        if (mRequestQueue.size() == 0)
-        {
-            mRequestQueue.close();
-        }
+        // Closed, the queue still runs what it holds, retries due later
+        // included, and the thread stops once it has run the last of it. A
+        // retry it can no longer post is left queued, for the loop below.
+        mRequestQueue.close();
 
         S32 timeout = 50;
         for ( ; timeout>0; timeout--)

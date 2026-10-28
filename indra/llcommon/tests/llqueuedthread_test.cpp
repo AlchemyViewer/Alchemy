@@ -163,6 +163,32 @@ namespace
         }
     }
 
+    TEST_CASE("llqueuedthread: shutdown with a request retrying does not wait out its timeout", "[llqueuedthread]")
+    {
+        // The request asks for another turn every time, so a retry is always
+        // queued. Shutdown runs it, sees it abort, and stops the thread, well
+        // inside the five seconds it waits for the thread before giving up.
+        TestQueuedThread thread;
+        thread.start();
+        std::atomic<int> turns{ 0 };
+        thread.addRequest(new TestRequest(thread.generateHandle(), [&turns]()
+            {
+                ++turns;
+                return false;
+            }));
+        LLTimer clock;
+        while (turns.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(turns.load() >= 1);
+
+        clock.reset();
+        thread.shutdown();
+        CHECK(thread.isStopped());
+        CHECK(clock.getElapsedTimeF64() < 2.5);
+    }
+
     TEST_CASE("llqueuedthread: update leaves a queue with no update of its own asleep", "[llqueuedthread]")
     {
         // Made paused, the thread waits until something is pending. A queue
