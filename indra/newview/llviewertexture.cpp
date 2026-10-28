@@ -4135,7 +4135,10 @@ F32 LLViewerMediaTexture::getMaxVirtualSize()
 
     if(!mMaxVirtualSizeResetCounter)
     {
-        addTextureStats(0.f, false);//reset
+        // A new window: the size goes back to what the faces seen in it ask for, so the interest of media turned
+        // away from decays and its plugin drops priority. addTextureStats only ever raises it.
+        mMaxVirtualSize = 0.f;
+        resetMaxVirtualSizeResetCounter();
     }
 
     if(mIsPlaying) //media is playing
