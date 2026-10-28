@@ -1,0 +1,147 @@
+# The store's test schema, compiled under cvartest:: by alcvargen as the
+# viewer's is under cvar::. Every type the store keeps, every layout of slot,
+# and the declarations a stored value is converted through.
+
+[render]
+label  = "Rendering"
+backup = "yes"
+
+[render.draw_distance]
+type     = "F32"
+default  = 128.0
+range    = [32.0, 1024.0]
+ui_range = [32.0, 512.0]
+ui_step  = 8.0
+unit     = "metres"
+alias    = "RenderFarClip"
+origin   = "linden"
+tags     = ["resource_input"]
+help     = "How far the view reaches"
+
+[render.quality_level]
+type    = "S32"
+default = 3
+range   = [0, 7]
+help    = "The quality level in use; 0 is the one recommended for this GPU"
+
+[render.frame_count]
+type    = "S64"
+default = 0
+scope   = "runtime"
+help    = "Frames drawn this session"
+
+[render.vintage]
+label = "Vintage mode"
+
+[render.vintage.enabled]
+type    = "bool"
+default = false
+alias   = { name = "RenderDisableVintageMode", inverted = true }
+origin  = "linden"
+tags    = ["shader_input"]
+help    = "Draw as viewers did before physically based rendering"
+
+[render.shadows]
+label  = "Shadows"
+preset = "scene"
+
+[render.shadows.detail]
+type    = "S32"
+default = 2
+choices = { 0 = "None", 1 = "Sun and moon", 2 = "Sun, moon and projectors" }
+alias   = "RenderShadowDetail"
+origin  = "linden"
+tags    = ["shader_input"]
+help    = "Which lights cast shadows"
+
+[render.shadows.resolution_scale]
+type    = "F32"
+default = 1.0
+range   = [0.25, 4.0]
+ui_step = 0.05
+unit    = "ratio"
+alias   = "RenderShadowResolutionScale"
+origin  = "linden"
+tags    = ["resource_input"]
+help    = "Shadow map size as a multiple of the window's"
+
+[render.shadows.max_maps]
+type    = "U32"
+default = 4
+range   = [1, 8]
+help    = "Spot light shadow maps drawn at most"
+
+[render.shadows.soft]
+type    = "bool"
+default = true
+help    = "Filter shadow edges"
+
+[render.shadows.bias]
+type    = "F64"
+default = 0.001
+range   = [0.0, 1.0]
+help    = "Depth bias of the sun's shadow"
+
+[render.shadows.tint]
+type    = "color4"
+default = [1.0, 0.9, 0.8, 1.0]
+range   = [0.0, 1.0]
+help    = "Shadow colour"
+
+[render.shadows.ambient]
+type    = "color3"
+default = [0.1, 0.1, 0.2]
+help    = "Light in shadow"
+
+[render.shadows.offset]
+type    = "vec3"
+default = [0.0, 0.0, 1.0]
+help    = "Where the sun's camera stands, from the focus"
+
+[render.shadows.anchor]
+type    = "vec3d"
+default = [128.0, 128.0, 20.0]
+help    = "A point in the region"
+
+[render.shadows.rotation]
+type    = "quat"
+default = [0.0, 0.0, 0.0, 1.0]
+help    = "A turn of the sun's camera"
+
+[render.shadows.uv_scale]
+type    = "vec2"
+default = [1.0, 2.0]
+help    = "Texture repeats"
+
+[render.shadows.screen_rect]
+type    = "rect"
+default = [0, 100, 200, 0]
+help    = "A region of the screen"
+
+[render.exposure]
+label = "Exposure"
+preset = "look"
+
+[render.exposure.compensation]
+type    = "F32"
+default = 0.0
+range   = [-4.0, 4.0]
+unit    = "ev"
+alias   = "AlchemyExposureCompensation"
+help    = "Exposure added to the metered value"
+
+[render.exposure.dynamic]
+label = "Dynamic exposure"
+
+[render.exposure.dynamic.enabled]
+type    = "bool"
+default = true
+alias   = "RenderDynamicExposureEnabled"
+origin  = "linden"
+help    = "Meter the scene's brightness"
+
+[render.exposure.dynamic.speed]
+type    = "F32"
+default = 1.0
+range   = [0.0, 10.0]
+help    = "How fast the meter follows"

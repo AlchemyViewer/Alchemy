@@ -413,10 +413,13 @@ jobs:
 
           # Each port's sources, build tree and staged package go once it is
           # installed: a cache miss builds every port, and their leftovers
-          # would take the disk the viewer's own build needs.
+          # would take the disk the viewer's own build needs. The settings
+          # lock is strict: any line of it the commit does not carry fails
+          # the configure, a new setting's first step too.
           cmake -S indra --preset $cmake_preset_name \
             "${compiler_args[@]}" \
             -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
+            -DAL_CVARS_STRICT:BOOL=ON \
             -DVCPKG_TARGET_TRIPLET="$vcpkg_triplet" \
             -DAL_BUILD_VIEWER:BOOL="$AL_BUILD_VIEWER" \
             -DAL_BUILD_APPEARANCE_UTILITY:BOOL="$AL_BUILD_APPEARANCE_UTILITY" \
@@ -434,6 +437,38 @@ jobs:
             -DAL_CHANNEL:STRING="${AL_CHANNEL}" \
             -DAL_GRID:STRING="$VIEWER_GRID" \
             $template_verifier_master_url
+
+      # A pull request's settings lock holds every line of its target
+      # branch's: a step that may have shipped is put right by a step after
+      # it, never taken out (doc/CVARS.md). The configure built the
+      # generator; one row checks, and a Viewer row, whose failure fails the
+      # run.
+      - name: Check the settings lock against the target branch's
+        if: github.event_name == 'pull_request' && matrix.runner == 'ubuntu-26.04' && matrix.build_variant == 'Viewer'
+        shell: bash
+        env:
+          BUILD_DIRECTORY: ${{ steps.configure.outputs.build_directory }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          # The checkout fetched every branch. A target branch missing from
+          # it fails the check, rather than passing it against an empty lock.
+          if ! git rev-parse --verify --quiet "origin/$BASE_REF^{commit}" > /dev/null
+          then
+            echo "::error::origin/$BASE_REF is not in the checkout; the settings lock cannot be checked against it"
+            exit 1
+          fi
+          base_lock="$RUNNER_TEMP/cvars.base.lock"
+          if git cat-file -e "origin/$BASE_REF:indra/cvars/cvars.lock" 2>/dev/null
+          then
+            git show "origin/$BASE_REF:indra/cvars/cvars.lock" > "$base_lock"
+          else
+            : > "$base_lock"
+          fi
+          shopt -s nullglob
+          schema=(indra/cvars/*.toml)
+          "$BUILD_DIRECTORY/alcvargen-host/bin/alcvargen" --check --lock indra/cvars/cvars.lock \
+            --base "$base_lock" "${schema[@]}"
 
       - name: Build
         id: build

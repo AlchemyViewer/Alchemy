@@ -8,6 +8,7 @@
   "skip": {
     "pkgconf": "a build tool",
     "boost-uninstall": "a build tool",
+    "tomlplusplus": "a build tool: the settings schema's generator reads the schema with it",
     "pthread": "an empty port; an alias of pthreads",
     "alsa": "an empty port; the system library is used",
     "dbus": "an empty port; the system library is used",

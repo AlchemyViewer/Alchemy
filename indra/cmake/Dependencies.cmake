@@ -94,6 +94,7 @@ al_import(ll::slua         PACKAGE unofficial-slua CONFIG TARGETS unofficial::sl
 al_import(ll::sqlite3      PACKAGE unofficial-sqlite3 CONFIG TARGETS unofficial::sqlite3::sqlite3)
 al_import(ll::tailslide    PACKAGE unofficial-slua CONFIG TARGETS unofficial::slua::libtailslide)
 al_import(ll::tinyexr      PACKAGE tinyexr         CONFIG TARGETS unofficial::tinyexr::tinyexr)
+al_import(ll::tomlplusplus PACKAGE tomlplusplus    CONFIG TARGETS tomlplusplus::tomlplusplus)
 al_import(ll::vorbis       PACKAGE Vorbis          CONFIG TARGETS Vorbis::vorbisfile Vorbis::vorbisenc Vorbis::vorbis)
 al_import(ll::xxhash       PACKAGE xxHash          CONFIG TARGETS xxHash::xxhash)
 

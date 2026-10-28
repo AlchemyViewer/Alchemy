@@ -1,0 +1,353 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Alchemy settings schema",
+  "description": "A file of indra/cvars: an area's groups and settings, each [area.group.key] a setting where it has a type and a group otherwise. Written by alcvargen --json-schema; doc/CVARS.md says how to use them.",
+  "type": "object",
+  "propertyNames": {
+    "enum": ["audio", "avatar", "build", "camera", "chat", "debug", "im", "input", "inventory", "login", "media", "net", "perf", "privacy", "render", "rlva", "script", "snapshot", "ui", "update", "voice", "world"]
+  },
+  "additionalProperties": {
+    "$ref": "#/definitions/group"
+  },
+  "definitions": {
+    "entry": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/setting"
+        },
+        {
+          "$ref": "#/definitions/group"
+        }
+      ]
+    },
+    "group": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "description": "The group's name in the interface; the key in words where left out.",
+          "type": "string"
+        },
+        "help": {
+          "description": "What the group's settings are for.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Whose values its settings are, where a setting does not say.",
+          "enum": ["global", "account", "runtime"]
+        },
+        "backup": {
+          "description": "Whether a backup takes its settings, where a setting does not say.",
+          "enum": ["yes", "machine", "ask", "never"]
+        },
+        "preset": {
+          "description": "The kind of preset that takes its settings, where a setting does not say.",
+          "enum": ["none", "look", "scene", "camera"]
+        },
+        "origin": {
+          "description": "Where its settings came from, where a setting does not say.",
+          "enum": ["alchemy", "linden", "firestorm", "rlva"]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/entry"
+      }
+    },
+    "setting": {
+      "type": "object",
+      "required": ["type", "default", "help"],
+      "properties": {
+        "type": {
+          "description": "What the setting holds. Required.",
+          "enum": ["bool", "S32", "U32", "F32", "S64", "F64", "string", "uuid", "vec2", "vec3", "vec3d", "quat", "rect", "color3", "color4", "uuid[]", "string[]", "vec2[]", "llsd"]
+        },
+        "default": {
+          "description": "Its value until the user sets one, in its type. Required."
+        },
+        "help": {
+          "description": "What it does, as its tooltip says it. Required.",
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "description": "Its name in the interface; the key in words where left out.",
+          "type": "string"
+        },
+        "scope": {
+          "description": "Whose value it is: the machine's, the account's, or the session's alone, never stored. Its group's where left out.",
+          "enum": ["global", "account", "runtime"]
+        },
+        "range": {
+          "description": "[lowest, highest]: the values it may hold; one outside is clamped.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "ui_range": {
+          "description": "[lowest, highest]: what a slider or spinner offers, within range.",
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "ui_step": {
+          "description": "A slider's or spinner's increment.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "description": "What its number measures. A unit changed is a step of the lock.",
+          "enum": ["metres", "kilometres", "centimetres", "seconds", "milliseconds", "microseconds", "minutes", "hours", "days", "degrees", "radians", "percent", "ratio", "bytes", "kilobytes", "megabytes", "gigabytes", "hertz", "pixels", "points", "ev", "kelvin", "fps", "decibels"]
+        },
+        "choices": {
+          "description": "The values it may take, each with its label: { value = \"label\", ... }, or [{ value = ..., label = \"...\", was = [...] }, ...], `was` naming the values that became it.",
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/choice"
+              }
+            }
+          ]
+        },
+        "flags": {
+          "description": "How it is shown and kept.",
+          "type": "array",
+          "items": {
+            "enum": ["hidden", "restart", "developer", "sensitive", "dangerous", "account_override"]
+          },
+          "uniqueItems": true
+        },
+        "tags": {
+          "description": "Generations that move whenever a setting carrying the tag changes: lower_snake names.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          }
+        },
+        "validate": {
+          "description": "The registered validator every write of it runs.",
+          "type": "string"
+        },
+        "alias": {
+          "description": "An old name it was stored under: \"Name\", or { name = \"...\", inverted, encoding = \"string\", joined = \"<separator>\", unit }, or a list of them.",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/alias"
+            },
+            {
+              "type": "array",
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/alias"
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "origin": {
+          "description": "Where it came from. Its group's where left out.",
+          "enum": ["alchemy", "linden", "firestorm", "rlva"]
+        },
+        "migrate": {
+          "description": "What became of stored values at a step of the lock: a list, an entry a step, [{ step = <n>, map = { old = new, ... }, else = \"keep\" | \"default\" | <value> }], scale and offset, reset = true, fn = \"<hook>\", or join = { \"<decl>\" = { ... } } to end a fork.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/migrate"
+          }
+        },
+        "backup": {
+          "description": "Whether a backup takes it. Its group's where left out.",
+          "enum": ["yes", "machine", "ask", "never"]
+        },
+        "preset": {
+          "description": "The kind of preset that takes it. Its group's where left out.",
+          "enum": ["none", "look", "scene", "camera"]
+        },
+        "asset": {
+          "description": "The kind of file a string names: its value is a bare file name.",
+          "type": "string"
+        },
+        "refers": {
+          "description": "What a UUID refers to. Required for a UUID.",
+          "enum": ["none", "sound", "texture", "material", "inventory_folder", "inventory_item", "object", "experience"]
+        },
+        "from": {
+          "description": "Settings it takes its first value from where it has none of its own: [{ name = \"<setting>\", fn = \"<hook>\" }, ...].",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/source"
+          }
+        },
+        "reuse": {
+          "description": "Declares again a name renamed away or retired, as a history of its own that its old values never meet.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "choice": {
+      "type": "object",
+      "required": ["value"],
+      "properties": {
+        "value": {
+          "type": ["integer", "string"]
+        },
+        "label": {
+          "type": "string"
+        },
+        "was": {
+          "description": "The values that became it",
+          "type": "array",
+          "items": {
+            "type": ["integer", "string"]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "alias": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": {
+          "description": "The old name",
+          "type": "string"
+        },
+        "inverted": {
+          "description": "A boolean that said the opposite",
+          "type": "boolean"
+        },
+        "encoding": {
+          "description": "A UUID or a list kept in a string",
+          "enum": ["string"]
+        },
+        "joined": {
+          "description": "A list kept in a string, its elements joined by this",
+          "type": "string"
+        },
+        "unit": {
+          "description": "The unit the old name's values were in",
+          "enum": ["metres", "kilometres", "centimetres", "seconds", "milliseconds", "microseconds", "minutes", "hours", "days", "degrees", "radians", "percent", "ratio", "bytes", "kilobytes", "megabytes", "gigabytes", "hertz", "pixels", "points", "ev", "kelvin", "fps", "decibels"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "answer": {
+      "type": "object",
+      "properties": {
+        "map": {
+          "description": "A value of the step before to what it becomes: numbers or strings, as each step holds them",
+          "type": "object",
+          "additionalProperties": {
+            "type": ["number", "string"]
+          }
+        },
+        "else": {
+          "type": ["number", "string"],
+          "description": "\"keep\": the value as it was; \"default\": the setting's default; or a value of its own"
+        },
+        "scale": {
+          "description": "value * scale + offset",
+          "type": "number"
+        },
+        "offset": {
+          "description": "value * scale + offset",
+          "type": "number"
+        },
+        "reset": {
+          "description": "Stored values take the default",
+          "const": true
+        },
+        "fn": {
+          "description": "A registered migration's name",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "migrate": {
+      "type": "object",
+      "required": ["step"],
+      "properties": {
+        "step": {
+          "description": "The step of the lock it begins: 2 or later",
+          "type": "integer",
+          "minimum": 2
+        },
+        "map": {
+          "description": "A value of the step before to what it becomes: numbers or strings, as each step holds them",
+          "type": "object",
+          "additionalProperties": {
+            "type": ["number", "string"]
+          }
+        },
+        "else": {
+          "type": ["number", "string"],
+          "description": "\"keep\": the value as it was; \"default\": the setting's default; or a value of its own"
+        },
+        "scale": {
+          "description": "value * scale + offset",
+          "type": "number"
+        },
+        "offset": {
+          "description": "value * scale + offset",
+          "type": "number"
+        },
+        "reset": {
+          "description": "Stored values take the default",
+          "const": true
+        },
+        "fn": {
+          "description": "A registered migration's name",
+          "type": "string"
+        },
+        "join": {
+          "description": "Ends a fork: each of the other branch's steps, by its fingerprint, answered",
+          "type": "object",
+          "propertyNames": {
+            "pattern": "^[0-9a-f]{16}$"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/answer"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "source": {
+      "type": "object",
+      "required": ["name", "fn"],
+      "properties": {
+        "name": {
+          "description": "A setting the lock holds",
+          "type": "string"
+        },
+        "fn": {
+          "description": "The registered migration that gives the value",
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -125,6 +125,7 @@ jobs:
           cmake -S indra --preset "ninja-os-$SANITIZER" \
             -DVCPKG_INSTALL_OPTIONS=--clean-after-build \
             -DAL_BUILD_VIEWER:BOOL=OFF \
+            -DAL_CVARS_STRICT:BOOL=ON \
             -DAL_ENABLE_GL_TESTS:BOOL=ON \
             -DAL_REQUIRE_LSCRIPT:BOOL=ON \
             -DAL_BUILD_FUZZERS:BOOL="$FUZZERS" \

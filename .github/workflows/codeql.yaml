@@ -119,6 +119,7 @@ jobs:
           cmake -S indra --preset "$PRESET" -B "$RUNNER_TEMP/codeql-build" \
             -DVCPKG_TARGET_TRIPLET="$TRIPLET" \
             -DAL_BUILD_TESTS:BOOL=OFF \
+            -DAL_CVARS_STRICT:BOOL=ON \
             -DAL_BUILD_PACKAGE:BOOL=OFF \
             -DAL_USE_VELOPACK:BOOL=ON \
             -DAL_USE_LTO:BOOL=OFF \

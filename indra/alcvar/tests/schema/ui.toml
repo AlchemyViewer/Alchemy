@@ -1,0 +1,144 @@
+# The store's test schema: strings, UUIDs and lists, LLSD, an account's
+# override, units and choices.
+
+[ui]
+label = "Interface"
+
+[ui.scale]
+type    = "F32"
+default = 1.0
+range   = [0.75, 2.5]
+flags   = ["account_override"]
+alias   = "UIScaleFactor"
+help    = "The size of everything in the interface"
+
+[ui.font_name]
+type    = "string"
+default = "DejaVu Sans"
+help    = "The interface's typeface"
+
+[ui.layout]
+type    = "llsd"
+default = '{"pane": 1, "split": [0.25, 0.75]}'
+help    = "Where a studio's panes are"
+
+[ui.recent]
+type    = "string[]"
+default = ["one", "two"]
+alias   = { name = "UIRecentNames", joined = "|" }
+help    = "Names used lately"
+
+[ui.curve]
+type    = "vec2[]"
+default = [[0.0, 0.0], [1.0, 1.0]]
+help    = "A tone curve's points"
+
+[ui.sounds]
+label = "Sounds"
+
+[ui.sounds.click]
+type    = "uuid"
+default = "4c8c3c77-de8d-bde2-b9b8-32635e0fd4a6"
+refers  = "sound"
+alias   = { name = "UISndClick", encoding = "string" }
+help    = "Played when a button is pressed"
+
+[ui.sounds.blocked]
+type    = "uuid[]"
+default = []
+refers  = "experience"
+alias   = { name = "RLVaBlockedExperiences", encoding = "string", joined = ";" }
+help    = "Experiences refused"
+
+[ui.toast]
+label = "Toasts"
+
+[ui.toast.fade_time]
+type    = "F32"
+default = 0.5
+range   = [0.0, 10.0]
+unit    = "seconds"
+alias   = { name = "ToastFadeTime", unit = "milliseconds" }
+help    = "How long a toast takes to fade"
+
+[ui.toast.quality]
+type    = "string"
+default = "high"
+choices = [
+    { value = "low", label = "Low" },
+    { value = "high", label = "High", was = ["best"] },
+]
+help    = "How toasts are drawn"
+
+[ui.toast.anisotropy]
+type    = "U32"
+default = 4
+choices = [
+    { value = 0, label = "Off" },
+    { value = 2, label = "2x" },
+    { value = 4, label = "4x" },
+    { value = 8, label = "8x", was = [16] },
+]
+help    = "Texture filtering"
+
+[ui.toast.sound]
+type    = "string"
+default = ""
+asset   = "sound"
+help    = "The sound file a toast plays"
+
+[ui.toast.delay]
+type    = "S32"
+default = 500
+range   = [0, 10000]
+unit    = "milliseconds"
+help    = "How long a toast waits before it shows; seconds in a float once"
+
+[ui.toast.width]
+type    = "F32"
+default = 0.25
+range   = [0.0, 1.0]
+unit    = "ratio"
+migrate = [{ step = 2, scale = 0.001 }]
+help    = "How much of the window a toast is wide; pixels once"
+
+[ui.toast.mood]
+type    = "string"
+default = "calm"
+choices = [{ value = "calm", label = "Calm" }, { value = "hectic", label = "Hectic", was = ["busy"] }]
+help    = "How a toast reads; its choices renamed twice"
+
+[ui.toast.tone]
+type    = "string"
+default = "plain"
+choices = { plain = "Plain", bright = "Bright", quiet = "Quiet" }
+migrate = [{ step = 2, map = { loud = "bright", quiet = "plain" }, else = "keep" }]
+help    = "How a toast sounds; loud became bright, and quiet plain, at step 2"
+
+[ui.toast.level]
+type    = "S32"
+default = 0
+choices = { 0 = "Low", 1 = "High" }
+migrate = [{ step = 2, map = { low = 0, high = 1 }, else = "default" }]
+help    = "How much a toast says; its choices strings before step 2"
+
+[ui.toast.lifetime]
+type    = "F32"
+default = 4.0
+unit    = "seconds"
+alias   = "ui.toast.duration"
+migrate = [{ step = 2, scale = 2.0 }]
+help    = "How long a toast stays; ui.toast.duration once, its seconds doubled before"
+
+[ui.toast.style]
+type    = "string"
+default = "plain"
+reuse   = true
+help    = "How a toast is drawn; once a number of another setting's"
+
+[ui.toast.corner]
+type    = "S32"
+default = 0
+migrate = [{ step = 2, map = { 0 = 1, 1 = 0 }, else = "keep" },
+           { step = 3, join = { "b55bd59aa25cf029" = { scale = 0.1 } } }]
+help    = "Which corner a toast shows in; two branches changed it at once"
