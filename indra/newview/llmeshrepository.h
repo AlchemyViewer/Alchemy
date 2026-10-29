@@ -801,6 +801,7 @@ public:
     bool            mUploadSkin;
     bool            mUploadJoints;
     bool            mLockScaleIfJointPosition;
+    LLVector3       mPositionOffset; // <SK:Nexii> Mesh uploader pivot: added to every stored domain
     volatile bool   mDiscarded;
 
     LLHost          mHost;
@@ -815,7 +816,8 @@ public:
                        const LLUUID destination_folder_id = LLUUID::null,
                        bool do_upload = true,
                        LLHandle<LLWholeModelFeeObserver> fee_observer = (LLHandle<LLWholeModelFeeObserver>()),
-                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                       const LLVector3& position_offset = LLVector3::zero); // <SK:Nexii> Mesh uploader pivot
     ~LLMeshUploadThread();
 
     bool finished() const { return mFinished; }
@@ -1008,7 +1010,8 @@ public:
                      const LLUUID& destination_folder_id = LLUUID::null,
                      bool do_upload = true,
                      LLHandle<LLWholeModelFeeObserver> fee_observer= (LLHandle<LLWholeModelFeeObserver>()),
-                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                     const LLVector3& position_offset = LLVector3::zero); // <SK:Nexii> Mesh uploader pivot
 
     S32 getMeshSize(const LLUUID& mesh_id, S32 lod) const;
 

@@ -144,6 +144,7 @@ protected:
     void        onDescriptionKeystroke(LLUICtrl*);
 
     static void     onImportScaleCommit(LLUICtrl*, void*);
+    void            onPivotCommit(); // <SK:Nexii> Mesh uploader pivot
     static void     onPelvisOffsetCommit(LLUICtrl*, void*);
 
     static void     onPreviewLODCommit(LLUICtrl*,void*);
