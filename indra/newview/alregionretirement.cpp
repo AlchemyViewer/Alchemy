@@ -49,6 +49,15 @@ namespace
     // removed anyway and removeRegion destroys the rest.
     constexpr F64 MAX_DRAIN_WAIT_SECONDS = 5.0;
 
+    void collect_local_ids(const LLViewerObject* objectp, std::vector<U32>& ids)
+    {
+        ids.push_back(objectp->getLocalID());
+        for (const LLViewerObject* childp : objectp->getChildren())
+        {
+            collect_local_ids(childp, ids);
+        }
+    }
+
     bool kept(LLViewerRegion* regionp)
     {
         LLViewerRegion* agent_region = gAgent.getRegion();
@@ -127,6 +136,7 @@ void ALRegionRetirement::forget(LLViewerRegion* regionp)
     {
         mRegionp = nullptr;
         mObjects.clear();
+        mKilledIds.clear();
     }
 }
 
@@ -174,6 +184,7 @@ void ALRegionRetirement::startNext()
         mRegionp = regionp;
         mRegionp->setRetiring(true);
         mObjects.clear();
+        mKilledIds.clear();
         gObjectList.getRegionObjects(mRegionp, mObjects);
         mObjectCount = mObjects.size();
         mStartTime = LLFrameTimer::getTotalSeconds();
@@ -186,15 +197,21 @@ void ALRegionRetirement::startNext()
 
 void ALRegionRetirement::killSome()
 {
-    // The agent or the camera came near it, or draw distance grew, while it was being retired.
+    // The agent or the camera came near it, or draw distance grew, while it was being retired. What was killed comes
+    // back: the cached objects from the region's cache as its idle update resumes (a cached object's drawable hands
+    // its entry back as it dies), and every one from the simulator, asked again as a cache miss is.
     if (kept(mRegionp))
     {
-        LL_WARNS("RegionRetirement") << mRegionp->getName()
-                                     << " is near the view again while being retired; keeping what is left of it"
-                                     << LL_ENDL;
+        LL_WARNS("RegionRetirement") << mRegionp->getName() << " is near the view again while being retired; keeping it"
+                                     << " and asking again for the " << mKilledIds.size() << " objects killed" << LL_ENDL;
         mRegionp->setRetiring(false);
+        for (U32 local_id : mKilledIds)
+        {
+            mRegionp->addCacheMissFull(local_id);
+        }
         mRegionp = nullptr;
         mObjects.clear();
+        mKilledIds.clear();
         return;
     }
 
@@ -214,6 +231,7 @@ void ALRegionRetirement::killSome()
             if (!objectp->isDead() && objectp->getRegion() == mRegionp && !objectp->getParent()
                 && !(avatarp && avatarp->isControlAvatar()))
             {
+                collect_local_ids(objectp, mKilledIds);
                 gObjectList.noteReleasedTextures(objectp, true);
                 gObjectList.killObject(objectp);
             }
@@ -236,6 +254,7 @@ void ALRegionRetirement::finish()
     LLViewerRegion* regionp = mRegionp;
     mRegionp = nullptr;
     mObjects.clear();
+    mKilledIds.clear();
     if (!regionp || regionp == gAgent.getRegion())
     {
         if (regionp)

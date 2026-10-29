@@ -38,7 +38,8 @@ class LLViewerRegion;
 // After a teleport the region left behind stays until its simulator sends DisableSimulator, about a minute later,
 // with its objects, avatars, terrain and probes. Once the arrival has settled, every region the agent is neither in
 // nor near is retired: marked so that its simulator creates no new objects, its objects killed a frame's budget at a
-// time, then removed, and its circuit closed, as DisableSimulator removes one.
+// time, then removed, and its circuit closed, as DisableSimulator removes one. One that comes near the view again
+// meanwhile is kept, and what was killed of it is asked for again.
 class ALRegionRetirement
 {
 public:
@@ -105,6 +106,8 @@ private:
     // the region being retired, and what of it is left to kill
     LLViewerRegion* mRegionp = nullptr;
     std::vector<LLPointer<LLViewerObject>> mObjects;
+    // the local ids of every object killed so far, asked of the simulator again if the retirement is called off
+    std::vector<U32> mKilledIds;
     size_t mObjectCount = 0;
     F64 mStartTime = 0.0;
     F64 mKilledTime = 0.0;
