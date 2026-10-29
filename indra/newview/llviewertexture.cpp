@@ -2250,17 +2250,20 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
 
 void LLViewerFetchedTexture::onAlphaMaskChanged()
 {
-    if (mGLTexturep.isNull() || !mGLTexturep->getIsAlphaMask())
+    if (mGLTexturep.isNull())
     {
         return;
     }
+    const bool is_mask = mGLTexturep->getIsAlphaMask();
 
-    // A face built while a deferred analysis was out found the texture no mask (clearAlphaAnalysis) and went into the
-    // blend pool; only a rebuild of its group moves it to a mask pass.
+    // A face of an alpha pool goes to a mask pass or a blend pass by the answer it was built with: one built by the
+    // other answer, or while a deferred analysis was out and the texture counted as no mask, stays in the wrong one
+    // until its group is rebuilt. The pool does not say which pass it took, so every face of one whose pass the answer
+    // decides is rebuilt; now a mask, only those that can render as one.
     for (U32 i = 0; i < mNumFaces[LLRender::DIFFUSE_MAP]; ++i)
     {
         LLFace* facep = mFaceList[LLRender::DIFFUSE_MAP][i];
-        if (!facep || !facep->isInAlphaPool() || !facep->canRenderAsMask())
+        if (!facep || !facep->isInAlphaPool() || (is_mask && !facep->canRenderAsMask()))
         {
             continue;
         }

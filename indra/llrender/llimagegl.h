@@ -372,9 +372,10 @@ public:
     U64 getContentStamp() const { return mContentStamp.load(std::memory_order_relaxed); }
 
     bool getIsAlphaMask() const;
-    // The texture this one was made for, told on the main thread whenever getIsAlphaMask's answer changes
-    // (LLGLTexture::onAlphaMaskChanged): a face built into a pool by the old answer, as one built while a deferred
-    // analysis was out is, belongs in another by the new one. Cleared by the owner as it goes.
+    // The texture this one was made for, told on the main thread whenever an analysis answers getIsAlphaMask
+    // differently from the last one (LLGLTexture::onAlphaMaskChanged): a face built into a pass by the old answer, or
+    // while a deferred analysis was out and the texture counted as no mask, belongs in another by the new one. The
+    // provisional no-mask while an analysis is out is no answer. Cleared by the owner as it goes.
     void setOwner(LLGLTexture* owner) { mOwner = owner; }
     LLGLTexture* getOwner() const { return mOwner; }
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
@@ -493,6 +494,7 @@ private:
     bool mAutoGenMips = false;
 
     bool mIsMask;
+    bool mAnsweredMask = false; // what the last analysis answered, mIsMask but for the provisional clear
     LLGLTexture* mOwner = nullptr;
     U8   mMaxAlpha;
     U8   mMinAlpha;

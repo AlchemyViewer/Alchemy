@@ -2663,16 +2663,19 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 
 void LLImageGL::clearAlphaAnalysis()
 {
-    setIsMask(false);
+    // Provisional, while an analysis is out: no answer, so the owner is not told, and the next answer is weighed
+    // against the last one.
+    mIsMask = false;
     mMaxAlpha = 255;
     mMinAlpha = 0;
 }
 
 void LLImageGL::setIsMask(bool is_mask)
 {
-    if (mIsMask != is_mask)
+    mIsMask = is_mask;
+    if (mAnsweredMask != is_mask)
     {
-        mIsMask = is_mask;
+        mAnsweredMask = is_mask;
         if (mOwner && on_main_thread())
         {
             mOwner->onAlphaMaskChanged();
@@ -3143,6 +3146,8 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
         {
             mAlphaOffset = INVALID_OFFSET ;
             clearAlphaAnalysis();
+            // no mask from now on: an answer
+            setIsMask(false);
 
             // Invalidate pending jobs
             ++mAlphaAnalysisSerial;

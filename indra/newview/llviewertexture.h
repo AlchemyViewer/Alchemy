@@ -382,7 +382,7 @@ public:
 
     bool updateFetch();
 
-    // Rebuilds the groups of faces the blend pool took while the texture's alpha analysis was out, once it says mask.
+    // Rebuilds the groups of faces built into a mask or a blend pass by another answer than the analysis now gives.
     void onAlphaMaskChanged() override;
 
     void clearFetchedResults(); //clear all fetched results, for debug use.
