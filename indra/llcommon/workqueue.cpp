@@ -112,6 +112,20 @@ bool LL::WorkQueueBase::runOne()
     return ! done();
 }
 
+bool LL::WorkQueueBase::runNext()
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
+    try
+    {
+        callWork(pop_());
+    }
+    catch (const Closed&)
+    {
+        return false;
+    }
+    return ! done();
+}
+
 bool LL::WorkQueueBase::runUntil(const TimePoint& until)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;

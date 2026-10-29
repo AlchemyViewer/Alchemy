@@ -75,7 +75,8 @@ public:
 
 
 HttpPolicy::HttpPolicy(HttpService * service)
-    : mService(service)
+    : mService(service),
+      mWakeAt(0)
 {
     // Create default class
     mClasses.push_back(new ClassState());
@@ -216,6 +217,7 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
     const HttpTime now(totalTime());
     HttpService::ELoopSpeed result(HttpService::REQUEST_SLEEP);
     HttpLibcurl & transport(mService->getTransport());
+    mWakeAt = 0;
 
     for (int policy_class(0); policy_class < mClasses.size(); ++policy_class)
     {
@@ -244,6 +246,7 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
         {
             // Throttled condition, don't serve this class but don't sleep hard.
             result = HttpService::NORMAL;
+            wakeAt(state.mThrottleEnd);
             continue;
         }
 
@@ -324,10 +327,31 @@ HttpService::ELoopSpeed HttpPolicy::processReadyQueue()
         {
             // If anything is ready, continue looping...
             result = HttpService::NORMAL;
+
+            // ...and wake for the clock if it is what holds them back.
+            // With every slot busy, a completion frees one and wakes
+            // the worker itself.
+            if (throttle_enabled && state.mThrottleLeft <= 0 && now < state.mThrottleEnd)
+            {
+                wakeAt(state.mThrottleEnd);
+            }
+            else if (needed > 0 && ! retryq.empty())
+            {
+                wakeAt(retryq.top()->mPolicyRetryAt);
+            }
         }
     } // end foreach policy_class
 
     return result;
+}
+
+
+void HttpPolicy::wakeAt(HttpTime when)
+{
+    if (! mWakeAt || when < mWakeAt)
+    {
+        mWakeAt = when;
+    }
 }
 
 bool HttpPolicy::cancel(HttpHandle handle)
@@ -345,7 +369,7 @@ bool HttpPolicy::cancel(HttpHandle handle)
             if ((*cur)->getHandle() == handle)
             {
                 HttpOpRequest::ptr_t op(*cur);
-                c1.erase(cur);                                  // All iterators are now invalidated
+                state.mRetryQueue.erase(cur);                   // All iterators are now invalidated
                 op->cancel();
                 return true;
             }

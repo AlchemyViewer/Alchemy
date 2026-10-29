@@ -29,6 +29,7 @@ target_sources(
     _httprequestqueue.cpp
     _httpservice.cpp
     _refcounted.cpp
+    alhttpwake.cpp
 )
 
 target_sources(
@@ -65,6 +66,7 @@ target_sources(
         _mutex.h
         _refcounted.h
         _thread.h
+        alhttpwake.h
 )
 
 target_link_libraries(llcorehttp PRIVATE al::flags PUBLIC llmath llcommon ll::libcurl ll::openssl)
@@ -92,12 +94,14 @@ if(AL_BUILD_TESTS)
     llcorehttp_tests
     PROJECT llcorehttp
     SOURCES
+      tests/alhttpwake_test.cpp
       tests/bufferarray_test.cpp
       tests/bufferstream_test.cpp
       tests/httpheaders_test.cpp
       tests/httpoperation_test.cpp
       tests/httprequest_test.cpp
       tests/httprequestqueue_test.cpp
+      tests/httpretryqueue_test.cpp
       tests/httpstatus_test.cpp
       tests/jsonrpcws_test.cpp
       tests/refcounted_test.cpp

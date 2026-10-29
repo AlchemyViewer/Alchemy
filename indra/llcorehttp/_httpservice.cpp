@@ -70,6 +70,7 @@ std::atomic<HttpService::EState> HttpService::sState(NOT_INITIALIZED);
 HttpService::HttpService()
     : mRequestQueue(NULL),
       mExitRequested(0U),
+      mLoopCount(0),
       mPolicy(NULL),
       mTransport(NULL),
       mLastPolicy(0)
@@ -117,6 +118,7 @@ HttpService::~HttpService()
 
     if (mRequestQueue)
     {
+        mRequestQueue->setWake(NULL);
         mRequestQueue->release();
         mRequestQueue = NULL;
     }
@@ -213,6 +215,17 @@ void HttpService::startThread()
     mPolicy->start();
     mTransport->start(mLastPolicy + 1);
 
+    // Without a wake the worker cannot wait on its transfers, and
+    // polls them instead
+    if (mWake.open())
+    {
+        mRequestQueue->setWake(&mWake);
+    }
+    else
+    {
+        LL_WARNS(LOG_CORE) << "No wake socket for the HTTP worker; it will poll its transfers." << LL_ENDL;
+    }
+
     mThread = std::make_unique<LLCoreInt::HttpThread>(boost::bind(&HttpService::threadRun, this, _1));
     mThread->detach(); // Detach thread to let it clean its self up
     sState = RUNNING;
@@ -258,6 +271,7 @@ void HttpService::shutdown()
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     // Disallow future enqueue of requests
     mRequestQueue->stopQueue();
+    mRequestQueue->setWake(NULL);
 
     // Cancel requests already on the request queue
     HttpRequestQueue::OpContainer ops;
@@ -280,9 +294,9 @@ void HttpService::shutdown()
 
 // Working thread loop-forever method.  Gives time to
 // each of the request queue, policy layer and transport
-// layer pieces and then either sleeps for a small time
-// or waits for a request to come in.  Repeats until
-// requested to stop.
+// layer pieces and then either goes round again at once,
+// waits on the transfers, or waits for a request to come
+// in.  Repeats until requested to stop.
 void HttpService::threadRun(LLCoreInt::HttpThread * thread)
 {
     set_thread_name("HttpService");
@@ -292,6 +306,7 @@ void HttpService::threadRun(LLCoreInt::HttpThread * thread)
     while (! mExitRequested)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+        mLoopCount.fetch_add(1, std::memory_order_relaxed);
         try
         {
             loop = processRequestQueue(loop);
@@ -304,10 +319,24 @@ void HttpService::threadRun(LLCoreInt::HttpThread * thread)
             new_loop = mTransport->processTransport();
             loop = (std::min)(loop, new_loop);
 
-            // Determine whether to spin, sleep briefly or sleep for next request
-            if (REQUEST_SLEEP != loop)
+            // Determine whether to go round at once, wait on the
+            // transfers until the policy's next deadline, or sleep
+            // for next request.  A stop staged this pass ends the
+            // loop now: nothing would wake the wait for it.
+            if (NORMAL == loop && ! mExitRequested)
             {
-                ms_sleep(HTTP_SERVICE_LOOP_SLEEP_NORMAL_MS);
+                long timeout_ms(HTTP_SERVICE_LOOP_WAIT_MAX_MS);
+                const HttpTime wake_at(mPolicy->getWakeAt());
+                if (wake_at)
+                {
+                    const HttpTime now(totalTime());
+                    const HttpTime until_ms(wake_at > now ? (wake_at - now + 999) / 1000 : 0);
+                    if (until_ms < HttpTime(timeout_ms))
+                    {
+                        timeout_ms = long(until_ms);
+                    }
+                }
+                mTransport->wait(timeout_ms, mWake);
             }
         }
         catch (const LLContinueError&)

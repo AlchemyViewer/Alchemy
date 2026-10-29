@@ -101,10 +101,17 @@ public:
         virtual bool processRequest() = 0; // Return true when request has completed
         virtual void finishRequest(bool completed); // Always called from thread after request has completed or aborted
         virtual void deleteRequest(); // Only method to delete a request
+        // Whether processRequest() last returned false to wait on something
+        // that wakes it (wakeRequest()), so that its retry is only a fallback
+        virtual bool waitsForWake() { return false; }
 
     protected:
         LLAtomicBase<status_t> mStatus;
         U32 mFlags;
+        // The queue's thread only: whether a retry is due, and which one,
+        // so that a retry woken early leaves its timed one with nothing to do.
+        bool mRetryPending = false;
+        U32 mRetryGeneration = 0;
     };
 
     //------------------------------------------------------------------------
@@ -133,11 +140,17 @@ private:
     virtual void startThread(void);
     virtual void endThread(void);
     virtual void threadedUpdate(void);
+    // Whether threadedUpdate() does anything, so that each update() posts it
+    // to the thread. A subclass that overrides threadedUpdate() says yes here.
+    virtual bool hasThreadedUpdate() const { return false; }
 
 protected:
     handle_t generateHandle();
     bool addRequest(QueuedRequest* req);
     void processRequest(QueuedRequest* req);
+    // Runs the request's pending retry, if it is still the one asked for.
+    // A generation of 0 runs whichever retry is pending.
+    void retryRequest(handle_t handle, U32 generation);
     void incQueue();
 
 public:
@@ -155,6 +168,10 @@ public:
 
     // Request accessors
     status_t getRequestStatus(handle_t handle);
+    // Any thread: what a request asked to retry for has happened, so its
+    // retry runs now rather than when it falls due. Nothing, for a request
+    // with no retry pending.
+    void wakeRequest(handle_t handle);
     void abortRequest(handle_t handle, bool autocomplete);
     void setFlags(handle_t handle, U32 flags);
     bool completeRequest(handle_t handle);
@@ -172,8 +189,8 @@ protected:
 
     //typedef std::set<QueuedRequest*, queued_request_less> request_queue_t;
     //request_queue_t mRequestQueue;
-    LL::WorkQueue mRequestQueue;
-    LL::WorkQueue::weak_t mMainQueue;
+    // A schedule, so that a request to retry later waits its turn without holding the thread.
+    LL::WorkSchedule mRequestQueue;
 
     enum { REQUEST_HASH_SIZE = 512 }; // must be power of 2
     typedef LLSimpleHash<handle_t, REQUEST_HASH_SIZE> request_hash_t;

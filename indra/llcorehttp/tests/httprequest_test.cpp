@@ -37,6 +37,14 @@
 #include "_httprequestqueue.h"
 
 #include <curl/curl.h>
+#if LL_WINDOWS
+#include <ws2tcpip.h>
+#else
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 #include "alregex.h"
 #include <chrono>
 #include <map>
@@ -45,6 +53,8 @@
 
 #include "llcleanup.h"
 #include "llproxy.h"
+#include "llthread.h"
+#include "lltimer.h"
 
 #include <iostream>
 
@@ -120,6 +130,63 @@ std::string get_base_url()
     out << "http://localhost:" << port << "/";
     return out.str();
 }
+
+
+// A port on the loopback that takes connections and never answers them.
+// The kernel completes each handshake into the listen backlog and nobody
+// accepts, so a request sent there is held until it times out.  Unlike the
+// peer's /sleep/, it holds a request without tying up the peer, which
+// serves one request at a time.
+class HoldingPort
+{
+public:
+    HoldingPort()
+        {
+            mSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+            sockaddr_in addr = {};
+            addr.sin_family = AF_INET;
+            addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+            socklen_t addr_len(sizeof(addr));
+            if (CURL_SOCKET_BAD != mSocket
+                && 0 == bind(mSocket, reinterpret_cast<sockaddr *>(&addr), sizeof(addr))
+                && 0 == getsockname(mSocket, reinterpret_cast<sockaddr *>(&addr), &addr_len)
+                && 0 == listen(mSocket, 4))
+            {
+                mPort = ntohs(addr.sin_port);
+            }
+        }
+
+    ~HoldingPort()
+        {
+            if (CURL_SOCKET_BAD != mSocket)
+            {
+#if LL_WINDOWS
+                closesocket(mSocket);
+#else
+                close(mSocket);
+#endif
+            }
+        }
+
+    HoldingPort(const HoldingPort &) = delete;
+    HoldingPort & operator=(const HoldingPort &) = delete;
+
+    bool isListening() const
+        {
+            return 0 != mPort;
+        }
+
+    std::string url() const
+        {
+            std::ostringstream out;
+            out << "http://127.0.0.1:" << mPort << "/";
+            return out.str();
+        }
+
+private:
+    curl_socket_t mSocket = CURL_SOCKET_BAD;
+    int mPort = 0;
+};
 
 
 void stop_thread(LLCore::HttpRequest * req)
@@ -1358,6 +1425,212 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that wants heade
     }
 }
 
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a stop request ends the worker without waiting on a held GET", "[HttpRequest_Tests]")
+{
+    ScopedCurlInit ready;
+
+    // The stop is staged in the middle of a pass, on the worker itself,
+    // with nothing to wake a wait on the held GET's socket.  The worker
+    // should end that pass and stop, not wait out its longest wait first.
+    HoldingPort holding;
+    REQUIRE(holding.isListening());
+    TestHandler2 handler(this, "handler");
+    LLCore::HttpHandler::ptr_t handlerp(&handler, NoOpDeletor);
+    mHandlerCalls = 0;
+
+    HttpRequest * req = NULL;
+    HttpOptions::ptr_t opts;
+
+    try
+    {
+        HttpRequest::createService();
+        HttpRequest::startThread();
+        req = new HttpRequest();
+
+        opts = HttpOptions::ptr_t(new HttpOptions);
+        opts->setRetries(0);
+        opts->setTimeout(10);
+
+        HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
+                                                     holding.url(),
+                                                     0,
+                                                     0,
+                                                     opts,
+                                                     HttpHeaders::ptr_t(),
+                                                     handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        // Long enough for the GET to be sent and held
+        LLTimer settle;
+        while (settle.getElapsedTimeF64() < 0.3)
+        {
+            req->update(0);
+            ms_sleep(10);
+        }
+        REQUIRE(mHandlerCalls == 0);
+
+        // Stopping cancels the held GET
+        mStatus = HttpStatus(HttpStatus::LLCORE, HE_OP_CANCELED);
+        LLTimer stopping;
+        handle = req->requestStopThread(LLCore::HttpHandler::ptr_t());
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+        while (! HttpService::isStopped() && stopping.getElapsedTimeF64() < 5.0)
+        {
+            LLThread::yield();
+        }
+        const F64 stopped_after(stopping.getElapsedTimeF64());
+        CAPTURE(stopped_after);
+        CHECK(HttpService::isStopped());
+        // Waiting first takes the longest wait, 100 ms; stopping at once,
+        // a fraction of a millisecond
+        CHECK(stopped_after < 0.08);
+
+        req->update(0);
+        CHECK(mHandlerCalls == 1);
+
+        opts.reset();
+        delete req;
+        req = NULL;
+        HttpRequest::destroyService();
+    }
+    catch (...)
+    {
+        stop_thread(req);
+        opts.reset();
+        delete req;
+        HttpRequest::destroyService();
+        throw;
+    }
+}
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: the worker waits on a held GET and answers NoOps queued meanwhile", "[HttpRequest_Tests]")
+{
+    ScopedCurlInit ready;
+
+    // A port that never answers holds this GET until it gives up after two
+    // seconds.  All that while the transfer has nothing to do, so the worker
+    // should be waiting on its socket, libcurl's timeout and its request
+    // queue, not coming round every couple of milliseconds to ask libcurl
+    // whether anything happened.  Requests queued meanwhile are still
+    // answered; that one ends the wait at once is alhttpwake_test's to
+    // check, since a wait's bound would answer it here too.
+    HoldingPort holding;
+    REQUIRE(holding.isListening());
+    TestHandler2 get_handler(this, "get handler");
+    LLCore::HttpHandler::ptr_t get_handlerp(&get_handler, NoOpDeletor);
+    HttpRequestTestData noop_state;
+    noop_state.mHandlerCalls = 0;
+    TestHandler2 noop_handler(&noop_state, "noop handler");
+    LLCore::HttpHandler::ptr_t noop_handlerp(&noop_handler, NoOpDeletor);
+    std::string url_base(holding.url());
+    mHandlerCalls = 0;
+
+    HttpRequest * req = NULL;
+    HttpOptions::ptr_t opts;
+
+    try
+    {
+        HttpRequest::createService();
+        HttpRequest::startThread();
+        req = new HttpRequest();
+
+        opts = HttpOptions::ptr_t(new HttpOptions);
+        opts->setRetries(0);            // Don't retry
+        opts->setTimeout(2);
+
+        mStatus = HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_OPERATION_TIMEDOUT);
+        const U64 loops_before(HttpService::instanceOf()->getLoopCount());
+        LLTimer held;
+        HttpHandle handle = req->requestGetByteRange(HttpRequest::DEFAULT_POLICY_ID,
+                                                     url_base,
+                                                     0,
+                                                     0,
+                                                     opts,
+                                                     HttpHeaders::ptr_t(),
+                                                     get_handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        // Five NoOps while the GET is held, a quarter second apart
+        for (int i(0); i < 5; ++i)
+        {
+            while (held.getElapsedTimeF64() < 0.25 * (i + 1))
+            {
+                req->update(0);
+                ms_sleep(10);
+            }
+            CAPTURE(i);
+            REQUIRE(mHandlerCalls == 0);
+            const int answered(noop_state.mHandlerCalls);
+            LLTimer noop;
+            handle = req->requestNoOp(noop_handlerp);
+            REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+            while (noop_state.mHandlerCalls == answered && noop.getElapsedTimeF64() < 5.0)
+            {
+                req->update(0);
+                LLThread::yield();
+            }
+            CHECK(noop_state.mHandlerCalls == answered + 1);
+        }
+
+        // Run the notification pump until the GET gives up
+        while (mHandlerCalls < 1 && held.getElapsedTimeF64() < 30.0)
+        {
+            req->update(0);
+            ms_sleep(10);
+        }
+        const F64 held_for(held.getElapsedTimeF64());
+        const U64 loops(HttpService::instanceOf()->getLoopCount() - loops_before);
+        REQUIRE(mHandlerCalls == 1);
+
+        // libcurl's clock on Windows is the tick count, which can end two
+        // seconds a tick short of the high-resolution clock's
+        CHECK(held_for >= 1.9);
+        CAPTURE(held_for);
+        CAPTURE(loops);
+        // Polling every 2 ms comes round about 800 times in two seconds.
+        // Waiting, it comes round for the GET's few socket events, the five
+        // NoOps and at most once each longest wait.
+        CHECK(loops < 100);
+
+        // Okay, request a shutdown of the servicing thread
+        mStatus = HttpStatus();
+        handle = req->requestStopThread(get_handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        int count(0);
+        int limit(LOOP_COUNT_LONG);
+        while (count++ < limit && mHandlerCalls < 2)
+        {
+            req->update(1000000);
+            usleep(LOOP_SLEEP_INTERVAL);
+        }
+        UNSCOPED_INFO("Stop request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(mHandlerCalls == 2);
+
+        count = 0;
+        limit = LOOP_COUNT_SHORT;
+        while (count++ < limit && ! HttpService::isStopped())
+        {
+            usleep(LOOP_SLEEP_INTERVAL);
+        }
+        CHECK(HttpService::isStopped());
+
+        opts.reset();
+        delete req;
+        req = NULL;
+        HttpRequest::destroyService();
+    }
+    catch (...)
+    {
+        stop_thread(req);
+        opts.reset();
+        delete req;
+        HttpRequest::destroyService();
+        throw;
+    }
+}
 
 TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to a peer that sleeps times out after two seconds", "[HttpRequest_Tests]")
 {
@@ -3056,7 +3329,10 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are 
         CHECK(mHandlerCalls == url_limit);
 
         // Each GET was retried once, as a 503, whatever its Retry-After said,
-        // and the retry of the one with "Retry-After: 2" came no sooner than that
+        // and the retry of the one with "Retry-After: 2" came no sooner than that.
+        // The others retried after the default backoff of one second, not held
+        // back to the latest retry due.  libcurl's clock on Windows is the tick
+        // count, so a second can end a tick short.
         for (int i(0); i < url_limit; ++i)
         {
             CAPTURE(i);
@@ -3067,6 +3343,11 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: GETs answered 503 are 
             if (0 == i)
             {
                 CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(1900));
+            }
+            else
+            {
+                CHECK(delivery->second.mAt - issued >= std::chrono::milliseconds(900));
+                CHECK(delivery->second.mAt - issued < std::chrono::milliseconds(1800));
             }
         }
 

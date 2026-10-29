@@ -32,7 +32,12 @@
 #include <curl/curl.h>
 #include <curl/multi.h>
 
+#if ! LL_WINDOWS
+#include <poll.h>
+#endif
+
 #include <set>
+#include <vector>
 
 #include "httprequest.h"
 #include "_httpservice.h"
@@ -76,6 +81,13 @@ public:
     ///
     /// Threading:  called by worker thread.
     HttpService::ELoopSpeed processTransport();
+
+    /// Wait until a transfer's socket is ready, libcurl wants
+    /// calling for a timeout of its own, @wake is signalled, or
+    /// @timeout_ms passes.
+    ///
+    /// Threading:  called by worker thread.
+    void wait(long timeout_ms, ALHttpWake & wake);
 
     /// Add request to the active list.  Caller is expected to have
     /// provided us with a reference count on the op to hold the
@@ -152,6 +164,10 @@ protected:
     /// and destroy.
     void cancelRequest(const opReqPtr_t &op);
 
+    /// Adds a socket to the next wait's poll, or its events to
+    /// the entry it already has.
+    void addPollFd(curl_socket_t sock, short events);
+
 protected:
     typedef std::set<opReqPtr_t> active_set_t;
 
@@ -215,6 +231,8 @@ protected:
     CURLM **            mMultiHandles;      // One handle per policy class
     int *               mActiveHandles;     // Active count per policy class
     bool *              mDirtyPolicy;       // Dirty policy update waiting for stall (per pc)
+    std::vector<pollfd> mPollFds;           // The wait's sockets, kept to reuse their storage
+    int                 mZeroWaits;         // Waits in a row asked not to wait at all
 
 }; // end class HttpLibcurl
 
