@@ -279,6 +279,13 @@ void LLModelPreview::updateDimentionsAndOffsets()
 
     mDetailsSignal((F32)(mPreviewScale[0] * scale), (F32)(mPreviewScale[1] * scale), (F32)(mPreviewScale[2] * scale));
 
+    // <SK:Nexii> Mesh uploader pivot: metres follow the model's size
+    if (LLFloaterModelPreview::sInstance && LLFloaterModelPreview::sInstance->mModelPreview == this)
+    {
+        LLFloaterModelPreview::sInstance->updatePivotControls();
+    }
+    // </SK:Nexii>
+
     updateStatusMessages();
 }
 
