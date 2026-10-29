@@ -379,17 +379,21 @@ void LLReflectionMapManager::update()
         return;
     }
 
-    // Which probes the view can reach this frame, before anything this frame asks whether one is relevant. The
-    // distance measured here is the one the sort below orders by.
+    // Probes track the viewer objects they are attached to, then which of them the view can reach this frame is worked
+    // out, before anything this frame asks whether one is relevant. The distance measured here is the one the sort
+    // below orders by.
     {
         const F32 draw_distance = gAgentCamera.mDrawDistance;
         U32 relevant = 0;
         for (auto& probe : mProbes)
         {
+            probe->syncToViewerObject();
+
             LLVector4a d;
             d.setSub(camera_pos, probe->mOrigin);
             probe->mDistance = d.getLength3().getF32() - probe->mRadius;
-            probe->mInReach = probe == mDefaultProbe || ALProbeReach::inReach(probe->mDistance, draw_distance);
+            probe->mInReach = probe == mDefaultProbe
+                || ALProbeReach::inReach(probe->mDistance, draw_distance, probe->mInReach);
             relevant += (probe == mDefaultProbe || probe->isRelevant()) ? 1 : 0;
         }
         mRelevantProbeCount = ALProbeReach::stepRelevant(relevant, mRelevantProbeCount);
@@ -421,8 +425,7 @@ void LLReflectionMapManager::update()
         }
     }
 
-    // Make probes track the viewer objects they are attached to, then work out which automatic
-    // probes a manual probe has made redundant.
+    // Work out which automatic probes a manual probe has made redundant.
     //
     // An automatic probe is a fallback for space nobody placed a probe in. Where a placed probe
     // has swallowed its whole influence volume it can no longer change a single pixel -- see
@@ -444,8 +447,6 @@ void LLReflectionMapManager::update()
 
         for (auto& probe : mProbes)
         {
-            probe->syncToViewerObject();
-
             if (probe != mDefaultProbe && probe->mViewerObject && probe->mComplete &&
                 probe->mCubeIndex != -1 && probe->mFadeIn >= 1.f && probe->isRelevant())
             {

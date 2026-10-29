@@ -122,5 +122,38 @@ namespace
         UNSCOPED_INFO("a buffer above 1 rounds to its multiple, in sixteens");
         CHECK(ALProbeReach::dynamicProbeCount(1, 16, 40, slots) == 48u);
         CHECK(ALProbeReach::dynamicProbeCount(1, 16, 56, slots) == 64u);
+        UNSCOPED_INFO("at other values the count is scaled by 16 / allocation");
+        CHECK(ALProbeReach::dynamicProbeCount(1, 2, 16, slots) == 128u);
+        CHECK(ALProbeReach::dynamicProbeCount(1, 2, 40, slots) == slots);
+        CHECK(ALProbeReach::dynamicProbeCount(1, 32, 40, slots) == 16u);
+        CHECK(ALProbeReach::dynamicProbeCount(1, 32, 8, slots) == 1u);
+    }
+
+    // A probe in reach stays in it a margin past draw distance, and one out of it comes back only within it.
+    TEST_CASE("ALProbeReach: reach does not flap at the edge of draw distance", "[ALProbeReach]")
+    {
+        const F32 draw = 128.f;
+        const F32 edge = draw + ALProbeReach::REACH_MARGIN;
+        CHECK(ALProbeReach::inReach(draw + 1.f, draw, true));
+        CHECK(ALProbeReach::inReach(edge, draw, true));
+        CHECK_FALSE(ALProbeReach::inReach(edge + 0.5f, draw, true));
+        CHECK_FALSE(ALProbeReach::inReach(draw + 1.f, draw, false));
+        CHECK(ALProbeReach::inReach(draw, draw, false));
+
+        // a probe wandering either side of the edge holds its state
+        bool in = true;
+        for (F32 d : { draw - 2.f, draw + 3.f, draw - 1.f, draw + 8.f, draw + 2.f })
+        {
+            in = ALProbeReach::inReach(d, draw, in);
+            CHECK(in);
+        }
+        in = ALProbeReach::inReach(edge + 4.f, draw, in);
+        CHECK_FALSE(in);
+        for (F32 d : { draw + 8.f, draw + 3.f, draw + 1.f })
+        {
+            in = ALProbeReach::inReach(d, draw, in);
+            CHECK_FALSE(in);
+        }
+        CHECK(ALProbeReach::inReach(draw - 1.f, draw, in));
     }
 }

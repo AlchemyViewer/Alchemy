@@ -38,10 +38,15 @@ struct ALProbeReach
         return inReach(dist_vec(origin, camera) - radius, draw_distance);
     }
 
-    // The same, from the distance between the camera and the sphere's surface, negative inside it.
-    static bool inReach(F32 distance_to_sphere, F32 draw_distance)
+    // Metres past draw distance a probe in reach may go before it is out of it, so a probe at the edge does not lose
+    // its cube slot, and need its twelve passes again, each time it crosses.
+    static constexpr F32 REACH_MARGIN = 16.f;
+
+    // The same, from the distance between the camera and the sphere's surface, negative inside it, and whether the
+    // probe was in reach before.
+    static bool inReach(F32 distance_to_sphere, F32 draw_distance, bool was_in_reach = false)
     {
-        return distance_to_sphere <= std::max(draw_distance, 0.f);
+        return distance_to_sphere <= std::max(draw_distance, 0.f) + (was_in_reach ? REACH_MARGIN : 0.f);
     }
 
     // Probes that matter, counted for dynamic allocation in steps of this many: every change of the count
@@ -82,7 +87,8 @@ struct ALProbeReach
 
         if (allocation > 1)
         {
-            // Round to the nearest increment of 16
+            // The count in units of allocation, rounded, times 16: the nearest multiple of 16 at an allocation of 16,
+            // and the count scaled by 16 / allocation at any other.
             count = ((count + allocation / 2) / allocation) * 16;
         }
         else
