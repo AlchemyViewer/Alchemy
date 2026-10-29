@@ -324,7 +324,7 @@ public:
         F32 atmos_amblit[3];           F32 _pad10;
         F32 haze_additive[3];          F32 _pad11;
         F32 haze_additive_glow[3];     F32 _pad12;
-        // skyF's and cloudsF's terms of the sky's light and densities (applySpecial)
+        // the dome's and the clouds' terms of the sky's light and densities (applySpecial)
         F32 sky_light_atten[3];        F32 _pad13;
         F32 cloud_sunlight[3];         F32 _pad14;
         F32 sky_ambient_below[3];      F32 _pad15;

@@ -27,6 +27,7 @@
 
 #include "stdtypes.h"
 #include "v2math.h"
+#include "v3math.h"
 
 #include <array>
 #include <limits>
@@ -124,6 +125,10 @@ struct WaterFar
 /// whether there is one. Under an infinite projection the waves follow the surface to the rim's farthest
 /// corner, so no stretch of water shares one wave coordinate, and the water fades out toward the rim.
 WaterFar waterFar(F32 projection_far, bool have_rim, const LLVector2& rim_min, const LLVector2& rim_max);
+
+/// @a agent, a direction in the agent's frame (east, north, up), in the sky dome's frame (north, up, east), the frame
+/// LLEnvironment::toLightNorm hands the sky's light directions to the shaders in.
+LLVector3 skyFrame(const LLVector3& agent);
 
 /// The rotation from a view's eye space to the sky dome's frame (north, up, east), column-major for a GLSL mat3.
 /// view is the camera's modelview, which takes agent directions (east, north, up) to the eye. LLEnvironment hands it

@@ -37,6 +37,7 @@
 #include "llfeaturemanager.h"
 #include "llviewershadermgr.h"
 
+#include "alskylayers.h"
 #include "alwatersurface.h"
 #include "llviewercontrol.h"
 #include "llversioninfo.h"
@@ -45,7 +46,6 @@
 #include "llenvironment.h"
 #include "llerrorcontrol.h"
 #include "llworld.h"
-#include "llsky.h"
 
 #include "pipeline.h"
 
@@ -119,7 +119,6 @@ LLGLSLShader        gUnderWaterOpaqueProgram;
 LLGLSLShader        gWaterWavesProgram;
 LLGLSLShader        gUnderWaterWavesProgram;
 LLGLSLShader        gWaterExclusionProgram;
-LLGLSLShader        gWaterFieldProgram;
 LLGLSLShader        gDepthPyramidProgram;
 
 //interface shaders
@@ -134,8 +133,6 @@ LLGLSLShader        gSelectionOutlineProgram;
 LLGLSLShader        gSelectionGlowReachProgram;
 LLGLSLShader        gSelectionGlowRowProgram;
 LLGLSLShader        gSelectionBackdropMaskProgram;
-
-LLGLSLShader        gDeferredHighlightProgram;
 
 LLGLSLShader        gPathfindingProgram;
 LLGLSLShader        gPathfindingNoNormalsProgram;
@@ -180,7 +177,7 @@ LLGLSLShader            gHazeWaterProgram;
 LLGLSLShader            gDeferredBlurLightProgram;
 LLGLSLShader            gDeferredBlurLightComputeProgram;
 LLGLSLShader            gDeferredSoftenProgram;
-LLGLSLShader            gDeferredSoftenSkyProgram;
+LLGLSLShader            gDeferredSkyCompositeProgram;
 LLGLSLShader            gDeferredShadowProgram;
 LLGLSLShader            gDeferredTerrainShadowProgram;
 LLGLSLShader            gDeferredShadowCubeProgram;
@@ -222,14 +219,9 @@ LLGLSLShader            gSMAABlendWeightsProgram[4];
 LLGLSLShader            gSMAANeighborhoodBlendProgram[4];
 LLGLSLShader            gCASProgram;
 LLGLSLShader            gDeferredPostNoDoFProgram;
-LLGLSLShader            gDeferredWLSkyProgram;
-LLGLSLShader            gEnvironmentMapProgram;
-LLGLSLShader            gDeferredWLCloudProgram;
-LLGLSLShader            gDeferredWLSunProgram;
-LLGLSLShader            gDeferredWLMoonProgram;
 LLGLSLShader            gDeferredStarProgram;
-LLGLSLShader            gDeferredMeteorProgram;
-LLGLSLShader            gDeferredAuroraProgram;
+LLGLSLShader            gDeferredStarQuadProgram;
+LLGLSLShader            gDeferredSkyCubeProgram;
 LLGLSLShader            gDeferredFullbrightShinyProgram;
 LLGLSLShader            gHUDFullbrightShinyProgram;
 LLGLSLShader            gNormalMapGenProgram;
@@ -732,10 +724,10 @@ bool LLViewerShaderMgr::setShaders(const ALShaderInputs& inputs, const ALRenderA
         shader->unload();
     }
 
-    // The fallback sky cube map is drawn with these programs, and again by the sky once it is told to.
-    if (LLGLSLShader::sLinked > 0 && gSky.mVOSkyp.notNull())
+    // The environment cube is drawn with these programs, and again by the sky once it is told to.
+    if (LLGLSLShader::sLinked > 0)
     {
-        gSky.mVOSkyp->forceSkyUpdate();
+        gPipeline.mSky.forceSkyUpdate();
     }
 
     if (!mFailedPrograms.empty())
@@ -1084,7 +1076,6 @@ void LLViewerShaderMgr::loadShadersWater()
         gWaterWavesProgram.unload();
         gUnderWaterWavesProgram.unload();
         gWaterExclusionProgram.unload();
-        gWaterFieldProgram.unload();
         return;
     }
 
@@ -1176,19 +1167,6 @@ void LLViewerShaderMgr::loadShadersWater()
         gWaterExclusionProgram.mShaderGroup = LLGLSLShader::SG_WATER;
         gWaterExclusionProgram.clearPermutations();
         built(gWaterExclusionProgram.createShader(), gWaterExclusionProgram);
-    }
-
-    {
-        // The field and nothing else: the sky pool's occlusion query over the water (LLPipeline::mSkyBehindQuery).
-        gWaterFieldProgram.mName = "Water Field Shader";
-        gWaterFieldProgram.mFeatures.hasWaterSurface = true;
-        gWaterFieldProgram.mShaderFiles.clear();
-        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldV.glsl", GL_VERTEX_SHADER));
-        gWaterFieldProgram.mShaderFiles.push_back(make_pair("environment/waterFieldF.glsl", GL_FRAGMENT_SHADER));
-        gWaterFieldProgram.mShaderLevel = mShaderLevel[SHADER_WATER];
-        gWaterFieldProgram.mShaderGroup = LLGLSLShader::SG_WATER;
-        gWaterFieldProgram.clearPermutations();
-        built(gWaterFieldProgram.createShader(), gWaterFieldProgram);
     }
 
     /// Keep track of water shader levels
@@ -1356,7 +1334,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
         gDeferredBlurLightProgram.unload();
         gDeferredBlurLightComputeProgram.unload();
         gDeferredSoftenProgram.unload();
-        gDeferredSoftenSkyProgram.unload();
+        gDeferredSkyCompositeProgram.unload();
         gDeferredShadowProgram.unload();
         gDeferredTerrainShadowProgram.unload();
         gDeferredShadowCubeProgram.unload();
@@ -1401,18 +1379,11 @@ void LLViewerShaderMgr::loadShadersDeferred()
             gSMAANeighborhoodBlendProgram[i].unload();
         }
         gCASProgram.unload();
-        gEnvironmentMapProgram.unload();
-        gDeferredWLSkyProgram.unload();
-        gDeferredWLCloudProgram.unload();
-        gDeferredWLSunProgram.unload();
-        gDeferredWLMoonProgram.unload();
         gDeferredStarProgram.unload();
-        gDeferredMeteorProgram.unload();
-        gDeferredAuroraProgram.unload();
+        gDeferredStarQuadProgram.unload();
+        gDeferredSkyCubeProgram.unload();
         gDeferredFullbrightShinyProgram.unload();
         gHUDFullbrightShinyProgram.unload();
-
-        gDeferredHighlightProgram.unload();
 
         gNormalMapGenProgram.unload();
         gDeferredGenBrdfLutProgram.unload();
@@ -1446,16 +1417,6 @@ void LLViewerShaderMgr::loadShadersDeferred()
 // [/RLVa:KB]
 
         return;
-    }
-
-    {
-        gDeferredHighlightProgram.mName = "Deferred Highlight Shader";
-        gDeferredHighlightProgram.mShaderFiles.clear();
-        gDeferredHighlightProgram.mShaderFiles.push_back(make_pair("interface/highlightV.glsl", GL_VERTEX_SHADER));
-        gDeferredHighlightProgram.mShaderFiles.push_back(make_pair("deferred/highlightF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredHighlightProgram.mShaderLevel = mShaderLevel[SHADER_INTERFACE];
-        add_common_permutations(&gDeferredHighlightProgram);
-        built(gDeferredHighlightProgram.createShader(), gDeferredHighlightProgram);
     }
 
     {
@@ -2462,53 +2423,68 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        // The soften pass, and its variant for the sky alone (softenLightF.glsl, SOFTEN_SKY), from one configuration,
-        // so the two resolve the same shader level and link the same objects.
-        const auto load_soften = [&](LLGLSLShader& shader, const char* name, bool sky)
+        gDeferredSoftenProgram.mName = "Deferred Soften Shader";
+        gDeferredSoftenProgram.mShaderFiles.clear();
+        gDeferredSoftenProgram.mFeatures.hasSrgb = true;
+        gDeferredSoftenProgram.mFeatures.calculatesAtmospherics = true;
+        gDeferredSoftenProgram.mFeatures.hasAtmospherics = true;
+        gDeferredSoftenProgram.mFeatures.hasGamma = true;
+        gDeferredSoftenProgram.mFeatures.isDeferred = true;
+        gDeferredSoftenProgram.mFeatures.hasFullGBuffer = true;
+        gDeferredSoftenProgram.mFeatures.hasShadows = use_sun_shadow;
+        gDeferredSoftenProgram.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
+
+        gDeferredSoftenProgram.clearPermutations();
+        add_common_permutations(&gDeferredSoftenProgram);
+        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
+        gDeferredSoftenProgram.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
+
+        gDeferredSoftenProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+        if (use_sun_shadow)
         {
-            shader.mName = name;
-            shader.mShaderFiles.clear();
-            shader.mFeatures.hasSrgb = true;
-            shader.mFeatures.calculatesAtmospherics = true;
-            shader.mFeatures.hasAtmospherics = true;
-            shader.mFeatures.hasGamma = true;
-            shader.mFeatures.isDeferred = true;
-            shader.mFeatures.hasFullGBuffer = true;
-            shader.mFeatures.hasShadows = use_sun_shadow;
-            shader.mFeatures.hasReflectionProbes = mShaderLevel[SHADER_DEFERRED] > 2;
+            gDeferredSoftenProgram.addPermutation("HAS_SUN_SHADOW", "1");
+        }
 
-            shader.clearPermutations();
-            add_common_permutations(&shader);
-            shader.mShaderFiles.push_back(make_pair("deferred/softenLightV.glsl", GL_VERTEX_SHADER));
-            shader.mShaderFiles.push_back(make_pair("deferred/softenLightF.glsl", GL_FRAGMENT_SHADER));
+        if (mInputs.mLocal.mSSAO)
+        { //if using SSAO, take screen space light map into account as if shadows are enabled
+            gDeferredSoftenProgram.mShaderLevel = llmax(gDeferredSoftenProgram.mShaderLevel, 2);
+            gDeferredSoftenProgram.addPermutation("HAS_SSAO", "1");
+        }
 
-            shader.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-
-            if (use_sun_shadow)
-            {
-                shader.addPermutation("HAS_SUN_SHADOW", "1");
-            }
-
-            if (mInputs.mLocal.mSSAO)
-            { //if using SSAO, take screen space light map into account as if shadows are enabled
-                shader.mShaderLevel = llmax(shader.mShaderLevel, 2);
-                shader.addPermutation("HAS_SSAO", "1");
-            }
-
-            if (sky)
-            {
-                shader.addPermutation("SOFTEN_SKY", "1");
-            }
-
-            built(shader.createShader(LLGLSLShader::VARIANT_CLASSIC), shader);
-        };
-
-        load_soften(gDeferredSoftenProgram, "Deferred Soften Shader", false);
-        load_soften(gDeferredSoftenSkyProgram, "Deferred Soften Sky Shader", true);
+        built(gDeferredSoftenProgram.createShader(LLGLSLShader::VARIANT_CLASSIC), gDeferredSoftenProgram);
     }
 
     {
-        // The haze pass, and its variant for the water's pixels, which converges on the sky behind the water.
+        // The sky at the far plane: every layer along the view ray, composited (deferred/skyCompositeF.glsl and the
+        // layers' files, ALSkyLayers::COMPOSITE_FILES), the sun bloom only where it is on. It reads the stars'
+        // attachment and nothing else of the G-buffer, and takes the classic sky's gain as a uniform, so it links again
+        // only where what it reads changes.
+        gDeferredSkyCompositeProgram.mName = "Deferred Sky Composite Shader";
+        gDeferredSkyCompositeProgram.mShaderFiles.clear();
+        gDeferredSkyCompositeProgram.mFeatures.hasSrgb = true;
+        gDeferredSkyCompositeProgram.mFeatures.isDeferred = true;
+
+        gDeferredSkyCompositeProgram.clearPermutations();
+        add_common_permutations(&gDeferredSkyCompositeProgram);
+        gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair("deferred/skyCompositeV.glsl", GL_VERTEX_SHADER));
+        gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair("deferred/skyCompositeMainF.glsl", GL_FRAGMENT_SHADER));
+        for (const char* file : ALSkyLayers::COMPOSITE_FILES)
+        {
+            gDeferredSkyCompositeProgram.mShaderFiles.push_back(make_pair(file, GL_FRAGMENT_SHADER));
+        }
+        if (mInputs.mLocal.mSunBloom)
+        {
+            gDeferredSkyCompositeProgram.addPermutation("SUN_BLOOM", "1");
+        }
+
+        gDeferredSkyCompositeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+
+        built(gDeferredSkyCompositeProgram.createShader(), gDeferredSkyCompositeProgram);
+    }
+
+    {
+        // The haze pass, and its variant for the water's pixels, which converges on WindLight's dome behind the water.
         const auto load_haze = [&](LLGLSLShader& program, const char* name, bool on_water)
         {
             program.mName = name;
@@ -2528,6 +2504,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
             add_common_permutations(&program);
             if (on_water)
             {
+                program.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
                 program.addPermutation("HAZE_ON_WATER", "1");
             }
 
@@ -2906,6 +2883,7 @@ void LLViewerShaderMgr::loadShadersDeferred()
 
     {
         gLuminanceProgram.mName = "Exposure Meter Grid";
+        gLuminanceProgram.mFeatures.isDeferred = true;
         gLuminanceProgram.mShaderFiles.clear();
         gLuminanceProgram.clearPermutations();
         gLuminanceProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
@@ -3149,107 +3127,13 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        gEnvironmentMapProgram.mName = "Environment Map Program";
-        gEnvironmentMapProgram.mShaderFiles.clear();
-        gEnvironmentMapProgram.mFeatures.calculatesAtmospherics = true;
-        gEnvironmentMapProgram.mFeatures.hasAtmospherics = true;
-        gEnvironmentMapProgram.mFeatures.hasGamma = true;
-        gEnvironmentMapProgram.mFeatures.hasSrgb = true;
-
-        gEnvironmentMapProgram.clearPermutations();
-        gEnvironmentMapProgram.addPermutation("HAS_HDRI", "1");
-        add_common_permutations(&gEnvironmentMapProgram);
-        gEnvironmentMapProgram.mShaderFiles.push_back(make_pair("deferred/skyV.glsl", GL_VERTEX_SHADER));
-        gEnvironmentMapProgram.mShaderFiles.push_back(make_pair("deferred/skyF.glsl", GL_FRAGMENT_SHADER));
-        gEnvironmentMapProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gEnvironmentMapProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        built(gEnvironmentMapProgram.createShader(), gEnvironmentMapProgram);
-    }
-
-    {
-        gDeferredWLSkyProgram.mName = "Deferred Windlight Sky Shader";
-        gDeferredWLSkyProgram.mShaderFiles.clear();
-        gDeferredWLSkyProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLSkyProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSkyProgram.mFeatures.hasGamma = true;
-        gDeferredWLSkyProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLSkyProgram.mShaderFiles.push_back(make_pair("deferred/skyV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLSkyProgram.mShaderFiles.push_back(make_pair("deferred/skyF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLSkyProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLSkyProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredWLSkyProgram);
-
-        built(gDeferredWLSkyProgram.createShader(), gDeferredWLSkyProgram);
-    }
-
-    {
-        gDeferredWLCloudProgram.mName = "Deferred Windlight Cloud Program";
-        gDeferredWLCloudProgram.mShaderFiles.clear();
-        gDeferredWLCloudProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLCloudProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLCloudProgram.mFeatures.hasGamma = true;
-        gDeferredWLCloudProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLCloudProgram.mShaderFiles.push_back(make_pair("deferred/cloudsV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLCloudProgram.mShaderFiles.push_back(make_pair("deferred/cloudsF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLCloudProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLCloudProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-        gDeferredWLCloudProgram.addConstant( LLGLSLShader::SHADER_CONST_CLOUD_MOON_DEPTH ); // SL-14113
-
-        add_common_permutations(&gDeferredWLCloudProgram);
-
-        built(gDeferredWLCloudProgram.createShader(), gDeferredWLCloudProgram);
-    }
-
-    {
-        gDeferredWLSunProgram.mName = "Deferred Windlight Sun Program";
-        gDeferredWLSunProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasGamma = true;
-        gDeferredWLSunProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLSunProgram.mFeatures.hasSrgb = true;
-        gDeferredWLSunProgram.mShaderFiles.clear();
-        gDeferredWLSunProgram.mShaderFiles.push_back(make_pair("deferred/sunDiscV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLSunProgram.mShaderFiles.push_back(make_pair("deferred/sunDiscF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLSunProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLSunProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-
-        add_common_permutations(&gDeferredWLSunProgram);
-
-        built(gDeferredWLSunProgram.createShader(), gDeferredWLSunProgram);
-    }
-
-    {
-        gDeferredWLMoonProgram.mName = "Deferred Windlight Moon Program";
-        gDeferredWLMoonProgram.mFeatures.calculatesAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasGamma = true;
-        gDeferredWLMoonProgram.mFeatures.hasAtmospherics = true;
-        gDeferredWLMoonProgram.mFeatures.hasSrgb = true;
-
-        gDeferredWLMoonProgram.mShaderFiles.clear();
-        gDeferredWLMoonProgram.mShaderFiles.push_back(make_pair("deferred/moonV.glsl", GL_VERTEX_SHADER));
-        gDeferredWLMoonProgram.mShaderFiles.push_back(make_pair("deferred/moonF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredWLMoonProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredWLMoonProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-        gDeferredWLMoonProgram.addConstant( LLGLSLShader::SHADER_CONST_CLOUD_MOON_DEPTH ); // SL-14113
-
-        add_common_permutations(&gDeferredWLMoonProgram);
-
-        built(gDeferredWLMoonProgram.createShader(), gDeferredWLMoonProgram);
-    }
-
-    {
         gDeferredStarProgram.mName = "Deferred Star Program";
         gDeferredStarProgram.mShaderFiles.clear();
         gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+        gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER));
         gDeferredStarProgram.mShaderFiles.push_back(make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
         gDeferredStarProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
         gDeferredStarProgram.mShaderGroup = LLGLSLShader::SG_SKY;
-        gDeferredStarProgram.addConstant( LLGLSLShader::SHADER_CONST_STAR_DEPTH ); // SL-14113
 
         add_common_permutations(&gDeferredStarProgram);
 
@@ -3257,29 +3141,34 @@ void LLViewerShaderMgr::loadShadersDeferred()
     }
 
     {
-        gDeferredMeteorProgram.mName = "Deferred Meteor Program";
-        gDeferredMeteorProgram.mShaderFiles.clear();
-        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsV.glsl", GL_VERTEX_SHADER));
-        gDeferredMeteorProgram.mShaderFiles.push_back(make_pair("deferred/meteorsF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredMeteorProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredMeteorProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+        // The stars with diffraction spikes, as quads (ALStarField::SPIKE_INTENSITY).
+        gDeferredStarQuadProgram.mName = "Deferred Star Quad Program";
+        gDeferredStarQuadProgram.mShaderFiles.clear();
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsV.glsl", GL_VERTEX_SHADER));
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/valueNoiseUtil.glsl", GL_VERTEX_SHADER));
+        gDeferredStarQuadProgram.mShaderFiles.push_back(make_pair("deferred/starsF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredStarQuadProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredStarQuadProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+        gDeferredStarQuadProgram.addPermutation("STAR_QUADS", "1");
 
-        add_common_permutations(&gDeferredMeteorProgram);
+        add_common_permutations(&gDeferredStarQuadProgram);
 
-        built(gDeferredMeteorProgram.createShader(), gDeferredMeteorProgram);
+        built(gDeferredStarQuadProgram.createShader(), gDeferredStarQuadProgram);
     }
 
+    if (!mInputs.mGlobal.mProbes)
     {
-        gDeferredAuroraProgram.mName = "Deferred Aurora Program";
-        gDeferredAuroraProgram.mShaderFiles.clear();
-        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraV.glsl", GL_VERTEX_SHADER));
-        gDeferredAuroraProgram.mShaderFiles.push_back(make_pair("deferred/auroraF.glsl", GL_FRAGMENT_SHADER));
-        gDeferredAuroraProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
-        gDeferredAuroraProgram.mShaderGroup = LLGLSLShader::SG_SKY;
+        // WindLight's dome baked into the environment cube the shiny and probe-less reflections read (ALSkyCube), where
+        // reflection probes are off.
+        gDeferredSkyCubeProgram.mName = "Sky Environment Cube Program";
+        gDeferredSkyCubeProgram.mShaderFiles.clear();
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("deferred/postDeferredNoTCV.glsl", GL_VERTEX_SHADER));
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("deferred/skyCubeF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredSkyCubeProgram.mShaderFiles.push_back(make_pair("windlight/windlightDomeF.glsl", GL_FRAGMENT_SHADER));
+        gDeferredSkyCubeProgram.mShaderLevel = mShaderLevel[SHADER_DEFERRED];
+        gDeferredSkyCubeProgram.mShaderGroup = LLGLSLShader::SG_SKY;
 
-        add_common_permutations(&gDeferredAuroraProgram);
-
-        built(gDeferredAuroraProgram.createShader(), gDeferredAuroraProgram);
+        built(gDeferredSkyCubeProgram.createShader(), gDeferredSkyCubeProgram);
     }
 
     {

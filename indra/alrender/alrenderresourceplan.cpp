@@ -66,13 +66,13 @@ namespace
 
     // Everything after the packs, in Id order.
     constexpr std::string_view OWN_NAMES[Plan::ID_COUNT - PACK_IDS] = {
-        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "sky.behind", "ssr.scene", "main.light.blurred",
+        "shadow.spot0", "shadow.spot1", "smaa.edges", "smaa.blend", "ssr.scene", "main.light.blurred",
         "glow0", "glow1", "glow2", "downres", "preview", "bake", "brdf.lut", "exposure.meter", "exposure.histogram",
         "exposure", "exposure.last", "lens.flare.a", "lens.flare.b", "noise", "noise.true", "smaa.area", "smaa.search",
-        "smaa.sample", "tone.curve",
+        "smaa.sample", "tone.curve", "sky.cube",
     };
 
-    static_assert(OWN_NAMES[(size_t)Id::ToneCurve - PACK_IDS] == "tone.curve", "a name for every id after the packs");
+    static_assert(OWN_NAMES[(size_t)Id::EnvironmentCube - PACK_IDS] == "sky.cube", "a name for every id after the packs");
 }
 
 // static
@@ -97,9 +97,10 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     // Albedo, ORM or specular, the normal and the emissive. The normal's layout is the one the programs were compiled
     // against (GBUFFER_NORM_HDR), which setShaders latches from RenderHDREnabled before it compiles; nothing compiles
     // against the emissive's, which follows HDR as the other HDR targets do. R11F_G11F_B10F rather than RGB16F, which
-    // pads to RGBA16F in memory: half the bandwidth, still float so it filters linearly and holds the sky writers'
-    // boosts past 1, and unsigned is enough since the writers clamp emissive at zero. Its 6/6/5 mantissa bits band in
-    // smooth gradients, which the sky, cloud and aurora writers' ditherEmissive covers.
+    // pads to RGBA16F in memory: half the bandwidth, still float so it filters linearly and holds what the stars and
+    // emissive materials write past 1, and unsigned is enough since the writers clamp emissive at zero. Its 6/6/5
+    // mantissa bits would band in smooth gradients; the smoothest, the sky's, are composited in registers and never
+    // stored here.
     const std::array<U32, ALRenderTargetDesc::MAX_COLOR> gbuffer_color = {
         GL_SRGB8_ALPHA8, GL_RGBA8, in.mGBufferNormHDR ? (U32)GL_RGBA16 : (U32)GL_RGB10_A2,
         in.mEmissive ? (hdr ? (U32)GL_R11F_G11F_B10F : (U32)GL_RGB8) : 0u
@@ -307,13 +308,6 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
                                                           .depth  = main_depth };
     }
 
-    // The sky behind everything at half size, in the format the sky's colour lands in: the emissive attachment's float
-    // with HDR, 8 bits otherwise.
-    plan.at(Id::SkyBehind).mDesc = ALRenderTargetDesc{ .width  = std::max(width / 2, 1u),
-                                                       .height = std::max(height / 2, 1u),
-                                                       .color  = { hdr && in.mEmissive ? (U32)GL_R11F_G11F_B10F
-                                                                                       : (U32)GL_RGBA8 } };
-
     // The legacy glow, which HDR's bloom replaces.
     if (!hdr)
     {
@@ -350,6 +344,14 @@ ALRenderResourcePlan ALRenderResourcePlan::make(const ALRenderResourceInputs& in
     plan.at(Id::Noise).mDesc     = ALRenderTargetDesc{ .color = { GL_RGB16F } };
     plan.at(Id::TrueNoise).mDesc = ALRenderTargetDesc{ .color = { GL_RGB16F } };
     plan.at(Id::ToneCurve).mDesc = ALRenderTargetDesc{ .color = { GL_RGBA16 } };
+
+    // Where there are no reflection probes, the shiny and probe-less reflections read the sky from a small cube the
+    // sky bakes, with every level.
+    if (!in.mProbes)
+    {
+        plan.at(Id::EnvironmentCube).mDesc =
+            ALRenderTargetDesc{ .color = { GL_RGBA8 }, .mips = ALRenderTargetDesc::Mips::Manual };
+    }
 
     // SMAA's area and search tables, and the debug image it can blend, for as long as SMAA is what antialiases, as its
     // edges and blend weights are.
@@ -427,7 +429,6 @@ bool ALRenderResourcePlan::followsRenderSize(Id id)
         case Id::SpotShadow1:
         case Id::SMAAEdges:
         case Id::SMAABlend:
-        case Id::SkyBehind:
         case Id::SSRScene:
         case Id::MainLightBlurred:
             return true;
@@ -474,7 +475,7 @@ bool ALRenderResourcePlan::isTransient(Id id)
                slot == Slot::DepthCopy || slot >= Slot::Bloom0;
     }
     return id == Id::SMAAEdges || id == Id::SMAABlend || id == Id::Glow0 || id == Id::Glow1 || id == Id::Glow2 ||
-           id == Id::SkyBehind || id == Id::MainLightBlurred || id == Id::Preview || id == Id::Bake;
+           id == Id::MainLightBlurred || id == Id::Preview || id == Id::Bake;
 }
 
 // static

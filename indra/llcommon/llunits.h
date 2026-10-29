@@ -69,7 +69,7 @@ LL_DECLARE_DERIVED_UNIT(Minutes,        "min",          Seconds, / 60);
 LL_DECLARE_DERIVED_UNIT(Hours,          "h",            Minutes, / 60);
 LL_DECLARE_DERIVED_UNIT(Days,           "d",            Hours, / 24);
 LL_DECLARE_DERIVED_UNIT(Milliseconds,   "ms",           Seconds, * 1000);
-LL_DECLARE_DERIVED_UNIT(Microseconds,   "\x09\x3cs",    Milliseconds, * 1000);
+LL_DECLARE_DERIVED_UNIT(Microseconds,   "\xC2\xB5s",    Milliseconds, * 1000);
 LL_DECLARE_DERIVED_UNIT(Nanoseconds,    "ns",           Microseconds, * 1000);
 }
 

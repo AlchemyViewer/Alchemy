@@ -321,6 +321,16 @@ void LLDrawPoolWater::renderPostDeferred(S32 pass)
 
     LLGLDisable cullface(GL_CULL_FACE);
 
+    // The main view's surface from above, counted for the haze's draw on the water's pixels (LLPipeline::mWaterSeen):
+    // every pixel that draw shades is one the surface drew here, so where none passed the depth test it is skipped.
+    std::optional<ALQueryScope> seen;
+    if (main_view && !underwater)
+    {
+        seen.emplace(gGL.queries(), ALQueryKind::Occlusion);
+        gPipeline.mWaterSeen      = seen->ticket();
+        gPipeline.mWaterSeenFrame = LLFrameTimer::getFrameCount();
+    }
+
     // The patches near the camera first, front to back, so the depth test turns away the flat field behind their crests.
     // The flat field's primitives and the patches' apart: a primitives query may not span a tessellated draw on every
     // driver (ALPrimitivePlot).

@@ -29,9 +29,12 @@
 
 #include "lltracerecording.h"
 #include "lltrace.h"
+#include "llcoros.h"
 #include "llstatsaccumulator.h"
 #include "llsingleton.h"
 #include "llsd.h"
+
+#include LLCOROS_MUTEX_HEADER
 
 namespace LLCore
 {
@@ -47,19 +50,19 @@ namespace LLCore
 
         void    recordDataDown(size_t bytes)
         {
-            std::lock_guard<std::mutex> lock(mStatsMutex);
+            LLCoros::LockType lock(mStatsMutex);
             mDataDown.push((F32)bytes);
         }
 
         void    recordDataUp(size_t bytes)
         {
-            std::lock_guard<std::mutex> lock(mStatsMutex);
+            LLCoros::LockType lock(mStatsMutex);
             mDataUp.push((F32)bytes);
         }
 
         void    recordHTTPRequest()
         {
-            std::lock_guard<std::mutex> lock(mStatsMutex);
+            LLCoros::LockType lock(mStatsMutex);
             ++mRequests;
         }
 
@@ -74,7 +77,8 @@ namespace LLCore
 
         std::map<S32, S32> mResutCodes;
 
-        std::mutex mStatsMutex;
+        // Taken where a request is made, which a coroutine may do.
+        LLCoros::Mutex mStatsMutex;
     };
 
 

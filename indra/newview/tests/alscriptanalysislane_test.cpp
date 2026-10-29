@@ -27,45 +27,43 @@
 #include "../alscriptanalysislane.h"
 #include "../alscriptanalyzers.h"
 
+#include "llmutex.h"
+#include "lltimer.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include "Luau/Cancellation.h"
 
 #include <chrono>
-#include <condition_variable>
 #include <functional>
 #include <memory>
-#include <mutex>
-#include <thread>
 
 namespace
 {
     // What the lanes answered, in the order they did, from their threads.
     struct Answers
     {
-        std::mutex               mutex;
-        std::condition_variable  changed;
+        LLCondition              changed;
         std::vector<std::string> said;
 
         void add(std::string one)
         {
             {
-                const std::lock_guard<std::mutex> lock(mutex);
+                LLMutexLock lock(&changed);
                 said.push_back(std::move(one));
             }
-            changed.notify_all();
+            changed.broadcast();
         }
 
         // Whether `count` answers came within a few seconds.
         bool waitFor(size_t count)
         {
-            std::unique_lock<std::mutex> lock(mutex);
-            return changed.wait_for(lock, std::chrono::seconds(5), [&] { return said.size() >= count; });
+            return changed.waitFor(std::chrono::seconds(5), [&] { return said.size() >= count; });
         }
 
         std::string all()
         {
-            const std::lock_guard<std::mutex> lock(mutex);
+            LLMutexLock lock(&changed);
             std::string out;
             for (const std::string& one : said)
             {
@@ -83,32 +81,30 @@ namespace
     public:
         struct Gate
         {
-            std::mutex              mutex;
-            std::condition_variable changed;
-            bool                    open    = false;
+            LLCondition changed;
+            bool        open    = false;
             // Held each time it is asked, not the first time alone: a check
             // that is slow however often it is started over.
-            bool                    always  = false;
-            int                     entered = 0;
+            bool        always  = false;
+            int         entered = 0;
 
             void release()
             {
                 {
-                    const std::lock_guard<std::mutex> lock(mutex);
+                    LLMutexLock lock(&changed);
                     open = true;
                 }
-                changed.notify_all();
+                changed.broadcast();
             }
 
             bool waitEntered(int times = 1)
             {
-                std::unique_lock<std::mutex> lock(mutex);
-                return changed.wait_for(lock, std::chrono::seconds(5), [&] { return entered >= times; });
+                return changed.waitFor(std::chrono::seconds(5), [&] { return entered >= times; });
             }
 
             int enteredNow()
             {
-                const std::lock_guard<std::mutex> lock(mutex);
+                LLMutexLock lock(&changed);
                 return entered;
             }
         };
@@ -126,19 +122,21 @@ namespace
             {
                 return;
             }
-            std::unique_lock<std::mutex> lock(mGate->mutex);
-            ++mGate->entered;
-            mGate->changed.notify_all();
+            {
+                LLMutexLock lock(&mGate->changed);
+                ++mGate->entered;
+            }
+            mGate->changed.broadcast();
             const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
             // Held once, unless always: run again, it answers at once.
-            while (!mGate->open && (mGate->always || mGate->entered == 1) && std::chrono::steady_clock::now() < deadline)
+            const auto let_go = [this] { return mGate->open || !(mGate->always || mGate->entered == 1); };
+            while (!mGate->changed.waitFor(std::chrono::milliseconds(5), let_go) && std::chrono::steady_clock::now() < deadline)
             {
                 if (mStops && setup.stop && setup.stop->requested())
                 {
                     mStopped = true;
                     return;
                 }
-                mGate->changed.wait_for(lock, std::chrono::milliseconds(5));
             }
         }
         bool stopped() const override { return mStopped; }
@@ -246,7 +244,7 @@ namespace
         CHECK(gate->waitEntered(2));
         CHECK(post(luau, job("again", ALScriptAnalysis::Kind::Hover, true)));
         // A moment, in which a question that stopped it would be answered.
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        ms_sleep(200);
         UNSCOPED_INFO("the second question waits for the check");
         CHECK(answers.all() == std::string("front/1"));
         UNSCOPED_INFO("not started over");

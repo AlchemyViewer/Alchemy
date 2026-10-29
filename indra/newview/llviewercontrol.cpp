@@ -53,7 +53,6 @@
 #include "llviewershadermgr.h"
 
 #include "llhudtext.h"
-#include "llsky.h"
 #include "llvieweraudio.h"
 #include "llviewermenu.h"
 #include "llviewertexturelist.h"
@@ -74,7 +73,6 @@
 #include "llerrorcontrol.h"
 #include "llappviewer.h"
 #include "llmemory.h"
-#include "llvowlsky.h"
 #include "alsamplerstate.h"
 #include "llrender.h"
 #include "llnavigationbar.h"
@@ -421,16 +419,6 @@ static bool handleGammaChanged(const LLSD& newvalue)
         }
     }
 
-    return true;
-}
-
-const F32 MAX_USER_FOG_RATIO = 10.f;
-const F32 MIN_USER_FOG_RATIO = 0.5f;
-
-static bool handleFogRatioChanged(const LLSD& newvalue)
-{
-    F32 fog_ratio = llmax(MIN_USER_FOG_RATIO, llmin((F32) newvalue.asReal(), MAX_USER_FOG_RATIO));
-    gSky.setFogRatio(fog_ratio);
     return true;
 }
 
@@ -1004,6 +992,7 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderFSAAType", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAUseStencil", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderSMAAPredication", handleRenderInputChanged);
+    setting_setup_signal_listener(gSavedSettings, "AlchemyRenderSunBloom", handleRenderInputChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderAnisotropicLevel", handleAnisotropicFilteringChanged);
     gSavedSettings.getControl("RenderAnisotropicLevel")->getValidateSignal()->connect(boost::bind(&validateAnisotropicFiltering, _2));
     setting_setup_signal_listener(gSavedSettings, "RenderShadowResolutionScale", handleRenderInputChanged);
@@ -1027,7 +1016,6 @@ void settings_setup_listeners()
     setting_setup_signal_listener(gSavedSettings, "RenderTreeLODFactor", handleTreeLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderFlexTimeFactor", handleFlexLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderGamma", handleGammaChanged);
-    setting_setup_signal_listener(gSavedSettings, "RenderFogRatio", handleFogRatioChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderMaxPartCount", handleMaxPartCountChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderDynamicLOD", handleRenderDynamicLODChanged);
     setting_setup_signal_listener(gSavedSettings, "RenderVSyncEnable", handleVSyncChanged);

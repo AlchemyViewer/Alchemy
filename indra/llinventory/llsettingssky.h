@@ -166,6 +166,7 @@ public:
     static LLSD flattenDensityProfile(const LLSD& profile);
 
     LLUUID getBloomTextureId() const;
+    void setBloomTextureId(LLUUID id);
     LLUUID getRainbowTextureId() const;
     LLUUID getHaloTextureId() const;
 

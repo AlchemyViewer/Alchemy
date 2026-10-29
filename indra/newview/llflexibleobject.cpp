@@ -34,7 +34,6 @@
 #include "llrendersphere.h"
 #include "llviewerobject.h"
 #include "llagent.h"
-#include "llsky.h"
 #include "llviewercamera.h"
 #include "llviewertexturelist.h"
 #include "llviewercontrol.h"

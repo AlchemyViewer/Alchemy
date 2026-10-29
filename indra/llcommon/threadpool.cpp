@@ -17,6 +17,7 @@
 // std headers
 // external library headers
 // other Linden headers
+#include "alprecisewaiter.h"
 #include "commoncontrol.h"
 #include "llerror.h"
 #include "llevents.h"
@@ -31,31 +32,53 @@
 // As of 2022-12-06, each of our worker threads only runs a single (default)
 // fiber: we don't launch explicit fibers within worker threads, nor do we
 // anticipate doing so. So a worker thread that's simply waiting for incoming
-// tasks should really sleep a little. Override the default fiber scheduler to
-// implement that.
+// tasks should sleep until there is one. Override the default fiber scheduler
+// to implement that.
+#if LL_WINDOWS
 struct sleepy_robin: public boost::fibers::algo::round_robin
 {
-    virtual void suspend_until( std::chrono::steady_clock::time_point const&) noexcept
+    // round_robin holds a std::condition_variable, and
+    // round_robin::suspend_until() calls
+    // std::condition_variable::wait_until(). On Windows, that call seems
+    // busier than it ought to be. This waits on a waiter instead, which a
+    // fiber made ready from another thread wakes, and whose timer, where a
+    // fiber's timed wait sets a deadline, the system timer's tick does not
+    // round as it does Sleep() and a wait's timeout -- to a whole 15.6 ms on
+    // Windows 11 for a process whose window is hidden, whatever resolution it
+    // asked for.
+    void suspend_until(std::chrono::steady_clock::time_point const& until) noexcept override
     {
-#if LL_WINDOWS
-        // round_robin holds a std::condition_variable, and
-        // round_robin::suspend_until() calls
-        // std::condition_variable::wait_until(). On Windows, that call seems
-        // busier than it ought to be. Try just sleeping.
-        Sleep(1);
-#else
-        // currently unused other than windows, but might as well have something here
-        // different units than Sleep(), but we actually just want to sleep for any de-minimis duration
-        usleep(1);
-#endif
+        if (!mWaiter.canWake())
+        {
+            round_robin::suspend_until(until);
+            return;
+        }
+        if (until == (std::chrono::steady_clock::time_point::max)())
+        {
+            mWaiter.waitUntil(ALPreciseWaiter::time_point::max());
+            return;
+        }
+        // The fibers' deadlines are on the standard library's steady clock
+        // and the waiter's on the native counter: what is left of the wait
+        // goes across, not the deadline.
+        mWaiter.waitFor(until - std::chrono::steady_clock::now());
     }
 
-    virtual void notify() noexcept
+    // A wake that comes before the wait is kept for it.
+    void notify() noexcept override
     {
-        // Since our Sleep() call above will wake up on its own, we need not
-        // take any special action to wake it.
+        if (!mWaiter.canWake())
+        {
+            round_robin::notify();
+            return;
+        }
+        mWaiter.wake();
     }
+
+private:
+    ALPreciseWaiter mWaiter;
 };
+#endif // LL_WINDOWS
 
 /*****************************************************************************
 *   ThreadPoolBase
@@ -156,7 +179,6 @@ void LL::ThreadPoolBase::close()
 void LL::ThreadPoolBase::run(const std::string& name)
 {
 #if LL_WINDOWS
-    // Try using sleepy_robin fiber scheduler.
     boost::fibers::use_scheduling_algorithm<sleepy_robin>();
 #endif // LL_WINDOWS
 

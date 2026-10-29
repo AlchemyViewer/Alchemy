@@ -32,6 +32,7 @@
 #include "llstring.h"
 #include "llevents.h"
 #include "llexception.h"
+#include "lltimer.h"
 #include "stringize.h"
 
 #include <boost/process/v2/process.hpp>
@@ -46,10 +47,9 @@
 #include <stdexcept>
 #include <limits>
 #include <algorithm>
-#include <chrono>
+#include <atomic>
 #include <cstring>
 #include <errno.h>
-#include <thread>
 #include <vector>
 #include <typeinfo>
 #include <signal.h>
@@ -65,30 +65,28 @@
 
 #if LL_WINDOWS
 #include "llwin32headers.h"
-#include <mutex>
+#include "llcoros.h"
+#include LLCOROS_MUTEX_HEADER
 
 namespace {
     // Global job object that will kill all child processes when parent terminates
     HANDLE g_jobObject = NULL;
-    bool g_jobObjectInitialized = false;
-    std::mutex g_jobObjectMutex;
+    // Set once g_jobObject holds the job, or NULL for good, so that a launch
+    // that finds it set may read g_jobObject without the lock.
+    std::atomic<bool> g_jobObjectInitialized{false};
+    // A child may be launched from a coroutine.
+    LLCoros::Mutex g_jobObjectMutex;
 
-    void InitializeJobObject()
+    // A job that kills every process in it when its last handle closes, or
+    // NULL where one could not be made.
+    HANDLE CreateKillOnCloseJob()
     {
-        if (g_jobObjectInitialized)
-            return;
-        std::lock_guard<std::mutex> lock(g_jobObjectMutex);
-        if (g_jobObjectInitialized)
-            return;
-
-        g_jobObjectInitialized = true;
-
         // Create a job object
-        g_jobObject = ::CreateJobObjectW(NULL, NULL);
-        if (g_jobObject == NULL)
+        HANDLE job = ::CreateJobObjectW(NULL, NULL);
+        if (job == NULL)
         {
             LL_WARNS("LLProcess") << "Failed to create job object: " << ::GetLastError() << LL_ENDL;
-            return;
+            return NULL;
         }
 
         // Configure the job to kill all processes when the last handle closes
@@ -99,22 +97,34 @@ namespace {
         // Windows 8+ supports nested jobs (for VS studio)
         jeli.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_BREAKAWAY_OK;
 
-        if (!::SetInformationJobObject(g_jobObject, JobObjectExtendedLimitInformation,
+        if (!::SetInformationJobObject(job, JobObjectExtendedLimitInformation,
             &jeli, sizeof(jeli)))
         {
             LL_WARNS("LLProcess") << "Failed to set job object limits: " << ::GetLastError() << LL_ENDL;
-            ::CloseHandle(g_jobObject);
-            g_jobObject = NULL;
-            return;
+            ::CloseHandle(job);
+            return NULL;
         }
 
         LL_INFOS("LLProcess") << "Job object created - child processes will terminate with parent" << LL_ENDL;
+        return job;
+    }
+
+    void InitializeJobObject()
+    {
+        if (g_jobObjectInitialized.load(std::memory_order_acquire))
+            return;
+        LLCoros::LockType lock(g_jobObjectMutex);
+        if (g_jobObjectInitialized.load(std::memory_order_relaxed))
+            return;
+
+        // Tried once, whether or not it is made.
+        g_jobObject = CreateKillOnCloseJob();
+        g_jobObjectInitialized.store(true, std::memory_order_release);
     }
 
     void AssignProcessToJob(HANDLE hProcess, const std::string& desc)
     {
-        if (!g_jobObjectInitialized)
-            InitializeJobObject();
+        InitializeJobObject();
 
         if (g_jobObject != NULL)
         {
@@ -496,7 +506,7 @@ LLProcess::~LLProcess()
                 }
                 // Sleep before next poll: applies to both EINTR and
                 // still-running (w == 0) cases.
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                ms_sleep(100);
             }
 
             // Force kill if still running

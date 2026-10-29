@@ -442,11 +442,23 @@ void ALScriptExplorerPane::relist(bool refetch, bool from_region)
     };
     listing.nameless = [this](const LLUUID& root) { return nameGivenTo(root); };
     listing.selected = mRoots;
+    // A prim holding a script open, or open through its file: a file's tab
+    // is open for each script it masters, which has no tab of its own.
     for (const ALScriptStudioDoc* doc : mServices->openDocs())
     {
         if (!doc->ref.inInventory())
         {
             listing.open.push_back(doc->ref.object);
+        }
+        else if (!doc->file.empty())
+        {
+            for (const ALMasterLink& link : ALScriptDiskMasters::instance().mastering(doc->file))
+            {
+                if (link.state != ALMasterLink::State::Orphaned && link.object.notNull())
+                {
+                    listing.open.push_back(link.object);
+                }
+            }
         }
     }
     listing.unnamed = mServices->words("ObjectUnnamed");

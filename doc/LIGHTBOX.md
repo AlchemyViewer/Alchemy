@@ -944,8 +944,13 @@ and no land setting turns them on — which is what makes them safe to expose he
 at all, and why they sit beside the day cycle rather than in Scene. All three
 gate on the same star brightness the night sky uses, so they simply do not
 appear in daylight, and an HDRI sky replaces the dome and leaves nothing to draw
-into. None is on the Looks whitelist: a Look is the aesthetic settings of the
-Look and Lens tabs, and a Look that switched the aurora on would be a surprise.
+into. The sun bloom is the fourth, and the one seen by day: the client draws it
+only while `AlchemyRenderSunBloom` is on, but what it draws is the sky's own
+bloom texture (`bloom_id`, set in the sky editor's Sun & Moon tab), so a sky
+decides how it looks and the setting decides whether it shows. Its textures are
+not even fetched while it is off. None is on the Looks whitelist: a Look is the
+aesthetic settings of the Look and Lens tabs, and a Look that switched the
+aurora on would be a surprise.
 
 Two shaping decisions in that section are worth copying. It is **one** section
 rather than three because two of the effects are a single control each, and a

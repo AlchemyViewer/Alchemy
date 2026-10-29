@@ -34,7 +34,6 @@
 #include "llviewercontrol.h"
 #include "lldrawable.h"
 #include "llface.h"
-#include "llsky.h"
 #include "llsurface.h"
 #include "llsurfacepatch.h"
 #include "llviewerregion.h"

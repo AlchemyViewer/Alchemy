@@ -1,8 +1,7 @@
 /**
  * @file alwatersurface_gl_test.cpp
  * @brief The water surface's draws on the hidden window: the water's field as the vertex stage lays it out, and the
- *        screen rectangle its slab covers; whether any of it shows, and the draws that wait on that; the water's
- *        stencil bits: where the exclusion pass removes
+ *        screen rectangle its slab covers; the water's stencil bits: where the exclusion pass removes
  *        the water, and which pixels the water shades, which the haze pass reads; and the waves' patches as the
  *        tessellation stages emit them, displaced by the heights baked from the normal map, and the depth pyramid
  *        that culls those the scene hides.
@@ -33,9 +32,6 @@
 #include "../alwaterfield.h"
 #include "../alwaterheightbake.h"
 #include "../alwaterstencil.h"
-
-#include "alframefences.h"
-#include "alquerypool.h"
 
 #include "llgl.h"
 #include "llglheaders.h"
@@ -545,10 +541,7 @@ namespace
             mNoise = nullptr;
             mHeights = nullptr;
             mSlopes.release();
-            mQueries.release();
-            mFrames.release();
             mScene.release();
-            mBehind.release();
         }
 
         // The water scene in a target whose depth carries stencil, cleared: the colour program, the viewer's own
@@ -828,28 +821,6 @@ namespace
         {
             bindField(mField, void_drawn, raise, patches);
             drawFieldParts(mField, patches);
-        }
-
-        // Whether the sky behind's draw over mQuery, ended, runs: mBehind cleared, then cleared red under the query's
-        // condition, as LLDrawPoolWLSky draws the sky behind under it, and read back.
-        bool conditionalClearRan()
-        {
-            mBehind.bindTarget();
-            gGL.setClearColor(LLColor4::black);
-            mBehind.clear();
-            mBehind.flush();
-            {
-                ALConditionalRender if_water(mQueries, mQuery);
-                mBehind.bindTarget();
-                gGL.setClearColor(LLColor4::red);
-                mBehind.clear();
-                gGL.setClearColor(LLColor4::black);
-                mBehind.flush();
-            }
-            mBehind.bindTarget();
-            const LLColor4U c = pixel(1, 1);
-            mBehind.flush();
-            return c.mV[VRED] == 255;
         }
 
         // Where pixel (x, y) of the field target lies, from the square's centre, in metres.
@@ -1422,11 +1393,7 @@ namespace
         LLGLSLShader           mColour;
         LLGLSLShader           mExclusion;
         LLGLSLShader           mField;
-        ALFrameFences          mFrames;
-        ALQueryPool            mQueries{ mFrames };
-        ALQueryTicket          mQuery;
         LLRenderTarget         mScene;
-        LLRenderTarget         mBehind;
         LLPointer<LLImageGL>   mCellMap;
         ALWaterField::Layout   mLayout;
         LLVector4              mSquare;
@@ -1452,7 +1419,7 @@ namespace
 
     // From above, an exclusion prim over the water removes the water behind it; one under the water removes nothing,
     // since the water hides it.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from above, an exclusion prim over the water removes the water behind it", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from above an exclusion prim over the water removes the water behind it", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1476,7 +1443,7 @@ namespace
     }
 
     // From below, the reverse: the prim under the water, on the camera's side, removes it; the one above it does not.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, a prim under the water removes it and one above does not", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below a prim under the water removes it and one above does not", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1544,7 +1511,7 @@ namespace
 
     // From below, the surface is drawn twice, once where the exclude bit is clear and once where it is set, and each
     // pixel takes exactly one of them.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below, each pixel takes exactly one of the surface's two draws", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: from below each pixel takes exactly one of the surface's two draws", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1632,7 +1599,7 @@ namespace
 
     // The haze pass's two draws, one where the surface bit is clear and one where it is set, shade every pixel once,
     // the second exactly where the water is.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the haze's two draws shade every pixel once, the converging one exactly on the water", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the haze's two draws shade every pixel once and the converging one exactly the water", "[alwatersurface_gl]")
     {
         for (LLRenderTarget::eDepthFormat format : formats())
         {
@@ -1719,7 +1686,7 @@ namespace
     }
 
     // Each cell lies at its own region's water height, and the rings at the agent region's.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: each cell lies at its own region's water height, and the rings at the agent region's", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: each cell lies at its own region's water height and the rings at the agent region's", "[alwatersurface_gl]")
     {
         setUpField();
         {
@@ -1843,42 +1810,6 @@ namespace
             mField.unload();
         }
         forwardZ();
-    }
-
-    // The sky behind: the field's samples against the world's depth decide whether the target is cleared and drawn,
-    // on the GPU. Behind an occluder everywhere, it is left as it was; through one gap, it is cleared.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the sky behind is cleared only where the field shows past the world", "[alwatersurface_gl]")
-    {
-        for (bool gap : { false, true })
-        {
-            setUpField();
-            UNSCOPED_INFO("behind target");
-            REQUIRE(mBehind.allocate(4, 4, GL_RGBA8));
-
-            // The world, above the water everywhere in view, or but for one column of pixels over the square's middle.
-            {
-                const F32 cx = (F32)mLayout.centreX();
-                const F32 cy = (F32)mLayout.centreY();
-                const F32 column = gap ? 2.f * FIELD_VIEW / FIELD_SIZE : 0.f;
-                opaque(cx - FIELD_VIEW, cx, cy - FIELD_VIEW, cy + FIELD_VIEW, 50.f);
-                opaque(cx + column, cx + FIELD_VIEW, cy - FIELD_VIEW, cy + FIELD_VIEW, 50.f);
-            }
-
-            {
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-                LLGLSColorMask no_color(false, false);
-                mQuery = mQueries.begin(ALQueryKind::Occlusion);
-                drawField(true);
-                mQueries.end(mQuery);
-            }
-
-            UNSCOPED_INFO((gap ? "water through the gap clears the sky behind" : "water all hidden leaves it"));
-            REQUIRE(conditionalClearRan() == gap);
-            mBehind.release();
-            tearDownWater();
-            mField.unload();
-            mQueries.release();
-        }
     }
 
     // Anti-repeat: the big layer hex-tiled through the viewer's own reads breaks its repeat and keeps what the author
@@ -2307,71 +2238,10 @@ namespace
         target.release();
     }
 
-    // The sky behind's query with waves: the field raised by A counts a crest over a wall the flat field misses, and
-    // the flat field counts the water under a camera between the plane and A above it, which the raised field, above
-    // the camera, misses.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: the sky behind's query counts both the raised and the flat field", "[alwatersurface_gl]")
-    {
-        setUpField();
-        mScene.flush();
-        constexpr F32 A = 3.f;
-        const F32 cx = (F32)mLayout.centreX();
-        const F32 cy = (F32)mLayout.centreY();
-        UNSCOPED_INFO("behind target");
-        REQUIRE(mBehind.allocate(4, 4, GL_RGBA8));
-
-        // Whether the query over `raises` lets the conditional clear run, from a camera at `camera_z`, behind a wall at
-        // `wall_z` over the whole view where `wall`.
-        const auto counted = [&](F32 camera_z, bool wall, F32 wall_z, std::initializer_list<F32> raises)
-        {
-            mScene.bindTarget();
-            mScene.clear();
-            mCameraZ = camera_z;
-            mView = view(camera_z, false);
-            gGL.matrixMode(LLRender::MM_PROJECTION);
-            gGL.loadMatrix(fieldOrtho(cx, cy));
-            gGL.matrixMode(LLRender::MM_MODELVIEW);
-            gGL.loadMatrix(mView);
-            if (wall)
-            {
-                opaque(cx - FIELD_VIEW, cx + FIELD_VIEW, cy - FIELD_VIEW, cy + FIELD_VIEW, wall_z);
-            }
-            {
-                LLGLDepthTest depth(GL_TRUE, GL_FALSE);
-                LLGLSColorMask no_color(false, false);
-                mQuery = mQueries.begin(ALQueryKind::Occlusion);
-                for (F32 raise : raises)
-                {
-                    drawField(true, raise);
-                }
-                mQueries.end(mQuery);
-            }
-            mScene.flush();
-            return conditionalClearRan();
-        };
-
-        // The wall stands half A above the highest water, the south-east region's.
-        UNSCOPED_INFO("a wall over all the water hides the flat field");
-        CHECK(!counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f }));
-        UNSCOPED_INFO("the field raised by A shows over it");
-        CHECK(counted(FIELD_CAMERA_Z, true, HIGH + 0.5f * A, { 0.f, A }));
-        UNSCOPED_INFO("from a deck within A of the plane, the raised field alone is missed");
-        CHECK(!counted(LOW + 0.5f * A, false, 0.f, { A }));
-        UNSCOPED_INFO("and the flat field counts the water");
-        CHECK(counted(LOW + 0.5f * A, false, 0.f, { 0.f, A }));
-
-        mBehind.release();
-        // tearDownWater flushes the scene, which setUpField left bound.
-        mScene.bindTarget();
-        tearDownWater();
-        mField.unload();
-        mQueries.release();
-    }
-
     // Whatever order the waves' patches are drawn in, each is drawn once and in the same place, and the order a view
     // asks for runs from its near end: every order the flags give tessellates the same triangles, and the slow axis run
     // from its high end draws the patches there first.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every patch order draws the same triangles, starting from the view's near end", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: every patch order draws the same triangles starting from the view's near end", "[alwatersurface_gl]")
     {
         setUpWater(LLRenderTarget::DEPTH_FMT_24);
         mScene.flush();
@@ -2541,7 +2411,7 @@ namespace
     // With waves the field leaves the patches' cells to them and fans the cells beside them onto their corners: drawn
     // alone, it covers every pixel inside the rim once but those over the patches' cells, which it leaves; with the
     // patches drawn too, flat, every pixel inside the rim is covered once.
-    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with waves, the field and the patches cover every pixel inside the rim once", "[alwatersurface_gl]")
+    TEST_CASE_METHOD(alwatersurface_data, "alwatersurface_gl: with waves the field and the patches cover every pixel inside the rim once", "[alwatersurface_gl]")
     {
         setUpField(REACH);
         const ALWaterField::PatchRect rect = ALWaterField::patchRect(mLayout);

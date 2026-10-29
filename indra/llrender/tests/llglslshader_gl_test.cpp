@@ -7,7 +7,7 @@
  *        work group size, its dispatches direct, by thread count and indirect, the image units its reserved names
  *        get, arrays included, the fixed storage binding points a buffer bound once serves every program at, and a
  *        compaction drawn indirectly. The units every kind of sampler gets, integer textures read through reserved
- *        samplers, and what the debug validator says of images and stencil reads. And who owns a shader object: a program its own, deleted once it links,
+ *        samplers, a bind given no texture, and what the debug validator says of images and stencil reads. And who owns a shader object: a program its own, deleted once it links,
  *        the manager the shared ones.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -2071,6 +2071,73 @@ namespace
                 }
             }
         }
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A program given no texture binds none. bindTexture with a null texture or render target, bindDepthTexture with a
+    // null target, and the slot's bindFast with a null texture each let the unit go, as the slot holding a texture
+    // another bind left there: its record says it holds nothing, GL's binding is no longer that texture, and the unit
+    // is returned as a bind returns it. The disable a reader pairs with its bind then finds nothing to release, under
+    // the debug checks too.
+    TEST_CASE_METHOD(llglslshader_data, "llglslshader_gl: bindTexture given no texture lets its unit go", "[llglslshader_gl]")
+    {
+        setUpShaders();
+        constexpr U32 W = 4;
+        constexpr U32 H = 4;
+        REQUIRE(mTargets[0].allocate(W, H, GL_RGBA8));
+        REQUIRE(buildProgram(mDraw, "null bind (test)",
+                             { { "test/fullscreenV.glsl", GL_VERTEX_SHADER }, { "test/sampleF.glsl", GL_FRAGMENT_SHADER } }));
+        const S32 unit = mDraw.getTextureChannel(TEST_SOURCE_MAP);
+        UNSCOPED_INFO("the sampler has a unit");
+        REQUIRE(unit >= 0);
+        mDraw.bind();
+
+        // The name GL holds on the unit's 2D target, read with the unit made active and the active one put back.
+        const auto bound_2d = [unit]()
+        {
+            glActiveTexture(GL_TEXTURE0 + unit);
+            GLint name = 0;
+            glGetIntegerv(GL_TEXTURE_BINDING_2D, &name);
+            glActiveTexture(GL_TEXTURE0 + gGL.getCurrentTexUnitIndex());
+            return (U32)name;
+        };
+        const auto hold_target = [&]()
+        {
+            UNSCOPED_INFO("the target is bound at the unit");
+            REQUIRE(mDraw.bindTexture(TEST_SOURCE_MAP, &mTargets[0], ALSamplers::PointClamp) == unit);
+            UNSCOPED_INFO("and GL holds it there");
+            REQUIRE(bound_2d() == mTargets[0].getTexture());
+        };
+        const auto check_let_go = [&](const char* what, S32 returned)
+        {
+            INFO(what);
+            CHECK(returned == unit);
+            const ALTextureSlot* slot = gGL.getTextureSlot(unit);
+            CHECK(slot->getCurrType() == ALTextureSlot::TT_NONE);
+            CHECK(slot->getCurrTexture() == 0);
+            CHECK(bound_2d() != mTargets[0].getTexture());
+        };
+
+        hold_target();
+        check_let_go("a null texture",
+                     mDraw.bindTexture(TEST_SOURCE_MAP, static_cast<LLTexture*>(nullptr), ALSamplers::PointClamp));
+
+        hold_target();
+        check_let_go("a null render target", mDraw.bindTexture(TEST_SOURCE_MAP, static_cast<LLRenderTarget*>(nullptr)));
+
+        hold_target();
+        check_let_go("a null depth target", mDraw.bindDepthTexture(TEST_SOURCE_MAP, nullptr));
+
+        hold_target();
+        gGL.getTextureSlot(unit)->bindFast(nullptr, ALSamplers::PointClamp);
+        check_let_go("a null texture through the slot", unit);
+
+        // A unit let go and then released, under the debug checks, whose expected target it does not hold.
+        gDebugGL = true;
+        S32 released = -1;
+        CHECK_NOTHROW(released = mDraw.disableTexture(TEST_SOURCE_MAP, ALTextureSlot::TT_CUBE_MAP));
+        gDebugGL = false;
+        CHECK(released == unit);
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 

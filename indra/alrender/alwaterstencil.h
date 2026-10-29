@@ -36,7 +36,7 @@ namespace ALWaterStencil
 constexpr GLuint EXCLUDE_BIT = 1u << 0;
 
 /// The water's own pixels: set by every water draw where it shades, read by the haze pass to converge the water's
-/// in-scatter on the sky behind it.
+/// in-scatter on WindLight's dome behind it.
 constexpr GLuint SURFACE_BIT = 1u << 1;
 
 /// The exclusion pass: the exclude bit set wherever a fragment passes the scene's depth test.

@@ -108,6 +108,7 @@ f32x4 PROBE probe_dot3(f32x4 a, f32x4 b) { return dot3(a, b); }
 f32x4 PROBE probe_dot4(f32x4 a, f32x4 b) { return dot4(a, b); }
 f32x4 PROBE probe_cross3(f32x4 a, f32x4 b) { return cross3(a, b); }
 void PROBE probe_prefetch(const void* p) { prefetch(p); }
+void PROBE probe_pause() { pause(); }
 
 // A transform of one point by a row-major affine matrix, the shape the
 // kernels take: three lane multiply-accumulates and an add.

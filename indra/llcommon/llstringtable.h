@@ -28,6 +28,7 @@
 #ifndef LL_STRING_TABLE_H
 #define LL_STRING_TABLE_H
 
+#include "alsharedmutex.h"
 #include "lldefs.h"
 #include "llformat.h"
 #include "llstl.h"
@@ -35,7 +36,6 @@
 #include <atomic>
 #include <memory>
 #include <set>
-#include <shared_mutex>
 #include <string>
 #include <string_view>
 
@@ -127,7 +127,7 @@ private:
                                       ll::string_hash,
                                       std::equal_to<>> table_t;
 
-    mutable std::shared_mutex   mMutex;
+    mutable ALSharedMutex       mMutex;
     table_t                     mTable;
     const bool                  mCounted;
 };

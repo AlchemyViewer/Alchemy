@@ -32,13 +32,13 @@
 #include "llvoavatar.h"
 #include "llviewercontrol.h"
 #include "llmeshrepository.h"
+#include "llmutex.h"
 #include "llvolume.h"
 #include "llrigginginfo.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
 
 #include <memory>
-#include <mutex>
 
 #define DEBUG_SKINNING  LL_DEBUG
 
@@ -254,7 +254,7 @@ namespace
         boost::unordered_flat_map<S32, S32> mByNum;
     };
 
-    std::mutex sPublishedJointNumsMutex;
+    LLMutex sPublishedJointNumsMutex;
     std::shared_ptr<const PublishedJointNums> sPublishedJointNums;
 
     void collect_joint_nums(LLJoint* joint, PublishedJointNums& nums, LLVOAvatar* avatar)
@@ -293,7 +293,7 @@ void LLSkinningUtil::publishJointNums(LLVOAvatar* avatar)
         }
     }
 
-    std::lock_guard lock(sPublishedJointNumsMutex);
+    LLMutexLock lock(&sPublishedJointNumsMutex);
     sPublishedJointNums = std::move(nums);
 }
 
@@ -301,7 +301,7 @@ bool LLSkinningUtil::initJointNumsFromPublished(LLMeshSkinInfo* skin)
 {
     std::shared_ptr<const PublishedJointNums> nums;
     {
-        std::lock_guard lock(sPublishedJointNumsMutex);
+        LLMutexLock lock(&sPublishedJointNumsMutex);
         nums = sPublishedJointNums;
     }
     if (!nums)

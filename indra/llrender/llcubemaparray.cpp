@@ -111,7 +111,7 @@ LLCubeMapArray::LLCubeMapArray(LLCubeMapArray& lhs, U32 width, U32 count) : mTex
     mCount = count;
 
     // Allocate a new cubemap array with the same criteria as the incoming cubemap array
-    allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mClass, lhs.mImage->getUseMipMaps(), lhs.mHDR);
+    allocate(mWidth, lhs.mImage->getComponents(), count, lhs.mClass, lhs.mImage->getUseMipMaps(), lhs.mHDR, lhs.mLevels);
 
     U32 min_count = std::min(count, lhs.mCount);
     if (min_count == 0)
@@ -143,7 +143,8 @@ LLCubeMapArray::~LLCubeMapArray()
 {
 }
 
-void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, EClass cls, bool use_mips, bool hdr)
+void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, EClass cls, bool use_mips, bool hdr,
+                              U32 mip_levels)
 {
     U32 texname = 0;
     mWidth = resolution;
@@ -172,7 +173,9 @@ void LLCubeMapArray::allocate(U32 resolution, U32 components, U32 count, EClass 
     // One allocation for the whole array. glTexStorage3D covers every layer and mip in a
     // single call and may only be called once for the object. Every format above is sized,
     // which is what glTexStorage3D requires.
-    const S32 levels = use_mips ? LLImageGL::calcMipLevelCount(resolution, resolution) : 1;
+    const S32 full_chain = LLImageGL::calcMipLevelCount(resolution, resolution);
+    const S32 levels = use_mips ? (mip_levels > 0 ? llmin((S32)mip_levels, full_chain) : full_chain) : 1;
+    mLevels = (U32)levels;
     glTexStorage3D(GL_TEXTURE_CUBE_MAP_ARRAY, levels, format, resolution, resolution, count * 6);
     mImage->markStorageAllocated();
     stop_glerror();

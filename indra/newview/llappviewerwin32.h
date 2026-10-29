@@ -31,6 +31,10 @@
 #include "llappviewer.h"
 #endif
 
+#include <memory>
+
+class ALTimerResolutionScope;
+
 class LLAppViewerWin32 : public LLAppViewer
 {
 public:
@@ -69,6 +73,9 @@ protected:
 private:
     std::string mCmdLine;
     bool mIsConsoleAllocated;
+    // The system timer's resolution, held at 1 ms from init() to the end of
+    // cleanup().
+    std::unique_ptr<ALTimerResolutionScope> mTimerResolution;
 };
 
 // Process-level setup shared between the native WinMain entry point and the

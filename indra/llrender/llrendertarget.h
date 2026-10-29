@@ -236,13 +236,14 @@ public:
     // blended geometry drew, and those are what light the billboard afterwards.
     void setDrawBuffers(U32 count = 0);
 
-    // Take the fragment shader's output `output` (frag_data[output]) into the first colour attachment and
-    // discard every other output. Asserts that this target is currently bound and has a colour attachment;
-    // the next bindTarget restores the one-to-one mapping.
+    // Draw into colour attachment `attachment` alone, from the fragment shader's output of the same index
+    // (frag_data[attachment]): every other output is discarded and every other attachment left as it is, and a clear
+    // clears that attachment alone. Asserts that this target is currently bound and has the attachment; setDrawBuffers()
+    // or the next bindTarget restores them all.
     //
-    // How a single-attachment target hosts a pass written for a G-buffer: the sky writes its colour to the
-    // emissive output, frag_data[3], when that buffer is on, and mSkyBehind keeps only that colour.
-    void setDrawOutput(U32 output);
+    // How a G-buffer pass that adds into one attachment leaves the rest unread and unwritten: the stars draw into the
+    // emissive attachment, or the albedo without it, and nothing else.
+    void setDrawAttachment(U32 attachment);
 
     //get X resolution
     U32 getWidth() const { return mResX; }
@@ -364,7 +365,7 @@ protected:
 
     ALTextureSlot::eTextureType mUsage;
 
-    // The colour attachment each draw buffer writes, -1 for none, as bindTarget, setDrawBuffers and setDrawOutput
+    // The colour attachment each draw buffer writes, -1 for none, as bindTarget, setDrawBuffers and setDrawAttachment
     // last set them: the buffers clearColorBuffers clears, one at a time.
     std::array<S8, 4> mDrawBuffers = { -1, -1, -1, -1 };
 

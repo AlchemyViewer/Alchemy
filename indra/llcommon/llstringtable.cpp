@@ -55,13 +55,13 @@ LLStringTable::~LLStringTable() = default;
 
 S32 LLStringTable::getUniqueEntries() const
 {
-    std::shared_lock<std::shared_mutex> lock(mMutex);
+    std::shared_lock<ALSharedMutex> lock(mMutex);
     return static_cast<S32>(mTable.size());
 }
 
 LLStringTableEntry* LLStringTable::checkStringEntry(std::string_view str) const
 {
-    std::shared_lock<std::shared_mutex> lock(mMutex);
+    std::shared_lock<ALSharedMutex> lock(mMutex);
     table_t::const_iterator found = mTable.find(str);
     return found == mTable.end() ? nullptr : found->second.get();
 }
@@ -88,7 +88,7 @@ LLStringTableEntry* LLStringTable::addStringEntry(std::string_view str)
     // of tag and attribute names recur across every file parsed -- so look
     // first under a shared lock and only take the table exclusively to insert.
     {
-        std::shared_lock<std::shared_mutex> lock(mMutex);
+        std::shared_lock<ALSharedMutex> lock(mMutex);
         table_t::const_iterator found = mTable.find(str);
         if (found != mTable.end())
         {
@@ -100,7 +100,7 @@ LLStringTableEntry* LLStringTable::addStringEntry(std::string_view str)
         }
     }
 
-    std::unique_lock<std::shared_mutex> lock(mMutex);
+    std::unique_lock<ALSharedMutex> lock(mMutex);
 
     // Another thread may have inserted it while the lock was not held.
     table_t::const_iterator found = mTable.find(str);
@@ -147,7 +147,7 @@ void LLStringTable::removeString(std::string_view str)
         return;
     }
 
-    std::unique_lock<std::shared_mutex> lock(mMutex);
+    std::unique_lock<ALSharedMutex> lock(mMutex);
     table_t::iterator found = mTable.find(str);
     if (found != mTable.end() && !found->second->decCount())
     {

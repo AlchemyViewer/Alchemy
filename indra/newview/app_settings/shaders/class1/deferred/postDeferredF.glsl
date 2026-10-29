@@ -290,7 +290,7 @@ vec4 dofEncode(vec4 c)
 #endif
 }
 
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 
 void main()
 {
@@ -550,6 +550,6 @@ void main()
         diff /= max(w, 1e-4);
     }
 
-    diff.rgb = clampHDRRange(diff.rgb);
+    diff.rgb = clampRadiance(diff.rgb, MAX_SCENE_RADIANCE);
     frag_color = dofEncode(diff);
 }

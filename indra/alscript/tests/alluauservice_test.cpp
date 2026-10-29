@@ -657,6 +657,33 @@ namespace
         CHECK(hover.label.rfind(newSolver ? "function print<" : "function print(", 0) == 0);
     }
 
+    // Tapple's: an event's handler, as it is written, tells its parameters
+    // under either solver; the old one typed only LLEvents there.
+    TEST_CASE_METHOD(alluauservice_data, "alluauservice: hover on an event's handler being written gives its parameters", "[alluauservice]")
+    {
+        UNSCOPED_INFO("definitions loaded: " + error);
+        CHECK(loaded);
+        const std::string script = "function LLEvents.run_time_permissions()\n"
+                                   "end\n"
+                                   "print(LLEvents.touch_start)\n";
+        for (const bool solver : { newSolver, !newSolver })
+        {
+            std::string why;
+            REQUIRE(service.setNewSolver(solver, why));
+            CAPTURE(solver);
+            ALScriptHover hover = service.hover(script, 0, 20);  // run_time_permissions
+            REQUIRE(hover.found);
+            UNSCOPED_INFO("the handler by its signature: " + hover.label);
+            CHECK(hover.label.rfind("function LLEvents.run_time_permissions(perm: number)", 0) == 0);
+            hover = service.hover(script, 2, 18);  // touch_start, read
+            REQUIRE(hover.found);
+            UNSCOPED_INFO("and read: " + hover.label);
+            CHECK(hover.label.find("detected: {DetectedEvent}") != std::string::npos);
+        }
+        std::string why;
+        CHECK(service.setNewSolver(newSolver, why));
+    }
+
     TEST_CASE_METHOD(alluauservice_data, "alluauservice: the configuration adds globals and turns lints off until it is replaced", "[alluauservice]")
     {
         UNSCOPED_INFO("definitions loaded: " + error);

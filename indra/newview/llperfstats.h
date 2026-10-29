@@ -31,7 +31,7 @@
 #include <chrono>
 #include <array>
 #include <boost/unordered_map.hpp>
-#include <mutex>
+#include "llmutex.h"
 #include "lluuid.h"
 #include "lltimer.h"
 #include "llapp.h"
@@ -68,7 +68,7 @@ namespace LLPerfStats
     extern U32 lastGlobalPrefChange;
     extern U32 lastSleepedFrame;
     extern U64 meanFrameTime;
-    extern std::mutex bufferToggleLock;
+    extern LLMutex bufferToggleLock;
 
     enum class ObjType_t{
         OT_GENERAL=0, // Also Unknown. Used for n/a type stats such as scenery

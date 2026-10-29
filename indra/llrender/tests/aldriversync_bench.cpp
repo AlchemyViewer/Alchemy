@@ -43,6 +43,7 @@
 
 #include "altestbenchmark.h"
 #include "llwindow.h"
+#include "lltimer.h"
 
 #include <SDL3/SDL_video.h>
 
@@ -57,7 +58,6 @@
 #include <chrono>
 #include <cstdio>
 #include <functional>
-#include <thread>
 #include <vector>
 
 namespace
@@ -428,9 +428,9 @@ TEST_CASE_METHOD(DriverSync, "aldriversync_bench: which calls wait for a threade
     const auto delete_old_fence = [&] { glDeleteSync(old_fence); old_fence = nullptr; };
     // A fence laid and a timestamp counted with nothing queued, then given the time to finish.
     const auto lay_old_fence = [&] { old_fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0); glFlush();
-                                     std::this_thread::sleep_for(std::chrono::milliseconds(5)); };
+                                     ms_sleep(5); };
     const auto count_old_query = [&] { glQueryCounter(mQuery, GL_TIMESTAMP); glFlush();
-                                       std::this_thread::sleep_for(std::chrono::milliseconds(5)); };
+                                       ms_sleep(5); };
 
     std::vector<Probe> probes = {
         { "glUniform4f (queued: the control)", nullptr, [&] { glUseProgram(mProgram); glUniform4f(mUniform, 1.f, 0.f, 0.f, 1.f); }, nullptr },

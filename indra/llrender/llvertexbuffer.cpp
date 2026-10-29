@@ -77,6 +77,8 @@ struct CompareMappedRegion
 
 #if ENABLE_GL_WORK_QUEUE
 
+#include "llmutex.h"
+
 #define THREAD_COUNT 1
 
 //============================================================================
@@ -111,8 +113,8 @@ public:
     void syncGL();
 
 private:
-    std::mutex mMutex;
-    std::condition_variable mCondition;
+    // Guards mQueue and mClosed, and the workers sleep on it.
+    LLCondition mCondition;
     std::queue<Work> mQueue;
     bool mClosed = false;
 };
@@ -126,7 +128,7 @@ void GLWorkQueue::syncGL()
 {
     /*if (mSync)
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         glWaitSync(mSync, 0, GL_TIMEOUT_IGNORED);
         mSync = 0;
     }*/
@@ -135,7 +137,7 @@ void GLWorkQueue::syncGL()
 size_t GLWorkQueue::size()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::lock_guard<std::mutex> lock(mMutex);
+    LLMutexLock lock(&mCondition);
     return mQueue.size();
 }
 
@@ -148,42 +150,35 @@ void GLWorkQueue::post(const GLWorkQueue::Work& value)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         mQueue.push(std::move(value));
     }
 
-    mCondition.notify_one();
+    mCondition.signal();
 }
 
 // Get the next element from the queue
 GLWorkQueue::Work GLWorkQueue::pop()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    // Lock the mutex
-    {
-        std::unique_lock<std::mutex> lock(mMutex);
-
-        // Wait for a new element to become available or for the queue to close
-        {
-            mCondition.wait(lock, [=] { return !mQueue.empty() || mClosed; });
-        }
-    }
-
     Work ret;
 
-    {
-        std::lock_guard<std::mutex> lock(mMutex);
+    // Wait for a new element to become available or for the queue to close,
+    // and take the next element under the same hold
+    mCondition.wait([&]
+        {
+            if (mQueue.size() > 0)
+            {
+                ret = mQueue.front();
+                mQueue.pop();
+                return true;
+            }
+            return mClosed;
+        });
 
-        // Get the next element from the queue
-        if (mQueue.size() > 0)
-        {
-            ret = mQueue.front();
-            mQueue.pop();
-        }
-        else
-        {
-            ret = []() {};
-        }
+    if (!ret)
+    {
+        ret = []() {};
     }
 
     return ret;
@@ -209,17 +204,17 @@ void GLWorkQueue::close()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     {
-        std::lock_guard<std::mutex> lock(mMutex);
+        LLMutexLock lock(&mCondition);
         mClosed = true;
     }
 
-    mCondition.notify_all();
+    mCondition.broadcast();
 }
 
 bool GLWorkQueue::isClosed()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
-    std::lock_guard<std::mutex> lock(mMutex);
+    LLMutexLock lock(&mCondition);
     return mClosed;
 }
 
@@ -1088,6 +1083,28 @@ void LLVertexBuffer::drawArrays(U32 mode, U32 first, U32 count) const
     STOP_GLERROR;
     ++LLRender::sDrawCalls;
     LLRender::sDrawElements += count;
+}
+
+void LLVertexBuffer::drawMultiArrays(U32 mode, const S32* first, const S32* count, U32 draws) const
+{
+    llassert(validate_bound_samplers());
+    llassert(mGLBuffer == sGLRenderBuffer);
+    llassert(mGLIndices == sGLRenderIndices);
+    if (draws == 0)
+    {
+        return;
+    }
+
+    gGL.syncMatrices();
+    STOP_GLERROR;
+    glMultiDrawArrays(sGLMode[mode], first, count, draws);
+    STOP_GLERROR;
+    ++LLRender::sDrawCalls;
+    for (U32 i = 0; i < draws; ++i)
+    {
+        llassert(first[i] >= 0 && count[i] >= 0 && (U32)(first[i] + count[i]) <= mNumVerts);
+        LLRender::sDrawElements += count[i];
+    }
 }
 
 //static

@@ -26,16 +26,15 @@
 
 #include "alframefences.h"
 
+#include "alprecisewaiter.h"
 #include "llgl.h"
 #include "llglheaders.h"
 #include "lltimer.h"
 
 #include <algorithm>
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <iterator>
-#include <thread>
 
 namespace
 {
@@ -43,51 +42,15 @@ namespace
     constexpr U64 WAIT_NANOSECONDS = 1000000000ull;
 
     // How long a wait for a stamp tries before a fence behind it waits it out, and how close to the end of what it
-    // expects a wait for a stamp stops sleeping and spins: a sleep's step is a millisecond at best, and the spin ends
-    // within microseconds of the write, as glClientWaitSync does.
+    // expects, either side, a wait for a stamp spins: the spin ends within microseconds of the write, as
+    // glClientWaitSync does, where a stamp a frame quicker or slower than the last would fall to a sleep's step.
     constexpr F64 STAMP_WAIT_SECONDS = 1.0;
     constexpr F64 STAMP_SPIN_SECONDS = 0.002;
-    // How long a wait for a stamp sleeps at a time: a millisecond while what it expects is far off, and a quarter of one
-    // once it has run past what it expected, so that it wakes soon after a stamp that comes late.
+    // How long a wait for a stamp sleeps at a time: a millisecond while what it expects is far off, so that a stamp
+    // that comes early is seen within one, and a quarter of one once it has spun past what it expected, so that it
+    // wakes soon after a stamp that comes late.
     constexpr F64 STAMP_SLEEP_SECONDS      = 0.001;
     constexpr F64 STAMP_LATE_SLEEP_SECONDS = 0.00025;
-
-#if LL_WINDOWS && !defined(CREATE_WAITABLE_TIMER_HIGH_RESOLUTION)
-#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
-#endif
-
-    // Sleeps about `seconds`, whatever the timer resolution: on Windows a sleep lasts a tick of it, 15.6 ms unless
-    // something raised it, which the native window does, an SDL window does not, and Windows 11 undoes for a window out
-    // of sight. A high-resolution waitable timer (Windows 10 1803 and later) keeps to a fraction of a millisecond.
-    void sleep_for(F64 seconds)
-    {
-#if LL_WINDOWS
-        // A timer for each thread that waits, made at its first wait and closed with the thread.
-        struct WaitTimer
-        {
-            HANDLE mHandle = CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
-            ~WaitTimer()
-            {
-                if (mHandle)
-                {
-                    CloseHandle(mHandle);
-                }
-            }
-        };
-        thread_local WaitTimer timer;
-        if (timer.mHandle)
-        {
-            LARGE_INTEGER due;
-            due.QuadPart = -std::max<LONGLONG>(1, LONGLONG(seconds * 1e7)); // relative, in 100 ns
-            if (SetWaitableTimer(timer.mHandle, &due, 0, nullptr, nullptr, FALSE))
-            {
-                WaitForSingleObject(timer.mHandle, INFINITE);
-                return;
-            }
-        }
-#endif
-        std::this_thread::sleep_for(std::chrono::duration<F64>(seconds));
-    }
 
     bool signalled(GLenum status)
     {
@@ -385,27 +348,34 @@ bool ALFrameFences::stampWritten(U32 slot) const
 
 bool ALFrameFences::waitStamp(U32 slot, F64 timeout, F64 expect)
 {
-    const F64 start = LLTimer::getTotalSeconds();
+    using time_point = ALPreciseWaiter::time_point;
+    const time_point start     = time_point::now();
+    const time_point give_up   = start.plus(timeout);
+    const time_point expected  = start.plus(expect);
+    const time_point spin_from = expected.plus(-STAMP_SPIN_SECONDS);
+    const time_point spin_to   = expected.plus(STAMP_SPIN_SECONDS);
     while (!stampWritten(slot))
     {
-        const F64 waited = LLTimer::getTotalSeconds() - start;
-        if (waited >= timeout)
+        const time_point now = time_point::now();
+        if (now >= give_up)
         {
             return false;
         }
-        // Asleep while more than a spin is left of what the wait expects, and once it has run a spin past that, in
-        // shorter sleeps.
-        if (waited + STAMP_SPIN_SECONDS < expect)
+        // Asleep until a spin before what the wait expects, the last step ending there, spinning from there to a spin
+        // past it, and after that asleep in shorter steps. The spin goes in two parts, to what it expects and past it,
+        // neither longer than one that never yields the core.
+        if (now < spin_from)
         {
-            sleep_for(STAMP_SLEEP_SECONDS);
+            ALPreciseWaiter::sleepUntil((std::min)(now.plus(STAMP_SLEEP_SECONDS), spin_from));
         }
-        else if (waited > expect + STAMP_SPIN_SECONDS)
+        else if (now < spin_to)
         {
-            sleep_for(STAMP_LATE_SLEEP_SECONDS);
+            const time_point part = now < expected ? expected : spin_to;
+            ALPreciseWaiter::spinUntil((std::min)(part, give_up), [this, slot]() { return stampWritten(slot); });
         }
         else
         {
-            std::this_thread::yield();
+            ALPreciseWaiter::sleepUntil((std::min)(now.plus(STAMP_LATE_SLEEP_SECONDS), give_up));
         }
     }
     return true;

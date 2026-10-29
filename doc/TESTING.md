@@ -57,6 +57,7 @@ namespace
 Everything a test file defines goes in an anonymous namespace. A test binary is many files in one executable, and two files' helpers of one name would be one function to the linker.
 
 - **Types production code befriends by name are the exception.** Each lives in `namespace ll_test`, and is declared there by the header that befriends it:
+  - `PreciseWaiterProbe` (`llcommon/alprecisewaiter.h`);
   - `llfontregistry_data` and `llfontregistry_gl_data` (`llrender/llfontregistry.h`);
   - `UIImageProbe` (`llrender/lluiimage.h`);
   - `VertexBufferProbe` (`llrender/llfonttextcache.h`);

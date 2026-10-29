@@ -17,6 +17,9 @@
 #include "llmutex.h"
 
 #include "llcoros.h"
+#include "alprecisewaiter.h"
+#include "llthread.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -77,7 +80,7 @@ namespace
                 {
                     return false;
                 }
-                std::this_thread::sleep_for(1ms);
+                ms_sleep(1);
             }
             return true;
         }
@@ -493,17 +496,17 @@ namespace
                 first_held = true;
                 while (!writer_started)
                 {
-                    std::this_thread::yield();
+                    LLThread::yield();
                 }
                 // Let the writer reach the lock and queue on it.
-                std::this_thread::sleep_for(BLOCKED);
+                ALPreciseWaiter::sleepFor(BLOCKED);
                 mMutex.lockShared();
                 mMutex.unlockShared();
                 mMutex.unlockShared();
             });
         while (!first_held)
         {
-            std::this_thread::yield();
+            LLThread::yield();
         }
         Worker writer([&]()
             {
@@ -528,7 +531,7 @@ namespace
             while (!stop)
             {
                 mMutex.lockShared();
-                std::this_thread::sleep_for(1ms);
+                ms_sleep(1);
                 mMutex.unlockShared();
             }
         };
@@ -536,7 +539,7 @@ namespace
         Worker reader2(read);
         Worker reader3(read);
         Worker reader4(read);
-        std::this_thread::sleep_for(BLOCKED);
+        ALPreciseWaiter::sleepFor(BLOCKED);
 
         Worker writer([this]()
             {

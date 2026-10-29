@@ -30,7 +30,6 @@
 
 #include "lldrawable.h"
 #include "llface.h"
-#include "llsky.h"
 #include "llvotree.h"
 #include "pipeline.h"
 #include "llviewercamera.h"

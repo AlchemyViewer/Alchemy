@@ -46,6 +46,7 @@
 
 #include "altestfatal.h"
 #include "llimage.h"
+#include "lltimer.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -1516,7 +1517,7 @@ namespace
         while (!worker_done && std::chrono::steady_clock::now() < deadline)
         {
             mainloop.runPending();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         // The handover was posted before worker_done was raised.
         mainloop.runPending();
@@ -1541,7 +1542,7 @@ namespace
 
         while (LLImageGL::publishUploads() > 0 && std::chrono::steady_clock::now() < deadline)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
 
         LLImageGLThread::deleteSingleton();
@@ -1587,7 +1588,7 @@ namespace
         while (!worker_done && std::chrono::steady_clock::now() < deadline)
         {
             mainloop.runPending();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         mainloop.runPending();
         REQUIRE(worker_done.load());
@@ -1600,7 +1601,7 @@ namespace
         while (std::chrono::steady_clock::now() < idle_until)
         {
             LLImageGL::updateClass();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         UNSCOPED_INFO("idle polls no fence, so nothing is published without a frame's end");
         CHECK_FALSE(completed);
@@ -1609,7 +1610,7 @@ namespace
         {
             gGL.endFrame();
             LLImageGL::updateClass();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         LLImageGLThread::deleteSingleton();
 
@@ -1647,7 +1648,7 @@ namespace
         while (!worker_done && std::chrono::steady_clock::now() < deadline)
         {
             mainloop.runPending();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         mainloop.runPending();
         REQUIRE(worker_done.load());
@@ -1657,7 +1658,7 @@ namespace
 
         // Long enough for the GPU to have finished the upload and the thread, with nothing else queued, to have seen it;
         // then one frame's end.
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ms_sleep(100);
         gGL.endFrame();
         LLImageGL::updateClass();
         UNSCOPED_INFO("published at the first frame's end");
@@ -1715,7 +1716,7 @@ namespace
         while (!worker_done && std::chrono::steady_clock::now() < deadline)
         {
             mainloop.runPending();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         mainloop.runPending();
         REQUIRE(worker_done.load());
@@ -1723,7 +1724,7 @@ namespace
         bool completed = false;
         img->afterPublish([&]() { completed = true; });
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        ms_sleep(100);
         for (int frame = 0; frame < 3; ++frame)
         {
             gGL.endFrame();
@@ -1737,7 +1738,7 @@ namespace
         {
             gGL.endFrame();
             LLImageGL::updateClass();
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            ms_sleep(1);
         }
         UNSCOPED_INFO("published once its thread has seen it");
         CHECK(completed);

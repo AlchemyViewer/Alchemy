@@ -99,7 +99,7 @@ HttpService::~HttpService()
                     }
                     // Sleep for a tenth of a second
                     ms_sleep(100);
-                    std::this_thread::yield();
+                    LLThread::yield();
                     counter++;
                 }
             }
