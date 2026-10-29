@@ -44,7 +44,6 @@
 #include "llviewercamera.h"
 
 #include "llvoavatarself.h"
-#include "llsky.h"
 #include "llagent.h"
 #include "lltoolmgr.h"
 #include "llselectmgr.h"
@@ -847,7 +846,8 @@ void LLViewerObjectList::renderObjectBeacons()
     }
 }
 
-void LLSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& direction, LLColor4 color)
+// static
+void ALSky::renderSunMoonBeacons(const LLVector3& pos_agent, const LLVector3& direction, LLColor4 color)
 {
     LLGLSUIDefault gls_ui;
     gUIProgram.bind();

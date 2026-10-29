@@ -53,7 +53,6 @@
 #include "llinventoryobserver.h"
 #include "lllandmarklist.h"
 #include "llprogressview.h"
-#include "llsky.h"
 #include "llui.h"
 #include "llviewercamera.h"
 #include "llviewerinventory.h"
@@ -61,6 +60,7 @@
 #include "llworld.h"
 #include "llworldmapview.h"
 #include "llviewercontrol.h"
+#include "pipeline.h"
 
 
 const F32 DESTINATION_REACHED_RADIUS    = 3.0f;
@@ -630,8 +630,9 @@ void LLTracker::renderBeacon(LLVector3d pos_global,
         color_frac = 1.f - 0.6f*(dist/LLViewerCamera::getInstance()->getFar());
     }
 
-    LLColor4 fogged_color = color_frac * color + (1 - color_frac)*gSky.getSkyFogColor();
-    LLColor4 fogged_color_under = color_frac * color_under + (1 - color_frac) * gSky.getSkyFogColor();
+    const LLColor4 fog_color = gPipeline.mSky.getSkyFogColor();
+    LLColor4 fogged_color = color_frac * color + (1 - color_frac) * fog_color;
+    LLColor4 fogged_color_under = color_frac * color_under + (1 - color_frac) * fog_color;
 
     F32 FADE_DIST = 3.f;
     fogged_color.mV[3] = llmax(0.2f, llmin(0.5f,(dist-FADE_DIST)/FADE_DIST));

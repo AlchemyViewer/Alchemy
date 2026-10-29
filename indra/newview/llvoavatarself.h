@@ -33,6 +33,7 @@
 #include <map>
 #include "lleventcoro.h"
 #include "llcoros.h"
+#include LLCOROS_MUTEX_HEADER
 
 struct LocalTextureData;
 class LLInventoryCallback;
@@ -110,7 +111,7 @@ private:
     // weights the avatar did not already have. Read by the profiler.
     static S32 sParamWeightsChanged;
 
-    std::mutex          mJointMapMutex; // getJoint gets used from mesh thread
+    LLCoros::Mutex      mJointMapMutex; // getJoint gets used from mesh thread, and from coroutines
 
 /********************************************************************************
  **                                                                            **

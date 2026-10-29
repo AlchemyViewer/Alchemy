@@ -28,13 +28,15 @@
 
 #include "alregex.h"
 #include "altextchars.h"
+#include "llcoros.h"
 #include "lldir.h"
 #include "llsdserialize.h"
 #include "llstring.h"
 
 #include <array>
 #include <bitset>
-#include <mutex>
+
+#include LLCOROS_MUTEX_HEADER
 
 // --- kinds -------------------------------------------------------------------
 
@@ -213,11 +215,12 @@ U32 ALSyntaxWords::tableBit(std::string_view table)
 {
     // Tables by name across every grammar and every set of words: a handful
     // (functions, constants, keywords and the like). Named as grammars load
-    // and words are taught, which is rare, so a lock costs nothing.
-    static std::mutex               lock;
+    // and words are taught, which is rare, so a lock costs nothing; and on
+    // whichever thread, or coroutine, does either.
+    static LLCoros::Mutex           lock;
     static std::vector<std::string> names;
-    const std::lock_guard<std::mutex> held(lock);
-    const auto                        it = std::find(names.begin(), names.end(), table);
+    const LLCoros::LockType         held(lock);
+    const auto                      it = std::find(names.begin(), names.end(), table);
     if (it != names.end())
     {
         return static_cast<U32>(it - names.begin());

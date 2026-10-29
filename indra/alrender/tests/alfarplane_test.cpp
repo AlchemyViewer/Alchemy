@@ -233,10 +233,11 @@ namespace
         REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 0.0, 1.0);") != std::string::npos);
         UNSCOPED_INFO("haze drawn on the far plane, forward");
         REQUIRE(haze_v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
-        // The lighting passes draw there too: the light map's passes, the lights and the soften pass's lit program in
-        // front of it, the soften pass's sky program on it.
+        // The lighting passes draw there too: the light map's passes, the lights and the soften pass in front of it,
+        // the sky's pass on it.
         for (const char* path : { "class2/deferred/softenLightV.glsl", "class3/deferred/multiPointLightV.glsl",
-                                  "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl" })
+                                  "class2/deferred/sunLightV.glsl", "class1/deferred/blurLightV.glsl",
+                                  "class1/deferred/skyCompositeV.glsl" })
         {
             const std::string v = shader_source(path);
             UNSCOPED_INFO(path << " drawn on the far plane, reversed");
@@ -244,9 +245,10 @@ namespace
             UNSCOPED_INFO(path << " drawn on the far plane, forward");
             REQUIRE(v.find("gl_Position = vec4(position.xy, 1.0, 1.0);") != std::string::npos);
         }
-        const std::string soften = shader_source("class3/deferred/softenLightF.glsl");
-        UNSCOPED_INFO("the sky's soften program lights nothing");
-        REQUIRE(soften.find("writeColor(skyColor(getGBuffer(tc)));") != std::string::npos);
+        const std::string sky = shader_source("class1/deferred/skyCompositeMainF.glsl");
+        UNSCOPED_INFO("the sky's pass lights nothing: it composites the sky along the view ray");
+        REQUIRE(sky.find("frag_color.rgb = clampRadiance(skyComposite(vary_fragcoord) * sky_classic_scale, "
+                         "MAX_SCENE_RADIANCE);") != std::string::npos);
         UNSCOPED_INFO("haze takes geometry where it is");
         REQUIRE(haze.find("= getPositionWithDepth(tc, depth);") != std::string::npos);
         UNSCOPED_INFO("void water fog keys on the far depth");
@@ -257,15 +259,17 @@ namespace
         UNSCOPED_INFO("flare sky is the far plane, forward");
         REQUIRE(flare.find("return d >= 1.0 ? 1.0 : 0.0;") != std::string::npos);
         // Opaque geometry in the haze pass takes the in-scatter blended geometry takes in its own shading, and the
-        // water surface alone converges on the sky behind it.
+        // water surface alone converges on WindLight's dome behind it, along the ray to the geometry where it is.
         UNSCOPED_INFO("the haze pass's in-scatter is alpha's");
         REQUIRE(haze.find("atmosFragLighting(vec3(0), additive, atten)") != std::string::npos);
-        UNSCOPED_INFO("water converges on the sky behind");
+        UNSCOPED_INFO("water converges on the dome");
         REQUIRE(haze.find("#ifdef HAZE_ON_WATER") != std::string::npos);
-        UNSCOPED_INFO("water converges on the sky behind");
+        UNSCOPED_INFO("water converges on the dome");
         REQUIRE(haze.find("additive = mix(additive, sky * (vec3(1.0) - atten), vec3(1.0) - atten);") != std::string::npos);
-        UNSCOPED_INFO("the sky behind is sampled for water");
-        REQUIRE(haze.find("texture(skyBehindMap, tc)") != std::string::npos);
+        UNSCOPED_INFO("the dome is worked out along the ray to the water");
+        REQUIRE(haze.find("windlightDome(eyeToSky * normalize(pos.xyz))") != std::string::npos);
+        UNSCOPED_INFO("the dome behind the water is unclamped, as the sky above it is");
+        REQUIRE(haze.find("min(dome") == std::string::npos);
         // The farthest geometry: a top corner of the edge water's extent, from as high above it as the water shows.
         const F64 edge = (F64)ALFarPlane::edgeWaterStretch(true) + MAX_FAR_CLIP;
         const F64 farthest = sqrt(2.0 * edge * edge + (F64)ALFarPlane::EDGE_WATER_STRETCH * ALFarPlane::EDGE_WATER_STRETCH);
@@ -436,7 +440,13 @@ namespace
         const std::string haze = shader_source("class3/deferred/hazeF.glsl");
         UNSCOPED_INFO("the haze pass hands over eye space");
         REQUIRE(haze.find("calcAtmosphericVarsLinear(pos.xyz,") != std::string::npos);
-        UNSCOPED_INFO("and does not turn it itself");
-        REQUIRE(haze.find("eyeToSky") == std::string::npos);
+        // The one turn it makes is the water's view ray, for the dome it converges on (windlightDomeF.glsl).
+        const std::string dome_call = "windlightDome(eyeToSky * normalize(pos.xyz))";
+        const size_t      dome      = haze.find(dome_call);
+        UNSCOPED_INFO("the dome along the water's ray");
+        REQUIRE(dome != std::string::npos);
+        UNSCOPED_INFO("and nothing else turned");
+        REQUIRE(haze.find("eyeToSky *") == dome + dome_call.find("eyeToSky *"));
+        REQUIRE(haze.find("eyeToSky *", dome + dome_call.size()) == std::string::npos);
     }
 }

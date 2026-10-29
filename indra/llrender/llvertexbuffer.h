@@ -272,6 +272,8 @@ public:
     // Detailed error checking can be enabled by setting gDebugGL to true
     void draw(U32 mode, U32 count, U32 indices_offset) const;
     void drawArrays(U32 mode, U32 offset, U32 count) const;
+    // Draws `draws` runs of vertices in one call, run i the count[i] vertices from first[i].
+    void drawMultiArrays(U32 mode, const S32* first, const S32* count, U32 draws) const;
     void drawRange(U32 mode, U32 start, U32 end, U32 count, U32 indices_offset) const;
 
     // draw without syncing matrices.  If you're positive there have been no matrix

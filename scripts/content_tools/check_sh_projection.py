@@ -276,7 +276,8 @@ def sh_pack_texel(t, sums):
     for j in range(8):
         k = 8 * t + j
         coef = k // 3
-        h.append(sums[coef - first][k - 3 * coef] if coef < 9 else 0.0)
+        # Held to a half's range, as shPackTexel holds it.
+        h.append(min(max(sums[coef - first][k - 3 * coef], -65504.0), 65504.0) if coef < 9 else 0.0)
     return (pack_half2x16(h[0], h[1]), pack_half2x16(h[2], h[3]),
             pack_half2x16(h[4], h[5]), pack_half2x16(h[6], h[7]))
 

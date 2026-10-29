@@ -58,7 +58,7 @@ void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float 
 float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
-vec3 clampRadiance(vec3 c);
+vec3 clampRadiance(vec3 c, float ceiling);
 float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 vec4 getNorm(vec2 screenpos);
@@ -136,7 +136,7 @@ void main()
 
         pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, normalize(lv), nl, diffPunc, specPunc);
 
-        final_color += intensity* clampRadiance(nl * (diffPunc + specPunc * energyComp));
+        final_color += clampRadiance(intensity * nl * (diffPunc + specPunc * energyComp), MAX_PUNCTUAL_RADIANCE);
     }
     else
     {
@@ -175,7 +175,7 @@ void main()
         // normalization of its own on top -- at grazing angles that product runs past what a
         // half-float target can hold, and an inf here spreads to the whole frame through bloom.
         // Colour-preserving, so a highlight that hits the ceiling dims rather than changing hue.
-        final_color = clampRadiance(final_color);
+        final_color = clampRadiance(final_color, MAX_PUNCTUAL_RADIANCE);
 
         if (dot(final_color, final_color) <= 0.0)
         {
@@ -185,6 +185,7 @@ void main()
     float final_scale = 1.0;
     if (classic_mode > 0)
         final_scale = 0.9;
-    frag_color.rgb = max(final_color * final_scale, vec3(0));
+    // What the pass blends into the scene, held to its share of the target (MAX_PUNCTUAL_RADIANCE).
+    frag_color.rgb = clampRadiance(final_color * final_scale, MAX_PUNCTUAL_RADIANCE);
     frag_color.a = 0.0;
 }

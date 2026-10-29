@@ -1434,6 +1434,24 @@ void LLFloaterIMSessionTab::sessionRemoved(const LLUUID& session_id)
     }
 }
 
+// A colon that starts a text emoticon or an emoji shortcode is not a pose.
+static bool starts_with_emoticon(std::string_view text)
+{
+    const size_t len = text.length();
+    // ":D", ":P,", ":o hello": a single letter and then nothing, a space or punctuation.
+    if (len >= 2 && LLStringOps::isAlpha(text[1]) && (len == 2 || LLStringOps::isSpace(text[2]) || LLStringOps::isPunct(text[2])))
+    {
+        return true;
+    }
+    // ":smile:", ":+1:": an emoji shortcode.
+    size_t i = 1;
+    while (i < len && (LLStringOps::isAlnum(text[i]) || text[i] == '_' || text[i] == '+' || text[i] == '-'))
+    {
+        ++i;
+    }
+    return i > 1 && i < len && text[i] == ':';
+}
+
 void LLFloaterIMSessionTab::applyMUPose(std::string& text)
 {
     if (!gSavedSettings.getBOOL("EnableMUPoseChat"))
@@ -1441,9 +1459,11 @@ void LLFloaterIMSessionTab::applyMUPose(std::string& text)
         return;
     }
     if (text.at(0) == ':'
-        && text.length() > 3)
+        && text.length() > 3
+        && !starts_with_emoticon(text))
     {
-        if (text.find(":'") == 0)
+        // ":'s" is a possessive pose, ":'(" a tear.
+        if (text.find(":'") == 0 && LLStringOps::isAlpha(text[2]))
         {
             text.replace(0, 1, "/me");
         }

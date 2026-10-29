@@ -44,7 +44,6 @@
 #include "llviewertexturelist.h"
 #include "llviewerjointmesh.h"
 #include "llvoavatar.h"
-#include "llsky.h"
 #include "pipeline.h"
 #include "llviewershadermgr.h"
 #include "llmath.h"

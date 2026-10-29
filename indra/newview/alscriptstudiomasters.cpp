@@ -257,7 +257,8 @@ void ALScriptStudioMasters::linkTo(Doc& doc, std::string path, ALMasterLink::Mad
     {
         said += " " + mServices.words("MasterLinkDiffers", args);
     }
-    mServices.report(said, bridged, tab, differs && tab ? std::vector<std::string>{ "master_send", "master_compare" } : std::vector<std::string>());
+    mServices.report(said, bridged, tab,
+                     differs && tab ? std::vector<std::string>{ "master_send", "master_take_world", "master_compare" } : std::vector<std::string>());
 }
 
 void ALScriptStudioMasters::unlink(Doc& doc)
@@ -499,6 +500,10 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     {
         compareWithWorld(doc, ref);
     }
+    else if (action == "master_take_world" && !doc.file.empty() && !ref.isNull())
+    {
+        takeWorld(doc, ref);
+    }
     else if (action == "master_compare_file" && doc.file.empty() && !ref.isNull())
     {
         compareWithFile(doc, ref);
@@ -566,16 +571,26 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
     }
 }
 
-void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
+void ALScriptStudioMasters::loadWorld(Doc& doc, const ALScriptRef& ref,
+                                      std::function<void(Doc& tab, const std::string& theirs, const std::string& name)> then)
 {
     // Answered later, the tab found again by its id: the window may have
     // closed meanwhile, or the tab.
     const std::string         id    = doc.id;
     const std::weak_ptr<bool> alive = mAlive;
-    mWindow.loadWorldText(ref, [this, alive, id](const ALScriptLoaded& loaded) {
+    mWindow.loadWorldText(ref, [this, alive, id, then = std::move(then)](const ALScriptLoaded& loaded) {
         Doc* found = alive.lock() ? mServices.findDoc(id) : nullptr;
-        if (!found || !loaded.error.empty())
+        if (!found)
         {
+            return;
+        }
+        // Not read: said, rather than the button having done nothing.
+        if (!loaded.error.empty())
+        {
+            LLStringUtil::format_map_t args;
+            args["[NAME]"] = loaded.name.empty() ? found->name : loaded.name;
+            args["[WHY]"]  = loaded.error;
+            mServices.report(mServices.words("MasterWorldNotRead", args), true, found);
             return;
         }
         // The author's text as it is in the world, out of its envelope.
@@ -584,10 +599,37 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
         {
             theirs = envelope->source;
         }
+        then(*found, theirs, loaded.name);
+    });
+}
+
+void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
+{
+    loadWorld(doc, ref, [this](Doc& tab, const std::string& theirs, const std::string& name) {
         LLStringUtil::format_map_t args;
-        args["[NAME]"] = loaded.name;
-        mWindow.compare(*found, found->editor->wholeText(), theirs, mServices.words("CompareMasterFile", args),
+        args["[NAME]"] = name;
+        mWindow.compare(tab, tab.editor->wholeText(), theirs, mServices.words("CompareMasterFile", args),
                         mServices.words("CompareMasterWorld", args));
+    });
+}
+
+void ALScriptStudioMasters::takeWorld(Doc& doc, const ALScriptRef& ref)
+{
+    loadWorld(doc, ref, [this](Doc& tab, const std::string& theirs, const std::string& name) {
+        LLStringUtil::format_map_t args;
+        args["[NAME]"] = name;
+        args["[FILE]"] = fileNameOf(tab.file);
+        if (theirs == tab.editor->wholeText())
+        {
+            mServices.report(mServices.words("MasterTookSame", args), false, &tab);
+            return;
+        }
+        // The file's text a step back, as an edit would leave it; the file
+        // on disk written only by a save of it, which then sends what the
+        // script already holds.
+        tab.editor->setSelection(ALTextRange(tab.editor->document().start(), tab.editor->document().end()));
+        tab.editor->insertText(theirs);
+        mServices.report(mServices.words("MasterTookWorld", args), false, &tab);
     });
 }
 
@@ -708,8 +750,8 @@ void ALScriptStudioMasters::giveWayTo(Doc& doc, const ALMasterLink& link)
     args["[NAME]"] = doc.name;
     args["[FILE]"] = fileNameOf(link.master);
     // Saved from here, the world holds what the file does not: the file's
-    // tab offers to send the file over it, or to compare the two, as a
-    // change heard in the world does.
+    // tab offers to send the file over it, to take it into the file, or to
+    // compare the two, as a change heard in the world does.
     const ALScriptRef ref = doc.ref;
     mWindow.closeTab(doc);
     mWindow.openMasterFile(link.master, link.lua);
@@ -720,7 +762,7 @@ void ALScriptStudioMasters::giveWayTo(Doc& doc, const ALMasterLink& link)
     {
         tab->master->offerFor = ref;
         said += " " + mServices.words("MasterLinkDiffers", args);
-        offers = { "master_send", "master_compare" };
+        offers = { "master_send", "master_take_world", "master_compare" };
     }
     mServices.report(said, false, tab, offers);
 }
@@ -827,10 +869,10 @@ void ALScriptStudioMasters::heard(const DiskMasters::Outcome& outcome)
             said("MasterSendFailed", true, { "master_send" });
             return;
         case What::Skipped: said("MasterSkipped", false); return;
-        case What::Held: said("MasterHeld", true, { "master_send", "master_compare", "master_unlink" }); return;
+        case What::Held: said("MasterHeld", true, { "master_send", "master_take_world", "master_compare", "master_unlink" }); return;
         case What::Differing:
             args["[WHO]"] = mServices.words(whoSaid(outcome.by));
-            said("MasterDiffering", true, { "master_send", "master_compare", "master_unlink" });
+            said("MasterDiffering", true, { "master_send", "master_take_world", "master_compare", "master_unlink" });
             return;
         case What::Suspended: said("MasterSuspended", true, { "master_find", "master_unlink" }); return;
         case What::Orphaned: said("MasterOrphaned", false, { "master_unlink" }); return;

@@ -74,7 +74,7 @@ ALScriptAnalysisLane::ALScriptAnalysisLane(std::string name, std::function<std::
     // Closing, a job still running is stopped rather than waited for, and
     // what waits is passed over.
     mThread = std::make_unique<ALSerialWorker>(std::move(name), [this]() {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        const LLCoros::LockType lock(mQueueMutex);
         ALLuauService::cancel(mRunningStop);
     });
 }
@@ -89,7 +89,7 @@ bool ALScriptAnalysisLane::post(const std::string& key, U8 rank, bool yields, Jo
     const std::string id      = job.request.id;
     const U32         version = job.request.version;
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        const LLCoros::LockType lock(mQueueMutex);
         if (mQueue.add(key, id, version, rank, std::move(job), yields))
         {
             // What runs is answering something no longer wanted, or gives
@@ -99,7 +99,7 @@ bool ALScriptAnalysisLane::post(const std::string& key, U8 rank, bool yields, Jo
     }
     if (!mThread->post([this]() { runNext(); }))
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        const LLCoros::LockType lock(mQueueMutex);
         mQueue.forget(id);
         return false;
     }
@@ -108,7 +108,7 @@ bool ALScriptAnalysisLane::post(const std::string& key, U8 rank, bool yields, Jo
 
 void ALScriptAnalysisLane::forget(const std::string& id)
 {
-    const std::lock_guard<std::mutex> lock(mQueueMutex);
+    const LLCoros::LockType lock(mQueueMutex);
     if (mQueue.forget(id))
     {
         // What runs for it answers nobody now, nor waits again.
@@ -134,7 +134,7 @@ void ALScriptAnalysisLane::runNext()
     // What stops it, where it is a question.
     ALLuauService::Stop stop;
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        const LLCoros::LockType lock(mQueueMutex);
         next = mQueue.take();
         if (!next)
         {
@@ -161,7 +161,7 @@ void ALScriptAnalysisLane::runNext()
             LL_WARNS("ScriptAnalysis") << "Engine work failed: " << e.what() << LL_ENDL;
         }
         {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            const LLCoros::LockType lock(mQueueMutex);
             mQueue.finished();
         }
         mMain.run(job.engineDone);
@@ -177,7 +177,7 @@ void ALScriptAnalysisLane::runNext()
     bool unwanted = false;
     bool again    = false;
     {
-        const std::lock_guard<std::mutex> lock(mQueueMutex);
+        const LLCoros::LockType lock(mQueueMutex);
         unwanted = mQueue.superseded();
         // Stopped as it gave way to the front tab, and wanted still: it waits
         // again, behind what it gave way to, and answers after -- put back
@@ -220,7 +220,7 @@ void ALScriptAnalysisLane::runNext()
         warm.callback     = nullptr;
         warm.request.kind = Kind::Warm;
         {
-            const std::lock_guard<std::mutex> lock(mQueueMutex);
+            const LLCoros::LockType lock(mQueueMutex);
             mQueue.add(keyOf(warm.request), asked.id, asked.version, rankOf(warm.request), std::move(warm));
         }
         mThread->post([this]() { runNext(); });

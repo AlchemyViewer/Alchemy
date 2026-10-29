@@ -61,6 +61,7 @@
 #include "altestteardown.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <functional>
@@ -470,6 +471,18 @@ namespace ll_test
             // reads gDebugGL for it, as the viewer's does; raised only for the
             // creation, since left on it also turns every LLGLState into an
             // llassert_always and the tests are not written against that.
+#if LL_LINUX
+            // Mesa's llvmpipe, which the Linux runners render on, filters an 8-bit texture on a fast path that
+            // rounds each filtered texel back to 8 bits, where the GPUs the tests' bounds are measured on keep it
+            // finer: a shader that steepens what it samples, as the clouds' opacity does, turns that step into
+            // several. Mesa reads the choice once, as the first context comes up; one the caller made stands. The
+            // variable is the process's from then on, so the state guard takes it as such.
+            if (!getenv("GALLIVM_PERF"))
+            {
+                setenv("GALLIVM_PERF", "no_aos_sampling", 1);
+                ll_test::StateGuard::accept("the environment");
+            }
+#endif
             gDebugGL = true;
             mWindow = LLWindowManager::createWindow(&mCallbacks, "llrender-gl-test", "llrender-gl-test",
                                                     0, 0, WIDTH, HEIGHT, 0,

@@ -21,11 +21,13 @@ target_sources(
     almainloop.cpp
     alserialworker.cpp
     alparamtype.cpp
+    alprecisewaiter.cpp
     alrecoverystore.cpp
     alregex.cpp
     alsanitizer.cpp
     alsavehistory.cpp
     alscratcharena.cpp
+    altimerresolutionscope.cpp
     alwatchedfile.cpp
     apply.cpp
     commoncontrol.cpp
@@ -128,13 +130,17 @@ target_sources(
         almainloop.h
         alserialworker.h
         alparamtype.h
+        alprecisewaiter.h
         alrandmap.h
         alrecoverystore.h
         alregex.h
         alsanitizer.h
         alsavehistory.h
         alscratcharena.h
+        alsharedmutex.h
         alsimd.h
+        altimerresolutionscope.h
+        alunitconversion.h
         alwatchedfile.h
         always_return.h
         apply.h
@@ -311,12 +317,16 @@ if(AL_BUILD_TESTS)
       tests/alcompact_test.cpp
       tests/alenumtable_test.cpp
       tests/alfilewrite_test.cpp
+      tests/alprecisewaiter_test.cpp
       tests/alrecoverystore_test.cpp
       tests/alregex_test.cpp
       tests/alsavehistory_test.cpp
       tests/alscratcharena_test.cpp
       tests/alserialworker_test.cpp
+      tests/alsharedmutex_test.cpp
       tests/alsimd_test.cpp
+      tests/altimerresolutionscope_test.cpp
+      tests/alunitconversion_test.cpp
       tests/alwatchedfile_test.cpp
       tests/apply_test.cpp
       tests/bitpack_test.cpp
@@ -364,12 +374,14 @@ if(AL_BUILD_TESTS)
       tests/lluri_test.cpp
       tests/lluuid_test.cpp
       tests/stringize_test.cpp
+      tests/threadpool_test.cpp
       tests/threadsafeschedule_test.cpp
       tests/tuple_test.cpp
       tests/workqueue_test.cpp
     # The viewer's own patterns under Boost.Regex and under RE2, side by
-    # side, over the text each is run on; and the cost of its locks.
-    BENCH_SOURCES tests/alregex_bench.cpp tests/llmutex_bench.cpp
+    # side, over the text each is run on; the cost of its locks; and how late
+    # its waits wake.
+    BENCH_SOURCES tests/alregex_bench.cpp tests/llmutex_bench.cpp tests/oversleep_bench.cpp
     SUPPORT llcommon_test_checks
     LIBRARIES llcommon
   )

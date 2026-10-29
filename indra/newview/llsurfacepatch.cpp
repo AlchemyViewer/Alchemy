@@ -32,7 +32,6 @@
 #include "llsurface.h"
 #include "pipeline.h"
 #include "llagent.h"
-#include "llsky.h"
 
 // For getting composition values
 #include "llviewerregion.h"

@@ -37,7 +37,6 @@
 #include "lldrawpoolmaterials.h"
 #include "lldrawpoolpbropaque.h"
 #include "lldrawpoolsimple.h"
-#include "lldrawpoolsky.h"
 #include "lldrawpooltree.h"
 #include "lldrawpoolterrain.h"
 #include "lldrawpoolwater.h"
@@ -47,7 +46,6 @@
 #include "pipeline.h"
 #include "llspatialpartition.h"
 #include "llviewercamera.h"
-#include "lldrawpoolwlsky.h"
 #include "llglslshader.h"
 #include "llglcommonfunc.h"
 #include "llimagegl.h"
@@ -102,9 +100,6 @@ LLDrawPool *LLDrawPool::createPool(const U32 type, LLViewerTexture *tex0)
     case POOL_TERRAIN:
         poolp = new LLDrawPoolTerrain(tex0);
         break;
-    case POOL_SKY:
-        poolp = new LLDrawPoolSky();
-        break;
     case POOL_WATER:
         poolp = new LLDrawPoolWater();
         break;
@@ -113,9 +108,6 @@ LLDrawPool *LLDrawPool::createPool(const U32 type, LLViewerTexture *tex0)
         break;
     case POOL_MATERIALS:
         poolp = new LLDrawPoolMaterials();
-        break;
-    case POOL_WL_SKY:
-        poolp = new LLDrawPoolWLSky();
         break;
     case POOL_GLTF_PBR:
         poolp = new LLDrawPoolGLTFPBR();

@@ -26,11 +26,13 @@
 
 #include "alscriptanalysis.h"
 #include "alscriptjobqueue.h"
+#include "llcoros.h"
 
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <string>
+
+#include LLCOROS_MUTEX_HEADER
 
 class ALScriptAnalyzer;
 class ALSerialWorker;
@@ -122,9 +124,10 @@ private:
     std::unique_ptr<ALSerialWorker>                    mThread;
     // Touched only on the thread.
     std::unique_ptr<ALScriptAnalyzer>                  mAnalyzer;
-    // What waits, written on the main thread and taken on the thread, and
-    // the stop of the job running; both under the lock.
-    std::mutex            mQueueMutex;
+    // What waits, written on the main thread, a coroutine there among what
+    // writes, and taken on the thread, and the stop of the job running; both
+    // under the lock.
+    LLCoros::Mutex        mQueueMutex;
     ALScriptJobQueue<Job> mQueue;
     ALLuauService::Stop   mRunningStop;
 };

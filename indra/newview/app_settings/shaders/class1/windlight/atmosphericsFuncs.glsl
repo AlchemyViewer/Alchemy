@@ -53,7 +53,7 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     vec3 rel_pos = eyeToSky * inPositionEye;
     light_dir = eyeToSky * light_dir;
 
-    //(TERRAIN) limit altitude. The haze lies max_y deep above the camera, as the sky dome's does (skyF.glsl): a ray
+    //(TERRAIN) limit altitude. The haze lies max_y deep above the camera, as the dome's does (windlightDomeAt): a ray
     // rising h = y / max_y layers is hazed over about 1/h of its length, and a far point over max_y / sin(elevation),
     // the dome's own path. A ray falling below the camera stays in the haze, as the dome's do, and keeps its whole
     // length. Eased, (1 + h^8)^(-1/8), where a hard limit creased the haze along the contour max_y up (and, when it
@@ -92,7 +92,7 @@ void calcAtmosphericVars(vec3 inPositionEye, vec3 light_dir, float ambFactor, ou
     float haze_glow = 1. - dot(rel_pos_norm, light_dir);
     // haze_glow is 0 at the sun and increases away from sun
     // set a minimum "angle" (smaller allows a tighter, brighter hotspot). WindLight's objects used .03;
-    // only its sky dome used .001, and skyF keeps that.
+    // only its sky dome used .001, and windlightDomeAt keeps that.
     haze_glow = max(haze_glow, .03);
     haze_glow *= glow.x;
     // higher glow.x gives dimmer glow (because next step is 1 / "angle")

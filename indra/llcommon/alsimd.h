@@ -1497,6 +1497,27 @@ AL_SIMD_INLINE void prefetch_nta(const void* p)
 }
 
 ////////////////////////////////////
+// Spinning
+////////////////////////////////////
+
+// Once a round of a loop that spins on the clock or on memory another thread
+// writes: the core's shared resources go to its sibling thread, and less
+// power to the loop, for a moment. Not a yield; the thread keeps its core.
+// On x86 a pause, which lasts tens to a hundred-odd cycles by the
+// generation. On arm64 an instruction barrier: yield is a no-op on most
+// cores, and the barrier waits for the pipeline to drain.
+AL_SIMD_INLINE void pause()
+{
+#if AL_SIMD_X86
+    _mm_pause();
+#elif defined(_MSC_VER) && !defined(__clang__)
+    __isb(_ARM64_BARRIER_SY);
+#else
+    __asm__ __volatile__("isb" ::: "memory");
+#endif
+}
+
+////////////////////////////////////
 // Copies
 ////////////////////////////////////
 

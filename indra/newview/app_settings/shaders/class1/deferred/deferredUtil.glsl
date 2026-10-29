@@ -101,9 +101,9 @@ const float ONE_OVER_PI = 0.3183098861;
 // real angular size, which is a physical bound rather than an invented one.
 const float MIN_PBR_ROUGHNESS = 0.045;
 
-// PUNCTUAL_LIGHT_SCALE and MAX_PUNCTUAL_RADIANCE are injected by llshadermgr.cpp alongside the
-// GBuffer flags. Both have to hold across separately compiled objects, which a global const
-// cannot do.
+// PUNCTUAL_LIGHT_SCALE and the radiance ceilings (MAX_PUNCTUAL_RADIANCE, MAX_SURFACE_RADIANCE,
+// MAX_SCENE_RADIANCE) are injected by llshadermgr.cpp alongside the GBuffer flags. They have to
+// hold across separately compiled objects, which a global const cannot do.
 
 vec3 srgb_to_linear(vec3 cs);
 vec3 linear_to_srgb(vec3 cs);
@@ -111,22 +111,6 @@ vec3 atmosFragLightingLinear(vec3 light, vec3 additive, vec3 atten);
 
 vec4 decodeNormal(vec4 norm);
 vec3 unpackGeoNormal(float v);
-
-vec3 clampHDRRange(vec3 color)
-{
-    // Why do this?
-    // There are situations where the color range will go to something insane - potentially producing infs and NaNs even.
-    // This is a safety measure to prevent that.
-    // -Geenz 2025-03-05
-    // Infinity becomes the largest value the frame can carry, not 1.0. Substituting 1.0 turns
-    // the brightest pixel in a linear frame into mid grey, so an overflow reads as a dark hole
-    // exactly where something should be searing -- a failure that inverts the error rather than
-    // bounding it. NaN still goes to black, which is the only safe answer for a value that
-    // carries no magnitude at all.
-    color = mix(color, vec3(MAX_PUNCTUAL_RADIANCE), isinf(color));
-    color = mix(color, vec3(0.0), isnan(color));
-    return color;
-}
 
 float calcLegacyDistanceAttenuation(float distance, float falloff)
 {
@@ -497,17 +481,25 @@ vec3 gtaoMultiBounce(float visibility, vec3 albedo)
     return max(vec3(visibility), ((visibility * a + b) * visibility + c) * visibility);
 }
 
-// Clamp radiance to a ceiling without turning it a different colour on the way.
+// Clamp radiance to `ceiling` without turning it a different colour on the way: the one clamp the
+// passes share. The ceiling says what the value is a part of -- MAX_PUNCTUAL_RADIANCE for what one
+// light or light pass adds to the scene, MAX_SURFACE_RADIANCE for the soften pass the lights add
+// onto, MAX_SCENE_RADIANCE for anything else written into it whole (llshadermgr.cpp says why each).
 //
 // A per-channel clamp lets one channel saturate while the others keep climbing, so a highlight
 // pushed past the ceiling drifts toward whichever primary saturated first -- a bright warm
 // specular goes orange, then red. Scaling by the largest channel holds the ratios, so the
 // colour is preserved exactly and only the magnitude gives.
-vec3 clampRadiance(vec3 c)
+//
+// An infinity becomes the ceiling, not 1.0 or black, which would read as a dark hole exactly where
+// something should be searing. A NaN carries no magnitude at all and goes to black, and nothing
+// radiates less than nothing, so a negative goes to zero. Both are taken before the scale, which
+// would turn an infinity into a NaN, and by a select, since min and max may answer a NaN either way.
+vec3 clampRadiance(vec3 c, float ceiling)
 {
-    c = max(c, vec3(0));
+    c = mix(clamp(c, vec3(0.0), vec3(3.0e38)), vec3(0.0), isnan(c));
     float peak = max(max(c.r, c.g), c.b);
-    return peak > MAX_PUNCTUAL_RADIANCE ? c * (MAX_PUNCTUAL_RADIANCE / peak) : c;
+    return peak > ceiling ? c * (ceiling / peak) : c;
 }
 
 // Multiple-scattering compensation for the punctual specular lobe (Turquin 2019, "Practical
@@ -823,7 +815,7 @@ vec3 pbrCalcPointLightOrSpotLight(vec3 diffuseColor, vec3 specularColor,
 
         pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
         specPunc *= pbrEnergyCompensation(specularColor, perceptualRoughness, dot(n.xyz, v));
-        color = intensity * clampRadiance(nl * (diffPunc + specPunc));
+        color = clampRadiance(intensity * nl * (diffPunc + specPunc), MAX_PUNCTUAL_RADIANCE);
     }
     float final_scale = 1.0;
     if (classic_mode > 0)
@@ -909,7 +901,7 @@ vec3 finishLegacyPunctual(vec3 col, float spot_atten)
     if (classic_mode > 0)
         final_scale = 0.9;
 
-    return max(clampRadiance(col * spot_atten) * final_scale, vec3(0));
+    return max(clampRadiance(col * spot_atten, MAX_PUNCTUAL_RADIANCE) * final_scale, vec3(0));
 }
 
 // Diffuse only, for the legacy surfaces that carry no specular data at all.
@@ -1039,13 +1031,13 @@ vec3 pbrBaseLight(vec3 diffuseColor, vec3 specularColor, float metallic, vec3 v,
         // this explicit rather than accidental, and it picks up the material occlusion that this
         // branch has never applied.
         vec3 finalAmbient = irradiance.rgb * diffuseColor.rgb * gtaoMultiBounce(ao, diffuseColor); // BINGO
-        vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol)); // QUESTIONABLE BINGO?
+        vec3 finalSun = clampRadiance(sun_contrib * ((diffPunc.rgb + specPunc.rgb) * scol), MAX_PUNCTUAL_RADIANCE); // QUESTIONABLE BINGO?
         color.rgb = srgb_to_linear(linear_to_srgb(finalAmbient) + (linear_to_srgb(finalSun) * 1.1));
         //color.rgb = sun_contrib * diffuseColor.rgb;
     }
     else
     {
-        color += clampRadiance(nl * (diffPunc + specPunc)) * sunlit * PUNCTUAL_LIGHT_SCALE * scol;
+        color += clampRadiance(nl * (diffPunc + specPunc) * sunlit * PUNCTUAL_LIGHT_SCALE * scol, MAX_PUNCTUAL_RADIANCE);
     }
 
     color.rgb += iblSpec.rgb;

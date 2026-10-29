@@ -1,5 +1,5 @@
 /**
- * @file llunit.h
+ * @file llunittype.h
  * @brief Unit conversion classes
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
@@ -30,208 +30,198 @@
 #include "stdtypes.h"
 #include "llpreprocessor.h"
 #include "llerror.h"
+#include "alunitconversion.h"
+
+#include <fmt/base.h>
+
+#include <type_traits>
+#include <utility>
 
 #ifdef LL_WINDOWS
 #pragma warning(push)
 #pragma warning(disable : 4244) // possible loss of data on conversions
 #endif
 
-//lightweight replacement of type traits for simple type equality check
+// the storage type an operation on two storage types yields
 template<typename S, typename T>
-struct LLIsSameType
-{
-    static const bool value = false;
-};
+using LLResultTypeAdd = decltype(std::declval<S>() + std::declval<T>());
+
+template<typename S, typename T>
+using LLResultTypeSubtract = decltype(std::declval<S>() - std::declval<T>());
+
+template<typename S, typename T>
+using LLResultTypeMultiply = decltype(std::declval<S>() * std::declval<T>());
+
+template<typename S, typename T>
+using LLResultTypeDivide = decltype(std::declval<S>() / std::declval<T>());
+
+// the storage type a conversion between two storage types is worked in
+template<typename S, typename T>
+using LLResultTypePromote = std::common_type_t<S, T>;
+
+// LLUnit and LLUnitImplicit, whatever their storage type and units
+template<typename T>
+concept ALUnitType = requires { typename T::is_unit_t; };
 
 template<typename T>
-struct LLIsSameType<T, T>
+concept ALImplicitUnitType = ALUnitType<T> && requires { typename T::is_implicit_unit_t; };
+
+template<typename T>
+concept ALExplicitUnitType = ALUnitType<T> && !ALImplicitUnitType<T>;
+
+// a plain value, such as an F32, or anything else that is not a unit
+template<typename T>
+concept ALUnitlessType = !ALUnitType<T>;
+
+// the unit UNITS is defined from, through as many units as it takes: Bytes for Gigabits
+template<typename UNITS, bool IS_ROOT = std::is_same_v<typename UNITS::base_unit_t, UNITS>>
+struct ALRootUnit
 {
-    static const bool value = true;
+    using type = typename ALRootUnit<typename UNITS::base_unit_t>::type;
 };
 
-// workaround for decltype() not existing and typeof() not working inline in gcc 4.2
-template<typename S, typename T>
-struct LLResultTypeAdd
+template<typename UNITS>
+struct ALRootUnit<UNITS, true>
 {
-    typedef LL_TYPEOF(S() + T()) type_t;
+    using type = UNITS;
 };
 
-template<typename S, typename T>
-struct LLResultTypeSubtract
-{
-    typedef LL_TYPEOF(S() - T()) type_t;
-};
+// units of one dimension, which convert into each other
+template<typename UNITS1, typename UNITS2>
+concept ALCompatibleUnits = std::is_same_v<typename ALRootUnit<UNITS1>::type, typename ALRootUnit<UNITS2>::type>;
 
-template<typename S, typename T>
-struct LLResultTypeMultiply
+// the conversion from the root unit of UNITS, through each unit it is defined from, to UNITS
+template<typename UNITS>
+constexpr auto al_unit_conversion_from_root()
 {
-    typedef LL_TYPEOF(S() * T()) type_t;
-};
+    if constexpr (std::is_same_v<typename UNITS::base_unit_t, UNITS>)
+    {
+        return ALUnitConversion();
+    }
+    else
+    {
+        return al_compose_unit_conversions(al_unit_conversion_from_root<typename UNITS::base_unit_t>(), UNITS::sConversion);
+    }
+}
 
-template<typename S, typename T>
-struct LLResultTypeDivide
+// the conversion from FROM_UNITS to TO_UNITS, as one map through their root unit
+template<typename FROM_UNITS, typename TO_UNITS>
+struct ALUnitConversionBetween
 {
-    typedef LL_TYPEOF(S() / T(1)) type_t;
-};
-
-template<typename S, typename T>
-struct LLResultTypePromote
-{
-    typedef LL_TYPEOF((true) ? S() : T()) type_t;
+    static constexpr auto value = al_compose_unit_conversions(al_invert_unit_conversion(al_unit_conversion_from_root<FROM_UNITS>()),
+                                                              al_unit_conversion_from_root<TO_UNITS>());
 };
 
 template<typename STORAGE_TYPE, typename UNITS>
 struct LLUnit
 {
-    typedef LLUnit<STORAGE_TYPE, UNITS> self_t;
-    typedef STORAGE_TYPE storage_t;
-    typedef void is_unit_t;
+    using self_t = LLUnit<STORAGE_TYPE, UNITS>;
+    using storage_t = STORAGE_TYPE;
+    using unit_t = UNITS;
+    using is_unit_t = void;
 
     // value initialization
-    LL_FORCE_INLINE explicit LLUnit(storage_t value = storage_t())
+    LL_FORCE_INLINE constexpr explicit LLUnit(storage_t value = storage_t())
     :   mValue(value)
     {}
 
-
-    LL_FORCE_INLINE static self_t convert(self_t v)
-    {
-        return v;
-    }
-
-    template<typename FROM_STORAGE_TYPE>
-    LL_FORCE_INLINE static self_t convert(LLUnit<FROM_STORAGE_TYPE, UNITS> v)
-    {
-        self_t result;
-        result.mValue = (STORAGE_TYPE)v.value();
-        return result;
-    }
-
-    template<typename FROM_UNITS>
-    LL_FORCE_INLINE static self_t convert(LLUnit<STORAGE_TYPE, FROM_UNITS> v)
-    {
-        self_t result;
-        STORAGE_TYPE divisor = ll_convert_units(v, result);
-        result.mValue /= divisor;
-        return result;
-    }
-
     template<typename FROM_STORAGE_TYPE, typename FROM_UNITS>
-    LL_FORCE_INLINE static self_t convert(LLUnit<FROM_STORAGE_TYPE, FROM_UNITS> v)
+        requires ALCompatibleUnits<FROM_UNITS, UNITS>
+    [[nodiscard]] LL_FORCE_INLINE static constexpr self_t convert(LLUnit<FROM_STORAGE_TYPE, FROM_UNITS> v)
     {
-        typedef typename LLResultTypePromote<FROM_STORAGE_TYPE, STORAGE_TYPE>::type_t result_storage_t;
-        LLUnit<result_storage_t, UNITS> result;
-        result_storage_t divisor = ll_convert_units(v, result);
-        result.value(result.value() / divisor);
-        return self_t(result.value());
+        if constexpr (std::is_same_v<FROM_UNITS, UNITS>)
+        {
+            return self_t((storage_t)v.value());
+        }
+        else
+        {
+            // worked in the promoted storage type, so that an integer unit converted to a floating point one keeps
+            // its fraction until it is stored
+            using result_storage_t = LLResultTypePromote<FROM_STORAGE_TYPE, STORAGE_TYPE>;
+            return self_t((storage_t)al_apply_unit_conversion<ALUnitConversionBetween<FROM_UNITS, UNITS>>((result_storage_t)v.value()));
+        }
     }
-
 
     // unit initialization and conversion
     template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE LLUnit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
+        requires ALCompatibleUnits<OTHER_UNITS, UNITS>
+    LL_FORCE_INLINE constexpr LLUnit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
     :   mValue(convert(other).mValue)
     {}
 
-    LL_FORCE_INLINE storage_t value() const
+    // nor does a unit of another dimension pass for this one through the storage type
+    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
+        requires (!ALCompatibleUnits<OTHER_UNITS, UNITS>)
+    LLUnit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) = delete;
+
+    [[nodiscard]] LL_FORCE_INLINE constexpr storage_t value() const
     {
         return mValue;
     }
 
-    LL_FORCE_INLINE void value(const storage_t& value)
+    LL_FORCE_INLINE constexpr void value(const storage_t& value)
     {
         mValue = value;
     }
 
     template<typename NEW_UNITS>
-    storage_t valueInUnits() const
+        requires ALCompatibleUnits<NEW_UNITS, UNITS>
+    [[nodiscard]] constexpr storage_t valueInUnits() const
     {
         return LLUnit<storage_t, NEW_UNITS>(*this).value();
     }
 
     template<typename NEW_UNITS>
-    void valueInUnits(const storage_t& value) const
+        requires ALCompatibleUnits<NEW_UNITS, UNITS>
+    constexpr void valueInUnits(const storage_t& value)
     {
         *this = LLUnit<storage_t, NEW_UNITS>(value);
     }
 
-    LL_FORCE_INLINE operator storage_t() const
+    LL_FORCE_INLINE constexpr operator storage_t() const
     {
         return value();
     }
 
-    /*LL_FORCE_INLINE self_t& operator= (storage_t v)
+    LL_FORCE_INLINE constexpr self_t& operator += (self_t other)
     {
-        value(v);
+        mValue += other.mValue;
         return *this;
-    }*/
-
-    LL_FORCE_INLINE void operator += (self_t other)
-    {
-        mValue += convert(other).mValue;
     }
 
-    LL_FORCE_INLINE void operator -= (self_t other)
+    template<ALUnitType OTHER>
+        requires (!ALCompatibleUnits<typename OTHER::unit_t, UNITS>)
+    self_t& operator += (const OTHER& other) = delete;
+
+    LL_FORCE_INLINE constexpr self_t& operator -= (self_t other)
     {
-        mValue -= convert(other).mValue;
+        mValue -= other.mValue;
+        return *this;
     }
 
-    LL_FORCE_INLINE void operator *= (const storage_t& multiplicand)
+    template<ALUnitType OTHER>
+        requires (!ALCompatibleUnits<typename OTHER::unit_t, UNITS>)
+    self_t& operator -= (const OTHER& other) = delete;
+
+    LL_FORCE_INLINE constexpr self_t& operator *= (const storage_t& multiplicand)
     {
         mValue *= multiplicand;
+        return *this;
     }
 
-    LL_FORCE_INLINE void operator *= (const self_t& multiplicand)
-    {
-        // spurious use of dependent type to stop gcc from triggering the static assertion before instantiating the template
-        LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "Multiplication of unit types not supported.");
-    }
+    // a product of units is a new kind of unit
+    template<ALUnitType OTHER>
+    self_t& operator *= (const OTHER& multiplicand) = delete;
 
-    LL_FORCE_INLINE void operator /= (const storage_t& divisor)
+    LL_FORCE_INLINE constexpr self_t& operator /= (const storage_t& divisor)
     {
         mValue /= divisor;
+        return *this;
     }
 
-    void operator /= (const self_t& divisor)
-    {
-        // spurious use of dependent type to stop gcc from triggering the static assertion before instantiating the template
-        LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "Illegal in-place division of unit types.");
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator == (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue == convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator != (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue != convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator < (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue < convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator <= (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue <= convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator > (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue > convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator >= (const LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS>& other) const
-    {
-        return mValue >= convert(other).value();
-    }
+    // a unit divided by a unit is a plain value, not this unit
+    template<ALUnitType OTHER>
+    self_t& operator /= (const OTHER& divisor) = delete;
 
 protected:
     storage_t mValue;
@@ -256,161 +246,101 @@ std::istream& operator >>(std::istream& s, LLUnit<STORAGE_TYPE, UNITS>& unit)
 template<typename STORAGE_TYPE, typename UNITS>
 struct LLUnitImplicit : public LLUnit<STORAGE_TYPE, UNITS>
 {
-    typedef LLUnitImplicit<STORAGE_TYPE, UNITS> self_t;
-    typedef typename LLUnit<STORAGE_TYPE, UNITS>::storage_t storage_t;
-    typedef LLUnit<STORAGE_TYPE, UNITS> base_t;
+    using self_t = LLUnitImplicit<STORAGE_TYPE, UNITS>;
+    using storage_t = typename LLUnit<STORAGE_TYPE, UNITS>::storage_t;
+    using base_t = LLUnit<STORAGE_TYPE, UNITS>;
+    using is_implicit_unit_t = void;
 
-    LL_FORCE_INLINE LLUnitImplicit(storage_t value = storage_t())
+    LL_FORCE_INLINE constexpr LLUnitImplicit(storage_t value = storage_t())
     :   base_t(value)
     {}
 
     template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE LLUnitImplicit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
+        requires ALCompatibleUnits<OTHER_UNITS, UNITS>
+    LL_FORCE_INLINE constexpr LLUnitImplicit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
     :   base_t(other)
     {}
 
-    // unlike LLUnit, LLUnitImplicit is *implicitly* convertable to a POD value (F32, S32, etc)
-    // this allows for interoperability with legacy code
-    LL_FORCE_INLINE operator storage_t() const
+    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
+        requires (!ALCompatibleUnits<OTHER_UNITS, UNITS>)
+    LLUnitImplicit(LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) = delete;
+
+    // unlike LLUnit, LLUnitImplicit is also *implicitly* constructed from a POD value (F32, S32, etc)
+    // and takes part in arithmetic with one; this allows for interoperability with legacy code
+    LL_FORCE_INLINE constexpr operator storage_t() const
     {
         return base_t::value();
     }
 
-    using base_t::operator +=;
-    LL_FORCE_INLINE void operator += (storage_t value)
+    LL_FORCE_INLINE constexpr self_t& operator += (base_t other)
+    {
+        base_t::operator += (other);
+        return *this;
+    }
+
+    LL_FORCE_INLINE constexpr self_t& operator += (storage_t value)
     {
         base_t::mValue += value;
+        return *this;
     }
 
-    // this overload exists to explicitly catch use of another implicit unit
+    // this overload exists to explicitly catch use of another unit
     // without ambiguity between conversion to storage_t vs conversion to base_t
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE void operator += (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
+    template<ALUnitType OTHER>
+        requires ALCompatibleUnits<typename OTHER::unit_t, UNITS>
+    LL_FORCE_INLINE constexpr self_t& operator += (const OTHER& other)
     {
         base_t::mValue += base_t::convert(other).value();
+        return *this;
     }
 
-    using base_t::operator -=;
-    LL_FORCE_INLINE void operator -= (storage_t value)
+    template<ALUnitType OTHER>
+        requires (!ALCompatibleUnits<typename OTHER::unit_t, UNITS>)
+    self_t& operator += (const OTHER& other) = delete;
+
+    LL_FORCE_INLINE constexpr self_t& operator -= (base_t other)
+    {
+        base_t::operator -= (other);
+        return *this;
+    }
+
+    LL_FORCE_INLINE constexpr self_t& operator -= (storage_t value)
     {
         base_t::mValue -= value;
+        return *this;
     }
 
-    // this overload exists to explicitly catch use of another implicit unit
+    // this overload exists to explicitly catch use of another unit
     // without ambiguity between conversion to storage_t vs conversion to base_t
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE void operator -= (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other)
+    template<ALUnitType OTHER>
+        requires ALCompatibleUnits<typename OTHER::unit_t, UNITS>
+    LL_FORCE_INLINE constexpr self_t& operator -= (const OTHER& other)
     {
         base_t::mValue -= base_t::convert(other).value();
+        return *this;
     }
 
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator == (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
+    template<ALUnitType OTHER>
+        requires (!ALCompatibleUnits<typename OTHER::unit_t, UNITS>)
+    self_t& operator -= (const OTHER& other) = delete;
+
+    LL_FORCE_INLINE constexpr self_t& operator *= (const storage_t& multiplicand)
     {
-        return base_t::mValue == base_t::convert(other).value();
+        base_t::operator *= (multiplicand);
+        return *this;
     }
 
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator == (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
+    template<ALUnitType OTHER>
+    self_t& operator *= (const OTHER& multiplicand) = delete;
+
+    LL_FORCE_INLINE constexpr self_t& operator /= (const storage_t& divisor)
     {
-        return base_t::mValue == base_t::convert(other).value();
+        base_t::operator /= (divisor);
+        return *this;
     }
 
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator == (STORAGE_T other) const
-    {
-        return base_t::mValue == other;
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator != (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue != convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator != (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue != base_t::convert(other).value();
-    }
-
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator != (STORAGE_T other) const
-    {
-        return base_t::mValue != other;
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator < (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue < base_t::convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator < (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue < base_t::convert(other).value();
-    }
-
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator < (STORAGE_T other) const
-    {
-        return base_t::mValue < other;
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator <= (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue <= base_t::convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator <= (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue <= base_t::convert(other).value();
-    }
-
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator <= (STORAGE_T other) const
-    {
-        return base_t::mValue <= other;
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator > (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue > base_t::convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator > (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue > base_t::convert(other).value();
-    }
-
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator > (STORAGE_T other) const
-    {
-        return base_t::mValue > other;
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator >= (LLUnit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue >= base_t::convert(other).value();
-    }
-
-    template<typename OTHER_STORAGE_TYPE, typename OTHER_UNITS>
-    LL_FORCE_INLINE bool operator >= (LLUnitImplicit<OTHER_STORAGE_TYPE, OTHER_UNITS> other) const
-    {
-        return base_t::mValue >= base_t::convert(other).value();
-    }
-
-    template<typename STORAGE_T>
-    LL_FORCE_INLINE bool operator >= (STORAGE_T other) const
-    {
-        return base_t::mValue >= other;
-    }
+    template<ALUnitType OTHER>
+    self_t& operator /= (const OTHER& divisor) = delete;
 };
 
 template<typename STORAGE_TYPE, typename UNITS>
@@ -429,427 +359,329 @@ std::istream& operator >>(std::istream& s, LLUnitImplicit<STORAGE_TYPE, UNITS>& 
         return s;
 }
 
-template<typename S1, typename T1, typename S2, typename T2>
-LL_FORCE_INLINE S2 ll_convert_units(LLUnit<S1, T1> in, LLUnit<S2, T2>& out)
+// what an operation on two units yields: in the first one's units, and implicit when either of them is
+template<typename UNIT1, typename UNIT2, typename STORAGE_TYPE>
+using ALUnitResult = std::conditional_t<ALImplicitUnitType<UNIT1> || ALImplicitUnitType<UNIT2>,
+                                        LLUnitImplicit<STORAGE_TYPE, typename UNIT1::unit_t>,
+                                        LLUnit<STORAGE_TYPE, typename UNIT1::unit_t>>;
+
+// what an operation on a unit and a plain value yields: the unit's kind, in STORAGE_TYPE
+template<typename UNIT, typename STORAGE_TYPE>
+using ALUnitLike = std::conditional_t<ALImplicitUnitType<UNIT>,
+                                      LLUnitImplicit<STORAGE_TYPE, typename UNIT::unit_t>,
+                                      LLUnit<STORAGE_TYPE, typename UNIT::unit_t>>;
+
+//
+// Operators between two units take any mix of LLUnit and LLUnitImplicit, and convert the second into the first's
+// units. An operation the units do not support is deleted rather than left out: a unit converts to its storage type,
+// so an operator left out would be taken by the storage type's own and drop the units without a word.
+//
+
+//
+// operator + and -: two units of one dimension, or an implicit unit and a plain value
+//
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr ALUnitResult<UNIT1, UNIT2, LLResultTypeAdd<typename UNIT1::storage_t, typename UNIT2::storage_t>> operator + (const UNIT1& first, const UNIT2& second)
 {
-    S2 divisor(1);
-
-    LL_STATIC_ASSERT((LLIsSameType<T1, T2>::value
-                        || !LLIsSameType<T1, typename T1::base_unit_t>::value
-                        || !LLIsSameType<T2, typename T2::base_unit_t>::value),
-                        "conversion requires compatible units");
-
-    if (LLIsSameType<T1, T2>::value)
-    {
-        // T1 and T2 same type, just assign
-        out.value((S2)in.value());
-    }
-    else if (T1::sLevel > T2::sLevel)
-    {
-        // reduce T1
-        LLUnit<S2, typename T1::base_unit_t> new_in;
-        divisor *= (S2)ll_convert_units(in, new_in);
-        divisor *= (S2)ll_convert_units(new_in, out);
-    }
-    else
-    {
-        // reduce T2
-        LLUnit<S2, typename T2::base_unit_t> new_out;
-        divisor *= (S2)ll_convert_units(in, new_out);
-        divisor *= (S2)ll_convert_units(new_out, out);
-    }
-    return divisor;
+    using result_t = ALUnitResult<UNIT1, UNIT2, LLResultTypeAdd<typename UNIT1::storage_t, typename UNIT2::storage_t>>;
+    return result_t(result_t::convert(first).value() + result_t::convert(second).value());
 }
 
-template<typename T>
-struct LLStorageType
-{
-    typedef T type_t;
-};
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+void operator + (const UNIT1& first, const UNIT2& second) = delete;
 
-template<typename STORAGE_TYPE, typename UNITS>
-struct LLStorageType<LLUnit<STORAGE_TYPE, UNITS> >
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr LLUnitImplicit<LLResultTypeAdd<typename UNIT::storage_t, UNITLESS_TYPE>, typename UNIT::unit_t> operator + (const UNIT& first, UNITLESS_TYPE second)
 {
-    typedef STORAGE_TYPE type_t;
-};
-
-// all of these operators need to perform type promotion on the storage type of the units, so they
-// cannot be expressed as operations on identical types with implicit unit conversion
-// e.g. typeof(S32Bytes(x) + F32Megabytes(y)) <==> F32Bytes
-
-//
-// operator +
-//
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator + (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
+    LLUnitImplicit<LLResultTypeAdd<typename UNIT::storage_t, UNITLESS_TYPE>, typename UNIT::unit_t> result(first);
     result += second;
     return result;
 }
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS>
-LLUnit<STORAGE_TYPE, UNITS> operator + (LLUnit<STORAGE_TYPE, UNITS> first, UNITLESS second)
+template<ALUnitlessType UNITLESS_TYPE, ALImplicitUnitType UNIT>
+[[nodiscard]] LL_FORCE_INLINE constexpr LLUnitImplicit<LLResultTypeAdd<UNITLESS_TYPE, typename UNIT::storage_t>, typename UNIT::unit_t> operator + (UNITLESS_TYPE first, const UNIT& second)
 {
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "operator + requires compatible unit types");
-    return LLUnit<STORAGE_TYPE, UNITS>(0);
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS>
-LLUnit<STORAGE_TYPE, UNITS> operator + (UNITLESS first, LLUnit<STORAGE_TYPE, UNITS> second)
-{
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "operator + requires compatible unit types");
-    return LLUnit<STORAGE_TYPE, UNITS>(0);
-}
-
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator + (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
+    LLUnitImplicit<LLResultTypeAdd<UNITLESS_TYPE, typename UNIT::storage_t>, typename UNIT::unit_t> result(first);
     result += second;
     return result;
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator + (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
+// an explicit unit and a plain value do not add
+template<ALExplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+void operator + (const UNIT& first, const UNITLESS_TYPE& second) = delete;
+
+template<ALUnitlessType UNITLESS_TYPE, ALExplicitUnitType UNIT>
+void operator + (const UNITLESS_TYPE& first, const UNIT& second) = delete;
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr ALUnitResult<UNIT1, UNIT2, LLResultTypeSubtract<typename UNIT1::storage_t, typename UNIT2::storage_t>> operator - (const UNIT1& first, const UNIT2& second)
 {
-    LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
-    result += second;
-    return result;
+    using result_t = ALUnitResult<UNIT1, UNIT2, LLResultTypeSubtract<typename UNIT1::storage_t, typename UNIT2::storage_t>>;
+    return result_t(result_t::convert(first).value() - result_t::convert(second).value());
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator + (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
-    result += LLUnitImplicit<STORAGE_TYPE1, UNITS1>(second);
-    return result;
-}
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+void operator - (const UNIT1& first, const UNIT2& second) = delete;
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator + (LLUnitImplicit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr LLUnitImplicit<LLResultTypeSubtract<typename UNIT::storage_t, UNITLESS_TYPE>, typename UNIT::unit_t> operator - (const UNIT& first, UNITLESS_TYPE second)
 {
-    LLUnitImplicit<typename LLResultTypeAdd<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> result(first);
-    result += second;
-    return result;
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeAdd<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::
-    type_t, UNITS> operator + (UNITLESS_TYPE first, LLUnitImplicit<STORAGE_TYPE, UNITS> second)
-{
-    LLUnitImplicit<typename LLResultTypeAdd<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS> result(first);
-    result += second;
-    return result;
-}
-
-//
-// operator -
-//
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator - (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
+    LLUnitImplicit<LLResultTypeSubtract<typename UNIT::storage_t, UNITLESS_TYPE>, typename UNIT::unit_t> result(first);
     result -= second;
     return result;
 }
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS>
-LLUnit<STORAGE_TYPE, UNITS> operator - (LLUnit<STORAGE_TYPE, UNITS> first, UNITLESS second)
+template<ALUnitlessType UNITLESS_TYPE, ALImplicitUnitType UNIT>
+[[nodiscard]] LL_FORCE_INLINE constexpr LLUnitImplicit<LLResultTypeSubtract<UNITLESS_TYPE, typename UNIT::storage_t>, typename UNIT::unit_t> operator - (UNITLESS_TYPE first, const UNIT& second)
 {
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "operator - requires compatible unit types");
-    return LLUnit<STORAGE_TYPE, UNITS>(0);
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS>
-LLUnit<STORAGE_TYPE, UNITS> operator - (UNITLESS first, LLUnit<STORAGE_TYPE, UNITS> second)
-{
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE, "operator - requires compatible unit types");
-    return LLUnit<STORAGE_TYPE, UNITS>(0);
-}
-
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator - (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
+    LLUnitImplicit<LLResultTypeSubtract<UNITLESS_TYPE, typename UNIT::storage_t>, typename UNIT::unit_t> result(first);
     result -= second;
     return result;
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator - (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
-    result -= second;
-    return result;
-}
+template<ALExplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+void operator - (const UNIT& first, const UNITLESS_TYPE& second) = delete;
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> operator - (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
-{
-    LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE1, STORAGE_TYPE2>::type_t, UNITS1> result(first);
-    result -= LLUnitImplicit<STORAGE_TYPE1, UNITS1>(second);
-    return result;
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator - (LLUnitImplicit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
-{
-    LLUnitImplicit<typename LLResultTypeSubtract<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> result(first);
-    result -= second;
-    return result;
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeSubtract<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS> operator - (UNITLESS_TYPE first, LLUnitImplicit<STORAGE_TYPE, UNITS> second)
-{
-    LLUnitImplicit<typename LLResultTypeSubtract<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS> result(first);
-    result -= second;
-    return result;
-}
+template<ALUnitlessType UNITLESS_TYPE, ALExplicitUnitType UNIT>
+void operator - (const UNITLESS_TYPE& first, const UNIT& second) = delete;
 
 //
-// operator *
+// operator *: a unit and a plain value
 //
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LLUnit<STORAGE_TYPE1, UNITS1> operator * (LLUnit<STORAGE_TYPE1, UNITS1>, LLUnit<STORAGE_TYPE2, UNITS2>)
+template<ALUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr ALUnitLike<UNIT, LLResultTypeMultiply<typename UNIT::storage_t, UNITLESS_TYPE>> operator * (const UNIT& first, UNITLESS_TYPE second)
 {
-    // spurious use of dependent type to stop gcc from triggering the static assertion before instantiating the template
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE1, "multiplication of unit types results in new unit type - not supported.");
-    return LLUnit<STORAGE_TYPE1, UNITS1>();
+    return ALUnitLike<UNIT, LLResultTypeMultiply<typename UNIT::storage_t, UNITLESS_TYPE>>(first.value() * second);
 }
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnit<typename LLResultTypeMultiply<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator * (LLUnit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
+template<ALUnitlessType UNITLESS_TYPE, ALUnitType UNIT>
+[[nodiscard]] LL_FORCE_INLINE constexpr ALUnitLike<UNIT, LLResultTypeMultiply<UNITLESS_TYPE, typename UNIT::storage_t>> operator * (UNITLESS_TYPE first, const UNIT& second)
 {
-    return LLUnit<typename LLResultTypeMultiply<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS>(first.value() * second);
+    return ALUnitLike<UNIT, LLResultTypeMultiply<UNITLESS_TYPE, typename UNIT::storage_t>>(first * second.value());
 }
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnit<typename LLResultTypeMultiply<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS> operator * (UNITLESS_TYPE first, LLUnit<STORAGE_TYPE, UNITS> second)
-{
-    return LLUnit<typename LLResultTypeMultiply<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS>(first * second.value());
-}
-
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LLUnitImplicit<STORAGE_TYPE1, UNITS1> operator * (LLUnitImplicit<STORAGE_TYPE1, UNITS1>, LLUnitImplicit<STORAGE_TYPE2, UNITS2>)
-{
-    // spurious use of dependent type to stop gcc from triggering the static assertion before instantiating the template
-    LL_BAD_TEMPLATE_INSTANTIATION(STORAGE_TYPE1, "multiplication of unit types results in new unit type - not supported.");
-    return LLUnitImplicit<STORAGE_TYPE1, UNITS1>();
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeMultiply<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator * (LLUnitImplicit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
-{
-    return LLUnitImplicit<typename LLResultTypeMultiply<STORAGE_TYPE, UNITLESS_TYPE>::type_t, UNITS>(first.value() * second);
-}
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeMultiply<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS> operator * (UNITLESS_TYPE first, LLUnitImplicit<STORAGE_TYPE, UNITS> second)
-{
-    return LLUnitImplicit<typename LLResultTypeMultiply<typename LLStorageType<UNITLESS_TYPE>::type_t, STORAGE_TYPE>::type_t, UNITS>(first * second.value());
-}
-
+// a product of units is a new kind of unit
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+void operator * (const UNIT1& first, const UNIT2& second) = delete;
 
 //
-// operator /
+// operator /: a unit by a plain value, or by a unit of its dimension, which leaves a plain value
 //
-
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnit<typename LLResultTypeDivide<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator / (LLUnit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
+template<ALUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr ALUnitLike<UNIT, LLResultTypeDivide<typename UNIT::storage_t, UNITLESS_TYPE>> operator / (const UNIT& first, UNITLESS_TYPE second)
 {
-    return LLUnit<typename LLResultTypeDivide<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS>(first.value() / second);
+    return ALUnitLike<UNIT, LLResultTypeDivide<typename UNIT::storage_t, UNITLESS_TYPE>>(first.value() / second);
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t operator / (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr LLResultTypeDivide<typename UNIT1::storage_t, typename UNIT2::storage_t> operator / (const UNIT1& first, const UNIT2& second)
 {
-    return first.value() / first.convert(second).value();
+    using first_t = LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>;
+    return (LLResultTypeDivide<typename UNIT1::storage_t, typename UNIT2::storage_t>)(first.value() / first_t::convert(second).value());
 }
 
-template<typename STORAGE_TYPE, typename UNITS, typename UNITLESS_TYPE>
-LL_FORCE_INLINE LLUnitImplicit<typename LLResultTypeDivide<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS> operator / (LLUnitImplicit<STORAGE_TYPE, UNITS> first, UNITLESS_TYPE second)
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+void operator / (const UNIT1& first, const UNIT2& second) = delete;
+
+//
+// comparisons between two units of one dimension, or between an implicit unit and a plain value
+//
+// != is rewritten from ==. The relational operators are not rewritten from <=>, which MSVC compiles to a chain of
+// branches for a floating point storage type.
+//
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator == (const UNIT1& first, const UNIT2& second)
 {
-    return LLUnitImplicit<typename LLResultTypeDivide<STORAGE_TYPE, typename LLStorageType<UNITLESS_TYPE>::type_t>::type_t, UNITS>(first.value() / second);
+    return first.value() == LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>::convert(second).value();
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t operator / (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator < (const UNIT1& first, const UNIT2& second)
 {
-    return (typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t)(first.value() / first.convert(second).value());
+    return first.value() < LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>::convert(second).value();
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t operator / (LLUnit<STORAGE_TYPE1, UNITS1> first, LLUnitImplicit<STORAGE_TYPE2, UNITS2> second)
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator <= (const UNIT1& first, const UNIT2& second)
 {
-    return (typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t)(first.value() / first.convert(second).value());
+    return first.value() <= LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>::convert(second).value();
 }
 
-template<typename STORAGE_TYPE1, typename UNITS1, typename STORAGE_TYPE2, typename UNITS2>
-LL_FORCE_INLINE typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t operator / (LLUnitImplicit<STORAGE_TYPE1, UNITS1> first, LLUnit<STORAGE_TYPE2, UNITS2> second)
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator > (const UNIT1& first, const UNIT2& second)
 {
-    return (typename LLResultTypeDivide<STORAGE_TYPE1, STORAGE_TYPE2>::type_t)(first.value() / first.convert(second).value());
+    return first.value() > LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>::convert(second).value();
+}
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator >= (const UNIT1& first, const UNIT2& second)
+{
+    return first.value() >= LLUnit<typename UNIT1::storage_t, typename UNIT1::unit_t>::convert(second).value();
+}
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+bool operator == (const UNIT1& first, const UNIT2& second) = delete;
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+bool operator < (const UNIT1& first, const UNIT2& second) = delete;
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+bool operator <= (const UNIT1& first, const UNIT2& second) = delete;
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+bool operator > (const UNIT1& first, const UNIT2& second) = delete;
+
+template<ALUnitType UNIT1, ALUnitType UNIT2>
+    requires (!ALCompatibleUnits<typename UNIT1::unit_t, typename UNIT2::unit_t>)
+bool operator >= (const UNIT1& first, const UNIT2& second) = delete;
+
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator == (const UNIT& first, const UNITLESS_TYPE& second)
+{
+    return first.value() == second;
+}
+
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator < (const UNIT& first, const UNITLESS_TYPE& second)
+{
+    return first.value() < second;
+}
+
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator <= (const UNIT& first, const UNITLESS_TYPE& second)
+{
+    return first.value() <= second;
+}
+
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator > (const UNIT& first, const UNITLESS_TYPE& second)
+{
+    return first.value() > second;
+}
+
+template<ALImplicitUnitType UNIT, ALUnitlessType UNITLESS_TYPE>
+[[nodiscard]] LL_FORCE_INLINE constexpr bool operator >= (const UNIT& first, const UNITLESS_TYPE& second)
+{
+    return first.value() >= second;
 }
 
 template<typename T>
 struct LLGetUnitLabel
 {
-    static const char* getUnitLabel() { return ""; }
+    static constexpr const char* getUnitLabel() { return ""; }
 };
 
 template<typename T, typename STORAGE_T>
 struct LLGetUnitLabel<LLUnit<STORAGE_T, T> >
 {
-    static const char* getUnitLabel() { return T::getUnitLabel(); }
+    static constexpr const char* getUnitLabel() { return T::getUnitLabel(); }
 };
 
-template<typename T>
-struct LLUnitLinearOps
+// formats the value as its storage type would be, then the unit's label: fmt::format("{:.1f}", F32Seconds(2.f)) is "2.0s"
+template<typename STORAGE_TYPE, typename UNITS>
+struct fmt::formatter<LLUnit<STORAGE_TYPE, UNITS>> : fmt::formatter<STORAGE_TYPE>
 {
-    typedef LLUnitLinearOps<T> self_t;
-
-    LLUnitLinearOps(T val)
-    :   mValue(val),
-        mDivisor(1)
-    {}
-
-    template<typename OTHER_T>
-    self_t operator * (OTHER_T other)
+    template<typename FORMAT_CONTEXT>
+    auto format(const LLUnit<STORAGE_TYPE, UNITS>& unit, FORMAT_CONTEXT& ctx) const
     {
-        return mValue * other;
+        auto out = fmt::formatter<STORAGE_TYPE>::format(unit.value(), ctx);
+        for (const char* label = UNITS::getUnitLabel(); *label; ++label)
+        {
+            *out++ = *label;
+        }
+        return out;
     }
-
-    template<typename OTHER_T>
-    self_t operator / (OTHER_T other)
-    {
-        mDivisor *= other;
-        return *this;
-    }
-
-    template<typename OTHER_T>
-    self_t operator + (OTHER_T other)
-    {
-        mValue += other * mDivisor;
-        return *this;
-    }
-
-    template<typename OTHER_T>
-    self_t operator - (OTHER_T other)
-    {
-        mValue -= other * mDivisor;
-        return *this;
-    }
-
-    T mValue;
-    T mDivisor;
 };
 
-template<typename T>
-struct LLUnitInverseLinearOps
+template<typename STORAGE_TYPE, typename UNITS>
+struct fmt::formatter<LLUnitImplicit<STORAGE_TYPE, UNITS>> : fmt::formatter<LLUnit<STORAGE_TYPE, UNITS>>
 {
-    typedef LLUnitInverseLinearOps<T> self_t;
-
-    LLUnitInverseLinearOps(T val)
-    :   mValue(val),
-        mDivisor(1),
-        mMultiplicand(1)
-    {}
-
-    template<typename OTHER_T>
-    self_t operator * (OTHER_T other)
-    {
-        mDivisor *= other;
-        return *this;
-    }
-
-    template<typename OTHER_T>
-    self_t operator / (OTHER_T other)
-    {
-        mValue *= other;
-        mMultiplicand *= other;
-        return *this;
-    }
-
-    template<typename OTHER_T>
-    self_t operator + (OTHER_T other)
-    {
-        mValue -= other * mMultiplicand;
-        return *this;
-    }
-
-    template<typename OTHER_T>
-    self_t operator - (OTHER_T other)
-    {
-        mValue += other * mMultiplicand;
-        return *this;
-    }
-
-    T mValue;
-    T mDivisor;
-    T mMultiplicand;
 };
 
-#define LL_DECLARE_BASE_UNIT(base_unit_name, unit_label)                                             \
-struct base_unit_name                                                                                \
-{                                                                                                    \
-    static const int sLevel = 0;                                                                     \
-    typedef base_unit_name base_unit_t;                                                              \
-    static const char* getUnitLabel() { return unit_label; }                                         \
-    template<typename T>                                                                             \
-    static LLUnit<T, base_unit_name> fromValue(T value) { return LLUnit<T, base_unit_name>(value); } \
-    template<typename STORAGE_T, typename UNIT_T>                                                    \
-    static LLUnit<STORAGE_T, base_unit_name> fromValue(LLUnit<STORAGE_T, UNIT_T> value)              \
-    { return LLUnit<STORAGE_T, base_unit_name>(value); }                                             \
+//
+// unit definitions
+//
+// A unit is a type naming its base unit and its label, and, for a unit defined from another, sConversion: the
+// ALUnitConversion taking a value in the base unit to one in this unit.
+//
+//     struct Kilobytes : ALDerivedUnit<Kilobytes, Bytes>
+//     {
+//         static constexpr const char* getUnitLabel() { return "KB"; }
+//         static constexpr auto sConversion = ALUnitConversion() / 1024;
+//     };
+//
+// Units of one dimension convert into each other through the base unit they share, as one map worked out at compile
+// time. LL_DECLARE_BASE_UNIT and LL_DECLARE_DERIVED_UNIT write these out.
+//
+template<typename SELF>
+struct ALUnitDefinition
+{
+    template<ALUnitlessType T>
+    [[nodiscard]] static constexpr LLUnit<T, SELF> fromValue(T value)
+    {
+        return LLUnit<T, SELF>(value);
+    }
+
+    template<typename STORAGE_T, typename UNIT_T>
+    [[nodiscard]] static constexpr LLUnit<STORAGE_T, SELF> fromValue(LLUnit<STORAGE_T, UNIT_T> value)
+    {
+        return LLUnit<STORAGE_T, SELF>(value);
+    }
+};
+
+template<typename SELF>
+struct ALBaseUnit : ALUnitDefinition<SELF>
+{
+    using base_unit_t = SELF;
+};
+
+template<typename SELF, typename BASE_UNIT>
+struct ALDerivedUnit : ALUnitDefinition<SELF>
+{
+    using base_unit_t = BASE_UNIT;
+};
+
+#define LL_DECLARE_BASE_UNIT(base_unit_name, unit_label)                        \
+struct base_unit_name : ALBaseUnit<base_unit_name>                              \
+{                                                                               \
+    static constexpr const char* getUnitLabel() { return unit_label; }          \
 }
 
-
-#define LL_DECLARE_DERIVED_UNIT(unit_name, unit_label, base_unit_name, conversion_operation)     \
-struct unit_name                                                                                 \
-{                                                                                                \
-    static const int sLevel = base_unit_name::sLevel + 1;                                        \
-    typedef base_unit_name base_unit_t;                                                          \
-    static const char* getUnitLabel() { return unit_label; }                                     \
-    template<typename T>                                                                         \
-    static LLUnit<T, unit_name> fromValue(T value) { return LLUnit<T, unit_name>(value); }       \
-    template<typename STORAGE_T, typename UNIT_T>                                                \
-    static LLUnit<STORAGE_T, unit_name> fromValue(LLUnit<STORAGE_T, UNIT_T> value)               \
-    { return LLUnit<STORAGE_T, unit_name>(value); }                                              \
-};                                                                                               \
-                                                                                                 \
-template<typename S1, typename S2>                                                               \
-LL_FORCE_INLINE S2 ll_convert_units(LLUnit<S1, unit_name> in, LLUnit<S2, base_unit_name>& out)   \
-{                                                                                                \
-    typedef typename LLResultTypePromote<S1, S2>::type_t result_storage_t;                       \
-    LLUnitInverseLinearOps<result_storage_t> result =                                            \
-        LLUnitInverseLinearOps<result_storage_t>(in.value()) conversion_operation;               \
-    out = LLUnit<S2, base_unit_name>((S2)result.mValue);                                         \
-    return result.mDivisor;                                                                      \
-}                                                                                                \
-                                                                                                 \
-template<typename S1, typename S2>                                                               \
-LL_FORCE_INLINE S2 ll_convert_units(LLUnit<S1, base_unit_name> in, LLUnit<S2, unit_name>& out)   \
-{                                                                                                \
-    typedef typename LLResultTypePromote<S1, S2>::type_t result_storage_t;                       \
-    LLUnitLinearOps<result_storage_t> result =                                                   \
-        LLUnitLinearOps<result_storage_t>(in.value()) conversion_operation;                      \
-    out = LLUnit<S2, unit_name>((S2)result.mValue);                                              \
-    return result.mDivisor;                                                                      \
+#define LL_DECLARE_DERIVED_UNIT(unit_name, unit_label, base_unit_name, conversion_operation)   \
+struct unit_name : ALDerivedUnit<unit_name, base_unit_name>                                    \
+{                                                                                              \
+    static constexpr const char* getUnitLabel() { return unit_label; }                         \
+    static constexpr auto sConversion = ALUnitConversion() conversion_operation;               \
 }
 
-#define LL_DECLARE_UNIT_TYPEDEFS(ns, unit_name)                         \
-    typedef LLUnit<F32, ns::unit_name> F32##unit_name;                  \
-    typedef LLUnitImplicit<F32, ns::unit_name> F32##unit_name##Implicit;\
-    typedef LLUnit<F64, ns::unit_name> F64##unit_name;                  \
-    typedef LLUnitImplicit<F64, ns::unit_name> F64##unit_name##Implicit;\
-    typedef LLUnit<S32, ns::unit_name> S32##unit_name;                  \
-    typedef LLUnitImplicit<S32, ns::unit_name> S32##unit_name##Implicit;\
-    typedef LLUnit<S64, ns::unit_name> S64##unit_name;                  \
-    typedef LLUnitImplicit<S64, ns::unit_name> S64##unit_name##Implicit;\
-    typedef LLUnit<U32, ns::unit_name> U32##unit_name;                  \
-    typedef LLUnitImplicit<U32, ns::unit_name> U32##unit_name##Implicit;\
-    typedef LLUnit<U64, ns::unit_name> U64##unit_name;                  \
-    typedef LLUnitImplicit<U64, ns::unit_name> U64##unit_name##Implicit
+#define LL_DECLARE_UNIT_TYPEDEFS(ns, unit_name)                           \
+    using F32##unit_name = LLUnit<F32, ns::unit_name>;                    \
+    using F32##unit_name##Implicit = LLUnitImplicit<F32, ns::unit_name>;  \
+    using F64##unit_name = LLUnit<F64, ns::unit_name>;                    \
+    using F64##unit_name##Implicit = LLUnitImplicit<F64, ns::unit_name>;  \
+    using S32##unit_name = LLUnit<S32, ns::unit_name>;                    \
+    using S32##unit_name##Implicit = LLUnitImplicit<S32, ns::unit_name>;  \
+    using S64##unit_name = LLUnit<S64, ns::unit_name>;                    \
+    using S64##unit_name##Implicit = LLUnitImplicit<S64, ns::unit_name>;  \
+    using U32##unit_name = LLUnit<U32, ns::unit_name>;                    \
+    using U32##unit_name##Implicit = LLUnitImplicit<U32, ns::unit_name>;  \
+    using U64##unit_name = LLUnit<U64, ns::unit_name>;                    \
+    using U64##unit_name##Implicit = LLUnitImplicit<U64, ns::unit_name>
 
 #ifdef LL_WINDOWS
 #pragma warning(pop)

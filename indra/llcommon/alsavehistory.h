@@ -24,13 +24,15 @@
 
 #pragma once
 
+#include "llcoros.h"
 #include "lldate.h"
 #include "llsd.h"
 #include "lluuid.h"
 
-#include <mutex>
 #include <string>
 #include <vector>
+
+#include LLCOROS_MUTEX_HEADER
 
 // A save of a script or a notecard as it went up: its text, and enough
 // about whose it was to list it and to say what it was.
@@ -118,9 +120,10 @@ private:
     // A key's saves past the count, or older than the age, let go of.
     void trim(const std::string& folder, const LLDate& now);
 
-    std::string        mDirectory;
-    size_t             mPerKey = MAX_PER_KEY;
-    F64                mMaxAge = MAX_AGE;
-    size_t             mBytes  = MAX_BYTES;
-    mutable std::mutex mLock;
+    std::string            mDirectory;
+    size_t                 mPerKey = MAX_PER_KEY;
+    F64                    mMaxAge = MAX_AGE;
+    size_t                 mBytes  = MAX_BYTES;
+    // Listed on the main thread, which a coroutine may do.
+    mutable LLCoros::Mutex mLock;
 };

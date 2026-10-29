@@ -26,9 +26,11 @@
 
 #include "alparamtype.h"
 
+#include "llcoros.h"
+
 #include <boost/unordered/unordered_flat_map.hpp>
 
-#include <mutex>
+#include LLCOROS_MUTEX_HEADER
 
 namespace
 {
@@ -42,9 +44,11 @@ namespace
         return sTable;
     }
 
-    std::mutex& lock()
+    // A block is first made wherever it is first wanted, a coroutine
+    // among those places.
+    LLCoros::Mutex& lock()
     {
-        static std::mutex sMutex;
+        static LLCoros::Mutex sMutex;
         return sMutex;
     }
 }
@@ -52,14 +56,14 @@ namespace
 //static
 void ALParamTypes::record(const LLInitParam::ParamDescriptor* param, const ALParamType& type)
 {
-    std::lock_guard<std::mutex> guard(lock());
+    LLCoros::LockType guard(lock());
     table()[param] = type;
 }
 
 //static
 const ALParamType* ALParamTypes::find(const LLInitParam::ParamDescriptor* param)
 {
-    std::lock_guard<std::mutex> guard(lock());
+    LLCoros::LockType guard(lock());
     const table_t::const_iterator found = table().find(param);
     return found == table().end() ? nullptr : &found->second;
 }
@@ -67,14 +71,14 @@ const ALParamType* ALParamTypes::find(const LLInitParam::ParamDescriptor* param)
 //static
 size_t ALParamTypes::count()
 {
-    std::lock_guard<std::mutex> guard(lock());
+    LLCoros::LockType guard(lock());
     return table().size();
 }
 
 //static
 size_t ALParamTypes::bytes()
 {
-    std::lock_guard<std::mutex> guard(lock());
+    LLCoros::LockType guard(lock());
     // A flat map's slot is the pair plus a byte of control, and it keeps room
     // it has not filled: the load factor is what the capacity says.
     return (sizeof(table_t::value_type) + 1) * table().bucket_count();

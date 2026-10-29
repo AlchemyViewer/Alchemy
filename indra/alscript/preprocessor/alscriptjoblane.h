@@ -24,14 +24,16 @@
 
 #pragma once
 
+#include "llcoros.h"
 #include "llerror.h"
 
 #include <deque>
 #include <exception>
 #include <functional>
 #include <memory>
-#include <mutex>
 #include <string>
+
+#include LLCOROS_MUTEX_HEADER
 
 // What waits for a worker, on the worker's side: it takes the next itself
 // as each ends, rather than waiting a frame for the main thread to hand it
@@ -59,7 +61,7 @@ public:
     // started on drain(). Nothing, once closed.
     bool put(Queued queued, const taking_t& taking)
     {
-        std::lock_guard<std::mutex> guard(mLock);
+        LLCoros::LockType guard(mLock);
         if (mClosed)
         {
             return false;
@@ -106,7 +108,7 @@ public:
         {
             std::function<void()> work;
             {
-                std::lock_guard<std::mutex> guard(mLock);
+                LLCoros::LockType guard(mLock);
                 mRunning.reset();
                 std::deque<Queued>& from = !mRuns.empty() ? mRuns : mChecks;
                 if (mClosed || from.empty())
@@ -139,7 +141,7 @@ public:
     // starts it again.
     void notStarted()
     {
-        std::lock_guard<std::mutex> guard(mLock);
+        LLCoros::LockType guard(mLock);
         mDraining = false;
         mRuns.clear();
         mChecks.clear();
@@ -148,7 +150,7 @@ public:
     // Nothing more taken, and what waits let go of; kept closed.
     void close()
     {
-        std::lock_guard<std::mutex> guard(mLock);
+        LLCoros::LockType guard(mLock);
         mClosed = true;
         mRuns.clear();
         mChecks.clear();
@@ -156,12 +158,13 @@ public:
 
     size_t waiting()
     {
-        std::lock_guard<std::mutex> guard(mLock);
+        LLCoros::LockType guard(mLock);
         return mRuns.size() + mChecks.size();
     }
 
 private:
-    std::mutex           mLock;
+    // The main thread's side may be a coroutine's.
+    LLCoros::Mutex       mLock;
     std::deque<Queued>   mRuns;
     std::deque<Queued>   mChecks;
     bool                 mDraining = false;

@@ -28,6 +28,7 @@
 
 #include "alfilewrite.h"
 #include "fsyspath.h"
+#include "llcoros.h"
 #include "llfile.h"
 #include "llsdserialize.h"
 #include "lltimer.h"
@@ -35,14 +36,15 @@
 
 #include <algorithm>
 #include <cmath>
-#include <condition_variable>
 #include <ctime>
 #include <cstdlib>
 #include <filesystem>
 #include <map>
-#include <mutex>
 #include <sstream>
 #include <string_view>
+
+#include LLCOROS_MUTEX_HEADER
+#include LLCOROS_CONDVAR_HEADER
 
 namespace
 {
@@ -294,7 +296,8 @@ F64 ALRecoveryRetry::delayAfter(S32 failures)
 // with where it goes -- handed over whole, what it holds of LLSD made on
 // the thread that asked and held by nothing else, since an LLSD's count of
 // who holds it is no thread's but one's -- whether one is being written
-// now, and whether the writer has been asked to write them.
+// now, and whether the writer has been asked to write them. Handed over and
+// waited for on the main thread, which a coroutine may do.
 struct ALRecoveryStore::Writer
 {
     struct Waiting
@@ -303,8 +306,8 @@ struct ALRecoveryStore::Writer
         ALRecoveryEntry entry;
         bool                  durable = false;
     };
-    std::mutex                     mutex;
-    std::condition_variable        changed;
+    LLCoros::Mutex                 mutex;
+    LLCoros::ConditionVariable     changed;
     std::map<std::string, Waiting> waiting;
     bool                           busy   = false;
     bool                           posted = false;
@@ -313,7 +316,7 @@ struct ALRecoveryStore::Writer
     // Everything waiting written, what comes meanwhile too.
     void drain()
     {
-        std::unique_lock<std::mutex> lock(mutex);
+        LLCoros::LockType lock(mutex);
         while (!waiting.empty())
         {
             auto one = waiting.extract(waiting.begin());
@@ -396,7 +399,7 @@ void ALRecoveryStore::writeSoon(ALRecoveryEntry entry, bool durable)
         mWriter = std::make_unique<Writer>();
     }
     {
-        const std::lock_guard<std::mutex> lock(mWriter->mutex);
+        const LLCoros::LockType lock(mWriter->mutex);
         // A durable write still waiting stays durable when a newer one
         // takes its place.
         if (const auto was = mWriter->waiting.find(key); was != mWriter->waiting.end())
@@ -425,7 +428,7 @@ void ALRecoveryStore::flush() const
     {
         return;
     }
-    std::unique_lock<std::mutex> lock(mWriter->mutex);
+    LLCoros::LockType lock(mWriter->mutex);
     mWriter->changed.wait(lock, [this] { return mWriter->waiting.empty() && !mWriter->busy && !mWriter->posted; });
 }
 
@@ -434,7 +437,7 @@ std::vector<std::string> ALRecoveryStore::takeFailures()
     std::vector<std::string> out;
     if (mWriter)
     {
-        const std::lock_guard<std::mutex> lock(mWriter->mutex);
+        const LLCoros::LockType lock(mWriter->mutex);
         out.swap(mWriter->failed);
     }
     return out;
@@ -446,10 +449,10 @@ bool ALRecoveryStore::takeFailure(const std::string& key)
     {
         return false;
     }
-    const std::lock_guard<std::mutex> lock(mWriter->mutex);
-    std::vector<std::string>&         failed = mWriter->failed;
-    const auto                        gone   = std::remove(failed.begin(), failed.end(), key);
-    const bool                        any    = gone != failed.end();
+    const LLCoros::LockType   lock(mWriter->mutex);
+    std::vector<std::string>& failed = mWriter->failed;
+    const auto                gone   = std::remove(failed.begin(), failed.end(), key);
+    const bool                any    = gone != failed.end();
     failed.erase(gone, failed.end());
     return any;
 }

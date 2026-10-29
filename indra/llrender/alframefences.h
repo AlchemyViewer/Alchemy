@@ -49,7 +49,7 @@
 /// thread: a poll of a fence not yet signalled, even at the swap, waits for that thread to run everything issued before
 /// it, which leaves it idle while the CPU begins the next frame, and the frame as long as the two threads' work end to
 /// end wherever the driver's thread is the slower. The pacing wait reads the slot until the stamp comes, sleeping
-/// through what the last wait took but its end and yielding the rest. A frame whose stamp has not come in a second is
+/// through what the last wait took but its end and spinning the rest. A frame whose stamp has not come in a second is
 /// waited out on a fence laid behind it, and a stamp still missing after that sends the frames' ends back to fences.
 /// The GPU writes a stamp only once the frame has finished, so its front end may wait there before it begins the next
 /// frame.

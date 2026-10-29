@@ -1,10 +1,10 @@
 /**
- * @file lldrawpoolsky.cpp
- * @brief LLDrawPoolSky class implementation
+ * @file class1/deferred/skyCompositeV.glsl
+ * @brief The sky's pass: the screen triangle on the far plane, its pixels' places on the screen for the composite.
  *
- * $LicenseInfo:firstyear=2002&license=viewerlgpl$
- * Second Life Viewer Source Code
- * Copyright (C) 2010, Linden Research, Inc.
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright © 2026, Rye <rye@alchemyviewer.org>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -24,34 +24,20 @@
  * $/LicenseInfo$
  */
 
-#include "llviewerprecompiledheaders.h"
+in vec3 position;
 
-#include "lldrawpoolsky.h"
+out vec2 vary_fragcoord;
 
-// DEPRECATED
-
-LLDrawPoolSky::LLDrawPoolSky()
-:   LLFacePool(POOL_SKY),
-    mSkyTex(NULL),
-    mShader(NULL)
+void main()
 {
+    // Level with the depth the sky leaves cleared, as the soften pass's triangle is (softenLightV.glsl): the sky's draw
+    // passes only on the far plane, where the world drew nothing (LLPipeline::renderDeferredLighting). Reverse-Z puts the
+    // far plane at ndc z 0.
+#ifdef REVERSE_Z
+    gl_Position = vec4(position.xy, 0.0, 1.0);
+#else
+    gl_Position = vec4(position.xy, 1.0, 1.0);
+#endif
+
+    vary_fragcoord = position.xy * 0.5 + 0.5;
 }
-
-void LLDrawPoolSky::prerender()
-{
-}
-
-void LLDrawPoolSky::render(S32 pass)
-{
-
-}
-
-void LLDrawPoolSky::renderSkyFace(U8 index)
-{
-
-}
-
-void LLDrawPoolSky::endRenderPass( S32 pass )
-{
-}
-

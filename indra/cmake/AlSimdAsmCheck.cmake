@@ -50,7 +50,7 @@ set(
   mask_lane2=4 mask_xyz=4 mask_not=4
   cmplt=3 cmpge=3 cmpeq=3 cmpne=4 nonfinite=6 select=5
   bits=7 any=6 all=6 any3=7 all3=8
-  dot3=10 dot4=9 cross3=16 prefetch=3 transform=18
+  dot3=10 dot4=9 cross3=16 prefetch=3 pause=3 transform=18
 )
 # gersemi: on
 

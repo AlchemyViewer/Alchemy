@@ -87,8 +87,6 @@ uniform vec4 waterPlane;
 
 uniform int cube_snapshot;
 
-uniform float sky_hdr_scale;
-
 void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float nh, out float nl, out float nv, out float vh, out float lightDist);
 float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
@@ -111,7 +109,7 @@ vec3 pbrBaseLight(vec3 diffuseColor,
 
 GBufferInfo getGBuffer(vec2 screenpos);
 float horizonOcclusion(vec3 r, vec3 geometricNormal);
-vec3 clampHDRRange(vec3 color);
+vec3 clampRadiance(vec3 c, float ceiling);
 
 void adjustIrradiance(inout vec3 irradiance, float ambocc)
 {
@@ -150,49 +148,20 @@ float ssaoVisibility(float ambocc)
 #endif
 }
 
-// The colour the sky family wrote, which nothing lights: an HDRI sky's as it is, WindLight's scaled for fake HDR.
-vec3 skyColor(GBufferInfo gb)
-{
-    if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI))
-    {
-        // actual HDRI sky, just copy color value -- from the albedo target when there is no
-        // emissive one, where skyF encodes it and the read decodes it back to linear
-#if defined(HAS_EMISSIVE)
-        return gb.emissive.rgb;
-#else
-        return gb.albedo.rgb;
-#endif
-    }
-
-    //should only be true of WL sky, port over base color value and scale for fake HDR
-#if defined(HAS_EMISSIVE)
-    vec3 color = srgb_to_linear(gb.emissive.rgb);
-#else
-    // the sky wrote display-encoded values raw into the sRGB albedo target, and this pass reads it
-    // with hardware decode, so baseColor is already linear; decoding again darkened the vintage sky
-    vec3 color = gb.albedo.rgb;
-#endif
-    return color * sky_hdr_scale;
-}
-
 void writeColor(vec3 color)
 {
     float final_scale = 1;
     if (classic_mode > 0)
         final_scale = 1.1;
 
-    frag_color.rgb = clampHDRRange(color.rgb * final_scale); //output linear since local lights will be added to this shader's results
+    // Output linear, held to half the scene's range: the local lights add onto it (MAX_SURFACE_RADIANCE).
+    frag_color.rgb = clampRadiance(color.rgb * final_scale, MAX_SURFACE_RADIANCE);
     frag_color.a = 0.0;
 }
 
 void main()
 {
     vec2  tc           = vary_fragcoord.xy;
-#ifdef SOFTEN_SKY
-    // This variant's draw passes only at the cleared depth, where nothing but the sky family draws, so nothing here
-    // is lit or hazed: the sky's colour goes through as it was written (LLPipeline::renderDeferredLighting).
-    writeColor(skyColor(getGBuffer(tc)));
-#else
     float depth        = getDepth(tc.xy);
     vec4  pos          = getPositionWithDepth(tc, depth);
 
@@ -243,7 +212,7 @@ void main()
     bool pbr = GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_PBR);
     vec3 irradiance = amblit_linear;
     vec3 legacyenv = vec3(0);
-    if (pbr || !(GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS)))
+    if (pbr || !GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
         // PBR IBL from the roughness, the legacy environment from the glossiness.
         float glossiness = pbr ? 1.0 - unpackRoughness(spec.ga) : spec.a;
@@ -281,10 +250,12 @@ void main()
         vec3 v = -normalize(pos.xyz);
         color = pbrBaseLight(diffuseColor, specularColor, metallic, v, gb.normal, perceptualRoughness, light_dir, sunlit_linear, scol, radiance, irradiance, colorEmissive, visibility, additive, atten);
     }
-    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_HAS_HDRI) || GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
+    else if (GET_GBUFFER_FLAG(gb.gbufferFlag, GBUFFER_FLAG_SKIP_ATMOS))
     {
-        // unlit in front of the far plane, where the sky's own draw does not reach: a debug highlight writes SKIP_ATMOS
-        color = skyColor(gb);
+        // Unlit, as it is: class 1's material program (deferred/materialF.glsl) writes its magenta into the albedo,
+        // with no normal to light, flagged to skip the atmospherics. The sRGB albedo target is read with hardware
+        // decode, so the colour is linear already.
+        color = gb.albedo.rgb;
     }
     else
     {
@@ -367,5 +338,4 @@ void main()
 
     //color.r = classic_mode > 0 ? 1.0 : 0.0;
     writeColor(color);
-#endif
 }

@@ -38,9 +38,21 @@
 
 out vec4 frag_color;
 
-uniform sampler2D diffuseRect;  // the HDR scene, before bloom
-uniform sampler2D normalMap;    // the G-buffer normals, whose flags mark the sky
-uniform vec4 meter_params;      // xy: a patch's size in scene texels, zw: taps across it per axis
+uniform sampler2D diffuseRect;   // the HDR scene, before bloom
+uniform sampler2D depthMap;      // the scene's depth, the far plane wherever the sky is
+uniform sampler2D meterWaterMap; // the G-buffer's normals under the water's own pixels, 0 elsewhere
+uniform vec4 meter_params;       // xy: a patch's size in scene texels, zw: taps across it per axis
+
+// The sky is what the world leaves at the far plane (deferredUtil.glsl).
+bool isFarDepth(float d);
+
+// And the water over it. The water writes the scene's depth but never the G-buffer, so where it lies over nothing the
+// deferred pass drew, the G-buffer keeps its clear under it, whose 1 in the normals' alpha no writer's flag is (read
+// with GET_GBUFFER_FLAG's tolerance). Nothing is water where there is no map to say so.
+bool waterOverSky(ivec2 px, ivec2 water_size)
+{
+    return all(lessThan(px, water_size)) && texelFetch(meterWaterMap, px, 0).a > 0.9;
+}
 
 float lum(vec3 col)
 {
@@ -50,6 +62,7 @@ float lum(vec3 col)
 void main()
 {
     vec2 scene_size = vec2(textureSize(diffuseRect, 0));
+    ivec2 water_size = textureSize(meterWaterMap, 0);
     vec2 patch_origin = floor(gl_FragCoord.xy) * meter_params.xy;
     vec2 tap_step = meter_params.xy / meter_params.zw;
     ivec2 taps = ivec2(meter_params.zw);
@@ -62,10 +75,11 @@ void main()
         for (int i = 0; i < taps.x; ++i)
         {
             vec2 px = patch_origin + (vec2(i, j) + 0.5) * tap_step;
-            // R16F tops out at 65504; the sun disc can be brighter
-            float L = min(lum(textureLod(diffuseRect, px / scene_size, 0.0).rgb), 60000.0);
-            vec4 norm = texelFetch(normalMap, ivec2(px), 0);
-            if (GET_GBUFFER_FLAG(norm.w, GBUFFER_FLAG_SKIP_ATMOS) || GET_GBUFFER_FLAG(norm.w, GBUFFER_FLAG_HAS_HDRI))
+            // R16F tops out at 65504; the sun disc can be brighter. A NaN reads as the black the
+            // frame shows it as, not as whatever min makes of it.
+            float L = lum(textureLod(diffuseRect, px / scene_size, 0.0).rgb);
+            L = isnan(L) ? 0.0 : min(L, 60000.0);
+            if (isFarDepth(texelFetch(depthMap, ivec2(px), 0).r) || waterOverSky(ivec2(px), water_size))
             {
                 sky += L;
                 sky_taps += 1.0;

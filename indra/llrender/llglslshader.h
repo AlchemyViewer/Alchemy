@@ -147,14 +147,6 @@ public:
 class LLGLSLShader
 {
 public:
-    // NOTE: Keep gShaderConsts and LLGLSLShader::ShaderConsts_e in sync!
-    enum eShaderConsts
-    {
-        SHADER_CONST_CLOUD_MOON_DEPTH
-        , SHADER_CONST_STAR_DEPTH
-        , NUM_SHADER_CONSTS
-    };
-
     // enum primarily used to control application sky settings uniforms
     typedef enum
     {
@@ -455,8 +447,6 @@ public:
     }
     void removePermutation(std::string name);
 
-    void addConstant(const LLGLSLShader::eShaderConsts shader_const);
-
     // Texture channel for the specified uniform, or -1 if the uniform is not used as a
     // texture. enableTexture only resolves it; disableTexture also releases the slot, and its
     // `mode` is the caller's expected target, checked against what was actually bound there
@@ -469,6 +459,8 @@ public:
 
     // bindTexture returns the texture unit we've bound the texture to.
     // You can reuse the return value to unbind a texture when required.
+    // A null texture or target binds nothing there, and the unit is let go of what it held; the
+    // unit is returned all the same. bindDepthTexture likewise.
     //
     // The sampler is NAMED BY THE CALLER, and there is no overload that infers it. How a pass
     // reads an image is a property of the pass: two materials can reference one texture and

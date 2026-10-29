@@ -121,6 +121,7 @@ namespace
         check("glow noise", s, [](Settings& x) { x.mGlowNoise = !x.mGlowNoise; }, Cost::Local);
         check("bloom halation", s, [](Settings& x) { x.mBloomHalation = !x.mBloomHalation; }, Cost::Local);
         check("SMAA predication", s, [](Settings& x) { x.mSMAAPredication = !x.mSMAAPredication; }, Cost::Local);
+        check("sun bloom", s, [](Settings& x) { x.mSunBloom = !x.mSunBloom; }, Cost::Local);
         check("terrain normals", s, [](Settings& x) { x.mTerrainPBRNormals = !x.mTerrainPBRNormals; }, Cost::Local);
         check("dynamic LOD", s, [](Settings& x) { x.mDynamicLOD = !x.mDynamicLOD; }, Cost::Local);
         check("water waves", s, [](Settings& x) { x.mWaterWaves = !x.mWaterWaves; }, Cost::Local);

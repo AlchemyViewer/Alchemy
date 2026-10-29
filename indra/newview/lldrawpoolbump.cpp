@@ -40,7 +40,6 @@
 #include "llcubemap.h"
 #include "lldrawable.h"
 #include "llface.h"
-#include "llsky.h"
 #include "llstartup.h"
 #include "lltextureentry.h"
 #include "llviewercamera.h"
@@ -209,74 +208,6 @@ S32 LLDrawPoolBump::numBumpPasses()
 }
 
 
-//static
-void LLDrawPoolBump::bindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel)
-{
-    LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
-    if( cube_map && !LLPipeline::sReflectionProbesEnabled )
-    {
-        if (shader )
-        {
-            const LLMatrix4a& modelview = LLViewerCamera::getCurrent().getModelview();
-            const LLMatrix4 mat = modelview.toMatrix4();
-            LLVector3 vec = LLVector3(gShinyOrigin) * mat;
-            LLVector4 vec4(vec, gShinyOrigin.mV[3]);
-            shader->uniform4fv(LLViewerShaderMgr::SHINY_ORIGIN, 1, vec4.mV);
-            if (shader_level > 1)
-            {
-                cube_map->setMatrix(1, modelview);
-                // Make sure that texture coord generation happens for tex unit 1, as that's the one we use for
-                // the cube map in the one pass shiny shaders
-                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
-                cube_map->enableTexture(cube_channel);
-                diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
-            }
-            else
-            {
-                cube_map->setMatrix(0, modelview);
-                cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
-                diffuse_channel = -1;
-                cube_map->enable(cube_channel);
-            }
-            gGL.getTextureSlot(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
-        }
-        else
-        {
-            cube_channel = 0;
-            diffuse_channel = -1;
-            gGL.getTextureSlot(0)->unbind();
-            cube_map->enable(0);
-            cube_map->setMatrix(0, LLViewerCamera::getCurrent().getModelview());
-            gGL.getTextureSlot(0)->bind(cube_map, ALSamplers::AnisoClamp);
-        }
-    }
-}
-
-//static
-void LLDrawPoolBump::unbindCubeMap(LLGLSLShader* shader, S32 shader_level, S32& diffuse_channel, S32& cube_channel)
-{
-    LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
-    if( cube_map && !LLPipeline::sReflectionProbesEnabled)
-    {
-        if (shader_level > 1)
-        {
-            shader->disableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, ALTextureSlot::TT_CUBE_MAP);
-
-            if (LLViewerShaderMgr::instance()->getShaderLevel(LLViewerShaderMgr::SHADER_OBJECT) > 0)
-            {
-                if (diffuse_channel != 0)
-                {
-                    shader->disableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
-                }
-            }
-        }
-        // Moved below shader->disableTexture call to avoid false alarms from auto-re-enable of textures on stage 0
-        // MAINT-755
-        cube_map->disable();
-        cube_map->restoreMatrix();
-    }
-}
-
 void LLDrawPoolBump::beginFullbrightShiny()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
@@ -303,18 +234,14 @@ void LLDrawPoolBump::beginFullbrightShiny()
         gGL.getTextureSlot(channel)->bind(&gPipeline.mExposureMap);
     }
 
-    LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
-
-    if (cube_map && !LLPipeline::sReflectionProbesEnabled)
+    if (!LLPipeline::sReflectionProbesEnabled)
     {
         // Make sure that texture coord generation happens for tex unit 1, as that's the one we use for
         // the cube map in the one pass shiny shaders
         gGL.getTextureSlot(1)->unbind();
         cube_channel = shader->enableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP);
-        cube_map->enableTexture(cube_channel);
         diffuse_channel = shader->enableTexture(LLViewerShaderMgr::DIFFUSE_MAP);
-
-        gGL.getTextureSlot(cube_channel)->bind(cube_map, ALSamplers::AnisoClamp);
+        gPipeline.mSky.bindEnvironmentCube(cube_channel);
     }
 
     {
@@ -379,10 +306,9 @@ void LLDrawPoolBump::endFullbrightShiny()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DRAWPOOL;
 
-    LLCubeMap* cube_map = gSky.mVOSkyp ? gSky.mVOSkyp->getCubeMap() : NULL;
-    if( cube_map && !LLPipeline::sReflectionProbesEnabled )
+    if (!LLPipeline::sReflectionProbesEnabled)
     {
-        cube_map->disable();
+        shader->disableTexture(LLViewerShaderMgr::ENVIRONMENT_MAP, ALTextureSlot::TT_CUBE_MAP);
         if (shader->mFeatures.hasReflectionProbes)
         {
             gPipeline.unbindReflectionProbes(*shader);

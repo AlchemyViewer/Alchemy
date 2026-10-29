@@ -76,7 +76,7 @@ void calcHalfVectors(vec3 lv, vec3 n, vec3 v, out vec3 h, out vec3 l, out float 
 float blinnPhongLobe(float nh, float glossiness);
 void calcDiffuseSpecular(vec3 baseColor, float metallic, out vec3 diffuseColor, out vec3 specularColor);
 vec3 pbrEnergyCompensation(vec3 specularColor, float perceptualRoughness, float nv);
-vec3 clampRadiance(vec3 c);
+vec3 clampRadiance(vec3 c, float ceiling);
 float unpackRoughness(vec2 p);
 float calcLegacyDistanceAttenuation(float distance, float falloff);
 bool clipProjectedLightVars(vec3 center, vec3 pos, out float dist, out float l_dist, out vec3 lv, out vec4 proj_tc );
@@ -216,7 +216,7 @@ void main()
 
                 pbrPunctual(diffuseColor, specularColor, perceptualRoughness, metallic, n.xyz, v, lv, nl, diffPunc, specPunc);
 
-                final_color += intensity * clampRadiance(nl * (diffPunc + specPunc * energyComp));
+                final_color += clampRadiance(intensity * nl * (diffPunc + specPunc * energyComp), MAX_PUNCTUAL_RADIANCE);
 
                 // How much direct light this pixel already received, which is what bounds the
                 // ambiance below. Declared and passed but never assigned, so that bound never
@@ -322,7 +322,8 @@ void main()
     float final_scale = 1.0;
     if (classic_mode > 0)
         final_scale = 0.9;
-    //output linear
-    frag_color.rgb = final_color * final_scale;
+    // Output linear, held to the pass's share of the target (MAX_PUNCTUAL_RADIANCE): the projected
+    // texture's specular adds past the bounded lobe.
+    frag_color.rgb = clampRadiance(final_color * final_scale, MAX_PUNCTUAL_RADIANCE);
     frag_color.a = 0.0;
 }

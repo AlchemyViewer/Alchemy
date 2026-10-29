@@ -165,7 +165,14 @@ void ALTextureSlot::bindFast(LLTexture* texture, ALSampler key)
 {
     // getGLTexture() is virtual and this is the per-draw path, so it is resolved once and the
     // sampler is chosen from the result rather than re-fetching.
-    LLImageGL* gl_tex = texture->getGLTexture();
+    LLImageGL* gl_tex = texture ? texture->getGLTexture() : nullptr;
+    if (!gl_tex)
+    {
+        // Nothing to bind: the slot lets go of what it holds, so the draw reads nothing an earlier
+        // bind left here.
+        unbindFast();
+        return;
+    }
     bindFastImpl(texture, gl_tex, gGL.getSampler(key));
 }
 

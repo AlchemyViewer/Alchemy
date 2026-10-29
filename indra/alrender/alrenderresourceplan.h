@@ -110,7 +110,6 @@ public:
         // The main view's own, at its render size.
         SpotShadow0, SpotShadow1,
         SMAAEdges, SMAABlend,
-        SkyBehind,
         SSRScene,
         MainLightBlurred,
 
@@ -130,6 +129,7 @@ public:
         SMAASearch,
         SMAASample,
         ToneCurve,
+        EnvironmentCube, ///< the sky's cube for the shiny and probe-less reflections, without probes (ALSkyCube)
 
         COUNT
     };
@@ -225,7 +225,7 @@ public:
     /// Whether the passes that use it acquire it from the transient pool for as long as they need it, rather than the
     /// reconcile building it to keep: a target that lives for one phase of a frame, and holds nothing across frames. A
     /// pack's light map is one, the main view's blurred light map, the water's copies of the scene, the bloom pyramid,
-    /// the post chain, SMAA's edges and blend weights, the legacy glow, the sky behind the water, and the targets the
+    /// the post chain, SMAA's edges and blend weights, the legacy glow, and the targets the
     /// UI previews and the appearance bakes draw into.
     static bool isTransient(Id id);
     /// Whether the reconcile readies it in the pool for the next frame to find: every transient resource but the

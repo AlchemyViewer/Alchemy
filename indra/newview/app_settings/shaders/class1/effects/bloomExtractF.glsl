@@ -51,7 +51,10 @@ float softThreshold(float lum, float T, float K)
 void main()
 {
     vec4 col = texture(diffuseMap, vary_texcoord0);
-    vec3 rgb = max(col.rgb, vec3(0.0));
+    // A NaN to zero and an infinity to the scene's largest value, ahead of the clamp below, which
+    // would scale an infinity by zero into a NaN: the pyramid spreads one such texel over the
+    // whole frame. The select first, since min and max may answer a NaN either way.
+    vec3 rgb = mix(clamp(col.rgb, vec3(0.0), vec3(65504.0)), vec3(0.0), isnan(col.rgb));
 
     // Firefly clamp, on bloom's input only.
     //

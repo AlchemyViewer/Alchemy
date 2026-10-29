@@ -33,7 +33,6 @@
 #include "lldrawable.h"
 #include "llface.h"
 #include "llprimitive.h"
-#include "llsky.h"
 #include "llsurfacepatch.h"
 #include "llsurface.h"
 #include "llviewerobjectlist.h"

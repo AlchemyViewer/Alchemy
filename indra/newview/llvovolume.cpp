@@ -59,7 +59,6 @@
 #include "llflexibleobject.h"
 #include "llskinningutil.h"
 #include "alsimdkernels.h"
-#include "llsky.h"
 #include "lltexturefetch.h"
 #include "llvector4a.h"
 #include "llviewercamera.h"

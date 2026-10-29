@@ -28,14 +28,16 @@
 #include "altextfind.h"
 
 #include "alserialworker.h"
+#include "llcoros.h"
 #include "llsingleton.h"
 
 #include <atomic>
-#include <condition_variable>
 #include <exception>
 #include <functional>
-#include <mutex>
 #include <optional>
+
+#include LLCOROS_MUTEX_HEADER
+#include LLCOROS_CONDVAR_HEADER
 
 namespace
 {
@@ -78,23 +80,25 @@ namespace
     };
 }
 
+// Between the worker and the main thread, where a coroutine may be what lets
+// a search go or collects it.
 struct ALTextFind::Working
 {
-    std::mutex               lock;
-    std::condition_variable  done;
-    bool                     finished = false;
-    std::vector<ALTextRange> found;
-    std::string              error;
+    LLCoros::Mutex             lock;
+    LLCoros::ConditionVariable done;
+    bool                       finished = false;
+    std::vector<ALTextRange>   found;
+    std::string                error;
     // The text to look through, until the worker takes it: let go of at
     // once where the search is, rather than when its turn comes.
-    std::string              text;
+    std::string                text;
     // Set where nobody takes what it finds: a search not begun is passed
     // over, and one under way stops at its next match or line.
-    std::atomic<bool>        dropped{ false };
+    std::atomic<bool>          dropped{ false };
     // What it was asked, to ask it again where the text has moved on.
-    U32                      version = 0;
-    std::string              query;
-    ALTextSearchOptions      options;
+    U32                        version = 0;
+    std::string                query;
+    ALTextSearchOptions        options;
 };
 
 ALTextFind::~ALTextFind()
@@ -120,7 +124,7 @@ void ALTextFind::letGo()
     mWorking->dropped = true;
     std::string text;
     {
-        std::lock_guard<std::mutex> guard(mWorking->lock);
+        LLCoros::LockType guard(mWorking->lock);
         text.swap(mWorking->text);
     }
     mWorking.reset();
@@ -168,7 +172,7 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
         const bool posted         = ALTextFindThread::instance().post([working, query, asked, scope]() {
             std::string text;
             {
-                std::lock_guard<std::mutex> guard(working->lock);
+                LLCoros::LockType guard(working->lock);
                 text.swap(working->text);
             }
             if (working->dropped)
@@ -190,7 +194,7 @@ void ALTextFind::search(const ALTextDocument& doc, const std::string& query, con
                 found.clear();
                 error = fault.what();
             }
-            std::lock_guard<std::mutex> guard(working->lock);
+            LLCoros::LockType guard(working->lock);
             working->found    = std::move(found);
             working->error    = std::move(error);
             working->finished = true;
@@ -232,8 +236,8 @@ bool ALTextFind::collect(const ALTextDocument& doc, const ALTextRange& selection
     std::shared_ptr<Working> working = mWorking;
     // A worker closing passes over what waits for it, which then never
     // comes: not waited for, but looked through here.
-    const bool                   closing = wait && (ALTextFindThread::wasDeleted() || ALTextFindThread::instance().closing());
-    std::unique_lock<std::mutex> guard(working->lock);
+    const bool        closing = wait && (ALTextFindThread::wasDeleted() || ALTextFindThread::instance().closing());
+    LLCoros::LockType guard(working->lock);
     if (closing && !working->finished)
     {
         const std::string         query   = working->query;
