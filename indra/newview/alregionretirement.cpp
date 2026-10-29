@@ -42,10 +42,9 @@
 
 namespace
 {
-    // What a frame spends killing the retiring region's objects, beyond a floor of one: a kill takes a linkset, or an
-    // avatar and everything it wears.
+    // What a frame spends on the retiring region's objects, killing or passing over them, beyond a floor of one looked
+    // at, so every frame advances: a kill takes a linkset, or an avatar and everything it wears.
     constexpr F64 KILL_BUDGET_SECONDS = 0.0005;
-    constexpr size_t MIN_KILLS = 1;
     // How long the dead objects may take to leave the object list, a frame's budget at a time, before the region is
     // removed anyway and removeRegion destroys the rest.
     constexpr F64 MAX_DRAIN_WAIT_SECONDS = 5.0;
@@ -60,8 +59,14 @@ namespace
         std::vector<LLViewerRegion*> neighbours;
         agent_region->getNeighboringRegions(neighbours);
         const bool neighbour = std::find(neighbours.begin(), neighbours.end(), regionp) != neighbours.end();
-        return ALRegionRetirement::keeps(regionp == agent_region, neighbour, regionp->getOriginGlobal(),
-                                         regionp->getWidth(), gAgent.getPositionGlobal(), gAgentCamera.mDrawDistance);
+        // Near the agent, or near the camera, which can be a draw distance away from it and see as far again.
+        const LLVector3d origin = regionp->getOriginGlobal();
+        const F64 width = regionp->getWidth();
+        const F64 draw_distance = gAgentCamera.mDrawDistance;
+        return ALRegionRetirement::keeps(regionp == agent_region, neighbour, origin, width, gAgent.getPositionGlobal(),
+                                         draw_distance)
+            || ALRegionRetirement::keeps(false, false, origin, width, gAgentCamera.getCameraPositionGlobal(),
+                                         draw_distance);
     }
 }
 
@@ -181,10 +186,12 @@ void ALRegionRetirement::startNext()
 
 void ALRegionRetirement::killSome()
 {
-    if (mRegionp == gAgent.getRegion())
+    // The agent or the camera came near it, or draw distance grew, while it was being retired.
+    if (kept(mRegionp))
     {
-        LL_WARNS("RegionRetirement") << "The agent entered " << mRegionp->getName()
-                                     << " while it was being retired; keeping what is left of it" << LL_ENDL;
+        LL_WARNS("RegionRetirement") << mRegionp->getName()
+                                     << " is near the view again while being retired; keeping what is left of it"
+                                     << LL_ENDL;
         mRegionp->setRetiring(false);
         mRegionp = nullptr;
         mObjects.clear();
@@ -195,9 +202,10 @@ void ALRegionRetirement::killSome()
     if (!mObjects.empty())
     {
         const F64 start = LLTimer::getTotalSeconds();
-        size_t killed = 0;
-        while (!mObjects.empty() && (killed < MIN_KILLS || LLTimer::getTotalSeconds() - start < KILL_BUDGET_SECONDS))
+        bool examined = false;
+        while (!mObjects.empty() && (!examined || LLTimer::getTotalSeconds() - start < KILL_BUDGET_SECONDS))
         {
+            examined = true;
             LLPointer<LLViewerObject> objectp = std::move(mObjects.back());
             mObjects.pop_back();
             // Roots only: a root's death takes its children and its control avatar in the same call, so no frame sees
@@ -208,7 +216,6 @@ void ALRegionRetirement::killSome()
             {
                 gObjectList.noteReleasedTextures(objectp, true);
                 gObjectList.killObject(objectp);
-                ++killed;
             }
         }
         if (mObjects.empty())
