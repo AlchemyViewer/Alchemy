@@ -172,6 +172,15 @@ public:
     void setHasPivot(bool val) { mHasPivot = val; }
     void setModelPivot(const LLVector3& pivot) { mModelPivot = pivot; }
 
+    // <SK:Nexii> Mesh uploader pivot: the object's origin within its bounding box, -1 to 1 per axis
+    void setUploadPivot(const LLVector3& pivot) { mUploadPivot = pivot; }
+    const LLVector3& getUploadPivot() const { return mUploadPivot; }
+    // The pivot in effect: centred while the physics or the model count rules it out.
+    LLVector3 getEffectiveUploadPivot() const { return mUploadPivotAllowed ? mUploadPivot : LLVector3::zero; }
+    // What the stored domains are shifted by so that the origin lands on the pivot.
+    LLVector3 getUploadPositionOffset() const { return getEffectiveUploadPivot() * -0.5f; }
+    // </SK:Nexii>
+
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
     //Accessors for joint position upload friendly rigs
     const bool isRigValidForJointPositionUpload(void) const { return mRigValidJointUpload; }
@@ -271,6 +280,8 @@ protected:
     bool        mResetJoints;
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
+    LLVector3   mUploadPivot; // <SK:Nexii> Mesh uploader pivot
+    bool        mUploadPivotAllowed{true}; // <SK:Nexii> Mesh uploader pivot
 
     std::map<std::string, bool> mViewOption;
 

@@ -191,6 +191,12 @@ bool LLFloaterModelPreview::postBuild()
 
     childSetCommitCallback("import_scale", onImportScaleCommit, this);
     childSetCommitCallback("pelvis_offset", onPelvisOffsetCommit, this);
+    // <SK:Nexii> Mesh uploader pivot
+    for (const char* axis : { "pivot_x", "pivot_y", "pivot_z" })
+    {
+        getChild<LLUICtrl>(axis)->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotCommit, this));
+    }
+    // </SK:Nexii>
 
     getChild<LLLineEditor>("description_form")->setKeystrokeCallback(boost::bind(&LLFloaterModelPreview::onDescriptionKeystroke, this, _1), NULL);
 
@@ -200,6 +206,7 @@ bool LLFloaterModelPreview::postBuild()
     getChild<LLCheckBoxCtrl>("show_skin_weight")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onShowSkinWeightChecked, this, _1));
     getChild<LLCheckBoxCtrl>("show_joint_overrides")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onViewOptionChecked, this, _1));
     getChild<LLCheckBoxCtrl>("show_joint_positions")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onViewOptionChecked, this, _1));
+    getChild<LLCheckBoxCtrl>("show_origin")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onViewOptionChecked, this, _1)); // <SK:Nexii> Mesh uploader pivot
 
     childDisable("upload_skin");
     childDisable("upload_joints");
@@ -510,7 +517,8 @@ void LLFloaterModelPreview::onClickCalculateBtn()
                           childGetValue("upload_textures").asBoolean(),
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mUploadModelUrl, mDestinationFolderId, false,
-                          getWholeModelFeeObserverHandle());
+                          getWholeModelFeeObserverHandle(),
+                          LLHandle<LLWholeModelUploadObserver>(), mModelPreview->getUploadPositionOffset()); // <SK:Nexii> Mesh uploader pivot
 
     toggleCalculateButton(false);
     mUploadBtn->setEnabled(false);
@@ -675,6 +683,24 @@ void LLFloaterModelPreview::onImportScaleCommit(LLUICtrl*,void* userdata)
 
     fp->mModelPreview->refresh();
 }
+
+// <SK:Nexii> Mesh uploader pivot
+void LLFloaterModelPreview::onPivotCommit()
+{
+    if (!mModelPreview)
+    {
+        return;
+    }
+
+    mModelPreview->setUploadPivot(LLVector3((F32)childGetValue("pivot_x").asReal(),
+                                            (F32)childGetValue("pivot_y").asReal(),
+                                            (F32)childGetValue("pivot_z").asReal()));
+    mModelPreview->updateStatusMessages();
+    toggleCalculateButton(true);
+    mModelPreview->refresh();
+}
+// </SK:Nexii>
+
 //static
 void LLFloaterModelPreview::onPelvisOffsetCommit( LLUICtrl*, void* userdata )
 {
@@ -1739,7 +1765,8 @@ void LLFloaterModelPreview::onUpload(void* user_data)
                           mp->childGetValue("upload_textures").asBoolean(),
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mp->mUploadModelUrl, mp->mDestinationFolderId,
-                          true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle());
+                          true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle(),
+                          mp->mModelPreview->getUploadPositionOffset()); // <SK:Nexii> Mesh uploader pivot
 }
 
 
@@ -1873,6 +1900,15 @@ void LLFloaterModelPreview::resetDisplayOptions()
 void LLFloaterModelPreview::resetUploadOptions()
 {
     childSetValue("import_scale", 1);
+    // <SK:Nexii> Mesh uploader pivot
+    childSetValue("pivot_x", 0);
+    childSetValue("pivot_y", 0);
+    childSetValue("pivot_z", 0);
+    if (mModelPreview)
+    {
+        mModelPreview->setUploadPivot(LLVector3::zero);
+    }
+    // </SK:Nexii>
     childSetValue("pelvis_offset", 0);
     childSetValue("physics_explode", 0);
     childSetValue("physics_file", "");

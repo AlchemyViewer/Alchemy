@@ -2182,6 +2182,53 @@ void LLModelPreview::updateStatusMessages()
         }
     }
 
+    // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls where the pivot puts them but fits
+    // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
+    {
+        bool has_physics = false;
+        bool analyzed = true;
+        bool rigged = false;
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            rigged |= instance.mModel && !instance.mModel->mSkinWeights.empty();
+            const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
+            if (physics && physics->getNumVolumeFaces() > 0)
+            {
+                has_physics = true;
+                analyzed &= !physics->mPhysics.mHull.empty();
+            }
+        }
+
+        std::string pivot_status;
+        mUploadPivotAllowed = true;
+        if (rigged)
+        {
+            pivot_status = mFMP->getString("pivot_status_rigged");
+            mUploadPivotAllowed = false;
+        }
+        else if (mUploadData.size() > 1)
+        {
+            pivot_status = mFMP->getString("pivot_status_multiple");
+            mUploadPivotAllowed = false;
+        }
+        else if (has_physics && !analyzed)
+        {
+            pivot_status = mFMP->getString("pivot_status_analyze");
+            mUploadPivotAllowed = false;
+        }
+        else if (!has_physics && !mUploadPivot.isExactlyZero())
+        {
+            pivot_status = mFMP->getString("pivot_status_no_physics");
+        }
+
+        for (const char* axis : { "pivot_x", "pivot_y", "pivot_z" })
+        {
+            mFMP->childSetEnabled(axis, mUploadPivotAllowed);
+        }
+        mFMP->childSetValue("pivot_status", pivot_status);
+    }
+    // </SK:Nexii>
+
     if (!mModelNoErrors || mHasDegenerate)
     {
         mFMP->childDisable("ok_btn");
@@ -3640,6 +3687,53 @@ bool LLModelPreview::render()
             }
         }
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the object's origin, drawn through the model
+    if (mViewOption["show_origin"])
+    {
+        LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+        gDebugProgram.bind();
+        gGL.getTextureSlot(0)->unbind();
+        LLGLDepthTest gls_depth(GL_FALSE);
+        gGL.setLineWidth(2.f);
+
+        const LLVector3 pivot = getEffectiveUploadPivot() * 0.5f;
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            const LLMatrix4& mat = instance.mTransform;
+            const LLVector3 origin = pivot * mat;
+
+            LLVector3 axes[3];
+            F32 reach = 0.f;
+            for (S32 i = 0; i < 3; ++i)
+            {
+                axes[i].set(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]);
+                reach = llmax(reach, axes[i].normalize());
+            }
+            reach *= 0.6f;
+
+            static const LLColor4 colors[3] = { LLColor4::red, LLColor4::green, LLColor4::blue };
+            gGL.begin(LLRender::LINES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                gGL.color4f(colors[i].mV[VRED] * 0.5f, colors[i].mV[VGREEN] * 0.5f, colors[i].mV[VBLUE] * 0.5f, 1.f);
+                gGL.vertex3fv((origin - axes[i] * reach).mV);
+                gGL.vertex3fv(origin.mV);
+                gGL.color4fv(colors[i].mV);
+                gGL.vertex3fv(origin.mV);
+                gGL.vertex3fv((origin + axes[i] * reach).mV);
+            }
+            gGL.end();
+        }
+        gGL.flush();
+        gGL.setLineWidth(1.f);
+
+        if (shader)
+        {
+            shader->bind();
+        }
+    }
+    // </SK:Nexii>
 
     gObjectPreviewProgram.unbind();
 
