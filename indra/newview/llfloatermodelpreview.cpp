@@ -196,6 +196,8 @@ bool LLFloaterModelPreview::postBuild()
     {
         getChild<LLUICtrl>(axis)->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotCommit, this));
     }
+    childSetValue("pivot_units", "percent");
+    getChild<LLUICtrl>("pivot_units")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotUnitsCommit, this));
     // </SK:Nexii>
 
     getChild<LLLineEditor>("description_form")->setKeystrokeCallback(boost::bind(&LLFloaterModelPreview::onDescriptionKeystroke, this, _1), NULL);
@@ -685,6 +687,17 @@ void LLFloaterModelPreview::onImportScaleCommit(LLUICtrl*,void* userdata)
 }
 
 // <SK:Nexii> Mesh uploader pivot
+static const char* const PIVOT_AXES[3] = { "pivot_x", "pivot_y", "pivot_z" };
+
+LLVector3 LLFloaterModelPreview::getPivotHalfExtents() const
+{
+    if (!mModelPreview)
+    {
+        return LLVector3::zero;
+    }
+    return mModelPreview->mPreviewScale * (F32)childGetValue("import_scale").asReal();
+}
+
 void LLFloaterModelPreview::onPivotCommit()
 {
     if (!mModelPreview)
@@ -692,12 +705,54 @@ void LLFloaterModelPreview::onPivotCommit()
         return;
     }
 
-    mModelPreview->setUploadPivot(LLVector3((F32)childGetValue("pivot_x").asReal(),
-                                            (F32)childGetValue("pivot_y").asReal(),
-                                            (F32)childGetValue("pivot_z").asReal()));
+    const bool metres = childGetValue("pivot_units").asString() == "metres";
+    const LLVector3 half = getPivotHalfExtents();
+    LLVector3 pivot;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const F32 shown = (F32)childGetValue(PIVOT_AXES[i]).asReal();
+        if (metres)
+        {
+            pivot.mV[i] = half.mV[i] > 0.f ? shown / half.mV[i] : 0.f;
+        }
+        else
+        {
+            pivot.mV[i] = shown / 100.f;
+        }
+        pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
+    }
+
+    mModelPreview->setUploadPivot(pivot);
     mModelPreview->updateStatusMessages();
     toggleCalculateButton(true);
     mModelPreview->refresh();
+}
+
+void LLFloaterModelPreview::onPivotUnitsCommit()
+{
+    updatePivotControls();
+}
+
+void LLFloaterModelPreview::updatePivotControls()
+{
+    if (!mModelPreview)
+    {
+        return;
+    }
+
+    const bool metres = childGetValue("pivot_units").asString() == "metres";
+    const LLVector3 half = getPivotHalfExtents();
+    const LLVector3& pivot = mModelPreview->getUploadPivot();
+    for (S32 i = 0; i < 3; ++i)
+    {
+        LLSpinCtrl* spinner = getChild<LLSpinCtrl>(PIVOT_AXES[i]);
+        const F32 range = metres ? half.mV[i] : 100.f;
+        spinner->setMinValue(-range);
+        spinner->setMaxValue(range);
+        spinner->setIncrement(metres ? 0.01f : 50.f);
+        spinner->setPrecision(metres ? 3 : 1);
+        spinner->setValue(pivot.mV[i] * range);
+    }
 }
 // </SK:Nexii>
 
@@ -1901,13 +1956,12 @@ void LLFloaterModelPreview::resetUploadOptions()
 {
     childSetValue("import_scale", 1);
     // <SK:Nexii> Mesh uploader pivot
-    childSetValue("pivot_x", 0);
-    childSetValue("pivot_y", 0);
-    childSetValue("pivot_z", 0);
+    childSetValue("pivot_units", "percent");
     if (mModelPreview)
     {
         mModelPreview->setUploadPivot(LLVector3::zero);
     }
+    updatePivotControls();
     // </SK:Nexii>
     childSetValue("pelvis_offset", 0);
     childSetValue("physics_explode", 0);
