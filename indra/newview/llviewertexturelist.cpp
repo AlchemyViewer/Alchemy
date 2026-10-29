@@ -1122,6 +1122,8 @@ void LLViewerTextureList::updateImageDecodePriority(LLViewerFetchedTexture* imag
     {
         // still referenced outside of image list, reset timer
         imagep->getLastReferencedTimer()->reset();
+        // not by its region's dead objects, which are gone by then (ALRegionRetirement waits at most 5 s for them)
+        imagep->forgetReleasedWithRegion(10.0);
 
         if (imagep->hasSavedRawImage())
         {

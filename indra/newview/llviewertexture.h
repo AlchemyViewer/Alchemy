@@ -357,6 +357,15 @@ public:
     {
         return mReleasedWithRegion >= 0.0 && (F64)LLFrameTimer::getUptimeSeconds() - mReleasedWithRegion < seconds;
     }
+    // Still referenced a while after the mark, by something other than the dead objects that set it and are destroyed
+    // within seconds: a later release is an ordinary one.
+    void forgetReleasedWithRegion(F64 after_seconds)
+    {
+        if (mReleasedWithRegion >= 0.0 && (F64)LLFrameTimer::getUptimeSeconds() - mReleasedWithRegion >= after_seconds)
+        {
+            mReleasedWithRegion = -1.0;
+        }
+    }
 
     virtual void processTextureStats() ;
 
