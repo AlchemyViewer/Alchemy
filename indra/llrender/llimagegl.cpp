@@ -2664,16 +2664,20 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
 void LLImageGL::clearAlphaAnalysis()
 {
     // Provisional, while an analysis is out: no answer, so the owner is not told, and the next answer is weighed
-    // against the last one.
+    // against the last one, and against this if anything read it meanwhile.
     mIsMask = false;
+    mProvisionalRead.store(false, std::memory_order_relaxed);
     mMaxAlpha = 255;
     mMinAlpha = 0;
 }
 
 void LLImageGL::setIsMask(bool is_mask)
 {
+    // A face built while the provisional answer stood went by it, as by an answer.
+    const bool provisional_read = mProvisionalRead.exchange(false, std::memory_order_relaxed);
+    const bool changed = mAnsweredMask != is_mask || (provisional_read && is_mask);
     mIsMask = is_mask;
-    if (mAnsweredMask != is_mask)
+    if (changed)
     {
         mAnsweredMask = is_mask;
         if (mOwner && on_main_thread())
@@ -3120,6 +3124,11 @@ bool LLImageGL::getBoundRecently() const
 bool LLImageGL::getIsAlphaMask() const
 {
     llassert_always(!sSkipAnalyzeAlpha);
+    if (mIsMask != mAnsweredMask)
+    {
+        // the provisional no-mask of a mask texture, which a face built now goes by
+        mProvisionalRead.store(true, std::memory_order_relaxed);
+    }
     return mIsMask;
 }
 

@@ -2011,7 +2011,8 @@ namespace
     }
 
     // An image of 64 px or more is analysed on a worker, and counts as no mask until the answer comes back. That
-    // provisional no-mask is no answer: the texture hears only of an answer that differs from the last one.
+    // provisional no-mask is no answer: the texture hears of an answer that differs from the last one, or of a mask
+    // answer after the provisional no-mask was read.
     TEST_CASE_METHOD(llimagegl_data, "LLImageGL: a deferred alpha analysis tells the texture its answer when it comes back", "[LLImageGL]")
     {
         // The queues the analysis is posted to and answered on, as the viewer's. The main one has to exist before the
@@ -2038,16 +2039,22 @@ namespace
         CHECK(img->getIsAlphaMask());
         CHECK(owner->mChanges == 1);
 
-        UNSCOPED_INFO("the same answer after another deferral is no change");
+        UNSCOPED_INFO("the same answer after another deferral, its provisional no-mask unread, is no change");
         REQUIRE(img->createGLTexture(0, makeAlphaRaw(true, 64).get()));
-        CHECK_FALSE(img->getIsAlphaMask());
         settle();
         CHECK(img->getIsAlphaMask());
         CHECK(owner->mChanges == 1);
 
+        UNSCOPED_INFO("read meanwhile it is one: a face built by the provisional no-mask went to the blend pass");
+        REQUIRE(img->createGLTexture(0, makeAlphaRaw(true, 64).get()));
+        CHECK_FALSE(img->getIsAlphaMask());
+        settle();
+        CHECK(img->getIsAlphaMask());
+        CHECK(owner->mChanges == 2);
+
         REQUIRE(img->createGLTexture(0, makeAlphaRaw(false, 64).get()));
         settle();
         CHECK_FALSE(img->getIsAlphaMask());
-        CHECK(owner->mChanges == 2);
+        CHECK(owner->mChanges == 3);
     }
 }
