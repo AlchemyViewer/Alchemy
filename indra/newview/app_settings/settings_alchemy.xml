@@ -898,6 +898,17 @@
             <key>Value</key>
             <integer>4</integer>
         </map>
+        <key>AssetFetchConcurrency</key>
+        <map>
+            <key>Comment</key>
+            <string>Maximum number of HTTP connections used for fetching assets other than textures and meshes (sounds, animations, gestures and the rest); 0 uses the default.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALScriptStudioVimClipboard</key>
         <map>
             <key>Comment</key>
