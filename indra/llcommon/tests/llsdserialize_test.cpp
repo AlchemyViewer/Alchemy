@@ -2663,7 +2663,7 @@ namespace
 
     TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd fails a block whose inflated bytes do not parse", "[llsd_serialization]")
     {
-        for (const std::string bytes : {
+        for (const std::string& bytes : {
                  std::string("?"),
                  std::string("i\0\0", 3),
                  std::string("[\0\0\0\x02i\0\0\0\x01]", 11),
