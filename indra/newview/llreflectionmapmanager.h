@@ -289,6 +289,8 @@ private:
     U32 mReflectionProbeCount;
 
     U32 mDynamicProbeCount;
+    // the probes relevant last frame, the default probe among them, in ALProbeReach's steps, for dynamic allocation
+    U32 mRelevantProbeCount = 0;
 
     // cached settings from gSavedSettings
     S32 mRenderReflectionProbeDetail = -1;

@@ -439,9 +439,44 @@ void LLViewerTextureManager::init()
     gTextureManagerBridgep = new LLViewerTextureManagerBridge;
 }
 
+namespace
+{
+    // The textures the emergency purge has yet to visit, a frame's budget at a time. Keys, not references: a
+    // reference held here would count an unreferenced texture as referenced in every other visit meanwhile, and
+    // restart its lazy flush wait.
+    std::vector<LLTextureKey> sEmergencyPurge;
+
+    void continue_emergency_purge()
+    {
+        if (sEmergencyPurge.empty())
+        {
+            return;
+        }
+        LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("emergency purge");
+        constexpr F64 PURGE_BUDGET = 0.001;
+        constexpr U32 MIN_VISITS = 64;
+        const F64 start = LLTimer::getTotalSeconds();
+        U32 visited = 0;
+        while (!sEmergencyPurge.empty() && (visited < MIN_VISITS || LLTimer::getTotalSeconds() - start < PURGE_BUDGET))
+        {
+            // held for its visit only, as the update loop's copy holds what it visits (min_refs counts on that)
+            LLPointer<LLViewerFetchedTexture> image = gTextureList.findImage(sEmergencyPurge.back());
+            sEmergencyPurge.pop_back();
+            if (image)
+            {
+                gTextureList.updateImageDecodePriority(image, false /*will modify gTextureList otherwise!*/);
+            }
+            ++visited;
+        }
+        LL_PROFILE_ZONE_NUM(visited);
+    }
+}
+
 void LLViewerTextureManager::cleanup()
 {
     stop_glerror();
+
+    sEmergencyPurge.clear();
 
     delete gTextureManagerBridgep;
     LLImageGL::sDefaultGLTexture = NULL;
@@ -558,15 +593,21 @@ void LLViewerTexture::updateClass()
 
         if (is_sys_low || over_pct > 2.f)
         { // if we're low on system memory, emergency purge off screen textures to avoid a death spiral
+            // Every texture visited at the slammed bias, over the next frames rather than in this one.
             LL_WARNS() << "Low system memory detected, emergency downrezzing off screen textures" << LL_ENDL;
-            for (auto& image : gTextureList)
+            if (sEmergencyPurge.empty())
             {
-                gTextureList.updateImageDecodePriority(image, false /*will modify gTextureList otherwise!*/);
+                for (const LLPointer<LLViewerFetchedTexture>& image : gTextureList)
+                {
+                    sEmergencyPurge.emplace_back(image->getID(), (ETexListType)image->getTextureListType());
+                }
             }
         }
     }
 
     was_low = is_low;
+
+    continue_emergency_purge();
 
     if (is_low)
     {
@@ -940,6 +981,9 @@ void LLViewerTexture::resetTextureStats()
 {
     mMaxVirtualSize = 0.0f;
     mMaxVirtualSizeResetCounter = 0;
+    // The sliced face walk's carried maxima would put the old sizes back on its next visit.
+    mFaceWalkMax = 0.f;
+    mFaceWalkRotationMax = 0.f;
 }
 
 //virtual
@@ -2202,6 +2246,35 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
     }
 
     return true;
+}
+
+void LLViewerFetchedTexture::onAlphaMaskChanged()
+{
+    if (mGLTexturep.isNull())
+    {
+        return;
+    }
+    const bool is_mask = mGLTexturep->getIsAlphaMask();
+
+    // A face of an alpha pool goes to a mask pass or a blend pass by the answer it was built with: one built by the
+    // other answer, or while a deferred analysis was out and the texture counted as no mask, stays in the wrong one
+    // until its group is rebuilt. The pool does not say which pass it took, so every face of one whose pass the answer
+    // decides is rebuilt; now a mask, only those that can render as one.
+    for (U32 i = 0; i < mNumFaces[LLRender::DIFFUSE_MAP]; ++i)
+    {
+        LLFace* facep = mFaceList[LLRender::DIFFUSE_MAP][i];
+        if (!facep || !facep->isInAlphaPool() || (is_mask && !facep->canRenderAsMask()))
+        {
+            continue;
+        }
+        LLDrawable* drawablep = facep->getDrawable();
+        LLSpatialGroup* group = drawablep ? drawablep->getSpatialGroup() : nullptr;
+        if (group && !group->isDead())
+        {
+            group->dirtyGeom();
+            gPipeline.markRebuild(group);
+        }
+    }
 }
 
 bool LLViewerFetchedTexture::updateFetch()
@@ -4065,7 +4138,10 @@ F32 LLViewerMediaTexture::getMaxVirtualSize()
 
     if(!mMaxVirtualSizeResetCounter)
     {
-        addTextureStats(0.f, false);//reset
+        // A new window: the size goes back to what the faces seen in it ask for, so the interest of media turned
+        // away from decays and its plugin drops priority. addTextureStats only ever raises it.
+        mMaxVirtualSize = 0.f;
+        resetMaxVirtualSizeResetCounter();
     }
 
     if(mIsPlaying) //media is playing

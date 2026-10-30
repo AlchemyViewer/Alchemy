@@ -41,6 +41,7 @@
 #include "llregionhandle.h"
 #include "llsurface.h"
 #include "lltrans.h"
+#include "llvertexbuffer.h"
 #include "llviewercamera.h"
 #include "llviewertexture.h"
 #include "llviewertexturelist.h"
@@ -130,7 +131,8 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
     {
         LLHost old_host = regionp->getHost();
         // region already exists!
-        if (host == old_host && regionp->isAlive())
+        // One being retired has lost objects its simulator will not send again.
+        if (host == old_host && regionp->isAlive() && !regionp->isRetiring())
         {
             // This is a duplicate for the same host and it's alive, don't bother.
             LL_INFOS() << "Region already exists and is alive, using existing region" << LL_ENDL;
@@ -146,6 +148,10 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
         if (!regionp->isAlive())
         {
             LL_WARNS() << "LLWorld::addRegion exists, but isn't alive. Removing old region and creating new" << LL_ENDL;
+        }
+        else if (regionp->isRetiring())
+        {
+            LL_INFOS() << "LLWorld::addRegion exists, but is being retired. Removing old region and creating new" << LL_ENDL;
         }
 
         // Save capabilities seed URL
@@ -268,6 +274,8 @@ void LLWorld::removeRegion(const LLHost &host)
     from_region_handle(regionp->getHandle(), &x, &y);
     LL_INFOS() << "Removing region " << x << ":" << y << LL_ENDL;
 
+    mRegionRetirement.forget(regionp);
+
     mRegionList.remove(regionp);
     mActiveRegionList.remove(regionp);
     mCulledRegionList.remove(regionp);
@@ -280,6 +288,9 @@ void LLWorld::removeRegion(const LLHost &host)
     //llassert_always(!gObjectList.hasMapObjectInRegion(regionp)) ;
 
     delete regionp; // Delete last to prevent use after free
+
+    // The geometry only the region held goes now rather than at the pool's next clean.
+    LLVertexBuffer::trimPoolSoon();
 }
 
 
@@ -681,6 +692,9 @@ void LLWorld::updateRegions(F32 max_update_time)
     {
         LLViewerRegion::sLastCameraUpdated = LLViewerOctreeEntryData::getCurrentFrame() + 1;
     }
+    // Before the regions' updates, since it may remove one.
+    mRegionRetirement.update();
+
     LLViewerRegion::calcNewObjectCreationThrottle();
     if(LLViewerRegion::isNewObjectCreationThrottleDisabled())
     {
@@ -702,7 +716,8 @@ void LLWorld::updateRegions(F32 max_update_time)
          iter != mRegionList.end(); ++iter)
     {
         LLViewerRegion* regionp = *iter;
-        if(regionp != self_regionp)
+        // A retiring region creates nothing more from its object cache.
+        if(regionp != self_regionp && !regionp->isRetiring())
         {
             region_list.insert(regionp);
         }
