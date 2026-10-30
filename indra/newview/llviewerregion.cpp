@@ -856,7 +856,9 @@ void LLViewerRegion::saveObjectCache()
         LLVOCache & instance = LLVOCache::instance();
 
         instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled);
-        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mGLTFOverridesDirty, removal_enabled);
+        // The two files are one cache, so the extras go out with every write
+        // of the objects as well as when the overrides change.
+        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
         mCacheDirty = false;
         mGLTFOverridesDirty = false;
     }

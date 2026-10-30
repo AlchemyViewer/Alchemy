@@ -2097,9 +2097,22 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
         return;
     }
 
+    // The header is what reads and removes a region's files, so a region it
+    // does not hold gets no extras: an object write that failed has just
+    // dropped it, and a file written now would never be read or purged.
+    if (mHandleEntryMap.find(handle) == mHandleEntryMap.end())
+    {
+        LL_DEBUGS("VOCache") << "Skipping write of extras cache for handle " << handle << ": no header entry" << LL_ENDL;
+        return;
+    }
+
     std::filesystem::path filename = getObjectCacheExtrasFilename(handle);
 
-    if (!dirty_cache)
+    // The objects are read only with their extras beside them, so a region
+    // with nothing to change still gets a file when it has none: an empty one
+    // says it has no overrides, a missing one reads as a bad cache and takes
+    // the objects with it.
+    if (!dirty_cache && LLFile::isfile(filename))
     {
         LL_DEBUGS("VOCache") << "Skipping write of extras cache for handle " << handle << ": overrides not dirty" << LL_ENDL;
         return;
