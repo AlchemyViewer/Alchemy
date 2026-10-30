@@ -784,6 +784,29 @@ namespace
         CHECK(kept.size() == written.size());
     }
 
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an object write that fails leaves no extras file behind", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1022 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+
+        // A body past the cache's ten-thousand-byte cap on one entry fails the
+        // object write, which drops the region from the header. The save goes
+        // on to the extras, dirty since the objects were.
+        LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(3);
+        objects[4] = makeEntry(4, 4, 10001);
+        LLVOCache::instance().writeToCache(handle, id, objects, /*dirty=*/true, false);
+        UNSCOPED_INFO("the failed write dropped the region");
+        REQUIRE(LLVOCache::instance().getCacheEntries() == 0u);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1] = requireOverride(1, handle, 2);
+        LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, /*dirty=*/true, false);
+        UNSCOPED_INFO("no object file");
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
+        UNSCOPED_INFO("and no extras file for a region the header does not hold");
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+    }
+
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: staysInMemory keeps entries seen lately or inside the rear sphere", "[LLVOCache]")
     {
         // A stand-in for an entry that nothing has looked at in a while: its
