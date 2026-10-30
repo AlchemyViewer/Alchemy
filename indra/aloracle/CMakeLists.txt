@@ -27,7 +27,8 @@ endif()
 # Each library the oracle covers: its wrappers, and the library they link,
 # but llcommon, which the boundary in aloracle.cpp links already.
 
-# llcommon: LLSD's formats, LLURI's escaping and queries, and LLDate.
+# llcommon: LLSD's formats, conversions and zipped blocks, LLURI's escaping and
+# queries, and LLDate.
 target_sources(aloracle PRIVATE aloracle_llsd.cpp aloracle_lluri.cpp aloracle_lldate.cpp)
 
 # llmath: llquantize.h's quantized floats.

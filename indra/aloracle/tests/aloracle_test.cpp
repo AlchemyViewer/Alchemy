@@ -86,6 +86,27 @@ namespace
         return { status, taken(text) };
     }
 
+    Result convert(int32_t type, const std::string& value)
+    {
+        aloracle_bytes converted{};
+        const int32_t status = aloracle_llsd_convert(type, in(value), value.size(), &converted);
+        return { status, taken(converted) };
+    }
+
+    Result zip(const std::string& value)
+    {
+        aloracle_bytes zipped{};
+        const int32_t status = aloracle_llsd_zip(in(value), value.size(), &zipped);
+        return { status, taken(zipped) };
+    }
+
+    Result unzip(const std::string& data, int32_t* result = nullptr)
+    {
+        aloracle_bytes value{};
+        const int32_t status = aloracle_llsd_unzip(in(data), data.size(), &value, result);
+        return { status, taken(value) };
+    }
+
     // The value notation text holds, in the binary values cross in.
     std::string valueOf(const std::string& notation)
     {
@@ -300,6 +321,61 @@ namespace
               == ALORACLE_BAD_ARGUMENT);
         CHECK(out.data == nullptr);
         CHECK(out.size == 0);
+    }
+
+    TEST_CASE("aloracle: convert reads a value as another type with LLSD's own conversions", "[aloracle]")
+    {
+        CHECK(convert(ALORACLE_LLSD_TYPE_STRING, valueOf("r2.5")).bytes == valueOf("'2.5'"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_STRING, valueOf("r0.1234567")).bytes == valueOf("'0.123457'"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_INTEGER, valueOf("'1.9'")).bytes == valueOf("i1"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_BOOLEAN, valueOf("'false'")).bytes == valueOf("true"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_BOOLEAN, valueOf("i0")).bytes == valueOf("false"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_STRING, valueOf("d\"2006-04-24T01:02:03Z\"")).bytes
+              == valueOf("'2006-04-24T01:02:03Z'"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_UUID, valueOf("'not a uuid'")).bytes
+              == valueOf("u00000000-0000-0000-0000-000000000000"));
+        CHECK(convert(ALORACLE_LLSD_TYPE_BINARY, valueOf("'text'")).bytes == valueOf("b(0)\"\""));
+    }
+
+    TEST_CASE("aloracle: convert refuses a type that has no conversion", "[aloracle]")
+    {
+        const std::string value = valueOf("i1");
+        CHECK(convert(ALORACLE_LLSD_TYPE_UNDEFINED, value).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(convert(ALORACLE_LLSD_TYPE_MAP, value).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(convert(ALORACLE_LLSD_TYPE_ARRAY, value).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(convert(11, value).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(convert(ALORACLE_LLSD_TYPE_STRING, "i1").status == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a zipped value unzips as it was", "[aloracle]")
+    {
+        const std::string value = valueOf("{'a':i1,'b':[r2.5,'x',!]}");
+        const Result zipped = zip(value);
+        REQUIRE(zipped.status == ALORACLE_OK);
+        // A zlib header, not gzip's.
+        CHECK(zipped.bytes.substr(0, 1) == "\x78");
+
+        int32_t result = -1;
+        const Result unzipped = unzip(zipped.bytes, &result);
+        CHECK(unzipped.status == ALORACLE_OK);
+        CHECK(result == 0);
+        CHECK(unzipped.bytes == value);
+    }
+
+    TEST_CASE("aloracle: unzip fails what is not zlib with unzip_llsd's result", "[aloracle]")
+    {
+        int32_t result = -1;
+        CHECK(unzip("not zlib", &result).status == ALORACLE_FAILED);
+        CHECK(result == 3); // ZR_DATA_ERROR
+
+        const Result zipped = zip(valueOf("'some text to zip'"));
+        REQUIRE(zipped.status == ALORACLE_OK);
+        result = -1;
+        CHECK(unzip(zipped.bytes.substr(0, zipped.bytes.size() / 2), &result).status == ALORACLE_FAILED);
+        CHECK(result == 5); // ZR_BUFFER_ERROR
+
+        CHECK(unzip("").status == ALORACLE_FAILED);
+        CHECK(aloracle_llsd_unzip(nullptr, 2, nullptr, nullptr) == ALORACLE_BAD_ARGUMENT);
     }
 
     TEST_CASE("aloracle: escape leaves the set it is given as it is", "[aloracle]")

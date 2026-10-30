@@ -85,7 +85,7 @@ typedef struct aloracle_bytes
 ALORACLE_API void aloracle_bytes_free(aloracle_bytes* bytes);
 
 //
-// LLSD: llsdserialize.cpp and llsdserialize_xml.cpp
+// LLSD: llsd.cpp, llsdserialize.cpp and llsdserialize_xml.cpp
 //
 
 /// The formats, numbered as LLSDSerialize::ELLSD_Serialize numbers them.
@@ -140,6 +140,46 @@ ALORACLE_API int32_t aloracle_llsd_serialize(int32_t format,
                                              const uint8_t* value,
                                              size_t size,
                                              aloracle_bytes* text);
+
+/// The types, numbered as LLSD::Type numbers them.
+enum
+{
+    ALORACLE_LLSD_TYPE_UNDEFINED = 0,
+    ALORACLE_LLSD_TYPE_BOOLEAN = 1,
+    ALORACLE_LLSD_TYPE_INTEGER = 2,
+    ALORACLE_LLSD_TYPE_REAL = 3,
+    ALORACLE_LLSD_TYPE_STRING = 4,
+    ALORACLE_LLSD_TYPE_UUID = 5,
+    ALORACLE_LLSD_TYPE_DATE = 6,
+    ALORACLE_LLSD_TYPE_URI = 7,
+    ALORACLE_LLSD_TYPE_BINARY = 8,
+    ALORACLE_LLSD_TYPE_MAP = 9,
+    ALORACLE_LLSD_TYPE_ARRAY = 10,
+};
+
+/// Reads a value as another type with LLSD's own conversion to it (asBoolean,
+/// asInteger, asReal, asString, asUUID, asDate, asURI or asBinary), and gives
+/// converted what that returns. Undefined, a map and an array have none, and
+/// are ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_llsd_convert(int32_t type,
+                                           const uint8_t* value,
+                                           size_t size,
+                                           aloracle_bytes* converted);
+
+/// Zips a value as zip_llsd does: zlib at its best compression, over the
+/// value in LLSD binary with no header line. Where zip_llsd gives nothing,
+/// ALORACLE_FAILED.
+ALORACLE_API int32_t aloracle_llsd_zip(const uint8_t* value, size_t size, aloracle_bytes* zipped);
+
+/// Unzips data as LLUZipHelper::unzip_llsd does from bytes in memory, and
+/// gives value the LLSD it read. result, which may be null, gets what
+/// unzip_llsd returned, an LLUZipHelper::EZipRresult; any but ZR_OK, 0, is
+/// ALORACLE_FAILED. More than 2^31 - 1 bytes, which unzip_llsd cannot be
+/// given, is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_llsd_unzip(const uint8_t* data,
+                                         size_t size,
+                                         aloracle_bytes* value,
+                                         int32_t* result);
 
 //
 // LLURI: lluri.cpp
