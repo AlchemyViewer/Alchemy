@@ -126,34 +126,12 @@ std::string LLURI::unescape(const std::string& str)
     std::string::const_iterator end = str.end();
     for(; it != end; ++it)
     {
-        if((*it) == '%')
+        // Only a '%' and two hex digits is an escape. Any other '%' stays as
+        // it is, and what follows it is read as text.
+        if((*it) == '%' && (end - it) > 2 && is_char_hex(it[1]) && is_char_hex(it[2]))
         {
-            ++it;
-            if(it == end) break;
-
-            if(is_char_hex(*it))
-            {
-                U8 c = hex_as_nybble(*it++);
-
-                c = c << 4;
-                if (it == end) break;
-
-                if(is_char_hex(*it))
-                {
-                    c |= hex_as_nybble(*it);
-                    ostr.put((char)c);
-                }
-                else
-                {
-                    ostr.put((char)c);
-                    ostr.put(*it);
-                }
-            }
-            else
-            {
-                ostr.put('%');
-                ostr.put(*it);
-            }
+            ostr.put((char)((hex_as_nybble(it[1]) << 4) | hex_as_nybble(it[2])));
+            it += 2;
         }
         else
         {
@@ -211,13 +189,13 @@ namespace
 //static
 std::string LLURI::escape(const std::string& str)
 {
-    static std::string default_allowed = unreserved();
-    static bool initialized = false;
-    if(!initialized)
+    // sorted as it is made, which no second thread can see half done
+    static const std::string default_allowed = []
     {
-        std::sort(default_allowed.begin(), default_allowed.end());
-        initialized = true;
-    }
+        std::string allowed = unreserved();
+        std::sort(allowed.begin(), allowed.end());
+        return allowed;
+    }();
     return escape(str, default_allowed, true);
 }
 
@@ -309,7 +287,8 @@ LLURI::LLURI(const std::string& escaped_str)
     std::string::size_type delim_pos;
     delim_pos = escaped_str.find(':');
     std::string temp;
-    if (delim_pos == std::string::npos)
+    // A scheme is never empty, so a colon at the start does not end one.
+    if (delim_pos == std::string::npos || delim_pos == 0)
     {
         mScheme = "";
         mEscapedOpaque = escaped_str;
@@ -685,7 +664,7 @@ LLSD LLURI::queryMap(std::string escaped_query_string)
 {
     LL_DEBUGS() << "LLURI::queryMap query params: " << escaped_query_string << LL_ENDL;
 
-    LLSD result = LLSD::emptyArray();
+    LLSD result = LLSD::emptyMap();
     while(!escaped_query_string.empty())
     {
         // get tuple first
