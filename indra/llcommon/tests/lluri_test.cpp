@@ -32,8 +32,46 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
+#include <future>
+#include <vector>
+
 namespace
 {
+    // First in the file, so that its calls are the first escape(str) of the
+    // process its entry runs in.
+    TEST_CASE("LLURI: escape gives every thread the same answer on their first calls at once", "[LLURI]")
+    {
+        const std::string unreserved =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            "0123456789"
+            "-._~";
+        std::string printable;
+        for (char c = ' '; c <= '~'; ++c)
+        {
+            printable.push_back(c);
+        }
+        const std::string expected = LLURI::escape(printable, unreserved);
+
+        std::atomic<bool> go{ false };
+        std::vector<std::future<std::string>> callers;
+        for (int i = 0; i < 16; ++i)
+        {
+            callers.push_back(std::async(std::launch::async, [&]
+            {
+                while (!go.load(std::memory_order_acquire))
+                {
+                }
+                return LLURI::escape(printable);
+            }));
+        }
+        go.store(true, std::memory_order_release);
+        for (std::future<std::string>& caller : callers)
+        {
+            CHECK(caller.get() == expected);
+        }
+    }
+
     struct URITestData {
         void require_parts(const LLURI& u,
                 const char* expectedScheme,

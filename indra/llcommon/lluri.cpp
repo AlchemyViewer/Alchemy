@@ -189,13 +189,13 @@ namespace
 //static
 std::string LLURI::escape(const std::string& str)
 {
-    static std::string default_allowed = unreserved();
-    static bool initialized = false;
-    if(!initialized)
+    // sorted as it is made, which no second thread can see half done
+    static const std::string default_allowed = []
     {
-        std::sort(default_allowed.begin(), default_allowed.end());
-        initialized = true;
-    }
+        std::string allowed = unreserved();
+        std::sort(allowed.begin(), allowed.end());
+        return allowed;
+    }();
     return escape(str, default_allowed, true);
 }
 
