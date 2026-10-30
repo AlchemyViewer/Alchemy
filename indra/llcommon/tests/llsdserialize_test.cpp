@@ -2500,4 +2500,53 @@ namespace
         CHECK_FALSE(valid);
         CHECK(out.get() == nullptr);
     }
+
+    // these bytes, deflated with zlib's wrapping
+    std::string zlib_bytes(const std::string& bytes)
+    {
+        uLongf size = compressBound((uLong)bytes.size());
+        std::string compressed(size, '\0');
+        REQUIRE(compress((Bytef*)compressed.data(), &size, (const Bytef*)bytes.data(), (uLong)bytes.size()) ==
+                Z_OK);
+        compressed.resize(size);
+        return compressed;
+    }
+
+    LLUZipHelper::EZipRresult unzip_bytes(LLSD& out, const std::string& bytes)
+    {
+        const std::string compressed = zlib_bytes(bytes);
+        return LLUZipHelper::unzip_llsd(out, (const U8*)compressed.data(), (S32)compressed.size());
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd fails a block whose inflated bytes do not parse", "[llsd_serialization]")
+    {
+        for (const std::string bytes : {
+                 std::string("?"),
+                 std::string("i\0\0", 3),
+                 std::string("[\0\0\0\x02i\0\0\0\x01]", 11),
+                 std::string("<? LLSD/Binary ?>\n"),
+             })
+        {
+            CAPTURE(bytes);
+            LLSD out;
+            CHECK(unzip_bytes(out, bytes) == LLUZipHelper::ZR_PARSE_ERROR);
+        }
+
+        LLSD one;
+        REQUIRE(unzip_bytes(one, std::string("i\0\0\0\x01", 5)) == LLUZipHelper::ZR_OK);
+        CHECK_THAT(one, ll_test::LLSDEquals(LLSD(1)));
+        LLSD undefined(1);
+        REQUIRE(unzip_bytes(undefined, "<? LLSD/Binary ?>\n!") == LLUZipHelper::ZR_OK);
+        CHECK(undefined.isUndefined());
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd fails a block that inflates to nothing", "[llsd_serialization]")
+    {
+        LLSD out;
+        CHECK(unzip_bytes(out, std::string()) == LLUZipHelper::ZR_PARSE_ERROR);
+
+        const std::string empty = zlib_bytes(std::string());
+        std::istringstream in(empty);
+        CHECK(LLUZipHelper::unzip_llsd(out, in, (S32)empty.size()) == LLUZipHelper::ZR_PARSE_ERROR);
+    }
 }

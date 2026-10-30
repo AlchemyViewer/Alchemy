@@ -2765,9 +2765,18 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
     {
         char* result_ptr = strip_deprecated_header((char*)result, cur_size);
 
+        // Nothing holds no value, and a stream over no buffer throws from its
+        // first read.
+        if (cur_size == 0)
+        {
+            free(result);
+            return ZR_PARSE_ERROR;
+        }
+
         boost::iostreams::stream<boost::iostreams::array_source> istrm(result_ptr, cur_size);
 
-        if (!LLSDSerialize::fromBinary(data, istrm, cur_size, UNZIP_LLSD_MAX_DEPTH))
+        // fromBinary() gives the number of values it read, or PARSE_FAILURE
+        if (LLSDSerialize::fromBinary(data, istrm, cur_size, UNZIP_LLSD_MAX_DEPTH) <= 0)
         {
             free(result);
             return ZR_PARSE_ERROR;
