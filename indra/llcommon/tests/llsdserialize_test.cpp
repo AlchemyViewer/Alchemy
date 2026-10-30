@@ -663,6 +663,60 @@ namespace
             LLSDParser::PARSE_FAILURE);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: markup that is not XML fails to parse", "[llsd_XML_parsing]")
+    {
+        for (const char* text : {
+                 "<!><llsd><integer>1</integer></llsd>",
+                 "<! x ?><llsd><integer>1</integer></llsd>",
+                 "<!doctype llsd><llsd><integer>1</integer></llsd>",
+                 "<!ELEMENT llsd ANY><llsd><integer>1</integer></llsd>",
+                 "<llsd><integer>1</integer><!x></llsd>",
+                 "<llsd><string/ >x</llsd>",
+                 "<llsd><string / ></llsd>",
+                 "<llsd><array><string a='1'/\n></array></llsd>",
+                 "<?> ?><llsd><integer>1</integer></llsd>",
+                 "<llsd><?><integer>1</integer>?></llsd>",
+             })
+        {
+            INFO(text);
+            std::istringstream input(text);
+            LLSD parsed;
+            mParser->reset();
+            CHECK(mParser->parse(input, parsed, strlen(text)) == LLSDParser::PARSE_FAILURE);
+        }
+
+        // What XML does take.
+        require_parse(
+            "comment",
+            "<!-- c --><llsd><!----><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "doctype",
+            "<!DOCTYPE llsd [<!ELEMENT llsd ANY>]><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "cdata",
+            "<llsd><string><![CDATA[<a/ >]]></string></llsd>",
+            LLSD("<a/ >"),
+            1);
+        require_parse(
+            "declaration and processing instruction",
+            "<?xml version=\"1.0\" ?><llsd><?pi x?><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        LLSD strings = LLSD::emptyArray();
+        strings.append("");
+        strings.append("");
+        strings.append("a / >b");
+        require_parse(
+            "empty elements and text",
+            "<llsd><array><string/><string a='1' \n/><string>a / >b</string></array></llsd>",
+            strings,
+            4);
+    }
+
 
     TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a value of unknown type parses as undefined", "[llsd_XML_parsing]")
     {

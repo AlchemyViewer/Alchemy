@@ -1092,13 +1092,16 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
             }
             else if (c == '>')
             {
+                // An empty element ends "/>", with nothing between the two. A
+                // '/' anywhere else is no attribute, and valid_attributes()
+                // refuses it.
                 size_t end = mPos;
-                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 if (end > attr_off && mBuffer[end - 1] == '/')
                 {
                     self_closing = true;
                     --end;
                 }
+                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 attr_len = end - attr_off;
                 ++mPos;
                 return true;
@@ -1144,6 +1147,8 @@ bool LLSDXMLParser::Impl::scanMarkup()
 
     if (lead == '?')
     {
+        // "<?>" is no processing instruction, nor the start of one.
+        if (!avail(3) || mBuffer[mPos + 2] == '>') return false;
         size_t at;
         mPos += 2;
         if (!findMarker("?>", 2, at)) return false;
@@ -1170,8 +1175,13 @@ bool LLSDXMLParser::Impl::scanMarkup()
             mPos = at + 3;
             return true;
         }
-        mPos += 2;
-        return scanDoctype();
+        if (avail(9) && memcmp(mBuffer.data() + mPos, "<!DOCTYPE", 9) == 0)
+        {
+            mPos += 2;
+            return scanDoctype();
+        }
+        // XML begins nothing else with "<!".
+        return false;
     }
 
     if (lead == '/')
