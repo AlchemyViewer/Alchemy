@@ -164,8 +164,10 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     std::string header{ hdr_buf, static_cast<std::string::size_type>(inbuf) };
     if (str.fail())
     {
+        // Reading on past a first line that reaches the end of the stream
+        // fails the stream, but the line is still the first line.
+        fail_if_not_legacy = (inbuf == 0 || !str.eof());
         str.clear();
-        fail_if_not_legacy = true;
     }
 
     // SIZE_UNLIMITED is negative: subtracting the header length from it would
@@ -205,6 +207,7 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     }
 
     // trim off the <? ... ?> header syntax
+    bool bracketed = false;
     auto start = header.find_first_not_of("<? ");
     if (start != std::string::npos)
     {
@@ -212,22 +215,27 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
         if (end != std::string::npos)
         {
             header = header.substr(start, end - start);
-            ws(str);
+            bracketed = true;
         }
     }
     /*
-     * Create the parser as appropriate
+     * Create the parser as appropriate. Whitespace after a bracketed header
+     * is skipped, but a line that names no format is the document's own, and
+     * so is what follows it.
      */
     if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_BINARY_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDBinaryParser>(str, sd, remaining) > 0);
     }
     else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_XML_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDXMLParser>(str, sd, remaining) > 0);
     }
     else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_NOTATION_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDNotationParser>(str, sd, remaining) > 0);
     }
     else // no header we recognize

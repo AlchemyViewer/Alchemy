@@ -1874,6 +1874,54 @@ namespace
         }
     }
 
+    bool deserialize_text(LLSD& out, const std::string& text, llssize max_bytes = LLSDSerialize::SIZE_UNLIMITED)
+    {
+        out.clear();
+        std::istringstream in(text);
+        return LLSDSerialize::deserialize(out, in, max_bytes);
+    }
+
+    TEST_CASE("llsd serialization: deserialize reads a short document with no newline", "[llsd_serialization]")
+    {
+        // The first line is what comes before a newline within its first 20
+        // bytes, or before the end of a shorter document.
+        LLSD out;
+        CHECK(deserialize_text(out, "i1"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "i1", 2));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "'0123456789abcdef'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("0123456789abcdef")));
+        CHECK(deserialize_text(out, "'0123456789abcdefg'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("0123456789abcdefg")));
+
+        LLSD array = LLSD::emptyArray();
+        array.append(1);
+        array.append(2);
+        CHECK(deserialize_text(out, "[i1,i2]"));
+        CHECK_THAT(out, ll_test::LLSDEquals(array));
+
+        // A document must hold a first line.
+        CHECK_FALSE(deserialize_text(out, ""));
+        CHECK_FALSE(deserialize_text(out, "\ni1"));
+    }
+
+    TEST_CASE("llsd serialization: deserialize skips whitespace only after a header it knows", "[llsd_serialization]")
+    {
+        LLSD out;
+        CHECK(deserialize_text(out, "'abcdefghijklmnopq r  st'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("abcdefghijklmnopq r  st")));
+        CHECK(deserialize_text(out, "'a ?\n  b'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("a ?\n  b")));
+
+        CHECK(deserialize_text(out, "<? llsd/notation ?>\n \t\r\n i1"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, std::string("<? LLSD/Binary ?>\n\n i\0\0\0\x01", 25)));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "<? LLSD/XML ?>\n   <llsd><integer>1</integer></llsd>"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+    }
+
     TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: strip_deprecated_header skips a header with or without a newline", "[llsd_serialization]")
     {
         // strip_deprecated_header() must consume the newline following the
