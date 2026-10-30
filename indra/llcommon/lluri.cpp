@@ -126,34 +126,12 @@ std::string LLURI::unescape(const std::string& str)
     std::string::const_iterator end = str.end();
     for(; it != end; ++it)
     {
-        if((*it) == '%')
+        // Only a '%' and two hex digits is an escape. Any other '%' stays as
+        // it is, and what follows it is read as text.
+        if((*it) == '%' && (end - it) > 2 && is_char_hex(it[1]) && is_char_hex(it[2]))
         {
-            ++it;
-            if(it == end) break;
-
-            if(is_char_hex(*it))
-            {
-                U8 c = hex_as_nybble(*it++);
-
-                c = c << 4;
-                if (it == end) break;
-
-                if(is_char_hex(*it))
-                {
-                    c |= hex_as_nybble(*it);
-                    ostr.put((char)c);
-                }
-                else
-                {
-                    ostr.put((char)c);
-                    ostr.put(*it);
-                }
-            }
-            else
-            {
-                ostr.put('%');
-                ostr.put(*it);
-            }
+            ostr.put((char)((hex_as_nybble(it[1]) << 4) | hex_as_nybble(it[2])));
+            it += 2;
         }
         else
         {

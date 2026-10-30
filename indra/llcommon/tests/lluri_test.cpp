@@ -265,6 +265,37 @@ namespace
         CHECK(uri_raw.empty());
     }
 
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape decodes a valid escape and leaves a plus alone", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%41") == "A");
+        CHECK(LLURI::unescape("%4a%4A") == "JJ");
+        CHECK(LLURI::unescape("a%20b") == "a b");
+        CHECK(LLURI::unescape("%2B") == "+");
+        CHECK(LLURI::unescape("a+b") == "a+b");
+        CHECK(LLURI::unescape("%00") == std::string(1, '\0'));
+        CHECK(LLURI::unescape("%C3%A7") == "\xC3\xA7");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape leaves a malformed escape as it is", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%") == "%");
+        CHECK(LLURI::unescape("%4") == "%4");
+        CHECK(LLURI::unescape("%4g") == "%4g");
+        CHECK(LLURI::unescape("%zz") == "%zz");
+        CHECK(LLURI::unescape("%g4") == "%g4");
+        CHECK(LLURI::unescape("100%") == "100%");
+        CHECK(LLURI::unescape("a%4") == "a%4");
+        CHECK(LLURI::unescape("%4%") == "%4%");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape reads the text after a malformed escape as text", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%%41") == "%A");
+        CHECK(LLURI::unescape("%4%41") == "%4A");
+        CHECK(LLURI::unescape("%41%") == "A%");
+        CHECK(LLURI::unescape("%%") == "%%");
+    }
+
     TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip URIs", "[LLURI]")
     {
         require_escape_round_trip("http://secondlife.com");
