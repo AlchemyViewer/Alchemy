@@ -446,6 +446,7 @@ private:
     int mSkipThrough;
 
     std::string mCurrentKey;        // Current XML <tag>
+    bool mHaveKey;                  // a <key> waits for its value, though it may be empty
 
     // String data between <tag> and </tag>. While it is a single unbroken run
     // of the source it is held as an offset into mBuffer and never copied;
@@ -697,6 +698,7 @@ void LLSDXMLParser::Impl::reset()
     mSkipThrough = 0;
 
     mCurrentKey.clear();
+    mHaveKey = false;
     clearContent();
 
     mInput = nullptr;
@@ -1279,13 +1281,14 @@ bool LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
     else if (mStack.back()->isMap())
     {
-        if (mCurrentKey.empty()) { startSkipping(); return true; }
+        if (!mHaveKey) { startSkipping(); return true; }
 
         LLSD& map = *mStack.back();
         LLSD& newElement = map[std::move(mCurrentKey)];
         mStack.push_back(&newElement);
 
         mCurrentKey.clear();
+        mHaveKey = false;
     }
     else if (mStack.back()->isArray())
     {
@@ -1342,6 +1345,7 @@ void LLSDXMLParser::Impl::endElement(Element element)
 
         case ELEMENT_KEY:
             mCurrentKey = takeContent();
+            mHaveKey = true;
             clearContent();
             return;
 

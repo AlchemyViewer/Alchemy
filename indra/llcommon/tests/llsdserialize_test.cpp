@@ -871,6 +871,47 @@ namespace
             1);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: an empty key is a key", "[llsd_XML_parsing]")
+    {
+        LLSD both = LLSD::emptyMap();
+        both[""] = 1;
+        both["a"] = 2;
+        require_parse(
+            "empty key",
+            "<llsd><map><key></key><integer>1</integer><key>a</key><integer>2</integer></map></llsd>",
+            both,
+            3);
+        LLSD empty = LLSD::emptyMap();
+        empty[""] = 1;
+        require_parse(
+            "self-closed empty key",
+            "<llsd><map><key /><integer>1</integer></map></llsd>",
+            empty,
+            2);
+
+        // A key is taken by the one value after it, and a value with no key
+        // before it is skipped.
+        require_parse(
+            "second value under an empty key",
+            "<llsd><map><key></key><integer>1</integer><integer>2</integer></map></llsd>",
+            empty,
+            2);
+        LLSD a = LLSD::emptyMap();
+        a["a"] = 2;
+        require_parse(
+            "value with no key",
+            "<llsd><map><integer>1</integer><key>a</key><integer>2</integer></map></llsd>",
+            a,
+            2);
+
+        // The formatter writes a map's empty key, which reads back.
+        std::stringstream stream;
+        LLSDSerialize::toXML(both, stream);
+        LLSD parsed;
+        REQUIRE(LLSDSerialize::fromXML(parsed, stream) > 0);
+        CHECK_THAT(parsed, ll_test::LLSDEquals(both));
+    }
+
     /*
     TODO:
         test XML parsing
