@@ -102,6 +102,16 @@ namespace
         require_parts(LLURI("foo%3A"), "", "foo:", "", "");
     }
 
+    TEST_CASE_METHOD(URITestData, "LLURI: a string that starts with a colon has no scheme and writes back whole", "[LLURI]")
+    {
+        require_parts(LLURI(":foo"), "", ":foo", "", "");
+        CHECK(LLURI(":foo").asString() == ":foo");
+        CHECK(LLURI(":").asString() == ":");
+        CHECK(LLURI("::").asString() == "::");
+        CHECK(LLURI(":a:b").asString() == ":a:b");
+        CHECK_FALSE(LLURI(":foo") == LLURI("foo"));
+    }
+
     TEST_CASE_METHOD(URITestData, "LLURI: a scheme without paths leaves no authority or path", "[LLURI]")
     {
         require_parts(LLURI("mailto:zero@ll.com"),

@@ -287,7 +287,8 @@ LLURI::LLURI(const std::string& escaped_str)
     std::string::size_type delim_pos;
     delim_pos = escaped_str.find(':');
     std::string temp;
-    if (delim_pos == std::string::npos)
+    // A scheme is never empty, so a colon at the start does not end one.
+    if (delim_pos == std::string::npos || delim_pos == 0)
     {
         mScheme = "";
         mEscapedOpaque = escaped_str;
