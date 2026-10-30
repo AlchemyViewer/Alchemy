@@ -81,6 +81,16 @@ namespace
         CHECK(query["y"].asURI().asString() == "https://lindenlab.com/");
     }
 
+    TEST_CASE_METHOD(URITestData, "LLURI: the query map of an empty query is an empty map", "[LLURI]")
+    {
+        CHECK(LLURI::queryMap("").isMap());
+        CHECK(LLURI::queryMap("").size() == 0);
+        CHECK(LLURI::queryMap("&&").isMap());
+        CHECK(LLURI("http://host/path").queryMap().isMap());
+        CHECK(LLURI("http://host/path?").queryMap().isMap());
+        CHECK(LLURI::queryMap("x=1").isMap());
+    }
+
     TEST_CASE_METHOD(URITestData, "LLURI: an empty string has no parts", "[LLURI]")
     {
         require_parts(LLURI(""), "", "", "", "");

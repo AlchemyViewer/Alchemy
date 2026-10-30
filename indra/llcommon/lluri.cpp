@@ -663,7 +663,7 @@ LLSD LLURI::queryMap(std::string escaped_query_string)
 {
     LL_DEBUGS() << "LLURI::queryMap query params: " << escaped_query_string << LL_ENDL;
 
-    LLSD result = LLSD::emptyArray();
+    LLSD result = LLSD::emptyMap();
     while(!escaped_query_string.empty())
     {
         // get tuple first
