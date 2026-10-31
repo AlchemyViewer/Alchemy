@@ -169,7 +169,8 @@ public:
      * @brief unescape an escaped URI string.
      *
      * @param str The escped URI to unescape.
-     * @return Returns the unescaped uri or an empty string.
+     * @return Returns the uri with each %XX escape decoded. A '%' that two
+     * hex digits do not follow is kept as it is.
      */
     static std::string unescape(const std::string& str);
     //@}

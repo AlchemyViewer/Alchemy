@@ -40,6 +40,7 @@ namespace LLCore
 
 
 class HttpOperation;
+class ALHttpWake;
 
 
 /// Thread-safe queue of HttpOperation objects.  Just
@@ -126,6 +127,14 @@ public:
     /// Threading:  callable by any thread.
     bool stopQueue();
 
+    /// The worker's wait on its transfers, which a request
+    /// arriving on an empty queue and @stopQueue signal as they
+    /// wake @fetchAll.  NULL for none; cleared before the wake
+    /// is closed.
+    ///
+    /// Threading:  callable by any thread.
+    void setWake(ALHttpWake * wake);
+
     static void setMessageLogFunc(std::function<void(const HttpRequestQueue::opPtr_t &)> func) { sMessageLogFunc = func;}
 
 protected:
@@ -137,6 +146,7 @@ protected:
     LLCoreInt::HttpMutex                mQueueMutex;
     LLCoreInt::HttpConditionVariable    mQueueCV;
     bool                                mQueueStopped;
+    ALHttpWake *                        mWake;          // Guarded by mQueueMutex
 
 }; // end class HttpRequestQueue
 

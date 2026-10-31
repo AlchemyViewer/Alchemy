@@ -59,18 +59,26 @@ namespace
         return F3DAUDIO_VECTOR{ -v.mV[1] * inv, v.mV[2] * inv, v.mV[0] * inv };
     }
 
-    // Audible range base distance (metres). The volume curve below is
-    // normalized to a CurveDistanceScaler computed as kAudibleRange /
-    // rolloff; with the default unit rolloff this puts the asymptote
-    // (kVolumeCurvePoints[end].x = 1.0) at 384 m — roughly the diagonal
-    // of a 256 x 256 m SL region. Fixed rather than user-tunable: the
-    // earlier "audible range" knob exposed a setting that mostly drifted
-    // away from FMOD parity when touched, and the curve table is tuned
-    // assuming this value.
-    constexpr float kAudibleRange = 384.0f;
+    // Audible range (metres): F3DAudio's CurveDistanceScaler. Every curve
+    // handed to F3DAudio is expressed in fractions of it and ends at 1.0,
+    // so this is how far the volume curve follows the inverse-distance
+    // law. 2048 m is the viewer's maximum draw distance (MAX_FAR_CLIP), so
+    // nothing the viewer can load lies beyond it; at unit rolloff the
+    // curve is at -66 dB there, the same as OpenAL's inverse-distance
+    // model, which has no end. Fixed rather than user-tunable: the earlier
+    // "audible range" knob exposed a setting that mostly drifted away from
+    // FMOD parity when touched.
+    //
+    // The LPF and reverb curves below were tuned as fractions of a 384 m
+    // range (roughly the diagonal of a 256 x 256 m SL region). They are
+    // written in metres against kLegacyAudibleRange so that changing
+    // kAudibleRange stretches the volume curve and nothing else.
+    constexpr float kAudibleRange       = 2048.0f;
+    constexpr float kLegacyAudibleRange = 384.0f;
 
-    // Distance-attenuation curve. Tracks FMOD's FMOD_3D_INVERSEROLLOFF
-    // with default min_distance = 1.0 m:
+    // Distance-attenuation curve. Tracks OpenAL's default
+    // AL_INVERSE_DISTANCE_CLAMPED and FMOD's FMOD_3D_INVERSEROLLOFF, both
+    // with a 1.0 m reference distance:
     //   volume = min_dist / (min_dist + rolloff * (d - min_dist))   for d > min_dist
     //   volume = 1.0                                                 for d <= min_dist
     //
@@ -80,22 +88,26 @@ namespace
     // factor changes — not by scaling CurveDistanceScaler. The other
     // FAudio knobs that touch the curve (kAudibleRange) stay fixed.
     //
-    // F3DAudio interpolates linearly between supplied points; sampling
-    // at 10 points keeps worst-case interpolation error below the dB
-    // resolution of typical hearing across the audible band.
+    // F3DAudio interpolates linearly between supplied points, and 1/x is
+    // convex, so a sparse table reads loud between its points (the old
+    // 10-point table by up to 1.85 dB, 0.9 dB at 2 m). The points are
+    // spaced so every segment has the same, small error instead. With
+    // u = d - min_dist + min_dist / rolloff the curve is
+    // min_dist / (rolloff * u), a pure power law, so points that are
+    // geometric in u are geometric in gain too, and a segment of ratio q
+    // overshoots by at most (1 + q)^2 / (4 q) at its midpoint. For
+    // N = kVolumeCurveSegments, point k = 0..N is
+    //   gain_k     = q^-k,  q = (1 + rolloff * (range - min_dist) / min_dist)^(1/N)
+    //   distance_k = min_dist + min_dist * (q^k - 1) / rolloff
+    // so point 0 is the reference distance at unity gain and point N lands
+    // exactly on kAudibleRange. A leading point at 0 m, also at unity,
+    // gives F3DAudio the 0.0 start it expects.
     //
-    // Beyond fractional 1.0, F3DAudio clamps to the last point's gain —
-    // sources past the audible range settle at the curve's tail value
-    // instead of continuing to drop. Negligible in practice (~-52 dB at
-    // rolloff=1) and a clean stop-loss against extreme-distance
-    // ghosting.
+    // Past fractional 1.0 F3DAudio holds the last point's gain; at 2048 m
+    // that is -66 dB at unit rolloff and nothing loaded lies beyond it.
     constexpr float kVolumeCurveMinDistance = 1.0f;
-    constexpr float kVolumeCurveSampleDistances[] = {
-        0.0f, 1.0f, 1.5f, 3.0f, 7.5f, 15.0f, 38.0f, 75.0f, 150.0f, 384.0f
-    };
-    constexpr std::size_t kVolumeCurvePointCount =
-        sizeof(kVolumeCurveSampleDistances) /
-        sizeof(kVolumeCurveSampleDistances[0]);
+    constexpr std::size_t kVolumeCurveSegments = 40;
+    constexpr std::size_t kVolumeCurvePointCount = kVolumeCurveSegments + 2;
 
     F3DAUDIO_DISTANCE_CURVE_POINT kVolumeCurvePoints[kVolumeCurvePointCount];
     // F3DAudio.h wraps its structs in `#pragma pack(push, 1)`, giving
@@ -118,22 +130,28 @@ namespace
     void recompute_volume_curve(float rolloff)
     {
         if (rolloff <= 0.0f) rolloff = 1.0f;  // safety
-        for (std::size_t i = 0; i < kVolumeCurvePointCount; ++i)
+
+        // Double precision: q^k reaches ~2000 at the far end.
+        const double r = rolloff;
+        const double m = kVolumeCurveMinDistance;
+        const double q = std::pow(1.0 + r * (kAudibleRange - m) / m,
+                                  1.0 / static_cast<double>(kVolumeCurveSegments));
+
+        kVolumeCurvePoints[0].Distance   = 0.0f;
+        kVolumeCurvePoints[0].DSPSetting = 1.0f;
+
+        double qk = 1.0;  // q^k
+        for (std::size_t k = 0; k <= kVolumeCurveSegments; ++k)
         {
-            const float d = kVolumeCurveSampleDistances[i];
-            kVolumeCurvePoints[i].Distance = d / kAudibleRange;
-            if (d <= kVolumeCurveMinDistance)
-            {
-                kVolumeCurvePoints[i].DSPSetting = 1.0f;
-            }
-            else
-            {
-                const float effective_d =
-                    kVolumeCurveMinDistance
-                  + rolloff * (d - kVolumeCurveMinDistance);
-                kVolumeCurvePoints[i].DSPSetting =
-                    kVolumeCurveMinDistance / effective_d;
-            }
+            // The last point is pinned to exactly 1.0: the computed
+            // distance lands within rounding of it, and F3DAudio wants the
+            // curve to end on its endpoint, not a hair either side.
+            const bool last = (k == kVolumeCurveSegments);
+            const double d = m + m * (qk - 1.0) / r;
+            kVolumeCurvePoints[k + 1].Distance =
+                last ? 1.0f : static_cast<float>(d / kAudibleRange);
+            kVolumeCurvePoints[k + 1].DSPSetting = static_cast<float>(1.0 / qk);
+            qk *= q;
         }
     }
 
@@ -149,16 +167,18 @@ namespace
     // 1.0 -> 0.75 across the full audible range — too mild for the SL
     // distance scale where we want clearly muffled sounds at the edge
     // of a region. Frequency parameter at the source voice is [0, 1]
-    // where 1 = full HF passthrough, 0 = full cutoff. Distances below
-    // are fractions of CurveDistanceScaler (= 384 m at default tunings).
+    // where 1 = full HF passthrough, 0 = full cutoff. Knots are written in
+    // metres and normalized by kAudibleRange; past the old 384 m end the
+    // curve holds its final value.
     F3DAUDIO_DISTANCE_CURVE_POINT kLpfCurvePoints[] = {
-        { 0.000f, 1.000f },   //    0 m: full HF
-        { 0.039f, 1.000f },   //   15 m: hold passthrough in the close field
-        { 0.099f, 0.900f },   //   38 m: barely-perceptible HF tilt
-        { 0.195f, 0.800f },   //   75 m: clearly "across the parcel" tone
-        { 0.391f, 0.600f },   //  150 m: noticeable air absorption
-        { 0.781f, 0.400f },   //  300 m: strong muffling
-        { 1.000f, 0.300f },   //  384 m: at silence anyway, but cap the bottom
+        { 0.0f,                                1.0f },   //    0 m: full HF
+        { 15.0f / kAudibleRange,               1.0f },   //   15 m: hold passthrough in the close field
+        { 38.0f / kAudibleRange,               0.9f },   //   38 m: barely-perceptible HF tilt
+        { 75.0f / kAudibleRange,               0.8f },   //   75 m: clearly "across the parcel" tone
+        { 150.0f / kAudibleRange,              0.6f },   //  150 m: noticeable air absorption
+        { 300.0f / kAudibleRange,              0.4f },   //  300 m: strong muffling
+        { kLegacyAudibleRange / kAudibleRange, 0.3f },   //  384 m: cap the bottom
+        { 1.0f,                                0.3f },   // range: hold
     };
     alignas(void*) F3DAUDIO_DISTANCE_CURVE kLpfCurve = {
         kLpfCurvePoints,
@@ -166,6 +186,23 @@ namespace
                               sizeof(kLpfCurvePoints[0]))
     };
 
+    // Reverb send level against distance. Left null, F3DAudio's default
+    // (reverbDefault in F3DAudio.c: 1.0 at 0 m falling linearly to 0.0 at
+    // CurveDistanceScaler) would stretch with kAudibleRange. The reverb
+    // send is its own matrix (run_f3d writes it from dsp.ReverbLevel, with
+    // no volume-curve attenuation), so that would leave a far source's
+    // reverb wash high while its dry signal fell away. This pins it to the
+    // shape it had at the old 384 m range.
+    F3DAUDIO_DISTANCE_CURVE_POINT kReverbCurvePoints[] = {
+        { 0.0f,                                1.0f },
+        { kLegacyAudibleRange / kAudibleRange, 0.0f },
+        { 1.0f,                                0.0f },
+    };
+    alignas(void*) F3DAUDIO_DISTANCE_CURVE kReverbCurve = {
+        kReverbCurvePoints,
+        static_cast<uint32_t>(sizeof(kReverbCurvePoints) /
+                              sizeof(kReverbCurvePoints[0]))
+    };
     // Stereo emitter spread (metres). Channels are positioned at the
     // emitter's left/right by this distance. ~0.5 m is the X3DAudio
     // sample-code default and feels right for the SL "stereo speaker on
@@ -377,7 +414,7 @@ namespace
         // submix more than help spatially.
         emitter.pLPFDirectCurve = &kLpfCurve;
         emitter.pLPFReverbCurve = nullptr;
-        emitter.pReverbCurve = nullptr;
+        emitter.pReverbCurve = &kReverbCurve;
         emitter.pCone = nullptr;
 
         std::array<float, 64> matrix{};

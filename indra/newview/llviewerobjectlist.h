@@ -39,6 +39,7 @@
 
 // project includes
 #include "llviewerobject.h"
+#include "alobjectroster.h"
 #include "lleventcoro.h"
 #include "llcoros.h"
 
@@ -79,6 +80,11 @@ public:
 
     bool killObject(LLViewerObject *objectp);
     void killObjects(LLViewerRegion *regionp); // Kill all objects owned by a particular region.
+    // Marks the textures objectp shows, and with_children its children's, as let go with a region (the lazy flush
+    // takes them at once).
+    void noteReleasedTextures(LLViewerObject* objectp, bool with_children);
+    // The live objects of regionp, for a caller that kills them a few at a time.
+    void getRegionObjects(const LLViewerRegion* regionp, std::vector<LLPointer<LLViewerObject>>& objects) const;
 
     // An object into the list or out of it, by its id, as it happens, for
     // whoever follows objects by id to hear of it rather than poll. One
@@ -88,7 +94,9 @@ public:
     boost::signals2::connection onPresence(const presence_signal_t::slot_type& slot) { return mPresenceSignal.connect(slot); }
     void killAllObjects();
 
-    void cleanDeadObjects(const bool use_timer = true); // Clean up the dead object list.
+    // Destroys dead objects, oldest first, as many as a frame's budget allows, and at least a share of the queue
+    // that grows with it.
+    void cleanDeadObjects();
 
     // Simulator and viewer side object updates...
     void processUpdateCore(LLViewerObject* objectp, void** data, U32 block, const EObjectUpdateType update_type,
@@ -142,6 +150,8 @@ public:
     void updateAvatarVisibility();
 
     inline S32 getNumObjects() { return (S32) mObjects.size(); }
+    // Dead objects still in the list, waiting for cleanDeadObjects.
+    inline S32 getNumDeadObjects() const { return (S32) mObjects.queued(); }
     inline S32 getNumActiveObjects() { return (S32) mActiveObjects.size(); }
 
     void addToMap(LLViewerObject *objectp);
@@ -205,7 +215,6 @@ public:
 
     S32 mNumUnknownUpdates;
     S32 mNumDeadObjectUpdates;
-    S32 mNumDeadObjects;
 protected:
     std::vector<U64>    mOrphanParents; // LocalID/ip,port of orphaned objects
     std::vector<OrphanInfo> mOrphanChildren;    // UUID's of orphaned objects
@@ -214,12 +223,11 @@ protected:
 
     typedef std::vector<LLPointer<LLViewerObject> > vobj_list_t;
 
-    vobj_list_t mObjects;
+    // Every object, the dead among them until cleanDeadObjects destroys them.
+    ALObjectRoster<LLViewerObject> mObjects;
     std::vector<LLPointer<LLViewerObject> > mActiveObjects;
 
     vobj_list_t mMapObjects;
-
-    uuid_set_t   mDeadObjects;
 
     boost::unordered_map<LLUUID, LLPointer<LLViewerObject>> mUUIDObjectMap;
     presence_signal_t mPresenceSignal;

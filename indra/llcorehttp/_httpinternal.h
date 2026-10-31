@@ -164,8 +164,16 @@ constexpr long HTTP_THROTTLE_RATE_DEFAULT = 0L;
 // Tuning parameters
 
 // Time worker thread sleeps after a pass through the
-// request, ready and active queues.
+// request, ready and active queues when it cannot wait on
+// its transfers' sockets: it has no wake socket, or there
+// are more sockets than an fd_set holds.
 constexpr int HTTP_SERVICE_LOOP_SLEEP_NORMAL_MS = 2;
+
+// Longest the worker waits on its transfers with nothing
+// due to wake it.  A bound on whatever the wait might miss,
+// not a poll: sockets, libcurl's timeouts, the policy's
+// deadlines and new requests all end the wait sooner.
+constexpr long HTTP_SERVICE_LOOP_WAIT_MAX_MS = 100L;
 
 // Block allocation size (a tuning parameter) is found
 // in bufferarray.h.

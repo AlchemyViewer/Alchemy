@@ -44,7 +44,6 @@ LLQueuedThread::LLQueuedThread(const std::string& name, bool threaded, bool shou
     mRequestQueue(name, 1024 * 1024)
 {
     llassert(threaded); // not threaded implementation is deprecated
-    mMainQueue = LL::WorkQueue::getInstance("mainloop");
 
     // The thread starts when the owner calls start(), once the object is made.
     if (mThreaded && should_pause)
@@ -80,10 +79,10 @@ void LLQueuedThread::shutdown()
     unpause(); // MAIN THREAD
     if (mThreaded)
     {
-        if (mRequestQueue.size() == 0)
-        {
-            mRequestQueue.close();
-        }
+        // Closed, the queue still runs what it holds, retries due later
+        // included, and the thread stops once it has run the last of it. A
+        // retry it can no longer post is left queued, for the loop below.
+        mRequestQueue.close();
 
         S32 timeout = 50;
         for ( ; timeout>0; timeout--)
@@ -163,8 +162,9 @@ size_t LLQueuedThread::updateQueue(F32 max_time_ms)
     // Frame Update
     if (mThreaded)
     {
-        // schedule a call to threadedUpdate for every call to updateQueue
-        if (!isQuitting())
+        // schedule a call to threadedUpdate for every call to updateQueue,
+        // unless it has nothing to do: then the post only wakes the thread
+        if (!isQuitting() && hasThreadedUpdate())
         {
             mRequestQueue.post([=, this]()
                 {
@@ -366,16 +366,32 @@ LLQueuedThread::status_t LLQueuedThread::getRequestStatus(handle_t handle)
     return res;
 }
 
+// Any thread
+void LLQueuedThread::wakeRequest(handle_t handle)
+{
+    mRequestQueue.post([this, handle]
+        {
+            LL_PROFILE_ZONE_NAMED("processRequest - wake");
+            retryRequest(handle, 0);
+        });
+}
+
 void LLQueuedThread::abortRequest(handle_t handle, bool autocomplete)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_THREAD;
     lockData();
     QueuedRequest* req = (QueuedRequest*)mRequestHash.find(handle);
+    const bool found(req != NULL);
     if (req)
     {
         req->setFlags(FLAG_ABORT | (autocomplete ? FLAG_AUTO_COMPLETE : 0));
     }
     unlockData();
+    // A request waiting for a wake sees the abort now, not at its fallback
+    if (found)
+    {
+        wakeRequest(handle);
+    }
 }
 
 // MAIN thread
@@ -501,47 +517,43 @@ void LLQueuedThread::processRequest(LLQueuedThread::QueuedRequest* req)
 
                 llassert(!mRunCondition->isSelfLocked());
 
-#if 0
-                // try again on next frame
-                // NOTE: tried using "post" with a time in the future, but this
-                // would invariably cause this thread to wait for a long time (10+ ms)
-                // while work is pending
-                bool ret = LL::WorkQueue::postMaybe(
-                    mMainQueue,
-                    [=]()
-                    {
-                        LL_PROFILE_ZONE_NAMED("processRequest - retry");
-                        mRequestQueue.post([=]()
-                            {
-                                LL_PROFILE_ZONE_NAMED("processRequest - retry"); // <-- not redundant, track retry on both queues
-                                processRequest(req);
-                            });
-                    });
-                llassert(ret);
-#else
+                // Try again in 16 ms, running whatever else is ready
+                // meanwhile, or sooner if wakeRequest() says what it waits
+                // on has happened. A request that waits for that wake is
+                // tried again only as a fallback, in case it never comes.
+                // Posted from this thread between requests, so the wait for
+                // the next one already knows this one's time.
                 using namespace std::chrono_literals;
-                auto retry_time = LL::WorkQueue::TimePoint::clock::now() + 16ms;
-                mRequestQueue.post([=, this]
+                const auto delay(req->waitsForWake() ? 250ms : 16ms);
+                const handle_t handle(req->getHashKey());
+                const U32 generation(++req->mRetryGeneration);
+                req->mRetryPending = true;
+                mRequestQueue.post([this, handle, generation]
                     {
                         LL_PROFILE_ZONE_NAMED("processRequest - retry");
-                        if (LL::WorkQueue::TimePoint::clock::now() < retry_time)
-                        {
-                            auto sleep_time = std::chrono::duration_cast<std::chrono::milliseconds>(retry_time - LL::WorkQueue::TimePoint::clock::now());
-
-                            if (sleep_time.count() > 0)
-                            {
-                                ms_sleep((U32)sleep_time.count());
-                            }
-                        }
-                        processRequest(req);
-                    });
-#endif
-
+                        retryRequest(handle, generation);
+                    },
+                    LL::WorkSchedule::TimePoint::clock::now() + delay);
             }
         }
     }
 
     mIdleThread = true;
+}
+
+// Runs on its OWN thread. Found by handle, since a retry already run may
+// have finished the request and deleted it. While a retry is pending the
+// request is queued, which nothing else deletes.
+void LLQueuedThread::retryRequest(handle_t handle, U32 generation)
+{
+    lockData();
+    QueuedRequest* req = (QueuedRequest*)mRequestHash.find(handle);
+    unlockData();
+    if (req && req->mRetryPending && (0 == generation || req->mRetryGeneration == generation))
+    {
+        req->mRetryPending = false;
+        processRequest(req);
+    }
 }
 
 // virtual

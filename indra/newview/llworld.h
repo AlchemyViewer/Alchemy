@@ -39,6 +39,7 @@
 #include "llstring.h"
 #include "llviewerpartsim.h"
 #include "llviewertexture.h"
+#include "alregionretirement.h"
 
 #include <vector>
 
@@ -214,6 +215,8 @@ private:
     region_list_t   mCulledRegionList;
 
     region_remove_signal_t mRegionRemovedSignal;
+
+    ALRegionRetirement mRegionRetirement;
 
     // Number of points on edge
     static const U32 mWidth;

@@ -169,6 +169,11 @@ bool ALFontColrV1Painter::paintGlyph(hb_font_t*       hb_font,
         return false;
     }
 
+    // Only hb_raster_paint_render clears the paint, so a glyph that failed
+    // after painting began leaves its surfaces behind, and the next glyph
+    // composites its smaller groups onto that larger root past their end.
+    hb_raster_paint_clear(p);
+
     // Resolve glyph extents in 26.6 fixed-point pixels (HB scaled units).
     // Source preference matches the canonical hb-raster example:
     //   1. hb_font_get_glyph_extents — usually the OUTLINE bbox, which for

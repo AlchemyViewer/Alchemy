@@ -742,6 +742,71 @@ namespace
         requireSameOverride(overrides[2], read[2]);
     }
 
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: a region that never had an override keeps its objects into the next login", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1021 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        LLVOCacheEntry::vocache_entry_map_t written = makeEntries(30);
+
+        // The region's save: its objects missed the cache, so they are dirty;
+        // no override ever arrived, so there are none and nothing marked the
+        // overrides dirty.
+        LLVOCache::instance().writeToCache(handle, id, written, /*dirty=*/true, false);
+        LLVOCacheEntry::vocache_gltf_overrides_map_t nothing;
+        LLVOCache::instance().writeGenericExtrasToCache(handle, id, nothing, /*dirty=*/false, false);
+        UNSCOPED_INFO("the extras file is written beside the objects");
+        CHECK(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+
+        LLVOCache::deleteSingleton();
+        LLVOCache::initParamSingleton(false);
+        LLVOCache::instance().initCache(LL_PATH_CACHE, CACHE_NUMBER_OF_REGIONS, CACHE_VERSION);
+
+        // The next login loads as LLViewerRegion::loadObjectCache does: extras
+        // it cannot use take the objects with them.
+        LLVOCacheEntry::vocache_entry_map_t read;
+        UNSCOPED_INFO("the objects read");
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        const bool extras_read = LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, read);
+        if (!extras_read)
+        {
+            LLVOCache::instance().removeGenericExtrasForHandle(handle);
+        }
+        UNSCOPED_INFO("the extras read");
+        CHECK(extras_read);
+        UNSCOPED_INFO("and hold no override");
+        CHECK(overrides.empty());
+
+        LLVOCacheEntry::vocache_entry_map_t kept;
+        UNSCOPED_INFO("the object cache is still there after the load");
+        CHECK(LLVOCache::instance().readFromCache(handle, id, kept));
+        UNSCOPED_INFO("with every object in it");
+        CHECK(kept.size() == written.size());
+    }
+
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an object write that fails leaves no extras file behind", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1022 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+
+        // A body past the cache's ten-thousand-byte cap on one entry fails the
+        // object write, which drops the region from the header. The save goes
+        // on to the extras, dirty since the objects were.
+        LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(3);
+        objects[4] = makeEntry(4, 4, 10001);
+        LLVOCache::instance().writeToCache(handle, id, objects, /*dirty=*/true, false);
+        UNSCOPED_INFO("the failed write dropped the region");
+        REQUIRE(LLVOCache::instance().getCacheEntries() == 0u);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1] = requireOverride(1, handle, 2);
+        LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, /*dirty=*/true, false);
+        UNSCOPED_INFO("no object file");
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
+        UNSCOPED_INFO("and no extras file for a region the header does not hold");
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+    }
+
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: staysInMemory keeps entries seen lately or inside the rear sphere", "[LLVOCache]")
     {
         // A stand-in for an entry that nothing has looked at in a while: its

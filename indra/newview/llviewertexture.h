@@ -350,6 +350,23 @@ public:
 
     void destroyTexture() ;
 
+    // An object showing it died with its region (LLViewerObjectList::noteReleasedTextures): once unreferenced, soon
+    // after, the lazy flush takes it without its wait.
+    void noteReleasedWithRegion() { mReleasedWithRegion = (F64)LLFrameTimer::getUptimeSeconds(); }
+    bool releasedWithRegionWithin(F64 seconds) const
+    {
+        return mReleasedWithRegion >= 0.0 && (F64)LLFrameTimer::getUptimeSeconds() - mReleasedWithRegion < seconds;
+    }
+    // Still referenced a while after the mark, by something other than the dead objects that set it and are destroyed
+    // within seconds: a later release is an ordinary one.
+    void forgetReleasedWithRegion(F64 after_seconds)
+    {
+        if (mReleasedWithRegion >= 0.0 && (F64)LLFrameTimer::getUptimeSeconds() - mReleasedWithRegion >= after_seconds)
+        {
+            mReleasedWithRegion = -1.0;
+        }
+    }
+
     virtual void processTextureStats() ;
 
     bool needsAux() const { return mNeedsAux; }
@@ -364,6 +381,9 @@ public:
     void setMinDiscardLevel(S32 discard)    { mMinDesiredDiscardLevel = llmin(mMinDesiredDiscardLevel,(S8)discard); }
 
     bool updateFetch();
+
+    // Rebuilds the groups of faces built into a mask or a blend pass by another answer than the analysis now gives.
+    void onAlphaMaskChanged() override;
 
     void clearFetchedResults(); //clear all fetched results, for debug use.
 
@@ -503,6 +523,7 @@ protected:
     S32 mMinDiscardLevel;
     S8  mDesiredDiscardLevel;           // The discard level we'd LIKE to have - if we have it and there's space
     S8  mMinDesiredDiscardLevel;    // The minimum discard level we'd like to have
+    F64 mReleasedWithRegion = -1.0; // LLFrameTimer::getUptimeSeconds() when noteReleasedWithRegion last ran, or -1
 
     bool mNeedsAux;                 // We need to decode the auxiliary channels
     bool mHasAux;                    // We have aux channels

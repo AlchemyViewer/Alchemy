@@ -265,6 +265,11 @@ public:
     U32 getCRC() const                              { return mTotalCRC; }
     S32 getListIndex() const                        { return mListIndex; }
     void setListIndex(S32 idx)                      { mListIndex = idx; }
+    // Position in LLViewerObjectList's list of every object (ALObjectRoster).
+    S32 getObjectListIndex() const                  { return mObjectListIndex; }
+    void setObjectListIndex(S32 idx)                { mObjectListIndex = idx; }
+    bool isPendingRemoval() const                   { return mPendingRemoval; }
+    void setPendingRemoval()                        { mPendingRemoval = true; }
 
     virtual bool isFlexible() const                 { return false; }
     virtual bool isSculpted() const                 { return false; }
@@ -803,6 +808,12 @@ public:
 
     // index into LLViewerObjectList::mActiveObjects or -1 if not in list
     S32             mListIndex;
+
+    // index into LLViewerObjectList::mObjects or -1 if not in it
+    S32             mObjectListIndex = -1;
+
+    // dead, and queued to leave LLViewerObjectList::mObjects
+    bool            mPendingRemoval = false;
 
     // last index data for mIndexAndLocalIDToUUID
     U32             mRegionIndex;

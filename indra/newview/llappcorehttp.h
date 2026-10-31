@@ -75,6 +75,22 @@ public:
         /// Pipelined:       yes
         AP_TEXTURE,
 
+        /// Whole-asset fetching policy class.  Used to
+        /// download every asset but textures and meshes
+        /// (sounds, animations, gestures, ...) via the
+        /// 'ViewerAsset' capability.  Kept apart from
+        /// AP_TEXTURE so that neither stalls behind the
+        /// other.  GET requests only.
+        ///
+        /// Destination:     cdn:80
+        /// Protocol:        http:
+        /// Transfer size:   KB-MB
+        /// Long poll:       no
+        /// Concurrency:     high
+        /// Request rate:    high
+        /// Pipelined:       yes
+        AP_ASSET,
+
         /// Legacy mesh fetching policy class.  Used to
         /// download textures via 'GetMesh' capability.
         /// To be deprecated.  Do not share.

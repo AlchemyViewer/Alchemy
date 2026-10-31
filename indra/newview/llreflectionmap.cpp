@@ -373,6 +373,11 @@ bool LLReflectionMap::isRelevant() const
         return false;
     }
 
+    if (!mInReach)
+    { // wholly beyond draw distance, as is every probe of the region a teleport left
+        return false;
+    }
+
     if (mViewerObject && probe_level > 0)
     { // not an automatic probe
         return true;
