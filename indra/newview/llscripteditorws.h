@@ -345,7 +345,7 @@ protected:
                (const std::string& method, const LLSD& id, const LLSD& params) -> LLSD
         {
             // <SK:Nexii> Fix the script editor server's coroutine safety
-            // An async handler's may be the server's last reference; it is let
+            // An async handler's reference may be the server's last; it is let
             // go on the main coroutine, since stopping the server takes an LLMutex.
             struct Release
             {
