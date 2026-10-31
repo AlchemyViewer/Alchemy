@@ -663,6 +663,60 @@ namespace
             LLSDParser::PARSE_FAILURE);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: markup that is not XML fails to parse", "[llsd_XML_parsing]")
+    {
+        for (const char* text : {
+                 "<!><llsd><integer>1</integer></llsd>",
+                 "<! x ?><llsd><integer>1</integer></llsd>",
+                 "<!doctype llsd><llsd><integer>1</integer></llsd>",
+                 "<!ELEMENT llsd ANY><llsd><integer>1</integer></llsd>",
+                 "<llsd><integer>1</integer><!x></llsd>",
+                 "<llsd><string/ >x</llsd>",
+                 "<llsd><string / ></llsd>",
+                 "<llsd><array><string a='1'/\n></array></llsd>",
+                 "<?> ?><llsd><integer>1</integer></llsd>",
+                 "<llsd><?><integer>1</integer>?></llsd>",
+             })
+        {
+            INFO(text);
+            std::istringstream input(text);
+            LLSD parsed;
+            mParser->reset();
+            CHECK(mParser->parse(input, parsed, strlen(text)) == LLSDParser::PARSE_FAILURE);
+        }
+
+        // What XML does take.
+        require_parse(
+            "comment",
+            "<!-- c --><llsd><!----><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "doctype",
+            "<!DOCTYPE llsd [<!ELEMENT llsd ANY>]><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "cdata",
+            "<llsd><string><![CDATA[<a/ >]]></string></llsd>",
+            LLSD("<a/ >"),
+            1);
+        require_parse(
+            "declaration and processing instruction",
+            "<?xml version=\"1.0\" ?><llsd><?pi x?><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        LLSD strings = LLSD::emptyArray();
+        strings.append("");
+        strings.append("");
+        strings.append("a / >b");
+        require_parse(
+            "empty elements and text",
+            "<llsd><array><string/><string a='1' \n/><string>a / >b</string></array></llsd>",
+            strings,
+            4);
+    }
+
 
     TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a value of unknown type parses as undefined", "[llsd_XML_parsing]")
     {
@@ -869,6 +923,70 @@ namespace
             "<llsd><binary> \n </binary></llsd>",
             LLSD(LLSD::Binary()),
             1);
+    }
+
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: an empty key is a key", "[llsd_XML_parsing]")
+    {
+        LLSD both = LLSD::emptyMap();
+        both[""] = 1;
+        both["a"] = 2;
+        require_parse(
+            "empty key",
+            "<llsd><map><key></key><integer>1</integer><key>a</key><integer>2</integer></map></llsd>",
+            both,
+            3);
+        LLSD empty = LLSD::emptyMap();
+        empty[""] = 1;
+        require_parse(
+            "self-closed empty key",
+            "<llsd><map><key /><integer>1</integer></map></llsd>",
+            empty,
+            2);
+
+        // A key is taken by the one value after it, and a value with no key
+        // before it is skipped.
+        require_parse(
+            "second value under an empty key",
+            "<llsd><map><key></key><integer>1</integer><integer>2</integer></map></llsd>",
+            empty,
+            2);
+        LLSD a = LLSD::emptyMap();
+        a["a"] = 2;
+        require_parse(
+            "value with no key",
+            "<llsd><map><integer>1</integer><key>a</key><integer>2</integer></map></llsd>",
+            a,
+            2);
+
+        // The formatter writes a map's empty key, which reads back.
+        std::stringstream stream;
+        LLSDSerialize::toXML(both, stream);
+        LLSD parsed;
+        REQUIRE(LLSDSerialize::fromXML(parsed, stream) > 0);
+        CHECK_THAT(parsed, ll_test::LLSDEquals(both));
+    }
+
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a key with no value goes when its map closes", "[llsd_XML_parsing]")
+    {
+        // A key belongs to the map it is in, so no value after that map
+        // closes takes it.
+        LLSD inner = LLSD::emptyMap();
+        inner["a"] = LLSD::emptyMap();
+        for (const char* text : {
+                 "<llsd><map><key>a</key><map><key>b</key></map><integer>1</integer></map></llsd>",
+                 "<llsd><map><key>a</key><map><key /></map><integer>1</integer></map></llsd>",
+             })
+        {
+            require_parse(text, text, inner, 2);
+        }
+        LLSD maps = LLSD::emptyArray();
+        maps.append(LLSD::emptyMap());
+        maps.append(LLSD::emptyMap());
+        require_parse(
+            "key in the map before",
+            "<llsd><array><map><key>a</key></map><map><integer>1</integer></map></array></llsd>",
+            maps,
+            3);
     }
 
     /*
@@ -1833,6 +1951,54 @@ namespace
         }
     }
 
+    bool deserialize_text(LLSD& out, const std::string& text, llssize max_bytes = LLSDSerialize::SIZE_UNLIMITED)
+    {
+        out.clear();
+        std::istringstream in(text);
+        return LLSDSerialize::deserialize(out, in, max_bytes);
+    }
+
+    TEST_CASE("llsd serialization: deserialize reads a short document with no newline", "[llsd_serialization]")
+    {
+        // The first line is what comes before a newline within its first 20
+        // bytes, or before the end of a shorter document.
+        LLSD out;
+        CHECK(deserialize_text(out, "i1"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "i1", 2));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "'0123456789abcdef'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("0123456789abcdef")));
+        CHECK(deserialize_text(out, "'0123456789abcdefg'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("0123456789abcdefg")));
+
+        LLSD array = LLSD::emptyArray();
+        array.append(1);
+        array.append(2);
+        CHECK(deserialize_text(out, "[i1,i2]"));
+        CHECK_THAT(out, ll_test::LLSDEquals(array));
+
+        // A document must hold a first line.
+        CHECK_FALSE(deserialize_text(out, ""));
+        CHECK_FALSE(deserialize_text(out, "\ni1"));
+    }
+
+    TEST_CASE("llsd serialization: deserialize skips whitespace only after a header it knows", "[llsd_serialization]")
+    {
+        LLSD out;
+        CHECK(deserialize_text(out, "'abcdefghijklmnopq r  st'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("abcdefghijklmnopq r  st")));
+        CHECK(deserialize_text(out, "'a ?\n  b'"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD("a ?\n  b")));
+
+        CHECK(deserialize_text(out, "<? llsd/notation ?>\n \t\r\n i1"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, std::string("<? LLSD/Binary ?>\n\n i\0\0\0\x01", 25)));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+        CHECK(deserialize_text(out, "<? LLSD/XML ?>\n   <llsd><integer>1</integer></llsd>"));
+        CHECK_THAT(out, ll_test::LLSDEquals(LLSD(1)));
+    }
+
     TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: strip_deprecated_header skips a header with or without a newline", "[llsd_serialization]")
     {
         // strip_deprecated_header() must consume the newline following the
@@ -2499,5 +2665,54 @@ namespace
         NavMeshBytes out(unzip_llsdNavMesh(valid, outsize, in, (S32)empty.size()));
         CHECK_FALSE(valid);
         CHECK(out.get() == nullptr);
+    }
+
+    // these bytes, deflated with zlib's wrapping
+    std::string zlib_bytes(const std::string& bytes)
+    {
+        uLongf size = compressBound((uLong)bytes.size());
+        std::string compressed(size, '\0');
+        REQUIRE(compress((Bytef*)compressed.data(), &size, (const Bytef*)bytes.data(), (uLong)bytes.size()) ==
+                Z_OK);
+        compressed.resize(size);
+        return compressed;
+    }
+
+    LLUZipHelper::EZipRresult unzip_bytes(LLSD& out, const std::string& bytes)
+    {
+        const std::string compressed = zlib_bytes(bytes);
+        return LLUZipHelper::unzip_llsd(out, (const U8*)compressed.data(), (S32)compressed.size());
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd fails a block whose inflated bytes do not parse", "[llsd_serialization]")
+    {
+        for (const std::string& bytes : {
+                 std::string("?"),
+                 std::string("i\0\0", 3),
+                 std::string("[\0\0\0\x02i\0\0\0\x01]", 11),
+                 std::string("<? LLSD/Binary ?>\n"),
+             })
+        {
+            CAPTURE(bytes);
+            LLSD out;
+            CHECK(unzip_bytes(out, bytes) == LLUZipHelper::ZR_PARSE_ERROR);
+        }
+
+        LLSD one;
+        REQUIRE(unzip_bytes(one, std::string("i\0\0\0\x01", 5)) == LLUZipHelper::ZR_OK);
+        CHECK_THAT(one, ll_test::LLSDEquals(LLSD(1)));
+        LLSD undefined(1);
+        REQUIRE(unzip_bytes(undefined, "<? LLSD/Binary ?>\n!") == LLUZipHelper::ZR_OK);
+        CHECK(undefined.isUndefined());
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: unzip_llsd fails a block that inflates to nothing", "[llsd_serialization]")
+    {
+        LLSD out;
+        CHECK(unzip_bytes(out, std::string()) == LLUZipHelper::ZR_PARSE_ERROR);
+
+        const std::string empty = zlib_bytes(std::string());
+        std::istringstream in(empty);
+        CHECK(LLUZipHelper::unzip_llsd(out, in, (S32)empty.size()) == LLUZipHelper::ZR_PARSE_ERROR);
     }
 }

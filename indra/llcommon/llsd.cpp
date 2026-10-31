@@ -36,6 +36,7 @@
 #include "stringize.h"
 
 #include <atomic>
+#include <bit>
 #include <charconv>
 #include <limits>
 
@@ -986,8 +987,17 @@ LLSD::String LLSD::asString() const
         return String(buf, end);
     }
     case TypeReal:
+    {
+        // By the bits: optimised builds are /fp:fast, under which fmt's test
+        // for NaN, a comparison of the value with itself, may fold away.
+        const U64 bits = std::bit_cast<U64>(mData.r);
+        if ((bits & 0x7fffffffffffffffull) > 0x7ff0000000000000ull)
+        {
+            return (bits >> 63) ? "-nan" : "nan";
+        }
         // {:g} matches the printf %g formatting this historically used
         return fmt::format("{:g}", mData.r);
+    }
     case TypeDate:
         return Date(mData.r).asString();
     case TypeUndefined:

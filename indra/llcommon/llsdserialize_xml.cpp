@@ -446,6 +446,7 @@ private:
     int mSkipThrough;
 
     std::string mCurrentKey;        // Current XML <tag>
+    bool mHaveKey;                  // a <key> waits for its value, though it may be empty
 
     // String data between <tag> and </tag>. While it is a single unbroken run
     // of the source it is held as an offset into mBuffer and never copied;
@@ -697,6 +698,7 @@ void LLSDXMLParser::Impl::reset()
     mSkipThrough = 0;
 
     mCurrentKey.clear();
+    mHaveKey = false;
     clearContent();
 
     mInput = nullptr;
@@ -1090,13 +1092,16 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
             }
             else if (c == '>')
             {
+                // An empty element ends "/>", with nothing between the two. A
+                // '/' anywhere else is no attribute, and valid_attributes()
+                // refuses it.
                 size_t end = mPos;
-                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 if (end > attr_off && mBuffer[end - 1] == '/')
                 {
                     self_closing = true;
                     --end;
                 }
+                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 attr_len = end - attr_off;
                 ++mPos;
                 return true;
@@ -1142,6 +1147,8 @@ bool LLSDXMLParser::Impl::scanMarkup()
 
     if (lead == '?')
     {
+        // "<?>" is no processing instruction, nor the start of one.
+        if (!avail(3) || mBuffer[mPos + 2] == '>') return false;
         size_t at;
         mPos += 2;
         if (!findMarker("?>", 2, at)) return false;
@@ -1168,8 +1175,13 @@ bool LLSDXMLParser::Impl::scanMarkup()
             mPos = at + 3;
             return true;
         }
-        mPos += 2;
-        return scanDoctype();
+        if (avail(9) && memcmp(mBuffer.data() + mPos, "<!DOCTYPE", 9) == 0)
+        {
+            mPos += 2;
+            return scanDoctype();
+        }
+        // XML begins nothing else with "<!".
+        return false;
     }
 
     if (lead == '/')
@@ -1279,13 +1291,14 @@ bool LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
     else if (mStack.back()->isMap())
     {
-        if (mCurrentKey.empty()) { startSkipping(); return true; }
+        if (!mHaveKey) { startSkipping(); return true; }
 
         LLSD& map = *mStack.back();
         LLSD& newElement = map[std::move(mCurrentKey)];
         mStack.push_back(&newElement);
 
         mCurrentKey.clear();
+        mHaveKey = false;
     }
     else if (mStack.back()->isArray())
     {
@@ -1342,6 +1355,7 @@ void LLSDXMLParser::Impl::endElement(Element element)
 
         case ELEMENT_KEY:
             mCurrentKey = takeContent();
+            mHaveKey = true;
             clearContent();
             return;
 
@@ -1454,6 +1468,13 @@ void LLSDXMLParser::Impl::endElement(Element element)
 
         case ELEMENT_UNKNOWN:
             value.clear();
+            break;
+
+        case ELEMENT_MAP:
+            // A key still waiting for its value belongs to this map: no value
+            // in the one around it takes it.
+            mCurrentKey.clear();
+            mHaveKey = false;
             break;
 
         default:
