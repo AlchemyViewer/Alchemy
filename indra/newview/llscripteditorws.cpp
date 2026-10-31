@@ -475,7 +475,7 @@ LLWebsocketMgr::WSConnection::ptr_t LLScriptEditorWSServer::connectionFactory(LL
 {
     auto connection = std::make_shared<LLScriptEditorWSConnection>(server, handle);
     {
-        LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+        std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
         mActiveConnections[connection->getConnectionID()] = connection;
     }
 
@@ -519,7 +519,7 @@ void LLScriptEditorWSServer::onStopped()
 
     mSubscriptions.clear();
     {
-        LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+        std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
         mActiveConnections.clear();
     }
 
@@ -557,7 +557,7 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
         U32    connection_id = script_connection->getConnectionID();
         size_t left          = 0;
         {
-            LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+            std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
             mActiveConnections.erase(connection_id);
             left = mActiveConnections.size();
         }
@@ -585,7 +585,7 @@ void LLScriptEditorWSServer::onConnectionClosed(const LLWebsocketMgr::WSConnecti
 
 size_t LLScriptEditorWSServer::unauthenticatedConnectionCount() const
 {
-    LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+    std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
     size_t      count = 0;
     for (const auto& [id, weak] : mActiveConnections)
     {
@@ -702,7 +702,7 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
 
         LLScriptEditorWSConnection::wptr_t connection;
         {
-            LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+            std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
             auto        con_it = mActiveConnections.find(connection_id);
             if (con_it == mActiveConnections.end())
             {
@@ -711,8 +711,8 @@ LLScriptEditorWSServer::SubscriptionError LLScriptEditorWSServer::updateScriptSu
             connection = con_it->second;
         }
 
-        if ((it->second.mConnectionID != 0) && !it->second.mConnection.expired()
-            && it->second.mConnection.lock()->isConnected())
+        auto subscribed = it->second.mConnection.lock(); // <SK:Nexii> Locked once: the connection may close on the WebSocket thread
+        if ((it->second.mConnectionID != 0) && subscribed && subscribed->isConnected())
         {
             LL_WARNS("ScriptEditorWS") << "Script " << script_id << " is already subscribed on connection ID " << it->second.mConnectionID
                                        << ", cannot subscribe again on connection ID " << connection_id << LL_ENDL;
@@ -1285,7 +1285,7 @@ void LLScriptEditorWSServer::registerCommand(const WSCommandInfo& info, WSComman
 
 bool LLScriptEditorWSConnection::hasFeature(const std::string& feature) const
 {
-    LLCoros::LockType lock(mHandshakeMutex); // <SK:Nexii>
+    std::lock_guard lock(mHandshakeMutex); // <SK:Nexii>
     return mFeatures.count(feature) > 0;
 }
 
@@ -1382,7 +1382,7 @@ void LLScriptEditorWSServer::sendCommandExecute(
 {
     LLScriptEditorWSConnection::ptr_t connection;
     {
-        LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+        std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
         auto        it = mActiveConnections.find(connection_id);
         if (it == mActiveConnections.end())
         {
@@ -2324,6 +2324,11 @@ LLSD LLScriptEditorWSServer::handleObjectItemCreate(const std::string& method, c
     // waited past, for as long as the time allows.
     const F64 deadline = LLTimer::getTotalSeconds().value() + ITEM_CREATE_TIMEOUT;
     LLSD      response;
+    // <SK:Nexii> Fix the script editor server's coroutine safety
+    // Each event read is taken off the mail drop; one left on it is handed
+    // to the next wait at once, which then spins without yielding.
+    LLCoros::OverrideConsuming consuming(true);
+    // </SK:Nexii>
     for (;;)
     {
         const F64 left = deadline - LLTimer::getTotalSeconds().value();
@@ -2598,7 +2603,7 @@ void LLScriptEditorWSServer::notifyConnection(U32 connection_id, const std::stri
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     LLScriptEditorWSConnection::ptr_t connection;
     {
-        LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+        std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
         auto        it = mActiveConnections.find(connection_id);
         if (it != mActiveConnections.end())
         {
@@ -2624,7 +2629,7 @@ void LLScriptEditorWSServer::notifyAll(const std::string& method, const LLSD& pa
     // one that has not proven itself hears nothing.
     std::vector<LLScriptEditorWSConnection::ptr_t> connections;
     {
-        LLCoros::LockType lock(mConnectionsMutex); // <SK:Nexii>
+        std::lock_guard lock(mConnectionsMutex); // <SK:Nexii>
         for (const auto& pair : mActiveConnections)
         {
             auto connection = pair.second.lock();
@@ -2939,7 +2944,7 @@ void LLScriptEditorWSConnection::handleHandshakeResponse(const LLSD& result, con
 
     {
         // Written here, on the server's thread, and read on the main one.
-        LLCoros::LockType lock(mHandshakeMutex); // <SK:Nexii>
+        std::lock_guard lock(mHandshakeMutex); // <SK:Nexii>
         mClientName      = result["client_name"].asString();
         mClientVersion   = result["client_version"].asString();
         mProtocolVersion = protocol_version;
