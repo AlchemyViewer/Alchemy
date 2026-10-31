@@ -966,6 +966,29 @@ namespace
         CHECK_THAT(parsed, ll_test::LLSDEquals(both));
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a key with no value goes when its map closes", "[llsd_XML_parsing]")
+    {
+        // A key belongs to the map it is in, so no value after that map
+        // closes takes it.
+        LLSD inner = LLSD::emptyMap();
+        inner["a"] = LLSD::emptyMap();
+        for (const char* text : {
+                 "<llsd><map><key>a</key><map><key>b</key></map><integer>1</integer></map></llsd>",
+                 "<llsd><map><key>a</key><map><key /></map><integer>1</integer></map></llsd>",
+             })
+        {
+            require_parse(text, text, inner, 2);
+        }
+        LLSD maps = LLSD::emptyArray();
+        maps.append(LLSD::emptyMap());
+        maps.append(LLSD::emptyMap());
+        require_parse(
+            "key in the map before",
+            "<llsd><array><map><key>a</key></map><map><integer>1</integer></map></array></llsd>",
+            maps,
+            3);
+    }
+
     /*
     TODO:
         test XML parsing

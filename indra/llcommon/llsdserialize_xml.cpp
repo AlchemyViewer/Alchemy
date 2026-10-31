@@ -1470,6 +1470,13 @@ void LLSDXMLParser::Impl::endElement(Element element)
             value.clear();
             break;
 
+        case ELEMENT_MAP:
+            // A key still waiting for its value belongs to this map: no value
+            // in the one around it takes it.
+            mCurrentKey.clear();
+            mHaveKey = false;
+            break;
+
         default:
             // other values, map and array, have already been set
             break;
