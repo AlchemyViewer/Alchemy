@@ -376,6 +376,9 @@ class LLVBOPool
     // Of those, the stores kept for reuse.
     virtual U64 getVramBytesPooled() const = 0;
     virtual LLVertexBuffer::PoolStats getStats() const = 0;
+    // Frees kept stores freed at least `age` ago that the GPU is done with, until LLTimer::getTotalSeconds() reaches
+    // deadline. True while any is kept.
+    virtual bool trim(std::chrono::steady_clock::duration age, F64 deadline) { return false; }
 };
 
 // VBO Pool for Apple GPUs (as in M1/M2 etc, not Intel macs)
@@ -639,6 +642,34 @@ public:
 
     }
 
+    bool trim(std::chrono::steady_clock::duration age, F64 deadline) override
+    {
+        const Time cutoff = std::chrono::steady_clock::now() - age;
+        for (auto* pool : { &mVBOPool, &mIBOPool })
+        {
+            for (Pool::iterator iter = pool->begin(); iter != pool->end(); )
+            {
+                // oldest at the back
+                auto& entries = iter->second;
+                while (!entries.empty() && entries.back().mAge < cutoff && finished_with(entries.back().mFrame))
+                {
+                    if (LLTimer::getTotalSeconds() >= deadline)
+                    {
+                        return true;
+                    }
+                    auto& entry = entries.back();
+                    ll_aligned_free_16(entry.mData);
+                    delete_buffers(1, &entry.mGLName);
+                    llassert(mReserved >= iter->first);
+                    mReserved -= iter->first;
+                    entries.pop_back();
+                }
+                iter = entries.empty() ? pool->erase(iter) : std::next(iter);
+            }
+        }
+        return mReserved > 0;
+    }
+
     // clean periodically (clean gets called for every alloc/free)
     void clean()
     {
@@ -804,6 +835,37 @@ U64 LLVertexBuffer::getBytesPooled()
 LLVertexBuffer::PoolStats LLVertexBuffer::getPoolStats()
 {
     return sVBOPool ? sVBOPool->getStats() : PoolStats();
+}
+
+// Until when updatePoolTrim trims the pool, 0 when it does not.
+static F64 sPoolTrimUntil = 0.0;
+
+//static
+void LLVertexBuffer::trimPoolSoon()
+{
+    // A store freed in the first five seconds is a second old before the window closes.
+    constexpr F64 POOL_TRIM_SECONDS = 6.0;
+    sPoolTrimUntil = LLTimer::getTotalSeconds() + POOL_TRIM_SECONDS;
+}
+
+//static
+void LLVertexBuffer::updatePoolTrim()
+{
+    if (sPoolTrimUntil == 0.0 || !sVBOPool)
+    {
+        return;
+    }
+    const F64 now = LLTimer::getTotalSeconds();
+    if (now >= sPoolTrimUntil)
+    {
+        sPoolTrimUntil = 0.0;
+        return;
+    }
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_VERTEX;
+    // A store kept less than a second is likely to be taken again, as LODs and rebuilds swap geometry.
+    using namespace std::chrono_literals;
+    constexpr F64 POOL_TRIM_BUDGET = 0.0005;
+    sVBOPool->trim(1s, now + POOL_TRIM_BUDGET);
 }
 
 //============================================================================

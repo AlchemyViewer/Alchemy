@@ -33,6 +33,7 @@
 #include "linden_common.h"
 
 #include "llimagegl.h"
+#include "llgltexture.h"
 
 #include "llerror.h"
 #include "llimage.h"
@@ -2655,16 +2656,35 @@ void LLImageGL::setAlphaAnalysis(const AlphaAnalysis& analysis)
         return;
     }
 
-    mIsMask = analysis.mIsMask;
+    setIsMask(analysis.mIsMask);
     mMaxAlpha = analysis.mMaxAlpha;
     mMinAlpha = analysis.mMinAlpha;
 }
 
 void LLImageGL::clearAlphaAnalysis()
 {
+    // Provisional, while an analysis is out: no answer, so the owner is not told, and the next answer is weighed
+    // against the last one, and against this if anything read it meanwhile.
     mIsMask = false;
+    mProvisionalRead.store(false, std::memory_order_relaxed);
     mMaxAlpha = 255;
     mMinAlpha = 0;
+}
+
+void LLImageGL::setIsMask(bool is_mask)
+{
+    // A face built while the provisional answer stood went by it, as by an answer.
+    const bool provisional_read = mProvisionalRead.exchange(false, std::memory_order_relaxed);
+    const bool changed = mAnsweredMask != is_mask || (provisional_read && is_mask);
+    mIsMask = is_mask;
+    if (changed)
+    {
+        mAnsweredMask = is_mask;
+        if (mOwner && on_main_thread())
+        {
+            mOwner->onAlphaMaskChanged();
+        }
+    }
 }
 
 void LLImageGL::publishPendingAlpha()
@@ -2679,7 +2699,7 @@ void LLImageGL::publishPendingAlpha()
     }
     if (mPendingAlpha.mHasAnalysis)
     {
-        mIsMask = mPendingAlpha.mAnalysis.mIsMask;
+        setIsMask(mPendingAlpha.mAnalysis.mIsMask);
         mMaxAlpha = mPendingAlpha.mAnalysis.mMaxAlpha;
         mMinAlpha = mPendingAlpha.mAnalysis.mMinAlpha;
     }
@@ -3104,6 +3124,11 @@ bool LLImageGL::getBoundRecently() const
 bool LLImageGL::getIsAlphaMask() const
 {
     llassert_always(!sSkipAnalyzeAlpha);
+    if (mIsMask != mAnsweredMask)
+    {
+        // the provisional no-mask of a mask texture, which a face built now goes by
+        mProvisionalRead.store(true, std::memory_order_relaxed);
+    }
     return mIsMask;
 }
 
@@ -3130,6 +3155,8 @@ void LLImageGL::setNeedsAlphaAndPickMask(bool need_mask)
         {
             mAlphaOffset = INVALID_OFFSET ;
             clearAlphaAnalysis();
+            // no mask from now on: an answer
+            setIsMask(false);
 
             // Invalidate pending jobs
             ++mAlphaAnalysisSerial;
@@ -3563,7 +3590,7 @@ void LLImageGL::analyzeAlpha(const void* data_in, U32 w, U32 h)
             // Only apply if no newer analysis has been requested
             if (mAlphaAnalysisSerial == request_serial)
             {
-                mIsMask = analysis.mIsMask;
+                setIsMask(analysis.mIsMask);
                 mMaxAlpha = analysis.mMaxAlpha;
                 mMinAlpha = analysis.mMinAlpha;
             }

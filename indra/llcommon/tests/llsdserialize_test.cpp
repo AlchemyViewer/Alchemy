@@ -2111,6 +2111,31 @@ namespace
         require_via_binary_and_xml("uri", test);
     }
 
+    TEST_CASE("llsd serialize compatible: a uri that starts with a colon writes back the text it was read from", "[llsd_serialize_compatible]")
+    {
+        const std::string xml("<llsd><uri>:foo</uri></llsd>\n");
+        std::istringstream xml_in(xml);
+        LLSD from_xml;
+        REQUIRE(LLSDSerialize::fromXML(from_xml, xml_in) == 1);
+        std::ostringstream xml_out;
+        LLSDSerialize::toXML(from_xml, xml_out);
+        CHECK(xml_out.str() == xml);
+
+        const std::string notation("l\":foo\"");
+        std::istringstream notation_in(notation);
+        LLSD from_notation;
+        REQUIRE(LLSDSerialize::fromNotation(from_notation, notation_in, LLSDSerialize::SIZE_UNLIMITED) == 1);
+        std::ostringstream notation_out;
+        LLSDSerialize::toNotation(from_notation, notation_out);
+        CHECK(notation_out.str() == notation);
+
+        std::stringstream binary;
+        LLSDSerialize::toBinary(from_notation, binary);
+        LLSD from_binary;
+        REQUIRE(LLSDSerialize::fromBinary(from_binary, binary, LLSDSerialize::SIZE_UNLIMITED) == 1);
+        CHECK(from_binary.asString() == ":foo");
+    }
+
     TEST_CASE_METHOD(TestLLSDCrossCompatible, "llsd serialize compatible: random binary round-trips via binary into notation and XML", "[llsd_serialize_compatible]")
     {
         LLSD test;

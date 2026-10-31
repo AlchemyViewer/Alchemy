@@ -89,6 +89,17 @@ public:
     /// Threading:  called by worker thread
     HttpService::ELoopSpeed processReadyQueue();
 
+    /// The time the last @processReadyQueue left work waiting
+    /// on the clock for: the earliest retry due while its class
+    /// has a free slot, or the end of a throttle window.  Zero
+    /// for none, when what it waits on is a free slot.
+    ///
+    /// Threading:  called by worker thread
+    HttpTime getWakeAt() const
+        {
+            return mWakeAt;
+        }
+
     /// Add request to a ready queue.  Caller is expected to have
     /// provided us with a reference count to hold the request.  (No
     /// additional references will be added.)
@@ -166,9 +177,12 @@ protected:
     struct ClassState;
     typedef std::vector<ClassState *>   class_list_t;
 
+    void wakeAt(HttpTime when);
+
     HttpPolicyGlobal                    mGlobalOptions;
     class_list_t                        mClasses;
     HttpService *                       mService;               // Naked pointer, not refcounted, not owner
+    HttpTime                            mWakeAt;
 };  // end class HttpPolicy
 
 }  // end namespace LLCore

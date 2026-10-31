@@ -33,6 +33,8 @@
 
 #include "llheadlessgl_fixture.h"
 
+#include "lltimer.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
@@ -482,6 +484,77 @@ namespace
         writeIndices(*buffers.back(), 0, 0);
         uploadAndDrawFromScratch(*buffers.back());
         CHECK(at(LEFT) == packed(green));
+        CHECK(glGetError() == GLenum(GL_NO_ERROR));
+    }
+
+    // A trim lets go of the stores the pool keeps for reuse once they have been kept a second and the GPU is done with
+    // them, and of none sooner: a store the next LODs and rebuilds take straight back stays.
+    TEST_CASE_METHOD(llvertexbuffer_gl_data, "llvertexbuffer_gl: a pool trim frees kept stores once they are a second old", "[llvertexbuffer_gl]")
+    {
+        if (gGLManager.mIsApple)
+        {
+            SKIP("Apple's GPUs pool no buffers");
+        }
+        setUp();
+        // A size no other case makes, so that the pool's entries of it are this case's.
+        constexpr U32 QUADS = 43;
+        constexpr U32 COUNT = 16;
+        auto make_all = [](std::vector<LLPointer<LLVertexBuffer>>& buffers)
+        {
+            buffers.clear();
+            for (U32 i = 0; i < COUNT; ++i)
+            {
+                buffers.push_back(makeBuffer(4 * QUADS, 6 * QUADS));
+            }
+        };
+        auto trim = []()
+        {
+            LLVertexBuffer::trimPoolSoon();
+            // a frame's budget at a time, until nothing more goes
+            for (U32 i = 0; i < 1000; ++i)
+            {
+                const U64 pooled = LLVertexBuffer::getBytesPooled();
+                LLVertexBuffer::updatePoolTrim();
+                if (LLVertexBuffer::getBytesPooled() == pooled)
+                {
+                    break;
+                }
+            }
+        };
+
+        std::vector<LLPointer<LLVertexBuffer>> buffers;
+        make_all(buffers);
+        buffers.clear();
+        ALFrameFences& frames = gGL.frameFences();
+        gGL.endFrame();
+        frames.waitFinished(frames.frame() - 1);
+
+        trim();
+        {
+            INFO("kept less than a second, every store of the size comes back from the pool");
+            const LLVertexBuffer::PoolStats before = LLVertexBuffer::getPoolStats();
+            make_all(buffers);
+            const LLVertexBuffer::PoolStats after = LLVertexBuffer::getPoolStats();
+            CHECK(after.mHits - before.mHits == 2 * COUNT);
+            CHECK(after.mMisses == before.mMisses);
+        }
+
+        buffers.clear();
+        gGL.endFrame();
+        frames.waitFinished(frames.frame() - 1);
+        ms_sleep(1100);
+        const U64 pooled = LLVertexBuffer::getBytesPooled();
+        const U64 allocated = LLVertexBuffer::getBytesAllocated();
+        trim();
+        {
+            INFO("kept a second, every store of the size is gone and the counts follow");
+            CHECK(LLVertexBuffer::getBytesPooled() < pooled);
+            CHECK(allocated - LLVertexBuffer::getBytesAllocated() == pooled - LLVertexBuffer::getBytesPooled());
+            const LLVertexBuffer::PoolStats before = LLVertexBuffer::getPoolStats();
+            make_all(buffers);
+            const LLVertexBuffer::PoolStats after = LLVertexBuffer::getPoolStats();
+            CHECK(after.mMisses - before.mMisses == 2 * COUNT);
+        }
         CHECK(glGetError() == GLenum(GL_NO_ERROR));
     }
 }
