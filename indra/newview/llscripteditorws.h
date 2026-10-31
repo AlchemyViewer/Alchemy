@@ -35,9 +35,9 @@
 #include "lltimer.h"
 #include "lleventtimer.h"
 #include "llcoros.h" // <SK:Nexii>
-#include <mutex> // <SK:Nexii>
 
 #include <memory>
+#include <mutex> // <SK:Nexii>
 #include <string>
 #include <vector>
 #include <map>
@@ -345,8 +345,8 @@ protected:
                (const std::string& method, const LLSD& id, const LLSD& params) -> LLSD
         {
             // <SK:Nexii> Fix the script editor server's coroutine safety
-            // The handler's may be the server's last reference; it is let go
-            // on the main coroutine, since stopping the server takes an LLMutex.
+            // An async handler's may be the server's last reference; it is let
+            // go on the main coroutine, since stopping the server takes an LLMutex.
             struct Release
             {
                 std::shared_ptr<LLWebsocketMgr::WSServer> mRef;
@@ -354,7 +354,8 @@ protected:
                 {
                     if (mRef && !LLCoros::on_main_coro())
                     {
-                        LLJSONRPCConnection::postToMainThread([ref = std::move(mRef)]() {});
+                        LL_WARNS_IF(!LLJSONRPCConnection::postToMainThread([ref = std::move(mRef)]() {}), "ScriptEditorWS")
+                            << "Main loop not taking work; server reference let go on a coroutine" << LL_ENDL;
                     }
                 }
             } release{ weak_base.lock() };
