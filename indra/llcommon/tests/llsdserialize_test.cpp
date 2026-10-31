@@ -1028,6 +1028,55 @@ namespace
             3);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a key keeps an empty value", "[llsd_XML_parsing]")
+    {
+        // A map's entry is made when its value opens, so a value with no
+        // content is still the key's, under an empty key too, and the key
+        // after it keeps its own.
+        LLSD empty_values = LLSD::emptyMap();
+        empty_values["undef"] = LLSD();
+        empty_values["string"] = std::string();
+        empty_values["uuid"] = LLUUID::null;
+        empty_values["binary"] = LLSD::Binary();
+        empty_values["map"] = LLSD::emptyMap();
+        empty_values["array"] = LLSD::emptyArray();
+        empty_values[""] = std::string();
+        empty_values["after"] = 1;
+        require_parse(
+            "self-closed values",
+            "<llsd><map><key>undef</key><undef /><key>string</key><string /><key>uuid</key><uuid />"
+            "<key>binary</key><binary /><key>map</key><map /><key>array</key><array />"
+            "<key /><string/><key>after</key><integer>1</integer></map></llsd>",
+            empty_values,
+            9);
+        require_parse(
+            "open and closed values",
+            "<llsd><map><key>undef</key><undef></undef><key>string</key><string></string>"
+            "<key>uuid</key><uuid></uuid><key>binary</key><binary encoding=\"base64\"></binary>"
+            "<key>map</key><map></map><key>array</key><array></array>"
+            "<key></key><string></string><key>after</key><integer>1</integer></map></llsd>",
+            empty_values,
+            9);
+
+        // The formatter writes each of them, compact or pretty, and they read back.
+        for (bool pretty : {false, true})
+        {
+            std::stringstream stream;
+            if (pretty)
+            {
+                LLSDSerialize::toPrettyXML(empty_values, stream);
+            }
+            else
+            {
+                LLSDSerialize::toXML(empty_values, stream);
+            }
+            INFO(stream.str());
+            LLSD parsed;
+            REQUIRE(LLSDSerialize::fromXML(parsed, stream) == 9);
+            CHECK_THAT(parsed, ll_test::LLSDEquals(empty_values));
+        }
+    }
+
     /*
     TODO:
         test XML parsing
