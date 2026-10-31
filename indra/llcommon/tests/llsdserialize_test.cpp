@@ -717,6 +717,45 @@ namespace
             4);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a DOCTYPE holding nothing fails to parse", "[llsd_XML_parsing]")
+    {
+        // XML names the root element in a DOCTYPE.
+        for (const char* text : {
+                 "<!DOCTYPE><llsd><integer>1</integer></llsd>",
+                 "<!DOCTYPE \n><llsd><integer>1</integer></llsd>",
+                 "<!DOCTYPE\t\r\n ><llsd><integer>1</integer></llsd>",
+             })
+        {
+            INFO(text);
+            std::istringstream input(text);
+            LLSD parsed;
+            mParser->reset();
+            CHECK(mParser->parse(input, parsed, strlen(text)) == LLSDParser::PARSE_FAILURE);
+        }
+
+        // One holding anything else is skipped.
+        require_parse(
+            "name",
+            "<!DOCTYPE llsd><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "name and subset",
+            "<!DOCTYPE llsd [<!ENTITY a \"b\">]><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "name against the keyword",
+            "<!DOCTYPEllsd><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+        require_parse(
+            "subset alone",
+            "<!DOCTYPE [<!ENTITY a \"b\">]><llsd><integer>1</integer></llsd>",
+            LLSD(1),
+            1);
+    }
+
 
     TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a value of unknown type parses as undefined", "[llsd_XML_parsing]")
     {
