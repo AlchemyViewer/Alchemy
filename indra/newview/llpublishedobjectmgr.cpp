@@ -134,23 +134,48 @@ public:
                          LLInventoryObject::object_list_t* inventory,
                          S32 serial_num, void* user_data) override
     {
-        if (mServer)
+        if (!mServer)
         {
-            if (mServer->isObjectPublished(mObjectID))
-            {
-                mServer->onPrimInventoryChanged(mObjectID, mPrimID);
-            }
-            else
-            {
-                mServer->onPrimInventoryReady(mObjectID, mPrimID);
-            }
+            return;
         }
+        // <SK:Nexii> Fix the crash publishing a linkset whose inventory comes from the capability's coroutine
+        if (LLCoros::on_main_coro())
+        {
+            notifyServer(mServer, mObjectID, mPrimID);
+            return;
+        }
+        // The server's mutexes may be taken only on the main coroutine, so a
+        // load from fetchInventoryFromCapCoro is handed to the main loop.
+        std::weak_ptr<LLWebsocketMgr::WSServer> weak = mServer->weak_from_this();
+        const LLUUID object_id = mObjectID;
+        const LLUUID prim_id   = mPrimID;
+        const bool posted = LLJSONRPCConnection::postToMainThread([weak, object_id, prim_id]() {
+            if (auto self = weak.lock())
+            {
+                notifyServer(static_cast<LLScriptEditorWSServer*>(self.get()), object_id, prim_id);
+            }
+        });
+        LL_WARNS_IF(!posted, "ScriptEditorWS") << "Main loop not taking work; prim " << prim_id
+                                               << "'s inventory not passed on" << LL_ENDL;
+        // </SK:Nexii>
     }
 
     const LLUUID& getObjectID() const { return mObjectID; }
     const LLUUID& getPrimID() const { return mPrimID; }
 
 private:
+    static void notifyServer(LLScriptEditorWSServer* server, const LLUUID& object_id, const LLUUID& prim_id)
+    {
+        if (server->isObjectPublished(object_id))
+        {
+            server->onPrimInventoryChanged(object_id, prim_id);
+        }
+        else
+        {
+            server->onPrimInventoryReady(object_id, prim_id);
+        }
+    }
+
     LLScriptEditorWSServer* mServer;
     LLUUID                  mObjectID;
     LLUUID                  mPrimID;
