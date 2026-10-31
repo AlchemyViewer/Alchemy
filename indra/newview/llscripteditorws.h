@@ -34,6 +34,7 @@
 #include "llhandle.h"
 #include "lltimer.h"
 #include "lleventtimer.h"
+#include "llcoros.h" // <SK:Nexii>
 
 #include <memory>
 #include <string>
@@ -132,7 +133,9 @@ private:
 
     // Client handshake response data, written as the client answers, on
     // the server's thread, and read on the main one: under the lock.
-    mutable LLMutex mHandshakeMutex;
+    // <SK:Nexii> Fiber-aware: the async handlers' coroutines take it too.
+    mutable LLCoros::Mutex mHandshakeMutex;
+    // </SK:Nexii>
     std::string  mClientName;      ///< Name of the external editor client
     std::string  mClientVersion;   ///< Version of the external editor client
     std::string  mProtocolVersion; ///< JSON-RPC protocol version supported by client
@@ -393,7 +396,9 @@ private:
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
     // Written on the server's thread as connections come and go, read on
     // the main one as messages go out: under the lock either way.
-    mutable LLMutex                                   mConnectionsMutex;
+    // <SK:Nexii> Fiber-aware: the async handlers' coroutines take it too.
+    mutable LLCoros::Mutex                            mConnectionsMutex;
+    // </SK:Nexii>
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
     // The manager sends through the server and names prims as it does.
