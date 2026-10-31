@@ -5528,7 +5528,20 @@ void LLWindowWin32::LLWindowWin32Thread::run()
             logger.onChange("runPending()");
 #endif
             //process any pending functions
-            getQueue().runPending();
+            if (mWindowHandleThrd == 0)
+            {
+                // With no window there are no messages to pump, and only a
+                // posted function can make one: wait for the next. Nothing
+                // may be posted for longer than the watchdog allows, so it
+                // is paused for the wait.
+                pauseTimeout();
+                getQueue().runNext();
+                resumeTimeout("Window:Queue");
+            }
+            else
+            {
+                getQueue().runPending();
+            }
         }
 
 #if 0

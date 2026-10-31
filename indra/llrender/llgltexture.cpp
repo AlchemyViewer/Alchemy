@@ -49,6 +49,7 @@ LLGLTexture::LLGLTexture(const LLImageRaw* raw, bool usemipmaps)
     mUseMipMaps = usemipmaps ;
     // Create an empty image of the specified size and width
     mGLTexturep = new LLImageGL(raw, usemipmaps) ;
+    mGLTexturep->setOwner(this);
     mFullWidth = mGLTexturep->getWidth();
     mFullHeight = mGLTexturep->getHeight();
     mComponents = mGLTexturep->getComponents();
@@ -57,6 +58,11 @@ LLGLTexture::LLGLTexture(const LLImageRaw* raw, bool usemipmaps)
 
 LLGLTexture::~LLGLTexture()
 {
+    // A deferred alpha analysis may outlive this texture, with the GL texture it holds.
+    if (mGLTexturep && mGLTexturep->getOwner() == this)
+    {
+        mGLTexturep->setOwner(nullptr);
+    }
     cleanup();
 }
 
@@ -131,6 +137,7 @@ void LLGLTexture::generateGLTexture()
     if(mGLTexturep.isNull())
     {
         mGLTexturep = new LLImageGL(mFullWidth, mFullHeight, mComponents, mUseMipMaps) ;
+        mGLTexturep->setOwner(this);
     }
 }
 

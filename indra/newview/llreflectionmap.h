@@ -144,6 +144,9 @@ public:
     // would be treated as one until the manager deletes it.
     bool mOrphaned = false;
 
+    // its influence sphere comes within draw distance of the camera (ALProbeReach), as the manager found this frame
+    bool mInReach = true;
+
     // fade in parameter for this probe
     F32 mFadeIn = 0.f;
 

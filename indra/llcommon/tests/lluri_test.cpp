@@ -32,8 +32,46 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
+#include <future>
+#include <vector>
+
 namespace
 {
+    // First in the file, so that its calls are the first escape(str) of the
+    // process its entry runs in.
+    TEST_CASE("LLURI: escape gives every thread the same answer on their first calls at once", "[LLURI]")
+    {
+        const std::string unreserved =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            "0123456789"
+            "-._~";
+        std::string printable;
+        for (char c = ' '; c <= '~'; ++c)
+        {
+            printable.push_back(c);
+        }
+        const std::string expected = LLURI::escape(printable, unreserved);
+
+        std::atomic<bool> go{ false };
+        std::vector<std::future<std::string>> callers;
+        for (int i = 0; i < 16; ++i)
+        {
+            callers.push_back(std::async(std::launch::async, [&]
+            {
+                while (!go.load(std::memory_order_acquire))
+                {
+                }
+                return LLURI::escape(printable);
+            }));
+        }
+        go.store(true, std::memory_order_release);
+        for (std::future<std::string>& caller : callers)
+        {
+            CHECK(caller.get() == expected);
+        }
+    }
+
     struct URITestData {
         void require_parts(const LLURI& u,
                 const char* expectedScheme,
@@ -81,6 +119,16 @@ namespace
         CHECK(query["y"].asURI().asString() == "https://lindenlab.com/");
     }
 
+    TEST_CASE_METHOD(URITestData, "LLURI: the query map of an empty query is an empty map", "[LLURI]")
+    {
+        CHECK(LLURI::queryMap("").isMap());
+        CHECK(LLURI::queryMap("").size() == 0);
+        CHECK(LLURI::queryMap("&&").isMap());
+        CHECK(LLURI("http://host/path").queryMap().isMap());
+        CHECK(LLURI("http://host/path?").queryMap().isMap());
+        CHECK(LLURI::queryMap("x=1").isMap());
+    }
+
     TEST_CASE_METHOD(URITestData, "LLURI: an empty string has no parts", "[LLURI]")
     {
         require_parts(LLURI(""), "", "", "", "");
@@ -90,6 +138,16 @@ namespace
     {
         require_parts(LLURI("foo"), "", "foo", "", "");
         require_parts(LLURI("foo%3A"), "", "foo:", "", "");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: a string that starts with a colon has no scheme and writes back whole", "[LLURI]")
+    {
+        require_parts(LLURI(":foo"), "", ":foo", "", "");
+        CHECK(LLURI(":foo").asString() == ":foo");
+        CHECK(LLURI(":").asString() == ":");
+        CHECK(LLURI("::").asString() == "::");
+        CHECK(LLURI(":a:b").asString() == ":a:b");
+        CHECK_FALSE(LLURI(":foo") == LLURI("foo"));
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: a scheme without paths leaves no authority or path", "[LLURI]")
@@ -263,6 +321,37 @@ namespace
         CHECK(uri_esc.empty());
         std::string uri_raw(LLURI::unescape(""));
         CHECK(uri_raw.empty());
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape decodes a valid escape and leaves a plus alone", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%41") == "A");
+        CHECK(LLURI::unescape("%4a%4A") == "JJ");
+        CHECK(LLURI::unescape("a%20b") == "a b");
+        CHECK(LLURI::unescape("%2B") == "+");
+        CHECK(LLURI::unescape("a+b") == "a+b");
+        CHECK(LLURI::unescape("%00") == std::string(1, '\0'));
+        CHECK(LLURI::unescape("%C3%A7") == "\xC3\xA7");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape leaves a malformed escape as it is", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%") == "%");
+        CHECK(LLURI::unescape("%4") == "%4");
+        CHECK(LLURI::unescape("%4g") == "%4g");
+        CHECK(LLURI::unescape("%zz") == "%zz");
+        CHECK(LLURI::unescape("%g4") == "%g4");
+        CHECK(LLURI::unescape("100%") == "100%");
+        CHECK(LLURI::unescape("a%4") == "a%4");
+        CHECK(LLURI::unescape("%4%") == "%4%");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: unescape reads the text after a malformed escape as text", "[LLURI]")
+    {
+        CHECK(LLURI::unescape("%%41") == "%A");
+        CHECK(LLURI::unescape("%4%41") == "%4A");
+        CHECK(LLURI::unescape("%41%") == "A%");
+        CHECK(LLURI::unescape("%%") == "%%");
     }
 
     TEST_CASE_METHOD(URITestData, "LLURI: escape and unescape round-trip URIs", "[LLURI]")

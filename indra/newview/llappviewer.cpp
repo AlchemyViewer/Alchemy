@@ -32,6 +32,7 @@
 
 // Viewer includes
 #include "llversioninfo.h"
+#include "llvertexbuffer.h"
 #include "llfeaturemanager.h"
 #include "lluictrlfactory.h"
 #include "lltexteditor.h"
@@ -5833,11 +5834,15 @@ void LLAppViewer::idle()
         {
             LLDrawable::cleanupDeadDrawables();
         }
+        // what the dead drawables' geometry left in the buffer pool, after a region went
+        LLVertexBuffer::updatePoolTrim();
     }
 
     //
-    // After this point, in theory we should never see a dead object
-    // in the various object/drawable lists.
+    // After this point, in theory we should never see a dead drawable
+    // in the drawable lists. The object list keeps dead objects until
+    // cleanDeadObjects reaches them, a frame's budget at a time; every
+    // lookup lost them when they died.
     //
 
     //////////////////////////////////////

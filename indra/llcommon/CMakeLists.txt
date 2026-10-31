@@ -358,6 +358,7 @@ if(AL_BUILD_TESTS)
       tests/llprocessor_test.cpp
       tests/llprocinfo_test.cpp
       tests/llptrto_test.cpp
+      tests/llqueuedthread_test.cpp
       tests/llrand_test.cpp
       tests/llsd_test.cpp
       tests/llsdjson_test.cpp

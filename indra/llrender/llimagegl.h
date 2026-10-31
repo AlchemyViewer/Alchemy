@@ -49,6 +49,7 @@
 #define LL_IMAGEGL_THREAD_CHECK 0 //set to 1 to enable thread debugging for ImageGL
 
 class LLWindow;
+class LLGLTexture;
 
 #define BYTES_TO_MEGA_BYTES(x) ((x) >> 20)
 #define MEGA_BYTES_TO_BYTES(x) ((x) << 20)
@@ -371,6 +372,13 @@ public:
     U64 getContentStamp() const { return mContentStamp.load(std::memory_order_relaxed); }
 
     bool getIsAlphaMask() const;
+    // The texture this one was made for, told on the main thread whenever an analysis answers getIsAlphaMask
+    // differently from the last one (LLGLTexture::onAlphaMaskChanged): a face built into a pass by the old answer, or
+    // while a deferred analysis was out and the texture counted as no mask, belongs in another by the new one. The
+    // provisional no-mask while an analysis is out is no answer, but an answer of mask after it was read is a change
+    // for the faces built by it. Cleared by the owner as it goes.
+    void setOwner(LLGLTexture* owner) { mOwner = owner; }
+    LLGLTexture* getOwner() const { return mOwner; }
     // The highest alpha of the level its alpha was last analysed at (analyzeAlpha), or 255 where it was not: no
     // alpha channel, an alpha it cannot read, or an analysis not yet back.
     U8 getMaxAlpha() const { return mMaxAlpha; }
@@ -468,6 +476,7 @@ private:
 
     // Sets the published analysis to what a texture without a readable alpha holds: no mask, and opaque.
     void clearAlphaAnalysis();
+    void setIsMask(bool is_mask);
     void publishPendingAlpha();
     void discardPendingAlpha();
 
@@ -486,6 +495,9 @@ private:
     bool mAutoGenMips = false;
 
     bool mIsMask;
+    bool mAnsweredMask = false; // what the last analysis answered, mIsMask but for the provisional clear
+    mutable std::atomic<bool> mProvisionalRead{ false }; // getIsAlphaMask answered the provisional no-mask
+    LLGLTexture* mOwner = nullptr;
     U8   mMaxAlpha;
     U8   mMinAlpha;
     bool mNeedsAlphaAndPickMask;

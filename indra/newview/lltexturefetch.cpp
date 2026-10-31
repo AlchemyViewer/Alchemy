@@ -1327,6 +1327,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
         }
         else
         {
+            // callbackCacheRead wakes this
+            waitForWake();
             return false;
         }
     }
@@ -1491,6 +1493,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
             setState(WAIT_HTTP_RESOURCE2);
             mFetcher->addHttpWaiter(this->mID);
             ++mResourceWaitCount;
+            // releaseHttpWaiters wakes this
+            waitForWake();
             return false;
         }
 
@@ -1503,7 +1507,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
     if (mState == WAIT_HTTP_RESOURCE2)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_THREAD("tfwdw - WAIT_HTTP_RESOURCE2");
-        // Just idle it if we make it to the head...
+        // Just idle it if we make it to the head... releaseHttpWaiters wakes this
+        waitForWake();
         return false;
     }
 
@@ -1868,6 +1873,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
             // various possible timeout components (total request time, connection
             // time, I/O time, with and without retries, etc.) in the future.
 
+            // onCompleted wakes this
+            waitForWake();
             return false;
         }
     }
@@ -2007,6 +2014,8 @@ bool LLTextureFetchWorker::doWork(S32 param)
         }
         else
         {
+            // callbackDecoded wakes this
+            waitForWake();
             return false;
         }
     }
@@ -2079,6 +2088,11 @@ bool LLTextureFetchWorker::doWork(S32 param)
                 // Prioritize the write
                 mFetcher->mTextureCache->prioritizeWrite(mCacheWriteHandle);
             }
+            if (!mWritten)
+            {
+                // callbackCacheWrite wakes this
+                waitForWake();
+            }
             return false;
         }
     }
@@ -2120,6 +2134,10 @@ void LLTextureFetchWorker::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRe
     LLMutexLock lock(&mWorkMutex);                                      // +Mw
 
     mHttpActive = false;
+
+    // Whichever way this ends, doWork has something to act on. This runs on
+    // the fetch thread, so it runs again once this returns.
+    wakeWork();
 
     if (log_to_viewer_log || log_to_sim)
     {
@@ -2473,6 +2491,7 @@ void LLTextureFetchWorker::callbackCacheRead(bool success, LLImageFormatted* ima
         }
     }
     mLoaded = true;
+    wakeWork();
 }                                                                       // -Mw
 
 // Threads:  Ttc
@@ -2485,6 +2504,7 @@ void LLTextureFetchWorker::callbackCacheWrite(bool success)
         return;
     }
     mWritten = true;
+    wakeWork();
 }                                                                       // -Mw
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2534,6 +2554,7 @@ void LLTextureFetchWorker::callbackDecoded(bool success, const std::string &erro
         mDecodedDiscard = -1; // Redundant, here for clarity and paranoia
     }
     mDecoded = true;
+    wakeWork();
 //  LL_INFOS(LOG_TXT) << mID << " : DECODE COMPLETE " << LL_ENDL;
 }                                                                       // -Mw
 
@@ -3506,6 +3527,7 @@ void LLTextureFetch::releaseHttpWaiters()
         }
 
         worker->setState(LLTextureFetchWorker::SEND_HTTP_REQ);
+        worker->wakeWork();
         worker->unlockWorkMutex();                                      // -Mw
 
         removeHttpWaiter(worker->mID);

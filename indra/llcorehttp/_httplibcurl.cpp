@@ -32,6 +32,7 @@
 #include "_httppolicy.h"
 
 #include "llhttpconstants.h"
+#include "lltimer.h"
 
 namespace
 {
@@ -64,7 +65,8 @@ HttpLibcurl::HttpLibcurl(HttpService * service)
       mPolicyCount(0),
       mMultiHandles(NULL),
       mActiveHandles(NULL),
-      mDirtyPolicy(NULL)
+      mDirtyPolicy(NULL),
+      mZeroWaits(0)
 {}
 
 
@@ -141,11 +143,15 @@ void HttpLibcurl::start(int policy_count)
 //
 // If active list goes empty *and* we didn't queue any
 // requests for retry, we return a request for a hard
-// sleep otherwise ask for a normal polling interval.
+// sleep.  If a request completed or a stalled policy was
+// applied, the ready queue may now have a slot to fill, so
+// we ask to go round at once; otherwise to wait on the
+// transfers.
 HttpService::ELoopSpeed HttpLibcurl::processTransport()
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
     HttpService::ELoopSpeed ret(HttpService::REQUEST_SLEEP);
+    bool turn_around(false);
 
     // Give libcurl some cycles to do I/O & callbacks
     for (unsigned int policy_class(0); policy_class < mPolicyCount; ++policy_class)
@@ -162,6 +168,7 @@ HttpService::ELoopSpeed HttpLibcurl::processTransport()
             if (mDirtyPolicy[policy_class])
             {
                 policyUpdated(policy_class);
+                turn_around = true;
             }
             continue;
         }
@@ -190,7 +197,7 @@ HttpService::ELoopSpeed HttpLibcurl::processTransport()
 
                     completeRequest(mMultiHandles[policy_class], handle, result);
                     handle = NULL;                  // No longer valid on return
-                    ret = HttpService::NORMAL;      // If anything completes, we may have a free slot.
+                    turn_around = true;             // If anything completes, we may have a free slot.
                                                     // Turning around quickly reduces connection gap by 7-10mS.
                 }
                 else if (CURLMSG_NONE == msg->msg)
@@ -209,11 +216,139 @@ HttpService::ELoopSpeed HttpLibcurl::processTransport()
         }
     }
 
-    if (! mActiveOps.empty())
+    if (turn_around)
+    {
+        ret = HttpService::IMMEDIATE;
+    }
+    else if (! mActiveOps.empty())
     {
         ret = HttpService::NORMAL;
     }
     return ret;
+}
+
+
+// Waits on the sockets of every class with transfers in
+// flight, and on the wake that a new request signals, for
+// no longer than libcurl's own next timeout or @timeout_ms.
+//
+// One wait has to cover every class's multi handle, and
+// curl_multi_wait() takes one.  So each class's sockets come
+// from curl_multi_fdset() and its next timeout from
+// curl_multi_timeout(), and the lot are polled together.
+// An fd_set holds FD_SETSIZE sockets; on Windows a full one
+// may have dropped some, and the wait is then cut to the
+// old polling interval.
+void HttpLibcurl::wait(long timeout_ms, ALHttpWake & wake)
+{
+    LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
+    mPollFds.clear();
+    bool all_sockets(true);
+
+    for (unsigned int policy_class(0); policy_class < mPolicyCount; ++policy_class)
+    {
+        CURLM * multi_handle(mMultiHandles[policy_class]);
+        if (! multi_handle || ! mActiveHandles[policy_class])
+        {
+            continue;
+        }
+
+        long curl_timeout_ms(-1);
+        curl_multi_timeout(multi_handle, &curl_timeout_ms);
+        if (curl_timeout_ms >= 0 && curl_timeout_ms < timeout_ms)
+        {
+            timeout_ms = curl_timeout_ms;
+        }
+
+        fd_set read_fds, write_fds, except_fds;
+        FD_ZERO(&read_fds);
+        FD_ZERO(&write_fds);
+        FD_ZERO(&except_fds);
+        int max_fd(-1);
+        curl_multi_fdset(multi_handle, &read_fds, &write_fds, &except_fds, &max_fd);
+#if LL_WINDOWS
+        all_sockets = all_sockets && read_fds.fd_count < FD_SETSIZE && write_fds.fd_count < FD_SETSIZE;
+        for (u_int i(0); i < read_fds.fd_count; ++i)
+        {
+            addPollFd(read_fds.fd_array[i], POLLRDNORM);
+        }
+        for (u_int i(0); i < write_fds.fd_count; ++i)
+        {
+            addPollFd(write_fds.fd_array[i], POLLWRNORM);
+        }
+#else
+        for (int fd(0); fd <= max_fd; ++fd)
+        {
+            const short events((FD_ISSET(fd, &read_fds) ? POLLIN : 0) | (FD_ISSET(fd, &write_fds) ? POLLOUT : 0));
+            if (events)
+            {
+                addPollFd(fd, events);
+            }
+        }
+#endif
+    }
+
+    if (! wake.isOpen() || ! all_sockets)
+    {
+        timeout_ms = (std::min)(timeout_ms, long(HTTP_SERVICE_LOOP_SLEEP_NORMAL_MS));
+    }
+    if (timeout_ms <= 0)
+    {
+        // libcurl or the policy wants another pass at once.  A second
+        // such pass in a row waits a millisecond, so that a timer that
+        // never clears cannot spin the worker.
+        if (++mZeroWaits < 2)
+        {
+            return;
+        }
+        timeout_ms = 1;
+    }
+    mZeroWaits = 0;
+    if (wake.isOpen())
+    {
+        pollfd wake_fd = {};
+        wake_fd.fd = wake.readSocket();
+        wake_fd.events = POLLIN;
+        mPollFds.push_back(wake_fd);
+    }
+    if (mPollFds.empty())
+    {
+        ms_sleep(U32(timeout_ms));
+        return;
+    }
+
+#if LL_WINDOWS
+    const int ready(WSAPoll(mPollFds.data(), ULONG(mPollFds.size()), int(timeout_ms)));
+#else
+    const int ready(poll(mPollFds.data(), nfds_t(mPollFds.size()), int(timeout_ms)));
+#endif
+    if (ready < 0)
+    {
+        // A failing poll fails at once; don't let it spin the loop.
+        LL_WARNS_ONCE(LOG_CORE) << "Poll of the transfers' sockets failed; polling them instead." << LL_ENDL;
+        ms_sleep(HTTP_SERVICE_LOOP_SLEEP_NORMAL_MS);
+    }
+    else if (ready > 0 && wake.isOpen() && mPollFds.back().revents)
+    {
+        wake.drain();
+    }
+}
+
+
+void HttpLibcurl::addPollFd(curl_socket_t sock, short events)
+{
+    for (pollfd & entry : mPollFds)
+    {
+        if (entry.fd == sock)
+        {
+            entry.events |= events;
+            return;
+        }
+    }
+    pollfd entry = {};
+    entry.fd = sock;
+    entry.events = events;
+    mPollFds.push_back(entry);
 }
 
 

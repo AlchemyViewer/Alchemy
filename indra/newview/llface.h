@@ -268,6 +268,8 @@ public:
 
     // true if face was recently in the main camera frustum according to LLViewerTextureList updates
     bool mInFrustum = false;
+    // true if the face's box was in the main camera's frustum when calcPixelArea last measured it
+    bool mBoxInFrustum = false;
     // value of gFrameCount the last time the face was touched by LLViewerTextureList::updateImageDecodePriority
     U32 mLastTextureUpdate = 0;
 

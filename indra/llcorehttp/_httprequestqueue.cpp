@@ -28,6 +28,7 @@
 
 #include "_httpoperation.h"
 #include "_mutex.h"
+#include "alhttpwake.h"
 
 
 using namespace LLCoreInt;
@@ -41,7 +42,8 @@ std::function<void(const HttpRequestQueue::opPtr_t &)> HttpRequestQueue::sMessag
 
 HttpRequestQueue::HttpRequestQueue()
     : RefCounted(true),
-      mQueueStopped(false)
+      mQueueStopped(false),
+      mWake(NULL)
 {
 }
 
@@ -87,6 +89,10 @@ HttpStatus HttpRequestQueue::addOp(const HttpRequestQueue::opPtr_t &op, bool log
         if (loggable && sMessageLogFunc != nullptr ) { sMessageLogFunc(op); }
         wake = mQueue.empty();
         mQueue.push_back(op);
+        if (wake && mWake)
+        {
+            mWake->signal();
+        }
     }
     if (wake)
     {
@@ -153,6 +159,10 @@ bool HttpRequestQueue::stopQueue()
     {
         HttpScopedLock lock(mQueueMutex);
 
+        if (mWake)
+        {
+            mWake->signal();
+        }
         if (!mQueueStopped)
         {
             mQueueStopped = true;
@@ -162,6 +172,14 @@ bool HttpRequestQueue::stopQueue()
         wakeAll();
         return false;
     }
+}
+
+
+void HttpRequestQueue::setWake(ALHttpWake * wake)
+{
+    HttpScopedLock lock(mQueueMutex);
+
+    mWake = wake;
 }
 
 

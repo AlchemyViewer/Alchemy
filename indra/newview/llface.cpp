@@ -2105,6 +2105,21 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
 
     LLViewerCamera* camera = LLViewerCamera::getInstance();
 
+    // An active drawable's face extents are in the drawable's frame: its box in agent space is theirs transformed.
+    LLVector4a box_center = center;
+    LLVector4a box_size = size;
+    if (!isState(LLFace::RIGGED) && mDrawablep && !mDrawablep->isStatic()
+        && mVObjp.notNull() && mVObjp->getPartitionType() != LLViewerRegion::PARTITION_PARTICLE)
+    {
+        LLVector4a box[2];
+        matMulBoundBox(getRenderMatrix(), mExtents, box);
+        box_center.setAdd(box[0], box[1]);
+        box_center.mul(0.5f);
+        box_size.setSub(box[1], box[0]);
+        box_size.mul(0.5f);
+    }
+    mBoxInFrustum = camera->AABBInFrustum(box_center, box_size) != 0;
+
     F32 size_squared = size.dot3(size).getF32();
     LLVector4a lookAt;
     LLVector4a t;
@@ -2131,7 +2146,7 @@ bool LLFace::calcPixelArea(F32& cos_angle_to_view_dir, F32& radius)
     //if has media, check if the face is out of the view frustum.
     if(hasMedia())
     {
-        if(!camera->AABBInFrustum(center, size))
+        if(!mBoxInFrustum)
         {
             mImportanceToCamera = 0.f ;
             return false ;
