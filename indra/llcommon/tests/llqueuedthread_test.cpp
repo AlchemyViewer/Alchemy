@@ -70,6 +70,13 @@ namespace
 
         // Runs `work` on the queue's thread, in turn with its requests.
         void post(std::function<void()> work) { mRequestQueue.post(std::move(work)); }
+
+        // Set on the queue's thread once its pause, if any, lets it go on to
+        // run its queue.
+        std::atomic<bool> mThreadStarted{ false };
+
+    private:
+        void startThread() override { mThreadStarted = true; }
     };
 
     // A queued thread with an update of its own to run each update().
@@ -111,15 +118,19 @@ namespace
         bool                  mWaitsForWake;
     };
 
-    TEST_CASE("llqueuedthread: a request added once the thread waits for work runs", "[llqueuedthread]")
+    TEST_CASE("llqueuedthread: a thread started with nothing queued runs a request added after", "[llqueuedthread]")
     {
-        // The thread starts with nothing queued and is given time to wait for
-        // work. Nothing calls update(), so only the request's own post can
-        // wake it. A thread slower to start than that shows nothing, but
-        // cannot fail.
+        // Nothing is queued as the thread starts and nothing calls update(),
+        // so nothing but a pause may hold it before it runs its queue, and
+        // only the request's own post can wake it there.
         TestQueuedThread thread;
         thread.start();
-        ms_sleep(100);
+        LLTimer clock;
+        while (!thread.mThreadStarted.load() && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(thread.mThreadStarted.load());
 
         std::atomic<int> runs{ 0 };
         thread.addRequest(new TestRequest(thread.generateHandle(), [&runs]()
@@ -127,7 +138,38 @@ namespace
                 ++runs;
                 return true;
             }));
+        clock.reset();
+        while (runs.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        CHECK(runs.load() == 1);
+    }
+
+    TEST_CASE("llqueuedthread: a paused thread unpaused with nothing queued runs a request added after", "[llqueuedthread]")
+    {
+        // Made paused, the thread waits before it runs its queue. Unpaused
+        // with nothing pending, it goes on to run it.
+        TestQueuedThread thread(true);
+        thread.start();
+        ms_sleep(50);
+        CHECK_FALSE(thread.mThreadStarted.load());
+
+        thread.unpause();
         LLTimer clock;
+        while (!thread.mThreadStarted.load() && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        REQUIRE(thread.mThreadStarted.load());
+
+        std::atomic<int> runs{ 0 };
+        thread.addRequest(new TestRequest(thread.generateHandle(), [&runs]()
+            {
+                ++runs;
+                return true;
+            }));
+        clock.reset();
         while (runs.load() < 1 && clock.getElapsedTimeF64() < 10.0)
         {
             ms_sleep(1);

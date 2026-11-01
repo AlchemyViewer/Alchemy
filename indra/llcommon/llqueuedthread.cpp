@@ -557,23 +557,13 @@ void LLQueuedThread::retryRequest(handle_t handle, U32 generation)
 }
 
 // virtual
-bool LLQueuedThread::runCondition()
-{
-    // mRunCondition must be locked here
-    if (mRequestQueue.size() == 0 && mIdleThread)
-        return false;
-    else
-        return true;
-}
-
-// virtual
 void LLQueuedThread::run()
 {
-    // A queue made paused waits here until it is unpaused. It waits for the
-    // pause alone: checkPause() would also wait while runCondition() is
-    // false, as it is while the queue is empty, and a request posted to the
-    // queue signals nothing here. The queue waits for its own work below.
-    mRunCondition->wait([this]() { return mStatus != RUNNING || !isPaused(); });
+    // A queue made paused waits here until it is unpaused. Nothing else holds
+    // it: the queue waits for its own work below, and a request posted to it
+    // signals nothing here, so a queued thread keeps LLThread's
+    // runCondition(), which never asks it to sleep.
+    checkPause();
     startThread();
 
 
