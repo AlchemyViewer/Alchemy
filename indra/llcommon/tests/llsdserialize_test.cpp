@@ -236,6 +236,44 @@ namespace
         require_xml("binary", expected);
     }
 
+    TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: control characters format as character references", "[LLSDXMLFormatter]")
+    {
+        // XML takes a C0 control other than tab, LF and CR only as a character
+        // reference, and has none for NUL. Tab, LF, CR and NUL go out as they
+        // are, and so does everything else bar the five entities.
+        mSD = "a\x01\t\x1b\n";
+        const std::string expected = "<llsd><string>a&#x1;\t&#x1b;\n</string></llsd>\n";
+        require_xml("string", expected);
+        std::istringstream input(expected);
+        LLSD parsed;
+        REQUIRE(LLSDSerialize::fromXML(parsed, input) == 1);
+        CHECK(parsed.asString() == mSD.asString());
+
+        for (int c = 0x01; c < 0x20; ++c)
+        {
+            if (c == '\t' || c == '\n' || c == '\r')
+            {
+                continue;
+            }
+            std::ostringstream ref;
+            ref << "&#x" << std::hex << c << ';';
+            const std::string raw(1, (char)c);
+
+            mSD = "s" + raw;
+            require_xml("string", "<llsd><string>s" + ref.str() + "</string></llsd>\n");
+            mSD = LLSD::emptyMap();
+            mSD["k" + raw] = 1;
+            require_xml("key", "<llsd><map><key>k" + ref.str() + "</key><integer>1</integer></map></llsd>\n");
+            mSD = LLURI("u" + raw);
+            require_xml("uri", "<llsd><uri>u" + ref.str() + "</uri></llsd>\n");
+        }
+
+        mSD = std::string("a\0b\rc", 5);
+        require_xml("NUL and CR", std::string("<llsd><string>a\0b\rc</string></llsd>\n", 36));
+        mSD = "<>&'\"";
+        require_xml("entities", "<llsd><string>&lt;&gt;&amp;&apos;&quot;</string></llsd>\n");
+    }
+
     TEST_CASE_METHOD(sd_xml_data, "LLSDXMLFormatter: a single-line document deserializes without a spurious error", "[LLSDXMLFormatter]")
     {
         // A complete, single-line legacy <llsd> document (no embedded '\n') is

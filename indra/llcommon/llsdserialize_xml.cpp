@@ -298,7 +298,10 @@ std::string LLSDXMLFormatter::escapeString(const std::string& in)
 void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
 {
     // Append unescaped runs in bulk; only the five XML special characters
-    // need an entity.
+    // need an entity. XML takes a C0 control other than tab, LF and CR only
+    // as a character reference, written in lower-case hex with no leading
+    // zero, and has none for NUL, which is left as it is.
+    static constexpr char HEX[] = "0123456789abcdef";
     out.reserve(out.size() + in.size());
     const char* start = in.data();
     const char* end = start + in.size();
@@ -306,6 +309,7 @@ void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
     for(const char* p = start; p < end; ++p)
     {
         const char* entity;
+        char reference[7];
         switch(*p)
         {
         case '<':
@@ -324,7 +328,26 @@ void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
             entity = "&quot;";
             break;
         default:
-            continue;
+        {
+            const unsigned char c = (unsigned char)*p;
+            if (c == 0 || c >= 0x20 || c == '\t' || c == '\n' || c == '\r')
+            {
+                continue;
+            }
+            char* r = reference;
+            *r++ = '&';
+            *r++ = '#';
+            *r++ = 'x';
+            if (c >= 0x10)
+            {
+                *r++ = '1';
+            }
+            *r++ = HEX[c & 0xf];
+            *r++ = ';';
+            *r = '\0';
+            entity = reference;
+            break;
+        }
         }
         out.append(run, p - run);
         out.append(entity);
