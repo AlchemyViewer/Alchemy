@@ -63,7 +63,8 @@ const S32 PING_RELEASE_BLOCK = 2;   // How many pings behind we have to be to co
 const F32Seconds TARGET_PERIOD_LENGTH(5.f);
 const F32Seconds LL_DUPLICATE_SUPPRESSION_TIMEOUT(60.f); //this can be long, as time-based cleanup is
                                                     // only done when wrapping packetids, now...
-const F32Seconds LL_DUPLICATE_COPY_WINDOW(5.f);     // how long after a reliable packet is handled an unmarked copy of it counts as a duplicate
+const F32Seconds LL_DUPLICATE_COPY_WINDOW(5.f);     // how long after a reliable packet is handled a copy of it may still arrive:
+                                                    // an unmarked copy counts as a duplicate, and a ping keeps its number
 
 LLCircuitData::LLCircuitData(const LLHost &host, TPACKETID in_id,
                              const F32Seconds circuit_heartbeat_interval, const F32Seconds circuit_timeout)
@@ -874,11 +875,10 @@ bool LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
     }
 
     // WARNING!
-    // Duplicate suppression can FAIL if packets are delivered out of
-    // order, although it's EXTREMELY unlikely.  It would require
-    // that the ping get delivered out of order enough that the ACK
-    // for the packet that it was out of order with was received BEFORE
-    // the ping was sent.
+    // Duplicate suppression can FAIL if a copy of a packet is delivered
+    // after the ping, and longer than LL_DUPLICATE_COPY_WINDOW after the
+    // packet was handled: the ping lets the receiver forget a number its
+    // oldest unacked passes once it was handled that long ago.
 
     // Find the current oldest reliable packetID
     // This is to handle the case if we actually manage to wrap our
@@ -1015,26 +1015,39 @@ void LLCircuitData::clearDuplicateList(TPACKETID oldest_id)
 {
     // purge old data from the duplicate suppression queue
 
-    // we want to KEEP all x where oldest_id <= x <= last incoming packet, and delete everything else.
+    // we want to KEEP all x where oldest_id <= x <= last incoming packet, and delete everything else
+    // once no copy of it can still be coming.
 
     //LL_INFOS() << mHost << ": clearing before oldest " << oldest_id << LL_ENDL;
     //LL_INFOS() << "Recent list before: " << mRecentlyReceivedReliablePackets.size() << LL_ENDL;
+    U64Microseconds mt_usec = LLMessageSystem::getMessageTimeUsecs();
+
+    packet_time_map::iterator pit;
     if (oldest_id < mHighestPacketID)
     {
-        // Clean up everything with a packet ID less than oldest_id.
-        packet_time_map::iterator pit_start;
-        packet_time_map::iterator pit_end;
-        pit_start = mRecentlyReceivedReliablePackets.begin();
-        pit_end = mRecentlyReceivedReliablePackets.lower_bound(oldest_id);
-        mRecentlyReceivedReliablePackets.erase(pit_start, pit_end);
+        // Clean up everything with a packet ID less than oldest_id that was
+        // handled longer ago than a copy of it takes to arrive. The sender
+        // pings once it has the ack, and a resend that crossed the ack, or a
+        // copy the network made, can come after the ping.
+        packet_time_map::iterator pit_end = mRecentlyReceivedReliablePackets.lower_bound(oldest_id);
+        for (pit = mRecentlyReceivedReliablePackets.begin(); pit != pit_end; )
+        {
+            U64Microseconds delta_t_usec = mt_usec - (*pit).second;
+            F64Seconds delta_t_sec = delta_t_usec;
+            if (delta_t_sec >= LL_DUPLICATE_COPY_WINDOW)
+            {
+                mRecentlyReceivedReliablePackets.erase(pit++);
+            }
+            else
+            {
+                ++pit;
+            }
+        }
     }
 
     // Do timeout checks on everything with an ID > mHighestPacketID.
     // This should be empty except for wrapping IDs.  Thus, this should be
     // highly rare.
-    U64Microseconds mt_usec = LLMessageSystem::getMessageTimeUsecs();
-
-    packet_time_map::iterator pit;
     for(pit = mRecentlyReceivedReliablePackets.upper_bound(mHighestPacketID);
         pit != mRecentlyReceivedReliablePackets.end(); )
     {

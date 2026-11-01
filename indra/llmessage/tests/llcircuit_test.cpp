@@ -199,10 +199,11 @@ namespace ll_test
             circuit.mAcks.erase(circuit.mAcks.begin(), circuit.mAcks.end());
         }
 
-        // A reliable packet was handled, its number recorded as
-        // LLMessageSystem::checkMessages records it.
+        // A reliable packet was handled, its number counted in and recorded
+        // as LLMessageSystem::checkMessages counts and records it.
         static void handled(LLCircuitData& circuit, TPACKETID id)
         {
+            circuit.checkPacketInID(id, false);
             circuit.mRecentlyReceivedReliablePackets[id] = LLMessageSystem::getMessageTimeUsecs();
         }
 
@@ -399,5 +400,28 @@ namespace
         sMessageTime += F64Seconds(6.0);
         CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 7, false));
         CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
+    }
+
+    TEST_CASE("llcircuit: a ping keeps a number handled moments ago that its sender has had acked", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        CircuitProbe::handled(circuit, 7);
+        CircuitProbe::handled(circuit, 8);
+        CircuitProbe::handled(circuit, 9);
+
+        // A second on, the sender has had 7 acked and pings with 8 its oldest
+        // unacked; a resend of 7 that crossed the ack, or a copy the network
+        // made, may still be on its way.
+        sMessageTime += F64Seconds(1.0);
+        circuit.clearDuplicateList(8);
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
+
+        // A ping six seconds on lets 7 go, and keeps 8, which it does not pass.
+        sMessageTime += F64Seconds(5.0);
+        circuit.clearDuplicateList(8);
+        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 7, true));
+        CHECK(CircuitProbe::isDuplicate(circuit, 8, true));
     }
 }
