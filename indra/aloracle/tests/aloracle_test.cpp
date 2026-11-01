@@ -895,12 +895,21 @@ namespace
         const MessageTemplate messages;
         REQUIRE(messages.status == ALORACLE_OK);
 
-        aloracle_bytes out{};
+        // What each is given is emptied though it refuses.
+        uint8_t held = 0;
+        aloracle_bytes out{ &held, 1 };
         int32_t result = -1;
         CHECK(aloracle_zerocode_encode(in(packet), oversized, 6, &out) == ALORACLE_BAD_ARGUMENT);
+        CHECK(out.data == nullptr);
+        CHECK(out.size == 0);
+        out = aloracle_bytes{ &held, 1 };
         CHECK(aloracle_zerocode_decode(in(packet), oversized, 64, 6, &out) == ALORACLE_BAD_ARGUMENT);
+        CHECK(out.data == nullptr);
+        CHECK(out.size == 0);
+        out = aloracle_bytes{ &held, 1 };
         CHECK(aloracle_message_read(messages.handle, in(packet), oversized, &out, &result) == ALORACLE_BAD_ARGUMENT);
         CHECK(out.data == nullptr);
+        CHECK(out.size == 0);
         CHECK(result == -1);
     }
 
