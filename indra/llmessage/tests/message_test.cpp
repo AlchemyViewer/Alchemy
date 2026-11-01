@@ -372,5 +372,112 @@ namespace
         CHECK(after == before);
     }
 #endif
+
+    // One message, DuplicateTest, whose one block holds a U32.
+    const char* const DUPLICATE_TEST_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    DuplicateTest Low 1 NotTrusted Unencoded\n"
+        "    {\n"
+        "        Payload Single\n"
+        "        { Data U32 }\n"
+        "    }\n"
+        "}\n";
+
+    // A socket of the test's own, closed when this ends.
+    class SenderSocket
+    {
+    public:
+        SenderSocket()
+        {
+            mPort = NET_USE_OS_ASSIGNED_PORT;
+            mResult = start_net(mSocket, mPort);
+        }
+
+        ~SenderSocket()
+        {
+            end_net(mSocket);
+        }
+
+        SenderSocket(const SenderSocket&) = delete;
+        SenderSocket& operator=(const SenderSocket&) = delete;
+
+        S32 mSocket = -1;
+        int mPort = 0;
+        S32 mResult = -1;
+    };
+
+    S32 sDuplicateTestsHandled = 0;
+
+    void handle_duplicate_test(LLMessageSystem*, void**)
+    {
+        ++sDuplicateTestsHandled;
+    }
+
+    // Reads what has come in until the system has taken `packets` packets
+    // in all, or a second has passed.
+    void read_until(LLMessageSystem& system, U32 packets)
+    {
+        LockMessageChecker lmc(&system);
+        const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+        while (system.mPacketsIn < packets && LLTimer::getTotalSeconds() < give_up)
+        {
+            if (!lmc.checkMessages())
+            {
+                ms_sleep(1);
+            }
+        }
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a reliable packet that arrives twice unmarked is handled once", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, DUPLICATE_TEST_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+        system.setHandlerFunc("DuplicateTest", handle_duplicate_test);
+        sDuplicateTestsHandled = 0;
+
+        // The packets come from a socket of the test's own, on a circuit the
+        // system has to it, as it has to a simulator.
+        const SenderSocket sender;
+        REQUIRE(sender.mResult == 0);
+        system.enableCircuit(LLHost("127.0.0.1", sender.mPort), true);
+        const LLHost receiver("127.0.0.1", system.getListenPort());
+
+        // DuplicateTest numbered `id`: the flags, the packet number, no extra
+        // header, the number of Low message 1 and its U32.
+        auto send = [&](U8 flags, U8 id)
+        {
+            const U8 packet[] = { flags, 0, 0, 0, id, 0, 0xff, 0xff, 0x00, 0x01, 1, 2, 3, 4 };
+            REQUIRE(send_packet(sender.mSocket, (const char*)packet, (int)sizeof(packet), receiver.getAddress(), receiver.getPort()));
+        };
+
+        {
+            INFO("both copies in before either is read");
+            send(LL_RELIABLE_FLAG, 1);
+            send(LL_RELIABLE_FLAG, 1);
+            read_until(system, 2);
+            REQUIRE(system.mPacketsIn == 2);
+            CHECK(sDuplicateTestsHandled == 1);
+        }
+        {
+            INFO("the second copy in after the first is handled");
+            send(LL_RELIABLE_FLAG, 2);
+            read_until(system, 3);
+            send(LL_RELIABLE_FLAG, 2);
+            read_until(system, 4);
+            REQUIRE(system.mPacketsIn == 4);
+            CHECK(sDuplicateTestsHandled == 2);
+        }
+        {
+            INFO("a copy marked resent, as before");
+            send(LL_RELIABLE_FLAG | LL_RESENT_FLAG, 2);
+            read_until(system, 5);
+            REQUIRE(system.mPacketsIn == 5);
+            CHECK(sDuplicateTestsHandled == 2);
+        }
+    }
 }
 

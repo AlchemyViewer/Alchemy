@@ -639,46 +639,36 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
             if (buffer[0] & LL_RESENT_FLAG)
             {
                 recv_resent = true;
-                if (cdp && cdp->isDuplicateResend(mCurrentRecvPacketID))
-                {
-                    // We need to ACK here to suppress
-                    // further resends of packets we've
-                    // already seen.
-                    if (recv_reliable)
-                    {
-                        //mAckList.addData(new LLPacketAck(host, mCurrentRecvPacketID));
-                        // ***************************************
-                        // TESTING CODE
-                        //if(mCircuitInfo.mCurrentCircuit->mHost != host)
-                        //{
-                        //  LL_WARNS("Messaging") << "DISCARDED PACKET HOST MISMATCH! HOST: "
-                        //          << host << " CIRCUIT: "
-                        //          << mCircuitInfo.mCurrentCircuit->mHost
-                        //          << LL_ENDL;
-                        //}
-                        // ***************************************
-                        //mCircuitInfo.mCurrentCircuit->mAcks.put(mCurrentRecvPacketID);
-                        cdp->collectRAck(mCurrentRecvPacketID);
-                    }
+            }
 
-                    LL_DEBUGS("Messaging") << "Discarding duplicate resend from " << host << LL_ENDL;
-                    if(mVerboseLog)
-                    {
-                        std::ostringstream str;
-                        str << "MSG: <- " << host;
-                        std::string tbuf;
-                        tbuf = llformat( "\t%6d\t%6d\t%6d ", receive_size, (mIncomingCompressedSize ? mIncomingCompressedSize : receive_size), mCurrentRecvPacketID);
-                        str << tbuf << "(unknown)"
-                            << (recv_reliable ? " reliable" : "")
-                            << " resent "
-                            << ((num_acks > 0) ? "acks" : "")
-                            << " DISCARD DUPLICATE";
-                        LL_INFOS("Messaging") << str.str() << LL_ENDL;
-                    }
-                    mPacketsIn++;
-                    valid_packet = false;
-                    continue;
+            // A reliable packet the network delivers twice comes the second
+            // time without the resent flag, and is as much a duplicate as a
+            // resend. Only reliable packets' numbers are recorded, so an
+            // unreliable one is not looked up.
+            if (recv_reliable && cdp && cdp->isDuplicateResend(mCurrentRecvPacketID))
+            {
+                // We need to ACK here to suppress
+                // further resends of packets we've
+                // already seen.
+                cdp->collectRAck(mCurrentRecvPacketID);
+
+                LL_DEBUGS("Messaging") << "Discarding duplicate from " << host << LL_ENDL;
+                if(mVerboseLog)
+                {
+                    std::ostringstream str;
+                    str << "MSG: <- " << host;
+                    std::string tbuf;
+                    tbuf = llformat( "\t%6d\t%6d\t%6d ", receive_size, (mIncomingCompressedSize ? mIncomingCompressedSize : receive_size), mCurrentRecvPacketID);
+                    str << tbuf << "(unknown)"
+                        << " reliable"
+                        << (recv_resent ? " resent " : " ")
+                        << ((num_acks > 0) ? "acks" : "")
+                        << " DISCARD DUPLICATE";
+                    LL_INFOS("Messaging") << str.str() << LL_ENDL;
                 }
+                mPacketsIn++;
+                valid_packet = false;
+                continue;
             }
 
             // UseCircuitCode can be a valid, off-circuit packet.
@@ -1168,10 +1158,12 @@ S32 LLMessageSystem::bufferInboundPacket()
 
             // Check packet sequencing here, in true socket-arrival order, before
             // this packet is sorted into the high/low priority inbound queue.
-            // Skip genuine duplicate resends, same as checkMessages()/logValidMsg()
-            // would do further downstream.
+            // Skip duplicates of reliable packets already handled, marked resent
+            // or not, same as checkMessages()/logValidMsg() would do further
+            // downstream.
             bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
-            if (!recv_resent || !cdp->isDuplicateResend(recv_packet_id))
+            bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
+            if (!recv_reliable || !cdp->isDuplicateResend(recv_packet_id))
             {
                 cdp->checkPacketInID(recv_packet_id, recv_resent);
                 pkt.setPacketIDChecked(true);
