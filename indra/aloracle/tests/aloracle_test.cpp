@@ -881,6 +881,42 @@ namespace
         aloracle_message_template_free(nullptr);
     }
 
+    TEST_CASE("aloracle: a packet over 2^31 - 1 bytes is refused before it is read", "[aloracle]")
+    {
+        // Seven bytes, passed as more than the C++ can be given: a read of the
+        // size claimed would run far past them.
+        const std::string packet = packetOf("\x09"s);
+        const size_t oversized = size_t(INT32_MAX) + 1;
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        aloracle_bytes out{};
+        int32_t result = -1;
+        CHECK(aloracle_zerocode_encode(in(packet), oversized, 6, &out) == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_zerocode_decode(in(packet), oversized, 64, 6, &out) == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_message_read(messages.handle, in(packet), oversized, &out, &result) == ALORACLE_BAD_ARGUMENT);
+        CHECK(out.data == nullptr);
+        CHECK(result == -1);
+    }
+
+    TEST_CASE("aloracle: a template that could fill the string table is refused before it is parsed", "[aloracle]")
+    {
+        // More distinct tokens than the table has room for. A parse would
+        // intern TestCrowded and then come back fatal at the words after it,
+        // so a refusal shows nothing was interned.
+        std::string crowded = "version 2.0\n{ TestCrowded Low 14 NotTrusted Unencoded }\n";
+        for (int i = 0; i < 9000; ++i)
+        {
+            crowded += "word" + std::to_string(i) + (i % 16 == 15 ? "\n" : " ");
+        }
+        const MessageTemplate refused(crowded);
+        CHECK(refused.status == ALORACLE_BAD_ARGUMENT);
+        CHECK(refused.handle == nullptr);
+
+        const MessageTemplate messages;
+        CHECK(messages.status == ALORACLE_OK);
+    }
+
     TEST_CASE("aloracle: an LL_ERRS comes back fatal while other threads log", "[aloracle]")
     {
         // The notation parser logs each character it does not know, and the

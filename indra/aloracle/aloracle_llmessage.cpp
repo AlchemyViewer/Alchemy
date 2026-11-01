@@ -36,6 +36,8 @@
 #include "llzerocode.h"
 #include "message.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <limits>
 #include <memory>
@@ -109,6 +111,19 @@ namespace
     {
         return std::string_view(reinterpret_cast<const char*>(bytes.data()) + from, to - from);
     }
+
+    // Every distinct token in a template's text: no fewer than the names its
+    // parse could intern.
+    size_t distinctTokens(const std::string& text)
+    {
+        LLTemplateTokenizer tokens(text);
+        boost::unordered_flat_set<std::string> distinct;
+        while (!tokens.wantEOF())
+        {
+            distinct.insert(tokens.next());
+        }
+        return distinct.size();
+    }
 }
 
 int32_t aloracle_zerocode_encode(const uint8_t* packet, size_t size, uint32_t header_size, aloracle_bytes* encoded)
@@ -116,7 +131,7 @@ int32_t aloracle_zerocode_encode(const uint8_t* packet, size_t size, uint32_t he
     return aloracle::guarded([&]() -> int32_t
     {
         std::string bytes;
-        if (!aloracle::clear(encoded) || !aloracle::take(packet, size, bytes) || !fitsS32(size))
+        if (!aloracle::clear(encoded) || !fitsS32(size) || !aloracle::take(packet, size, bytes))
         {
             return ALORACLE_BAD_ARGUMENT;
         }
@@ -144,8 +159,8 @@ int32_t aloracle_zerocode_decode(const uint8_t* packet,
     return aloracle::guarded([&]() -> int32_t
     {
         std::string bytes;
-        if (!aloracle::clear(expanded) || !aloracle::take(packet, size, bytes) || !fitsS32(size)
-            || capacity < header_size)
+        if (!aloracle::clear(expanded) || !fitsS32(size) || capacity < header_size
+            || !aloracle::take(packet, size, bytes))
         {
             return ALORACLE_BAD_ARGUMENT;
         }
@@ -182,6 +197,13 @@ int32_t aloracle_message_template_new(const uint8_t* text,
         }
         *message_template = nullptr;
 
+        // LLMessageStringTable::getString probes for a free slot with no end:
+        // once the table is full, a name not in it never returns.
+        if (LLMessageStringTable::getInstance()->mUsed + distinctTokens(body) >= MESSAGE_NUMBER_OF_HASH_BUCKETS - 1)
+        {
+            return ALORACLE_BAD_ARGUMENT;
+        }
+
         auto made = std::make_unique<aloracle_message_template>();
         LLTemplateTokenizer tokens(body);
         LLTemplateParser parsed(tokens);
@@ -206,6 +228,7 @@ int32_t aloracle_message_template_new(const uint8_t* text,
 
 void aloracle_message_template_free(aloracle_message_template* message_template)
 {
+    LLMutexLock lock(&aloracle::callLock());
     delete message_template;
 }
 
@@ -259,8 +282,8 @@ int32_t aloracle_message_read(const aloracle_message_template* message_template,
     return aloracle::guarded([&]() -> int32_t
     {
         std::string bytes;
-        if (!aloracle::clear(written) || !message_template || !aloracle::take(packet, size, bytes)
-            || size < (size_t)LL_MINIMUM_VALID_PACKET_SIZE || !fitsS32(size))
+        if (!aloracle::clear(written) || !message_template || size < (size_t)LL_MINIMUM_VALID_PACKET_SIZE
+            || !fitsS32(size) || !aloracle::take(packet, size, bytes))
         {
             return ALORACLE_BAD_ARGUMENT;
         }

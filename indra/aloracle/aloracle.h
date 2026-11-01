@@ -350,7 +350,11 @@ typedef struct aloracle_message_template aloracle_message_template;
 /// malformed template, and addTemplate's on a name used twice, are
 /// ALORACLE_FATAL; what the parser had made before its LL_ERRS is not freed.
 /// Names are interned for the life of the process, as LLMessageStringTable
-/// interns them, in a table of 8192 with no way out of it.
+/// interns them, in a table of 8192 with no way out of it, where a lookup of
+/// a new name in a full table never returns. So a template with so many
+/// distinct tokens that, with the names the table holds already, it could
+/// bring the table to 8191, where getString starts to warn of it, is
+/// ALORACLE_BAD_ARGUMENT, refused before anything is interned.
 ALORACLE_API int32_t aloracle_message_template_new(const uint8_t* text,
                                                    size_t size,
                                                    aloracle_message_template** message_template);
