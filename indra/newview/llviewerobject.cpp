@@ -3501,7 +3501,11 @@ bool LLViewerObject::isAnimatedObject() const
 struct LLFilenameAndTask
 {
     LLUUID mTaskID;
+    // The simulator's name for the file, used only to ask for it.
     std::string mFilename;
+    // The name of the copy in the cache folder, which the viewer makes, so a
+    // simulator cannot pick a file there to overwrite, read or delete.
+    std::string mLocalFilename;
 
     // for sequencing in case of multiple updates
     S16 mSerial;
@@ -3617,7 +3621,8 @@ void LLViewerObject::processTaskInv(LLMessageSystem* msg, void** user_data)
             delete ft;
             return;
         }
-        U64 new_id = gXferManager->requestFile(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ft->mFilename),
+        ft->mLocalFilename = "inventory_" + LLUUID::generateNewID().asString() + ".tmp";
+        U64 new_id = gXferManager->requestFile(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ft->mLocalFilename),
             ft->mFilename, LL_PATH_CACHE,
             object->mRegionp->getHost(),
             true,
@@ -3659,7 +3664,7 @@ void LLViewerObject::processTaskInvFile(void** user_data, S32 error_code, LLExtS
             LL_DEBUGS() << "Processing file that is potentially out of date for task: " << ft->mTaskID << LL_ENDL;
         }
 
-        if (object->loadTaskInvFile(ft->mFilename))
+        if (object->loadTaskInvFile(ft->mLocalFilename))
         {
 
             LLInventoryObject::object_list_t::iterator it = object->mInventory->begin();
@@ -3693,6 +3698,14 @@ void LLViewerObject::processTaskInvFile(void** user_data, S32 error_code, LLExtS
         // has already handled it.
         LL_DEBUGS() << "Problem loading task inventory. Return code: "
                  << error_code << LL_ENDL;
+
+        // Its name is used for this request alone, so nothing else would
+        // remove a file that came for an object since gone or a serial since
+        // passed.
+        if (ft)
+        {
+            LLFile::remove(gDirUtilp->getExpandedFilename(LL_PATH_CACHE, ft->mLocalFilename), ENOENT);
+        }
     }
     delete ft;
 }

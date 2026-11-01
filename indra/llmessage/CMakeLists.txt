@@ -213,6 +213,7 @@ if(AL_BUILD_TESTS)
       tests/llsdmessagereader_test.cpp
       tests/lltemplatemessagebuilder_test.cpp
       tests/llxfer_file_test.cpp
+      tests/llxfermanager_test.cpp
       tests/llxorcipher_test.cpp
       tests/llzerocode_test.cpp
       tests/message_test.cpp

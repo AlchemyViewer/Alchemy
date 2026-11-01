@@ -83,8 +83,7 @@ void LLXfer_File::init (const std::string& local_filename, bool delete_local_on_
         mLocalFilename =  local_filename.substr(0,LL_MAX_PATH-1);
 
         // You can only automatically delete .tmp file as a safeguard against nasty messages.
-        std::string exten = mLocalFilename.substr(mLocalFilename.length()-4, 4);
-        mDeleteLocalOnCompletion = (delete_local_on_completion && exten == ".tmp");
+        mDeleteLocalOnCompletion = (delete_local_on_completion && mLocalFilename.ends_with(".tmp"));
     }
 }
 

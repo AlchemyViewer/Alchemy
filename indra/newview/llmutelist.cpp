@@ -955,7 +955,11 @@ void LLMuteList::processMuteListUpdate(LLMessageSystem* msg, void**)
     // Todo: Based of logs and testing, there is no callback
     // from server if file doesn't exist server side.
     // Once server side gets fixed make sure it gets handled right.
-    std::string *local_filename_and_path = new std::string(gDirUtilp->getExpandedFilename( LL_PATH_CACHE, filename ));
+    // The simulator's name is used only to ask for the file. The copy in the
+    // cache folder gets a name the viewer makes, so a simulator cannot pick a
+    // file there to overwrite, read or delete.
+    const std::string local_filename = "mute_" + LLUUID::generateNewID().asString() + ".tmp";
+    std::string *local_filename_and_path = new std::string(gDirUtilp->getExpandedFilename( LL_PATH_CACHE, local_filename ));
     gXferManager->requestFile(*local_filename_and_path,
                               filename,
                               LL_PATH_CACHE,
