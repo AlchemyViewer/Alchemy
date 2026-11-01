@@ -1289,9 +1289,13 @@ void LLCircuitData::pingTimerStop(const U8 ping_id)
     }
 
     U32Milliseconds msec = delta_ping*mHeartbeatInterval + time;
+
+    // Only the pings sent after this one are still in flight. Count them
+    // before averaging: setPingDelay starts from getPingDelayAveraged(),
+    // which takes the time in flight of every ping counted as a floor.
+    mPingsInTransit = delta_ping;
     setPingDelay(msec);
 
-    mPingsInTransit = delta_ping;
     if (mBlocked && (mPingsInTransit <= PING_RELEASE_BLOCK))
     {
         mBlocked = false;
