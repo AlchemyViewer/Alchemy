@@ -374,8 +374,10 @@ llssize deserialize_boolean(
  *
  * @param value The string to escape and serialize
  * @param str The stream to serialize to.
+ * @param escape_double_quote Whether a double quote is escaped too, as it is
+ *        between the double quotes a URI is written in.
  */
-void serialize_string(std::string& out, const std::string& value);
+void serialize_string(std::string& out, const std::string& value, bool escape_double_quote = false);
 
 
 /**
@@ -1835,7 +1837,7 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, Sink& sink,
 
     case LLSD::TypeURI:
         sink.put("l\"");
-        serialize_string(sink.buffer(), data.asString());
+        serialize_string(sink.buffer(), data.asString(), true);
         sink.checkFlush();
         sink.put('"');
         break;
@@ -2250,7 +2252,7 @@ static const char* NOTATION_STRING_CHARACTERS[256] =
     "\\x1f",    // 31
     " ",        // 32
     "!",        // 33
-    "\"",       // 34
+    "\\\"",     // 34
     "#",        // 35
     "$",        // 36
     "%",        // 37
@@ -2474,10 +2476,11 @@ static const char* NOTATION_STRING_CHARACTERS[256] =
     "\\xff"     // 255
 };
 
-void serialize_string(std::string& out, const std::string& value)
+void serialize_string(std::string& out, const std::string& value, bool escape_double_quote)
 {
     // Append unescaped runs in bulk; only bytes outside 32..126 plus the
-    // quote and backslash need the escape table.
+    // single quote and backslash need the escape table, and the double quote
+    // where asked.
     out.reserve(out.size() + value.size());
     const char* start = value.data();
     const char* end = start + value.size();
@@ -2485,7 +2488,7 @@ void serialize_string(std::string& out, const std::string& value)
     for(const char* p = start; p < end; ++p)
     {
         U8 c = (U8)(*p);
-        if(c < 32 || c >= 127 || c == '\'' || c == '\\')
+        if(c < 32 || c >= 127 || c == '\'' || c == '\\' || (escape_double_quote && c == '"'))
         {
             if(p > run)
             {
