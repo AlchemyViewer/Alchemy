@@ -1388,7 +1388,7 @@ void LLInventoryCategory::setPreferredType(LLFolderType::EType type)
 LLSD LLInventoryCategory::asLLSD() const
 {
     LLSD sd = LLSD();
-    sd[INV_ITEM_ID_LABEL]   = mUUID;
+    sd[INV_FOLDER_ID_LABEL_WS] = mUUID;
     sd[INV_PARENT_ID_LABEL] = mParentUUID;
     S8 type = static_cast<S8>(mPreferredType);
     sd[INV_ASSET_TYPE_LABEL] = type;
