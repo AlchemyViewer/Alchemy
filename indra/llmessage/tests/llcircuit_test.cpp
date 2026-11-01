@@ -207,9 +207,9 @@ namespace ll_test
             circuit.mRecentlyReceivedReliablePackets[id] = LLMessageSystem::getMessageTimeUsecs();
         }
 
-        static bool isDuplicate(LLCircuitData& circuit, TPACKETID id, bool resent)
+        static bool checkDuplicate(LLCircuitData& circuit, TPACKETID id, bool resent)
         {
-            return circuit.isDuplicate(id, resent);
+            return circuit.checkDuplicate(id, resent);
         }
     };
 }
@@ -387,19 +387,19 @@ namespace
         CircuitProbe::handled(circuit, 7);
 
         // A copy the network made comes unmarked, a resend marked.
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
-        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 8, false));
-        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 8, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 8, false));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 8, true));
 
         sMessageTime += F64Seconds(4.0);
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, false));
 
         // Long after, an unmarked packet with that number is a fresh one from
         // numbering the sender started over; a resend still matches.
         sMessageTime += F64Seconds(6.0);
-        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 7, false));
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
     }
 
     TEST_CASE("llcircuit: a ping keeps a number handled moments ago that its sender has had acked", "[llcircuit]")
@@ -415,13 +415,41 @@ namespace
         // made, may still be on its way.
         sMessageTime += F64Seconds(1.0);
         circuit.clearDuplicateList(8);
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
-        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
 
-        // A ping six seconds on lets 7 go, and keeps 8, which it does not pass.
+        // A ping five seconds after those copies lets 7 go, and keeps 8, which
+        // it does not pass.
         sMessageTime += F64Seconds(5.0);
         circuit.clearDuplicateList(8);
-        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 7, true));
-        CHECK(CircuitProbe::isDuplicate(circuit, 8, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 7, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, 8, true));
+    }
+
+    TEST_CASE("llcircuit: each copy of a handled packet restarts the time a ping keeps its number", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        const F64Seconds handled_at = sMessageTime;
+        CircuitProbe::handled(circuit, 7);
+        CircuitProbe::handled(circuit, 8);
+        CircuitProbe::handled(circuit, 9);
+
+        // The ack for 7 is lost, and the sender resends it.
+        sMessageTime = handled_at + F64Seconds(4.0);
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
+
+        // The ack for that resend reaches the sender, which pings with 8 its
+        // oldest unacked, while a resend of 7 it sent before the ack came is
+        // still on its way.
+        sMessageTime = handled_at + F64Seconds(6.5);
+        circuit.clearDuplicateList(8);
+        sMessageTime = handled_at + F64Seconds(7.0);
+        CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
+
+        // A ping five seconds after that last copy lets 7 go.
+        sMessageTime = handled_at + F64Seconds(12.0);
+        circuit.clearDuplicateList(8);
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 7, true));
     }
 }

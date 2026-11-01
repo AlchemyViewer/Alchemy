@@ -63,7 +63,7 @@ const S32 PING_RELEASE_BLOCK = 2;   // How many pings behind we have to be to co
 const F32Seconds TARGET_PERIOD_LENGTH(5.f);
 const F32Seconds LL_DUPLICATE_SUPPRESSION_TIMEOUT(60.f); //this can be long, as time-based cleanup is
                                                     // only done when wrapping packetids, now...
-const F32Seconds LL_DUPLICATE_COPY_WINDOW(5.f);     // how long after a reliable packet is handled a copy of it may still arrive:
+const F32Seconds LL_DUPLICATE_COPY_WINDOW(5.f);     // how long after a reliable packet, or its latest copy, a copy may still arrive:
                                                     // an unmarked copy counts as a duplicate, and a ping keeps its number
 
 LLCircuitData::LLCircuitData(const LLHost &host, TPACKETID in_id,
@@ -600,24 +600,30 @@ void LLCircuit::resendUnackedPackets(S32& unacked_list_length, S32& unacked_list
 }
 
 
-bool LLCircuitData::isDuplicate(TPACKETID packetnum, bool resent)
+bool LLCircuitData::checkDuplicate(TPACKETID packetnum, bool resent)
 {
-    packet_time_map::const_iterator it = mRecentlyReceivedReliablePackets.find(packetnum);
+    packet_time_map::iterator it = mRecentlyReceivedReliablePackets.find(packetnum);
     if (it == mRecentlyReceivedReliablePackets.end())
     {
         return false;
     }
-    if (resent)
-    {
-        return true;
-    }
 
-    // A copy the network made of a packet comes within moments of the first,
+    // A copy the network made of a packet comes within moments of the last,
     // unmarked. An older number an unmarked packet meets is left from
     // numbering the sender has since started over, on a circuit kept up.
-    U64Microseconds delta_t_usec = LLMessageSystem::getMessageTimeUsecs() - it->second;
+    U64Microseconds mt_usec = LLMessageSystem::getMessageTimeUsecs();
+    U64Microseconds delta_t_usec = mt_usec - it->second;
     F64Seconds delta_t_sec = delta_t_usec;
-    return delta_t_sec < LL_DUPLICATE_COPY_WINDOW;
+    if (!resent && delta_t_sec >= LL_DUPLICATE_COPY_WINDOW)
+    {
+        return false;
+    }
+
+    // While acks for a packet are lost its sender goes on resending it, and
+    // the last resend can come after the ping that says it was acked: the
+    // window a copy may still arrive in runs from the latest copy.
+    it->second = mt_usec;
+    return true;
 }
 
 
@@ -877,8 +883,8 @@ bool LLCircuitData::updateWatchDogTimers(LLMessageSystem *msgsys)
     // WARNING!
     // Duplicate suppression can FAIL if a copy of a packet is delivered
     // after the ping, and longer than LL_DUPLICATE_COPY_WINDOW after the
-    // packet was handled: the ping lets the receiver forget a number its
-    // oldest unacked passes once it was handled that long ago.
+    // packet or its last copy came: the ping lets the receiver forget a
+    // number its oldest unacked passes once nothing of it came for that long.
 
     // Find the current oldest reliable packetID
     // This is to handle the case if we actually manage to wrap our
@@ -1026,7 +1032,8 @@ void LLCircuitData::clearDuplicateList(TPACKETID oldest_id)
     if (oldest_id < mHighestPacketID)
     {
         // Clean up everything with a packet ID less than oldest_id that was
-        // handled longer ago than a copy of it takes to arrive. The sender
+        // handled, or last seen again, longer ago than a copy of it takes to
+        // arrive. The sender
         // pings once it has the ack, and a resend that crossed the ack, or a
         // copy the network made, can come after the ping.
         packet_time_map::iterator pit_end = mRecentlyReceivedReliablePackets.lower_bound(oldest_id);
