@@ -418,9 +418,6 @@ struct LLTEContents
     U8     glow[MAX_TES];
     LLMaterialID material_ids[MAX_TES];
 
-    static const U32 MAX_TE_BUFFER = 4096;
-    U8 packed_buffer[MAX_TE_BUFFER];
-
     U32 size;
     U32 face_count;
 };
@@ -498,7 +495,10 @@ public:
     LLMaterialPtr getTEMaterialParams(const U8 index);
 
     void copyTEs(const LLPrimitive *primitive);
-    S32 packTEField(U8 *cur_ptr, U8 *data_ptr, U8 data_size, U8 last_face_index, EMsgVariableType type) const;
+    void packTEField(std::vector<U8>& packed, const U8 *data_ptr, U8 data_size, U8 last_face_index, EMsgVariableType type) const;
+    // The texture entries of the first LLTEContents::MAX_TES faces, packed as
+    // a TextureEntry field holds them.
+    std::vector<U8> packTEEntry() const;
     bool packTEMessage(LLMessageSystem *mesgsys) const;
     bool packTEMessage(LLDataPacker &dp) const;
     S32 unpackTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num); // Variable num of blocks
@@ -507,6 +507,8 @@ public:
     // Same as above, but usable before an instance exists to derive the face count from
     // (e.g. decoding a message for an object that hasn't been created yet).
     static S32 parseTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, LLTEContents& tec, U8 face_count);
+    // Parses a packed TextureEntry field of any length into tec, for face_count faces.
+    static S32 parseTEEntry(std::vector<U8>& packed, LLTEContents& tec, U8 face_count);
     S32 applyParsedTEMessage(LLTEContents& tec);
 
 #ifdef CHECK_FOR_FINITE

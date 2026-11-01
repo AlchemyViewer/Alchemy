@@ -68,6 +68,7 @@ if(AL_BUILD_TESTS)
       tests/llmaterialid_test.cpp
       tests/llmediaentry_test.cpp
       tests/llmodel_test.cpp
+      tests/llprimitivetemessage_test.cpp
     LIBRARIES llprimitive
   )
   # This one stubs LLMaterialID and LLPrimTextureList, which the library
