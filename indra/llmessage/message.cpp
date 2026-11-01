@@ -2011,16 +2011,11 @@ void LLMessageSystem::disableCircuit(const LLHost &host)
             LL_INFOS("Messaging") << "Host " << LLHost(old_ip, old_port) << " circuit " << code << " removed from lookup table" << LL_ENDL;
             gMessageSystem->mIPPortToCircuitCode.erase(ip_port);
         }
-        mCircuitInfo.removeCircuitData(host);
-    }
-    else
-    {
-        // Sigh, since we can open circuits which don't have circuit
-        // codes, it's possible for this to happen...
-
-        LL_WARNS("Messaging") << "Couldn't find circuit code for " << host << LL_ENDL;
     }
 
+    // A circuit opened without a code, as the viewer opens every circuit to
+    // a simulator, goes too.
+    mCircuitInfo.removeCircuitData(host);
 }
 
 

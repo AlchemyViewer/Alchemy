@@ -286,6 +286,46 @@ namespace
         }
     }
 
+    // The viewer opens every circuit to a simulator with no circuit code, as
+    // EnableSimulator does, and CloseCircuit, DisableSimulator and a region's
+    // retirement disable it.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: disableCircuit removes a circuit opened without a circuit code", "[LLMessageSystem]")
+    {
+        const LLHost host("127.0.0.1", 13000);
+        gMessageSystem->enableCircuit(host, true);
+        REQUIRE(gMessageSystem->mCircuitInfo.findCircuit(host) != nullptr);
+        REQUIRE(gMessageSystem->findCircuitCode(host) == 0);
+
+        gMessageSystem->disableCircuit(host);
+        CHECK(gMessageSystem->mCircuitInfo.findCircuit(host) == nullptr);
+
+        // A later EnableSimulator opens it again.
+        gMessageSystem->enableCircuit(host, true);
+        const LLCircuitData* reopened = gMessageSystem->mCircuitInfo.findCircuit(host);
+        REQUIRE(reopened != nullptr);
+        CHECK(reopened->isAlive());
+        CHECK(reopened->getTrusted());
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: disableCircuit removes a circuit and the circuit code it has", "[LLMessageSystem]")
+    {
+        const LLHost host("127.0.0.1", 13001);
+        const U32 code = 1234;
+        const U64 ip_port = ((U64)host.getAddress() << 32) | host.getPort();
+        LLUUID session_id;
+        session_id.generate();
+        REQUIRE(gMessageSystem->addCircuitCode(code, session_id));
+        gMessageSystem->mIPPortToCircuitCode[ip_port] = code;
+        gMessageSystem->mCircuitCodeToIPPort[code] = ip_port;
+        gMessageSystem->enableCircuit(host, false);
+        REQUIRE(gMessageSystem->findCircuitCode(host) == code);
+
+        gMessageSystem->disableCircuit(host);
+        CHECK(gMessageSystem->mCircuitInfo.findCircuit(host) == nullptr);
+        CHECK(gMessageSystem->findCircuitCode(host) == 0);
+        CHECK(gMessageSystem->mCircuitCodeToIPPort.count(code) == 0);
+    }
+
 #if !LL_WINDOWS
     TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: start_net closes its socket when it finds no port to bind", "[LLMessageSystem]")
         // start_net closes the socket it made when it finds no port to bind
