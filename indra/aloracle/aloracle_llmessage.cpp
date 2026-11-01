@@ -29,7 +29,6 @@
 #include "llhost.h"
 #include "llmessagetemplate.h"
 #include "llmessagetemplateparser.h"
-#include "llmutex.h"
 #include "llsd.h"
 #include "llsdutil.h"
 #include "lltemplatemessagebuilder.h"
@@ -95,17 +94,12 @@ struct aloracle_message_template
     }
 };
 
+// The parser interns every name it makes in LLMessageStringTable, which has
+// no lock, and validateMessage counts each message it reads on its template:
+// both rely on the library running one call at a time.
+
 namespace
 {
-    // The parser interns every name it makes in LLMessageStringTable, which
-    // has no lock, and validateMessage counts each message it reads on its
-    // template: either goes one call at a time.
-    LLMutex& messageLock()
-    {
-        static LLMutex lock;
-        return lock;
-    }
-
     bool fitsS32(size_t size)
     {
         return size <= (size_t)std::numeric_limits<S32>::max();
@@ -188,7 +182,6 @@ int32_t aloracle_message_template_new(const uint8_t* text,
         }
         *message_template = nullptr;
 
-        LLMutexLock lock(&messageLock());
         auto made = std::make_unique<aloracle_message_template>();
         LLTemplateTokenizer tokens(body);
         LLTemplateParser parsed(tokens);
@@ -278,7 +271,6 @@ int32_t aloracle_message_read(const aloracle_message_template* message_template,
         const U8* buffer = reinterpret_cast<const U8*>(bytes.data());
         const LLHost host;
 
-        LLMutexLock lock(&messageLock());
         LLTemplateMessageReader reader(messages.mNumbers);
         reader.clearMessage();
         int32_t read = ALORACLE_MESSAGE_READ;

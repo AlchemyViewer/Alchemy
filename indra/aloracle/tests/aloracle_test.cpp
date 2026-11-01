@@ -881,6 +881,46 @@ namespace
         aloracle_message_template_free(nullptr);
     }
 
+    TEST_CASE("aloracle: an LL_ERRS comes back fatal while other threads log", "[aloracle]")
+    {
+        // The notation parser logs each character it does not know, and the
+        // template's frequency is one the parser calls LL_ERRS on.
+        const std::string unknown = "?";
+        const std::string often = "version 2.0\n{ TestOften Often 1 NotTrusted Unencoded }\n";
+
+        std::vector<std::future<int>> workers;
+        for (int i = 0; i < 8; ++i)
+        {
+            workers.push_back(std::async(std::launch::async, [&, i]
+            {
+                int disagreements = 0;
+                for (int j = 0; j < 500; ++j)
+                {
+                    if (i % 2)
+                    {
+                        if (parse(ALORACLE_LLSD_NOTATION, unknown).status != ALORACLE_FAILED)
+                        {
+                            ++disagreements;
+                        }
+                    }
+                    else
+                    {
+                        const MessageTemplate messages(often);
+                        if (messages.status != ALORACLE_FATAL)
+                        {
+                            ++disagreements;
+                        }
+                    }
+                }
+                return disagreements;
+            }));
+        }
+        for (std::future<int>& worker : workers)
+        {
+            CHECK(worker.get() == 0);
+        }
+    }
+
     TEST_CASE("aloracle: templates read and messages read from several threads at once agree", "[aloracle]")
     {
         const MessageTemplate messages;

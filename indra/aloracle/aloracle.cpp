@@ -58,6 +58,12 @@ namespace aloracle
         (void)prepared;
     }
 
+    LLMutex& callLock()
+    {
+        static LLMutex lock;
+        return lock;
+    }
+
     bool clear(aloracle_bytes* out)
     {
         if (!out)

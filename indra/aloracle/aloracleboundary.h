@@ -26,6 +26,8 @@
 
 #include "aloracle.h"
 
+#include "llmutex.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -44,13 +46,20 @@ namespace aloracle
     /// the first call's body; every later call waits for it.
     void prepare();
 
-    /// Runs a call's body, which returns a status, and turns whatever it
-    /// throws into one.
+    /// What every call's body runs under. LLError takes its own lock with
+    /// try_to_lock, and an LL_ERRS that finds another thread logging skips
+    /// the fatal function and crashes, or, at a site met for the first time,
+    /// is skipped and its caller goes on: no two calls log at once.
+    LLMutex& callLock();
+
+    /// Runs a call's body, which returns a status, under callLock(), and
+    /// turns whatever it throws into one.
     template <typename Body>
     int32_t guarded(Body&& body) noexcept
     {
         try
         {
+            LLMutexLock lock(&callLock());
             prepare();
             return body();
         }

@@ -44,7 +44,8 @@
 //   LLSDSerialize::toBinary writes it. A value passed in is read by
 //   LLSDBinaryParser, to its default depth of 256, and must be the whole of
 //   the bytes.
-// - Any function may be called from any thread, and from several at once.
+// - Any function may be called from any thread, and from several at once,
+//   though the library runs one call at a time.
 // - The library is built with the viewer's compiler flags, so an optimised
 //   build has its fast floating point too.
 
