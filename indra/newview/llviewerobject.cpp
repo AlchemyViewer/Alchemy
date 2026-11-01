@@ -6792,6 +6792,12 @@ bool LLViewerObject::unpackParameterEntry(U16 param_type, std::vector<U8>& data)
     {
         param_type = LLNetworkData::PARAMS_SCULPT;
     }
+    if (!LLNetworkData::isValid(param_type, data))
+    {
+        LL_WARNS_ONCE("UpdateFail") << "Extra parameter " << param_type << " of " << data.size()
+                                    << " bytes is not the size of its type for " << getID() << LL_ENDL;
+        return false;
+    }
     ExtraParameter* param = getExtraParameterEntryCreate(param_type);
     if (param)
     {

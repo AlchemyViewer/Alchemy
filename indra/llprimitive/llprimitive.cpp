@@ -1529,14 +1529,17 @@ bool LLPrimitive::getTESTAxes(const U8 face, U32* s_axis, U32* t_axis)
 //============================================================================
 
 //static
-bool LLNetworkData::isValid(U16 param_type, U32 size)
+bool LLNetworkData::isValid(U16 param_type, const std::vector<U8>& data)
 {
     // ew - better mechanism needed
 
+    const size_t size = data.size();
     switch(param_type)
     {
     case PARAMS_FLEXIBLE:
-        return (size == 16);
+        // LLFlexibleObjectData::unpack reads one with or without the user
+        // force after its four bytes.
+        return (size == 4 || size == 16);
     case PARAMS_LIGHT:
         return (size == 16);
     case PARAMS_SCULPT:
@@ -1546,7 +1549,8 @@ bool LLNetworkData::isValid(U16 param_type, U32 size)
     case PARAMS_EXTENDED_MESH:
         return (size == 4);
     case PARAMS_RENDER_MATERIAL:
-        return (size > 1);
+        // A count, then a face and a material ID for each.
+        return (size > 1 && size == 1 + 17 * (size_t)data[0]);
     case PARAMS_REFLECTION_PROBE:
         return (size == 9);
     }

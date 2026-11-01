@@ -461,6 +461,49 @@ namespace
         CHECK(read.empty());
     }
 
+    TEST_CASE("LLNetworkData: isValid holds each extra parameter to the size of its type", "[LLNetworkData]")
+    {
+        const auto sized = [](size_t size) { return std::vector<U8>(size, 0); };
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(16)));
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(4)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(15)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(0)));
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(16)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(12)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(17)));
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_SCULPT, sized(17)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_SCULPT, sized(16)));
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(28)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(27)));
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(4)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(2)));
+
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(9)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(8)));
+
+        // A render material's count names how many faces and material IDs follow it.
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(1)));
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(200)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(0)));
+        std::vector<U8> more_than_counted = render_material_data(3);
+        more_than_counted[0] = 2;
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, more_than_counted));
+        std::vector<U8> fewer_than_counted = render_material_data(3);
+        fewer_than_counted[0] = 4;
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, fewer_than_counted));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, sized(0)));
+
+        // Types with no data class of their own.
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RESERVED, sized(16)));
+        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_MESH, sized(17)));
+        CHECK_FALSE(LLNetworkData::isValid(0x25, sized(16)));
+    }
+
     TEST_CASE("LLRenderMaterialParams: a render material of more than sixty entries unpacks every entry", "[LLRenderMaterialParams]")
     {
         std::vector<U8> data = render_material_data(200);

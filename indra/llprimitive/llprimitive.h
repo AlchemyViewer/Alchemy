@@ -119,7 +119,8 @@ public:
     virtual bool unpack(LLDataPacker &dp) = 0;
     virtual bool operator==(const LLNetworkData& data) const = 0;
     virtual void copy(const LLNetworkData& data) = 0;
-    static bool isValid(U16 param_type, U32 size);
+    // Whether data is the size an extra parameter of the type is.
+    static bool isValid(U16 param_type, const std::vector<U8>& data);
 
     // The number of slots an object keeps its extra parameters in, one for
     // each type up to PARAMS_MAX.
