@@ -123,9 +123,16 @@ int32_t aloracle_particles_unpack(int32_t form, const uint8_t* data, size_t size
             }
             // unpack passes over a size it doesn't know a byte at a time,
             // each read past the end failing with a warning: a size past the
-            // data's end would keep it at that for up to 2^31 reads.
+            // data's end would keep it at that for up to 2^31 reads, and so
+            // would a particle block's size so far below 0 that taking the
+            // block's 18 bytes from it wraps.
+            if (system_size > (S32)bytes.size())
+            {
+                return ALORACLE_BAD_ARGUMENT;
+            }
             const S32 particle_size = sizeAt(bytes, system_size == SYSTEM_SIZE ? 72 : 4 + std::max(system_size, 0));
-            if (system_size > (S32)bytes.size() || particle_size > (S32)bytes.size())
+            if (particle_size > (S32)bytes.size()
+                || (system_size == SYSTEM_SIZE && particle_size < std::numeric_limits<S32>::min() + 18))
             {
                 return ALORACLE_BAD_ARGUMENT;
             }

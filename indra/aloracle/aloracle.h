@@ -465,6 +465,9 @@ ALORACLE_API int32_t aloracle_volume_params_unpack(const uint8_t* shape, size_t 
 /// LLVolumeParams*, LLDataPacker&) does, from params, a map as
 /// aloracle_volume_params_unpack gives with no ok, whose values are set
 /// through LLProfileParams' and LLPathParams' setters, with no constraint.
+/// A profile's begin, end or hollow that its setter would cut to five places
+/// through an int, 100000 times it past an int's range or NaN, is
+/// ALORACLE_BAD_ARGUMENT.
 ALORACLE_API int32_t aloracle_volume_params_pack(const uint8_t* params, size_t size, aloracle_bytes* shape);
 
 /// Reads an extra parameter as LLViewerObject::unpackParameterEntry does
@@ -529,8 +532,9 @@ enum
 /// system block's size is 68. So is an extended form whose system block's
 /// size, or the particle block's after it, is more than the data holds,
 /// which unpack passes over a byte at a time, each read past the end failing
-/// with a warning, for up to 2^31 reads. So is an unknown form, or more than
-/// 2^31 - 1 bytes.
+/// with a warning, for up to 2^31 reads; and so is one whose particle
+/// block's size is so far below 0 that taking the block's 18 bytes from it
+/// wraps to near 2^31. So is an unknown form, or more than 2^31 - 1 bytes.
 ALORACLE_API int32_t aloracle_particles_unpack(int32_t form,
                                                const uint8_t* data,
                                                size_t size,

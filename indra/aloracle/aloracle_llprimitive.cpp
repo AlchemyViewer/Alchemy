@@ -263,6 +263,15 @@ namespace
         }
         return true;
     }
+
+    // Whether LLProfileParams' setters can cut a value to five places, which
+    // they do through an int: where 100000 times it is within an int's range.
+    bool cutsThroughInt(F32 value)
+    {
+        const double scaled = (double)value * 100000.0;
+        return scaled > (double)std::numeric_limits<int>::min() - 1.0
+            && scaled < (double)std::numeric_limits<int>::max() + 1.0;
+    }
 }
 
 int32_t aloracle_texture_entry_unpack(const uint8_t* entry, size_t size, uint32_t face_count, aloracle_bytes* value)
@@ -351,13 +360,23 @@ int32_t aloracle_volume_params_pack(const uint8_t* params, size_t size, aloracle
             return ALORACLE_BAD_ARGUMENT;
         }
 
+        const LLSD& p = sd["profile"];
+        const F32 begin = (F32)p["begin"].asReal();
+        const F32 end = (F32)p["end"].asReal();
+        const F32 hollow = (F32)p["hollow"].asReal();
+        // setBegin takes 1 and over, and setEnd 0 and under, without a cut.
+        if (!(begin >= 1.0f || cutsThroughInt(begin)) || !(end <= 0.0f || cutsThroughInt(end))
+            || !cutsThroughInt(hollow))
+        {
+            return ALORACLE_BAD_ARGUMENT;
+        }
+
         LLVolumeParams volume;
         LLProfileParams& profile = volume.getProfileParams();
-        const LLSD& p = sd["profile"];
         profile.setCurveType((U8)p["curve"].asInteger());
-        profile.setBegin((F32)p["begin"].asReal());
-        profile.setEnd((F32)p["end"].asReal());
-        profile.setHollow((F32)p["hollow"].asReal());
+        profile.setBegin(begin);
+        profile.setEnd(end);
+        profile.setHollow(hollow);
 
         LLPathParams& path = volume.getPathParams();
         const LLSD& q = sd["path"];

@@ -1319,6 +1319,10 @@ namespace
         }
         CHECK(textureEntryPack(valueOf(many + "]")).status == ALORACLE_BAD_ARGUMENT);
         CHECK(volumeParamsUnpack(BOX.substr(0, 22)).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(volumeParamsPack(valueOf("{'profile':{'hollow':r1e9},'path':{}}")).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(volumeParamsPack(valueOf("{'profile':{'begin':r-1e9},'path':{}}")).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(volumeParamsPack(valueOf("{'profile':{'begin':r1e9,'end':r-1e9},'path':{}}")).status
+              == ALORACLE_OK);
         CHECK(extraParamUnpack(0x50, std::string(16, '\0')).status == ALORACLE_BAD_ARGUMENT);
         CHECK(extraParamUnpack(0x20, std::string(15, '\0')).status == ALORACLE_BAD_ARGUMENT);
         CHECK(extraParamPack(0x20, valueOf("{'radius':r1}")).status == ALORACLE_BAD_ARGUMENT);
@@ -1341,6 +1345,18 @@ namespace
               == ALORACLE_BAD_ARGUMENT);
         CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(1000) + SYSTEM + particleBlock(0)).status
               == ALORACLE_BAD_ARGUMENT);
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(0x7FFFFFFF) + SYSTEM + particleBlock(0)).status
+              == ALORACLE_BAD_ARGUMENT);
+        // A particle block's size that taking 18 from wraps.
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(68) + SYSTEM + s32Bytes(-0x7FFFFFFF - 1)
+                                                               + particleBlock(0))
+                  .status
+              == ALORACLE_BAD_ARGUMENT);
+        // One that doesn't reads, the leftover below 0 passed over.
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(68) + SYSTEM + s32Bytes(-0x7FFFFFFF + 17)
+                                                               + particleBlock(0))
+                  .status
+              == ALORACLE_OK);
         CHECK(nameValueParse("Name STRING " + std::string(2036, 'x')).status == ALORACLE_BAD_ARGUMENT);
     }
 }
