@@ -526,8 +526,11 @@ enum
 /// Data too short for a fixed-point value the form reads, which unpackFixed
 /// would read from an uninitialized local, is ALORACLE_BAD_ARGUMENT: under 86
 /// bytes for the legacy form, and under 94 for the extended form where its
-/// system block's size is 68. So is an unknown form, or more than 2^31 - 1
-/// bytes.
+/// system block's size is 68. So is an extended form whose system block's
+/// size, or the particle block's after it, is more than the data holds,
+/// which unpack passes over a byte at a time, each read past the end failing
+/// with a warning, for up to 2^31 reads. So is an unknown form, or more than
+/// 2^31 - 1 bytes.
 ALORACLE_API int32_t aloracle_particles_unpack(int32_t form,
                                                const uint8_t* data,
                                                size_t size,

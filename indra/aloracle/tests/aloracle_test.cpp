@@ -1330,6 +1330,17 @@ namespace
                                                                + particleBlock(0).substr(1))
                   .status
               == ALORACLE_BAD_ARGUMENT);
+        // Sizes unpack would pass over a byte at a time, far past the data.
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(10) + std::string(10, '\0')
+                                                               + s32Bytes(0x7FFFFFFF) + SYSTEM)
+                  .status
+              == ALORACLE_BAD_ARGUMENT);
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(68) + SYSTEM + s32Bytes(0x7FFFFFFF)
+                                                               + particleBlock(0))
+                  .status
+              == ALORACLE_BAD_ARGUMENT);
+        CHECK(particlesUnpack(ALORACLE_PARTICLES_EXTENDED, s32Bytes(1000) + SYSTEM + particleBlock(0)).status
+              == ALORACLE_BAD_ARGUMENT);
         CHECK(nameValueParse("Name STRING " + std::string(2036, 'x')).status == ALORACLE_BAD_ARGUMENT);
     }
 }

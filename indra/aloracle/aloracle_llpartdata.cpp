@@ -32,6 +32,7 @@
 #include "llsdutil_math.h"
 #include "message.h"
 
+#include <algorithm>
 #include <limits>
 #include <string>
 
@@ -46,6 +47,18 @@ namespace
     // An extended system whose system block is the size it knows: the two
     // sizes, the system block and the particle block's fixed part.
     constexpr size_t EXTENDED_SIZE = 4 + 68 + 4 + 18;
+
+    // The S32 size at an offset, or 0, as a failed unpackS32 leaves the
+    // size it reads into, where it doesn't fit.
+    S32 sizeAt(const std::string& bytes, S32 at)
+    {
+        S32 size = 0;
+        if (at >= 0 && (size_t)at + 4 <= bytes.size())
+        {
+            htolememcpy(&size, bytes.data() + at, MVT_S32, 4);
+        }
+        return size;
+    }
 
     LLSD describe(const LLPartSysData& system, bool ok)
     {
@@ -103,12 +116,16 @@ int32_t aloracle_particles_unpack(int32_t form, const uint8_t* data, size_t size
         }
         else if (form == ALORACLE_PARTICLES_EXTENDED)
         {
-            S32 system_size = 0;
-            if (bytes.size() >= 4)
-            {
-                htolememcpy(&system_size, bytes.data(), MVT_S32, 4);
-            }
+            const S32 system_size = sizeAt(bytes, 0);
             if (system_size == SYSTEM_SIZE && bytes.size() < EXTENDED_SIZE)
+            {
+                return ALORACLE_BAD_ARGUMENT;
+            }
+            // unpack passes over a size it doesn't know a byte at a time,
+            // each read past the end failing with a warning: a size past the
+            // data's end would keep it at that for up to 2^31 reads.
+            const S32 particle_size = sizeAt(bytes, system_size == SYSTEM_SIZE ? 72 : 4 + std::max(system_size, 0));
+            if (system_size > (S32)bytes.size() || particle_size > (S32)bytes.size())
             {
                 return ALORACLE_BAD_ARGUMENT;
             }
