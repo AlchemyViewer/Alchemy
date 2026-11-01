@@ -1639,6 +1639,31 @@ namespace
         require_parse("valid uri", "l\"http://www.google.com\"", val, 1);
     }
 
+    TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a uri holding a double quote round-trips", "[llsd_notation_parsing]")
+    {
+        // A URI goes out between double quotes, so a double quote in it is
+        // escaped, as the single quote and the backslash are. A string goes
+        // out between single quotes, and leaves the double quote as it is.
+        LLPointer<LLSDNotationFormatter> formatter(new LLSDNotationFormatter);
+        const LLSD uri = LLURI("a\"b'c");
+        std::ostringstream uri_out;
+        formatter->format(uri, uri_out);
+        CHECK(uri_out.str() == "l\"a\\\"b\\'c\"");
+        require_parse("uri", uri_out.str(), uri, 1);
+
+        const LLSD backslash_uri = LLURI("a\\\"");
+        std::ostringstream backslash_out;
+        formatter->format(backslash_uri, backslash_out);
+        CHECK(backslash_out.str() == "l\"a\\\\\\\"\"");
+        require_parse("uri ending in a backslash and a double quote", backslash_out.str(), backslash_uri, 1);
+
+        const LLSD str("a\"b'c");
+        std::ostringstream str_out;
+        formatter->format(str, str_out);
+        CHECK(str_out.str() == "'a\"b\\'c'");
+        require_parse("string", str_out.str(), str, 1);
+    }
+
     TEST_CASE_METHOD(TestLLSDNotationParsing, "llsd notation parsing: a date parses", "[llsd_notation_parsing]")
     {
         LLSD val = LLDate("2007-12-28T09:22:53.10Z");
