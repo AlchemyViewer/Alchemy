@@ -55,7 +55,7 @@
 //   meaning change, so a caller built against another can refuse the library
 //   rather than call it wrongly.
 
-#define ALORACLE_ABI_VERSION 1
+#define ALORACLE_ABI_VERSION 2
 
 #ifdef __cplusplus
 extern "C" {
@@ -412,6 +412,142 @@ ALORACLE_API int32_t aloracle_message_read(const aloracle_message_template* mess
                                            size_t size,
                                            aloracle_bytes* written,
                                            int32_t* result);
+
+//
+// Objects: lltextureentry.cpp and llprimitive.cpp's texture entries and
+// extra parameters, llvolumemessage.cpp, lltextureanim.cpp, llpartdata.cpp
+// and llnamevalue.cpp
+//
+// A texture entry's face crosses as a map of
+// - image and material_id: UUIDs
+// - color: an array of four reals, red, green, blue and alpha
+// - scale_s, scale_t, offset_s, offset_t, rotation and glow: reals
+// - bump: the bump, shiny and fullbright byte, and media_tex_gen: the media
+//   and texture coordinate byte, integers
+// A float crosses as the real it widens to, and a U32 as the integer with its
+// bits.
+//
+
+/// Reads a texture entry, the bytes of its field, as
+/// LLPrimitive::unpackTEMessage(LLDataPacker&) does for a primitive of
+/// face_count faces, which is how the compressed and terse updates read one.
+/// The faces start at LLTextureEntry's defaults but for glow, which is 2, a
+/// glow no texture entry gives: a face that keeps it was not written, as
+/// none is where the entry is malformed. value gets a map of result, what
+/// unpackTEMessage returned, and faces, an array of each face. A face_count
+/// of 0 or over 45, LLTEContents::MAX_TES, or an entry of more than 2^31 - 5
+/// bytes, is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_texture_entry_unpack(const uint8_t* entry,
+                                                   size_t size,
+                                                   uint32_t face_count,
+                                                   aloracle_bytes* value);
+
+/// Writes a texture entry as LLPrimitive::packTEMessage(LLDataPacker&) does
+/// for a primitive whose faces are faces, an array of faces set through
+/// LLPrimitive's setTE functions. entry gets the bytes of its field, after
+/// the length packTEMessage writes before them. More than 44 faces, where
+/// faces that each differ in every field would overrun the 4096 bytes
+/// packTEMessage packs into, is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_texture_entry_pack(const uint8_t* faces, size_t size, aloracle_bytes* entry);
+
+/// Reads the 23 bytes of a shape, path then profile, as
+/// LLVolumeMessage::unpackVolumeParams(LLVolumeParams*, LLDataPacker&) does,
+/// constraints and all. value gets a map of
+/// - ok: what unpackVolumeParams returned, false where it held a value back
+/// - profile: a map of curve, an integer, and begin, end and hollow, reals
+/// - path: a map of curve, an integer, and begin, end, scale_x, scale_y,
+///   shear_x, shear_y, twist_begin, twist_end, radius_offset, taper_x,
+///   taper_y, revolutions and skew, reals
+/// Any other number of bytes is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_volume_params_unpack(const uint8_t* shape, size_t size, aloracle_bytes* value);
+
+/// Writes a shape's 23 bytes as LLVolumeMessage::packVolumeParams(const
+/// LLVolumeParams*, LLDataPacker&) does, from params, a map as
+/// aloracle_volume_params_unpack gives with no ok, whose values are set
+/// through LLProfileParams' and LLPathParams' setters, with no constraint.
+ALORACLE_API int32_t aloracle_volume_params_pack(const uint8_t* params, size_t size, aloracle_bytes* shape);
+
+/// Reads an extra parameter as LLViewerObject::unpackParameterEntry does
+/// into an object that has none yet: a type of 0x60, PARAMS_MESH, as 0x30,
+/// PARAMS_SCULPT, and the data unpacked into a new LLNetworkData of its type.
+/// value gets what its asLLSD returns, or for 0x80, PARAMS_RENDER_MATERIAL,
+/// which has none, a map of entries, an array of maps of te_idx, an integer,
+/// and id, a UUID, in the order they came. A type with no LLNetworkData,
+/// data shorter than its type unpacks, whose locals it would read
+/// uninitialized, and data of more than 2^31 - 1 bytes, are
+/// ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_extra_param_unpack(uint16_t type,
+                                                 const uint8_t* data,
+                                                 size_t size,
+                                                 aloracle_bytes* value);
+
+/// Writes an extra parameter as its LLNetworkData::pack does, from value, a
+/// map as aloracle_extra_param_unpack gives, set through the type's fromLLSD,
+/// or for 0x80 through LLRenderMaterialParams::setMaterial, entry by entry.
+/// data gets what pack wrote. A type with no LLNetworkData, or a value its
+/// fromLLSD refuses, is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_extra_param_pack(uint16_t type,
+                                               const uint8_t* value,
+                                               size_t size,
+                                               aloracle_bytes* data);
+
+/// Reads a texture animation, the bytes of its field, as
+/// LLTextureAnim::unpackTAMessage(LLDataPacker&) does, which is how the
+/// compressed update reads one. value gets what asLLSD returns: mode, face,
+/// sizeX and sizeY, integers, and start, length and rate, reals. More than
+/// 2^31 - 5 bytes is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_texture_anim_unpack(const uint8_t* data, size_t size, aloracle_bytes* value);
+
+/// Writes a texture animation's 16 bytes as
+/// LLTextureAnim::packTAMessage(LLDataPacker&) does, from value, a map as
+/// aloracle_texture_anim_unpack gives, set through fromLLSD. data gets the
+/// bytes after the length packTAMessage writes before them. A value fromLLSD
+/// refuses is ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_texture_anim_pack(const uint8_t* value, size_t size, aloracle_bytes* data);
+
+/// The forms a particle system comes in.
+enum
+{
+    ALORACLE_PARTICLES_LEGACY = 0,   ///< LLPartSysData::unpackLegacy
+    ALORACLE_PARTICLES_EXTENDED = 1, ///< LLPartSysData::unpack
+};
+
+/// Reads a particle system in the form given into a new LLPartSysData.
+/// value gets a map of
+/// - ok: what the unpack returned
+/// - crc, flags, pattern and burst_part_count: integers
+/// - max_age, start_age, inner_angle, outer_angle, burst_rate, burst_radius,
+///   burst_speed_min and burst_speed_max: reals
+/// - angular_velocity and accel: arrays of three reals
+/// - image and target: UUIDs
+/// - part: a map of flags, blend_source and blend_dest, integers, max_age,
+///   start_glow and end_glow, reals, start_color and end_color, arrays of
+///   four reals, and start_scale and end_scale, arrays of two
+/// Data too short for a fixed-point value the form reads, which unpackFixed
+/// would read from an uninitialized local, is ALORACLE_BAD_ARGUMENT: under 86
+/// bytes for the legacy form, and under 94 for the extended form where its
+/// system block's size is 68. So is an unknown form, or more than 2^31 - 1
+/// bytes.
+ALORACLE_API int32_t aloracle_particles_unpack(int32_t form,
+                                               const uint8_t* data,
+                                               size_t size,
+                                               aloracle_bytes* value);
+
+/// Reads one line of a name-value list as LLNameValue's constructor from a
+/// string does, the line ending at the first NUL. value gets a map of
+/// - name, type, class and sendto: the strings it keeps for them
+/// - type_id, class_id and sendto_id: its ENameValueType, ENameValueClass and
+///   ENameValueSendto
+/// - value, but for NVT_NULL: a string for STRING and ASSET, a real for F32,
+///   an integer for S32 and U32, an array of three reals for VEC3, and the
+///   decimal digits for U64
+/// - printed, but for NVT_NULL: what printNameValue returns
+/// The constructor reads into static buffers, which a line with no name or
+/// no type leaves holding the line read before it, and a VEC3 that does not
+/// read three numbers leaves the rest of its components uninitialized. A
+/// line of 2048 bytes or more, which would overrun those buffers, is
+/// ALORACLE_BAD_ARGUMENT.
+ALORACLE_API int32_t aloracle_name_value_parse(const uint8_t* line, size_t size, aloracle_bytes* value);
 
 #ifdef __cplusplus
 }
