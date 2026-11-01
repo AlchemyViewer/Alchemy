@@ -111,6 +111,30 @@ namespace
         bool                  mWaitsForWake;
     };
 
+    TEST_CASE("llqueuedthread: a request added once the thread waits for work runs", "[llqueuedthread]")
+    {
+        // The thread starts with nothing queued and is given time to wait for
+        // work. Nothing calls update(), so only the request's own post can
+        // wake it. A thread slower to start than that shows nothing, but
+        // cannot fail.
+        TestQueuedThread thread;
+        thread.start();
+        ms_sleep(100);
+
+        std::atomic<int> runs{ 0 };
+        thread.addRequest(new TestRequest(thread.generateHandle(), [&runs]()
+            {
+                ++runs;
+                return true;
+            }));
+        LLTimer clock;
+        while (runs.load() < 1 && clock.getElapsedTimeF64() < 10.0)
+        {
+            ms_sleep(1);
+        }
+        CHECK(runs.load() == 1);
+    }
+
     TEST_CASE("llqueuedthread: a request that asks to retry lets one queued after it run first", "[llqueuedthread]")
     {
         // A asks for a second turn. C, queued behind A, adds B as it runs,

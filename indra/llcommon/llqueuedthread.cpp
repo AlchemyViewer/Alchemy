@@ -569,8 +569,11 @@ bool LLQueuedThread::runCondition()
 // virtual
 void LLQueuedThread::run()
 {
-    // A queue made paused waits here until it is unpaused.
-    checkPause();
+    // A queue made paused waits here until it is unpaused. It waits for the
+    // pause alone: checkPause() would also wait while runCondition() is
+    // false, as it is while the queue is empty, and a request posted to the
+    // queue signals nothing here. The queue waits for its own work below.
+    mRunCondition->wait([this]() { return mStatus != RUNNING || !isPaused(); });
     startThread();
 
 
