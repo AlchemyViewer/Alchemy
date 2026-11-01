@@ -366,6 +366,12 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
     // Do base class updates...
     U32 retval = LLViewerObject::processUpdateMessage(mesgsys, user_data, block_num, update_type, dp);
+    if (isDead())
+    {
+        // The base class refused the update, or killed the object to recover
+        // from it: the rest is not to be read.
+        return retval;
+    }
 
     LLUUID sculpt_id;
     U8 sculpt_type = 0;

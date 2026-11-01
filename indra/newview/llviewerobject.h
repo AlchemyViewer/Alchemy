@@ -755,7 +755,7 @@ private:
         }
         return nullptr;
     }
-    bool unpackParameterEntry(U16 param_type, LLDataPacker *dp);
+    bool unpackParameterEntry(U16 param_type, std::vector<U8>& data);
 
     // This function checks to see if the given media URL has changed its version
     // and the update wasn't due to this agent's last action.

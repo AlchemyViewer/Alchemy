@@ -1626,29 +1626,24 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 S32 size = mesgsys->getSizeFast(_PREHASH_ObjectData, block_num, _PREHASH_ExtraParams);
                 if (size > 0)
                 {
-                    U8 *buffer = new(std::nothrow) U8[size];
-                    if (!buffer)
-                    {
-                        LLError::LLUserWarningMsg::showOutOfMemory();
-                        LL_ERRS() << "Bad memory allocation for buffer, size: " << size << LL_ENDL;
-                    }
-                    mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_ExtraParams, buffer, size, block_num);
-                    LLDataPackerBinaryBuffer dp(buffer, size);
+                    std::vector<U8> buffer(size);
+                    mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_ExtraParams, buffer.data(), size, block_num);
+                    LLDataPackerBinaryBuffer dp(buffer.data(), size);
 
-                    U8 num_parameters;
-                    dp.unpackU8(num_parameters, "num_params");
-                    U8 param_block[MAX_OBJECT_PARAMS_SIZE];
-                    for (U8 param=0; param<num_parameters; ++param)
+                    // A block with an entry past its end has every parameter
+                    // switched off: each is marked unused above.
+                    std::vector<LLNetworkData::Entry> entries;
+                    if (LLNetworkData::unpackEntries(dp, entries))
                     {
-                        U16 param_type;
-                        S32 param_size;
-                        dp.unpackU16(param_type, "param_type");
-                        dp.unpackBinaryData(param_block, MAX_OBJECT_PARAMS_SIZE, param_size, "param_data");
-                        //LL_INFOS() << "Param type: " << param_type << ", Size: " << param_size << LL_ENDL;
-                        LLDataPackerBinaryBuffer dp2(param_block, param_size);
-                        unpackParameterEntry(param_type, &dp2);
+                        for (LLNetworkData::Entry& entry : entries)
+                        {
+                            unpackParameterEntry(entry.mType, entry.mData);
+                        }
                     }
-                    delete[] buffer;
+                    else
+                    {
+                        LL_WARNS("UpdateFail") << "Extra parameter past the end of its block for " << getID() << LL_ENDL;
+                    }
                 }
 
                 for (size_t i = 0; i < mExtraParameterList.size(); ++i)
@@ -1944,25 +1939,28 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     deleteParticleSource();
                 }
 
+                // Unpack extra params. An entry past the end of the update
+                // leaves nothing after it to read, so the update is refused:
+                // the object is dropped and asked for whole again.
+                std::vector<LLNetworkData::Entry> entries;
+                if (!LLNetworkData::unpackEntries(*dp, entries))
+                {
+                    LL_WARNS("UpdateFail") << "Extra parameter past the end of the compressed update for " << getID()
+                                           << ", refusing the update" << LL_ENDL;
+                    mRegionp->addCacheMissFull(getLocalID());
+                    gObjectList.killObject(this);
+                    return retval;
+                }
+
                 // Mark all extra parameters not used
                 for (auto& entry : mExtraParameterList)
                 {
                     if (entry.in_use) *entry.in_use = false;
                 }
 
-                // Unpack extra params
-                U8 num_parameters;
-                dp->unpackU8(num_parameters, "num_params");
-                U8 param_block[MAX_OBJECT_PARAMS_SIZE];
-                for (U8 param=0; param<num_parameters; ++param)
+                for (LLNetworkData::Entry& entry : entries)
                 {
-                    U16 param_type;
-                    S32 param_size;
-                    dp->unpackU16(param_type, "param_type");
-                    dp->unpackBinaryData(param_block, MAX_OBJECT_PARAMS_SIZE, param_size, "param_data");
-                    //LL_INFOS() << "Param type: " << param_type << ", Size: " << param_size << LL_ENDL;
-                    LLDataPackerBinaryBuffer dp2(param_block, param_size);
-                    unpackParameterEntry(param_type, &dp2);
+                    unpackParameterEntry(entry.mType, entry.mData);
                 }
 
                 for (size_t i = 0; i < mExtraParameterList.size(); ++i)
@@ -6788,7 +6786,7 @@ void LLViewerObject::adjustAudioGain(const F32 gain)
 
 //----------------------------------------------------------------------------
 
-bool LLViewerObject::unpackParameterEntry(U16 param_type, LLDataPacker *dp)
+bool LLViewerObject::unpackParameterEntry(U16 param_type, std::vector<U8>& data)
 {
     if (LLNetworkData::PARAMS_MESH == param_type)
     {
@@ -6797,7 +6795,8 @@ bool LLViewerObject::unpackParameterEntry(U16 param_type, LLDataPacker *dp)
     ExtraParameter* param = getExtraParameterEntryCreate(param_type);
     if (param)
     {
-        param->data->unpack(*dp);
+        LLDataPackerBinaryBuffer dp(data.data(), (S32)data.size());
+        param->data->unpack(dp);
         *param->in_use = true;
         parameterChanged(param_type, param->data, true, false);
         return true;

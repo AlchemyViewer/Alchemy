@@ -1566,6 +1566,27 @@ S32 LLNetworkData::slotOf(U16 param_type)
     return (param_type >> 4) - 1;
 }
 
+//static
+bool LLNetworkData::unpackEntries(LLDataPacker& dp, std::vector<Entry>& entries)
+{
+    entries.clear();
+    U8 count = 0;
+    if (!dp.unpackU8(count, "num_params"))
+    {
+        return false;
+    }
+    entries.resize(count);
+    for (Entry& entry : entries)
+    {
+        if (!dp.unpackU16(entry.mType, "param_type") || !dp.unpackBinaryData(entry.mData, "param_data"))
+        {
+            entries.clear();
+            return false;
+        }
+    }
+    return true;
+}
+
 //============================================================================
 
 LLLightParams::LLLightParams()

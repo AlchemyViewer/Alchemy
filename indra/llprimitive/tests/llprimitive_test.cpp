@@ -379,6 +379,102 @@ namespace
             }
         }
     }
+
+    // Packs extra parameters as an object update holds them: their count,
+    // then each one's type and data.
+    std::vector<U8> pack_entries(const std::vector<LLNetworkData::Entry>& entries)
+    {
+        std::vector<U8> buffer(65536);
+        LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size());
+        REQUIRE(dp.packU8((U8)entries.size(), "num_params"));
+        for (const LLNetworkData::Entry& entry : entries)
+        {
+            REQUIRE(dp.packU16(entry.mType, "param_type"));
+            REQUIRE(dp.packBinaryData(entry.mData.data(), (S32)entry.mData.size(), "param_data"));
+        }
+        buffer.resize(dp.getCurrentSize());
+        return buffer;
+    }
+
+    // A render material's data: its count, then a face and a material ID for
+    // each.
+    std::vector<U8> render_material_data(U8 count)
+    {
+        std::vector<U8> data(1 + 17 * (size_t)count);
+        data[0] = count;
+        for (U8 i = 0; i < count; ++i)
+        {
+            U8* entry = &data[1 + 17 * (size_t)i];
+            entry[0] = i;
+            for (U8 b = 0; b < 16; ++b)
+            {
+                entry[1 + b] = (U8)(i + b * 3 + 1);
+            }
+        }
+        return data;
+    }
+
+    TEST_CASE("LLNetworkData: unpackEntries reads every entry an update holds whole", "[LLNetworkData]")
+    {
+        std::vector<LLNetworkData::Entry> sent(3);
+        sent[0].mType = LLNetworkData::PARAMS_LIGHT;
+        sent[0].mData.assign(16, 0x11);
+        sent[1].mType = LLNetworkData::PARAMS_RENDER_MATERIAL;
+        sent[1].mData = render_material_data(70);
+        sent[2].mType = LLNetworkData::PARAMS_EXTENDED_MESH;
+        sent[2].mData.assign(4, 0x22);
+        REQUIRE(sent[1].mData.size() > 1024);
+
+        std::vector<U8> buffer = pack_entries(sent);
+        LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size());
+        std::vector<LLNetworkData::Entry> read;
+        REQUIRE(LLNetworkData::unpackEntries(dp, read));
+        REQUIRE(read.size() == sent.size());
+        for (size_t i = 0; i < sent.size(); ++i)
+        {
+            CAPTURE(i);
+            CHECK(read[i].mType == sent[i].mType);
+            CHECK(read[i].mData == sent[i].mData);
+        }
+        CHECK_FALSE(dp.hasNext());
+    }
+
+    TEST_CASE("LLNetworkData: unpackEntries refuses an entry past the end of its block", "[LLNetworkData]")
+    {
+        std::vector<LLNetworkData::Entry> sent(2);
+        sent[0].mType = LLNetworkData::PARAMS_LIGHT;
+        sent[0].mData.assign(16, 0x11);
+        sent[1].mType = LLNetworkData::PARAMS_SCULPT;
+        sent[1].mData.assign(17, 0x33);
+        std::vector<U8> buffer = pack_entries(sent);
+
+        // Cut inside the second entry's data.
+        LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size() - 5);
+        std::vector<LLNetworkData::Entry> read(1);
+        CHECK_FALSE(LLNetworkData::unpackEntries(dp, read));
+        CHECK(read.empty());
+
+        // An update that ends before its count.
+        LLDataPackerBinaryBuffer empty(buffer.data(), 0);
+        read.resize(1);
+        CHECK_FALSE(LLNetworkData::unpackEntries(empty, read));
+        CHECK(read.empty());
+    }
+
+    TEST_CASE("LLRenderMaterialParams: a render material of more than sixty entries unpacks every entry", "[LLRenderMaterialParams]")
+    {
+        std::vector<U8> data = render_material_data(200);
+        LLDataPackerBinaryBuffer dp(data.data(), (S32)data.size());
+        LLRenderMaterialParams params;
+        CHECK(params.unpack(dp));
+        for (U8 i = 0; i < 200; ++i)
+        {
+            CAPTURE((int)i);
+            LLUUID expected;
+            memcpy(expected.mData, &data[1 + 17 * (size_t)i + 1], 16);
+            CHECK(params.getMaterial(i) == expected);
+        }
+    }
 }
 
 #include "llmessagesystem_stub.cpp"

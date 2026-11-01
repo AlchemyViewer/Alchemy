@@ -127,6 +127,17 @@ public:
     // The slot an object keeps a type of extra parameter in, or -1 for a type
     // with no slot of its own.
     static S32 slotOf(U16 param_type);
+
+    // An extra parameter as an object update carries it.
+    struct Entry
+    {
+        U16 mType = 0;
+        std::vector<U8> mData;
+    };
+    // Unpacks the extra parameters an object update holds: their count, then
+    // each one's type and data. False where the count or an entry runs past
+    // the data, which leaves entries empty.
+    static bool unpackEntries(LLDataPacker& dp, std::vector<Entry>& entries);
 };
 
 extern const F32 LIGHT_MIN_RADIUS;
