@@ -46,8 +46,10 @@
 //   the bytes.
 // - Any function may be called from any thread, and from several at once,
 //   though the library runs one call at a time.
-// - The library is built with the viewer's compiler flags, so an optimised
-//   build has its fast floating point too.
+// - The library, and every library it links, is built with /fp:precise, or
+//   -ffp-contract=off on GCC and Clang, in place of the viewer's fast
+//   floating point: it computes as the source says, with no contraction or
+//   reassociation.
 
 #ifdef __cplusplus
 extern "C" {
