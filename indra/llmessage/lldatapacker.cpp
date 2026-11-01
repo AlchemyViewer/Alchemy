@@ -189,19 +189,19 @@ bool LLDataPacker::unpackFixed(F32 &value, const char *name,
     F32 fixed_val;
     if (total_bits <= 8)
     {
-        U8 fixed_8;
+        U8 fixed_8 = 0;
         success = unpackU8(fixed_8, name);
         fixed_val = (F32)fixed_8;
     }
     else if (total_bits <= 16)
     {
-        U16 fixed_16;
+        U16 fixed_16 = 0;
         success = unpackU16(fixed_16, name);
         fixed_val = (F32)fixed_16;
     }
     else if (total_bits <= 31)
     {
-        U32 fixed_32;
+        U32 fixed_32 = 0;
         success = unpackU32(fixed_32, name);
         fixed_val = (F32)fixed_32;
     }
@@ -209,6 +209,13 @@ bool LLDataPacker::unpackFixed(F32 &value, const char *name,
     {
         fixed_val = 0;
         LL_ERRS() << "Bad bit count: " << total_bits << LL_ENDL;
+    }
+
+    if (!success)
+    {
+        // Nothing was read, so the value is zero.
+        value = 0.f;
+        return false;
     }
 
     //LL_INFOS() << "Fixed_val:" << fixed_val << LL_ENDL;

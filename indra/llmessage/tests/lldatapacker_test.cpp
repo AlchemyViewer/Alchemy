@@ -694,4 +694,24 @@ namespace
         CHECK(fixed[1] == 2);
         CHECK(fixed[2] == 0);
     }
+
+    // A fixed-point value with nothing left to read it from reads as zero in
+    // either form and says it failed.
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer unpackFixed past the end reads zero", "[datapacker_test]")
+    {
+        U8 byte = 0x80;
+        LLDataPackerBinaryBuffer reader(&byte, 0);
+
+        F32 value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "signed", true, 8, 7));
+        CHECK(value == 0.f);
+
+        value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "unsigned", false, 8, 8));
+        CHECK(value == 0.f);
+
+        value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "wide", true, 14, 16));
+        CHECK(value == 0.f);
+    }
 }
