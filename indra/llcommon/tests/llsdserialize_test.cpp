@@ -794,6 +794,99 @@ namespace
             1);
     }
 
+    TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a DOCTYPE ends where XML ends it", "[llsd_XML_parsing]")
+    {
+        // A quoted literal may hold '[' and '>'. In the internal subset, a
+        // declaration's literal, a comment or a processing instruction may
+        // hold ']' and '>', and other markup runs to its first '>'. One left
+        // open fails the document.
+        struct Case
+        {
+            const char* what;
+            const char* text;
+            LLSD        value;
+            S32         count;
+        };
+        const S32 FAILS = LLSDParser::PARSE_FAILURE;
+        const Case cases[] = {
+            { "literal holding [",
+              "<!DOCTYPE llsd SYSTEM \"[\" ><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "entity literal holding [",
+              "<!DOCTYPE x [ <!ENTITY a \"[\" > ]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "comment holding [",
+              "<!DOCTYPE x [<!-- [ -->]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "literal holding a document",
+              "<!DOCTYPE x SYSTEM \"><llsd><integer>1</integer></llsd>\"><llsd><integer>2</integer></llsd>", LLSD(2), 1 },
+            { "literal left open",
+              "<!DOCTYPE llsd 'x><llsd/>", LLSD(), FAILS },
+            { "entity literal left open",
+              "<!DOCTYPE llsd [<!ENTITY\"a \"b\">]><llsd/>", LLSD(), FAILS },
+            { "processing instruction left open",
+              "<!DOCTYPE llsd [<?>]><llsd><integer>1</integer></llsd>", LLSD(), FAILS },
+            { "comment left open",
+              "<!DOCTYPE llsd [<!-->]><llsd><integer>1</integer></llsd>", LLSD(), FAILS },
+            { "subset left open",
+              "<!DOCTYPE llsd [", LLSD(), FAILS },
+            { "entity literal holding ]>",
+              "<!DOCTYPE llsd [<!ENTITY a \"]>\">]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "processing instruction holding ]>",
+              "<!DOCTYPE llsd [<?pi ]> ?>]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "element declaration ending at its first >",
+              "<!DOCTYPE llsd [<!ELEMENT a \"x>]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "attribute list literal holding >",
+              "<!DOCTYPE llsd [<!ATTLIST a b CDATA \">\">]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "keyword matched as a prefix",
+              "<!DOCTYPE llsd [<!ENTITYX a \"]>\">]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "lower-case keyword ending at its first >",
+              "<!DOCTYPE llsd [<!entity a \"]>\">]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "other markup ending at its first >",
+              "<!DOCTYPE llsd [<x \"]>]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "anything between ] and >",
+              "<!DOCTYPE llsd [] \"junk><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "literals holding the other quote",
+              "<!DOCTYPE llsd PUBLIC 'a\"b' \"c'd\"><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+            { "entity literal in single quotes",
+              "<!DOCTYPE llsd [<!ENTITY a 'x\">'>]><llsd><integer>1</integer></llsd>", LLSD(1), 1 },
+        };
+
+        const auto parse = [this](const std::string& text, LLSD& parsed)
+        {
+            std::istringstream input(text);
+            mParser->reset();
+            return mParser->parse(input, parsed, text.size());
+        };
+
+        for (const Case& c : cases)
+        {
+            INFO(c.what << ": " << c.text);
+            LLSD parsed;
+            CHECK(parse(c.text, parsed) == c.count);
+            CHECK_THAT(parsed, ll_test::LLSDEquals(c.value));
+        }
+
+        // The parser reads 4 KiB first. Padding the DOCTYPE after its keyword
+        // puts the end of that read before each byte that follows in turn,
+        // so every literal, keyword and end above is read across a refill.
+        constexpr size_t FIRST_READ = 4 * 1024;
+        constexpr size_t KEYWORD = sizeof("<!DOCTYPE") - 1;
+        for (const Case& c : cases)
+        {
+            const std::string rest(c.text + KEYWORD);
+            size_t wrong_at = std::string::npos;
+            for (size_t i = 0; i < rest.size() && wrong_at == std::string::npos; ++i)
+            {
+                const std::string text(std::string(c.text, KEYWORD) + std::string(FIRST_READ - KEYWORD - i, ' ') + rest);
+                LLSD parsed;
+                if (parse(text, parsed) != c.count || !llsd_equals(parsed, c.value))
+                {
+                    wrong_at = i;
+                }
+            }
+            INFO(c.what << ": " << c.text << " read wrongly with a refill before byte " << wrong_at << " after the keyword");
+            CHECK(wrong_at == std::string::npos);
+        }
+    }
+
 
     TEST_CASE_METHOD(TestLLSDXMLParsing, "llsd XML parsing: a value of unknown type parses as undefined", "[llsd_XML_parsing]")
     {
