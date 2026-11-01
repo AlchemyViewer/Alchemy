@@ -375,6 +375,8 @@ private:
     bool    refill();
     bool    avail(size_t bytes);
     bool    findMarker(const char* marker, size_t marker_len, size_t& found);
+    bool    nextChar(char& c);
+    bool    skipPast(char c);
     void    rewindStream();
     //@}
 
@@ -385,6 +387,7 @@ private:
     bool    scanName(size_t& name_off, size_t& name_len);
     bool    scanTagTail(size_t& attr_off, size_t& attr_len, bool& self_closing);
     bool    scanDoctype();
+    bool    scanSubsetMarkup();
     bool    decodeEntity();
     static bool base64Encoded(const char* attrs, size_t len);
     //@}
@@ -1115,28 +1118,94 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
     }
 }
 
+bool LLSDXMLParser::Impl::nextChar(char& c)
+{
+    if (!avail(1))
+    {
+        return false;
+    }
+    c = mBuffer[mPos++];
+    return true;
+}
+
+bool LLSDXMLParser::Impl::skipPast(char c)
+{
+    size_t at;
+    if (!findMarker(&c, 1, at))
+    {
+        return false;
+    }
+    mPos = at + 1;
+    return true;
+}
+
 bool LLSDXMLParser::Impl::scanDoctype()
 {
     // mPos is just past "<!DOCTYPE". XML names the root element there, so one
-    // holding nothing but space is refused. The internal subset may contain
-    // '>', so track it.
-    int in_subset = 0;
+    // holding nothing but space is refused. A quoted literal runs to the same
+    // quote, whatever it holds, and '[' opens the internal subset.
     bool empty = true;
+    char c;
     for (;;)
     {
-        while (mPos < mBuffer.size())
+        if (!nextChar(c)) return false;
+        if (c == '>') return !empty;
+        if (!is_xml_space(c)) empty = false;
+        if (c == '"' || c == '\'')
         {
-            const char c = mBuffer[mPos++];
-            if (c == '[') ++in_subset;
-            else if (c == ']') { if (in_subset) --in_subset; }
-            else if (c == '>' && !in_subset) return !empty;
-            if (!is_xml_space(c)) empty = false;
+            if (!skipPast(c)) return false;
         }
-        if (!refill())
+        else if (c == '[')
         {
-            return false;
+            break;
         }
     }
+
+    // The subset ends at the first ']' outside its markup, and the DOCTYPE
+    // at the first '>' after that, whatever lies between.
+    for (;;)
+    {
+        if (!nextChar(c)) return false;
+        if (c == ']') return skipPast('>');
+        if (c == '<' && !scanSubsetMarkup()) return false;
+    }
+}
+
+bool LLSDXMLParser::Impl::scanSubsetMarkup()
+{
+    // mPos is just past a '<' in the internal subset. A processing instruction
+    // or comment ends at the first end after its start, so "<?>" and "<!-->"
+    // end nothing. A declaration that may quote a literal ends at the first
+    // '>' outside one; an element declaration, or any other markup, at the
+    // first '>'. Keywords match as prefixes.
+    size_t at;
+    if (avail(1) && mBuffer[mPos] == '?')
+    {
+        mPos += 1;
+        if (!findMarker("?>", 2, at)) return false;
+        mPos = at + 2;
+        return true;
+    }
+    if (avail(3) && memcmp(mBuffer.data() + mPos, "!--", 3) == 0)
+    {
+        mPos += 3;
+        if (!findMarker("-->", 3, at)) return false;
+        mPos = at + 3;
+        return true;
+    }
+    if ((avail(7) && memcmp(mBuffer.data() + mPos, "!ENTITY", 7) == 0)
+        || (avail(8) && memcmp(mBuffer.data() + mPos, "!ATTLIST", 8) == 0)
+        || (avail(9) && memcmp(mBuffer.data() + mPos, "!NOTATION", 9) == 0))
+    {
+        char c;
+        for (;;)
+        {
+            if (!nextChar(c)) return false;
+            if (c == '>') return true;
+            if ((c == '"' || c == '\'') && !skipPast(c)) return false;
+        }
+    }
+    return skipPast('>');
 }
 
 bool LLSDXMLParser::Impl::scanMarkup()
