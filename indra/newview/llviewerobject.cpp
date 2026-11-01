@@ -4636,6 +4636,12 @@ void LLViewerObject::addNVPair(const std::string& data)
 {
     // cout << "LLViewerObject::addNVPair() with ---" << data << "---" << endl;
     LLNameValue *nv = new LLNameValue(data.c_str());
+    if (!nv->mName)
+    {
+        // The line has no name or no type.
+        delete nv;
+        return;
+    }
 
 //  char splat[MAX_STRING];
 //  temp->printNameValue(splat);

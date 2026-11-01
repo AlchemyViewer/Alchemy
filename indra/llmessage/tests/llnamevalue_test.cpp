@@ -404,4 +404,69 @@ namespace
 
         // cant test for U64 as no set64 exists nor any operators support U64 type
     }
+
+    // A line that is missing its name or type holds no pair, whatever the
+    // line before it held.
+    TEST_CASE_METHOD(namevalue_test, "LLNameValue: a line with no name or no type is left with no name", "[LLNameValue]")
+    {
+        LLNameValue before("Before STRING RW S value");
+        REQUIRE(before.mName);
+        CHECK(before.getTypeEnum() == NVT_STRING);
+
+        LLNameValue no_type("Lonely");
+        CHECK(no_type.mName == NULL);
+        CHECK(no_type.getTypeEnum() == NVT_NULL);
+
+        LLNameValue no_type_spaced(" \tLonely \r\n");
+        CHECK(no_type_spaced.mName == NULL);
+        CHECK(no_type_spaced.getTypeEnum() == NVT_NULL);
+
+        LLNameValue blank(" \t\r\n");
+        CHECK(blank.mName == NULL);
+        CHECK(blank.getTypeEnum() == NVT_NULL);
+
+        LLNameValue empty("");
+        CHECK(empty.mName == NULL);
+        CHECK(empty.getTypeEnum() == NVT_NULL);
+    }
+
+    TEST_CASE_METHOD(namevalue_test, "LLNameValue: a VEC3 value missing components reads each missing one as zero", "[LLNameValue]")
+    {
+        LLNameValue two("SecondLife", "1.5, 2.5", "VEC3", "RW", "S");
+        CHECK(*two.getVec3() == LLVector3(1.5f, 2.5f, 0.f));
+
+        LLNameValue one("SecondLife", "<7.25", "VEC3", "RW", "S");
+        CHECK(*one.getVec3() == LLVector3(7.25f, 0.f, 0.f));
+
+        LLNameValue none("SecondLife", "", "VEC3", "RW", "S");
+        CHECK(*none.getVec3() == LLVector3(0.f, 0.f, 0.f));
+
+        LLNameValue line(" Spot VEC3 RW S <4, 5");
+        CHECK(*line.getVec3() == LLVector3(4.f, 5.f, 0.f));
+    }
+
+    TEST_CASE_METHOD(namevalue_test, "LLNameValue: a line reads a name and value of any length", "[LLNameValue]")
+    {
+        const std::string name(3000, 'n');
+        const std::string value(20000, 'x');
+        LLNameValue nv((name + " STRING R DSV " + value).c_str());
+        REQUIRE(nv.mName);
+        CHECK(std::string_view(nv.mName) == name);
+        CHECK(nv.getTypeEnum() == NVT_STRING);
+        CHECK(nv.getClassEnum() == NVC_READ_ONLY);
+        CHECK(nv.getSendtoEnum() == NVS_DATA_SIM_VIEWER);
+        REQUIRE(nv.getString());
+        CHECK(std::string_view(nv.getString()) == value);
+    }
+
+    TEST_CASE_METHOD(namevalue_test, "LLNameValue: a line with no class or sendto keeps the whole rest as its value", "[LLNameValue]")
+    {
+        LLNameValue nv("  Title   STRING   a value with  spaces ");
+        REQUIRE(nv.mName);
+        CHECK(std::string_view(nv.mName) == "Title");
+        CHECK(nv.getClassEnum() == NVC_READ_WRITE);
+        CHECK(nv.getSendtoEnum() == NVS_SIM);
+        REQUIRE(nv.getString());
+        CHECK(std::string_view(nv.getString()) == "a value with  spaces ");
+    }
 }
