@@ -1117,8 +1117,11 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
 
 bool LLSDXMLParser::Impl::scanDoctype()
 {
-    // mPos is just past "<!". The internal subset may contain '>', so track it.
+    // mPos is just past "<!DOCTYPE". XML names the root element there, so one
+    // holding nothing but space is refused. The internal subset may contain
+    // '>', so track it.
     int in_subset = 0;
+    bool empty = true;
     for (;;)
     {
         while (mPos < mBuffer.size())
@@ -1126,7 +1129,8 @@ bool LLSDXMLParser::Impl::scanDoctype()
             const char c = mBuffer[mPos++];
             if (c == '[') ++in_subset;
             else if (c == ']') { if (in_subset) --in_subset; }
-            else if (c == '>' && !in_subset) return true;
+            else if (c == '>' && !in_subset) return !empty;
+            if (!is_xml_space(c)) empty = false;
         }
         if (!refill())
         {
@@ -1177,7 +1181,7 @@ bool LLSDXMLParser::Impl::scanMarkup()
         }
         if (avail(9) && memcmp(mBuffer.data() + mPos, "<!DOCTYPE", 9) == 0)
         {
-            mPos += 2;
+            mPos += 9;
             return scanDoctype();
         }
         // XML begins nothing else with "<!".
