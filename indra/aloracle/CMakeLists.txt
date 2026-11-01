@@ -35,6 +35,10 @@ target_sources(aloracle PRIVATE aloracle_llsd.cpp aloracle_lluri.cpp aloracle_ll
 target_sources(aloracle PRIVATE aloracle_llquantize.cpp)
 target_link_libraries(aloracle PRIVATE llmath)
 
+# llmessage: zerocoding, and template messages read and written back.
+target_sources(aloracle PRIVATE aloracle_llmessage.cpp)
+target_link_libraries(aloracle PRIVATE llmessage)
+
 if(AL_BUILD_TESTS)
   # The tests call the library through aloracle.h alone.
   al_add_test_binary(

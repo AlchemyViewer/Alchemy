@@ -156,6 +156,122 @@ namespace
         return std::string(depth - 1, '[') + "i1" + std::string(depth - 1, ']');
     }
 
+    Result zerocodeEncode(const std::string& packet, uint32_t header_size = 6)
+    {
+        aloracle_bytes encoded{};
+        const int32_t status = aloracle_zerocode_encode(in(packet), packet.size(), header_size, &encoded);
+        return { status, taken(encoded) };
+    }
+
+    Result zerocodeDecode(const std::string& packet, uint32_t capacity = 4096, uint32_t header_size = 6)
+    {
+        aloracle_bytes expanded{};
+        const int32_t status =
+            aloracle_zerocode_decode(in(packet), packet.size(), capacity, header_size, &expanded);
+        return { status, taken(expanded) };
+    }
+
+    // A template the message tests share, with one message of each frequency,
+    // each block type, and a message the parser drops.
+    const std::string MESSAGE_TEMPLATE = R"(version 2.0
+
+// The tokenizer skips a line from its slash.
+{
+    TestHigh High 1 NotTrusted Unencoded
+    {
+        AgentData Single
+        { AgentID LLUUID }
+        { Flags U8 }
+    }
+    {
+        Items Variable
+        { Value U32 }
+        { Name Variable 1 }
+    }
+}
+{
+    TestMedium Medium 3 Trusted Zerocoded
+    {
+        Data Single
+        { Position LLVector3 }
+    }
+}
+{
+    TestLow Low 300 NotTrusted Unencoded
+    {
+        Pairs Multiple 2
+        { Key U16 }
+        { Blob Fixed 3 }
+        { Text Variable 2 }
+    }
+}
+{
+    TestFixed Fixed 0xFFFFFFFB NotTrusted Unencoded UDPDeprecated
+}
+{
+    TestGone Low 5 NotTrusted Unencoded Deprecated
+}
+{
+    TestAllVariable Low 6 NotTrusted Unencoded
+    {
+        First Variable
+        { A U8 }
+    }
+    {
+        Second Variable
+        { B U8 }
+    }
+}
+{
+    TestBlocked Low 7 NotTrusted Unencoded UDPBlackListed
+}
+)";
+
+    // A template read from text, freed with the scope.
+    struct MessageTemplate
+    {
+        explicit MessageTemplate(const std::string& text = MESSAGE_TEMPLATE)
+        {
+            status = aloracle_message_template_new(in(text), text.size(), &handle);
+        }
+
+        ~MessageTemplate()
+        {
+            aloracle_message_template_free(handle);
+        }
+
+        MessageTemplate(const MessageTemplate&) = delete;
+        MessageTemplate& operator=(const MessageTemplate&) = delete;
+
+        aloracle_message_template* handle = nullptr;
+        int32_t status = -1;
+    };
+
+    // A message read and written back: the call's status, what was written
+    // back, and what the read did.
+    struct MessageRead
+    {
+        int32_t status;
+        std::string written;
+        int32_t result;
+    };
+
+    MessageRead readMessage(const MessageTemplate& message_template, const std::string& packet)
+    {
+        aloracle_bytes written{};
+        int32_t result = -1;
+        const int32_t status =
+            aloracle_message_read(message_template.handle, in(packet), packet.size(), &written, &result);
+        return { status, taken(written), result };
+    }
+
+    // A packet's six header bytes, flags, sequence number 1 and offset, then
+    // the body from the message number on.
+    std::string packetOf(const std::string& body, char offset = 0)
+    {
+        return "\x00\x00\x00\x00\x01"s + offset + body;
+    }
+
     TEST_CASE("aloracle: an LLSD value crosses in LLSD binary with no header", "[aloracle]")
     {
         CHECK(valueOf("{'a':i1}") == "{\0\0\0\x01" "k\0\0\0\x01" "a" "i\0\0\0\x01" "}"s);
@@ -511,6 +627,287 @@ namespace
                         ++disagreements;
                     }
                     if (dateFormat(1791955800.5).bytes != date)
+                    {
+                        ++disagreements;
+                    }
+                }
+                return disagreements;
+            }));
+        }
+        for (std::future<int>& worker : workers)
+        {
+            CHECK(worker.get() == 0);
+        }
+    }
+
+    TEST_CASE("aloracle: zerocoding replaces each run of zeros with a count", "[aloracle]")
+    {
+        const std::string packet = packetOf("\x01\x00\x00\x00\x02"s);
+        const Result encoded = zerocodeEncode(packet);
+        REQUIRE(encoded.status == ALORACLE_OK);
+        CHECK(encoded.bytes == "\x80\x00\x00\x00\x01\x00" "\x01\x00\x03\x02"s);
+
+        const Result decoded = zerocodeDecode(encoded.bytes);
+        CHECK(decoded.status == ALORACLE_OK);
+        CHECK(decoded.bytes == packet);
+    }
+
+    TEST_CASE("aloracle: zerocoding splits a run of zeros every 255", "[aloracle]")
+    {
+        const std::string packet = packetOf(std::string(300, '\0'));
+        const Result encoded = zerocodeEncode(packet);
+        REQUIRE(encoded.status == ALORACLE_OK);
+        CHECK(encoded.bytes == "\x80\x00\x00\x00\x01\x00" "\x00\xFF\x00\x2D"s);
+
+        const Result decoded = zerocodeDecode(encoded.bytes);
+        CHECK(decoded.status == ALORACLE_OK);
+        CHECK(decoded.bytes == packet);
+    }
+
+    TEST_CASE("aloracle: zerocoding fails a packet it would not shrink", "[aloracle]")
+    {
+        CHECK(zerocodeEncode(packetOf("\x01\x02\x03")).status == ALORACLE_FAILED);
+        // A zero on its own takes two bytes.
+        CHECK(zerocodeEncode(packetOf("\x01\x00\x02"s)).status == ALORACLE_FAILED);
+        CHECK(zerocodeEncode("\x00\x00"s).status == ALORACLE_FAILED);
+        CHECK(zerocodeEncode("").status == ALORACLE_FAILED);
+    }
+
+    TEST_CASE("aloracle: zero decoding leaves a packet with no flag or no body unwritten", "[aloracle]")
+    {
+        const Result plain = zerocodeDecode(packetOf("\x01\x00\x03"s));
+        CHECK(plain.status == ALORACLE_OK);
+        CHECK(plain.bytes.empty());
+
+        const Result short_packet = zerocodeDecode("\x80\x00"s);
+        CHECK(short_packet.status == ALORACLE_OK);
+        CHECK(short_packet.bytes.empty());
+
+        const Result nothing = zerocodeDecode("", 0, 0);
+        CHECK(nothing.status == ALORACLE_OK);
+        CHECK(nothing.bytes.empty());
+    }
+
+    TEST_CASE("aloracle: zero decoding reads a zero count as 256 more", "[aloracle]")
+    {
+        const Result decoded = zerocodeDecode("\x80\x00\x00\x00\x01\x00" "\x00\x00\x05\x07"s);
+        CHECK(decoded.status == ALORACLE_OK);
+        CHECK(decoded.bytes == packetOf(std::string(261, '\0') + "\x07"));
+    }
+
+    TEST_CASE("aloracle: zero decoding fails a run past its capacity", "[aloracle]")
+    {
+        const std::string encoded = "\x80\x00\x00\x00\x01\x00" "\x00\x0A"s;
+        // decode wants a byte of room past the last run.
+        CHECK(zerocodeDecode(encoded, 16).status == ALORACLE_FAILED);
+        const Result room = zerocodeDecode(encoded, 17);
+        CHECK(room.status == ALORACLE_OK);
+        CHECK(room.bytes == packetOf(std::string(10, '\0')));
+
+        CHECK(zerocodeDecode("\x80\x00\x00\x00\x01\x00" "\x01\x02\x03"s, 8).status == ALORACLE_FAILED);
+    }
+
+    TEST_CASE("aloracle: zerocoding refuses what its C++ cannot be given", "[aloracle]")
+    {
+        CHECK(zerocodeDecode(packetOf("\x01"), 5).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_zerocode_encode(nullptr, 3, 0, nullptr) == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_zerocode_decode(nullptr, 3, 64, 0, nullptr) == ALORACLE_BAD_ARGUMENT);
+        aloracle_bytes out{};
+        CHECK(aloracle_zerocode_encode(nullptr, 3, 0, &out) == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_zerocode_decode(nullptr, 3, 64, 0, &out) == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a template is described as its parser made it", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        aloracle_bytes value{};
+        REQUIRE(aloracle_message_template_describe(messages.handle, &value) == ALORACLE_OK);
+        const std::string described = taken(value);
+
+        // TestGone is Deprecated, which the parser drops; Low and Fixed
+        // numbers keep their 0xFFFF and 0xFFFFFFFF tops.
+        const std::string expected = valueOf(
+            "{'version':r2,'messages':["
+            "{'name':'TestHigh','number':i1,'frequency':i1,'trust':i1,'encoding':i0,'deprecation':i0,'blocks':["
+            "{'name':'AgentData','type':i1,'number':i1,'variables':["
+            "{'name':'AgentID','type':i17,'size':i16},{'name':'Flags','type':i3,'size':i1}]},"
+            "{'name':'Items','type':i3,'number':i1,'variables':["
+            "{'name':'Value','type':i5,'size':i4},{'name':'Name','type':i2,'size':i1}]}]},"
+            "{'name':'TestMedium','number':i65283,'frequency':i2,'trust':i0,'encoding':i1,'deprecation':i0,'blocks':["
+            "{'name':'Data','type':i1,'number':i1,'variables':[{'name':'Position','type':i13,'size':i12}]}]},"
+            "{'name':'TestLow','number':i-65236,'frequency':i4,'trust':i1,'encoding':i0,'deprecation':i0,'blocks':["
+            "{'name':'Pairs','type':i2,'number':i2,'variables':["
+            "{'name':'Key','type':i4,'size':i2},{'name':'Blob','type':i1,'size':i3},"
+            "{'name':'Text','type':i2,'size':i2}]}]},"
+            "{'name':'TestFixed','number':i-5,'frequency':i4,'trust':i1,'encoding':i0,'deprecation':i1,'blocks':[]},"
+            "{'name':'TestAllVariable','number':i-65530,'frequency':i4,'trust':i1,'encoding':i0,'deprecation':i0,"
+            "'blocks':["
+            "{'name':'First','type':i3,'number':i1,'variables':[{'name':'A','type':i3,'size':i1}]},"
+            "{'name':'Second','type':i3,'number':i1,'variables':[{'name':'B','type':i3,'size':i1}]}]},"
+            "{'name':'TestBlocked','number':i-65529,'frequency':i4,'trust':i1,'encoding':i0,'deprecation':i2,"
+            "'blocks':[]}"
+            "]}");
+        CHECK(described == expected);
+    }
+
+    TEST_CASE("aloracle: a message reads and writes back to its bytes", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        const std::string high = "\x01"s + std::string(16, '\x11') + "\x07"
+            + "\x02" + "\x01\x00\x00\x00"s + "\x02" "ab" + "\x02\x00\x00\x00"s + "\x00"s;
+        const std::string low = "\xFF\xFF\x01\x2C"s + "\x01\x00" "abc" "\x02\x00" "hi"s + "\x02\x00" "def" "\x00\x00"s;
+        const std::string fixed = "\xFF\xFF\xFF\xFB";
+        const std::string medium = "\xFF\x03"s + std::string(12, '\x42');
+        for (const std::string& body : { high, low, fixed, medium })
+        {
+            const MessageRead read = readMessage(messages, packetOf(body));
+            CHECK(read.status == ALORACLE_OK);
+            CHECK(read.result == ALORACLE_MESSAGE_READ);
+            CHECK(read.written == body);
+        }
+    }
+
+    TEST_CASE("aloracle: a message writes back without the bytes its offset skips", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        const std::string position(12, '\x42');
+        const MessageRead read = readMessage(messages, packetOf("\xFF\x03\xEE" + position, 1));
+        CHECK(read.result == ALORACLE_MESSAGE_READ);
+        CHECK(read.written == "\xFF\x03" + position);
+    }
+
+    TEST_CASE("aloracle: a body cut short writes back with zeros", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        // A fixed field the packet ends inside is all zeros, not what came of it.
+        const MessageRead medium = readMessage(messages, packetOf("\xFF\x03\x01\x02\x03\x04\x05"));
+        CHECK(medium.status == ALORACLE_OK);
+        CHECK(medium.result == ALORACLE_MESSAGE_READ);
+        CHECK(medium.written == "\xFF\x03"s + std::string(12, '\0'));
+
+        // A Variable block the packet ends before has no repeats.
+        const MessageRead high = readMessage(messages, packetOf("\x01"s + std::string(16, '\x11') + "\x07"));
+        CHECK(high.result == ALORACLE_MESSAGE_READ);
+        CHECK(high.written == "\x01"s + std::string(16, '\x11') + "\x07" + "\x00"s);
+    }
+
+    TEST_CASE("aloracle: a variable field whose length runs past the end writes back empty", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        const std::string first = "\x01\x00" "abc" "\x02\x00" "hi"s;
+        const MessageRead read =
+            readMessage(messages, packetOf("\xFF\xFF\x01\x2C"s + first + "\x02\x00" "def" "\x00\x01" "zz"s));
+        CHECK(read.status == ALORACLE_OK);
+        CHECK(read.result == ALORACLE_MESSAGE_READ);
+        CHECK(read.written == "\xFF\xFF\x01\x2C"s + first + "\x02\x00" "def" "\x00\x00"s);
+    }
+
+    TEST_CASE("aloracle: validateMessage refuses an unknown number or one too short for its frequency", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        for (const std::string& body : { "\x09"s, "\xFF\xFF\x00\x63"s, "\xFF"s, "\xFF\xFF\x01"s, "\xFF\xFF\x00\x07"s })
+        {
+            const MessageRead read = readMessage(messages, packetOf(body));
+            CHECK(read.status == ALORACLE_OK);
+            CHECK(read.result == ALORACLE_MESSAGE_REFUSED);
+            CHECK(read.written.empty());
+        }
+    }
+
+    TEST_CASE("aloracle: decodeData drops a message whose Variable blocks all have none", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        for (const std::string& body : { "\xFF\xFF\x00\x06"s, "\xFF\xFF\x00\x06\x00\x00"s })
+        {
+            const MessageRead read = readMessage(messages, packetOf(body));
+            CHECK(read.status == ALORACLE_OK);
+            CHECK(read.result == ALORACLE_MESSAGE_DROPPED);
+            CHECK(read.written.empty());
+        }
+
+        const MessageRead one = readMessage(messages, packetOf("\xFF\xFF\x00\x06\x01\x05"s));
+        CHECK(one.result == ALORACLE_MESSAGE_READ);
+        CHECK(one.written == "\xFF\xFF\x00\x06\x01\x05\x00"s);
+    }
+
+    TEST_CASE("aloracle: a message read refuses what the message log does not read", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        CHECK(readMessage(messages, "\x00\x00\x00\x00\x01\x00"s).status == ALORACLE_BAD_ARGUMENT);
+        const std::string packet = packetOf("\x09"s);
+        aloracle_bytes written{};
+        CHECK(aloracle_message_read(nullptr, in(packet), packet.size(), &written, nullptr) == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_message_read(messages.handle, in(packet), packet.size(), nullptr, nullptr)
+              == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_message_read(messages.handle, nullptr, 7, &written, nullptr) == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a template that names a message twice or will not parse is fatal", "[aloracle]")
+    {
+        const MessageTemplate twice("version 2.0\n{ TestTwice Low 10 NotTrusted Unencoded }\n"
+                                    "{ TestTwice Low 11 NotTrusted Unencoded }\n");
+        CHECK(twice.status == ALORACLE_FATAL);
+        CHECK(twice.handle == nullptr);
+
+        const MessageTemplate frequency("version 2.0\n{ TestOften Often 1 NotTrusted Unencoded }\n");
+        CHECK(frequency.status == ALORACLE_FATAL);
+        CHECK(frequency.handle == nullptr);
+
+        const MessageTemplate unversioned("{ TestUnversioned Low 12 NotTrusted Unencoded }\n");
+        CHECK(unversioned.status == ALORACLE_FATAL);
+
+        const MessageTemplate unclosed("version 2.0\n{ TestUnclosed Low 13 NotTrusted Unencoded\n");
+        CHECK(unclosed.status == ALORACLE_FATAL);
+
+        CHECK(aloracle_message_template_new(nullptr, 0, nullptr) == ALORACLE_BAD_ARGUMENT);
+        aloracle_bytes value{};
+        CHECK(aloracle_message_template_describe(nullptr, &value) == ALORACLE_BAD_ARGUMENT);
+        aloracle_message_template_free(nullptr);
+    }
+
+    TEST_CASE("aloracle: templates read and messages read from several threads at once agree", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+        aloracle_bytes value{};
+        REQUIRE(aloracle_message_template_describe(messages.handle, &value) == ALORACLE_OK);
+        const std::string described = taken(value);
+        const std::string body = "\xFF\xFF\x01\x2C"s + "\x01\x00" "abc" "\x02\x00" "hi"s + "\x02\x00" "def" "\x00\x00"s;
+
+        std::vector<std::future<int>> workers;
+        for (int i = 0; i < 8; ++i)
+        {
+            workers.push_back(std::async(std::launch::async, [&]
+            {
+                int disagreements = 0;
+                for (int j = 0; j < 50; ++j)
+                {
+                    const MessageTemplate mine;
+                    aloracle_bytes mine_value{};
+                    if (mine.status != ALORACLE_OK
+                        || aloracle_message_template_describe(mine.handle, &mine_value) != ALORACLE_OK
+                        || taken(mine_value) != described)
+                    {
+                        ++disagreements;
+                    }
+                    if (readMessage(messages, packetOf(body)).written != body
+                        || readMessage(mine, packetOf(body)).written != body)
                     {
                         ++disagreements;
                     }
