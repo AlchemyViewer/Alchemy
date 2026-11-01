@@ -198,6 +198,18 @@ namespace ll_test
         {
             circuit.mAcks.erase(circuit.mAcks.begin(), circuit.mAcks.end());
         }
+
+        // A reliable packet was handled, its number recorded as
+        // LLMessageSystem::checkMessages records it.
+        static void handled(LLCircuitData& circuit, TPACKETID id)
+        {
+            circuit.mRecentlyReceivedReliablePackets[id] = LLMessageSystem::getMessageTimeUsecs();
+        }
+
+        static bool isDuplicate(LLCircuitData& circuit, TPACKETID id, bool resent)
+        {
+            return circuit.isDuplicate(id, resent);
+        }
     };
 }
 
@@ -365,5 +377,27 @@ namespace
         circuits.sendAcks(ACK_COLLECT_TIME);
         CHECK(sAckedIDs == std::vector<TPACKETID>{ 1, 2, 3 });
         CHECK(circuits.mSendAckMap.empty());
+    }
+
+    TEST_CASE("llcircuit: an unmarked packet is a duplicate only of a number handled moments ago", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        CircuitProbe::handled(circuit, 7);
+
+        // A copy the network made comes unmarked, a resend marked.
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
+        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 8, false));
+        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 8, true));
+
+        sMessageTime += F64Seconds(4.0);
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, false));
+
+        // Long after, an unmarked packet with that number is a fresh one from
+        // numbering the sender started over; a resend still matches.
+        sMessageTime += F64Seconds(6.0);
+        CHECK_FALSE(CircuitProbe::isDuplicate(circuit, 7, false));
+        CHECK(CircuitProbe::isDuplicate(circuit, 7, true));
     }
 }

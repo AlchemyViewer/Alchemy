@@ -182,7 +182,10 @@ protected:
     bool            updateWatchDogTimers(LLMessageSystem *msgsys);  // Return false if the circuit is dead and should be cleaned up
 
     void            addReliablePacket(S32 mSocket, U8 *buf_ptr, S32 buf_len, LLReliablePacketParams *params);
-    bool            isDuplicateResend(TPACKETID packetnum);
+    // Whether a reliable packet numbered packetnum was handled already: any
+    // number the record holds for a resent packet, and for an unmarked one
+    // only a number handled moments ago.
+    bool            isDuplicate(TPACKETID packetnum, bool resent);
     // Call this method when a reliable message comes in - this will
     // correctly place the packet in the correct list to be acked
     // later. RAack = requested ack

@@ -63,6 +63,7 @@ const S32 PING_RELEASE_BLOCK = 2;   // How many pings behind we have to be to co
 const F32Seconds TARGET_PERIOD_LENGTH(5.f);
 const F32Seconds LL_DUPLICATE_SUPPRESSION_TIMEOUT(60.f); //this can be long, as time-based cleanup is
                                                     // only done when wrapping packetids, now...
+const F32Seconds LL_DUPLICATE_COPY_WINDOW(5.f);     // how long after a reliable packet is handled an unmarked copy of it counts as a duplicate
 
 LLCircuitData::LLCircuitData(const LLHost &host, TPACKETID in_id,
                              const F32Seconds circuit_heartbeat_interval, const F32Seconds circuit_timeout)
@@ -598,9 +599,24 @@ void LLCircuit::resendUnackedPackets(S32& unacked_list_length, S32& unacked_list
 }
 
 
-bool LLCircuitData::isDuplicateResend(TPACKETID packetnum)
+bool LLCircuitData::isDuplicate(TPACKETID packetnum, bool resent)
 {
-    return (mRecentlyReceivedReliablePackets.find(packetnum) != mRecentlyReceivedReliablePackets.end());
+    packet_time_map::const_iterator it = mRecentlyReceivedReliablePackets.find(packetnum);
+    if (it == mRecentlyReceivedReliablePackets.end())
+    {
+        return false;
+    }
+    if (resent)
+    {
+        return true;
+    }
+
+    // A copy the network made of a packet comes within moments of the first,
+    // unmarked. An older number an unmarked packet meets is left from
+    // numbering the sender has since started over, on a circuit kept up.
+    U64Microseconds delta_t_usec = LLMessageSystem::getMessageTimeUsecs() - it->second;
+    F64Seconds delta_t_sec = delta_t_usec;
+    return delta_t_sec < LL_DUPLICATE_COPY_WINDOW;
 }
 
 

@@ -645,7 +645,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
             // time without the resent flag, and is as much a duplicate as a
             // resend. Only reliable packets' numbers are recorded, so an
             // unreliable one is not looked up.
-            if (recv_reliable && cdp && cdp->isDuplicateResend(mCurrentRecvPacketID))
+            if (recv_reliable && cdp && cdp->isDuplicate(mCurrentRecvPacketID, recv_resent))
             {
                 // We need to ACK here to suppress
                 // further resends of packets we've
@@ -1163,7 +1163,7 @@ S32 LLMessageSystem::bufferInboundPacket()
             // downstream.
             bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
             bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
-            if (!recv_reliable || !cdp->isDuplicateResend(recv_packet_id))
+            if (!recv_reliable || !cdp->isDuplicate(recv_packet_id, recv_resent))
             {
                 cdp->checkPacketInID(recv_packet_id, recv_resent);
                 pkt.setPacketIDChecked(true);
