@@ -272,6 +272,11 @@ namespace
         return "\x00\x00\x00\x00\x01"s + offset + body;
     }
 
+    TEST_CASE("aloracle: the library gives the interface version it was built with", "[aloracle]")
+    {
+        CHECK(aloracle_abi_version() == ALORACLE_ABI_VERSION);
+    }
+
     TEST_CASE("aloracle: an LLSD value crosses in LLSD binary with no header", "[aloracle]")
     {
         CHECK(valueOf("{'a':i1}") == "{\0\0\0\x01" "k\0\0\0\x01" "a" "i\0\0\0\x01" "}"s);

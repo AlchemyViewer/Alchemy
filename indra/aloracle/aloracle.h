@@ -50,6 +50,12 @@
 //   -ffp-contract=off on GCC and Clang, in place of the viewer's fast
 //   floating point: it computes as the source says, with no contraction or
 //   reassociation.
+// - aloracle_abi_version gives the ALORACLE_ABI_VERSION the library was built
+//   with, raised whenever a function is removed or its arguments, results or
+//   meaning change, so a caller built against another can refuse the library
+//   rather than call it wrongly.
+
+#define ALORACLE_ABI_VERSION 1
 
 #ifdef __cplusplus
 extern "C" {
@@ -86,6 +92,9 @@ typedef struct aloracle_bytes
 /// Frees what bytes holds and leaves it empty. An empty one, or a null
 /// pointer, is left as it is.
 ALORACLE_API void aloracle_bytes_free(aloracle_bytes* bytes);
+
+/// The ALORACLE_ABI_VERSION the library was built with.
+ALORACLE_API int32_t aloracle_abi_version(void);
 
 //
 // LLSD: llsd.cpp, llsdserialize.cpp and llsdserialize_xml.cpp
