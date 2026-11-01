@@ -193,6 +193,12 @@ ALORACLE_API int32_t aloracle_llsd_unzip(const uint8_t* data,
                                          aloracle_bytes* value,
                                          int32_t* result);
 
+/// Writes a value as LLSD::asXMLRPCValue() does, and gives text its XML-RPC
+/// <value> element: a string, a UUID or a URI as a <string>, a date as a
+/// <dateTime.iso8601>, binary as <base64>, a map as a <struct> and an array
+/// as an <array>.
+ALORACLE_API int32_t aloracle_llsd_as_xmlrpc(const uint8_t* value, size_t size, aloracle_bytes* text);
+
 //
 // LLURI: lluri.cpp
 //
@@ -412,6 +418,36 @@ ALORACLE_API int32_t aloracle_message_read(const aloracle_message_template* mess
                                            size_t size,
                                            aloracle_bytes* written,
                                            int32_t* result);
+
+/// Reads a message's body from LLSD as the viewer reads one an event queue
+/// or a capability sent it, LLSDMessageReader::setMessage then its getters,
+/// and writes it back as LLTemplateMessageBuilder does. name is the
+/// template's name for the message, and body an LLSD map of each block's
+/// name to an array of maps of its fields. Each block is read in the
+/// template's order: a Single block once, a Multiple block the template's
+/// number of times, and a Variable block as many times as getNumberOfBlocks
+/// gives. Each of its fields is read in the template's order with the getter
+/// for its type, getU8 for a U8, getIPAddr for an IPADDR, getVector3 for an
+/// LLVector3 and so on, then added with the builder's matching add:
+/// - a Fixed field by getBinaryData at its size, into bytes of zeros, which
+///   it leaves as they are where the value isn't binary of that size;
+/// - a Variable field by getString where its value is a string, which
+///   addString writes with its NUL, and otherwise by getBinaryData into as
+///   many bytes of zeros as getSize gives.
+/// A block or field the body lacks reads as the getters' default, and a
+/// Variable 1 field is cut to 255 bytes, as the builder cuts it. written
+/// gets what buildMessage wrote from the message number on, as
+/// aloracle_message_read gives it. A name the template doesn't have, which
+/// is looked up by its text and never interned, or a message with a field
+/// of a type the reader has no getter for, S64, is ALORACLE_BAD_ARGUMENT.
+/// The builder's LL_ERRS on more than 255 repeats of a Variable block is
+/// ALORACLE_FATAL.
+ALORACLE_API int32_t aloracle_message_from_llsd(const aloracle_message_template* message_template,
+                                                const uint8_t* name,
+                                                size_t name_size,
+                                                const uint8_t* body,
+                                                size_t body_size,
+                                                aloracle_bytes* written);
 
 //
 // Objects: lltextureentry.cpp and llprimitive.cpp's texture entries and

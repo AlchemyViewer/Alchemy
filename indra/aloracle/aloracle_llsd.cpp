@@ -1,6 +1,6 @@
 /**
  * @file aloracle_llsd.cpp
- * @brief aloracle's functions over LLSD's parsers, formatters, conversions and zipped blocks.
+ * @brief aloracle's functions over LLSD's parsers, formatters, conversions, zipped blocks and XML-RPC values.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -249,5 +249,18 @@ int32_t aloracle_llsd_unzip(const uint8_t* data, size_t size, aloracle_bytes* va
             return ALORACLE_FAILED;
         }
         return aloracle::giveValue(unzipped, value);
+    });
+}
+
+int32_t aloracle_llsd_as_xmlrpc(const uint8_t* value, size_t size, aloracle_bytes* text)
+{
+    return aloracle::guarded([&]() -> int32_t
+    {
+        LLSD data;
+        if (!aloracle::clear(text) || !aloracle::takeValue(value, size, data))
+        {
+            return ALORACLE_BAD_ARGUMENT;
+        }
+        return aloracle::give(data.asXMLRPCValue(), text);
     });
 }

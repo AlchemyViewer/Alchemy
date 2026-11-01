@@ -109,6 +109,13 @@ namespace
         return { status, taken(value) };
     }
 
+    Result llsdAsXmlrpc(const std::string& value)
+    {
+        aloracle_bytes text{};
+        const int32_t status = aloracle_llsd_as_xmlrpc(in(value), value.size(), &text);
+        return { status, taken(text) };
+    }
+
     // The value notation text holds, in the binary values cross in.
     std::string valueOf(const std::string& notation)
     {
@@ -265,6 +272,14 @@ namespace
         const int32_t status =
             aloracle_message_read(message_template.handle, in(packet), packet.size(), &written, &result);
         return { status, taken(written), result };
+    }
+
+    Result messageFromLLSD(const MessageTemplate& message_template, const std::string& name, const std::string& body)
+    {
+        aloracle_bytes written{};
+        const int32_t status = aloracle_message_from_llsd(message_template.handle, in(name), name.size(), in(body),
+                                                          body.size(), &written);
+        return { status, taken(written) };
     }
 
     // A packet's six header bytes, flags, sequence number 1 and offset, then
@@ -499,6 +514,20 @@ namespace
 
         CHECK(unzip("").status == ALORACLE_FAILED);
         CHECK(aloracle_llsd_unzip(nullptr, 2, nullptr, nullptr) == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: an LLSD value writes as an XML-RPC value", "[aloracle]")
+    {
+        CHECK(llsdAsXmlrpc(valueOf("{'b':[r2.5,'x&y',!],'a':i1}")).bytes
+              == "<value><struct><member><name>a</name><value><int>1</int></value></member>"
+                 "<member><name>b</name><value><array><data><value><double>2.5</double></value>"
+                 "<value><string>x&amp;y</string></value><value><nil/></value></data></array></value>"
+                 "</member></struct></value>");
+        CHECK(llsdAsXmlrpc(valueOf("[true,b16\"0102\",u11111111-1111-1111-1111-111111111111]")).bytes
+              == "<value><array><data><value><boolean>1</boolean></value><value><base64>AQI=</base64></value>"
+                 "<value><string>11111111-1111-1111-1111-111111111111</string></value></data></array></value>");
+        CHECK(llsdAsXmlrpc("{"s).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_llsd_as_xmlrpc(nullptr, 1, nullptr) == ALORACLE_BAD_ARGUMENT);
     }
 
     TEST_CASE("aloracle: escape leaves the set it is given as it is", "[aloracle]")
@@ -863,6 +892,86 @@ namespace
         CHECK(aloracle_message_read(messages.handle, in(packet), packet.size(), nullptr, nullptr)
               == ALORACLE_BAD_ARGUMENT);
         CHECK(aloracle_message_read(messages.handle, nullptr, 7, &written, nullptr) == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a message body reads from LLSD with the reader's getter for each field", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        // A U32 reads from binary in network order, so an integer reads as 0;
+        // a Variable field from a string with its NUL, or from binary as it is.
+        const Result high = messageFromLLSD(messages, "TestHigh",
+                                            valueOf("{'AgentData':[{'AgentID':u11111111-1111-1111-1111-111111111111,"
+                                                    "'Flags':i7}],'Items':[{'Value':b16\"00000001\",'Name':'ab'},"
+                                                    "{'Value':i2,'Name':b16\"0102\"}]}"));
+        CHECK(high.status == ALORACLE_OK);
+        CHECK(high.bytes
+              == "\x01"s + std::string(16, '\x11') + "\x07" + "\x02" + "\x01\x00\x00\x00"s + "\x03" "ab\x00"s
+                     + "\x00\x00\x00\x00"s + "\x02\x01\x02");
+
+        // The fields an event queue's TeleportFinish carries.
+        const MessageTemplate info("version 2.0\n{ TestInfo Low 20 Trusted Unencoded\n{ Info Single\n"
+                                   "{ SimIP IPADDR }\n{ SimPort IPPORT }\n{ Handle U64 }\n{ Seed Variable 2 }\n"
+                                   "{ Flags U32 }\n}\n}\n");
+        REQUIRE(info.status == ALORACLE_OK);
+        const Result finish = messageFromLLSD(info, "TestInfo",
+                                              valueOf("{'Info':[{'SimIP':b16\"7F000001\",'SimPort':i13000,"
+                                                      "'Handle':b16\"0000000100000002\",'Seed':'http://x/',"
+                                                      "'Flags':b16\"00000010\"}]}"));
+        CHECK(finish.status == ALORACLE_OK);
+        CHECK(finish.bytes
+              == "\xFF\xFF\x00\x14"s + "\x7F\x00\x00\x01"s + "\x32\xC8" + "\x02\x00\x00\x00\x01\x00\x00\x00"s
+                     + "\x0A\x00" "http://x/\x00"s + "\x10\x00\x00\x00"s);
+    }
+
+    TEST_CASE("aloracle: a message body from LLSD reads what it lacks as the getters' defaults", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        // A Single block reads once, and a Variable block as often as it comes.
+        const Result empty = messageFromLLSD(messages, "TestHigh", valueOf("{}"));
+        CHECK(empty.status == ALORACLE_OK);
+        CHECK(empty.bytes == "\x01"s + std::string(16, '\x00') + "\x00\x00"s);
+
+        // A Multiple block reads the template's number, and a Fixed field
+        // whose value is binary of another size reads as zeros.
+        const Result low = messageFromLLSD(messages, "TestLow",
+                                           valueOf("{'Pairs':[{'Key':i1,'Blob':b16\"616263\",'Text':'hi'},"
+                                                   "{'Key':i2,'Blob':b16\"6162\"}]}"));
+        CHECK(low.status == ALORACLE_OK);
+        CHECK(low.bytes
+              == "\xFF\xFF\x01\x2C"s + "\x01\x00" "abc" "\x03\x00" "hi\x00"s + "\x02\x00"s + std::string(3, '\x00')
+                     + "\x00\x00"s);
+    }
+
+    TEST_CASE("aloracle: a message body from LLSD refuses a name its template lacks", "[aloracle]")
+    {
+        const MessageTemplate messages;
+        REQUIRE(messages.status == ALORACLE_OK);
+
+        const std::string body = valueOf("{}");
+        CHECK(messageFromLLSD(messages, "TestNone", body).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(messageFromLLSD(messages, "TestHigh\0"s, body).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(messageFromLLSD(messages, "TestHigh", "{"s).status == ALORACLE_BAD_ARGUMENT);
+        aloracle_bytes written{};
+        CHECK(aloracle_message_from_llsd(nullptr, in("TestHigh"s), 8, in(body), body.size(), &written)
+              == ALORACLE_BAD_ARGUMENT);
+
+        // A field of a type the reader has no getter for.
+        const MessageTemplate wide("version 2.0\n{ TestWide Low 21 NotTrusted Unencoded\n{ Data Single\n"
+                                   "{ Big S64 }\n}\n}\n");
+        REQUIRE(wide.status == ALORACLE_OK);
+        CHECK(messageFromLLSD(wide, "TestWide", body).status == ALORACLE_BAD_ARGUMENT);
+
+        // More repeats of a Variable block than the builder packs.
+        std::string many = "{'Items':[";
+        for (int item = 0; item < 256; ++item)
+        {
+            many += (item ? "," : "") + "{'Value':b16\"00000001\",'Name':'a'}"s;
+        }
+        CHECK(messageFromLLSD(messages, "TestHigh", valueOf(many + "]}")).status == ALORACLE_FATAL);
     }
 
     TEST_CASE("aloracle: a template that names a message twice or will not parse is fatal", "[aloracle]")
