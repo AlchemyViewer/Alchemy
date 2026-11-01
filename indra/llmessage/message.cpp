@@ -1651,9 +1651,10 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
         mReliablePacketsOut++;
     }
 
-    // tack packet acks onto the end of this message; signed math so an
-    // over-MTU payload yields a negative count instead of wrapping huge
-    S32 space_left = (MTUBYTES - (S32)buffer_length) / (S32)sizeof(TPACKETID); // space left for packet ids
+    // tack packet acks onto the end of this message, and the byte that counts
+    // them; signed math so an over-MTU payload yields a negative count
+    // instead of wrapping huge
+    S32 space_left = (MTUBYTES - (S32)buffer_length - 1) / (S32)sizeof(TPACKETID); // space left for packet ids
     S32 ack_count = (S32)cdp->mAcks.size();
     bool is_ack_appended = false;
     std::vector<TPACKETID> acks;

@@ -43,6 +43,25 @@
 #include <vector>
 #endif
 
+namespace ll_test
+{
+    // What the message system does with a circuit's acks as packets come in
+    // from its host.
+    struct CircuitProbe
+    {
+        // A reliable packet came in, to be acked.
+        static void receiveReliable(LLCircuitData& circuit, TPACKETID id)
+        {
+            circuit.collectRAck(id);
+        }
+
+        static size_t acksWaiting(const LLCircuitData& circuit)
+        {
+            return circuit.mAcks.size();
+        }
+    };
+}
+
 namespace
 {
     struct Response : public LLHTTPNode::Response
@@ -153,6 +172,118 @@ namespace
         CHECK(bound == (int)port);
         UNSCOPED_INFO("and end_net leaves no socket");
         CHECK(socket == -1);
+    }
+
+    // A message template file of the test's own, there while this lives.
+    class TemplateFile
+    {
+    public:
+        TemplateFile(const std::string& path, const char* text)
+            : mPath(path)
+        {
+            llofstream file(mPath.c_str());
+            file << text;
+        }
+
+        ~TemplateFile()
+        {
+            if (LLFile::remove(mPath) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mPath << LL_ENDL;
+            }
+        }
+
+        TemplateFile(const TemplateFile&) = delete;
+        TemplateFile& operator=(const TemplateFile&) = delete;
+
+    private:
+        std::string mPath;
+    };
+
+    // One message, AckBudgetTest, whose one block holds bytes of any length:
+    // its packet is the 6-byte header, the 4-byte number of a Low message,
+    // the 2-byte length and the bytes.
+    const char* const ACK_BUDGET_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    AckBudgetTest Low 1 NotTrusted Unencoded\n"
+        "    {\n"
+        "        Payload Single\n"
+        "        { Data Variable 2 }\n"
+        "    }\n"
+        "}\n";
+
+    // gMessageSystem is `system` while this lives, and what it was before
+    // once it ends.
+    class UseMessageSystem
+    {
+    public:
+        explicit UseMessageSystem(LLMessageSystem& system)
+            : mPrior(gMessageSystem)
+        {
+            gMessageSystem = &system;
+        }
+
+        ~UseMessageSystem()
+        {
+            gMessageSystem = mPrior;
+        }
+
+        UseMessageSystem(const UseMessageSystem&) = delete;
+        UseMessageSystem& operator=(const UseMessageSystem&) = delete;
+
+    private:
+        LLMessageSystem* mPrior;
+    };
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: acks appended to a packet fit in the MTU with their count", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, ACK_BUDGET_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+
+        // Packets go to the system's own socket, which reads none of them.
+        const LLHost host("127.0.0.1", system.getListenPort());
+        system.enableCircuit(host, false);
+        LLCircuitData* circuit = system.mCircuitInfo.findCircuit(host);
+        REQUIRE(circuit != nullptr);
+
+        // Sends AckBudgetTest holding `data_size` bytes, and says how long
+        // its packet was.
+        auto send = [&](S32 data_size)
+        {
+            const std::vector<U8> data(data_size, 0x5a);
+            system.newMessage("AckBudgetTest");
+            system.nextBlock("Payload");
+            system.addBinaryData("Data", data.data(), data_size);
+            return system.sendMessage(host);
+        };
+
+        UNSCOPED_INFO("the message alone");
+        CHECK(send(1184) == 1196);
+
+        for (TPACKETID id = 1; id <= 30; ++id)
+        {
+            ll_test::CircuitProbe::receiveReliable(*circuit, id);
+        }
+
+        {
+            INFO("4 bytes to the MTU hold an ack but not the count after it");
+            CHECK(send(1184) == 1196);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 30);
+        }
+        {
+            INFO("5 bytes hold one and its count");
+            CHECK(send(1183) == MTUBYTES);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 29);
+        }
+        {
+            INFO("100 bytes hold 24 and their count");
+            CHECK(send(1088) == 1100 + 24 * 4 + 1);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 5);
+        }
     }
 
 #if !LL_WINDOWS
