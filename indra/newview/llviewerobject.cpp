@@ -1812,21 +1812,27 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     parent_id = 0;
                 }
 
-                S32 sp_size;
-                U32 size;
                 if (value & 0x2)
                 {
-                    sp_size = 1;
                     delete [] mData;
                     mData = new U8[1];
                     dp->unpackU8(((U8*)mData)[0], "TreeData");
                 }
                 else if (value & 0x1)
                 {
+                    // The pad takes the bytes its data holds, whatever the
+                    // size before it names.
+                    U32 size = 0;
                     dp->unpackU32(size, "ScratchPadSize");
+                    std::vector<U8> scratch_pad;
+                    dp->unpackBinaryData(scratch_pad, "PartData");
                     delete [] mData;
-                    mData = new U8[size];
-                    dp->unpackBinaryData((U8 *)mData, size, sp_size, "PartData");
+                    mData = NULL;
+                    if (!scratch_pad.empty())
+                    {
+                        mData = new U8[scratch_pad.size()];
+                        memcpy(mData, scratch_pad.data(), scratch_pad.size());
+                    }
                 }
                 else
                 {
