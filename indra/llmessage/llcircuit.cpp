@@ -1076,13 +1076,13 @@ bool LLCircuitData::collectRAck(TPACKETID packet_num)
     {
         // First extra ack, we need to add ourselves to the list of circuits that need to send acks
         gMessageSystem->mCircuitInfo.mSendAckMap[mHost] = this;
+
+        // and the acks have waited since now, whether the last ones went in
+        // a PacketAck or on the end of a packet sent to the host.
+        mAckCreationTime = getAgeInSeconds();
     }
 
     mAcks.push_back(packet_num);
-    if (mAckCreationTime == 0)
-    {
-        mAckCreationTime = getAgeInSeconds();
-    }
     return true;
 }
 
@@ -1136,7 +1136,6 @@ void LLCircuit::sendAcks(F32 collect_time)
 
                 // empty out the acks list
                 cd->mAcks.clear();
-                cd->mAckCreationTime = 0.f;
             }
             // remove data map
             mSendAckMap.erase(cur_it);

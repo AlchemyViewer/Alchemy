@@ -69,6 +69,11 @@ class LLMessageSystem;
 class LLEncodedDatagramService;
 class LLSD;
 
+namespace ll_test
+{
+    struct CircuitProbe;
+}
+
 //
 // Classes
 //
@@ -160,6 +165,7 @@ public:
     friend class LLCircuit;
     friend class LLMessageSystem;
     friend class LLEncodedDatagramService;
+    friend struct ll_test::CircuitProbe;
     friend void crash_on_spaceserver_timeout (const LLHost &host, void *); // HACK, so it has access to setAlive() so it can send a final shutdown message.
 protected:
     TPACKETID       nextPacketOutID();

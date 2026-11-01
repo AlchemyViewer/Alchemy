@@ -1,6 +1,6 @@
 /**
  * @file llcircuit_test.cpp
- * @brief LLCircuitData's averaged ping and the resend timeout it gives.
+ * @brief LLCircuitData's averaged ping, and the acks it collects.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -37,12 +37,16 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <cmath>
+#include <vector>
 
 // The circuit reads its times from the message system's clock, which here is
-// the test's own.
+// the test's own, and sends its acks through the message system, which here
+// records the IDs each PacketAck carries.
 namespace
 {
     F64Seconds sMessageTime;
+    std::vector<TPACKETID> sAckedIDs;
+    std::vector<TPACKETID> sMessageIDs;
 }
 
 F64Seconds LLMessageSystem::getMessageTimeSeconds(const bool)
@@ -55,11 +59,36 @@ U64Microseconds LLMessageSystem::getMessageTimeUsecs(const bool)
     return sMessageTime;
 }
 
+void LLMessageSystem::newMessageFast(const char*)
+{
+    sMessageIDs.clear();
+}
+
+void LLMessageSystem::nextBlockFast(const char*)
+{
+}
+
+void LLMessageSystem::addU8Fast(const char*, U8)
+{
+}
+
+void LLMessageSystem::addU32Fast(const char*, U32 u)
+{
+    sMessageIDs.push_back(u);
+}
+
+S32 LLMessageSystem::sendMessage(const LLHost&)
+{
+    sAckedIDs.insert(sAckedIDs.end(), sMessageIDs.begin(), sMessageIDs.end());
+    return 0;
+}
+
 // The rest of llmessage that llcircuit.cpp calls. A circuit makes its throttle
 // group, and as it goes ends its host's transfers and reads whether the
 // message system logs verbosely; the rest is reached only by sending,
-// resending or acking a packet, which no case does. The message system a
-// circuit reads is made with none of the real one's sockets or templates.
+// resending or acking a reliable packet, which no case does. The message
+// system a circuit reads is made with none of the real one's sockets or
+// templates.
 LLPounceable<LLMessageSystem*, LLPounceableStatic> gMessageSystem;
 
 LLMessageSystem::LLMessageSystem(const std::string&, U32, S32, S32, S32, bool, const F32 circuit_heartbeat_interval,
@@ -83,27 +112,6 @@ LLPacketRing::~LLPacketRing()
 
 LLPacketBuffer::~LLPacketBuffer()
 {
-}
-
-void LLMessageSystem::newMessageFast(const char*)
-{
-}
-
-void LLMessageSystem::nextBlockFast(const char*)
-{
-}
-
-void LLMessageSystem::addU8Fast(const char*, U8)
-{
-}
-
-void LLMessageSystem::addU32Fast(const char*, U32)
-{
-}
-
-S32 LLMessageSystem::sendMessage(const LLHost&)
-{
-    return 0;
 }
 
 S32 LLMessageSystem::sendMessage(const LLHost&, LLStoredMessagePtr)
@@ -172,8 +180,30 @@ char const* const _PREHASH_Packets = "Packets";
 char const* const _PREHASH_PingID = "PingID";
 char const* const _PREHASH_StartPingCheck = "StartPingCheck";
 
+namespace ll_test
+{
+    // What the message system does with a circuit's acks as packets come in
+    // from its host and go out to it.
+    struct CircuitProbe
+    {
+        // A reliable packet came in, to be acked.
+        static void receiveReliable(LLCircuitData& circuit, TPACKETID id)
+        {
+            circuit.collectRAck(id);
+        }
+
+        // A packet went out with every waiting ack appended to it, taken off
+        // the circuit's list as LLMessageSystem::sendMessage takes them.
+        static void carryAcks(LLCircuitData& circuit)
+        {
+            circuit.mAcks.erase(circuit.mAcks.begin(), circuit.mAcks.end());
+        }
+    };
+}
+
 namespace
 {
+    using ll_test::CircuitProbe;
     using ll_test::WithinRounding;
 
     // The heartbeat and timeout the message system's tests start it with.
@@ -185,8 +215,13 @@ namespace
     // answer 0.2 s later measures 200 ms rather than truncating to 199.
     const F64Seconds CLOCK_START(1024.0);
 
+    // How long the viewer lets acks gather before it sends them in a
+    // PacketAck of their own (AckCollectTime).
+    const F32 ACK_COLLECT_TIME = 0.1f;
+
     // gMessageSystem is the stub while this lives, and what it was before
-    // once it ends; the clock is at its start.
+    // once it ends, with no circuit left on its lists; the clock is at its
+    // start.
     class StubMessageSystemScope
     {
     public:
@@ -196,10 +231,13 @@ namespace
             static LLMessageSystem system("", 0, 0, 0, 0, false, HEARTBEAT.value(), TIMEOUT.value());
             gMessageSystem = &system;
             sMessageTime = CLOCK_START;
+            sAckedIDs.clear();
         }
 
         ~StubMessageSystemScope()
         {
+            gMessageSystem->mCircuitInfo.mSendAckMap.clear();
+            gMessageSystem->mCircuitInfo.mUnackedCircuitMap.clear();
             gMessageSystem = mPrior;
         }
 
@@ -228,6 +266,16 @@ namespace
         circuit.pingTimerStart();
         sMessageTime = sent + round_trip;
         circuit.pingTimerStop(0);
+    }
+
+    // Waits until the circuit is `seconds` older than it was at `since`, by
+    // its own age, which is what it times its acks by.
+    void wait_until_aged(const LLCircuitData& circuit, F64 since, F64 seconds)
+    {
+        while (circuit.getAgeInSeconds() - since <= seconds)
+        {
+            ms_sleep(5);
+        }
     }
 
     TEST_CASE("llcircuit: an answered ping moves the averaged ping toward its round trip", "[llcircuit]")
@@ -267,5 +315,55 @@ namespace
         // and falls back a fifth of the way at the next fast one.
         answer_ping(circuit, CLOCK_START + HEARTBEAT, F64Seconds(0.2));
         CHECK_THAT(circuit.getPingDelayAveraged().value(), WithinRounding(1240.f, 2000.f));
+    }
+
+    TEST_CASE("llcircuit: an ack after a packet carried the last ones waits the collect time", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        LLCircuit& circuits = gMessageSystem->mCircuitInfo;
+
+        // An ack waits, a packet to the host carries it, and the next frame
+        // finds the circuit with none to send.
+        const F64 first_ack = circuit.getAgeInSeconds();
+        CircuitProbe::receiveReliable(circuit, 1);
+        CircuitProbe::carryAcks(circuit);
+        circuits.sendAcks(ACK_COLLECT_TIME);
+        CHECK(circuits.mSendAckMap.empty());
+        CHECK(sAckedIDs.empty());
+
+        // Well past the collect time after the first, another ack comes in,
+        // and waits the collect time from its own arrival
+        wait_until_aged(circuit, first_ack, 2.0 * ACK_COLLECT_TIME);
+        const F64 second_ack = circuit.getAgeInSeconds();
+        CircuitProbe::receiveReliable(circuit, 2);
+        circuits.sendAcks(ACK_COLLECT_TIME);
+        CHECK(sAckedIDs.empty());
+        CHECK(circuits.mSendAckMap.size() == 1);
+
+        // before it goes in a PacketAck.
+        wait_until_aged(circuit, second_ack, ACK_COLLECT_TIME);
+        circuits.sendAcks(ACK_COLLECT_TIME);
+        CHECK(sAckedIDs == std::vector<TPACKETID>{ 2 });
+        CHECK(circuits.mSendAckMap.empty());
+    }
+
+    TEST_CASE("llcircuit: acks gather for the collect time and go in one PacketAck", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        LLCircuit& circuits = gMessageSystem->mCircuitInfo;
+
+        const F64 first_ack = circuit.getAgeInSeconds();
+        CircuitProbe::receiveReliable(circuit, 1);
+        CircuitProbe::receiveReliable(circuit, 2);
+        circuits.sendAcks(ACK_COLLECT_TIME);
+        CHECK(sAckedIDs.empty());
+
+        wait_until_aged(circuit, first_ack, ACK_COLLECT_TIME);
+        CircuitProbe::receiveReliable(circuit, 3);
+        circuits.sendAcks(ACK_COLLECT_TIME);
+        CHECK(sAckedIDs == std::vector<TPACKETID>{ 1, 2, 3 });
+        CHECK(circuits.mSendAckMap.empty());
     }
 }
