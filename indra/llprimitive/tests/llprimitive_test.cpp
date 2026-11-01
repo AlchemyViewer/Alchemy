@@ -345,6 +345,40 @@ namespace
             CHECK(cylinder.getVolume()->getDetail() == LLVolumeLODGroup::getVolumeScaleFromDetail(lod));
         }
     }
+
+    TEST_CASE("LLNetworkData: each extra parameter type has a slot of its own", "[LLNetworkData]")
+    {
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_FLEXIBLE) == 0);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_LIGHT) == 1);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_SCULPT) == 2);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_LIGHT_IMAGE) == 3);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_RESERVED) == 4);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_MESH) == 5);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_EXTENDED_MESH) == 6);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_RENDER_MATERIAL) == 7);
+        CHECK(LLNetworkData::slotOf(LLNetworkData::PARAMS_REFLECTION_PROBE) == 8);
+        CHECK(LLNetworkData::SLOT_COUNT == 9);
+    }
+
+    // A type under the first, past the last or between two has no slot,
+    // rather than one before the slots or another type's.
+    TEST_CASE("LLNetworkData: a type that is not one of the multiples of 0x10 up to the last has no slot", "[LLNetworkData]")
+    {
+        for (U32 type = 0; type <= 0xFFFF; ++type)
+        {
+            const S32 slot = LLNetworkData::slotOf((U16)type);
+            const bool has_slot = type >= LLNetworkData::PARAMS_FLEXIBLE && type <= LLNetworkData::PARAMS_MAX && (type & 0xF) == 0;
+            CAPTURE(type);
+            if (has_slot)
+            {
+                CHECK(slot == (S32)(type >> 4) - 1);
+            }
+            else if (slot != -1)
+            {
+                FAIL_CHECK("a slot for a type with none");
+            }
+        }
+    }
 }
 
 #include "llmessagesystem_stub.cpp"

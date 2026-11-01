@@ -120,6 +120,13 @@ public:
     virtual bool operator==(const LLNetworkData& data) const = 0;
     virtual void copy(const LLNetworkData& data) = 0;
     static bool isValid(U16 param_type, U32 size);
+
+    // The number of slots an object keeps its extra parameters in, one for
+    // each type up to PARAMS_MAX.
+    static constexpr S32 SLOT_COUNT = PARAMS_MAX >> 4;
+    // The slot an object keeps a type of extra parameter in, or -1 for a type
+    // with no slot of its own.
+    static S32 slotOf(U16 param_type);
 };
 
 extern const F32 LIGHT_MIN_RADIUS;

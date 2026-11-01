@@ -729,17 +729,18 @@ private:
     bool isAssetInInventory(LLViewerInventoryItem* item, LLAssetType::EType type);
 
     ExtraParameter* createNewParameterEntry(U16 param_type);
+    // For a type with a slot of its own (LLNetworkData::slotOf).
     const ExtraParameter& getExtraParameterEntry(U16 param_type) const
     {
-        return mExtraParameterList[U32(param_type >> 4) - 1];
+        return mExtraParameterList[LLNetworkData::slotOf(param_type)];
     }
     ExtraParameter& getExtraParameterEntry(U16 param_type)
     {
-        return mExtraParameterList[U32(param_type >> 4) - 1];
+        return mExtraParameterList[LLNetworkData::slotOf(param_type)];
     }
     ExtraParameter* getExtraParameterEntryCreate(U16 param_type)
     {
-        if (param_type <= LLNetworkData::PARAMS_MAX)
+        if (LLNetworkData::slotOf(param_type) >= 0)
         {
             ExtraParameter& param = getExtraParameterEntry(param_type);
             if (!param.is_invalid)

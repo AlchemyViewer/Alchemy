@@ -304,7 +304,7 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mAttachmentItemID(LLUUID::null),
     mLastUpdateType(OUT_UNKNOWN),
     mLastUpdateCached(false),
-    mExtraParameterList(LLNetworkData::PARAMS_MAX >> 4),
+    mExtraParameterList(LLNetworkData::SLOT_COUNT),
     mCachedMuteListUpdateTime(0),
     mCachedOwnerInMuteList(false),
     mRiggedAttachedWarned(false)
@@ -6870,7 +6870,7 @@ LLViewerObject::ExtraParameter* LLViewerObject::createNewParameterEntry(U16 para
       }
     };
 
-    ExtraParameter& entry = mExtraParameterList[U32(param_type >> 4) - 1];
+    ExtraParameter& entry = getExtraParameterEntry(param_type);
     if (new_block)
     {
         entry.in_use = in_use;
@@ -6910,7 +6910,7 @@ bool LLViewerObject::setParameterEntry(U16 param_type, const LLNetworkData& new_
 // Should always return true.
 bool LLViewerObject::setParameterEntryInUse(U16 param_type, bool in_use, bool local_origin)
 {
-    if (param_type <= LLNetworkData::PARAMS_MAX)
+    if (LLNetworkData::slotOf(param_type) >= 0)
     {
         ExtraParameter* param = (in_use ? getExtraParameterEntryCreate(param_type) : &getExtraParameterEntry(param_type));
         if (param && param->data && *param->in_use != in_use)
@@ -6925,7 +6925,7 @@ bool LLViewerObject::setParameterEntryInUse(U16 param_type, bool in_use, bool lo
 
 void LLViewerObject::parameterChanged(U16 param_type, bool local_origin)
 {
-    if (param_type <= LLNetworkData::PARAMS_MAX)
+    if (LLNetworkData::slotOf(param_type) >= 0)
     {
         const ExtraParameter& param = getExtraParameterEntry(param_type);
         if (param.data)

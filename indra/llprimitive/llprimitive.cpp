@@ -1554,6 +1554,18 @@ bool LLNetworkData::isValid(U16 param_type, U32 size)
     return false;
 }
 
+//static
+S32 LLNetworkData::slotOf(U16 param_type)
+{
+    // Each type is a multiple of 0x10 from PARAMS_FLEXIBLE up, its slot the
+    // multiple less one.
+    if (param_type < PARAMS_FLEXIBLE || param_type > PARAMS_MAX || (param_type & 0xF))
+    {
+        return -1;
+    }
+    return (param_type >> 4) - 1;
+}
+
 //============================================================================
 
 LLLightParams::LLLightParams()
