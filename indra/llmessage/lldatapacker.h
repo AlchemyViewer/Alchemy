@@ -27,6 +27,8 @@
 #ifndef LL_LLDATAPACKER_H
 #define LL_LLDATAPACKER_H
 
+#include <vector>
+
 class LLColor4;
 class LLColor4U;
 class LLVector2;
@@ -50,6 +52,10 @@ public:
 
     virtual bool        packBinaryData(const U8 *value, S32 size, const char *name) = 0;
     virtual bool        unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name) = 0;
+    // Unpacks what packBinaryData packed into value, which takes as many
+    // bytes as the data holds. Data that says it holds more than is left to
+    // read is refused, and leaves value empty.
+    virtual bool        unpackBinaryData(std::vector<U8>& value, const char *name) = 0;
 
     // Constant size binary data packing
     virtual bool        packBinaryDataFixed(const U8 *value, S32 size, const char *name) = 0;
@@ -136,6 +142,7 @@ public:
 
     /*virtual*/ bool        packBinaryData(const U8 *value, S32 size, const char *name);
     /*virtual*/ bool        unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name);
+    /*virtual*/ bool        unpackBinaryData(std::vector<U8>& value, const char *name);
 
     // Constant size binary data packing
     /*virtual*/ bool        packBinaryDataFixed(const U8 *value, S32 size, const char *name);
@@ -263,6 +270,7 @@ public:
 
     /*virtual*/ bool        packBinaryData(const U8 *value, S32 size, const char *name);
     /*virtual*/ bool        unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name);
+    /*virtual*/ bool        unpackBinaryData(std::vector<U8>& value, const char *name);
 
     // Constant size binary data packing
     /*virtual*/ bool        packBinaryDataFixed(const U8 *value, S32 size, const char *name);
@@ -395,6 +403,7 @@ public:
 
     /*virtual*/ bool        packBinaryData(const U8 *value, S32 size, const char *name);
     /*virtual*/ bool        unpackBinaryData(U8 *value, S32 value_size, S32 &out_size, const char *name);
+    /*virtual*/ bool        unpackBinaryData(std::vector<U8>& value, const char *name);
 
     /*virtual*/ bool        packBinaryDataFixed(const U8 *value, S32 size, const char *name);
     /*virtual*/ bool        unpackBinaryDataFixed(U8 *value, S32 size, const char *name);

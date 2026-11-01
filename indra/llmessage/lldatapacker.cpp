@@ -102,6 +102,22 @@ static bool unpack_ascii_binary_data(const char* valuestr, U8* value, S32 value_
     return true;
 }
 
+// Unpacks a line packBinaryData wrote into value, which takes as many bytes
+// as the line gives. A line holds fewer bytes than its DP_BUFSIZE characters,
+// so one that gives more is refused for holding less.
+static bool unpack_ascii_binary_data(const char* valuestr, std::vector<U8>& value, const char* name)
+{
+    value.resize(DP_BUFSIZE);
+    S32 size = 0;
+    if (!unpack_ascii_binary_data(valuestr, value.data(), DP_BUFSIZE, size, name))
+    {
+        value.clear();
+        return false;
+    }
+    value.resize(size);
+    return true;
+}
+
 LLDataPacker::LLDataPacker() : mPassFlags(0), mWriteEnabled(false)
 {
 }
@@ -394,6 +410,35 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
         LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData buffer too small for data, truncating!" << LL_ENDL;
     }
 
+    return true;
+}
+
+bool LLDataPackerBinaryBuffer::unpackBinaryData(std::vector<U8>& value, const char *name)
+{
+    value.clear();
+    S32 size = 0;
+    if (!verifyLength(4, name))
+    {
+        return false;
+    }
+    htolememcpy(&size, mCurBufferp, MVT_S32, 4);
+    if (size < 0)
+    {
+        LL_WARNS() << "LLDataPackerBinaryBuffer::unpackBinaryData unpacked invalid size for " << name << ", aborting!" << LL_ENDL;
+        return false;
+    }
+    advance(4);
+
+    if (!verifyLength(size, name))
+    {
+        return false;
+    }
+    if (size > 0)
+    {
+        value.resize(size);
+        htolememcpy(value.data(), mCurBufferp, MVT_VARIABLE, size);
+        advance(size);
+    }
     return true;
 }
 
@@ -923,6 +968,17 @@ bool LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &o
         return false;
     }
     return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
+}
+
+bool LLDataPackerAsciiBuffer::unpackBinaryData(std::vector<U8>& value, const char *name)
+{
+    value.clear();
+    char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
+    if (!getValueStr(name, valuestr, DP_BUFSIZE))
+    {
+        return false;
+    }
+    return unpack_ascii_binary_data(valuestr, value, name);
 }
 
 
@@ -1717,6 +1773,17 @@ bool LLDataPackerAsciiFile::unpackBinaryData(U8 *value, S32 value_size, S32 &out
         return false;
     }
     return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
+}
+
+bool LLDataPackerAsciiFile::unpackBinaryData(std::vector<U8>& value, const char *name)
+{
+    value.clear();
+    char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
+    if (!getValueStr(name, valuestr, DP_BUFSIZE))
+    {
+        return false;
+    }
+    return unpack_ascii_binary_data(valuestr, value, name);
 }
 
 
