@@ -58,6 +58,12 @@ namespace aloracle
         (void)prepared;
     }
 
+    LLMutex& callLock()
+    {
+        static LLMutex lock;
+        return lock;
+    }
+
     bool clear(aloracle_bytes* out)
     {
         if (!out)
@@ -128,4 +134,9 @@ void aloracle_bytes_free(aloracle_bytes* bytes)
         std::free(bytes->data);
         *bytes = aloracle_bytes{ nullptr, 0 };
     }
+}
+
+int32_t aloracle_abi_version()
+{
+    return ALORACLE_ABI_VERSION;
 }
