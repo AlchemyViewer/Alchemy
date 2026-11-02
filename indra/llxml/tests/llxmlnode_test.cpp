@@ -212,6 +212,42 @@ namespace
         CHECK_FALSE(value.has("a<b"));
     }
 
+    // A login reply's numbers come from the network: one that does not read
+    // makes the reply malformed rather than throwing out of the login.
+    TEST_CASE("llxmlnode: an XML-RPC number that does not read makes the value malformed", "[llxmlnode]")
+    {
+        LLSD value;
+        REQUIRE(xmlrpc_value("<value><int> 42 </int></value>", value));
+        CHECK(value.asInteger() == 42);
+        REQUIRE(xmlrpc_value("<value><i4>-7</i4></value>", value));
+        CHECK(value.asInteger() == -7);
+        REQUIRE(xmlrpc_value("<value><double>2.5</double></value>", value));
+        CHECK(value.asReal() == 2.5);
+        REQUIRE(xmlrpc_value("<value><boolean>1</boolean></value>", value));
+        CHECK(value.asBoolean());
+
+        const char* const malformed[] = {
+            "<value><int>abc</int></value>",
+            "<value><int></int></value>",
+            "<value><int>99999999999</int></value>",
+            "<value><i4>-99999999999</i4></value>",
+            "<value><double>x</double></value>",
+            "<value><double>1e999</double></value>",
+            "<value><double></double></value>",
+            "<value><boolean>yes</boolean></value>",
+            "<value><boolean>99999999999</boolean></value>",
+            "<value><array><data><value><int>abc</int></value></data></array></value>",
+            "<value><struct><member><name>n</name><value><double>x</double></value></member></struct></value>",
+        };
+        for (const char* xml : malformed)
+        {
+            CAPTURE(xml);
+            bool read = true;
+            CHECK_NOTHROW(read = xmlrpc_value(xml, value));
+            CHECK_FALSE(read);
+        }
+    }
+
     TEST_CASE("llxmlnode: line numbers are reported for elements and their attributes", "[llxmlnode]")
     {
         const std::string xml = "<a>\n  <b k=\"v\"/>\n  <c/>\n</a>";

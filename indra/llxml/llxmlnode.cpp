@@ -3247,21 +3247,41 @@ bool LLXMLNode::fromXMLRPCValue(LLSD& target)
         return true;
     }
 
+    // A number that does not read, or is past its type's range, makes the
+    // value malformed.
     if (childp->hasName("int") || childp->hasName("i4"))
     {
-        target.assign(std::stoi(childp->getTextContents()));
+        S32 value = 0;
+        if (!LLStringUtil::convertToS32(childp->getTextContents(), value))
+        {
+            LL_WARNS() << "Malformed XML-RPC <" << childp->mName->mString << "> value" << LL_ENDL;
+            return false;
+        }
+        target.assign(value);
         return true;
     }
 
     if (childp->hasName("double"))
     {
-        target.assign(std::stod(childp->getTextContents()));
+        F64 value = 0.0;
+        if (!LLStringUtil::convertToF64(childp->getTextContents(), value))
+        {
+            LL_WARNS() << "Malformed XML-RPC <double> value" << LL_ENDL;
+            return false;
+        }
+        target.assign(value);
         return true;
     }
 
     if (childp->hasName("boolean"))
     {
-        target.assign(std::stoi(childp->getTextContents()) != 0);
+        S32 value = 0;
+        if (!LLStringUtil::convertToS32(childp->getTextContents(), value))
+        {
+            LL_WARNS() << "Malformed XML-RPC <boolean> value" << LL_ENDL;
+            return false;
+        }
+        target.assign(value != 0);
         return true;
     }
 
