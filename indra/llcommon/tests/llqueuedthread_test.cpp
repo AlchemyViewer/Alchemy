@@ -31,6 +31,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <functional>
 #include <string>
@@ -57,6 +58,27 @@ namespace
     private:
         LLMutex                  mMutex;
         std::vector<std::string> mRuns;
+    };
+
+    // When a request's turns began, from the queue's thread.
+    class TurnLog
+    {
+    public:
+        void note(F64 began)
+        {
+            LLMutexLock lock(&mMutex);
+            mTurns.push_back(began);
+        }
+
+        std::vector<F64> turns()
+        {
+            LLMutexLock lock(&mMutex);
+            return mTurns;
+        }
+
+    private:
+        LLMutex          mMutex;
+        std::vector<F64> mTurns;
     };
 
     class TestQueuedThread : public LLQueuedThread
@@ -305,21 +327,19 @@ namespace
         // A waits for a wake every turn. Over 100 ms, well inside its
         // fallback, it is not run again; a request retried every 16 ms would
         // have been several times. Woken, it runs again at once. The fallback
-        // is due no sooner than 250 ms after A's first turn, so a count read
-        // any later says nothing of either.
+        // is due no sooner than 250 ms after A's first turn, so only the
+        // turns begun before then and before the wake are counted, and a wake
+        // posted any later says nothing of which ran A.
         TestQueuedThread thread;
         thread.start();
         LLTimer clock;
+        TurnLog log;
         std::atomic<int> turns{ 0 };
         std::atomic<bool> done{ false };
-        F64 first_turn(0.0);
         const LLQueuedThread::handle_t handle(thread.generateHandle());
         thread.addRequest(new TestRequest(handle, [&]()
             {
-                if (0 == turns.load())
-                {
-                    first_turn = clock.getElapsedTimeF64();
-                }
+                log.note(clock.getElapsedTimeF64());
                 ++turns;
                 return done.load();
             }, true));
@@ -330,17 +350,8 @@ namespace
         REQUIRE(turns.load() >= 1);
 
         ms_sleep(100);
-        const int slept_turns(turns.load());
-        // Read once the count is, so no earlier than the count.
-        if (clock.getElapsedTimeF64() - first_turn < 0.25)
-        {
-            CHECK(slept_turns == 1);
-        }
-        else
-        {
-            WARN("A's fallback was due before its turns were counted; the count says nothing");
-        }
-
+        // Read before the wake is posted, so earlier than any turn it runs.
+        const F64 waking(clock.getElapsedTimeF64());
         thread.wakeRequest(handle);
         // Read once the wake is posted, so no earlier than its time in the
         // schedule.
@@ -355,6 +366,16 @@ namespace
         {
             ms_sleep(1);
         }
+
+        // Before the wake, only the fallback runs A again, and not within
+        // 250 ms of its first turn.
+        const std::vector<F64> began(log.turns());
+        REQUIRE(!began.empty());
+        const F64 first_turn(began.front());
+        const F64 counted_until(std::min(first_turn + 0.25, waking));
+        const auto unwoken_turns(std::count_if(began.begin(), began.end(), [counted_until](F64 at) { return at < counted_until; }));
+        CHECK(unwoken_turns == 1);
+
         // Whether or not the fallback ran first, the wake runs A again.
         CHECK(after_wake.load() >= 2);
         if (woken - first_turn < 0.25)
