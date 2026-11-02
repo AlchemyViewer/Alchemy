@@ -2198,11 +2198,16 @@ void LLModelPreview::updateStatusMessages()
         for (const LLModelInstance& instance : mUploadData)
         {
             rigged |= instance.mModel && !instance.mModel->mSkinWeights.empty();
+            // The hulls uploaded are the physics model's, or the base model's without one.
             const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
             if (physics && physics->getNumVolumeFaces() > 0)
             {
                 has_physics = true;
                 analyzed &= !physics->mPhysics.mHull.empty();
+            }
+            else if (!physics && instance.mModel && !instance.mModel->mPhysics.mHull.empty())
+            {
+                has_physics = true;
             }
         }
 

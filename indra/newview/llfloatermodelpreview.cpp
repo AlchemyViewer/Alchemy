@@ -695,7 +695,19 @@ LLVector3 LLFloaterModelPreview::getPivotHalfExtents() const
     {
         return LLVector3::zero;
     }
-    return mModelPreview->mPreviewScale * (F32)childGetValue("import_scale").asReal();
+    const F32 scale = (F32)childGetValue("import_scale").asReal();
+    if (mModelPreview->mUploadData.size() == 1)
+    {
+        // The pivot moves along the mesh's own axes, so a rotated instance measures along them.
+        const LLMatrix4& mat = mModelPreview->mUploadData[0].mTransform;
+        LLVector3 half;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            half.mV[i] = LLVector3(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]).length() * 0.5f * scale;
+        }
+        return half;
+    }
+    return mModelPreview->mPreviewScale * scale;
 }
 
 void LLFloaterModelPreview::onPivotCommit()
@@ -711,13 +723,13 @@ void LLFloaterModelPreview::onPivotCommit()
     for (S32 i = 0; i < 3; ++i)
     {
         const F32 shown = (F32)childGetValue(PIVOT_AXES[i]).asReal();
-        if (metres)
+        if (half.mV[i] <= 0.f)
         {
-            pivot.mV[i] = half.mV[i] > 0.f ? shown / half.mV[i] : 0.f;
+            pivot.mV[i] = 0.f; // a flat axis has nowhere to put it
         }
         else
         {
-            pivot.mV[i] = shown / 100.f;
+            pivot.mV[i] = metres ? shown / half.mV[i] : shown / 100.f;
         }
         pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
     }
