@@ -242,7 +242,8 @@ namespace
         // after its first turn, it runs again ahead of the retry due 16 ms
         // on, so a check posted after the wake finds its second turn run.
         // That first retry is then stale: run there and then, it does not
-        // run A again.
+        // run A again. The retry is due no sooner than 16 ms after A's first
+        // turn, so a wake posted any later says nothing of which ran it.
         TestQueuedThread thread;
         thread.start();
         LLTimer clock;
@@ -263,10 +264,12 @@ namespace
         {
             ms_sleep(1);
         }
-        REQUIRE(turns.load() == 1);
+        REQUIRE(turns.load() >= 1);
 
-        const F64 woken(clock.getElapsedTimeF64());
         thread.wakeRequest(handle);
+        // Read once the wake is posted, so no earlier than its time in the
+        // schedule.
+        const F64 woken(clock.getElapsedTimeF64());
         std::atomic<int> after_wake{ -1 };
         std::atomic<int> after_stale{ -1 };
         thread.post([&]()
@@ -283,6 +286,9 @@ namespace
         REQUIRE(after_stale.load() >= 0);
         CAPTURE(after_wake.load(), after_stale.load());
 
+        // Whether or not the retry ran first, the wake runs A again, and the
+        // first retry is stale once it has.
+        CHECK(after_wake.load() >= 2);
         CHECK(after_stale.load() == after_wake.load());
         if (woken - first_turn < 0.016)
         {
