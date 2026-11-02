@@ -64,6 +64,13 @@ public:
     // the region's centre's, as the teleport event's are, and a link with
     // more than three goes to the centre.
     static LLVector3 teleportPosition(const LLSD& tokens);
+
+    // A flag in a link's query, which the query holds as text: "false" and
+    // "0" and their kin read as false, "true" and "1" and theirs as true,
+    // and anything else as LLSD reads a string, true unless it is empty, so
+    // that a flag written from a boolean, "true" or empty, reads as that
+    // boolean. A key with no value reads as true.
+    static bool queryFlag(const LLSD& value);
 };
 
 #endif // AL_ALAPPLINKS_H

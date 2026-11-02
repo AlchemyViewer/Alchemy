@@ -26,6 +26,7 @@
 
 #include "alapplinks.h"
 
+#include "llstring.h"
 #include "lluri.h"
 
 #include <algorithm>
@@ -65,4 +66,15 @@ LLVector3 ALAppLinks::teleportPosition(const LLSD& tokens)
         }
     }
     return coords;
+}
+
+//static
+bool ALAppLinks::queryFlag(const LLSD& value)
+{
+    bool flag = false;
+    if (value.isString() && LLStringUtil::convertToBOOL(value.asString(), flag))
+    {
+        return flag;
+    }
+    return value.asBoolean();
 }

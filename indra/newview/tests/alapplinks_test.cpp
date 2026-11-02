@@ -26,6 +26,8 @@
 
 #include "../alapplinks.h"
 
+#include "lluri.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <initializer_list>
@@ -89,5 +91,26 @@ namespace
         CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50", "60", "70" })) == LLVector3(50, 60, 70));
         UNSCOPED_INFO("more than three coordinates");
         CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50", "60", "70", "80" })) == LLVector3(128, 128, 0));
+    }
+
+    // The viewer writes rlv_shownames into an object chat link from a
+    // boolean, and the handler hands on what the link's query holds.
+    TEST_CASE("ALAppLinks: a flag in a link's query reads as the boolean it says", "[ALAppLinks]")
+    {
+        LLSD written;
+        written["hide"] = true;
+        written["show"] = false;
+        const std::string query = LLURI::mapToQueryString(written);
+        REQUIRE(!query.empty());
+        const LLSD read = LLURI::queryMap(query.substr(1));
+        CHECK(ALAppLinks::queryFlag(read["hide"]));
+        CHECK_FALSE(ALAppLinks::queryFlag(read["show"]));
+
+        UNSCOPED_INFO("a link that says false");
+        CHECK_FALSE(ALAppLinks::queryFlag(LLURI::queryMap("hide=false")["hide"]));
+        CHECK_FALSE(ALAppLinks::queryFlag(LLURI::queryMap("hide=0")["hide"]));
+        CHECK(ALAppLinks::queryFlag(LLURI::queryMap("hide=1")["hide"]));
+        UNSCOPED_INFO("a key with no value");
+        CHECK(ALAppLinks::queryFlag(LLURI::queryMap("hide")["hide"]));
     }
 }
