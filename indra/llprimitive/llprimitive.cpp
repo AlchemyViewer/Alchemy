@@ -2222,10 +2222,10 @@ bool LLRenderMaterialParams::pack(LLDataPacker& dp) const
     U8 count = (U8)llmin((S32)mEntries.size(), 14); //limited to 255 bytes, no more than 14 material ids
 
     dp.packU8(count, "count");
-    for (auto& entry : mEntries)
+    for (U8 i = 0; i < count; ++i)
     {
-        dp.packU8(entry.te_idx, "te_idx");
-        dp.packUUID(entry.id, "id");
+        dp.packU8(mEntries[i].te_idx, "te_idx");
+        dp.packUUID(mEntries[i].id, "id");
     }
 
     return true;

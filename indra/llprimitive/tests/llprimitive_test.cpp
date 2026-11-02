@@ -504,6 +504,39 @@ namespace
         CHECK_FALSE(LLNetworkData::isValid(0x25, sized(16)));
     }
 
+    // A render material packs to no more than fourteen entries, and the count
+    // before them says how many follow.
+    TEST_CASE("LLRenderMaterialParams: pack writes as many entries as its count says", "[LLRenderMaterialParams]")
+    {
+        LLRenderMaterialParams params;
+        for (U8 te = 0; te < 20; ++te)
+        {
+            LLUUID id;
+            id.mData[0] = te + 1;
+            id.mData[15] = 0xC3;
+            params.setMaterial(te, id);
+        }
+
+        std::vector<U8> data(1024);
+        LLDataPackerBinaryBuffer writer(data.data(), (S32)data.size());
+        REQUIRE(params.pack(writer));
+        data.resize(writer.getCurrentSize());
+        REQUIRE_FALSE(data.empty());
+        CHECK(data[0] == 14);
+        CHECK(data.size() == 1 + 17 * (size_t)14);
+        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, data));
+
+        LLDataPackerBinaryBuffer reader(data.data(), (S32)data.size());
+        LLRenderMaterialParams read;
+        CHECK(read.unpack(reader));
+        CHECK_FALSE(reader.hasNext());
+        for (U8 te = 0; te < 20; ++te)
+        {
+            CAPTURE((int)te);
+            CHECK(read.getMaterial(te) == (te < 14 ? params.getMaterial(te) : LLUUID::null));
+        }
+    }
+
     TEST_CASE("LLRenderMaterialParams: a render material of more than sixty entries unpacks every entry", "[LLRenderMaterialParams]")
     {
         std::vector<U8> data = render_material_data(200);
