@@ -1523,9 +1523,13 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                     else
                     {   // Extract number of prims
-                        U8 generic_data[GENERIC_DATA_BUFFER_SIZE];
+                        // The field is read whole, its own size given as the
+                        // size to read: the reader holds any other to be an
+                        // error. A field of more than the buffer's bytes
+                        // takes them from the heap.
+                        boost::container::small_vector<U8, GENERIC_DATA_BUFFER_SIZE> generic_data(data_size);
                         mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data,
-                            &generic_data[0], llmin(data_size, GENERIC_DATA_BUFFER_SIZE), block_num);
+                            generic_data.data(), data_size, block_num);
                         // This is sample code to extract the number of prims
                         //    Future viewers should use it for their own purposes
                         if (!isAvatar())
