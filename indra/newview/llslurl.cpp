@@ -194,8 +194,12 @@ LLSLURL::LLSLURL(const std::string& slurl)
                     // it wasn't a /secondlife/<region> or /app/<params>, so it must be secondlife://<region>
                     // therefore the hostname will be the region name, and it's a location type
                     mType = LOCATION;
-                    // 'normalize' it so the region name is in fact the head of the path_array
-                    path_array.insert(0, slurl_uri.hostName());
+                    // 'normalize' it so the region name is in fact the head of the path_array.
+                    // With no host, as in secondlife:///<region>, it already is.
+                    if (!slurl_uri.hostName().empty())
+                    {
+                        path_array.insert(0, slurl_uri.hostName());
+                    }
                 }
             }
         }

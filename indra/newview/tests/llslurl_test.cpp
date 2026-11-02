@@ -397,6 +397,27 @@ namespace
         }
     }
 
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a secondlife SLURL with no host takes its region from the path", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("foo.bar.com");
+        LLSLURL slurl("secondlife:///myregion/1/2/3");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "myregion");
+        CHECK(slurl.getPosition() == LLVector3(1, 2, 3));
+        CHECK(slurl.getGrid() == "util.agni.lindenlab.com");
+
+        slurl = LLSLURL("secondlife:///myregion");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "myregion");
+        CHECK(slurl.getPosition() == LLVector3(128, 128, 0));
+    }
+
     TEST_CASE_METHOD(slurlTest, "LLSlurl: construction from grid/region/vector combos", "[LLSlurl]")
     {
         llofstream gridfile(TEST_FILENAME);
