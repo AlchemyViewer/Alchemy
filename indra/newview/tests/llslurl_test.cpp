@@ -367,6 +367,36 @@ namespace
 
     }
 
+    // Such a start location once asked the login for uri:&0&0&0. Invalid,
+    // the login goes to the last location instead.
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a location with nothing after its specifier is invalid", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        for (const char* text : { "secondlife:///secondlife", "secondlife:///secondlife/",
+                                  "secondlife://Aditi/secondlife", "https://maps.secondlife.com/secondlife",
+                                  "https://maps.secondlife.com/secondlife/", "/", "secondlife://%01/1/2/3" })
+        {
+            CAPTURE(text);
+            const LLSLURL slurl(text);
+            CHECK(slurl.getType() == LLSLURL::INVALID);
+            CHECK_FALSE(slurl.isValid());
+        }
+
+        LLGridManager::getInstance()->setGridChoice("my.grid.com");
+        for (const char* text : { "https://my.grid.com/region", "https://my.grid.com/region/", "/" })
+        {
+            CAPTURE(text);
+            const LLSLURL slurl(text);
+            CHECK(slurl.getType() == LLSLURL::INVALID);
+        }
+    }
+
     TEST_CASE_METHOD(slurlTest, "LLSlurl: construction from grid/region/vector combos", "[LLSlurl]")
     {
         llofstream gridfile(TEST_FILENAME);

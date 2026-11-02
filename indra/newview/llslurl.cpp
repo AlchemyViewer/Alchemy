@@ -265,7 +265,12 @@ LLSLURL::LLSLURL(const std::string& slurl)
 
         if (path_array.size() == 0)
         {
-            // we gotta have some stuff after the specifier as to whether it's a region or command
+            // we gotta have some stuff after the specifier as to whether it's a region or command;
+            // a location with no region is no location
+            if (mType == LOCATION)
+            {
+                mType = INVALID;
+            }
             return;
         }
 
@@ -296,6 +301,11 @@ LLSLURL::LLSLURL(const std::string& slurl)
             if (LLStringUtil::containsNonprintable(mRegion))
             {
                 LLStringUtil::stripNonprintable(mRegion);
+            }
+            if (mRegion.empty())
+            {
+                mType = INVALID;
+                return;
             }
 
             path_array.erase(0);
