@@ -52,3 +52,17 @@ std::optional<ALAppLinks::ObjectMute> ALAppLinks::objectMute(const LLSD& params)
     }
     return ObjectMute{ verb == "block", LLURI::unescape(params[2].asString()) };
 }
+
+//static
+LLVector3 ALAppLinks::teleportPosition(const LLSD& tokens)
+{
+    LLVector3 coords(128, 128, 0);
+    if (tokens.size() <= 4)
+    {
+        for (LLSD::Integer axis = 0; axis < 3 && axis + 1 < static_cast<LLSD::Integer>(tokens.size()); ++axis)
+        {
+            coords.mV[axis] = (F32)tokens[axis + 1].asReal();
+        }
+    }
+    return coords;
+}

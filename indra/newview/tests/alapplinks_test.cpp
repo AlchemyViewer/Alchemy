@@ -80,4 +80,14 @@ namespace
         CHECK_FALSE(ALAppLinks::objectMute(path({ id, "unblock" })).has_value());
         CHECK_FALSE(ALAppLinks::objectMute(path({ id, "inspect", "Some%20Object" })).has_value());
     }
+
+    TEST_CASE("ALAppLinks: a teleport link goes to its region's centre where it gives no position", "[ALAppLinks]")
+    {
+        CHECK(ALAppLinks::teleportPosition(path({ "Ahern" })) == LLVector3(128, 128, 0));
+        CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50" })) == LLVector3(50, 128, 0));
+        CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50", "60" })) == LLVector3(50, 60, 0));
+        CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50", "60", "70" })) == LLVector3(50, 60, 70));
+        UNSCOPED_INFO("more than three coordinates");
+        CHECK(ALAppLinks::teleportPosition(path({ "Ahern", "50", "60", "70", "80" })) == LLVector3(128, 128, 0));
+    }
 }

@@ -26,6 +26,7 @@
 #define AL_ALAPPLINKS_H
 
 #include "llsd.h"
+#include "v3math.h"
 
 #include <list>
 #include <optional>
@@ -57,6 +58,12 @@ public:
 
     // Nothing for another verb, or for a block or unblock with no name.
     static std::optional<ObjectMute> objectMute(const LLSD& params);
+
+    // Where in its region a teleport link goes: its first part is the region
+    // and the three after it x, y and z. A coordinate the link leaves out is
+    // the region's centre's, as the teleport event's are, and a link with
+    // more than three goes to the centre.
+    static LLVector3 teleportPosition(const LLSD& tokens);
 };
 
 #endif // AL_ALAPPLINKS_H
