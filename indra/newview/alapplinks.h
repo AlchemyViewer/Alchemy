@@ -28,6 +28,7 @@
 #include "llsd.h"
 
 #include <list>
+#include <optional>
 #include <string>
 
 // What the handlers of secondlife:///app links read from a link, apart from
@@ -44,6 +45,18 @@ public:
     // Whether the floater an openfloater link would open is one of
     // `floater_names`.
     static bool floaterNameIn(const LLSD& params, const std::list<std::string>& floater_names);
+
+    // What an agent or object link's block or unblock asks for: the link's
+    // second part is the verb and its third the object's name, which both
+    // verbs' links escape.
+    struct ObjectMute
+    {
+        bool        mBlock = false;
+        std::string mName;
+    };
+
+    // Nothing for another verb, or for a block or unblock with no name.
+    static std::optional<ObjectMute> objectMute(const LLSD& params);
 };
 
 #endif // AL_ALAPPLINKS_H

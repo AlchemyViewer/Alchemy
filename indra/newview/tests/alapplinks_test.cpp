@@ -58,4 +58,26 @@ namespace
         UNSCOPED_INFO("an escape that opens no floater on the list");
         CHECK_FALSE(ALAppLinks::floaterNameIn(path({ "upload%2520image" }), refused));
     }
+
+    // The viewer's block and unblock links both escape the object's name,
+    // as LLUrlAction writes them, and a mute is found by its name, so
+    // unblock has to read the name block added.
+    TEST_CASE("ALAppLinks: block and unblock read the same object name", "[ALAppLinks]")
+    {
+        const char* const id = "c3c1b8f4-1b54-4b05-9c47-8b7a3fe2a3f1";
+
+        const std::optional<ALAppLinks::ObjectMute> block = ALAppLinks::objectMute(path({ id, "block", "Some%20Object%26Co" }));
+        REQUIRE(block.has_value());
+        CHECK(block->mBlock);
+        CHECK(block->mName == "Some Object&Co");
+
+        const std::optional<ALAppLinks::ObjectMute> unblock = ALAppLinks::objectMute(path({ id, "unblock", "Some%20Object%26Co" }));
+        REQUIRE(unblock.has_value());
+        CHECK_FALSE(unblock->mBlock);
+        CHECK(unblock->mName == "Some Object&Co");
+
+        UNSCOPED_INFO("nothing without a name or for another verb");
+        CHECK_FALSE(ALAppLinks::objectMute(path({ id, "unblock" })).has_value());
+        CHECK_FALSE(ALAppLinks::objectMute(path({ id, "inspect", "Some%20Object" })).has_value());
+    }
 }

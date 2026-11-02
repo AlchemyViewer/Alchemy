@@ -41,3 +41,14 @@ bool ALAppLinks::floaterNameIn(const LLSD& params, const std::list<std::string>&
 {
     return std::find(floater_names.begin(), floater_names.end(), floaterName(params)) != floater_names.end();
 }
+
+//static
+std::optional<ALAppLinks::ObjectMute> ALAppLinks::objectMute(const LLSD& params)
+{
+    const std::string verb = params[1].asString();
+    if ((verb != "block" && verb != "unblock") || params.size() <= 2)
+    {
+        return std::nullopt;
+    }
+    return ObjectMute{ verb == "block", LLURI::unescape(params[2].asString()) };
+}
