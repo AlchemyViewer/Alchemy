@@ -1969,6 +1969,19 @@ void LLMessageSystem::enableCircuit(const LLHost &host, bool trusted)
     cdp->setTrusted(trusted);
 }
 
+void LLMessageSystem::closeCircuit(const LLHost &host)
+{
+    // Sent once, unreliably: the circuit is disabled at once, so nothing
+    // waits on an ack, and where the packet is lost the other end times the
+    // circuit out as it would have.
+    if (mCircuitInfo.findCircuit(host))
+    {
+        newMessageFast(_PREHASH_CloseCircuit);
+        sendMessage(host);
+    }
+    disableCircuit(host);
+}
+
 void LLMessageSystem::disableCircuit(const LLHost &host)
 {
     LL_INFOS("Messaging") << "LLMessageSystem::disableCircuit for " << host << LL_ENDL;

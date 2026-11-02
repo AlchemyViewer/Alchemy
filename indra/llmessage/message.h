@@ -739,6 +739,10 @@ public:
 
     void    enableCircuit(const LLHost &host, bool trusted);
     void    disableCircuit(const LLHost &host);
+    // Tells the other end of the circuit to host that it is closing, with
+    // CloseCircuit, then disables it here. The other end stops sending on
+    // it, rather than resending what goes unacked until it times it out.
+    void    closeCircuit(const LLHost &host);
 
     // Use this to establish trust on startup and in response to
     // DenyTrustedCircuit.
