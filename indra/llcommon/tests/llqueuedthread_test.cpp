@@ -298,15 +298,22 @@ namespace
     {
         // A waits for a wake every turn. Over 100 ms, well inside its
         // fallback, it is not run again; a request retried every 16 ms would
-        // have been several times. Woken, it runs again at once.
+        // have been several times. Woken, it runs again at once. The fallback
+        // is due no sooner than 250 ms after A's first turn, so a count read
+        // any later says nothing of either.
         TestQueuedThread thread;
         thread.start();
         LLTimer clock;
         std::atomic<int> turns{ 0 };
         std::atomic<bool> done{ false };
+        F64 first_turn(0.0);
         const LLQueuedThread::handle_t handle(thread.generateHandle());
         thread.addRequest(new TestRequest(handle, [&]()
             {
+                if (0 == turns.load())
+                {
+                    first_turn = clock.getElapsedTimeF64();
+                }
                 ++turns;
                 return done.load();
             }, true));
@@ -314,12 +321,24 @@ namespace
         {
             ms_sleep(1);
         }
-        REQUIRE(turns.load() == 1);
+        REQUIRE(turns.load() >= 1);
 
         ms_sleep(100);
-        CHECK(turns.load() == 1);
+        const int slept_turns(turns.load());
+        // Read once the count is, so no earlier than the count.
+        if (clock.getElapsedTimeF64() - first_turn < 0.25)
+        {
+            CHECK(slept_turns == 1);
+        }
+        else
+        {
+            WARN("A's fallback was due before its turns were counted; the count says nothing");
+        }
 
         thread.wakeRequest(handle);
+        // Read once the wake is posted, so no earlier than its time in the
+        // schedule.
+        const F64 woken(clock.getElapsedTimeF64());
         std::atomic<int> after_wake{ -1 };
         thread.post([&]()
             {
@@ -330,7 +349,16 @@ namespace
         {
             ms_sleep(1);
         }
-        CHECK(after_wake.load() == 2);
+        // Whether or not the fallback ran first, the wake runs A again.
+        CHECK(after_wake.load() >= 2);
+        if (woken - first_turn < 0.25)
+        {
+            CHECK(after_wake.load() == 2);
+        }
+        else
+        {
+            WARN("A was woken after its fallback was due; which ran it says nothing");
+        }
     }
 
     TEST_CASE("llqueuedthread: an abort reaches a request waiting for a wake at once", "[llqueuedthread]")
