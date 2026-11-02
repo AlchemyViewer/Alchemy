@@ -55,7 +55,7 @@
 //   meaning change, so a caller built against another can refuse the library
 //   rather than call it wrongly.
 
-#define ALORACLE_ABI_VERSION 2
+#define ALORACLE_ABI_VERSION 3
 
 #ifdef __cplusplus
 extern "C" {
@@ -591,6 +591,52 @@ ALORACLE_API int32_t aloracle_particles_unpack(int32_t form,
 /// line of 2048 bytes or more, which would overrun those buffers, is
 /// ALORACLE_BAD_ARGUMENT.
 ALORACLE_API int32_t aloracle_name_value_parse(const uint8_t* line, size_t size, aloracle_bytes* value);
+
+//
+// Terrain: patch_code.cpp's decoding and patch_idct.cpp's decompression of
+// a LayerData message's data
+//
+
+/// The layer types a LayerData message's LayerID block gives, as
+/// llvlmanager.cpp's codes name them.
+enum
+{
+    ALORACLE_LAYER_LAND = 'L',
+    ALORACLE_LAYER_WIND = '7',
+    ALORACLE_LAYER_CLOUD = '8',
+};
+
+/// Reads a LayerData message's Data, of the layer type its LayerID gives, as
+/// LLVLManager::unpackData does: decode_patch_group_header, then for land
+/// each patch LLSurface::decompressDCTPatch reads, up to the header whose
+/// quant_wbits is END_OF_PATCHES, 97; for wind the two LLWind::decompress
+/// reads, its velocity along x then along y; and for clouds none. A patch is
+/// decode_patch_header, decode_patch, then decompress_patch into heights of
+/// the patch's own size. value gets a map of
+/// - group: a map of stride, patch_size and layer_type, integers, as the
+///   header gives them; the viewer decompresses with a stride of its own
+/// - patches: an array, in the order they came, of maps of
+///   - quant_wbits, range and patchids, integers, and dc_offset, a real
+///   - x and y: patchids >> 5 and patchids & 31, the column and row of the
+///     region's patches LLSurface puts it at
+///   - heights: binary, the patch_size * patch_size F32s decompress_patch
+///     wrote, little-endian, the one at x, y the (y * patch_size + x)th
+/// LLSurface stops at a patch whose x or y is past its region's patches,
+/// which the library, with no region, does not. The viewer decompresses into
+/// buffers sized for patches of 16, so a patch size of 32 writes past
+/// LLWind's coefficients and velocities, and in LLSurface past the patch
+/// and, on the region's last row of patches, past the surface.
+/// LLBitPack::bitUnpack reads on past its data, so data that a step would
+/// read past the end of, as data does that ends before END_OF_PATCHES, is
+/// ALORACLE_BAD_ARGUMENT: the library reads it from a copy with room past its
+/// end, and gives nothing it read. So is a land or wind patch size but 16 or
+/// 32, for which decompress_patch's 32 by 32 transform reads beyond the
+/// coefficients it was given, and init_patch_decompressor writes past its
+/// tables over 32; a wind patch whose header is END_OF_PATCHES, which
+/// decode_patch_header leaves without word bits and LLWind decodes with
+/// those of the patch before it; an unknown type, which the viewer drops
+/// unread; and more than 2^31 - 1 bytes.
+ALORACLE_API int32_t aloracle_layer_decode(int32_t type, const uint8_t* data, size_t size, aloracle_bytes* value);
 
 #ifdef __cplusplus
 }

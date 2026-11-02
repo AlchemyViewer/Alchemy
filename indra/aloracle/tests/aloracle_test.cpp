@@ -26,7 +26,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
 #include <bit>
+#include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <future>
 #include <string>
@@ -1467,5 +1470,270 @@ namespace
                   .status
               == ALORACLE_OK);
         CHECK(nameValueParse("Name STRING " + std::string(2036, 'x')).status == ALORACLE_BAD_ARGUMENT);
+    }
+
+    // Bits as LLBitPack packs them: a value's bytes least significant first,
+    // only the low bits of its last, each byte's bits from the most
+    // significant down. The last byte's bits past them are zeros.
+    class Bits
+    {
+    public:
+        Bits& put(uint32_t value, int count)
+        {
+            for (int shift = 0; count > 0; shift += 8)
+            {
+                const int bits = std::min(count, 8);
+                const uint32_t byte = (value >> shift) & 0xFF;
+                for (int bit = bits - 1; bit >= 0; --bit)
+                {
+                    if (mCount % 8 == 0)
+                    {
+                        mBytes.push_back('\0');
+                    }
+                    if ((byte >> bit) & 1)
+                    {
+                        mBytes.back() = char(mBytes.back() | (0x80 >> (mCount % 8)));
+                    }
+                    ++mCount;
+                }
+                count -= bits;
+            }
+            return *this;
+        }
+
+        const std::string& bytes() const { return mBytes; }
+
+    private:
+        std::string mBytes;
+        size_t mCount = 0;
+    };
+
+    constexpr uint8_t END_OF_PATCHES = 97;
+
+    // A group header: its stride, patch size and layer type.
+    void group(Bits& bits, uint16_t stride, uint8_t patch_size, uint8_t layer_type)
+    {
+        bits.put(stride, 16).put(patch_size, 8).put(layer_type, 8);
+    }
+
+    // A patch: its header, then its coefficients in their zigzag order, each
+    // a 0 bit for 0, or 110 for one above 0 and 111 for one below then its
+    // magnitude in the header's word bits, then 10, which zeros the rest.
+    void patch(Bits& bits, uint8_t quant_wbits, float dc_offset, uint16_t range, uint16_t patchids,
+               const std::vector<int32_t>& coefficients = {})
+    {
+        bits.put(quant_wbits, 8).put(std::bit_cast<uint32_t>(dc_offset), 32).put(range, 16).put(patchids, 10);
+        const int word_bits = (quant_wbits & 0xF) + 2;
+        for (const int32_t coefficient : coefficients)
+        {
+            if (coefficient)
+            {
+                bits.put(coefficient < 0 ? 7 : 6, 3).put(uint32_t(std::abs(coefficient)), word_bits);
+            }
+            else
+            {
+                bits.put(0, 1);
+            }
+        }
+        bits.put(2, 2);
+    }
+
+    Result layerDecode(int32_t type, const std::string& data)
+    {
+        aloracle_bytes value{};
+        const int32_t status = aloracle_layer_decode(type, in(data), data.size(), &value);
+        return { status, taken(value) };
+    }
+
+    // A patch of one height throughout, as a layer gives it.
+    std::string flatPatchNotation(int quant_wbits, const std::string& dc_offset, int range, int x, int y,
+                                  float height, int size)
+    {
+        std::string heights;
+        for (int at = 0; at < size * size; ++at)
+        {
+            heights += f32Bytes(height);
+        }
+        return "{'quant_wbits':i" + std::to_string(quant_wbits) + ",'dc_offset':r" + dc_offset
+            + ",'range':i" + std::to_string(range) + ",'patchids':i" + std::to_string((x << 5) | y)
+            + ",'x':i" + std::to_string(x) + ",'y':i" + std::to_string(y) + ",'heights':b("
+            + std::to_string(heights.size()) + ")\"" + heights + "\"}";
+    }
+
+    // The heights of a layer's nth patch: the binary after its nth key
+    // "heights".
+    std::vector<float> heightsOf(const std::string& layer, size_t nth)
+    {
+        const std::string key = "k\0\0\0\x07heights"s;
+        size_t at = 0;
+        for (size_t found = 0; found <= nth; ++found)
+        {
+            at = layer.find(key, at);
+            REQUIRE(at != std::string::npos);
+            at += key.size();
+        }
+        REQUIRE(layer.size() >= at + 5);
+        REQUIRE(layer[at] == 'b');
+        const auto byte = [&](size_t offset) { return uint32_t(uint8_t(layer[offset])); };
+        const size_t size = (byte(at + 1) << 24) | (byte(at + 2) << 16) | (byte(at + 3) << 8) | byte(at + 4);
+        at += 5;
+        REQUIRE(layer.size() >= at + size);
+        std::vector<float> heights(size / 4);
+        for (size_t height = 0; height < heights.size(); ++height)
+        {
+            const size_t offset = at + height * 4;
+            heights[height] = std::bit_cast<float>(byte(offset) | (byte(offset + 1) << 8)
+                                                   | (byte(offset + 2) << 16) | (byte(offset + 3) << 24));
+        }
+        return heights;
+    }
+
+    TEST_CASE("aloracle: land patches with no coefficients lie flat at their offset and half their range", "[aloracle]")
+    {
+        // Prequant 2 heights 10 / 4 * 2 + 20; prequant 4 heights 1 / 16 * 8 - 4.
+        Bits bits;
+        group(bits, 264, 16, 'L');
+        patch(bits, 0x0D, 20.f, 10, (3 << 5) | 7);
+        patch(bits, 0x2D, -4.f, 1, 15 << 5);
+        bits.put(END_OF_PATCHES, 8);
+        CHECK(layerDecode(ALORACLE_LAYER_LAND, bits.bytes()).bytes
+              == valueOf("{'group':{'stride':i264,'patch_size':i16,'layer_type':i76},'patches':["
+                         + flatPatchNotation(0x0D, "20", 10, 3, 7, 25.f, 16) + ","
+                         + flatPatchNotation(0x2D, "-4", 1, 15, 0, -3.5f, 16) + "]}"));
+
+        Bits none;
+        group(none, 264, 32, 'L');
+        none.put(END_OF_PATCHES, 8);
+        CHECK(layerDecode(ALORACLE_LAYER_LAND, none.bytes()).bytes
+              == valueOf("{'group':{'stride':i264,'patch_size':i32,'layer_type':i76},'patches':[]}"));
+    }
+
+    TEST_CASE("aloracle: a land coefficient decompresses to its cosine along x or along y", "[aloracle]")
+    {
+        const double pi = 3.14159265358979323846;
+        for (const int size : { 16, 32 })
+        {
+            // The second coefficient in zigzag order is the first along x and
+            // the third the first along y, each dequantized by 3. At prequant
+            // 2 a range of 64 multiplies by 16 and adds 32 to the offset.
+            Bits bits;
+            group(bits, 264, uint8_t(size), 'L');
+            patch(bits, 0x0D, 20.f, 64, 0, { 0, 10 });
+            patch(bits, 0x0D, 20.f, 64, 1, { 0, 0, 10 });
+            bits.put(END_OF_PATCHES, 8);
+            const Result read = layerDecode(ALORACLE_LAYER_LAND, bits.bytes());
+            REQUIRE(read.status == ALORACLE_OK);
+            const std::vector<float> along_x = heightsOf(read.bytes, 0);
+            const std::vector<float> along_y = heightsOf(read.bytes, 1);
+            REQUIRE(along_x.size() == size_t(size * size));
+            REQUIRE(along_y.size() == size_t(size * size));
+
+            const auto height = [&](int at)
+            {
+                return 52. + 16. * 30. * std::cos((2. * at + 1.) * pi / (2. * size)) * (2. / size) / std::sqrt(2.);
+            };
+            for (int y = 0; y < size; ++y)
+            {
+                for (int x = 0; x < size; ++x)
+                {
+                    CHECK(std::fabs(along_x[y * size + x] - height(x)) < 1e-3);
+                    CHECK(std::fabs(along_y[y * size + x] - height(y)) < 1e-3);
+                }
+            }
+        }
+    }
+
+    TEST_CASE("aloracle: a wind layer reads its two patches and no more", "[aloracle]")
+    {
+        // Prequant 2 heights 2 / 4 * 2 plus the offset.
+        Bits bits;
+        group(bits, 16, 16, '7');
+        patch(bits, 0x0D, 1.f, 2, 0);
+        patch(bits, 0x0D, -1.f, 2, 0);
+        // A byte past them, which land would read as a patch cut short.
+        bits.put(0xFF, 8);
+        CHECK(layerDecode(ALORACLE_LAYER_WIND, bits.bytes()).bytes
+              == valueOf("{'group':{'stride':i16,'patch_size':i16,'layer_type':i55},'patches':["
+                         + flatPatchNotation(0x0D, "1", 2, 0, 0, 2.f, 16) + ","
+                         + flatPatchNotation(0x0D, "-1", 2, 0, 0, 0.f, 16) + "]}"));
+        CHECK(layerDecode(ALORACLE_LAYER_LAND, bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a cloud layer gives its group header alone", "[aloracle]")
+    {
+        Bits bits;
+        group(bits, 0, 255, '8');
+        CHECK(layerDecode(ALORACLE_LAYER_CLOUD, bits.bytes()).bytes
+              == valueOf("{'group':{'stride':i0,'patch_size':i255,'layer_type':i56},'patches':[]}"));
+    }
+
+    TEST_CASE("aloracle: layer data a step would read past the end of is refused", "[aloracle]")
+    {
+        Bits land;
+        group(land, 264, 16, 'L');
+        patch(land, 0x0D, 20.f, 10, 0, { 5, -5 });
+        land.put(END_OF_PATCHES, 8);
+        REQUIRE(layerDecode(ALORACLE_LAYER_LAND, land.bytes()).status == ALORACLE_OK);
+        // Every byte holds a bit a step reads, up to the end's last.
+        for (size_t cut = 0; cut < land.bytes().size(); ++cut)
+        {
+            CHECK(layerDecode(ALORACLE_LAYER_LAND, land.bytes().substr(0, cut)).status == ALORACLE_BAD_ARGUMENT);
+        }
+
+        Bits wind;
+        group(wind, 16, 16, '7');
+        patch(wind, 0x0D, 0.f, 2, 0, { 5, -5 });
+        patch(wind, 0x0D, 0.f, 2, 0, { -5, 5 });
+        REQUIRE(layerDecode(ALORACLE_LAYER_WIND, wind.bytes()).status == ALORACLE_OK);
+        for (size_t cut = 0; cut < wind.bytes().size(); ++cut)
+        {
+            CHECK(layerDecode(ALORACLE_LAYER_WIND, wind.bytes().substr(0, cut)).status == ALORACLE_BAD_ARGUMENT);
+        }
+        CHECK(layerDecode(ALORACLE_LAYER_CLOUD, "\x10\x00\x10"s).status == ALORACLE_BAD_ARGUMENT);
+    }
+
+    TEST_CASE("aloracle: a land or wind patch size but 16 or 32 is refused", "[aloracle]")
+    {
+        for (const uint8_t size : { 0, 8, 15, 17, 31, 33, 255 })
+        {
+            Bits bits;
+            group(bits, size, size, 'L');
+            patch(bits, 0x0D, 0.f, 2, 0);
+            patch(bits, 0x0D, 0.f, 2, 0);
+            bits.put(END_OF_PATCHES, 8);
+            CHECK(layerDecode(ALORACLE_LAYER_LAND, bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+            CHECK(layerDecode(ALORACLE_LAYER_WIND, bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+            CHECK(layerDecode(ALORACLE_LAYER_CLOUD, bits.bytes()).status == ALORACLE_OK);
+        }
+    }
+
+    TEST_CASE("aloracle: a wind patch header that ends the patches is refused", "[aloracle]")
+    {
+        // The end, then a 10 that would end its coefficients at once.
+        Bits bits;
+        group(bits, 16, 16, '7');
+        patch(bits, 0x0D, 0.f, 2, 0);
+        bits.put(END_OF_PATCHES, 8).put(2, 2);
+        CHECK(layerDecode(ALORACLE_LAYER_WIND, bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(layerDecode(ALORACLE_LAYER_LAND, bits.bytes()).status == ALORACLE_OK);
+    }
+
+    TEST_CASE("aloracle: a layer of a type the viewer has none for is refused", "[aloracle]")
+    {
+        // Data any of the three would read.
+        Bits bits;
+        group(bits, 264, 16, 'L');
+        patch(bits, 0x0D, 0.f, 2, 0);
+        patch(bits, 0x0D, 0.f, 2, 0);
+        bits.put(END_OF_PATCHES, 8);
+        REQUIRE(layerDecode(ALORACLE_LAYER_LAND, bits.bytes()).status == ALORACLE_OK);
+        REQUIRE(layerDecode(ALORACLE_LAYER_WIND, bits.bytes()).status == ALORACLE_OK);
+        CHECK(layerDecode('M', bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+        CHECK(layerDecode(0, bits.bytes()).status == ALORACLE_BAD_ARGUMENT);
+        aloracle_bytes value{};
+        CHECK(aloracle_layer_decode(ALORACLE_LAYER_LAND, in(bits.bytes()), bits.bytes().size(), nullptr)
+              == ALORACLE_BAD_ARGUMENT);
+        CHECK(aloracle_layer_decode(ALORACLE_LAYER_LAND, nullptr, 5, &value) == ALORACLE_BAD_ARGUMENT);
+        CHECK(value.data == nullptr);
     }
 }

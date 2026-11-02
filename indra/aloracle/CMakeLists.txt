@@ -36,10 +36,10 @@ target_sources(aloracle PRIVATE aloracle_llquantize.cpp)
 target_link_libraries(aloracle PRIVATE llmath)
 
 # llmessage: zerocoding, template messages read and written back, particle
-# systems and name-value pairs.
+# systems, name-value pairs and terrain patches.
 target_sources(
   aloracle
-  PRIVATE aloracle_llmessage.cpp aloracle_llpartdata.cpp aloracle_llnamevalue.cpp
+  PRIVATE aloracle_llmessage.cpp aloracle_llpartdata.cpp aloracle_llnamevalue.cpp aloracle_patch.cpp
 )
 target_link_libraries(aloracle PRIVATE llmessage)
 
