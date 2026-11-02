@@ -28,6 +28,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../llxmlnode.h"
+#include "llsd.h"
 
 #include <cmath>
 #include <sstream>
@@ -181,6 +182,34 @@ namespace
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
         UNSCOPED_INFO("interior whitespace kept");
         CHECK(node->getValue() == std::string("x   y"));
+    }
+
+    // An XML-RPC value parsed from text, as a login reply is.
+    bool xmlrpc_value(const std::string& xml, LLSD& value)
+    {
+        LLXMLNodePtr node;
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        return node->fromXMLRPCValue(value);
+    }
+
+    // The parser decodes an entity, so text that spells one after decoding
+    // keeps it.
+    TEST_CASE("llxmlnode: an XML-RPC value decodes each entity once", "[llxmlnode]")
+    {
+        LLSD value;
+        REQUIRE(xmlrpc_value("<value><string>a &amp;lt; b &lt; c</string></value>", value));
+        CHECK(value.asString() == "a &lt; b < c");
+
+        REQUIRE(xmlrpc_value("<value>&amp;amp;</value>", value));
+        CHECK(value.asString() == "&amp;");
+
+        REQUIRE(xmlrpc_value("<value><unknowntype>&amp;gt;</unknowntype></value>", value));
+        CHECK(value.asString() == "&gt;");
+
+        REQUIRE(xmlrpc_value("<value><struct><member><name>a&amp;lt;b</name>"
+                             "<value><string>x</string></value></member></struct></value>", value));
+        CHECK(value.has("a&lt;b"));
+        CHECK_FALSE(value.has("a<b"));
     }
 
     TEST_CASE("llxmlnode: line numbers are reported for elements and their attributes", "[llxmlnode]")

@@ -3197,7 +3197,7 @@ bool LLXMLNode::parseXmlRpcStructValue(LLSD& target)
         {
             if (chilp->hasName("name"))
             {
-                name = LLStringFn::xml_decode(chilp->getTextContents());
+                name = chilp->getTextContents();
             }
             else if (!chilp->fromXMLRPCValue(value))
             {
@@ -3230,7 +3230,7 @@ bool LLXMLNode::fromXMLRPCValue(LLSD& target)
     {
         LL_WARNS() << "No inner XML element (value type expected)" << LL_ENDL;
         // Value with no type qualifier is treated as string
-        target.assign(LLStringFn::xml_decode(getTextContents()));
+        target.assign(getTextContents());
         return true;
     }
 
@@ -3243,7 +3243,7 @@ bool LLXMLNode::fromXMLRPCValue(LLSD& target)
 
     if (childp->hasName("string"))
     {
-        target.assign(LLStringFn::xml_decode(childp->getXMLRPCTextContents()));
+        target.assign(childp->getXMLRPCTextContents());
         return true;
     }
 
@@ -3308,6 +3308,6 @@ bool LLXMLNode::fromXMLRPCValue(LLSD& target)
     LL_WARNS() << "Unknown inner XML element (known value type expected)"
                << LL_ENDL;
     // Value with unknown type qualifier is treated as string
-    target.assign(LLStringFn::xml_decode(childp->getTextContents()));
+    target.assign(childp->getTextContents());
     return true;
 }
