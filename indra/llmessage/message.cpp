@@ -521,12 +521,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
         S32 num_acks = 0;
         S32 true_rcv_size = 0;
         bool recv_packet_id_checked = false;
+        bool recv_acked = false;
 
         U8* buffer = mTrueReceiveBuffer;
 
         if (!faked_message)
         {
-            mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked);
+            mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked, recv_acked);
             receive_size = mTrueReceiveSize;
         }
         else
@@ -649,8 +650,12 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
             {
                 // We need to ACK here to suppress
                 // further resends of packets we've
-                // already seen.
-                cdp->collectRAck(mCurrentRecvPacketID);
+                // already seen, unless this copy was
+                // acked as it came in.
+                if (!recv_acked)
+                {
+                    cdp->collectRAck(mCurrentRecvPacketID);
+                }
 
                 LL_DEBUGS("Messaging") << "Discarding duplicate from " << host << LL_ENDL;
                 if(mVerboseLog)
@@ -731,8 +736,12 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
                     // Add to the recently received list for duplicate suppression
                     cdp->mRecentlyReceivedReliablePackets[mCurrentRecvPacketID] = getMessageTimeUsecs();
 
-                    // Put it onto the list of packets to be acked
-                    cdp->collectRAck(mCurrentRecvPacketID);
+                    // Put it onto the list of packets to be acked, unless
+                    // it was acked as it came in
+                    if (!recv_acked)
+                    {
+                        cdp->collectRAck(mCurrentRecvPacketID);
+                    }
                     mReliablePacketsIn++;
                 }
             }
@@ -965,9 +974,10 @@ void LLMessageSystem::setNetImpairment(F32 loss_percent, F32 burst_packets, F32 
 }
 #endif
 
-S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked)
+S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked, bool& already_acked)
 {
     packet_id_already_checked = false;
+    already_acked = false;
 
 #if AL_NET_IMPAIRMENT
     // Steady-state traffic arrives here, one direct socket read per call. The drain that feeds the
@@ -995,6 +1005,7 @@ S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_ch
         mLastSender      = pkt.getHost();
         mLastReceivingIF = pkt.getReceivingInterface();
         packet_id_already_checked = pkt.getPacketIDChecked();
+        already_acked = pkt.getAcked();
 
         if (packet_size > 0)
         {
@@ -1150,10 +1161,13 @@ S32 LLMessageSystem::bufferInboundPacket()
 
         if (cdp)
         {
-            // ACK inbound reliable packet ASAP
+            // ACK inbound reliable packet ASAP, so its sender stops resending
+            // it while it waits in the queue, whatever checkMessages() makes
+            // of it, which does not ack it again.
             if ((data[0] & LL_RELIABLE_FLAG))
             {
                 cdp->collectRAck(recv_packet_id);
+                pkt.setAcked(true);
             }
 
             // Check packet sequencing here, in true socket-arrival order, before
