@@ -322,7 +322,9 @@ LLSLURL::LLSLURL(const std::string& slurl)
             if (path_array.size() >= 2)
             {
                 mPosition = LLVector3(path_array); // this construction handles LLSD without all components (values default to 0.f)
-                if ((F32(mPosition[VX]) < 0.f) || (mPosition[VX] > REGION_WIDTH_METERS) ||
+                // A NaN passes every comparison below, so it is refused first.
+                if (!mPosition.isFinite() ||
+                    (F32(mPosition[VX]) < 0.f) || (mPosition[VX] > REGION_WIDTH_METERS) ||
                     (F32(mPosition[VY]) < 0.f) || (mPosition[VY] > REGION_WIDTH_METERS) ||
                     (F32(mPosition[VZ]) < 0.f) || (mPosition[VZ] > REGION_HEIGHT_METERS))
                 {
