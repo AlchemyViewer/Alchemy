@@ -233,6 +233,8 @@ namespace
             "<value><i4>-99999999999</i4></value>",
             "<value><double>x</double></value>",
             "<value><double>1e999</double></value>",
+            "<value><double>inf</double></value>",
+            "<value><double>nan</double></value>",
             "<value><double></double></value>",
             "<value><boolean>yes</boolean></value>",
             "<value><boolean>99999999999</boolean></value>",
