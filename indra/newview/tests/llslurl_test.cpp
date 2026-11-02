@@ -418,6 +418,29 @@ namespace
         CHECK(slurl.getPosition() == LLVector3(128, 128, 0));
     }
 
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a region is unescaped once from the host or the path", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        LLSLURL slurl("secondlife://my%2520region/1/2/3");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "my%20region");
+
+        slurl = LLSLURL("secondlife://my%20region/1/2/3");
+        CHECK(slurl.getRegion() == "my region");
+
+        slurl = LLSLURL("secondlife:///secondlife/my%2520region/1/2/3");
+        CHECK(slurl.getRegion() == "my%20region");
+
+        slurl = LLSLURL("https://maps.secondlife.com/secondlife/my%2520region/1/2/3");
+        CHECK(slurl.getRegion() == "my%20region");
+    }
+
     TEST_CASE_METHOD(slurlTest, "LLSlurl: construction from grid/region/vector combos", "[LLSlurl]")
     {
         llofstream gridfile(TEST_FILENAME);
