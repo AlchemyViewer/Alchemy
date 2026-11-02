@@ -3719,16 +3719,45 @@ bool LLModelPreview::render()
             }
             reach *= 0.6f;
 
+            // Arrows as the translate gizmo draws them: a shaft and a solid cone per axis.
             static const LLColor4 colors[3] = { LLColor4::red, LLColor4::green, LLColor4::blue };
+            const F32 head_length = reach * 0.2f;
+            const F32 head_radius = reach * 0.06f;
+            constexpr S32 HEAD_SEGMENTS = 12;
+
             gGL.begin(LLRender::LINES);
             for (S32 i = 0; i < 3; ++i)
             {
-                gGL.color4f(colors[i].mV[VRED] * 0.5f, colors[i].mV[VGREEN] * 0.5f, colors[i].mV[VBLUE] * 0.5f, 1.f);
-                gGL.vertex3fv((origin - axes[i] * reach).mV);
-                gGL.vertex3fv(origin.mV);
                 gGL.color4fv(colors[i].mV);
                 gGL.vertex3fv(origin.mV);
-                gGL.vertex3fv((origin + axes[i] * reach).mV);
+                gGL.vertex3fv((origin + axes[i] * (reach - head_length)).mV);
+            }
+            gGL.end();
+
+            gGL.begin(LLRender::TRIANGLES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                const LLVector3 tip = origin + axes[i] * reach;
+                const LLVector3 base = origin + axes[i] * (reach - head_length);
+                const LLVector3 u = axes[(i + 1) % 3] * head_radius;
+                const LLVector3 v = axes[(i + 2) % 3] * head_radius;
+                for (S32 s = 0; s < HEAD_SEGMENTS; ++s)
+                {
+                    const F32 a0 = F_TWO_PI * s / HEAD_SEGMENTS;
+                    const F32 a1 = F_TWO_PI * (s + 1) / HEAD_SEGMENTS;
+                    const LLVector3 r0 = base + u * cosf(a0) + v * sinf(a0);
+                    const LLVector3 r1 = base + u * cosf(a1) + v * sinf(a1);
+                    // Shade the side by its angle so the cone reads as solid.
+                    const F32 shade = 0.65f + 0.35f * cosf(a0);
+                    gGL.color4f(colors[i].mV[VRED] * shade, colors[i].mV[VGREEN] * shade, colors[i].mV[VBLUE] * shade, 1.f);
+                    gGL.vertex3fv(tip.mV);
+                    gGL.vertex3fv(r0.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.color4f(colors[i].mV[VRED] * 0.5f, colors[i].mV[VGREEN] * 0.5f, colors[i].mV[VBLUE] * 0.5f, 1.f);
+                    gGL.vertex3fv(base.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.vertex3fv(r0.mV);
+                }
             }
             gGL.end();
         }
