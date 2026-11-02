@@ -1932,10 +1932,10 @@ Analysed:
    name="preview_panel"
    top_pad="4"
    width="325"
-   height="408"/>
+   height="340"/>
   <panel
     follows="right|bottom"
-    height="140"
+    height="208"
     layout="topleft"
     name="right_panel"
     top_pad="5"
