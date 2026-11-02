@@ -1577,8 +1577,9 @@ bool LLNetworkData::isValid(U16 param_type, const U8* data, size_t size)
     case PARAMS_EXTENDED_MESH:
         return (size == 4);
     case PARAMS_RENDER_MATERIAL:
-        // A count, then a face and a material ID for each.
-        return (size > 1 && size == 1 + 17 * (size_t)data[0]);
+        // A count, then a face and a material ID for each. A count of 0,
+        // with none, clears the object's render materials.
+        return (size >= 1 && size == 1 + 17 * (size_t)data[0]);
     case PARAMS_REFLECTION_PROBE:
         return (size == 9);
     }

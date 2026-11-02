@@ -507,7 +507,7 @@ namespace
         // A render material's count names how many faces and material IDs follow it.
         CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(1)));
         CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(200)));
-        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(0)));
+        CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(0)));
         std::vector<U8> more_than_counted = render_material_data(3);
         more_than_counted[0] = 2;
         CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, more_than_counted));
@@ -602,6 +602,22 @@ namespace
             CAPTURE((int)te);
             CHECK(read.getMaterial(te) == (te < 14 ? params.getMaterial(te) : LLUUID::null));
         }
+    }
+
+    // A simulator clears an object's render materials with a count of 0
+    // and nothing after it.
+    TEST_CASE("LLRenderMaterialParams: an empty render material is valid and unpacks to no entries", "[LLRenderMaterialParams]")
+    {
+        std::vector<U8> data = render_material_data(0);
+        REQUIRE(data == std::vector<U8>{ 0 });
+        CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, data));
+
+        LLRenderMaterialParams params;
+        params.setMaterial(2, LLUUID::generateNewID());
+        LLDataPackerBinaryBuffer dp(data.data(), (S32)data.size());
+        CHECK(params.unpack(dp));
+        CHECK(params.isEmpty());
+        CHECK_FALSE(dp.hasNext());
     }
 
     TEST_CASE("LLRenderMaterialParams: a render material of more than sixty entries unpacks every entry", "[LLRenderMaterialParams]")

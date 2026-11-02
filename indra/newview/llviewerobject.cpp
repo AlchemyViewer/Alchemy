@@ -6733,8 +6733,9 @@ bool LLViewerObject::unpackParameterEntry(U16 param_type, U8* data, S32 size)
     }
     if (!LLNetworkData::isValid(param_type, data, size))
     {
+        // Once for each type and size, rather than for each object.
         LL_WARNS_ONCE("UpdateFail") << "Extra parameter " << param_type << " of " << size
-                                    << " bytes is not the size of its type for " << getID() << LL_ENDL;
+                                    << " bytes is not the size of its type" << LL_ENDL;
         return false;
     }
     ExtraParameter* param = getExtraParameterEntryCreate(param_type);
