@@ -37,6 +37,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include "altestmatchers.h"
 
+#include <cstring>
+#include <limits>
+#include <stdexcept>
+#include <vector>
+
 namespace
 {
 
@@ -143,5 +148,130 @@ namespace
         CHECK(data.mBlendFuncSource == (U8) 2);
         //mBlendFuncDest    1 ''   unsigned char
         CHECK(data.mBlendFuncDest == (U8) 1);
+    }
+
+    // The sniffed system's layout: its system size, the 68 bytes of the
+    // system, the particle size, the 18 bytes every particle holds, and the
+    // two of its blend function.
+    constexpr size_t PART_SIZE_OFFSET = 72;
+    constexpr size_t PART_FLAGS_OFFSET = 76;
+    constexpr size_t BLEND_OFFSET = 94;
+
+    std::vector<U8> sniffed_prefix(size_t length)
+    {
+        return std::vector<U8>(msg, msg + length);
+    }
+
+    void put_s32(std::vector<U8>& block, size_t offset, S32 value)
+    {
+        memcpy(&block[offset], &value, sizeof(value));
+    }
+
+    // Counts the bytes read one at a time, and stops a read that would go on
+    // far past the data.
+    class CountingPacker : public LLDataPackerBinaryBuffer
+    {
+    public:
+        CountingPacker(std::vector<U8>& block)
+        :   LLDataPackerBinaryBuffer(block.data(), (S32)block.size())
+        {
+        }
+
+        bool unpackU8(U8& value, const char* name) override
+        {
+            if (++mByteReads > 10000)
+            {
+                throw std::runtime_error("read on past the data");
+            }
+            return LLDataPackerBinaryBuffer::unpackU8(value, name);
+        }
+
+        S32 mByteReads = 0;
+    };
+
+    TEST_CASE("LLPartData: a system size past the data passes over only the bytes the data holds", "[LLPartData]")
+    {
+        std::vector<U8> block(4 + 8, 0);
+        put_s32(block, 0, 0x7fffffff);
+        CountingPacker dp(block);
+        LLPartSysData system;
+        bool read = true;
+        CHECK_NOTHROW(read = system.unpack(dp));
+        CHECK_FALSE(read);
+        CHECK(dp.mByteReads <= (S32)block.size());
+    }
+
+    TEST_CASE("LLPartData: a particle size past the data passes over only the bytes the data holds", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(BLEND_OFFSET);
+        put_s32(block, PART_SIZE_OFFSET, 0x7fffffff);
+        put_s32(block, PART_FLAGS_OFFSET, 0);
+        block.resize(block.size() + 8, 0);
+        CountingPacker dp(block);
+        LLPartSysData system;
+        bool read = true;
+        CHECK_NOTHROW(read = system.unpack(dp));
+        CHECK_FALSE(read);
+        CHECK(dp.mByteReads <= (S32)block.size());
+    }
+
+    TEST_CASE("LLPartData: a particle size so far below zero that taking a particle off it would wrap reads no system", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(BLEND_OFFSET);
+        put_s32(block, PART_SIZE_OFFSET, std::numeric_limits<S32>::min() + 5);
+        put_s32(block, PART_FLAGS_OFFSET, 0);
+        block.resize(block.size() + 8, 0);
+        CountingPacker dp(block);
+        LLPartSysData system;
+        bool read = true;
+        CHECK_NOTHROW(read = system.unpack(dp));
+        CHECK_FALSE(read);
+        CHECK(dp.mByteReads <= (S32)block.size());
+    }
+
+    TEST_CASE("LLPartData: a negative system size reads no system", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(sizeof(msg));
+        put_s32(block, 0, -5);
+        CountingPacker dp(block);
+        LLPartSysData system;
+        CHECK_FALSE(system.unpack(dp));
+        CHECK(dp.mByteReads == 0);
+    }
+
+    // A block that opens with the extended form's system size but stops
+    // before its system does.
+    TEST_CASE("LLPartData: a block shorter than the system its size names reads no system", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(40);
+        LLDataPackerBinaryBuffer dp(block.data(), (S32)block.size());
+        LLPartSysData system;
+        CHECK_FALSE(system.unpack(dp));
+    }
+
+    TEST_CASE("LLPartData: a blend function the particle size covers and the data does not reads no system", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(BLEND_OFFSET);
+        LLDataPackerBinaryBuffer dp(block.data(), (S32)block.size());
+        LLPartSysData system;
+        CHECK_FALSE(system.unpack(dp));
+    }
+
+    TEST_CASE("LLPartData: a glow the particle size covers and the data does not reads no system", "[LLPartData]")
+    {
+        std::vector<U8> block = sniffed_prefix(BLEND_OFFSET);
+        put_s32(block, PART_FLAGS_OFFSET, LLPartData::LL_PART_DATA_GLOW);
+        LLDataPackerBinaryBuffer dp(block.data(), (S32)block.size());
+        LLPartSysData system;
+        CHECK_FALSE(system.unpack(dp));
+    }
+
+    TEST_CASE("LLPartData: a legacy system cut short reads no system", "[LLPartData]")
+    {
+        // The legacy form is the system and the particle with no sizes.
+        std::vector<U8> block(msg + 4, msg + 4 + 68 + 10);
+        LLDataPackerBinaryBuffer dp(block.data(), (S32)block.size());
+        LLPartSysData system;
+        CHECK_FALSE(system.unpackLegacy(dp));
     }
 }
