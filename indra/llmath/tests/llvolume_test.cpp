@@ -7753,15 +7753,18 @@ namespace
     // value is not a number.
     TEST_CASE("llvolume: LLProfileParams holds a begin end or hollow to the unit range before cutting it", "[llvolume]")
     {
-        const auto cut = [](F32 value) { return ((int) (value * 100000)) / 100000.0f; };
+        // A value in range is cut to five places, to within the rounding of
+        // the division the cut ends with: the compiler may take it as a
+        // multiplication by the reciprocal at one place and not another.
+        const auto cut_to = [](F32 value, F32 expected) { return std::fabs(value - expected) < 1e-6f; };
         LLProfileParams profile;
 
         profile.setBegin(0.123456f);
-        CHECK(profile.getBegin() == cut(0.123456f));
+        CHECK(cut_to(profile.getBegin(), 0.12345f));
         profile.setEnd(0.654321f);
-        CHECK(profile.getEnd() == cut(0.654321f));
+        CHECK(cut_to(profile.getEnd(), 0.65432f));
         profile.setHollow(0.5f);
-        CHECK(profile.getHollow() == cut(0.5f));
+        CHECK(cut_to(profile.getHollow(), 0.5f));
 
         profile.setBegin(1.f);
         CHECK(profile.getBegin() == 0.f);
