@@ -1383,6 +1383,27 @@ S32 LLPrimitive::parseTEEntry(std::vector<U8>& packed, LLTEContents& tec, U8 fac
     return retval;
     }
 
+// static
+std::vector<U8> LLPrimitive::unpackCompressedData(LLDataPacker& dp, U32 flags)
+{
+    std::vector<U8> data;
+    if (flags & 0x2)
+    {
+        U8 tree_data = 0;
+        if (dp.unpackU8(tree_data, "TreeData"))
+        {
+            data.push_back(tree_data);
+        }
+    }
+    else if (flags & 0x1)
+    {
+        U32 size = 0;
+        dp.unpackU32(size, "ScratchPadSize");
+        dp.unpackBinaryData(data, "PartData");
+    }
+    return data;
+}
+
 S32 LLPrimitive::applyParsedTEMessage(LLTEContents& tec)
 {
     S32 retval = 0;

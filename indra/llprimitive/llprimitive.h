@@ -528,6 +528,12 @@ public:
     static S32 parseTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, LLTEContents& tec, U8 face_count);
     // Parses a packed TextureEntry field of any length into tec, for face_count faces.
     static S32 parseTEEntry(std::vector<U8>& packed, LLTEContents& tec, U8 face_count);
+    // Unpacks the data a compressed object update holds for its object where
+    // flags, the update's special code, has it: a tree's one byte for 0x2,
+    // or a scratch pad for 0x1, which takes the bytes its data holds whatever
+    // the size before it names. Empty for neither, or where the data is cut
+    // short.
+    static std::vector<U8> unpackCompressedData(LLDataPacker& dp, U32 flags);
     S32 applyParsedTEMessage(LLTEContents& tec);
 
 #ifdef CHECK_FOR_FINITE

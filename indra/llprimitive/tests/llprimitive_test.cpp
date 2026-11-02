@@ -504,6 +504,40 @@ namespace
         CHECK_FALSE(LLNetworkData::isValid(0x25, sized(16)));
     }
 
+    TEST_CASE("LLPrimitive: unpackCompressedData reads a tree's byte or a scratch pad", "[LLPrimitive]")
+    {
+        U8 tree[] = { 7 };
+        LLDataPackerBinaryBuffer tree_dp(tree, sizeof(tree));
+        CHECK(LLPrimitive::unpackCompressedData(tree_dp, 0x2) == std::vector<U8>{ 7 });
+
+        // A tree's byte where the flags name both.
+        LLDataPackerBinaryBuffer both_dp(tree, sizeof(tree));
+        CHECK(LLPrimitive::unpackCompressedData(both_dp, 0x3) == std::vector<U8>{ 7 });
+
+        // A scratch pad's size, then its data: its own size and its bytes.
+        U8 pad[] = { 99, 0, 0, 0, 3, 0, 0, 0, 1, 2, 3 };
+        LLDataPackerBinaryBuffer pad_dp(pad, sizeof(pad));
+        CHECK(LLPrimitive::unpackCompressedData(pad_dp, 0x1) == std::vector<U8>{ 1, 2, 3 });
+        CHECK_FALSE(pad_dp.hasNext());
+
+        LLDataPackerBinaryBuffer none_dp(tree, sizeof(tree));
+        CHECK(LLPrimitive::unpackCompressedData(none_dp, 0x4).empty());
+        CHECK(none_dp.hasNext());
+    }
+
+    // An update that ends before the data its flags name gives none, rather
+    // than a byte that was never read.
+    TEST_CASE("LLPrimitive: unpackCompressedData cut short gives no data", "[LLPrimitive]")
+    {
+        U8 byte = 7;
+        LLDataPackerBinaryBuffer tree_dp(&byte, 0);
+        CHECK(LLPrimitive::unpackCompressedData(tree_dp, 0x2).empty());
+
+        U8 pad[] = { 99, 0, 0, 0, 10, 0, 0, 0, 1, 2 };
+        LLDataPackerBinaryBuffer pad_dp(pad, sizeof(pad));
+        CHECK(LLPrimitive::unpackCompressedData(pad_dp, 0x1).empty());
+    }
+
     // A render material packs to no more than fourteen entries, and the count
     // before them says how many follow.
     TEST_CASE("LLRenderMaterialParams: pack writes as many entries as its count says", "[LLRenderMaterialParams]")
