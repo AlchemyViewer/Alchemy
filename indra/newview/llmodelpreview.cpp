@@ -3699,9 +3699,10 @@ bool LLModelPreview::render()
     if (mViewOption["show_origin"])
     {
         LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
-        gDebugProgram.bind();
+        gUIProgram.bind(); // takes the vertex colours, which gDebugProgram replaces with one uniform
         gGL.getTextureSlot(0)->unbind();
         LLGLDepthTest gls_depth(GL_FALSE);
+        LLGLDisable no_cull(GL_CULL_FACE);
         gGL.setLineWidth(2.f);
 
         const LLVector3 pivot = getEffectiveUploadPivot() * 0.5f;
