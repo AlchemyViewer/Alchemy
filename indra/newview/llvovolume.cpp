@@ -498,7 +498,7 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
                 // The field holds a texture entry as a data packer packs it.
                 // The packer reads no further than the field, so an entry
                 // longer than the field is refused.
-                std::vector<U8>             tdpbuffer(texture_length);
+                boost::container::small_vector<U8, 1024> tdpbuffer(texture_length);
                 mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer.data(), 0, block_num, texture_length);
                 LLDataPackerBinaryBuffer    tdp(tdpbuffer.data(), texture_length);
                 S32 result = unpackTEMessage(tdp);

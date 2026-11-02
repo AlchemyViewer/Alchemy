@@ -28,6 +28,7 @@
 #pragma once
 
 #include <map>
+#include <boost/container/small_vector.hpp>
 #include <boost/unordered_map.hpp>
 
 #include "almotionpredictor.h"
@@ -755,7 +756,7 @@ private:
         }
         return nullptr;
     }
-    bool unpackParameterEntry(U16 param_type, std::vector<U8>& data);
+    bool unpackParameterEntry(U16 param_type, U8* data, S32 size);
 
     // This function checks to see if the given media URL has changed its version
     // and the update wasn't due to this agent's last action.
@@ -957,8 +958,9 @@ protected:
     F64SecondsImplicit mRegionCrossExpire;      // frame time we detected region crossing in + wait time
     ALMotionPredictor mMotionPredictor;         // this object's own update rate, and what to do with it
 
-    // extra data sent from the sim...currently only used for tree species info
-    U8* mData;
+    // extra data sent from the sim...currently only used for tree species info,
+    // which fits in the room this keeps in place
+    boost::container::small_vector<U8, 8> mData;
 
     LLPointer<LLViewerPartSourceScript>     mPartSourcep;   // Particle source associated with this object.
     LLAudioSourceVO* mAudioSourcep;

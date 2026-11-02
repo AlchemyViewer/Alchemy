@@ -105,7 +105,7 @@ static bool unpack_ascii_binary_data(const char* valuestr, U8* value, S32 value_
 // Unpacks a line packBinaryData wrote into value, which takes as many bytes
 // as the line gives. A line holds fewer bytes than its DP_BUFSIZE characters,
 // so one that gives more is refused for holding less.
-static bool unpack_ascii_binary_data(const char* valuestr, std::vector<U8>& value, const char* name)
+static bool unpack_ascii_binary_data(const char* valuestr, boost::container::small_vector_base<U8>& value, const char* name)
 {
     value.resize(DP_BUFSIZE);
     S32 size = 0;
@@ -413,7 +413,7 @@ bool LLDataPackerBinaryBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &
     return true;
 }
 
-bool LLDataPackerBinaryBuffer::unpackBinaryData(std::vector<U8>& value, const char *name)
+bool LLDataPackerBinaryBuffer::unpackBinaryData(boost::container::small_vector_base<U8>& value, const char *name)
 {
     value.clear();
     S32 size = 0;
@@ -970,7 +970,7 @@ bool LLDataPackerAsciiBuffer::unpackBinaryData(U8 *value, S32 value_size, S32 &o
     return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
 }
 
-bool LLDataPackerAsciiBuffer::unpackBinaryData(std::vector<U8>& value, const char *name)
+bool LLDataPackerAsciiBuffer::unpackBinaryData(boost::container::small_vector_base<U8>& value, const char *name)
 {
     value.clear();
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */
@@ -1775,7 +1775,7 @@ bool LLDataPackerAsciiFile::unpackBinaryData(U8 *value, S32 value_size, S32 &out
     return unpack_ascii_binary_data(valuestr, value, value_size, out_size, name);
 }
 
-bool LLDataPackerAsciiFile::unpackBinaryData(std::vector<U8>& value, const char *name)
+bool LLDataPackerAsciiFile::unpackBinaryData(boost::container::small_vector_base<U8>& value, const char *name)
 {
     value.clear();
     char valuestr[DP_BUFSIZE];      /* Flawfinder: ignore */

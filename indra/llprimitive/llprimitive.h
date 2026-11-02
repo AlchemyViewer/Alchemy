@@ -36,6 +36,8 @@
 #include "lltextureentry.h"
 #include "llprimtexturelist.h"
 
+#include <boost/container/small_vector.hpp>
+
 // Moved to stdtypes.h --JC
 // typedef U8 LLPCode;
 class LLMessageSystem;
@@ -119,8 +121,9 @@ public:
     virtual bool unpack(LLDataPacker &dp) = 0;
     virtual bool operator==(const LLNetworkData& data) const = 0;
     virtual void copy(const LLNetworkData& data) = 0;
-    // Whether data is the size an extra parameter of the type is.
-    static bool isValid(U16 param_type, const std::vector<U8>& data);
+    // Whether the size bytes at data are the size an extra parameter of the
+    // type is.
+    static bool isValid(U16 param_type, const U8* data, size_t size);
 
     // The number of slots an object keeps its extra parameters in, one for
     // each type up to PARAMS_MAX.
@@ -129,16 +132,24 @@ public:
     // with no slot of its own.
     static S32 slotOf(U16 param_type);
 
-    // An extra parameter as an object update carries it.
-    struct Entry
+    // The extra parameters an object update holds: each one's type, and where
+    // its data lies in mBytes. An update's few parameters of a few dozen
+    // bytes each fit in the space each keeps in place.
+    struct Entries
     {
-        U16 mType = 0;
-        std::vector<U8> mData;
+        struct Entry
+        {
+            U16 mType = 0;
+            U32 mOffset = 0;
+            U32 mSize = 0;
+        };
+        boost::container::small_vector<Entry, 16> mEntries;
+        boost::container::small_vector<U8, 1024> mBytes;
     };
     // Unpacks the extra parameters an object update holds: their count, then
     // each one's type and data. False where the count or an entry runs past
     // the data, which leaves entries empty.
-    static bool unpackEntries(LLDataPacker& dp, std::vector<Entry>& entries);
+    static bool unpackEntries(LLDataPacker& dp, Entries& entries);
 };
 
 extern const F32 LIGHT_MIN_RADIUS;
@@ -526,14 +537,12 @@ public:
     // Same as above, but usable before an instance exists to derive the face count from
     // (e.g. decoding a message for an object that hasn't been created yet).
     static S32 parseTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, LLTEContents& tec, U8 face_count);
-    // Parses a packed TextureEntry field of any length into tec, for face_count faces.
-    static S32 parseTEEntry(std::vector<U8>& packed, LLTEContents& tec, U8 face_count);
-    // Unpacks the data a compressed object update holds for its object where
-    // flags, the update's special code, has it: a tree's one byte for 0x2,
-    // or a scratch pad for 0x1, which takes the bytes its data holds whatever
-    // the size before it names. Empty for neither, or where the data is cut
-    // short.
-    static std::vector<U8> unpackCompressedData(LLDataPacker& dp, U32 flags);
+    // Unpacks into data, in place of what it held, the data a compressed
+    // object update holds for its object where flags, the update's special
+    // code, has it: a tree's one byte for 0x2, or a scratch pad for 0x1, which
+    // takes the bytes its data holds whatever the size before it names. Empty
+    // for neither, or where the data is cut short.
+    static void unpackCompressedData(LLDataPacker& dp, U32 flags, boost::container::small_vector_base<U8>& data);
     S32 applyParsedTEMessage(LLTEContents& tec);
 
 #ifdef CHECK_FOR_FINITE

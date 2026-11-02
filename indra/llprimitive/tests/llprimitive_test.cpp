@@ -380,20 +380,32 @@ namespace
         }
     }
 
+    // An extra parameter as a test sends it.
+    struct SentEntry
+    {
+        U16 mType = 0;
+        std::vector<U8> mData;
+    };
+
     // Packs extra parameters as an object update holds them: their count,
     // then each one's type and data.
-    std::vector<U8> pack_entries(const std::vector<LLNetworkData::Entry>& entries)
+    std::vector<U8> pack_entries(const std::vector<SentEntry>& entries)
     {
         std::vector<U8> buffer(65536);
         LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size());
         REQUIRE(dp.packU8((U8)entries.size(), "num_params"));
-        for (const LLNetworkData::Entry& entry : entries)
+        for (const SentEntry& entry : entries)
         {
             REQUIRE(dp.packU16(entry.mType, "param_type"));
             REQUIRE(dp.packBinaryData(entry.mData.data(), (S32)entry.mData.size(), "param_data"));
         }
         buffer.resize(dp.getCurrentSize());
         return buffer;
+    }
+
+    bool is_valid(U16 type, const std::vector<U8>& data)
+    {
+        return LLNetworkData::isValid(type, data.data(), data.size());
     }
 
     // A render material's data: its count, then a face and a material ID for
@@ -416,7 +428,7 @@ namespace
 
     TEST_CASE("LLNetworkData: unpackEntries reads every entry an update holds whole", "[LLNetworkData]")
     {
-        std::vector<LLNetworkData::Entry> sent(3);
+        std::vector<SentEntry> sent(3);
         sent[0].mType = LLNetworkData::PARAMS_LIGHT;
         sent[0].mData.assign(16, 0x11);
         sent[1].mType = LLNetworkData::PARAMS_RENDER_MATERIAL;
@@ -427,21 +439,24 @@ namespace
 
         std::vector<U8> buffer = pack_entries(sent);
         LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size());
-        std::vector<LLNetworkData::Entry> read;
+        LLNetworkData::Entries read;
         REQUIRE(LLNetworkData::unpackEntries(dp, read));
-        REQUIRE(read.size() == sent.size());
+        REQUIRE(read.mEntries.size() == sent.size());
         for (size_t i = 0; i < sent.size(); ++i)
         {
             CAPTURE(i);
-            CHECK(read[i].mType == sent[i].mType);
-            CHECK(read[i].mData == sent[i].mData);
+            const LLNetworkData::Entries::Entry& entry = read.mEntries[i];
+            CHECK(entry.mType == sent[i].mType);
+            REQUIRE(entry.mOffset + entry.mSize <= read.mBytes.size());
+            const U8* data = read.mBytes.data() + entry.mOffset;
+            CHECK(std::vector<U8>(data, data + entry.mSize) == sent[i].mData);
         }
         CHECK_FALSE(dp.hasNext());
     }
 
     TEST_CASE("LLNetworkData: unpackEntries refuses an entry past the end of its block", "[LLNetworkData]")
     {
-        std::vector<LLNetworkData::Entry> sent(2);
+        std::vector<SentEntry> sent(2);
         sent[0].mType = LLNetworkData::PARAMS_LIGHT;
         sent[0].mData.assign(16, 0x11);
         sent[1].mType = LLNetworkData::PARAMS_SCULPT;
@@ -450,78 +465,94 @@ namespace
 
         // Cut inside the second entry's data.
         LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size() - 5);
-        std::vector<LLNetworkData::Entry> read(1);
+        LLNetworkData::Entries read;
         CHECK_FALSE(LLNetworkData::unpackEntries(dp, read));
-        CHECK(read.empty());
+        CHECK(read.mEntries.empty());
+        CHECK(read.mBytes.empty());
 
         // An update that ends before its count.
+        LLDataPackerBinaryBuffer whole(buffer.data(), (S32)buffer.size());
+        REQUIRE(LLNetworkData::unpackEntries(whole, read));
         LLDataPackerBinaryBuffer empty(buffer.data(), 0);
-        read.resize(1);
         CHECK_FALSE(LLNetworkData::unpackEntries(empty, read));
-        CHECK(read.empty());
+        CHECK(read.mEntries.empty());
+        CHECK(read.mBytes.empty());
     }
 
     TEST_CASE("LLNetworkData: isValid holds each extra parameter to the size of its type", "[LLNetworkData]")
     {
         const auto sized = [](size_t size) { return std::vector<U8>(size, 0); };
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(16)));
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(4)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(15)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_FLEXIBLE, sized(0)));
+        CHECK(is_valid(LLNetworkData::PARAMS_FLEXIBLE, sized(16)));
+        CHECK(is_valid(LLNetworkData::PARAMS_FLEXIBLE, sized(4)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_FLEXIBLE, sized(15)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_FLEXIBLE, sized(0)));
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(16)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(12)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT, sized(17)));
+        CHECK(is_valid(LLNetworkData::PARAMS_LIGHT, sized(16)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_LIGHT, sized(12)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_LIGHT, sized(17)));
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_SCULPT, sized(17)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_SCULPT, sized(16)));
+        CHECK(is_valid(LLNetworkData::PARAMS_SCULPT, sized(17)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_SCULPT, sized(16)));
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(28)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(27)));
+        CHECK(is_valid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(28)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_LIGHT_IMAGE, sized(27)));
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(4)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(2)));
+        CHECK(is_valid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(4)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_EXTENDED_MESH, sized(2)));
 
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(9)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(8)));
+        CHECK(is_valid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(9)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_REFLECTION_PROBE, sized(8)));
 
         // A render material's count names how many faces and material IDs follow it.
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(1)));
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(200)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(0)));
+        CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(1)));
+        CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(200)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, render_material_data(0)));
         std::vector<U8> more_than_counted = render_material_data(3);
         more_than_counted[0] = 2;
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, more_than_counted));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, more_than_counted));
         std::vector<U8> fewer_than_counted = render_material_data(3);
         fewer_than_counted[0] = 4;
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, fewer_than_counted));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, sized(0)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, fewer_than_counted));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, sized(0)));
 
         // Types with no data class of their own.
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_RESERVED, sized(16)));
-        CHECK_FALSE(LLNetworkData::isValid(LLNetworkData::PARAMS_MESH, sized(17)));
-        CHECK_FALSE(LLNetworkData::isValid(0x25, sized(16)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_RESERVED, sized(16)));
+        CHECK_FALSE(is_valid(LLNetworkData::PARAMS_MESH, sized(17)));
+        CHECK_FALSE(is_valid(0x25, sized(16)));
+    }
+
+    typedef boost::container::small_vector<U8, 8> object_data_t;
+
+    std::vector<U8> compressed_data(LLDataPackerBinaryBuffer& dp, U32 flags, object_data_t& data)
+    {
+        LLPrimitive::unpackCompressedData(dp, flags, data);
+        return std::vector<U8>(data.begin(), data.end());
     }
 
     TEST_CASE("LLPrimitive: unpackCompressedData reads a tree's byte or a scratch pad", "[LLPrimitive]")
     {
+        object_data_t data;
+        const U8* inline_storage = data.data();
+
         U8 tree[] = { 7 };
         LLDataPackerBinaryBuffer tree_dp(tree, sizeof(tree));
-        CHECK(LLPrimitive::unpackCompressedData(tree_dp, 0x2) == std::vector<U8>{ 7 });
+        CHECK(compressed_data(tree_dp, 0x2, data) == std::vector<U8>{ 7 });
+        CHECK(data.data() == inline_storage);
 
         // A tree's byte where the flags name both.
         LLDataPackerBinaryBuffer both_dp(tree, sizeof(tree));
-        CHECK(LLPrimitive::unpackCompressedData(both_dp, 0x3) == std::vector<U8>{ 7 });
+        CHECK(compressed_data(both_dp, 0x3, data) == std::vector<U8>{ 7 });
 
         // A scratch pad's size, then its data: its own size and its bytes.
         U8 pad[] = { 99, 0, 0, 0, 3, 0, 0, 0, 1, 2, 3 };
         LLDataPackerBinaryBuffer pad_dp(pad, sizeof(pad));
-        CHECK(LLPrimitive::unpackCompressedData(pad_dp, 0x1) == std::vector<U8>{ 1, 2, 3 });
+        CHECK(compressed_data(pad_dp, 0x1, data) == std::vector<U8>{ 1, 2, 3 });
         CHECK_FALSE(pad_dp.hasNext());
 
+        // Neither replaces what the data held with nothing.
         LLDataPackerBinaryBuffer none_dp(tree, sizeof(tree));
-        CHECK(LLPrimitive::unpackCompressedData(none_dp, 0x4).empty());
+        CHECK(compressed_data(none_dp, 0x4, data).empty());
         CHECK(none_dp.hasNext());
     }
 
@@ -529,13 +560,15 @@ namespace
     // than a byte that was never read.
     TEST_CASE("LLPrimitive: unpackCompressedData cut short gives no data", "[LLPrimitive]")
     {
+        object_data_t data = { 1, 2 };
         U8 byte = 7;
         LLDataPackerBinaryBuffer tree_dp(&byte, 0);
-        CHECK(LLPrimitive::unpackCompressedData(tree_dp, 0x2).empty());
+        CHECK(compressed_data(tree_dp, 0x2, data).empty());
 
+        data = { 1, 2 };
         U8 pad[] = { 99, 0, 0, 0, 10, 0, 0, 0, 1, 2 };
         LLDataPackerBinaryBuffer pad_dp(pad, sizeof(pad));
-        CHECK(LLPrimitive::unpackCompressedData(pad_dp, 0x1).empty());
+        CHECK(compressed_data(pad_dp, 0x1, data).empty());
     }
 
     // A render material packs to no more than fourteen entries, and the count
@@ -558,7 +591,7 @@ namespace
         REQUIRE_FALSE(data.empty());
         CHECK(data[0] == 14);
         CHECK(data.size() == 1 + 17 * (size_t)14);
-        CHECK(LLNetworkData::isValid(LLNetworkData::PARAMS_RENDER_MATERIAL, data));
+        CHECK(is_valid(LLNetworkData::PARAMS_RENDER_MATERIAL, data));
 
         LLDataPackerBinaryBuffer reader(data.data(), (S32)data.size());
         LLRenderMaterialParams read;

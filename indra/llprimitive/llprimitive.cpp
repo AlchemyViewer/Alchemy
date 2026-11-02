@@ -1305,6 +1305,70 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
     return parseTEMessage(mesgsys, block_name, block_num, tec, getNumTEs());
 }
 
+namespace
+{
+    // Room for a texture entry as long as the packers write for the most
+    // faces they pack, and the zero the parse puts after it.
+    constexpr size_t TE_INLINE_BYTES = 4608;
+    typedef boost::container::small_vector<U8, TE_INLINE_BYTES> te_bytes_t;
+
+    // Parses a packed TextureEntry field of any length into tec, for
+    // face_count faces.
+    S32 parse_te_entry(boost::container::small_vector_base<U8>& packed, LLTEContents& tec, U8 face_count)
+    {
+        S32 retval = 0;
+        // temp buffer for material ID processing
+        // data will end up in tec.material_id[]
+        material_id_type material_data[LLTEContents::MAX_TES];
+
+        if (packed.empty())
+        {
+            tec.size = 0;
+            tec.face_count = 0;
+            return retval;
+        }
+
+        // The last field is not zero terminated.
+        // Rather than special case the upack functions.  Just make it 0x00 terminated.
+        packed.push_back(0x00);
+        tec.size = (U32)packed.size();
+
+        tec.face_count = llmin((U32)face_count,(U32)LLTEContents::MAX_TES);
+
+        U8 *cur_ptr = packed.data();
+        LL_DEBUGS("TEXTUREENTRY") << "Texture Entry with buffere sized: " << tec.size << LL_ENDL;
+        U8 *buffer_end = packed.data() + packed.size();
+
+        if (!(  unpack_TEField<LLUUID>(tec.image_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID) &&
+                unpack_TEField<LLColor4U>(tec.colors, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
+                unpack_TEField<F32>(tec.scale_s, tec.face_count, cur_ptr, buffer_end, MVT_F32) &&
+                unpack_TEField<F32>(tec.scale_t, tec.face_count, cur_ptr, buffer_end, MVT_F32) &&
+                unpack_TEField<S16>(tec.offset_s, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
+                unpack_TEField<S16>(tec.offset_t, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
+                unpack_TEField<S16>(tec.image_rot, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
+                unpack_TEField<U8>(tec.bump, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
+                unpack_TEField<U8>(tec.media_flags, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
+                unpack_TEField<U8>(tec.glow, tec.face_count, cur_ptr, buffer_end, MVT_U8)))
+        {
+            LL_WARNS("TEXTUREENTRY") << "Failure parsing Texture Entry Message due to malformed TE Field! Dropping changes on the floor. " << LL_ENDL;
+            return 0;
+        }
+
+        if (cur_ptr >= buffer_end || !unpack_TEField<material_id_type>(material_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID))
+        {
+            memset((void*)material_data, 0, sizeof(material_data));
+        }
+
+        for (U32 i = 0; i < tec.face_count; i++)
+        {
+            tec.material_ids[i].set(&(material_data[i]));
+        }
+
+        retval = 1;
+        return retval;
+    }
+}
+
 // static
 S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, LLTEContents& tec, U8 face_count)
 {
@@ -1318,75 +1382,20 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
         size = mesgsys->getSizeFast(block_name, block_num, _PREHASH_TextureEntry);
     }
 
-    std::vector<U8> packed;
+    te_bytes_t packed;
     if (size > 0)
     {
         packed.resize(size);
         // if block_num < 0 ask for block 0
         mesgsys->getBinaryDataFast(block_name, _PREHASH_TextureEntry, packed.data(), 0, std::max(block_num, 0), size);
     }
-    return parseTEEntry(packed, tec, face_count);
+    return parse_te_entry(packed, tec, face_count);
 }
 
 // static
-S32 LLPrimitive::parseTEEntry(std::vector<U8>& packed, LLTEContents& tec, U8 face_count)
+void LLPrimitive::unpackCompressedData(LLDataPacker& dp, U32 flags, boost::container::small_vector_base<U8>& data)
 {
-    S32 retval = 0;
-    // temp buffer for material ID processing
-    // data will end up in tec.material_id[]
-    material_id_type material_data[LLTEContents::MAX_TES];
-
-    if (packed.empty())
-    {
-        tec.size = 0;
-        tec.face_count = 0;
-        return retval;
-    }
-
-    // The last field is not zero terminated.
-    // Rather than special case the upack functions.  Just make it 0x00 terminated.
-    packed.push_back(0x00);
-    tec.size = (U32)packed.size();
-
-    tec.face_count = llmin((U32)face_count,(U32)LLTEContents::MAX_TES);
-
-    U8 *cur_ptr = packed.data();
-    LL_DEBUGS("TEXTUREENTRY") << "Texture Entry with buffere sized: " << tec.size << LL_ENDL;
-    U8 *buffer_end = packed.data() + packed.size();
-
-    if (!(  unpack_TEField<LLUUID>(tec.image_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID) &&
-            unpack_TEField<LLColor4U>(tec.colors, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
-            unpack_TEField<F32>(tec.scale_s, tec.face_count, cur_ptr, buffer_end, MVT_F32) &&
-            unpack_TEField<F32>(tec.scale_t, tec.face_count, cur_ptr, buffer_end, MVT_F32) &&
-            unpack_TEField<S16>(tec.offset_s, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
-            unpack_TEField<S16>(tec.offset_t, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
-            unpack_TEField<S16>(tec.image_rot, tec.face_count, cur_ptr, buffer_end, MVT_S16) &&
-            unpack_TEField<U8>(tec.bump, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
-            unpack_TEField<U8>(tec.media_flags, tec.face_count, cur_ptr, buffer_end, MVT_U8) &&
-            unpack_TEField<U8>(tec.glow, tec.face_count, cur_ptr, buffer_end, MVT_U8)))
-    {
-        LL_WARNS("TEXTUREENTRY") << "Failure parsing Texture Entry Message due to malformed TE Field! Dropping changes on the floor. " << LL_ENDL;
-        return 0;
-    }
-
-    if (cur_ptr >= buffer_end || !unpack_TEField<material_id_type>(material_data, tec.face_count, cur_ptr, buffer_end, MVT_LLUUID))
-    {
-        memset((void*)material_data, 0, sizeof(material_data));
-    }
-
-    for (U32 i = 0; i < tec.face_count; i++)
-    {
-        tec.material_ids[i].set(&(material_data[i]));
-    }
-
-    retval = 1;
-    return retval;
-    }
-
-// static
-std::vector<U8> LLPrimitive::unpackCompressedData(LLDataPacker& dp, U32 flags)
-{
-    std::vector<U8> data;
+    data.clear();
     if (flags & 0x2)
     {
         U8 tree_data = 0;
@@ -1401,7 +1410,6 @@ std::vector<U8> LLPrimitive::unpackCompressedData(LLDataPacker& dp, U32 flags)
         dp.unpackU32(size, "ScratchPadSize");
         dp.unpackBinaryData(data, "PartData");
     }
-    return data;
 }
 
 S32 LLPrimitive::applyParsedTEMessage(LLTEContents& tec)
@@ -1446,7 +1454,7 @@ S32 LLPrimitive::unpackTEMessage(LLMessageSystem* mesgsys, char const* block_nam
 
 S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
 {
-    std::vector<U8> packed;
+    te_bytes_t packed;
     if (!dp.unpackBinaryData(packed, "TextureEntry"))
     {
         LL_WARNS() << "Bad texture entry block!  Abort!" << LL_ENDL;
@@ -1454,7 +1462,7 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
     }
 
     LLTEContents tec;
-    if (!parseTEEntry(packed, tec, getNumTEs()))
+    if (!parse_te_entry(packed, tec, getNumTEs()))
     {
         return 0;
     }
@@ -1550,11 +1558,10 @@ bool LLPrimitive::getTESTAxes(const U8 face, U32* s_axis, U32* t_axis)
 //============================================================================
 
 //static
-bool LLNetworkData::isValid(U16 param_type, const std::vector<U8>& data)
+bool LLNetworkData::isValid(U16 param_type, const U8* data, size_t size)
 {
     // ew - better mechanism needed
 
-    const size_t size = data.size();
     switch(param_type)
     {
     case PARAMS_FLEXIBLE:
@@ -1592,22 +1599,29 @@ S32 LLNetworkData::slotOf(U16 param_type)
 }
 
 //static
-bool LLNetworkData::unpackEntries(LLDataPacker& dp, std::vector<Entry>& entries)
+bool LLNetworkData::unpackEntries(LLDataPacker& dp, Entries& entries)
 {
-    entries.clear();
+    entries.mEntries.clear();
+    entries.mBytes.clear();
     U8 count = 0;
     if (!dp.unpackU8(count, "num_params"))
     {
         return false;
     }
-    entries.resize(count);
-    for (Entry& entry : entries)
+    boost::container::small_vector<U8, 256> data;
+    for (U8 i = 0; i < count; ++i)
     {
-        if (!dp.unpackU16(entry.mType, "param_type") || !dp.unpackBinaryData(entry.mData, "param_data"))
+        Entries::Entry entry;
+        if (!dp.unpackU16(entry.mType, "param_type") || !dp.unpackBinaryData(data, "param_data"))
         {
-            entries.clear();
+            entries.mEntries.clear();
+            entries.mBytes.clear();
             return false;
         }
+        entry.mOffset = (U32)entries.mBytes.size();
+        entry.mSize = (U32)data.size();
+        entries.mBytes.insert(entries.mBytes.end(), data.begin(), data.end());
+        entries.mEntries.push_back(entry);
     }
     return true;
 }

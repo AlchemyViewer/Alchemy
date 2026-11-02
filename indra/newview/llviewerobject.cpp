@@ -269,7 +269,6 @@ LLViewerObject::LLViewerObject(const LLUUID &id, const LLPCode pcode, LLViewerRe
     mLastMessageUpdateSecs(0.f),
     mLatestRecvPacketID(0),
     mRegionCrossExpire(0),
-    mData(NULL),
     mAudioSourcep(NULL),
     mAudioGain(1.f),
     mSoundCutOffRadius(0.f),
@@ -372,8 +371,8 @@ LLViewerObject::~LLViewerObject()
     for_each(mNameValuePairs.begin(), mNameValuePairs.end(), DeletePairedPointer()) ;
     mNameValuePairs.clear();
 
-    delete[] mData;
-    mData = NULL;
+    mData.clear();
+    mData.shrink_to_fit();
 
     delete mMedia;
     mMedia = NULL;
@@ -1499,11 +1498,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 }
 
                 // Clear out any existing generic data
-                if (mData)
-                {
-                    delete [] mData;
-                    mData = NULL;
-                }
+                mData.clear();
 
                 // Dec 2023 new generic data:
                 //    Trees work as before, this field contains genome data
@@ -1521,8 +1516,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 {    // has generic data
                     if (getPCode() == LL_PCODE_LEGACY_TREE || getPCode() == LL_PCODE_TREE_NEW)
                     {
-                        mData = new U8[data_size];
-                        mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, mData, data_size, block_num);
+                        mData.resize(data_size);
+                        mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_Data, mData.data(), data_size, block_num);
                         LL_DEBUGS("NewObjectData") << "Read " << data_size << " bytes tree genome data for " << getID() << ", pcode "
                                              << getPCodeString() << ", value " << (S32) mData[0] << LL_ENDL;
                     }
@@ -1603,18 +1598,19 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 S32 size = mesgsys->getSizeFast(_PREHASH_ObjectData, block_num, _PREHASH_ExtraParams);
                 if (size > 0)
                 {
-                    std::vector<U8> buffer(size);
+                    // The field is at most 255 bytes, which fit in place.
+                    boost::container::small_vector<U8, 256> buffer(size);
                     mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_ExtraParams, buffer.data(), size, block_num);
                     LLDataPackerBinaryBuffer dp(buffer.data(), size);
 
                     // A block with an entry past its end has every parameter
                     // switched off: each is marked unused above.
-                    std::vector<LLNetworkData::Entry> entries;
+                    LLNetworkData::Entries entries;
                     if (LLNetworkData::unpackEntries(dp, entries))
                     {
-                        for (LLNetworkData::Entry& entry : entries)
+                        for (const LLNetworkData::Entries::Entry& entry : entries.mEntries)
                         {
-                            unpackParameterEntry(entry.mType, entry.mData);
+                            unpackParameterEntry(entry.mType, entries.mBytes.data() + entry.mOffset, entry.mSize);
                         }
                     }
                     else
@@ -1814,14 +1810,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                 // A tree's byte or a scratch pad, replacing the data before
                 // it, and none where the update holds neither.
-                const std::vector<U8> object_data = unpackCompressedData(*dp, value);
-                delete [] mData;
-                mData = NULL;
-                if (!object_data.empty())
-                {
-                    mData = new U8[object_data.size()];
-                    memcpy(mData, object_data.data(), object_data.size());
-                }
+                unpackCompressedData(*dp, value, mData);
 
                 // Setup object text
                 if (!mText && (value & 0x4))
@@ -1883,7 +1872,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                 // Unpack extra params. An entry past the end of the update
                 // leaves nothing after it to read, so the update is refused:
                 // the object is dropped and asked for whole again.
-                std::vector<LLNetworkData::Entry> entries;
+                LLNetworkData::Entries entries;
                 if (!LLNetworkData::unpackEntries(*dp, entries))
                 {
                     LL_WARNS("UpdateFail") << "Extra parameter past the end of the compressed update for " << getID()
@@ -1899,9 +1888,9 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     if (entry.in_use) *entry.in_use = false;
                 }
 
-                for (LLNetworkData::Entry& entry : entries)
+                for (const LLNetworkData::Entries::Entry& entry : entries.mEntries)
                 {
-                    unpackParameterEntry(entry.mType, entry.mData);
+                    unpackParameterEntry(entry.mType, entries.mBytes.data() + entry.mOffset, entry.mSize);
                 }
 
                 for (size_t i = 0; i < mExtraParameterList.size(); ++i)
@@ -6732,22 +6721,22 @@ void LLViewerObject::adjustAudioGain(const F32 gain)
 
 //----------------------------------------------------------------------------
 
-bool LLViewerObject::unpackParameterEntry(U16 param_type, std::vector<U8>& data)
+bool LLViewerObject::unpackParameterEntry(U16 param_type, U8* data, S32 size)
 {
     if (LLNetworkData::PARAMS_MESH == param_type)
     {
         param_type = LLNetworkData::PARAMS_SCULPT;
     }
-    if (!LLNetworkData::isValid(param_type, data))
+    if (!LLNetworkData::isValid(param_type, data, size))
     {
-        LL_WARNS_ONCE("UpdateFail") << "Extra parameter " << param_type << " of " << data.size()
+        LL_WARNS_ONCE("UpdateFail") << "Extra parameter " << param_type << " of " << size
                                     << " bytes is not the size of its type for " << getID() << LL_ENDL;
         return false;
     }
     ExtraParameter* param = getExtraParameterEntryCreate(param_type);
     if (param)
     {
-        LLDataPackerBinaryBuffer dp(data.data(), (S32)data.size());
+        LLDataPackerBinaryBuffer dp(data, size);
         param->data->unpack(dp);
         *param->in_use = true;
         parameterChanged(param_type, param->data, true, false);
