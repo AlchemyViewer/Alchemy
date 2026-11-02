@@ -1,6 +1,6 @@
 /**
  * @file aloracle_llmessage.cpp
- * @brief aloracle's functions over llmessage's zerocoding and template messages.
+ * @brief aloracle's functions over llmessage's zerocoding and template messages, read from packets or LLSD.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
  * Alchemy Viewer Source Code
@@ -27,14 +27,20 @@
 #include "aloracleboundary.h"
 
 #include "llhost.h"
+#include "llmath.h"
 #include "llmessagetemplate.h"
 #include "llmessagetemplateparser.h"
+#include "llquaternion.h"
 #include "llsd.h"
+#include "llsdmessagereader.h"
 #include "llsdutil.h"
 #include "lltemplatemessagebuilder.h"
 #include "lltemplatemessagereader.h"
 #include "llzerocode.h"
 #include "message.h"
+#include "v3dmath.h"
+#include "v3math.h"
+#include "v4math.h"
 
 #include <boost/unordered/unordered_flat_set.hpp>
 
@@ -100,6 +106,10 @@ struct aloracle_message_template
 // no lock, and validateMessage counts each message it reads on its template:
 // both rely on the library running one call at a time.
 
+// llsdmessagereader.cpp's lookup, which its getters make: the field's value,
+// or undefined where the block or the field is missing.
+LLSD getLLSD(const LLSD& input, const char* block, const char* var, S32 blocknum);
+
 namespace
 {
     bool fitsS32(size_t size)
@@ -123,6 +133,189 @@ namespace
             distinct.insert(tokens.next());
         }
         return distinct.size();
+    }
+
+    // Writes the builder's message as buildMessage does with no offset, and
+    // gives written what it wrote from the message number on.
+    int32_t giveBuilt(LLTemplateMessageBuilder& builder, const LLMessageTemplate* message, aloracle_bytes* written)
+    {
+        // buildMessage checks only a field's data against the buffer, and that
+        // strictly: room for the header, the number, every block's count, every
+        // field's data and the longest length prefix each could take, and a
+        // byte over.
+        size_t capacity = LL_PACKET_ID_SIZE + (size_t)message->mFrequency + (size_t)builder.getMessageSize() + 1;
+        for (const LLMessageBlock* block : message->mMemberBlocks)
+        {
+            const LLMsgBlkData* first = builder.getCurrentMessage()->getBlock(block->mName, 0);
+            const size_t repeats = first ? (size_t)first->mBlockNumber : 0;
+            capacity += 1 + repeats * block->mMemberVariables.size() * sizeof(U32);
+        }
+        std::vector<U8> out(capacity);
+        const U32 built = builder.buildMessage(out.data(), (U32)out.size(), 0);
+        return aloracle::give(viewOf(out, LL_PACKET_ID_SIZE, built), written);
+    }
+
+    // Whether LLMessageReader has a getter for a field of the type.
+    bool hasGetter(EMsgVariableType type)
+    {
+        return type != MVT_S64;
+    }
+
+    // Reads a field of a block's repeat with the reader's getter for its type,
+    // and adds it to the builder's current block.
+    void copyField(LLSDMessageReader& reader,
+                   const LLSD& body,
+                   LLTemplateMessageBuilder& builder,
+                   const char* block,
+                   const LLMessageVariable& variable,
+                   S32 blocknum)
+    {
+        const char* var = variable.getName();
+        switch (variable.getType())
+        {
+        case MVT_FIXED:
+        {
+            std::vector<U8> data(variable.getSize());
+            reader.getBinaryData(block, var, data.data(), (S32)data.size(), blocknum);
+            builder.addBinaryData(var, data.data(), (S32)data.size());
+            break;
+        }
+        case MVT_VARIABLE:
+            if (getLLSD(body, block, var, blocknum).isString())
+            {
+                std::string text;
+                reader.getString(block, var, text, blocknum);
+                builder.addString(var, text);
+            }
+            else
+            {
+                std::vector<U8> data(std::max(reader.getSize(block, blocknum, var), 0));
+                reader.getBinaryData(block, var, data.data(), 0, blocknum, (S32)data.size());
+                builder.addBinaryData(var, data.data(), (S32)data.size());
+            }
+            break;
+        case MVT_U8:
+        {
+            U8 value = 0;
+            reader.getU8(block, var, value, blocknum);
+            builder.addU8(var, value);
+            break;
+        }
+        case MVT_U16:
+        {
+            U16 value = 0;
+            reader.getU16(block, var, value, blocknum);
+            builder.addU16(var, value);
+            break;
+        }
+        case MVT_U32:
+        {
+            U32 value = 0;
+            reader.getU32(block, var, value, blocknum);
+            builder.addU32(var, value);
+            break;
+        }
+        case MVT_U64:
+        {
+            U64 value = 0;
+            reader.getU64(block, var, value, blocknum);
+            builder.addU64(var, value);
+            break;
+        }
+        case MVT_S8:
+        {
+            S8 value = 0;
+            reader.getS8(block, var, value, blocknum);
+            builder.addS8(var, value);
+            break;
+        }
+        case MVT_S16:
+        {
+            S16 value = 0;
+            reader.getS16(block, var, value, blocknum);
+            builder.addS16(var, value);
+            break;
+        }
+        case MVT_S32:
+        {
+            S32 value = 0;
+            reader.getS32(block, var, value, blocknum);
+            builder.addS32(var, value);
+            break;
+        }
+        case MVT_F32:
+        {
+            F32 value = 0.f;
+            reader.getF32(block, var, value, blocknum);
+            builder.addF32(var, value);
+            break;
+        }
+        case MVT_F64:
+        {
+            F64 value = 0.0;
+            reader.getF64(block, var, value, blocknum);
+            builder.addF64(var, value);
+            break;
+        }
+        case MVT_LLVector3:
+        {
+            LLVector3 value;
+            reader.getVector3(block, var, value, blocknum);
+            builder.addVector3(var, value);
+            break;
+        }
+        case MVT_LLVector3d:
+        {
+            LLVector3d value;
+            reader.getVector3d(block, var, value, blocknum);
+            builder.addVector3d(var, value);
+            break;
+        }
+        case MVT_LLVector4:
+        {
+            LLVector4 value;
+            reader.getVector4(block, var, value, blocknum);
+            builder.addVector4(var, value);
+            break;
+        }
+        case MVT_LLQuaternion:
+        {
+            LLQuaternion value;
+            reader.getQuat(block, var, value, blocknum);
+            builder.addQuat(var, value);
+            break;
+        }
+        case MVT_LLUUID:
+        {
+            LLUUID value;
+            reader.getUUID(block, var, value, blocknum);
+            builder.addUUID(var, value);
+            break;
+        }
+        case MVT_BOOL:
+        {
+            bool value = false;
+            reader.getBOOL(block, var, value, blocknum);
+            builder.addBOOL(var, value);
+            break;
+        }
+        case MVT_IP_ADDR:
+        {
+            U32 value = 0;
+            reader.getIPAddr(block, var, value, blocknum);
+            builder.addIPAddr(var, value);
+            break;
+        }
+        case MVT_IP_PORT:
+        {
+            U16 value = 0;
+            reader.getIPPort(block, var, value, blocknum);
+            builder.addIPPort(var, value);
+            break;
+        }
+        default:
+            break;
+        }
     }
 }
 
@@ -318,20 +511,76 @@ int32_t aloracle_message_read(const aloracle_message_template* message_template,
         LLTemplateMessageBuilder builder(messages.mNames);
         builder.newMessage(message->mName);
         reader.copyToBuilder(builder);
+        return giveBuilt(builder, message, written);
+    });
+}
 
-        // buildMessage checks only a field's data against the buffer, and that
-        // strictly: room for the header, the number, every block's count, every
-        // field's data and the longest length prefix each could take, and a
-        // byte over.
-        size_t capacity = LL_PACKET_ID_SIZE + (size_t)message->mFrequency + (size_t)builder.getMessageSize() + 1;
+int32_t aloracle_message_from_llsd(const aloracle_message_template* message_template,
+                                   const uint8_t* name,
+                                   size_t name_size,
+                                   const uint8_t* body,
+                                   size_t body_size,
+                                   aloracle_bytes* written)
+{
+    return aloracle::guarded([&]() -> int32_t
+    {
+        std::string wanted;
+        LLSD value;
+        if (!aloracle::clear(written) || !message_template || !aloracle::take(name, name_size, wanted)
+            || !aloracle::takeValue(body, body_size, value))
+        {
+            return ALORACLE_BAD_ARGUMENT;
+        }
+
+        // Found by its text: the builder keys its messages by the string
+        // table's pointers, and a name looked up there would be interned for
+        // the life of the process.
+        const auto& all = message_template->mMessages;
+        const auto found = std::find_if(all.begin(), all.end(),
+                                        [&](const LLMessageTemplate* message) { return wanted == message->mName; });
+        if (found == all.end())
+        {
+            return ALORACLE_BAD_ARGUMENT;
+        }
+        const LLMessageTemplate* message = *found;
         for (const LLMessageBlock* block : message->mMemberBlocks)
         {
-            const LLMsgBlkData* first = builder.getCurrentMessage()->getBlock(block->mName, 0);
-            const size_t repeats = first ? (size_t)first->mBlockNumber : 0;
-            capacity += 1 + repeats * block->mMemberVariables.size() * sizeof(U32);
+            for (const LLMessageVariable* variable : block->mMemberVariables)
+            {
+                if (!hasGetter(variable->getType()))
+                {
+                    return ALORACLE_BAD_ARGUMENT;
+                }
+            }
         }
-        std::vector<U8> out(capacity);
-        const U32 built = builder.buildMessage(out.data(), (U32)out.size(), 0);
-        return aloracle::give(viewOf(out, LL_PACKET_ID_SIZE, built), written);
+
+        // The builder holds the map it is given by reference, but doesn't
+        // change it.
+        aloracle_message_template& messages = const_cast<aloracle_message_template&>(*message_template);
+        LLSDMessageReader reader;
+        reader.setMessage(message->mName, value);
+        LLTemplateMessageBuilder builder(messages.mNames);
+        builder.newMessage(message->mName);
+        for (const LLMessageBlock* block : message->mMemberBlocks)
+        {
+            S32 repeats = 1;
+            if (block->mType == MBT_MULTIPLE)
+            {
+                repeats = block->mNumber;
+            }
+            else if (block->mType == MBT_VARIABLE)
+            {
+                repeats = reader.getNumberOfBlocks(block->mName);
+            }
+            for (S32 blocknum = 0; blocknum < repeats; ++blocknum)
+            {
+                builder.nextBlock(block->mName);
+                for (const LLMessageVariable* variable : block->mMemberVariables)
+                {
+                    copyField(reader, value, builder, block->mName, *variable, blocknum);
+                }
+            }
+        }
+        return giveBuilt(builder, message, written);
     });
 }
