@@ -884,6 +884,26 @@ namespace
 
     }
 
+    TEST_CASE("LLInventory: a category survives asLLSD and fromLLSD", "[LLInventory]")
+    {
+        // A category's ID goes out as category_id, as fromLLSD reads it and
+        // AIS3 names it, not as an item's item_id.
+        LLPointer<LLInventoryCategory> src = create_random_inventory_cat();
+        src->setPreferredType(LLFolderType::FT_TEXTURE);
+        const LLSD sd = src->asLLSD();
+        CHECK(sd["category_id"].asUUID() == src->getUUID());
+        CHECK_FALSE(sd.has("item_id"));
+
+        LLPointer<LLInventoryCategory> dst = new LLInventoryCategory();
+        CHECK(dst->fromLLSD(sd));
+        CHECK(dst->getUUID() == src->getUUID());
+        CHECK(dst->getParentUUID() == src->getParentUUID());
+        CHECK(dst->getPreferredType() == src->getPreferredType());
+        CHECK(dst->getName() == src->getName());
+        CHECK(dst->getThumbnailUUID() == src->getThumbnailUUID());
+        CHECK(dst->getIsFavorite() == src->getIsFavorite());
+    }
+
     TEST_CASE("LLInventory: a category survives exportLLSD through a notation file", "[LLInventory]")
     {
         NamedTempFile temp_file("linden_file", "", ".dat");

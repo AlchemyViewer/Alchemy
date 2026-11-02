@@ -170,9 +170,9 @@ target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
 # tests
 if(AL_BUILD_TESTS)
-  # These three stand in for parts of llmessage and llcorehttp with stubs of
+  # These four stand in for parts of llmessage and llcorehttp with stubs of
   # their own, so they build their one file and do not link llmessage.
-  foreach(test llcoproceduremanager lltrustedmessageservice lltemplatemessagedispatcher)
+  foreach(test llcoproceduremanager lltrustedmessageservice lltemplatemessagedispatcher llcircuit)
     al_add_test_binary(
       ${test}_test
       PROJECT llmessage
@@ -213,6 +213,7 @@ if(AL_BUILD_TESTS)
       tests/llsdmessagereader_test.cpp
       tests/lltemplatemessagebuilder_test.cpp
       tests/llxfer_file_test.cpp
+      tests/llxfermanager_test.cpp
       tests/llxorcipher_test.cpp
       tests/llzerocode_test.cpp
       tests/message_test.cpp

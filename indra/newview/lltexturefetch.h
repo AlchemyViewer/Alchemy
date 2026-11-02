@@ -262,10 +262,6 @@ protected:
     // Threads:  T*
     void removeRequest(LLTextureFetchWorker* worker, bool cancel);
 
-    // Overrides from the LLThread tree
-    // Locks:  Ct
-    bool runCondition();
-
 private:
     // Threads:  Ttf
     /*virtual*/ void startThread(void);

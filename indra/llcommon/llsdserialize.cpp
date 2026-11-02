@@ -164,8 +164,10 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     std::string header{ hdr_buf, static_cast<std::string::size_type>(inbuf) };
     if (str.fail())
     {
+        // Reading on past a first line that reaches the end of the stream
+        // fails the stream, but the line is still the first line.
+        fail_if_not_legacy = (inbuf == 0 || !str.eof());
         str.clear();
-        fail_if_not_legacy = true;
     }
 
     // SIZE_UNLIMITED is negative: subtracting the header length from it would
@@ -205,6 +207,7 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
     }
 
     // trim off the <? ... ?> header syntax
+    bool bracketed = false;
     auto start = header.find_first_not_of("<? ");
     if (start != std::string::npos)
     {
@@ -212,22 +215,27 @@ bool LLSDSerialize::deserialize(LLSD& sd, std::istream& str, llssize max_bytes)
         if (end != std::string::npos)
         {
             header = header.substr(start, end - start);
-            ws(str);
+            bracketed = true;
         }
     }
     /*
-     * Create the parser as appropriate
+     * Create the parser as appropriate. Whitespace after a bracketed header
+     * is skipped, but a line that names no format is the document's own, and
+     * so is what follows it.
      */
     if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_BINARY_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDBinaryParser>(str, sd, remaining) > 0);
     }
     else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_XML_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDXMLParser>(str, sd, remaining) > 0);
     }
     else if (LLStringUtil::isEqualInsensitiveASCII(header, LLSD_NOTATION_HEADER))
     {
+        if (bracketed) ws(str);
         return (parse_using<LLSDNotationParser>(str, sd, remaining) > 0);
     }
     else // no header we recognize
@@ -366,8 +374,10 @@ llssize deserialize_boolean(
  *
  * @param value The string to escape and serialize
  * @param str The stream to serialize to.
+ * @param escape_double_quote Whether a double quote is escaped too, as it is
+ *        between the double quotes a URI is written in.
  */
-void serialize_string(std::string& out, const std::string& value);
+void serialize_string(std::string& out, const std::string& value, bool escape_double_quote = false);
 
 
 /**
@@ -1827,7 +1837,7 @@ S32 LLSDNotationFormatter::format_impl(const LLSD& data, Sink& sink,
 
     case LLSD::TypeURI:
         sink.put("l\"");
-        serialize_string(sink.buffer(), data.asString());
+        serialize_string(sink.buffer(), data.asString(), true);
         sink.checkFlush();
         sink.put('"');
         break;
@@ -2242,7 +2252,7 @@ static const char* NOTATION_STRING_CHARACTERS[256] =
     "\\x1f",    // 31
     " ",        // 32
     "!",        // 33
-    "\"",       // 34
+    "\\\"",     // 34
     "#",        // 35
     "$",        // 36
     "%",        // 37
@@ -2466,10 +2476,11 @@ static const char* NOTATION_STRING_CHARACTERS[256] =
     "\\xff"     // 255
 };
 
-void serialize_string(std::string& out, const std::string& value)
+void serialize_string(std::string& out, const std::string& value, bool escape_double_quote)
 {
     // Append unescaped runs in bulk; only bytes outside 32..126 plus the
-    // quote and backslash need the escape table.
+    // single quote and backslash need the escape table, and the double quote
+    // where asked.
     out.reserve(out.size() + value.size());
     const char* start = value.data();
     const char* end = start + value.size();
@@ -2477,7 +2488,7 @@ void serialize_string(std::string& out, const std::string& value)
     for(const char* p = start; p < end; ++p)
     {
         U8 c = (U8)(*p);
-        if(c < 32 || c >= 127 || c == '\'' || c == '\\')
+        if(c < 32 || c >= 127 || c == '\'' || c == '\\' || (escape_double_quote && c == '"'))
         {
             if(p > run)
             {
@@ -2765,9 +2776,18 @@ LLUZipHelper::EZipRresult LLUZipHelper::unzip_llsd(LLSD& data, const U8* in, S32
     {
         char* result_ptr = strip_deprecated_header((char*)result, cur_size);
 
+        // Nothing holds no value, and a stream over no buffer throws from its
+        // first read.
+        if (cur_size == 0)
+        {
+            free(result);
+            return ZR_PARSE_ERROR;
+        }
+
         boost::iostreams::stream<boost::iostreams::array_source> istrm(result_ptr, cur_size);
 
-        if (!LLSDSerialize::fromBinary(data, istrm, cur_size, UNZIP_LLSD_MAX_DEPTH))
+        // fromBinary() gives the number of values it read, or PARSE_FAILURE
+        if (LLSDSerialize::fromBinary(data, istrm, cur_size, UNZIP_LLSD_MAX_DEPTH) <= 0)
         {
             free(result);
             return ZR_PARSE_ERROR;

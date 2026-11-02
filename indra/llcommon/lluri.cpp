@@ -200,6 +200,23 @@ std::string LLURI::escape(const std::string& str)
 }
 
 //static
+std::string LLURI::escape(const std::string& str, EscapeSet set)
+{
+    switch (set)
+    {
+    case EscapeSet::HOST_AND_PORT:  return escapeHostAndPort(str);
+    case EscapeSet::PATH_COMPONENT: return escapePathComponent(str);
+    case EscapeSet::QUERY_VARIABLE: return escapeQueryVariable(str);
+    case EscapeSet::QUERY_VALUE:    return escapeQueryValue(str);
+    case EscapeSet::URI_QUERY:      return escapeUriQuery(str);
+    case EscapeSet::URI_DATA:       return escapeUriData(str);
+    case EscapeSet::URI_PATH:       return escapeUriPath(str);
+    case EscapeSet::UNRESERVED:
+    default:                        return escape(str);
+    }
+}
+
+//static
 std::string LLURI::escapePathAndData(const std::string &str)
 {
     std::string result;

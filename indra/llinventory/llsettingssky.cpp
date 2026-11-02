@@ -910,8 +910,8 @@ LLSD LLSettingsSky::defaults(const LLSettingsBase::TrackPosition& position)
 
         // give the sun and moon slightly different tracks through the sky
         // instead of positioning them at opposite poles from each other...
-        sunquat  = convert_azimuth_and_altitude_to_quat(altitude,                   azimuth);
-        moonquat = convert_azimuth_and_altitude_to_quat(altitude + (F_PI * 0.125f), azimuth + (F_PI * 0.125f));
+        sunquat  = convert_azimuth_and_altitude_to_quat(azimuth,                   altitude);
+        moonquat = convert_azimuth_and_altitude_to_quat(azimuth + (F_PI * 0.125f), altitude + (F_PI * 0.125f));
 
         // Magic constants copied form dfltsetting.xml
         dfltsetting[SETTING_CLOUD_COLOR]        = LLColor4(0.4099f, 0.4099f, 0.4099f, 0.0f).getValue();

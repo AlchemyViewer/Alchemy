@@ -32,6 +32,7 @@
 
 #include "llsdtraits.h"
 #include "llstring.h"
+#include <bit>
 #include <limits>
 
 using std::fpclassify;
@@ -296,6 +297,22 @@ namespace
         CHECK(LLSD(-2.5).asInteger() == -2);
         CHECK(LLSD("1e10").asInteger() == highest);
         CHECK(LLSD(LLDate(1e12)).asInteger() == highest);
+    }
+
+    TEST_CASE("LLSD(new): a NaN real converts to the string nan with its sign", "[LLSD_new]")
+    {
+        // Every NaN, quiet or signalling, whatever its payload. Optimised
+        // builds are /fp:fast, under which a NaN's comparison with itself may
+        // fold away.
+        const auto real = [](U64 bits) { return LLSD(std::bit_cast<LLSD::Real>(bits)); };
+        CHECK(real(0x7ff8000000000000ull).asString() == "nan");
+        CHECK(real(0xfff8000000000000ull).asString() == "-nan");
+        CHECK(real(0x7ff0000000000001ull).asString() == "nan");
+        CHECK(real(0xfff0000000000001ull).asString() == "-nan");
+        CHECK(real(0x7fffffffffffffffull).asString() == "nan");
+        CHECK(LLSD(std::numeric_limits<LLSD::Real>::quiet_NaN()).asString() == "nan");
+        CHECK(real(0x7ff0000000000000ull).asString() == "inf");
+        CHECK(real(0xfff0000000000000ull).asString() == "-inf");
     }
 
     template<class T>

@@ -63,6 +63,7 @@ Everything a test file defines goes in an anonymous namespace. A test binary is 
   - `VertexBufferProbe` (`llrender/llfonttextcache.h`);
   - `RenderProbe` (`llrender/llrender.h`);
   - `VolumeProbe` (`llmath/llvolume.h`);
+  - `CircuitProbe` (`llmessage/llcircuit.h`);
   - `TextViewProbe` (`llui/text/altextview.h` and `altextruler.h`);
   - `alincludesearch_data` (`alscript/preprocessor/alincludesearch.h`).
 - **Internal is not enough for LL's name-keyed registries.** `LLSingleton`, `LLInstanceTracker` and `LLThreadLocalSingletonPointer` key on `typeid(T).name()`, which is `(anonymous namespace)::X` for every anonymous `X`. A type used with one of them needs a name unique across the tree.

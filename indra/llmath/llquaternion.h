@@ -526,7 +526,9 @@ inline F32  LLQuaternion::normalize()
 {
     F32 mag = sqrtf(mQ[VX]*mQ[VX] + mQ[VY]*mQ[VY] + mQ[VZ]*mQ[VZ] + mQ[VS]*mQ[VS]);
 
-    if (mag > FP_MAG_THRESHOLD)
+    // A length that is not finite, from a component that is not or from
+    // squares that overflow, would scale every component to 0 or NaN.
+    if (mag > FP_MAG_THRESHOLD && is_finite(mag))
     {
         // Floating point error can prevent some quaternions from achieving
         // exact unity length.  When trying to renormalize such quaternions we
@@ -558,7 +560,8 @@ inline F32  LLQuaternion::normQuat()
 {
     F32 mag = sqrtf(mQ[VX]*mQ[VX] + mQ[VY]*mQ[VY] + mQ[VZ]*mQ[VZ] + mQ[VS]*mQ[VS]);
 
-    if (mag > FP_MAG_THRESHOLD)
+    // As normalize(): a length that is not finite gives identity.
+    if (mag > FP_MAG_THRESHOLD && is_finite(mag))
     {
         if (fabs(1.f - mag) > ONE_PART_IN_A_MILLION)
         {

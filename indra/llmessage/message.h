@@ -157,10 +157,11 @@ public:
 //
 // Zero-coding (applied when LL_ZERO_CODE_FLAG is set):
 //
-//   Runs of zero bytes in the body are replaced by a two-byte token:
-//     0x00 N        – represents (N + 1) zero bytes, for N in 1..254
-//     0x00 0x00 N   – represents (256 + N) zero bytes  (wrap/overflow case)
-//   A literal 0x00 byte that starts no run is encoded as 0x00 0x00 0x00.
+//   Runs of zero bytes in the body are replaced by a 0x00 byte and a count:
+//     0x00 N        – represents N zero bytes, for N in 1..255
+//     0x00 0x00 N   – represents (256 + N) zero bytes, each further 0x00
+//                     before the count adding 256 (read, never written)
+//   A lone zero byte is a run of one, 0x00 0x01.
 //   The six-byte packet header is excluded from zero-coding and is always
 //   transmitted as-is.
 

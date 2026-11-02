@@ -34,6 +34,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <limits>
+#include <random>
 #include <sstream>
 
 #define VALID_DATE                                  "2003-04-30T04:00:00Z"
@@ -417,6 +418,61 @@ namespace
         CHECK(LLDate(946684800.0078125).asString() == "2000-01-01T00:00:00Z");
         CHECK(LLDate(946684800.25).asString() == "2000-01-01T00:00:00.25Z");
         CHECK(LLDate(946684800.999).asString() == "2000-01-01T00:00:00.99Z");
+    }
+
+    TEST_CASE("LLDate: a date written in hundredths reads back and writes as itself", "[LLDate]")
+    {
+        // A date read from text is its whole seconds plus the fraction ".hh"
+        // read as a double, and that sum can land just below the hundredth.
+        // Written again, it is still that hundredth.
+        const auto seconds_at = [](S32 year, S32 month, S32 day)
+        {
+            LLDate date;
+            date.fromYMDHMS(year, month, day, 0, 0, 0);
+            return (S64)date.secondsSinceEpoch();
+        };
+        struct Range
+        {
+            const char* what;
+            S64         first;
+            S64         last;
+        };
+        const Range ranges[] = {
+            { "1900 to 9999", seconds_at(1900, 1, 1), seconds_at(10000, 1, 1) - 1 },
+            { "10000 to 99999", seconds_at(10000, 1, 1), seconds_at(100000, 1, 1) - 1 },
+            { "a day either side of 1970", -86400, 86400 },
+            { "years before 0", seconds_at(-9999, 1, 1), seconds_at(0, 1, 1) - 1 },
+        };
+        std::mt19937_64 random(20261101);
+        for (const Range& range : ranges)
+        {
+            std::uniform_int_distribution<S64> pick_second(range.first, range.last);
+            std::uniform_int_distribution<int> pick_hundredth(0, 99);
+            int differ = 0;
+            std::string first_written, first_rewritten;
+            for (int i = 0; i < 50000; ++i)
+            {
+                const F64 seconds = (F64)pick_second(random) + pick_hundredth(random) / 100.0;
+                const std::string written = LLDate(seconds).asString();
+                LLDate read;
+                REQUIRE(read.fromString(written));
+                const std::string rewritten = read.asString();
+                if (rewritten != written && differ++ == 0)
+                {
+                    first_written = written;
+                    first_rewritten = rewritten;
+                }
+            }
+            INFO(range.what << ": " << first_written << " read back and written as " << first_rewritten);
+            CHECK(differ == 0);
+        }
+
+        // A genuine fraction still cuts to the hundredth at or before it.
+        CHECK(LLDate(-1.5).asString() == "1969-12-31T23:59:58.50Z");
+        CHECK(LLDate(1.256).asString() == "1970-01-01T00:00:01.25Z");
+        LLDate hundredth;
+        REQUIRE(hundredth.fromString("2009-02-13T23:31:30.29Z"));
+        CHECK(LLDate(hundredth.secondsSinceEpoch() - 0.000001).asString() == "2009-02-13T23:31:30.28Z");
     }
 
     TEST_CASE("LLDate: an offset reads as hours and minutes with or without its colon", "[LLDate]")
