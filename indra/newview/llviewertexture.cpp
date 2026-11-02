@@ -2188,6 +2188,13 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
             LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - data not needed");
             // Data is ready but we don't need it
             // (received it already while fetcher was writing to disk)
+            if (!mIsFetching && current_discard >= 0 && fetch_discard > mRequestedDiscardLevel)
+            {
+                // Finished short of the level asked, with nothing finer than the texture's own: as for a fetch that
+                // brought no data, that is the best a fetch brings it, and updateFetch stops there. A finish at the
+                // level asked only brings again what was handed over while the fetcher wrote it.
+                mMinDiscardLevel = current_discard;
+            }
             destroyRawImage();
             return false; // done
         }
