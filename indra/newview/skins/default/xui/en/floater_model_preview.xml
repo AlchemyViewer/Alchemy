@@ -1430,8 +1430,8 @@
              name="pivot_units"
              top_delta="0"
              width="50">
-             <combo_item name="percent" value="percent">%</combo_item>
-             <combo_item name="metres" value="metres">m</combo_item>
+             <combo_item name="percent" value="percent" label="%"/>
+             <combo_item name="metres" value="metres" label="m"/>
            </combo_box>
            <text
              follows="top|left"
