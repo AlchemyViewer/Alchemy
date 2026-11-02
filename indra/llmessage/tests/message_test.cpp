@@ -148,6 +148,149 @@ namespace
         CHECK(response->mStatus == HTTP_NOT_FOUND);
     }
 
+    // CloseCircuit alone, as the template the viewer reads has it.
+    const char* const CLOSE_CIRCUIT_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    CloseCircuit Fixed 0xFFFFFFFD NotTrusted Unencoded\n"
+        "}\n";
+
+    // A message template file of the test's own, there while this lives.
+    class CloseCircuitTemplateFile
+    {
+    public:
+        CloseCircuitTemplateFile(const std::string& path)
+            : mPath(path)
+        {
+            llofstream file(mPath.c_str());
+            file << CLOSE_CIRCUIT_TEMPLATE;
+        }
+
+        ~CloseCircuitTemplateFile()
+        {
+            if (LLFile::remove(mPath) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mPath << LL_ENDL;
+            }
+        }
+
+        CloseCircuitTemplateFile(const CloseCircuitTemplateFile&) = delete;
+        CloseCircuitTemplateFile& operator=(const CloseCircuitTemplateFile&) = delete;
+
+    private:
+        std::string mPath;
+    };
+
+    // gMessageSystem is the system under test while this lives, and what it
+    // was before once it ends: disableCircuit asks gMessageSystem for the
+    // circuit's code.
+    class CloseCircuitSystemScope
+    {
+    public:
+        explicit CloseCircuitSystemScope(LLMessageSystem& system)
+            : mPrior(gMessageSystem)
+        {
+            gMessageSystem = &system;
+        }
+
+        ~CloseCircuitSystemScope()
+        {
+            gMessageSystem = mPrior;
+        }
+
+        CloseCircuitSystemScope(const CloseCircuitSystemScope&) = delete;
+        CloseCircuitSystemScope& operator=(const CloseCircuitSystemScope&) = delete;
+
+    private:
+        LLMessageSystem* mPrior;
+    };
+
+    // A socket of the test's own, standing for the other end of a circuit.
+    class PeerSocket
+    {
+    public:
+        PeerSocket()
+        {
+            start_net(mSocket, mPort);
+        }
+
+        ~PeerSocket()
+        {
+            end_net(mSocket);
+        }
+
+        PeerSocket(const PeerSocket&) = delete;
+        PeerSocket& operator=(const PeerSocket&) = delete;
+
+        bool isOpen() const { return mSocket >= 0; }
+        LLHost host() const { return LLHost("127.0.0.1", mPort); }
+
+        // The next packet to arrive within seconds, or nothing.
+        std::vector<U8> receive(F32 seconds)
+        {
+            char buffer[NET_BUFFER_SIZE];
+            LLTimer waited;
+            while (waited.getElapsedTimeF32() < seconds)
+            {
+                const S32 size = receive_packet(mSocket, buffer);
+                if (size > 0)
+                {
+                    return std::vector<U8>(buffer, buffer + size);
+                }
+                ms_sleep(5);
+            }
+            return {};
+        }
+
+    private:
+        S32 mSocket = -1;
+        int mPort = NET_USE_OS_ASSIGNED_PORT;
+    };
+
+    // The other end of a circuit closed here stops sending on it only where
+    // it is told so; otherwise it resends what goes unacked until it times
+    // the circuit out.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: closeCircuit tells the other end with CloseCircuit", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const CloseCircuitTemplateFile message_template(template_path);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const CloseCircuitSystemScope scope(system);
+
+        PeerSocket peer;
+        REQUIRE(peer.isOpen());
+        system.enableCircuit(peer.host(), false);
+        REQUIRE(system.mCircuitInfo.findCircuit(peer.host()) != nullptr);
+
+        system.closeCircuit(peer.host());
+
+        // The six-byte header, then CloseCircuit's number as a Fixed
+        // message's: all four bytes, high first.
+        const std::vector<U8> packet = peer.receive(1.f);
+        REQUIRE(packet.size() >= 10);
+        CHECK(packet[5] == 0);
+        CHECK(packet[6] == 0xFF);
+        CHECK(packet[7] == 0xFF);
+        CHECK(packet[8] == 0xFF);
+        CHECK(packet[9] == 0xFD);
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: closeCircuit sends nothing to a host it has no circuit with", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const CloseCircuitTemplateFile message_template(template_path);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const CloseCircuitSystemScope scope(system);
+
+        PeerSocket peer;
+        REQUIRE(peer.isOpen());
+        system.closeCircuit(peer.host());
+        CHECK(peer.receive(0.25f).empty());
+        CHECK(system.mCircuitInfo.findCircuit(peer.host()) == nullptr);
+    }
+
     TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a system whose template failed to load still closes its socket", "[LLMessageSystem]")
         // a system whose template failed to load still closes its socket
     {

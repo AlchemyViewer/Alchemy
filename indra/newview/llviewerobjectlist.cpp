@@ -459,7 +459,8 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
     if (!regionp)
     {
-        LL_WARNS() << "Object update from unknown region! " << region_handle << LL_ENDL;
+        // Once for each region: a retired region's simulator sends on until it disables the circuit.
+        LL_WARNS_ONCE() << "Object update from unknown region! " << region_handle << LL_ENDL;
         return;
     }
 
@@ -743,7 +744,8 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
     LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
     if (!regionp)
     {
-        LL_WARNS() << "Object update from unknown region! " << region_handle << LL_ENDL;
+        // Once for each region: a retired region's simulator sends on until it disables the circuit.
+        LL_WARNS_ONCE() << "Object update from unknown region! " << region_handle << LL_ENDL;
         return;
     }
 

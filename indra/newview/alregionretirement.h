@@ -38,8 +38,9 @@ class LLViewerRegion;
 // After a teleport the region left behind stays until its simulator sends DisableSimulator, about a minute later,
 // with its objects, avatars, terrain and probes. Once the arrival has settled, every region the agent is neither in
 // nor near is retired: marked so that its simulator creates no new objects, its objects killed a frame's budget at a
-// time, then removed, and its circuit closed, as DisableSimulator removes one. One that comes near the view again
-// meanwhile is kept, and what was killed of it is asked for again.
+// time, then removed. Its circuit is left for its simulator to close with DisableSimulator, unless
+// AlchemyRetireDepartedRegionsCloseCircuit asks for it to be closed at once, the simulator told so with CloseCircuit.
+// One that comes near the view again meanwhile is kept, and what was killed of it is asked for again.
 class ALRegionRetirement
 {
 public:
