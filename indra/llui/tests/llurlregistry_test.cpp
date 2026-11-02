@@ -85,4 +85,21 @@ namespace
         CHECK(found("say <NOLINK>hello</NOLINK> ok") == std::string("<NOLINK>hello</NOLINK>"));
         CHECK(found("say <nolink>hello</nolink> ok") == std::string("<nolink>hello</nolink>"));
     }
+
+    // A link straight after @ is an email with no username, and no link; a
+    // text widget goes on from what findUrl finds, so one that finds nothing
+    // there linked nothing after it either.
+    TEST_CASE_METHOD(llurlregistry_data, "llurlregistry: findUrl finds the link after one that comes straight after an at", "[llurlregistry]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        CHECK(found("@http://a.example.com and http://b.example.com") == std::string("http://b.example.com"));
+        UNSCOPED_INFO("after two");
+        CHECK(found("@http://a.example.com @http://b.example.com/x see http://c.example.com/y") == std::string("http://c.example.com/y"));
+        UNSCOPED_INFO("and none where there is no other");
+        CHECK(found("@http://a.example.com alone") == std::string(""));
+        CHECK(found("x@http://a.example.com") == std::string(""));
+    }
 }
