@@ -1978,10 +1978,15 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         mVertexBuffer[lod].clear();
         if (fmp && lod != LLModel::LOD_PHYSICS)
         {
-            fmp->mLODMode[lod] = MESH_OPTIMIZER_AUTO;
-            if (LLComboBox* lod_combo = fmp->findChild<LLComboBox>("lod_source_" + lod_name[lod]))
+            // Only a LOD still set to come from the file goes back to generation; another source stays.
+            LLComboBox* lod_combo = fmp->findChild<LLComboBox>("lod_source_" + lod_name[lod]);
+            if (!lod_combo || lod_combo->getCurrentIndex() == LOD_FROM_FILE)
             {
-                lod_combo->setCurrentByIndex(MESH_OPTIMIZER_AUTO);
+                fmp->mLODMode[lod] = MESH_OPTIMIZER_AUTO;
+                if (lod_combo)
+                {
+                    lod_combo->setCurrentByIndex(MESH_OPTIMIZER_AUTO);
+                }
             }
             fmp->childSetValue("lod_file_" + lod_name[lod], "");
         }
@@ -1999,8 +2004,8 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             LLModel* model = instance.mModel;
             if (model && suffix_lod(core_of(model)) >= 0 && lod_of(model) < 0)
             {
-                instance.mLabel = stripSuffix(instance.mLabel);
                 model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
+                instance.mLabel = model->mLabel; // a submodel keeps its letter, so it isn't taken for its root
             }
         }
     }
