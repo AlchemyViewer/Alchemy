@@ -172,6 +172,20 @@ public:
     void setHasPivot(bool val) { mHasPivot = val; }
     void setModelPivot(const LLVector3& pivot) { mModelPivot = pivot; }
 
+    // <SK:Nexii> Mesh uploader pivot: each model's origin within its bounding box, -1 to 1 per axis
+    enum EPivotMode { PIVOT_FILE, PIVOT_CENTRE, PIVOT_CUSTOM };
+    // Custom starts from the pivot the last mode gave a single model.
+    void setPivotMode(EPivotMode mode);
+    EPivotMode getPivotMode() const { return mPivotMode; }
+    void setCustomPivot(const LLVector3& pivot) { mCustomPivot = pivot; }
+    // The origin the file gave the model, where its vertices' origin sits in its box.
+    static LLVector3 getFileOriginPivot(const LLModel* model);
+    // The pivot the mode asks for, and the one in effect: centred while the physics or rigging rules it out.
+    LLVector3 getWantedPivot(const LLModel* model) const;
+    LLVector3 getUploadPivot(const LLModel* model) const { return mUploadPivotAllowed ? getWantedPivot(model) : LLVector3::zero; }
+    // What each model's stored domains are shifted by so that its origin lands on its pivot.
+    LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
+    // </SK:Nexii>
     // <SK:Nexii> Mesh uploader LODs by name: a file's NAME_LOD0-2 and NAME_PHYS models fill those slots of NAME
     void splitSuffixedModels(const std::string& filename);
     // </SK:Nexii>
@@ -275,7 +289,12 @@ protected:
     bool        mResetJoints;
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
+    // <SK:Nexii> Mesh uploader pivot
+    EPivotMode  mPivotMode{PIVOT_FILE};
+    LLVector3   mCustomPivot;
+    bool        mUploadPivotAllowed{true};
     bool        mLODFromHighFile[LLModel::NUM_LODS]{}; // <SK:Nexii> Mesh uploader LODs by name
+    // </SK:Nexii>
 
     std::map<std::string, bool> mViewOption;
 

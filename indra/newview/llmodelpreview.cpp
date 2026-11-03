@@ -279,6 +279,13 @@ void LLModelPreview::updateDimentionsAndOffsets()
 
     mDetailsSignal((F32)(mPreviewScale[0] * scale), (F32)(mPreviewScale[1] * scale), (F32)(mPreviewScale[2] * scale));
 
+    // <SK:Nexii> Mesh uploader pivot: metres follow the model's size
+    if (LLFloaterModelPreview::sInstance && LLFloaterModelPreview::sInstance->mModelPreview == this)
+    {
+        LLFloaterModelPreview::sInstance->updatePivotControls();
+    }
+    // </SK:Nexii>
+
     updateStatusMessages();
 }
 
@@ -1862,6 +1869,53 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         << ", failures: " << meshes_fail_count << LL_ENDL;
 }
 
+// <SK:Nexii> Mesh uploader pivot
+void LLModelPreview::setPivotMode(EPivotMode mode)
+{
+    if (mode == PIVOT_CUSTOM && mPivotMode != PIVOT_CUSTOM && mUploadData.size() == 1)
+    {
+        mCustomPivot = getWantedPivot(mUploadData[0].mModel);
+    }
+    mPivotMode = mode;
+}
+
+// static
+LLVector3 LLModelPreview::getFileOriginPivot(const LLModel* model)
+{
+    if (!model)
+    {
+        return LLVector3::zero;
+    }
+    // The loader centred the model on its box; the file's origin is where it moved the centre from.
+    LLVector3 size, centre;
+    model->getNormalizedScaleTranslation(size, centre);
+    LLVector3 pivot;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        pivot.mV[i] = size.mV[i] > 0.f ? -2.f * centre.mV[i] / size.mV[i] : 0.f;
+        // An origin outside the box is a scene's, from a file that placed its vertices in the scene: centre it.
+        if (fabsf(pivot.mV[i]) > 1.001f)
+        {
+            return LLVector3::zero;
+        }
+        pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
+    }
+    return pivot;
+}
+
+LLVector3 LLModelPreview::getWantedPivot(const LLModel* model) const
+{
+    switch (mPivotMode)
+    {
+    case PIVOT_FILE:
+        return getFileOriginPivot(model);
+    case PIVOT_CUSTOM:
+        return mUploadData.size() == 1 ? mCustomPivot : LLVector3::zero;
+    default:
+        return LLVector3::zero;
+    }
+}
+
 // <SK:Nexii> Mesh uploader LODs by name
 void LLModelPreview::splitSuffixedModels(const std::string& filename)
 {
@@ -2081,6 +2135,17 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
     {
         follow_physics();
     }
+}
+// </SK:Nexii>
+
+LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets() const
+{
+    LLMeshUploadThread::position_offsets_t offsets;
+    for (const LLModelInstance& instance : mUploadData)
+    {
+        offsets[instance.mModel.get()] = getUploadPivot(instance.mModel) * -0.5f;
+    }
+    return offsets;
 }
 // </SK:Nexii>
 
@@ -2426,6 +2491,56 @@ void LLModelPreview::updateStatusMessages()
             }
         }
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls where the pivot puts them but fits
+    // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
+    {
+        bool has_physics = false;
+        bool analyzed = true;
+        bool rigged = false;
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            rigged |= instance.mModel && !instance.mModel->mSkinWeights.empty();
+            // The hulls uploaded are the physics model's, or the base model's without one.
+            const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
+            if (physics && physics->getNumVolumeFaces() > 0)
+            {
+                has_physics = true;
+                analyzed &= !physics->mPhysics.mHull.empty();
+            }
+            else if (!physics && instance.mModel && !instance.mModel->mPhysics.mHull.empty())
+            {
+                has_physics = true;
+            }
+        }
+
+        std::string pivot_status;
+        mUploadPivotAllowed = true;
+        if (rigged)
+        {
+            pivot_status = mFMP->getString("pivot_status_rigged");
+            mUploadPivotAllowed = false;
+        }
+        else if (has_physics && !analyzed)
+        {
+            pivot_status = mFMP->getString("pivot_status_analyze");
+            mUploadPivotAllowed = false;
+        }
+        else if (!has_physics && std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
+                                             { return !getWantedPivot(instance.mModel).isExactlyZero(); }))
+        {
+            pivot_status = mFMP->getString("pivot_status_no_physics");
+        }
+
+        const bool custom = mFMP->childGetValue("pivot_mode").asString() == "custom";
+        for (const char* axis : { "pivot_x", "pivot_y", "pivot_z" })
+        {
+            mFMP->childSetEnabled(axis, mUploadPivotAllowed && custom);
+        }
+        mFMP->childSetEnabled("pivot_mode", mUploadPivotAllowed);
+        mFMP->childSetValue("pivot_status", pivot_status);
+    }
+    // </SK:Nexii>
 
     if (!mModelNoErrors || mHasDegenerate)
     {
@@ -3888,6 +4003,82 @@ bool LLModelPreview::render()
             }
         }
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the object's origin, drawn through the model
+    if (mViewOption["show_origin"] && !mViewOption["show_skin_weight"]) // rigged mesh is drawn on the avatar
+    {
+        LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+        gUIProgram.bind(); // takes the vertex colours, which gDebugProgram replaces with one uniform
+        gGL.getTextureSlot(0)->unbind();
+        LLGLDepthTest gls_depth(GL_FALSE);
+        LLGLDisable no_cull(GL_CULL_FACE);
+        gGL.setLineWidth(2.f);
+
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            const LLMatrix4& mat = instance.mTransform;
+            const LLVector3 origin = (getUploadPivot(instance.mModel) * 0.5f) * mat;
+
+            LLVector3 axes[3];
+            F32 reach = 0.f;
+            for (S32 i = 0; i < 3; ++i)
+            {
+                axes[i].set(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]);
+                reach = llmax(reach, axes[i].normalize());
+            }
+            reach *= 0.6f;
+
+            // Arrows as the translate gizmo draws them: a shaft and a solid cone per axis.
+            static const LLColor4 colors[3] = { LLColor4::red, LLColor4::green, LLColor4::blue };
+            const F32 head_length = reach * 0.2f;
+            const F32 head_radius = reach * 0.06f;
+            constexpr S32 HEAD_SEGMENTS = 12;
+
+            gGL.begin(LLRender::LINES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                gGL.color4fv(colors[i].mV);
+                gGL.vertex3fv(origin.mV);
+                gGL.vertex3fv((origin + axes[i] * (reach - head_length)).mV);
+            }
+            gGL.end();
+
+            gGL.begin(LLRender::TRIANGLES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                const LLVector3 tip = origin + axes[i] * reach;
+                const LLVector3 base = origin + axes[i] * (reach - head_length);
+                const LLVector3 u = axes[(i + 1) % 3] * head_radius;
+                const LLVector3 v = axes[(i + 2) % 3] * head_radius;
+                for (S32 s = 0; s < HEAD_SEGMENTS; ++s)
+                {
+                    const F32 a0 = F_TWO_PI * s / HEAD_SEGMENTS;
+                    const F32 a1 = F_TWO_PI * (s + 1) / HEAD_SEGMENTS;
+                    const LLVector3 r0 = base + u * cosf(a0) + v * sinf(a0);
+                    const LLVector3 r1 = base + u * cosf(a1) + v * sinf(a1);
+                    // Shade the side by its angle so the cone reads as solid.
+                    const F32 shade = 0.65f + 0.35f * cosf(a0);
+                    gGL.color4f(colors[i].mV[VRED] * shade, colors[i].mV[VGREEN] * shade, colors[i].mV[VBLUE] * shade, 1.f);
+                    gGL.vertex3fv(tip.mV);
+                    gGL.vertex3fv(r0.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.color4f(colors[i].mV[VRED] * 0.5f, colors[i].mV[VGREEN] * 0.5f, colors[i].mV[VBLUE] * 0.5f, 1.f);
+                    gGL.vertex3fv(base.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.vertex3fv(r0.mV);
+                }
+            }
+            gGL.end();
+        }
+        gGL.flush();
+        gGL.setLineWidth(1.f);
+
+        if (shader)
+        {
+            shader->bind();
+        }
+    }
+    // </SK:Nexii>
 
     gObjectPreviewProgram.unbind();
 
