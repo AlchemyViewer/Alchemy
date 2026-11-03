@@ -147,6 +147,7 @@ protected:
     // <SK:Nexii> Mesh uploader pivot: shown in percent of the half-extent or in metres from the centre
     void            onPivotCommit();
     void            onPivotUnitsCommit();
+    void            onPivotModeCommit();
     void            updatePivotControls();
     LLVector3       getPivotHalfExtents() const;
     // </SK:Nexii>

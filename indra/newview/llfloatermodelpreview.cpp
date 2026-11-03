@@ -31,6 +31,8 @@
 
 #include "llfloatermodelpreview.h"
 
+#include "llradiogroup.h" // <SK:Nexii> Mesh uploader pivot
+
 #include "llfilepicker.h"
 #include "llimagebmp.h"
 #include "llimagetga.h"
@@ -198,6 +200,8 @@ bool LLFloaterModelPreview::postBuild()
     }
     childSetValue("pivot_units", "percent");
     getChild<LLUICtrl>("pivot_units")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotUnitsCommit, this));
+    childSetValue("pivot_mode", "file");
+    getChild<LLUICtrl>("pivot_mode")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotModeCommit, this));
     // </SK:Nexii>
 
     getChild<LLLineEditor>("description_form")->setKeystrokeCallback(boost::bind(&LLFloaterModelPreview::onDescriptionKeystroke, this, _1), NULL);
@@ -520,7 +524,7 @@ void LLFloaterModelPreview::onClickCalculateBtn()
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mUploadModelUrl, mDestinationFolderId, false,
                           getWholeModelFeeObserverHandle(),
-                          LLHandle<LLWholeModelUploadObserver>(), mModelPreview->getUploadPositionOffset()); // <SK:Nexii> Mesh uploader pivot
+                          LLHandle<LLWholeModelUploadObserver>(), mModelPreview->getUploadPositionOffsets()); // <SK:Nexii> Mesh uploader pivot
 
     toggleCalculateButton(false);
     mUploadBtn->setEnabled(false);
@@ -734,7 +738,7 @@ void LLFloaterModelPreview::onPivotCommit()
         pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
     }
 
-    mModelPreview->setUploadPivot(pivot);
+    mModelPreview->setCustomPivot(pivot);
     mModelPreview->updateStatusMessages();
     toggleCalculateButton(true);
     mModelPreview->refresh();
@@ -745,6 +749,22 @@ void LLFloaterModelPreview::onPivotUnitsCommit()
     updatePivotControls();
 }
 
+void LLFloaterModelPreview::onPivotModeCommit()
+{
+    if (!mModelPreview)
+    {
+        return;
+    }
+    const std::string mode = childGetValue("pivot_mode").asString();
+    mModelPreview->setPivotMode(mode == "custom" ? LLModelPreview::PIVOT_CUSTOM
+                                : mode == "centre" ? LLModelPreview::PIVOT_CENTRE
+                                                   : LLModelPreview::PIVOT_FILE);
+    updatePivotControls();
+    mModelPreview->updateStatusMessages();
+    toggleCalculateButton(true);
+    mModelPreview->refresh();
+}
+
 void LLFloaterModelPreview::updatePivotControls()
 {
     if (!mModelPreview)
@@ -752,9 +772,22 @@ void LLFloaterModelPreview::updatePivotControls()
         return;
     }
 
+    // Custom is for one model: several each take their own origin from the file, or the centre.
+    const bool single = mModelPreview->mUploadData.size() == 1;
+    if (LLRadioGroup* modes = getChild<LLRadioGroup>("pivot_mode"))
+    {
+        if (!single && mModelPreview->getPivotMode() == LLModelPreview::PIVOT_CUSTOM)
+        {
+            mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+        }
+        modes->setIndexEnabled(2, single);
+        const LLModelPreview::EPivotMode mode = mModelPreview->getPivotMode();
+        modes->setValue(mode == LLModelPreview::PIVOT_CUSTOM ? "custom" : mode == LLModelPreview::PIVOT_CENTRE ? "centre" : "file");
+    }
+
     const bool metres = childGetValue("pivot_units").asString() == "metres";
     const LLVector3 half = getPivotHalfExtents();
-    const LLVector3& pivot = mModelPreview->getUploadPivot();
+    const LLVector3 pivot = single ? mModelPreview->getWantedPivot(mModelPreview->mUploadData[0].mModel) : LLVector3::zero;
     for (S32 i = 0; i < 3; ++i)
     {
         LLSpinCtrl* spinner = getChild<LLSpinCtrl>(PIVOT_AXES[i]);
@@ -1833,7 +1866,7 @@ void LLFloaterModelPreview::onUpload(void* user_data)
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mp->mUploadModelUrl, mp->mDestinationFolderId,
                           true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle(),
-                          mp->mModelPreview->getUploadPositionOffset()); // <SK:Nexii> Mesh uploader pivot
+                          mp->mModelPreview->getUploadPositionOffsets()); // <SK:Nexii> Mesh uploader pivot
 }
 
 
@@ -1971,7 +2004,8 @@ void LLFloaterModelPreview::resetUploadOptions()
     childSetValue("pivot_units", "percent");
     if (mModelPreview)
     {
-        mModelPreview->setUploadPivot(LLVector3::zero);
+        mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+        mModelPreview->setCustomPivot(LLVector3::zero);
     }
     updatePivotControls();
     // </SK:Nexii>

@@ -2700,7 +2700,7 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
                                        const std::string & upload_url, LLUUID destination_folder_id, bool do_upload,
                                        LLHandle<LLWholeModelFeeObserver> fee_observer,
                                        LLHandle<LLWholeModelUploadObserver> upload_observer,
-                                       const LLVector3& position_offset) // <SK:Nexii> Mesh uploader pivot
+                                       const position_offsets_t& position_offsets) // <SK:Nexii> Mesh uploader pivot
   : LLThread("mesh upload"),
     LLCore::HttpHandler(),
     mDiscarded(false),
@@ -2716,7 +2716,7 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mUploadSkin = upload_skin;
     mUploadJoints = upload_joints;
     mLockScaleIfJointPosition = lock_scale_if_joint_position;
-    mPositionOffset = position_offset; // <SK:Nexii> Mesh uploader pivot
+    mPositionOffsets = position_offsets; // <SK:Nexii> Mesh uploader pivot
     mMutex = new LLMutex();
     mPendingUploads = 0;
     mFinished = false;
@@ -2827,6 +2827,14 @@ LLSD llsd_from_file(std::string filename)
     return result;
 }
 
+// <SK:Nexii> Mesh uploader pivot
+LLVector3 LLMeshUploadThread::getPositionOffset(const LLModel* model) const
+{
+    auto it = mPositionOffsets.find(model);
+    return it != mPositionOffsets.end() ? it->second : LLVector3::zero;
+}
+// </SK:Nexii>
+
 void LLMeshUploadThread::packModelIntance(
     LLModel* model,
     LLMeshUploadThread::instance_list_t& instance_list,
@@ -2882,7 +2890,7 @@ void LLMeshUploadThread::packModelIntance(
             LLModel::WRITE_BINARY,
             false,
             data.mBaseModel->mSubmodelID,
-            mPositionOffset); // <SK:Nexii> Mesh uploader pivot
+            getPositionOffset(data.mBaseModel)); // <SK:Nexii> Mesh uploader pivot
 
         data.mAssetData = ostr.str();
         std::string str = ostr.str();
@@ -2910,6 +2918,9 @@ void LLMeshUploadThread::packModelIntance(
         LLQuaternion rot;
         LLMatrix4 transformation = instance.mTransform;
         decomposeMeshMatrix(transformation, pos, rot, scale);
+        // <SK:Nexii> Mesh uploader pivot: the prim stands on its pivot, so the mesh stays where it was placed
+        pos = (-getPositionOffset(data.mBaseModel)) * transformation;
+        // </SK:Nexii>
         instance_entry["position"] = ll_sd_from_vector3(pos);
         instance_entry["rotation"] = ll_sd_from_quaternion(rot);
         instance_entry["scale"] = ll_sd_from_vector3(scale);
@@ -5560,12 +5571,12 @@ void LLMeshRepository::uploadModel(std::vector<LLModelInstance>& data, const std
                                    bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                                    std::string upload_url, const LLUUID& destination_folder_id, bool do_upload,
                                    LLHandle<LLWholeModelFeeObserver> fee_observer, LLHandle<LLWholeModelUploadObserver> upload_observer,
-                                   const LLVector3& position_offset) // <SK:Nexii> Mesh uploader pivot
+                                   const LLMeshUploadThread::position_offsets_t& position_offsets) // <SK:Nexii> Mesh uploader pivot
 {
     LLMeshUploadThread* thread = new LLMeshUploadThread(data, lod_sources, scale, upload_textures,
                                                         upload_skin, upload_joints, lock_scale_if_joint_position,
                                                         upload_url, destination_folder_id, do_upload, fee_observer, upload_observer,
-                                                        position_offset); // <SK:Nexii> Mesh uploader pivot
+                                                        position_offsets); // <SK:Nexii> Mesh uploader pivot
     mUploadWaitList.push_back(thread);
 }
 

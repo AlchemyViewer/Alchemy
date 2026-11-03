@@ -36,7 +36,6 @@
   <string name="phys_status_vertex_limit_exceeded">Some physical hulls exceed vertex limitations.</string>
   <string name="phys_status_degenerate_triangles">The physics mesh is too dense or contains degenerate triangles. Use Analyze/Simplify to resolve.</string>
   <string name="pivot_status_rigged">A pivot is for unrigged mesh; rigged mesh is placed by its skeleton.</string>
-  <string name="pivot_status_multiple">A pivot can be set only when uploading a single model.</string>
   <string name="pivot_status_analyze">Analyze the physics to set a pivot: unanalyzed physics stays centred on the object.</string>
   <string name="pivot_status_no_physics">No physics shape is defined, so the object collides with its default hull, centred on itself. Fine for a phantom piece or physics type None.</string>
   <string name="layer_all">All</string> <!-- Text to display in physics layer combo box for "all layers" -->
@@ -1381,6 +1380,41 @@
              tool_tip="Where the object's origin, and so its rotation, sits within its bounding box: in percent, -100 and 100 are its faces and 0 its centre; in metres, the distance from its centre.">
              Pivot:
            </text>
+           <radio_group
+             follows="top|left"
+             height="16"
+             left_pad="0"
+             name="pivot_mode"
+             top_delta="0"
+             width="300">
+             <radio_item
+               height="16"
+               label="From file"
+               left="0"
+               name="pivot_mode_file"
+               tool_tip="Each model's origin as the file gives it, such as its object origin in Blender. A model whose origin lies outside its box stays centred."
+               top="0"
+               value="file"
+               width="90"/>
+             <radio_item
+               height="16"
+               label="Centre"
+               left_pad="0"
+               name="pivot_mode_centre"
+               tool_tip="The centre of the bounding box, as uploads place it without a pivot."
+               top_delta="0"
+               value="centre"
+               width="80"/>
+             <radio_item
+               height="16"
+               label="Custom"
+               left_pad="0"
+               name="pivot_mode_custom"
+               tool_tip="Set the pivot below, starting from the one last shown. For a single model only."
+               top_delta="0"
+               value="custom"
+               width="80"/>
+           </radio_group>
            <spinner
              decimal_digits="1"
              follows="top|left"
@@ -1388,11 +1422,11 @@
              increment="50"
              label="X"
              label_width="12"
-             left_pad="0"
+             left="70"
              max_val="100"
              min_val="-100"
              name="pivot_x"
-             top_delta="-4"
+             top_pad="6"
              value="0"
              width="80"/>
            <spinner
