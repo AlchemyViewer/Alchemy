@@ -20,6 +20,14 @@ What is checked, because each is easy to get subtly wrong and hard to see on scr
   (d) Adaptation: stepping toward a new EV lands in the same place at the same time at 30, 60
       and 144 fps, and a brighter scene is followed faster than a darker one.
   (e) Nothing lit: a black frame opens up to the minimum EV rather than dividing by nothing.
+  (g) Incident metering: with the grid divided by the patch's albedo (luminanceF.glsl), a white
+      wall and a grey card in the same light meter alike, a near black surface has no say, a blended
+      pixel (which the albedo cannot speak for) meters as reflective metering does, and the key moves
+      with the strength so that a scene of middle grey surfaces meters the same at any.
+
+The other checks run at incident strength 0 (reflective metering), where the grid is the light reflected
+and middle grey is its key; the pipeline's default is 1 (incident metering), where the grid is the light
+falling on surfaces and the key is 1.
 
 If the shaders' binning, trim, target or adaptation change, change them here in the same commit.
 
@@ -50,6 +58,7 @@ DEFAULTS = {
     "speed_down": 1.0,
     "metering_mode": 1,
     "sky_weight": 1.0,
+    "incident_strength": 0.0,
 }
 
 
@@ -69,16 +78,19 @@ def meter_weight(u, v, mode):
 
 
 def histogram(grid, settings):
-    """grid: {(x, y): (ground luminance, sky luminance, sky share)}; returns [(weight, weight * ev)]."""
+    """grid: {(x, y): (ground luminance, sky luminance, sky share[, earned])}; returns [(weight, weight * ev)]."""
     bins_per_ev = BINS / (HISTOGRAM_MAX_EV - HISTOGRAM_MIN_EV)
     bins = [[0.0, 0.0] for _ in range(BINS)]
-    for (x, y), (ground, sky, sky_share) in grid.items():
+    for (x, y), cell in grid.items():
+        ground, sky, sky_share = cell[:3]
+        ground_earned = cell[3] if len(cell) > 3 else 1.0
         for is_sky in (False, True):
             L = sky if is_sky else ground
             share = sky_share if is_sky else 1.0 - sky_share
+            earned = 1.0 if is_sky else ground_earned
             u = (x + 0.5) / METER_WIDTH
             v = (y + 0.5) / METER_HEIGHT
-            w = share * meter_weight(u, v, settings["metering_mode"]) * (settings["sky_weight"] if is_sky else 1.0)
+            w = share * earned * meter_weight(u, v, settings["metering_mode"]) * (settings["sky_weight"] if is_sky else 1.0)
             ev = min(max(math.log2(max(L, 1e-10)), HISTOGRAM_MIN_EV), HISTOGRAM_MIN_EV + BINS / bins_per_ev)
             b = min(math.floor((ev - HISTOGRAM_MIN_EV) * bins_per_ev), BINS - 1)
             if w > 0.0 and L > 0.0:
@@ -93,7 +105,8 @@ def histogram(grid, settings):
 def exposure_params(settings, meter=True):
     low = min(max(settings["low_percent"] * 0.01, 0.0), 0.99)
     high = min(max(settings["high_percent"] * 0.01, low + 0.01), 1.0)
-    params = (math.log2(KEY) + settings["compensation"], min(settings["min_ev"], settings["max_ev"]),
+    key_ev = (1.0 - min(max(settings["incident_strength"], 0.0), 1.0)) * math.log2(KEY)
+    params = (key_ev + settings["compensation"], min(settings["min_ev"], settings["max_ev"]),
               max(settings["min_ev"], settings["max_ev"]), 1.0 if meter else 0.0)
     params2 = (low, high, max(settings["speed_up"], 0.0), max(settings["speed_down"], 0.0))
     return params, params2
@@ -134,6 +147,38 @@ def exposure(bins, params, params2, prev=None, dt=0.0):
 
 
 # ---------------------------------------------------------------------------------------
+# luminanceF.glsl's division by the albedo (the rest of the grid is taken as given)
+
+# AlchemyExposureIncidentTuning's defaults.
+ALBEDO_FLOOR = 0.1
+ALBEDO_TRUSTED_FROM = 0.02
+ALBEDO_TRUSTED_TO = 0.12
+
+
+# luminanceF.glsl's NOMINAL_ALBEDO, the key: what a pixel the G-buffer cannot speak for is taken to reflect.
+NOMINAL_ALBEDO = KEY
+
+
+def mean_albedo(albedo, blended):
+    """A patch's mean albedo when this share of its taps are blended pixels, which read as nominal."""
+    return (1.0 - blended) * albedo + blended * NOMINAL_ALBEDO
+
+
+def smoothstep(lo, hi, x):
+    t = min(max((x - lo) / (hi - lo), 0.0), 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def patch_by_albedo(ground_mean, albedo, strength):
+    """A patch's non-sky mean luminance and mean albedo -> (the grid's r, the grid's alpha)."""
+    if strength <= 0.0:
+        return ground_mean, 1.0
+    value = ground_mean / max(albedo, ALBEDO_FLOOR) ** strength
+    earned = (1.0 - strength) + strength * smoothstep(ALBEDO_TRUSTED_FROM, ALBEDO_TRUSTED_TO, albedo)
+    return value, earned
+
+
+# ---------------------------------------------------------------------------------------
 # scenes
 
 def uniform_grid(luminance, sky_share=0.0, sky=None):
@@ -144,6 +189,15 @@ def uniform_grid(luminance, sky_share=0.0, sky=None):
 def random_grid(seed, median, spread_ev):
     rng = random.Random(seed)
     return {(x, y): (median * 2.0 ** rng.gauss(0.0, spread_ev), 0.0, 0.0)
+            for y in range(METER_HEIGHT) for x in range(METER_WIDTH)}
+
+
+def surface_grid(albedo, light, strength, black_albedo=None):
+    """A wall of this albedo in this light, its right half a black surface in the same light if black_albedo is given."""
+    wall = patch_by_albedo(albedo * light, albedo, strength)
+    black = wall if black_albedo is None else patch_by_albedo(black_albedo * light, black_albedo, strength)
+    return {(x, y): ((wall if x < METER_WIDTH // 2 else black)[0], 0.0, 0.0,
+                     (wall if x < METER_WIDTH // 2 else black)[1])
             for y in range(METER_HEIGHT) for x in range(METER_WIDTH)}
 
 
@@ -259,6 +313,44 @@ def check_broken_history(ck):
                   "EV %.3f, target %.3f" % (ev, target))
 
 
+def check_albedo(ck):
+    print("(g) incident metering: the light on surfaces, not the light they reflect")
+    by_light = dict(DEFAULTS, incident_strength=1.0)
+    light = 2.0
+
+    _, ev_white, _ = meter(surface_grid(0.8, light, 1.0), by_light)
+    _, ev_grey, _ = meter(surface_grid(0.18, light, 1.0), by_light)
+    ck.expect("a white wall and a grey card in the same light meter alike", abs(ev_white - ev_grey) < 1e-9,
+              "EV %.6f and %.6f" % (ev_white, ev_grey))
+    ck.expect("and at the light's own EV, so that white reads as white", abs(ev_white - math.log2(light)) < 1e-9,
+              "EV %.6f" % ev_white)
+
+    _, reflected_white, _ = meter(surface_grid(0.8, light, 0.0))
+    _, reflected_grey, _ = meter(surface_grid(0.18, light, 0.0))
+    ck.expect("at strength 0 they differ by their albedos, the white wall exposed down to grey",
+              abs((reflected_white - reflected_grey) - math.log2(0.8 / 0.18)) < 1e-9,
+              "%.3f stops apart" % (reflected_white - reflected_grey))
+
+    _, ev_mixed, _ = meter(surface_grid(0.8, light, 1.0, black_albedo=0.01), by_light)
+    ck.expect("a near black surface in the same light has no say", abs(ev_mixed - ev_white) < 1e-9,
+              "EV %.6f against %.6f" % (ev_mixed, ev_white))
+
+    # A blended surface's pixels read as reflecting the key, which meters them as reflective metering does, whether
+    # the surface behind is dark or bright; unflagged, the dark one would read as a far brighter light.
+    film = 0.5
+    _, ev_reflective, _ = meter(uniform_grid(film))
+    for behind in (0.05, 0.9):
+        value, earned = patch_by_albedo(film, mean_albedo(behind, 1.0), 1.0)
+        grid = {(x, y): (value, 0.0, 0.0, earned) for y in range(METER_HEIGHT) for x in range(METER_WIDTH)}
+        _, ev_blended, _ = meter(grid, by_light)
+        ck.expect("a blended pixel over a surface of albedo %.2f meters as reflective metering does" % behind,
+                  abs(ev_blended - ev_reflective) < 1e-9, "EV %.6f against %.6f" % (ev_blended, ev_reflective))
+
+    evs = [meter(surface_grid(0.18, light, s), dict(DEFAULTS, incident_strength=s))[1] for s in (0.0, 0.5, 1.0)]
+    ck.expect("middle grey surfaces meter the same at strength 0, a half and 1", max(evs) - min(evs) < 1e-9,
+              "EVs %s" % ", ".join("%.6f" % ev for ev in evs))
+
+
 def main():
     ck = Checker()
     check_calibration(ck)
@@ -267,6 +359,7 @@ def main():
     check_adaptation(ck)
     check_black(ck)
     check_broken_history(ck)
+    check_albedo(ck)
     print("RESULT: %s" % ("OK" if ck.failures == 0 else "MISMATCH"))
     return 0 if ck.failures == 0 else 1
 

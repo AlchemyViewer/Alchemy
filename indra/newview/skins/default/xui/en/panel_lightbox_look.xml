@@ -415,7 +415,7 @@ Row conventions:
 		<accordion_tab
 		 expanded="false"
 		 layout="topleft"
-		 height="194"
+		 height="220"
 		 name="atab_sec_autoexp_adv"
 		 title="Auto Exposure - Advanced"
 		 header_tool_tip="How quickly auto exposure adapts in each direction, how much of the darkest and brightest parts of the frame the meter ignores, and how much the sky counts."
@@ -423,7 +423,7 @@ Row conventions:
 			<panel
 			 follows="all"
 			 layout="topleft"
-			 height="165"
+			 height="191"
 			 left="0"
 			 top="0"
 			 right="-1"
@@ -508,6 +508,22 @@ Row conventions:
 				 tool_tip="How much the sky counts toward the exposure: 0 ignores it, 1 counts it like the rest of the frame"
 				 enabled_control="RenderDynamicExposureEnabled"
 				 control_name="AlchemyExposureSkyWeight" />
+				<setting_row
+				 follows="left|top|right"
+				 layout="topleft"
+				 left="8"
+				 top_pad="8"
+				 right="-8"
+				 height="18"
+				 label="Incident metering"
+				 decimal_digits="2"
+				 increment="0.05"
+				 min_val="0"
+				 max_val="1"
+				 name="autoexp_incident_strength"
+				 tool_tip="0 meters the light surfaces reflect, so a white wall in dim light is exposed as middle grey. 1 meters the light falling on them (incident metering), so white stays white and a grey card stays grey"
+				 enabled_control="RenderDynamicExposureEnabled"
+				 control_name="AlchemyExposureIncidentStrength" />
 				<button
 				 follows="top|right"
 				 layout="topleft"

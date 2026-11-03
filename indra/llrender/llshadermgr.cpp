@@ -2012,6 +2012,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("meter_params");
     mReservedUniforms.push_back("meterMap");
     mReservedUniforms.push_back("meterWaterMap");
+    mReservedUniforms.push_back("meterAlbedoMap");
+    mReservedUniforms.push_back("meterBlendMap");
+    mReservedUniforms.push_back("meter_albedo_params");
     mReservedUniforms.push_back("exposureHistogram");
 
     // Stars/Aurora/Meteors
