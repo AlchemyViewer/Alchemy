@@ -168,6 +168,55 @@ namespace
         CHECK(is_approx_equal(1.0f, res_quat.mQ[3]));
     }
 
+    TEST_CASE("LLQuaternion: normQuat and normalize give identity where the length is not finite", "[LLQuaternion]")
+    {
+        // Made from bits the compiler cannot see, so no floating-point mode
+        // can fold them. 2e19 is finite, but its square is not.
+        volatile U32 inf_bits = 0x7f800000u;
+        volatile U32 nan_bits = 0x7fc00000u;
+        const F32 inf = std::bit_cast<F32>(U32(inf_bits));
+        const F32 nan = std::bit_cast<F32>(U32(nan_bits));
+        struct Case
+        {
+            const char*  what;
+            LLQuaternion q;
+        };
+        const Case cases[] = {
+            { "infinite component", LLQuaternion(inf, 0.f, 0.f, 1.f) },
+            { "negative infinite component", LLQuaternion(0.5f, -inf, 0.f, 0.5f) },
+            { "component whose square overflows", LLQuaternion(2e19f, 0.f, 0.f, 1.f) },
+            { "NaN component", LLQuaternion(0.f, 0.f, nan, 1.f) },
+        };
+        const auto check_identity = [](const char* how, const LLQuaternion& q)
+        {
+            INFO(how);
+            CHECK(std::bit_cast<U32>(q.mQ[VX]) == 0u);
+            CHECK(std::bit_cast<U32>(q.mQ[VY]) == 0u);
+            CHECK(std::bit_cast<U32>(q.mQ[VZ]) == 0u);
+            CHECK(std::bit_cast<U32>(q.mQ[VS]) == std::bit_cast<U32>(1.f));
+        };
+        for (const Case& c : cases)
+        {
+            INFO(c.what);
+            LLQuaternion norm_quat(c.q);
+            norm_quat.normQuat();
+            check_identity("normQuat", norm_quat);
+            LLQuaternion normalized(c.q);
+            normalized.normalize();
+            check_identity("normalize", normalized);
+        }
+
+        // A length that is large but finite still normalises.
+        LLQuaternion norm_quat(1e19f, 0.f, 0.f, 1.f);
+        norm_quat.normQuat();
+        CHECK(is_approx_equal(1.f, norm_quat.mQ[VX]));
+        CHECK(norm_quat.mQ[VS] < 1e-18f);
+        LLQuaternion normalized(1e19f, 0.f, 0.f, 1.f);
+        normalized.normalize();
+        CHECK(is_approx_equal(1.f, normalized.mQ[VX]));
+        CHECK(normalized.mQ[VS] < 1e-18f);
+    }
+
     //test case for conjQuat() and transQuat() fns.
     TEST_CASE("LLQuaternion: conjQuat and transQuat agree on the vector part", "[LLQuaternion]")
     {

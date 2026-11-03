@@ -298,7 +298,10 @@ std::string LLSDXMLFormatter::escapeString(const std::string& in)
 void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
 {
     // Append unescaped runs in bulk; only the five XML special characters
-    // need an entity.
+    // need an entity. XML takes a C0 control other than tab, LF and CR only
+    // as a character reference, written in lower-case hex with no leading
+    // zero, and has none for NUL, which is left as it is.
+    static constexpr char HEX[] = "0123456789abcdef";
     out.reserve(out.size() + in.size());
     const char* start = in.data();
     const char* end = start + in.size();
@@ -306,6 +309,7 @@ void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
     for(const char* p = start; p < end; ++p)
     {
         const char* entity;
+        char reference[7];
         switch(*p)
         {
         case '<':
@@ -324,7 +328,26 @@ void LLSDXMLFormatter::escapeStringTo(std::string& out, const std::string& in)
             entity = "&quot;";
             break;
         default:
-            continue;
+        {
+            const unsigned char c = (unsigned char)*p;
+            if (c == 0 || c >= 0x20 || c == '\t' || c == '\n' || c == '\r')
+            {
+                continue;
+            }
+            char* r = reference;
+            *r++ = '&';
+            *r++ = '#';
+            *r++ = 'x';
+            if (c >= 0x10)
+            {
+                *r++ = '1';
+            }
+            *r++ = HEX[c & 0xf];
+            *r++ = ';';
+            *r = '\0';
+            entity = reference;
+            break;
+        }
         }
         out.append(run, p - run);
         out.append(entity);
@@ -375,6 +398,8 @@ private:
     bool    refill();
     bool    avail(size_t bytes);
     bool    findMarker(const char* marker, size_t marker_len, size_t& found);
+    bool    nextChar(char& c);
+    bool    skipPast(char c);
     void    rewindStream();
     //@}
 
@@ -385,6 +410,7 @@ private:
     bool    scanName(size_t& name_off, size_t& name_len);
     bool    scanTagTail(size_t& attr_off, size_t& attr_len, bool& self_closing);
     bool    scanDoctype();
+    bool    scanSubsetMarkup();
     bool    decodeEntity();
     static bool base64Encoded(const char* attrs, size_t len);
     //@}
@@ -446,6 +472,7 @@ private:
     int mSkipThrough;
 
     std::string mCurrentKey;        // Current XML <tag>
+    bool mHaveKey;                  // a <key> waits for its value, though it may be empty
 
     // String data between <tag> and </tag>. While it is a single unbroken run
     // of the source it is held as an offset into mBuffer and never copied;
@@ -697,6 +724,7 @@ void LLSDXMLParser::Impl::reset()
     mSkipThrough = 0;
 
     mCurrentKey.clear();
+    mHaveKey = false;
     clearContent();
 
     mInput = nullptr;
@@ -1090,13 +1118,16 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
             }
             else if (c == '>')
             {
+                // An empty element ends "/>", with nothing between the two. A
+                // '/' anywhere else is no attribute, and valid_attributes()
+                // refuses it.
                 size_t end = mPos;
-                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 if (end > attr_off && mBuffer[end - 1] == '/')
                 {
                     self_closing = true;
                     --end;
                 }
+                while (end > attr_off && is_xml_space(mBuffer[end - 1])) --end;
                 attr_len = end - attr_off;
                 ++mPos;
                 return true;
@@ -1110,24 +1141,94 @@ bool LLSDXMLParser::Impl::scanTagTail(size_t& attr_off, size_t& attr_len, bool& 
     }
 }
 
+bool LLSDXMLParser::Impl::nextChar(char& c)
+{
+    if (!avail(1))
+    {
+        return false;
+    }
+    c = mBuffer[mPos++];
+    return true;
+}
+
+bool LLSDXMLParser::Impl::skipPast(char c)
+{
+    size_t at;
+    if (!findMarker(&c, 1, at))
+    {
+        return false;
+    }
+    mPos = at + 1;
+    return true;
+}
+
 bool LLSDXMLParser::Impl::scanDoctype()
 {
-    // mPos is just past "<!". The internal subset may contain '>', so track it.
-    int in_subset = 0;
+    // mPos is just past "<!DOCTYPE". XML names the root element there, so one
+    // holding nothing but space is refused. A quoted literal runs to the same
+    // quote, whatever it holds, and '[' opens the internal subset.
+    bool empty = true;
+    char c;
     for (;;)
     {
-        while (mPos < mBuffer.size())
+        if (!nextChar(c)) return false;
+        if (c == '>') return !empty;
+        if (!is_xml_space(c)) empty = false;
+        if (c == '"' || c == '\'')
         {
-            const char c = mBuffer[mPos++];
-            if (c == '[') ++in_subset;
-            else if (c == ']') { if (in_subset) --in_subset; }
-            else if (c == '>' && !in_subset) return true;
+            if (!skipPast(c)) return false;
         }
-        if (!refill())
+        else if (c == '[')
         {
-            return false;
+            break;
         }
     }
+
+    // The subset ends at the first ']' outside its markup, and the DOCTYPE
+    // at the first '>' after that, whatever lies between.
+    for (;;)
+    {
+        if (!nextChar(c)) return false;
+        if (c == ']') return skipPast('>');
+        if (c == '<' && !scanSubsetMarkup()) return false;
+    }
+}
+
+bool LLSDXMLParser::Impl::scanSubsetMarkup()
+{
+    // mPos is just past a '<' in the internal subset. A processing instruction
+    // or comment ends at the first end after its start, so "<?>" and "<!-->"
+    // end nothing. A declaration that may quote a literal ends at the first
+    // '>' outside one; an element declaration, or any other markup, at the
+    // first '>'. Keywords match as prefixes.
+    size_t at;
+    if (avail(1) && mBuffer[mPos] == '?')
+    {
+        mPos += 1;
+        if (!findMarker("?>", 2, at)) return false;
+        mPos = at + 2;
+        return true;
+    }
+    if (avail(3) && memcmp(mBuffer.data() + mPos, "!--", 3) == 0)
+    {
+        mPos += 3;
+        if (!findMarker("-->", 3, at)) return false;
+        mPos = at + 3;
+        return true;
+    }
+    if ((avail(7) && memcmp(mBuffer.data() + mPos, "!ENTITY", 7) == 0)
+        || (avail(8) && memcmp(mBuffer.data() + mPos, "!ATTLIST", 8) == 0)
+        || (avail(9) && memcmp(mBuffer.data() + mPos, "!NOTATION", 9) == 0))
+    {
+        char c;
+        for (;;)
+        {
+            if (!nextChar(c)) return false;
+            if (c == '>') return true;
+            if ((c == '"' || c == '\'') && !skipPast(c)) return false;
+        }
+    }
+    return skipPast('>');
 }
 
 bool LLSDXMLParser::Impl::scanMarkup()
@@ -1142,6 +1243,8 @@ bool LLSDXMLParser::Impl::scanMarkup()
 
     if (lead == '?')
     {
+        // "<?>" is no processing instruction, nor the start of one.
+        if (!avail(3) || mBuffer[mPos + 2] == '>') return false;
         size_t at;
         mPos += 2;
         if (!findMarker("?>", 2, at)) return false;
@@ -1168,8 +1271,13 @@ bool LLSDXMLParser::Impl::scanMarkup()
             mPos = at + 3;
             return true;
         }
-        mPos += 2;
-        return scanDoctype();
+        if (avail(9) && memcmp(mBuffer.data() + mPos, "<!DOCTYPE", 9) == 0)
+        {
+            mPos += 9;
+            return scanDoctype();
+        }
+        // XML begins nothing else with "<!".
+        return false;
     }
 
     if (lead == '/')
@@ -1279,13 +1387,14 @@ bool LLSDXMLParser::Impl::startElement(Element element, size_t attr_off, size_t 
     }
     else if (mStack.back()->isMap())
     {
-        if (mCurrentKey.empty()) { startSkipping(); return true; }
+        if (!mHaveKey) { startSkipping(); return true; }
 
         LLSD& map = *mStack.back();
         LLSD& newElement = map[std::move(mCurrentKey)];
         mStack.push_back(&newElement);
 
         mCurrentKey.clear();
+        mHaveKey = false;
     }
     else if (mStack.back()->isArray())
     {
@@ -1342,6 +1451,7 @@ void LLSDXMLParser::Impl::endElement(Element element)
 
         case ELEMENT_KEY:
             mCurrentKey = takeContent();
+            mHaveKey = true;
             clearContent();
             return;
 
@@ -1454,6 +1564,13 @@ void LLSDXMLParser::Impl::endElement(Element element)
 
         case ELEMENT_UNKNOWN:
             value.clear();
+            break;
+
+        case ELEMENT_MAP:
+            // A key still waiting for its value belongs to this map: no value
+            // in the one around it takes it.
+            mCurrentKey.clear();
+            mHaveKey = false;
             break;
 
         default:

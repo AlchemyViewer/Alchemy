@@ -1094,7 +1094,11 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
     LLHost host = mesgsys->getSender();
 
     //LL_INFOS() << "Disabling simulator with message from " << host << LL_ENDL;
-    LLWorld::getInstance()->removeRegion(host);
+    // A region retired before its simulator disabled it is gone already, and only its circuit is left.
+    if (LLWorld::getInstance()->getRegion(host))
+    {
+        LLWorld::getInstance()->removeRegion(host);
+    }
 
     mesgsys->disableCircuit(host);
 }

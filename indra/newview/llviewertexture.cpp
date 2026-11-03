@@ -1342,6 +1342,7 @@ void LLViewerFetchedTexture::init(bool firstinit)
     mSaveRawImage = false;
     mSavedRawDiscardLevel = -1;
     mDesiredSavedRawDiscardLevel = -1;
+    mSavedRawFetchFailed = false;
     mLastReferencedSavedRawImageTime = 0.0f;
     mKeptSavedRawImageTime = 0.f;
     mLastCallBackActiveTime = 0.f;
@@ -2187,6 +2188,13 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
             LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - data not needed");
             // Data is ready but we don't need it
             // (received it already while fetcher was writing to disk)
+            if (!mIsFetching && current_discard >= 0 && fetch_discard > mRequestedDiscardLevel)
+            {
+                // Finished short of the level asked, with nothing finer than the texture's own: as for a fetch that
+                // brought no data, that is the best a fetch brings it, and updateFetch stops there. A finish at the
+                // level asked only brings again what was handed over while the fetcher wrote it.
+                mMinDiscardLevel = current_discard;
+            }
             destroyRawImage();
             return false; // done
         }
@@ -2226,9 +2234,18 @@ bool LLViewerFetchedTexture::processFetchResults(S32& desired_discard, S32 curre
                 else
                 {
                     // With no GL level (a sculpt-only map's texture went), the copy's level is the best a fetch
-                    // brings it: updateFetch stops there.
+                    // brings it. With a GL level the copy is what did not come (one forced to save, none saved
+                    // yet), and the GL level is the best. updateFetch stops at either.
                     S32 dis_level = getDiscardLevel();
-                    mMinDiscardLevel = dis_level >= 0 ? dis_level : mSavedRawDiscardLevel;
+                    if (dis_level >= 0)
+                    {
+                        mSavedRawFetchFailed = true;
+                        mMinDiscardLevel = dis_level;
+                    }
+                    else
+                    {
+                        mMinDiscardLevel = mSavedRawDiscardLevel;
+                    }
                     //desired_discard = dis_level;
                 }
             }
@@ -2409,10 +2426,13 @@ bool LLViewerFetchedTexture::updateFetch()
         make_request = false;
     }
     else if (current_discard >= 0 ? current_discard <= mMinDiscardLevel
-                                  : mSavedRawImage.notNull() && mSavedRawDiscardLevel >= 0 &&
-                                        mSavedRawDiscardLevel <= mMinDiscardLevel)
+             : mSavedRawImage.notNull() && mSavedRawDiscardLevel >= 0
+                 ? mSavedRawDiscardLevel <= mMinDiscardLevel
+                 : mSavedRawFetchFailed && getDiscardLevel() >= 0 && getDiscardLevel() <= mMinDiscardLevel)
     {
-        // At the best a fetch has brought: the texture's own level, or with none the copy's.
+        // At the best a fetch has brought: the texture's own level, or with none the copy's, or, where a fetch for the
+        // copy brought nothing, the GL level it had. Asked again, createRequest refuses a request its worker finished,
+        // and the worker would be held until the texture goes.
         LL_PROFILE_ZONE_NAMED_CATEGORY_TEXTURE("vftuf - current < min");
         make_request = false;
     }
@@ -3305,6 +3325,7 @@ void LLViewerFetchedTexture::forceToRefetchTexture(S32 desired_discard, F32 kept
     mLastReferencedSavedRawImageTime = sCurrentTime ;
     mSavedRawImage = NULL ;
     mSavedRawDiscardLevel = -1 ;
+    mSavedRawFetchFailed = false;
 }
 
 void LLViewerFetchedTexture::forceToSaveRawImage(S32 desired_discard, F32 kept_time)
@@ -3387,6 +3408,7 @@ void LLViewerFetchedTexture::destroySavedRawImage()
     mSaveRawImage = false ;
     mSavedRawDiscardLevel = -1 ;
     mDesiredSavedRawDiscardLevel = -1 ;
+    mSavedRawFetchFailed = false;
     mLastReferencedSavedRawImageTime = 0.0f ;
     mKeptSavedRawImageTime = 0.f ;
 

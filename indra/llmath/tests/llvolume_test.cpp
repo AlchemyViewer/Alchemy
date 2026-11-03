@@ -64,6 +64,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstring>
+#include <limits>
 #include <map>
 #include <numeric>
 #include <optional>
@@ -7745,5 +7746,62 @@ namespace
                                  counts[c] - one_normal - near_flat);
         }
         WARN(table);
+    }
+
+    // A begin, end or hollow is cut to five places through an int, which is
+    // undefined where 100000 times the value is past an int's range or the
+    // value is not a number.
+    TEST_CASE("llvolume: LLProfileParams holds a begin end or hollow to the unit range before cutting it", "[llvolume]")
+    {
+        // A value in range is cut to five places, to within the rounding of
+        // the division the cut ends with: the compiler may take it as a
+        // multiplication by the reciprocal at one place and not another.
+        const auto cut_to = [](F32 value, F32 expected) { return std::fabs(value - expected) < 1e-6f; };
+        LLProfileParams profile;
+
+        profile.setBegin(0.123456f);
+        CHECK(cut_to(profile.getBegin(), 0.12345f));
+        profile.setEnd(0.654321f);
+        CHECK(cut_to(profile.getEnd(), 0.65432f));
+        profile.setHollow(0.5f);
+        CHECK(cut_to(profile.getHollow(), 0.5f));
+
+        profile.setBegin(1.f);
+        CHECK(profile.getBegin() == 0.f);
+        profile.setEnd(0.f);
+        CHECK(profile.getEnd() == 1.f);
+        profile.setHollow(1.f);
+        CHECK(profile.getHollow() == 1.f);
+
+        const F32 nan = std::numeric_limits<F32>::quiet_NaN();
+        const F32 inf = std::numeric_limits<F32>::infinity();
+        struct Case
+        {
+            F32 value;
+            F32 begin;
+            F32 end;
+            F32 hollow;
+        };
+        const Case cases[] = {
+            { nan, 0.f, 1.f, 0.f },
+            { inf, 0.f, 1.f, 0.f },
+            { -inf, 0.f, 1.f, 0.f },
+            { 21475.f, 0.f, 1.f, 1.f },
+            { -21475.f, 0.f, 1.f, 0.f },
+            { 1e10f, 0.f, 1.f, 1.f },
+            { -1e10f, 0.f, 1.f, 0.f },
+            { -0.5f, 0.f, 1.f, 0.f },
+            { 2.f, 0.f, 1.f, 1.f },
+        };
+        for (const Case& c : cases)
+        {
+            CAPTURE(c.value);
+            profile.setBegin(c.value);
+            CHECK(profile.getBegin() == c.begin);
+            profile.setEnd(c.value);
+            CHECK(profile.getEnd() == c.end);
+            profile.setHollow(c.value);
+            CHECK(profile.getHollow() == c.hollow);
+        }
     }
 }

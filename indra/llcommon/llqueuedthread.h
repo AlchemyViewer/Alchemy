@@ -135,7 +135,6 @@ public:
     LLQueuedThread& operator=(const LLQueuedThread&) = delete;
 
 private:
-    virtual bool runCondition(void);
     virtual void run(void);
     virtual void startThread(void);
     virtual void endThread(void);

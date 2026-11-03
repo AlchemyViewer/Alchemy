@@ -3086,13 +3086,7 @@ bool LLTextureFetch::updateRequestPriority(const LLUUID& id, F32 priority)
 }
 
 // Replicates and expands upon the base class's
-// getPending() implementation.  getPending() and
-// runCondition() replicate one another's logic to
-// an extent and are sometimes used for the same
-// function (deciding whether or not to sleep/pause
-// a thread).  So the implementations need to stay
-// in step, at least until this can be refactored and
-// the redundancy eliminated.
+// getPending() implementation.
 //
 // Threads:  T*
 
@@ -3110,30 +3104,6 @@ size_t LLTextureFetch::getPending()
     }                                                                   // -Mfq
     unlockData();                                                       // -Ct
     return res;
-}
-
-// Locks:  Ct
-// virtual
-bool LLTextureFetch::runCondition()
-{
-    // Caller is holding the lock on LLThread's condition variable.
-
-    // LLQueuedThread, unlike its base class LLThread, makes this a
-    // private method which is unfortunate.  I want to use it directly
-    // but I'm going to have to re-implement the logic here (or change
-    // declarations, which I don't want to do right now).
-    //
-    // Changes here may need to be reflected in getPending().
-
-    bool have_no_commands(false);
-    {
-        LLMutexLock lock(&mQueueMutex);                                 // +Mfq
-
-        have_no_commands = mCommands.empty();
-    }                                                                   // -Mfq
-
-    return ! (have_no_commands
-              && (mRequestQueue.size() == 0 && mIdleThread));       // From base class
 }
 
 //////////////////////////////////////////////////////////////////////////////

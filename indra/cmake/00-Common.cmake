@@ -220,7 +220,17 @@ endif()
 # constant) and, on the link line, crtfastmath.o (FTZ/DAZ for every thread
 # in the process, including ones that are not ours). Compile options never
 # reach the link line, and these spellings never trigger crtfastmath.o.
-if(WINDOWS)
+#
+# A tree built for aloracle computes as the source says instead, with no
+# contraction or reassociation, so what it computes doesn't move with the
+# compiler, the ISA tier or what gets inlined.
+if(AL_BUILD_ORACLE)
+  if(WINDOWS)
+    target_compile_options(al_flags INTERFACE /fp:precise)
+  elseif(LINUX OR DARWIN)
+    target_compile_options(al_flags INTERFACE -fno-math-errno -ffp-contract=off)
+  endif()
+elseif(WINDOWS)
   target_compile_options(al_flags INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:/fp:fast>)
 elseif(LINUX OR DARWIN)
   target_compile_options(
