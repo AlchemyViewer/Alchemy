@@ -3757,7 +3757,7 @@ bool LLModelPreview::render()
     }
 
     // <SK:Nexii> Mesh uploader pivot: the object's origin, drawn through the model
-    if (mViewOption["show_origin"])
+    if (mViewOption["show_origin"] && !mViewOption["show_skin_weight"]) // rigged mesh is drawn on the avatar
     {
         LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
         gUIProgram.bind(); // takes the vertex colours, which gDebugProgram replaces with one uniform
