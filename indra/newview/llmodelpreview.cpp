@@ -287,6 +287,15 @@ void LLModelPreview::rebuildUploadData()
     assert_main_thread();
 
     mDefaultPhysicsShapeP = NULL;
+    // <SK:Nexii> Mesh uploader LODs by name: physics from the high file names its default shape as a physics file does
+    if (mLODFromHighFile[LLModel::LOD_PHYSICS])
+    {
+        LLMatrix4 ignored_transform;
+        LLModel* default_shape = nullptr;
+        FindModel(mScene[LLModel::LOD_PHYSICS], DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS), default_shape, ignored_transform);
+        mDefaultPhysicsShapeP = default_shape;
+    }
+    // </SK:Nexii>
     mUploadData.clear();
     mTextureSet.clear();
 
@@ -885,6 +894,7 @@ void LLModelPreview::setPhysicsFromLOD(S32 lod)
     if (lod >= 0 && lod <= 3)
     {
         mPhysicsSearchLOD = lod;
+        mLODFromHighFile[LLModel::LOD_PHYSICS] = false; // <SK:Nexii> Mesh uploader LODs by name
         mModel[LLModel::LOD_PHYSICS] = mModel[lod];
         mScene[LLModel::LOD_PHYSICS] = mScene[lod];
         mLODFile[LLModel::LOD_PHYSICS].clear();
@@ -1990,8 +2000,20 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             release(lod);
         }
     }
+    // Physics copied from a LOD follows that LOD when this file replaces it.
+    const S32 physics_from = mPhysicsSearchLOD;
+    auto follow_physics = [&]()
+    {
+        if (physics_from >= LLModel::LOD_IMPOSTOR && physics_from <= LLModel::LOD_HIGH && (split[physics_from] || was_from_file[physics_from]))
+        {
+            mModel[LLModel::LOD_PHYSICS] = mModel[physics_from];
+            mScene[LLModel::LOD_PHYSICS] = mScene[physics_from];
+            mVertexBuffer[LLModel::LOD_PHYSICS].clear();
+        }
+    };
     if (kept.size() == mModel[LLModel::LOD_HIGH].size())
     {
+        follow_physics();
         return;
     }
     mModel[LLModel::LOD_HIGH] = kept;
@@ -2015,12 +2037,8 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
 
     if (split[LLModel::LOD_PHYSICS])
     {
-        // As an explicit physics file does: the parts with no _PHYS are logged and may use a default shape.
+        // As an explicit physics file does: the parts with no _PHYS are logged, and may use a default shape.
         mPhysicsSearchLOD = LLModel::LOD_PHYSICS;
-        LLMatrix4 ignored_transform;
-        LLModel* default_shape = nullptr;
-        FindModel(mScene[LLModel::LOD_PHYSICS], DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS), default_shape, ignored_transform);
-        mDefaultPhysicsShapeP = default_shape;
         mWarnOfUnmatchedPhyicsMeshes = true;
     }
 
@@ -2030,9 +2048,9 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         {
             continue;
         }
-        if (lod != LLModel::LOD_PHYSICS && countRootModels(mModel[lod]) != countRootModels(kept))
+        if (lod != LLModel::LOD_PHYSICS && mModel[lod].size() != kept.size())
         {
-            // A LOD needs every model; the file's partial set is dropped and the LOD generated.
+            // A LOD needs every model and submodel; the file's partial set is dropped and the LOD generated.
             release(lod);
             std::ostringstream out;
             out << "Only some models have a " << getLodSuffix(lod) << " model in the file; generating that LOD instead";
@@ -2058,6 +2076,10 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         std::ostringstream out;
         out << "Took " << mModel[lod].size() << " model(s) named " << getLodSuffix(lod) << " from the file for that slot";
         LLFloaterModelPreview::addStringToLog(out, false);
+    }
+    if (!split[LLModel::LOD_PHYSICS])
+    {
+        follow_physics();
     }
 }
 // </SK:Nexii>
