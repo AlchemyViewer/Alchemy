@@ -2588,19 +2588,26 @@ void LLModelPreview::updateStatusMessages()
             pivot_without_physics |= !rigged && !instance_physics && !getWantedPivot(model).isExactlyZero();
         }
 
+        // Some instance must be free of the hold: several instances of one held model are all held.
+        mUploadPivotAllowed = std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
+                                          { return instance.mModel && !mPivotHeld.count(instance.mModel); });
+        // Every reason that applies is shown, since each concerns different parts.
         std::string pivot_status;
-        mUploadPivotAllowed = mPivotHeld.size() < mUploadData.size();
+        auto add_status = [&](const char* name)
+        {
+            pivot_status += (pivot_status.empty() ? "" : " ") + mFMP->getString(name);
+        };
         if (any_rigged)
         {
-            pivot_status = mFMP->getString("pivot_status_rigged");
+            add_status("pivot_status_rigged");
         }
-        else if (any_unanalyzed)
+        if (any_unanalyzed)
         {
-            pivot_status = mFMP->getString("pivot_status_analyze");
+            add_status("pivot_status_analyze");
         }
-        else if (pivot_without_physics)
+        if (pivot_without_physics)
         {
-            pivot_status = mFMP->getString("pivot_status_no_physics");
+            add_status("pivot_status_no_physics");
         }
 
         const bool custom = mFMP->childGetValue("pivot_mode").asString() == "custom";
