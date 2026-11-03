@@ -1381,6 +1381,7 @@
              Pivot:
            </text>
            <radio_group
+             layout="topleft"
              follows="top|left"
              height="16"
              left_pad="0"
@@ -1388,6 +1389,7 @@
              top_delta="0"
              width="300">
              <radio_item
+               layout="topleft"
                height="16"
                label="From file"
                left="0"
@@ -1397,6 +1399,7 @@
                value="file"
                width="90"/>
              <radio_item
+               layout="topleft"
                height="16"
                label="Centre"
                left_pad="0"
@@ -1406,6 +1409,7 @@
                value="centre"
                width="80"/>
              <radio_item
+               layout="topleft"
                height="16"
                label="Custom"
                left_pad="0"
