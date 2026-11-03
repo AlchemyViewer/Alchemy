@@ -2919,7 +2919,7 @@ void LLMeshUploadThread::packModelIntance(
         LLMatrix4 transformation = instance.mTransform;
         decomposeMeshMatrix(transformation, pos, rot, scale);
         // <SK:Nexii> Mesh uploader pivot: the prim stands on its pivot, so the mesh stays where it was placed
-        pos = (-getPositionOffset(data.mBaseModel)) * transformation;
+        pos = (-getPositionOffset(data.mBaseModel)) * transformation + mOrigin;
         // </SK:Nexii>
         instance_entry["position"] = ll_sd_from_vector3(pos);
         instance_entry["rotation"] = ll_sd_from_quaternion(rot);
