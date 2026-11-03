@@ -163,4 +163,130 @@ namespace
         CHECK(copy.unpackTEMessage(reader) == TEM_INVALID);
         CHECK(packed_entry(copy) == before);
     }
+
+    // Unpacks entry into prim through a data packer, as an update does.
+    S32 unpack_entry(LLPrimitive& prim, const std::vector<U8>& entry)
+    {
+        std::vector<U8> buffer = sized(entry);
+        LLDataPackerBinaryBuffer reader(buffer.data(), (S32)buffer.size());
+        return prim.unpackTEMessage(reader);
+    }
+
+    // A mesh has the faces of its placeholder shape until its asset loads,
+    // fewer than the entry it is sent names.
+    TEST_CASE("LLPrimitiveTEMessage: the faces a primitive gains take the values its entry gives them", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive sent;
+        give_faces_their_own_entries(sent, 6);
+        const std::vector<U8> entry = packed_entry(sent);
+
+        LLPrimitive prim;
+        prim.setNumTEs(4);
+        CHECK(unpack_entry(prim, entry) != TEM_INVALID);
+        REQUIRE(prim.hasTEEntry());
+
+        prim.setNumTEs(6);
+        REQUIRE(prim.getNumTEs() == 6);
+        CHECK(prim.getTE(4)->getID() == face_uuid(4, 1));
+        CHECK(prim.getTE(5)->getID() == face_uuid(5, 1));
+        CHECK(prim.getTE(5)->getMaterialID() == LLMaterialID(face_uuid(5, 100)));
+        CHECK(packed_entry(prim) == entry);
+    }
+
+    TEST_CASE("LLPrimitiveTEMessage: faces removed and gained again take the values the entry gives them", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive sent;
+        give_faces_their_own_entries(sent, 6);
+        const std::vector<U8> entry = packed_entry(sent);
+
+        LLPrimitive prim;
+        prim.setNumTEs(6);
+        CHECK(unpack_entry(prim, entry) != TEM_INVALID);
+
+        prim.setNumTEs(2);
+        REQUIRE(prim.getNumTEs() == 2);
+        CHECK(prim.getTE(1)->getID() == face_uuid(1, 1));
+
+        prim.setNumTEs(6);
+        CHECK(packed_entry(prim) == entry);
+    }
+
+    TEST_CASE("LLPrimitiveTEMessage: the faces a primitive gains take the values of the newest entry", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive sent;
+        give_faces_their_own_entries(sent, 6);
+        const std::vector<U8> first = packed_entry(sent);
+        sent.setTETexture(4, face_uuid(4, 50));
+        sent.setTEColor(5, LLColor4(0.5f, 0.25f, 0.75f, 1.f));
+        const std::vector<U8> second = packed_entry(sent);
+        REQUIRE(second != first);
+
+        LLPrimitive prim;
+        prim.setNumTEs(4);
+        CHECK(unpack_entry(prim, first) != TEM_INVALID);
+        CHECK(unpack_entry(prim, second) != TEM_INVALID);
+
+        prim.setNumTEs(6);
+        CHECK(prim.getTE(4)->getID() == face_uuid(4, 50));
+        CHECK(packed_entry(prim) == second);
+    }
+
+    // A refused entry changes no face, so the faces gained later take the
+    // values of the entry before it.
+    TEST_CASE("LLPrimitiveTEMessage: the faces a primitive gains after a refused entry take the entry before it", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive sent;
+        give_faces_their_own_entries(sent, 6);
+        const std::vector<U8> entry = packed_entry(sent);
+
+        LLPrimitive prim;
+        prim.setNumTEs(4);
+        CHECK(unpack_entry(prim, entry) != TEM_INVALID);
+
+        // Cut inside the first field's default value, and empty: each
+        // changes nothing.
+        const std::vector<U8> malformed(entry.begin(), entry.begin() + 8);
+        CHECK(unpack_entry(prim, malformed) == TEM_CHANGE_NONE);
+        CHECK(unpack_entry(prim, {}) == TEM_CHANGE_NONE);
+
+        prim.setNumTEs(6);
+        CHECK(packed_entry(prim) == entry);
+    }
+
+    // An entry gives every face past the last it packs that face's value.
+    TEST_CASE("LLPrimitiveTEMessage: faces gained past those an entry packs take the value it gives every face", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive sent;
+        give_faces_their_own_entries(sent, 4);
+        const std::vector<U8> entry = packed_entry(sent);
+
+        LLPrimitive prim;
+        prim.setNumTEs(4);
+        CHECK(unpack_entry(prim, entry) != TEM_INVALID);
+
+        prim.setNumTEs(6);
+        for (U8 face = 4; face < 6; ++face)
+        {
+            CAPTURE((int)face);
+            CHECK(*prim.getTE(face) == *prim.getTE(3));
+        }
+        CHECK(prim.getTE(3)->getID() == face_uuid(3, 1));
+    }
+
+    // With no entry to take values from, a face gained is a copy of the
+    // last.
+    TEST_CASE("LLPrimitiveTEMessage: a primitive that unpacked no entry copies its last face into the faces it gains", "[LLPrimitiveTEMessage]")
+    {
+        LLPrimitive prim;
+        give_faces_their_own_entries(prim, 2);
+        REQUIRE_FALSE(prim.hasTEEntry());
+
+        prim.setNumTEs(4);
+        for (U8 face = 2; face < 4; ++face)
+        {
+            CAPTURE((int)face);
+            CHECK(*prim.getTE(face) == *prim.getTE(1));
+        }
+        CHECK(prim.getTE(1)->getID() == face_uuid(1, 1));
+    }
 }
