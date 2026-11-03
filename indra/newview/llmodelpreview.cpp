@@ -1870,7 +1870,7 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
 // <SK:Nexii> Mesh uploader pivot
 void LLModelPreview::setPivotMode(EPivotMode mode)
 {
-    if (mode == PIVOT_CUSTOM && mPivotMode != PIVOT_CUSTOM && mUploadData.size() == 1)
+    if (mode == PIVOT_CUSTOM && mPivotMode != PIVOT_CUSTOM && isSingleModel())
     {
         mCustomPivot = getWantedPivot(mUploadData[0].mModel);
     }
@@ -1908,7 +1908,7 @@ LLVector3 LLModelPreview::getWantedPivot(const LLModel* model) const
     case PIVOT_FILE:
         return getFileOriginPivot(model);
     case PIVOT_CUSTOM:
-        return mUploadData.size() == 1 ? mCustomPivot : LLVector3::zero;
+        return isSingleModel() ? mCustomPivot : LLVector3::zero;
     default:
         return LLVector3::zero;
     }
@@ -2172,6 +2172,14 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
     }
 }
 // </SK:Nexii>
+
+bool LLModelPreview::isSingleModel() const
+{
+    // A model with more than eight materials uploads as a root and its submodels, sharing one transform.
+    return std::count_if(mUploadData.begin(), mUploadData.end(),
+                         [](const LLModelInstance& instance) { return instance.mModel && !instance.mModel->mSubmodelID; }) == 1;
+}
+
 
 LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets() const
 {
@@ -2533,20 +2541,24 @@ void LLModelPreview::updateStatusMessages()
         bool has_physics = false;
         bool analyzed = true;
         bool rigged = false;
+        bool pivot_without_physics = false; // a pivoted part that collides with a default hull centred on itself
         for (const LLModelInstance& instance : mUploadData)
         {
             rigged |= instance.mModel && !instance.mModel->mSkinWeights.empty();
             // The hulls uploaded are the physics model's, or the base model's without one.
             const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
+            bool instance_physics = false;
             if (physics && physics->getNumVolumeFaces() > 0)
             {
-                has_physics = true;
+                instance_physics = true;
                 analyzed &= !physics->mPhysics.mHull.empty();
             }
             else if (!physics && instance.mModel && !instance.mModel->mPhysics.mHull.empty())
             {
-                has_physics = true;
+                instance_physics = true;
             }
+            has_physics |= instance_physics;
+            pivot_without_physics |= !instance_physics && !getWantedPivot(instance.mModel).isExactlyZero();
         }
 
         std::string pivot_status;
@@ -2561,8 +2573,7 @@ void LLModelPreview::updateStatusMessages()
             pivot_status = mFMP->getString("pivot_status_analyze");
             mUploadPivotAllowed = false;
         }
-        else if (!has_physics && std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
-                                             { return !getWantedPivot(instance.mModel).isExactlyZero(); }))
+        else if (pivot_without_physics)
         {
             pivot_status = mFMP->getString("pivot_status_no_physics");
         }

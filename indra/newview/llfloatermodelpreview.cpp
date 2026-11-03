@@ -700,7 +700,7 @@ LLVector3 LLFloaterModelPreview::getPivotHalfExtents() const
     {
         return LLVector3::zero;
     }
-    if (mModelPreview->mUploadData.size() == 1)
+    if (mModelPreview->isSingleModel())
     {
         // The pivot moves along the mesh's own axes, so a rotated instance measures along them.
         // The transform carries the import scale already.
@@ -774,7 +774,7 @@ void LLFloaterModelPreview::updatePivotControls()
     }
 
     // Custom is for one model: several each take their own origin from the file, or the centre.
-    const bool single = mModelPreview->mUploadData.size() == 1;
+    const bool single = mModelPreview->isSingleModel();
     if (LLRadioGroup* modes = getChild<LLRadioGroup>("pivot_mode"))
     {
         if (!single && mModelPreview->getPivotMode() == LLModelPreview::PIVOT_CUSTOM)

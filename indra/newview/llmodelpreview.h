@@ -185,6 +185,8 @@ public:
     LLVector3 getUploadPivot(const LLModel* model) const { return mUploadPivotAllowed ? getWantedPivot(model) : LLVector3::zero; }
     // What each model's stored domains are shifted by so that its origin lands on its pivot.
     LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
+    // One model to upload, counting a root and its submodels once: what Custom and metres are for.
+    bool isSingleModel() const;
     // </SK:Nexii>
     // <SK:Nexii> Mesh uploader LODs by name: a file's NAME_LOD0-2 and NAME_PHYS models fill those slots of NAME
     void splitSuffixedModels(const std::string& filename);
