@@ -81,6 +81,9 @@
 #include "llmessagelog.h"
 #include "llpounceable.h"
 #include "llproxy.h"
+#if AL_SESSION_CAPTURE
+#include "alsessioncapture.h"
+#endif
 
 // Constants
 //const char* MESSAGE_LOG_FILENAME = "message.log";
@@ -604,6 +607,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
                 mCurrentRecvPacketID = ntohl(packet_id_net);
             }
             host = getSender();
+#if AL_SESSION_CAPTURE
+            if (ALSessionCapture::capturing())
+            {
+                ALSessionCapture::instance().recordPacket(false, host, faked_message ? fake_buffer : mTrueReceiveBuffer,
+                                                          mTrueReceiveSize, buffer, receive_size, faked_message);
+            }
+#endif
 
             const bool resetPacketId = true;
             cdp = findCircuit(host, resetPacketId);
@@ -1701,6 +1711,14 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
         buf_ptr[buffer_length++] = count;
         is_ack_appended = true;
     }
+
+#if AL_SESSION_CAPTURE
+    if (ALSessionCapture::capturing())
+    {
+        ALSessionCapture::instance().recordPacket(true, host, buf_ptr, (S32)buffer_length, (const U8*)mSendBuffer,
+                                                  mSendSize, false);
+    }
+#endif
 
     bool success;
     success = sendPacketToSocket((char *)buf_ptr, buffer_length, host);

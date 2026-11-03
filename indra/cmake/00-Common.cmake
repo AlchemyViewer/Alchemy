@@ -426,6 +426,12 @@ if(NOT AL_ENABLE_RELEASE_DEBUG_LOGGING)
   target_compile_definitions(al_flags INTERFACE $<$<CONFIG:Release>:LL_DISABLE_DEBUG_LOGGING=1>)
 endif()
 
+# The session recording's hooks, in every library that has one, compiled
+# out of Release as everything the shipped build must not have is.
+if(AL_SESSION_CAPTURE)
+  target_compile_definitions(al_flags INTERFACE $<$<NOT:$<CONFIG:Release>>:AL_SESSION_CAPTURE=1>)
+endif()
+
 # Per platform.
 if(WINDOWS)
   target_compile_definitions(

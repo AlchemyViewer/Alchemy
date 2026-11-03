@@ -1946,6 +1946,12 @@ if(AL_BUILD_VIEWER)
     list(APPEND viewer_SOURCES alcrashreporter_native.cpp)
   endif()
 
+  # The session recording's start and its snapshots of objects.
+  if(AL_SESSION_CAPTURE)
+    list(APPEND viewer_SOURCES alobjectcapture.cpp)
+    list(APPEND viewer_HEADERS alobjectcapture.h)
+  endif()
+
   if(WINDOWS)
     list(APPEND viewer_SOURCES llappviewerwin32.cpp llvelopack.cpp llwindebug.cpp)
 
