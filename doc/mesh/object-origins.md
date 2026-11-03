@@ -21,6 +21,8 @@ Until now the uploader always moved the origin to the middle of the object's bou
 
 The **Pivot** row is on the **Upload options** tab. It has three modes, X/Y/Z spinners beside them, and a status line under the spinners.
 
+![The Upload options tab: Pivot on From file, the spinners showing the upper arm's origin in percent, and the Origin arrows drawn on the preview at its elbow](images/uploader-pivot.png)
+
 | Mode | The origin goes | Works for |
 | --- | --- | --- |
 | From file (default) | where Blender's origin was, for each object | one object or many |
