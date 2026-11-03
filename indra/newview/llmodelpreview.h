@@ -172,13 +172,19 @@ public:
     void setHasPivot(bool val) { mHasPivot = val; }
     void setModelPivot(const LLVector3& pivot) { mModelPivot = pivot; }
 
-    // <SK:Nexii> Mesh uploader pivot: the object's origin within its bounding box, -1 to 1 per axis
-    void setUploadPivot(const LLVector3& pivot) { mUploadPivot = pivot; }
-    const LLVector3& getUploadPivot() const { return mUploadPivot; }
-    // The pivot in effect: centred while the physics or the model count rules it out.
-    LLVector3 getEffectiveUploadPivot() const { return mUploadPivotAllowed ? mUploadPivot : LLVector3::zero; }
-    // What the stored domains are shifted by so that the origin lands on the pivot.
-    LLVector3 getUploadPositionOffset() const { return getEffectiveUploadPivot() * -0.5f; }
+    // <SK:Nexii> Mesh uploader pivot: each model's origin within its bounding box, -1 to 1 per axis
+    enum EPivotMode { PIVOT_FILE, PIVOT_CENTRE, PIVOT_CUSTOM };
+    // Custom starts from the pivot the last mode gave a single model.
+    void setPivotMode(EPivotMode mode);
+    EPivotMode getPivotMode() const { return mPivotMode; }
+    void setCustomPivot(const LLVector3& pivot) { mCustomPivot = pivot; }
+    // The origin the file gave the model, where its vertices' origin sits in its box.
+    static LLVector3 getFileOriginPivot(const LLModel* model);
+    // The pivot the mode asks for, and the one in effect: centred while the physics or rigging rules it out.
+    LLVector3 getWantedPivot(const LLModel* model) const;
+    LLVector3 getUploadPivot(const LLModel* model) const { return mUploadPivotAllowed ? getWantedPivot(model) : LLVector3::zero; }
+    // What each model's stored domains are shifted by so that its origin lands on its pivot.
+    LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
     // </SK:Nexii>
 
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
@@ -280,8 +286,11 @@ protected:
     bool        mResetJoints;
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
-    LLVector3   mUploadPivot; // <SK:Nexii> Mesh uploader pivot
-    bool        mUploadPivotAllowed{true}; // <SK:Nexii> Mesh uploader pivot
+    // <SK:Nexii> Mesh uploader pivot
+    EPivotMode  mPivotMode{PIVOT_FILE};
+    LLVector3   mCustomPivot;
+    bool        mUploadPivotAllowed{true};
+    // </SK:Nexii>
 
     std::map<std::string, bool> mViewOption;
 

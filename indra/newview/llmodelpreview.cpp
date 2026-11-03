@@ -1846,6 +1846,64 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         << ", failures: " << meshes_fail_count << LL_ENDL;
 }
 
+// <SK:Nexii> Mesh uploader pivot
+void LLModelPreview::setPivotMode(EPivotMode mode)
+{
+    if (mode == PIVOT_CUSTOM && mPivotMode != PIVOT_CUSTOM && mUploadData.size() == 1)
+    {
+        mCustomPivot = getWantedPivot(mUploadData[0].mModel);
+    }
+    mPivotMode = mode;
+}
+
+// static
+LLVector3 LLModelPreview::getFileOriginPivot(const LLModel* model)
+{
+    if (!model)
+    {
+        return LLVector3::zero;
+    }
+    // The loader centred the model on its box; the file's origin is where it moved the centre from.
+    LLVector3 size, centre;
+    model->getNormalizedScaleTranslation(size, centre);
+    LLVector3 pivot;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        pivot.mV[i] = size.mV[i] > 0.f ? -2.f * centre.mV[i] / size.mV[i] : 0.f;
+        // An origin outside the box is a scene's, from a file that placed its vertices in the scene: centre it.
+        if (fabsf(pivot.mV[i]) > 1.001f)
+        {
+            return LLVector3::zero;
+        }
+        pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
+    }
+    return pivot;
+}
+
+LLVector3 LLModelPreview::getWantedPivot(const LLModel* model) const
+{
+    switch (mPivotMode)
+    {
+    case PIVOT_FILE:
+        return getFileOriginPivot(model);
+    case PIVOT_CUSTOM:
+        return mUploadData.size() == 1 ? mCustomPivot : LLVector3::zero;
+    default:
+        return LLVector3::zero;
+    }
+}
+
+LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets() const
+{
+    LLMeshUploadThread::position_offsets_t offsets;
+    for (const LLModelInstance& instance : mUploadData)
+    {
+        offsets[instance.mModel.get()] = getUploadPivot(instance.mModel) * -0.5f;
+    }
+    return offsets;
+}
+// </SK:Nexii>
+
 void LLModelPreview::updateStatusMessages()
 {
     // bit mask values for physics errors. used to prevent overwrite of single line status
@@ -2218,25 +2276,23 @@ void LLModelPreview::updateStatusMessages()
             pivot_status = mFMP->getString("pivot_status_rigged");
             mUploadPivotAllowed = false;
         }
-        else if (mUploadData.size() > 1)
-        {
-            pivot_status = mFMP->getString("pivot_status_multiple");
-            mUploadPivotAllowed = false;
-        }
         else if (has_physics && !analyzed)
         {
             pivot_status = mFMP->getString("pivot_status_analyze");
             mUploadPivotAllowed = false;
         }
-        else if (!has_physics && !mUploadPivot.isExactlyZero())
+        else if (!has_physics && std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
+                                             { return !getWantedPivot(instance.mModel).isExactlyZero(); }))
         {
             pivot_status = mFMP->getString("pivot_status_no_physics");
         }
 
+        const bool custom = mFMP->childGetValue("pivot_mode").asString() == "custom";
         for (const char* axis : { "pivot_x", "pivot_y", "pivot_z" })
         {
-            mFMP->childSetEnabled(axis, mUploadPivotAllowed);
+            mFMP->childSetEnabled(axis, mUploadPivotAllowed && custom);
         }
+        mFMP->childSetEnabled("pivot_mode", mUploadPivotAllowed);
         mFMP->childSetValue("pivot_status", pivot_status);
     }
     // </SK:Nexii>
@@ -3710,11 +3766,10 @@ bool LLModelPreview::render()
         LLGLDisable no_cull(GL_CULL_FACE);
         gGL.setLineWidth(2.f);
 
-        const LLVector3 pivot = getEffectiveUploadPivot() * 0.5f;
         for (const LLModelInstance& instance : mUploadData)
         {
             const LLMatrix4& mat = instance.mTransform;
-            const LLVector3 origin = pivot * mat;
+            const LLVector3 origin = (getUploadPivot(instance.mModel) * 0.5f) * mat;
 
             LLVector3 axes[3];
             F32 reach = 0.f;
