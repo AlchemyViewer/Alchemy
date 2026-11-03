@@ -1859,6 +1859,17 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         }
     }
 
+    // <SK:Nexii> Mesh uploader LODs by name: physics copied from a LOD follows it once it is generated again
+    if (mPhysicsSearchLOD >= LLModel::LOD_IMPOSTOR && mPhysicsSearchLOD <= LLModel::LOD_HIGH
+        && mLODFile[LLModel::LOD_PHYSICS].empty() && !mLODFromHighFile[LLModel::LOD_PHYSICS]
+        && (which_lod == -1 || which_lod == mPhysicsSearchLOD))
+    {
+        mModel[LLModel::LOD_PHYSICS] = mModel[mPhysicsSearchLOD];
+        mScene[LLModel::LOD_PHYSICS] = mScene[mPhysicsSearchLOD];
+        mVertexBuffer[LLModel::LOD_PHYSICS].clear();
+    }
+    // </SK:Nexii>
+
     dropFacesCopiesOfLostModels();
 
     LL_INFOS("Upload") << "LOD " << which_lod << ", Mesh optimizer processed meshes : " << meshes_processed
@@ -2074,10 +2085,11 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
     const S32 physics_from = mPhysicsSearchLOD;
     auto follow_physics = [&]()
     {
-        // A physics file of its own is left alone; only physics copied from that LOD follows it.
+        // A physics file of its own is left alone; only physics copied from that LOD follows it. A LOD
+        // released for generation is copied once generated (genMeshOptimizerLODs), not while empty here.
         const bool own_physics_file = !mLODFile[LLModel::LOD_PHYSICS].empty() && !was_from_file[LLModel::LOD_PHYSICS];
         if (!own_physics_file && physics_from >= LLModel::LOD_IMPOSTOR && physics_from <= LLModel::LOD_HIGH
-            && (split[physics_from] || was_from_file[physics_from]))
+            && split[physics_from])
         {
             mModel[LLModel::LOD_PHYSICS] = mModel[physics_from];
             mScene[LLModel::LOD_PHYSICS] = mScene[physics_from];
