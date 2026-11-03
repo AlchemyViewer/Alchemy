@@ -1159,7 +1159,12 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         }
 
-        if (cdp)
+        // A queue full at its ceiling has no room for the packet, which is
+        // left out as the network might have dropped it: neither acked nor
+        // its number recorded, so that its sender sends it again.
+        const bool has_room = (isHighPriorityMessage(pkt) ? mHighPriorityInbound : mLowPriorityInbound).hasRoom();
+
+        if (cdp && has_room)
         {
             // ACK inbound reliable packet ASAP, so its sender stops resending
             // it while it waits in the queue, whatever checkMessages() makes

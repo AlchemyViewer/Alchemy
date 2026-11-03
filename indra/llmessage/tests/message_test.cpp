@@ -752,5 +752,73 @@ namespace
         }
         CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 5);
     }
+
+    // The packets a full queue holds were acked as they came in, so taking
+    // the place of the oldest would lose a packet its sender never sends
+    // again. The packet the queue has no room for is left out unacked.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a full inbound queue leaves a reliable packet out unacked", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, DUPLICATE_TEST_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+        system.setHandlerFunc("DuplicateTest", handle_duplicate_test);
+        sDuplicateTestsHandled = 0;
+
+        const SenderSocket sender;
+        REQUIRE(sender.mResult == 0);
+        const LLHost sender_host("127.0.0.1", sender.mPort);
+        system.enableCircuit(sender_host, true);
+        const LLCircuitData* circuit = system.mCircuitInfo.findCircuit(sender_host);
+        REQUIRE(circuit != nullptr);
+        const LLHost receiver("127.0.0.1", system.getListenPort());
+
+        // DuplicateTest numbered `id`, a low priority message.
+        auto send = [&](U32 id, U8 flags)
+        {
+            const U8 packet[] = { flags, (U8)(id >> 24), (U8)(id >> 16), (U8)(id >> 8), (U8)id, 0, 0xff, 0xff, 0x00, 0x01, 1, 2, 3, 4 };
+            REQUIRE(send_packet(sender.mSocket, (const char*)packet, (int)sizeof(packet), receiver.getAddress(), receiver.getPort()));
+        };
+
+        // The ring's ceiling, filled a few at a time so that the socket's
+        // buffer holds every one until it is queued.
+        constexpr S32 FULL = 8192;
+        U32 id = 0;
+        while (system.getNumBufferedPackets() < FULL)
+        {
+            const S32 batch = llmin(128, FULL - system.getNumBufferedPackets());
+            for (S32 i = 0; i < batch; ++i)
+            {
+                send(++id, LL_RELIABLE_FLAG);
+            }
+            queue_until(system, (S32)id);
+            REQUIRE(system.getNumBufferedPackets() == (S32)id);
+        }
+        REQUIRE(ll_test::CircuitProbe::acksWaiting(*circuit) == FULL);
+
+        const U32 left_out = id + 1;
+        send(left_out, LL_RELIABLE_FLAG);
+        const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+        while (system.getTotalNumDroppedPackets() < 1 && LLTimer::getTotalSeconds() < give_up)
+        {
+            system.drainUdpSocket();
+            ms_sleep(1);
+        }
+        REQUIRE(system.getTotalNumDroppedPackets() == 1);
+        CHECK(system.getNumBufferedPackets() == FULL);
+        CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, left_out) == 0);
+        CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == FULL);
+
+        UNSCOPED_INFO("every packet queued is read, the first among them");
+        read_queued(system);
+        CHECK(sDuplicateTestsHandled == FULL);
+
+        UNSCOPED_INFO("and the one left out is taken when it comes again");
+        send(left_out, LL_RELIABLE_FLAG | LL_RESENT_FLAG);
+        read_until(system, FULL + 1);
+        CHECK(sDuplicateTestsHandled == FULL + 1);
+        CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, left_out) == 1);
+    }
 }
 
