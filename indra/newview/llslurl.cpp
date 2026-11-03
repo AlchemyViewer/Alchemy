@@ -107,6 +107,9 @@ LLSLURL::LLSLURL(const std::string& slurl)
         }
 
         LLSD path_array = slurl_uri.pathArray();
+        // A region taken from the host has been unescaped already, where one
+        // from the path, as pathArray gives it, has not.
+        bool region_unescaped = false;
 
         // determine whether it's a maingrid URI or an Standalone/open style URI
         // by looking at the scheme.  If it's a 'secondlife:' slurl scheme or
@@ -194,8 +197,13 @@ LLSLURL::LLSLURL(const std::string& slurl)
                     // it wasn't a /secondlife/<region> or /app/<params>, so it must be secondlife://<region>
                     // therefore the hostname will be the region name, and it's a location type
                     mType = LOCATION;
-                    // 'normalize' it so the region name is in fact the head of the path_array
-                    path_array.insert(0, slurl_uri.hostName());
+                    // 'normalize' it so the region name is in fact the head of the path_array.
+                    // With no host, as in secondlife:///<region>, it already is.
+                    if (!slurl_uri.hostName().empty())
+                    {
+                        path_array.insert(0, slurl_uri.hostName());
+                        region_unescaped = true;
+                    }
                 }
             }
         }
@@ -265,7 +273,12 @@ LLSLURL::LLSLURL(const std::string& slurl)
 
         if (path_array.size() == 0)
         {
-            // we gotta have some stuff after the specifier as to whether it's a region or command
+            // we gotta have some stuff after the specifier as to whether it's a region or command;
+            // a location with no region is no location
+            if (mType == LOCATION)
+            {
+                mType = INVALID;
+            }
             return;
         }
 
@@ -291,11 +304,16 @@ LLSLURL::LLSLURL(const std::string& slurl)
             // are collectively optional
             // are optional
 
-            mRegion = LLURI::unescape(path_array[0].asString());
+            mRegion = region_unescaped ? path_array[0].asString() : LLURI::unescape(path_array[0].asString());
 
             if (LLStringUtil::containsNonprintable(mRegion))
             {
                 LLStringUtil::stripNonprintable(mRegion);
+            }
+            if (mRegion.empty())
+            {
+                mType = INVALID;
+                return;
             }
 
             path_array.erase(0);
@@ -304,7 +322,9 @@ LLSLURL::LLSLURL(const std::string& slurl)
             if (path_array.size() >= 2)
             {
                 mPosition = LLVector3(path_array); // this construction handles LLSD without all components (values default to 0.f)
-                if ((F32(mPosition[VX]) < 0.f) || (mPosition[VX] > REGION_WIDTH_METERS) ||
+                // A NaN passes every comparison below, so it is refused first.
+                if (!mPosition.isFinite() ||
+                    (F32(mPosition[VX]) < 0.f) || (mPosition[VX] > REGION_WIDTH_METERS) ||
                     (F32(mPosition[VY]) < 0.f) || (mPosition[VY] > REGION_WIDTH_METERS) ||
                     (F32(mPosition[VZ]) < 0.f) || (mPosition[VZ] > REGION_HEIGHT_METERS))
                 {

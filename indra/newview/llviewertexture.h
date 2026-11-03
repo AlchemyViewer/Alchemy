@@ -557,6 +557,7 @@ protected:
     LLPointer<LLImageRaw> mSavedRawImage;
     S32 mSavedRawDiscardLevel;
     S32 mDesiredSavedRawDiscardLevel;
+    bool mSavedRawFetchFailed; // a fetch for the copy brought nothing: the GL level, mMinDiscardLevel, is the best
     F64 mLastReferencedSavedRawImageTime ;
     F32 mKeptSavedRawImageTime ;
 

@@ -62,6 +62,11 @@ cmake_dependent_option(
   "AL_BUILD_TESTS"
   OFF
 )
+option(
+  AL_BUILD_ORACLE
+  "Build aloracle, a shared library of C functions over parts of the viewer's C++: a dev tool, never packaged"
+  OFF
+)
 option(AL_BUILD_SHARED_LLCOMMON "Build llcommon as a shared library" OFF)
 option(AL_BUILD_PACKAGE "Add the package target: the CPack archive of the installed tree" ON)
 
@@ -595,6 +600,15 @@ add_subdirectory(llxml)
 add_subdirectory(llplugin)
 add_subdirectory(llui)
 add_subdirectory(viewer_components)
+
+if(AL_BUILD_ORACLE)
+  # Tracy starts its profiler, with its threads and a listening socket, in
+  # whatever process loads a library built with it.
+  if(AL_USE_TRACY)
+    message(FATAL_ERROR "AL_BUILD_ORACLE needs AL_USE_TRACY off")
+  endif()
+  add_subdirectory(aloracle)
+endif()
 
 if(AL_BUILD_TESTS)
   # Legacy C++ tests.

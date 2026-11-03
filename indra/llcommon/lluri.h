@@ -158,6 +158,30 @@ public:
         bool is_allowed_sorted = false);
 
     /**
+     * @brief The sets of characters LLURI's own escapers leave as they are.
+     */
+    enum class EscapeSet
+    {
+        UNRESERVED,     ///< letters, digits and -._~, as escape(str) allows
+        HOST_AND_PORT,  ///< UNRESERVED and !$&'()*+,;=: for buildHTTP's host and port
+        PATH_COMPONENT, ///< UNRESERVED and !$&'()*+,;=:@ for buildHTTP's path parts
+        QUERY_VARIABLE, ///< UNRESERVED and :@!$'()*+, for mapToQueryString's names
+        QUERY_VALUE,    ///< UNRESERVED and :@!$'()*+,= for mapToQueryString's values
+        URI_QUERY,      ///< UNRESERVED and :@?&$;*+=%/ for escapePathAndData's query
+        URI_DATA,       ///< UNRESERVED and % for escapePathAndData's data: URI data
+        URI_PATH,       ///< rfc 1738's path characters, for escapePathAndData's path
+    };
+
+    /**
+     * @brief Escape a string as the escaper that uses the set does.
+     *
+     * @param str The raw URI to escape.
+     * @param set The characters to leave as they are.
+     * @return Returns the escaped uri or an empty string.
+     */
+    static std::string escape(const std::string& str, EscapeSet set);
+
+    /**
      * @brief Break string into data part and path or sheme
      * and escape path (if present) and data.
      * Data part is not allowed to have path related symbols

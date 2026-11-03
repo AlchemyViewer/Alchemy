@@ -548,13 +548,10 @@ S32 LLUUID::getNodeID(unsigned char* node_id)
                 if ((pCurrAddresses->IfType == IF_TYPE_ETHERNET_CSMACD || pCurrAddresses->IfType == IF_TYPE_IEEE80211) && pCurrAddresses->ConnectionType == NET_IF_CONNECTION_DEDICATED
                     && pCurrAddresses->OperStatus == IfOperStatusUp)
                 {
-                    if (pCurrAddresses->PhysicalAddressLength == 6)
+                    if (pCurrAddresses->PhysicalAddressLength == sizeof(local_node_id))
                     {
-                        for (size_t i = 0; i < 5; ++i)
-                        {
-                            node_id[i] = pCurrAddresses->PhysicalAddress[i];
-                            local_node_id[i] = pCurrAddresses->PhysicalAddress[i];
-                        }
+                        memcpy(local_node_id, pCurrAddresses->PhysicalAddress, sizeof(local_node_id));
+                        memcpy(node_id, local_node_id, sizeof(local_node_id));
                         retval = 1;
                         got_node_id = true;
                         break;

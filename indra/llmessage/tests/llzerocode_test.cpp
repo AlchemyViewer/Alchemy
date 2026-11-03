@@ -28,6 +28,8 @@
 
 #include "../llzerocode.h"
 
+#include "message.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <vector>
@@ -143,7 +145,7 @@ namespace
     }
 
     // decode() must also accept the "0x00 0x00 N" doubled-marker wire format
-    // (worth +255 zero bytes per extra marker) for compatibility with any
+    // (worth +256 zero bytes per extra marker) for compatibility with any
     // encoder other than this one's chunking strategy, even though encode()
     // itself never emits it.
     TEST_CASE("LLZeroCode: decode accepts the doubled-marker wrap form", "[LLZeroCode]")
@@ -223,6 +225,56 @@ namespace
         CHECK(overflow);
         UNSCOPED_INFO("the partial output is discarded");
         CHECK(dec_size == 0u);
+    }
+
+    // Decodes `encoded`, whose header is 6 bytes, into a destination of
+    // `capacity` bytes, and says how many it wrote: 0 where it overflowed.
+    U32 decoded_size_within(const std::vector<U8>& encoded, U32 capacity, bool& overflow)
+    {
+        std::vector<U8> dec(capacity, 0xDD);
+        return LLZeroCode::decode(encoded.data(), (U32)encoded.size(), dec.data(), capacity, 6, overflow);
+    }
+
+    // A run, as plain bytes may, can end exactly at the destination's
+    // capacity, and not a byte past it.
+    TEST_CASE("LLZeroCode: decode fits a final run that ends at the capacity", "[LLZeroCode]")
+    {
+        bool overflow = false;
+        {
+            INFO("4 plain bytes and a run of 6 after the header: 16 bytes");
+            const std::vector<U8> encoded = makeBuffer(6, LLZeroCode::FLAG, {1, 2, 3, 4, 0x00, 6});
+            CHECK(decoded_size_within(encoded, 16, overflow) == 16u);
+            CHECK_FALSE(overflow);
+            CHECK(decoded_size_within(encoded, 15, overflow) == 0u);
+            CHECK(overflow);
+        }
+        {
+            INFO("a run of 256 + 4 after the header: 266 bytes");
+            const std::vector<U8> encoded = makeBuffer(6, LLZeroCode::FLAG, {0x00, 0x00, 4});
+            CHECK(decoded_size_within(encoded, 266, overflow) == 266u);
+            CHECK_FALSE(overflow);
+            CHECK(decoded_size_within(encoded, 265, overflow) == 0u);
+            CHECK(overflow);
+        }
+    }
+
+    // The message system decodes into a buffer of MAX_BUFFER_SIZE bytes, and
+    // a packet that fills it and ends in zeros decodes whole.
+    TEST_CASE("LLZeroCode: a packet that fills the receive buffer and ends in zeros round-trips", "[LLZeroCode]")
+    {
+        std::vector<U8> body(MAX_BUFFER_SIZE - LL_PACKET_ID_SIZE, 0);
+        body[0] = 1;
+        const std::vector<U8> src = makeBuffer(LL_PACKET_ID_SIZE, 0x00, body);
+        std::vector<U8> enc(2 * src.size(), 0);
+        const S32 enc_size = LLZeroCode::encode(src.data(), (U32)src.size(), enc.data(), (U32)enc.size(), LL_PACKET_ID_SIZE);
+        REQUIRE(enc_size > 0);
+
+        std::vector<U8> dec(MAX_BUFFER_SIZE, 0xDD);
+        bool overflow = false;
+        const U32 dec_size = LLZeroCode::decode(enc.data(), (U32)enc_size, dec.data(), (U32)dec.size(), LL_PACKET_ID_SIZE, overflow);
+        CHECK_FALSE(overflow);
+        REQUIRE(dec_size == (U32)MAX_BUFFER_SIZE);
+        CHECK(memcmp(dec.data(), src.data(), src.size()) == 0);
     }
 
     // A pathological alternating zero/non-zero pattern grows under zero-coding

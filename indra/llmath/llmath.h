@@ -107,6 +107,14 @@ constexpr bool is_zero(F32 x) noexcept
     return (std::bit_cast<U32>(x) & 0x7fffffffu) == 0;
 }
 
+// Neither infinite nor NaN: an exponent short of all ones. Read from the bits,
+// since -ffinite-math-only and fast math under LTO fold std::isfinite and a
+// value's comparison with itself away.
+constexpr bool is_finite(F32 x) noexcept
+{
+    return (std::bit_cast<U32>(x) & 0x7f800000u) != 0x7f800000u;
+}
+
 constexpr bool is_approx_equal(F32 x, F32 y) noexcept
 {
     constexpr U32 COMPARE_MANTISSA_UP_TO_BIT = 0x02;

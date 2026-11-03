@@ -34,6 +34,7 @@
 
 #include <atomic>
 #include <future>
+#include <utility>
 #include <vector>
 
 namespace
@@ -312,6 +313,50 @@ namespace
         cedilla.push_back( (char)0xC3 );
         cedilla.push_back( (char)0xA7 );
         CHECK(LLURI::escape( cedilla, unreserved) == "%C3%A7");
+    }
+
+    TEST_CASE_METHOD(URITestData, "LLURI: each escape set leaves its own characters as they are", "[LLURI]")
+    {
+        const std::string unreserved =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+            "0123456789"
+            "-._~";
+        const std::pair<LLURI::EscapeSet, std::string> sets[] = {
+            { LLURI::EscapeSet::UNRESERVED, unreserved },
+            { LLURI::EscapeSet::HOST_AND_PORT, unreserved + "!$&'()*+,;=:" },
+            { LLURI::EscapeSet::PATH_COMPONENT, unreserved + "!$&'()*+,;=:@" },
+            { LLURI::EscapeSet::QUERY_VARIABLE, unreserved + ":@!$'()*+," },
+            { LLURI::EscapeSet::QUERY_VALUE, unreserved + ":@!$'()*+,=" },
+            { LLURI::EscapeSet::URI_QUERY, unreserved + ":@?&$;*+=%/" },
+            { LLURI::EscapeSet::URI_DATA, unreserved + "%" },
+            { LLURI::EscapeSet::URI_PATH, unreserved + "$+!*'(),{}|\\^[]`<>#%;/?:@&=" },
+        };
+
+        std::string every_byte;
+        for (int c = 0; c < 256; ++c)
+        {
+            every_byte.push_back((char)c);
+        }
+        for (const auto& [set, allowed] : sets)
+        {
+            static const char hex[] = "0123456789ABCDEF";
+            std::string expected;
+            for (char c : every_byte)
+            {
+                if (allowed.find(c) != std::string::npos)
+                {
+                    expected.push_back(c);
+                }
+                else
+                {
+                    expected.push_back('%');
+                    expected.push_back(hex[(U8)c >> 4]);
+                    expected.push_back(hex[(U8)c & 15]);
+                }
+            }
+            CAPTURE((int)set);
+            CHECK(LLURI::escape(every_byte, set) == expected);
+        }
     }
 
 

@@ -69,6 +69,11 @@ class LLMessageSystem;
 class LLEncodedDatagramService;
 class LLSD;
 
+namespace ll_test
+{
+    struct CircuitProbe;
+}
+
 //
 // Classes
 //
@@ -160,6 +165,7 @@ public:
     friend class LLCircuit;
     friend class LLMessageSystem;
     friend class LLEncodedDatagramService;
+    friend struct ll_test::CircuitProbe;
     friend void crash_on_spaceserver_timeout (const LLHost &host, void *); // HACK, so it has access to setAlive() so it can send a final shutdown message.
 protected:
     TPACKETID       nextPacketOutID();
@@ -176,7 +182,11 @@ protected:
     bool            updateWatchDogTimers(LLMessageSystem *msgsys);  // Return false if the circuit is dead and should be cleaned up
 
     void            addReliablePacket(S32 mSocket, U8 *buf_ptr, S32 buf_len, LLReliablePacketParams *params);
-    bool            isDuplicateResend(TPACKETID packetnum);
+    // Whether a reliable packet numbered packetnum was handled already: any
+    // number the record holds for a resent packet, and for an unmarked one
+    // only a number handled or seen again moments ago. A duplicate's number
+    // is kept as seen now.
+    bool            checkDuplicate(TPACKETID packetnum, bool resent);
     // Call this method when a reliable message comes in - this will
     // correctly place the packet in the correct list to be acked
     // later. RAack = requested ack
