@@ -555,6 +555,10 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     // Each part's own LOD and physics models, by the part's label (NAME, or NAMEb for a submodel):
     // slots 0-2 are LOD0-2, slot 3 the physics shape.
     std::map<std::string, std::array<LLModel*, 4>, std::less<>> lods_of;
+    // How many models (root and submodels) each part has at High, and at each of its own LOD slots:
+    // a LOD split differently from High would leave faces out, so it isn't served.
+    std::map<std::string, S32, std::less<>> high_count;
+    std::map<std::string, std::array<S32, 4>, std::less<>> lod_count;
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
         for (const LLModelInstance& instance : iter->second)
@@ -568,6 +572,10 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             const std::string_view base = base_of(core);
             if (base.empty() || bases.find(base) == bases.end())
             {
+                if (base.empty())
+                {
+                    ++high_count[std::string(core)];
+                }
                 continue;
             }
             const std::string_view suffix = core.substr(base.size());
@@ -578,6 +586,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 key += mdl->mLabel.back();
             }
             lods_of[key][slot] = mdl; // value-initialised to nulls on first use
+            ++lod_count[std::string(base)][slot];
         }
     }
     // A static part stands on the origin its file gives, as the uploader's From file pivot places it:
@@ -638,7 +647,8 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 if (idx < face.mNumVertices)
                 {
                     pos.emplace_back(LLVector3(face.mPositions[idx].getF32ptr()) + offset);
-                    norm.emplace_back(face.mNormals[idx].getF32ptr());
+                    // A Collada model without normals has none; the physics display draws positions alone.
+                    norm.emplace_back(face.mNormals ? LLVector3(face.mNormals[idx].getF32ptr()) : LLVector3::z_axis);
                 }
             }
         }
@@ -798,9 +808,19 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             auto own = lods_of.find(mdl->mLabel);
             if (own != lods_of.end())
             {
+                const std::string_view own_base = core_label(mdl);
+                const auto high_it = high_count.find(own_base);
+                const auto lod_it = lod_count.find(own_base);
                 for (S32 lod = LLModel::LOD_IMPOSTOR; lod < LLModel::LOD_HIGH; ++lod)
                 {
-                    if (LLModel* lod_mdl = own->second[lod])
+                    LLModel* lod_mdl = own->second[lod];
+                    // Served only where it can stand in for High: split the same way, with its
+                    // materials in the same order (faces take High's materials by index), and
+                    // skinned where High is, or it would draw unskinned at that distance.
+                    if (lod_mdl
+                        && high_it != high_count.end() && lod_it != lod_count.end() && lod_it->second[lod] == high_it->second
+                        && lod_mdl->mMaterialList == mdl->mMaterialList
+                        && (!unit_rigged || !lod_mdl->mSkinWeights.empty()))
                     {
                         part.mLODVolumes[lod] = make_volume(lod_mdl, pivot_offset4);
                     }
