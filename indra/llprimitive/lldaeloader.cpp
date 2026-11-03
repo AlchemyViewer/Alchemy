@@ -2131,7 +2131,7 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 
                         if (model->mLabel.empty())
                         {
-                            label = getLodlessLabel(instance_geo);
+                            label = mLod == LLModel::LOD_HIGH ? getElementLabel(instance_geo) : getLodlessLabel(instance_geo); // <SK:Nexii> Mesh uploader LODs by name
 
                             llassert(!label.empty());
 
@@ -2512,7 +2512,8 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
     LLModel* ret = new LLModel(volume_params, 0.f);
 
-    std::string model_name = getLodlessLabel(mesh);
+    // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps its suffixes for the preview to sort out
+    std::string model_name = mLod == LLModel::LOD_HIGH ? getElementLabel(mesh) : getLodlessLabel(mesh);
     ret->mLabel = model_name + lod_suffix[mLod];
 
     llassert(!ret->mLabel.empty());

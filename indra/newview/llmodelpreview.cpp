@@ -1007,6 +1007,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     if (loaded_lod == -1)
     { //populate all LoDs from model loader scene
         mSimplifiers.clear();
+        std::fill(std::begin(mLODFromHighFile), std::end(mLODFromHighFile), false); // <SK:Nexii> Mesh uploader LODs by name
         mBaseModel.clear();
         mBaseScene.clear();
 
@@ -1113,6 +1114,18 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     { //only replace given LoD
         mModel[loaded_lod] = mModelLoader->mModelList;
         mScene[loaded_lod] = mModelLoader->mScene;
+        // <SK:Nexii> Mesh uploader LODs by name: a file of its own replaces what the high file gave
+        if (loaded_lod != LLModel::LOD_HIGH)
+        {
+            mLODFromHighFile[loaded_lod] = false;
+        }
+        // </SK:Nexii>
+        // <SK:Nexii> Mesh uploader LODs by name
+        if (loaded_lod == LLModel::LOD_HIGH)
+        {
+            splitSuffixedModels(mModelLoader->mFilename);
+        }
+        // </SK:Nexii>
 
         // Duplicate the model if it is an internal bounding box model
         if (loaded_lod == LLModel::LOD_PHYSICS &&
@@ -1838,6 +1851,216 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         << ", slopily simplified: " << meshes_sloppy_simplified
         << ", failures: " << meshes_fail_count << LL_ENDL;
 }
+
+// <SK:Nexii> Mesh uploader LODs by name
+void LLModelPreview::splitSuffixedModels(const std::string& filename)
+{
+    bool was_from_file[LLModel::NUM_LODS];
+    std::copy(std::begin(mLODFromHighFile), std::end(mLODFromHighFile), was_from_file);
+    for (bool& from_file : mLODFromHighFile)
+    {
+        from_file = false;
+    }
+    // A submodel is named after its root with a letter added, after any suffix: NAME_LOD2b.
+    auto core_of = [](const LLModel* model) -> std::string
+    {
+        return model->mSubmodelID > 0 && !model->mLabel.empty() ? model->mLabel.substr(0, model->mLabel.size() - 1) : model->mLabel;
+    };
+    auto letter_of = [](const LLModel* model) -> std::string
+    {
+        return model->mSubmodelID > 0 && !model->mLabel.empty() ? model->mLabel.substr(model->mLabel.size() - 1) : std::string();
+    };
+    auto suffix_lod = [](const std::string& label) -> S32
+    {
+        for (S32 lod : { (S32)LLModel::LOD_IMPOSTOR, (S32)LLModel::LOD_LOW, (S32)LLModel::LOD_MEDIUM, (S32)LLModel::LOD_PHYSICS })
+        {
+            const std::string suffix = getLodSuffix(lod);
+            if (label.size() > suffix.size() && label.compare(label.size() - suffix.size(), suffix.size(), suffix) == 0)
+            {
+                return lod;
+            }
+        }
+        return -1;
+    };
+
+    const bool legacy = gSavedSettings.getBOOL("ImporterLegacyMatching");
+    // Only a suffixed model whose base the file also has is a LOD; any other is a model of its own.
+    std::set<std::string> bases;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        if (model && !model->mSubmodelID && suffix_lod(model->mLabel) < 0)
+        {
+            bases.insert(model->mLabel);
+        }
+    }
+    auto lod_of = [&](const LLModel* model) -> S32
+    {
+        if (!model)
+        {
+            return -1;
+        }
+        const std::string core = core_of(model);
+        const S32 lod = suffix_lod(core);
+        return lod >= 0 && bases.count(stripSuffix(core)) && !legacy ? lod : -1;
+    };
+
+    // LODs an earlier file filled and this one does not are generated again.
+    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
+    auto release = [&](S32 lod)
+    {
+        mModel[lod].clear();
+        mScene[lod].clear();
+        mLODFile[lod].clear();
+        mVertexBuffer[lod].clear();
+        if (fmp && lod != LLModel::LOD_PHYSICS)
+        {
+            fmp->mLODMode[lod] = MESH_OPTIMIZER_AUTO;
+            if (LLComboBox* lod_combo = fmp->findChild<LLComboBox>("lod_source_" + lod_name[lod]))
+            {
+                lod_combo->setCurrentByIndex(MESH_OPTIMIZER_AUTO);
+            }
+            fmp->childSetValue("lod_file_" + lod_name[lod], "");
+        }
+        else if (fmp)
+        {
+            fmp->childSetValue("physics_file", "");
+        }
+    };
+
+    // A suffixed model with no base is named as the loader always named it, without its suffix.
+    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
+    {
+        for (LLModelInstance& instance : scene_pair.second)
+        {
+            LLModel* model = instance.mModel;
+            if (model && suffix_lod(core_of(model)) >= 0 && lod_of(model) < 0)
+            {
+                instance.mLabel = stripSuffix(instance.mLabel);
+                model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
+            }
+        }
+    }
+
+    // Each model's LOD is settled once, before any is renamed.
+    std::map<const LLModel*, S32> moved;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = lod_of(model);
+        if (lod >= 0)
+        {
+            moved[model.get()] = lod;
+        }
+    }
+    auto moved_to = [&](const LLModel* model) -> S32
+    {
+        auto it = moved.find(model);
+        return it != moved.end() ? it->second : -1;
+    };
+
+    bool split[LLModel::NUM_LODS] = {};
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = moved_to(model);
+        if (lod >= 0 && !split[lod])
+        {
+            split[lod] = true;
+            mModel[lod].clear();
+            mScene[lod].clear();
+        }
+    }
+    LLModelLoader::model_list kept;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = moved_to(model);
+        if (lod < 0)
+        {
+            kept.push_back(model);
+        }
+        else
+        {
+            // Named as a separate LOD file would name it, so the matching finds a submodel too.
+            model->mLabel = stripSuffix(core_of(model)) + letter_of(model) + getLodSuffix(lod);
+            mModel[lod].push_back(model);
+        }
+    }
+    for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
+    {
+        if (was_from_file[lod] && !split[lod])
+        {
+            release(lod);
+        }
+    }
+    if (kept.size() == mModel[LLModel::LOD_HIGH].size())
+    {
+        return;
+    }
+    mModel[LLModel::LOD_HIGH] = kept;
+
+    for (auto scene_it = mScene[LLModel::LOD_HIGH].begin(); scene_it != mScene[LLModel::LOD_HIGH].end();)
+    {
+        LLModelLoader::model_instance_list& list = scene_it->second;
+        for (auto it = list.begin(); it != list.end();)
+        {
+            const S32 lod = moved_to(it->mModel);
+            if (lod < 0)
+            {
+                ++it;
+                continue;
+            }
+            mScene[lod][scene_it->first].push_back(*it);
+            it = list.erase(it);
+        }
+        scene_it = list.empty() ? mScene[LLModel::LOD_HIGH].erase(scene_it) : std::next(scene_it);
+    }
+
+    if (split[LLModel::LOD_PHYSICS])
+    {
+        // As an explicit physics file does: the parts with no _PHYS are logged and may use a default shape.
+        mPhysicsSearchLOD = LLModel::LOD_PHYSICS;
+        LLMatrix4 ignored_transform;
+        LLModel* default_shape = nullptr;
+        FindModel(mScene[LLModel::LOD_PHYSICS], DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS), default_shape, ignored_transform);
+        mDefaultPhysicsShapeP = default_shape;
+        mWarnOfUnmatchedPhyicsMeshes = true;
+    }
+
+    for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
+    {
+        if (!split[lod])
+        {
+            continue;
+        }
+        if (lod != LLModel::LOD_PHYSICS && countRootModels(mModel[lod]) != countRootModels(kept))
+        {
+            // A LOD needs every model; the file's partial set is dropped and the LOD generated.
+            release(lod);
+            std::ostringstream out;
+            out << "Only some models have a " << getLodSuffix(lod) << " model in the file; generating that LOD instead";
+            LLFloaterModelPreview::addStringToLog(out, true);
+            continue;
+        }
+        mLODFromHighFile[lod] = true;
+        mLODFile[lod] = filename;
+        mVertexBuffer[lod].clear();
+        if (fmp)
+        {
+            fmp->setCtrlLoadFromFile(lod);
+            if (lod == LLModel::LOD_PHYSICS)
+            {
+                fmp->childSetValue("physics_file", filename);
+            }
+            else
+            {
+                fmp->mLODMode[lod] = LOD_FROM_FILE;
+                fmp->childSetValue("lod_file_" + lod_name[lod], filename);
+            }
+        }
+        std::ostringstream out;
+        out << "Took " << mModel[lod].size() << " model(s) named " << getLodSuffix(lod) << " from the file for that slot";
+        LLFloaterModelPreview::addStringToLog(out, false);
+    }
+}
+// </SK:Nexii>
 
 void LLModelPreview::updateStatusMessages()
 {
@@ -2699,7 +2922,10 @@ void LLModelPreview::update()
         for (S32 lod = LLModel::LOD_HIGH; lod >= 0; --lod)
         {
             // adding all lods into query for generation
-            mLodsQuery.push_back(lod);
+            if (!mLODFromHighFile[lod]) // <SK:Nexii> Mesh uploader LODs by name: the file gave this one
+            {
+                mLodsQuery.push_back(lod);
+            }
         }
 
         if (subscribe_for_generation)

@@ -431,7 +431,8 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
         // Potentially multiple nodes can reuse the same mesh and Collada used
         // node name instead of mesh name, so for consistency use node name if
         // avaliable, node index otherwise.
-        std::string base_name = getLodlessLabel(node);
+        // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps its suffixes for the preview to sort out
+        std::string base_name = mLod == LLModel::LOD_HIGH ? node.mName : getLodlessLabel(node);
         if (base_name.empty())
         {
             base_name = "node_" + std::to_string(node_idx);
