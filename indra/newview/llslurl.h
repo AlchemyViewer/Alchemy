@@ -82,6 +82,7 @@ public:
     std::string getRegion() const { return mRegion; }
     LLVector3   getPosition() const { return mPosition; }
     std::string getAppCmd() const { return mAppCmd; }
+    // an app SLURL's query as the link writes it, escaped
     std::string getAppQuery() const { return mAppQuery; }
     LLSD        getAppQueryMap() const { return mAppQueryMap; }
     LLSD        getAppPath() const { return mAppPath; }

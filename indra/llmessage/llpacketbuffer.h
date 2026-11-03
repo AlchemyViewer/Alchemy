@@ -55,12 +55,18 @@ public:
     bool    getPacketIDChecked() const          { return mPacketIDChecked; }
     void    setPacketIDChecked(bool checked)    { mPacketIDChecked = checked; }
 
+    // Whether this packet, a reliable one, was acked as it was read off the
+    // socket, before it was sorted into the inbound queue.
+    bool    getAcked() const                    { return mAcked; }
+    void    setAcked(bool acked)                { mAcked = acked; }
+
 protected:
     char    mData[NET_BUFFER_SIZE]; // packet data       /* Flawfinder : ignore */
     S32     mSize;                  // size of buffer in bytes
     LLHost  mHost;                  // source/dest IP and port
     LLHost  mReceivingIF;           // source/dest IP and port
     bool    mPacketIDChecked = false;
+    bool    mAcked = false;
 };
 
 #endif

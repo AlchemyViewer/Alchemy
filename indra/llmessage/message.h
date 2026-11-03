@@ -983,9 +983,10 @@ private:
     // Receive one packet: pop from ring if buffered, else read from mSocket.
     // Sets mLastSender and mLastReceivingIF.
     // Sets packet_id_already_checked to whether checkPacketInID() was already
-    // run for this packet back when it was buffered (see bufferInboundPacket()).
+    // run for this packet back when it was buffered (see bufferInboundPacket()),
+    // and already_acked to whether it was acked then.
     // Returns packet_size, or 0 if no packet or packet was dropped.
-    S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked);
+    S32  receivePacketOrDrop(char* datap, bool& packet_id_already_checked, bool& already_acked);
 
 public:
 #if AL_NET_IMPAIRMENT
