@@ -29,6 +29,7 @@
 #include "llpacketring.h"
 
 #include "llerror.h"
+#include "llframetimer.h"
 
 constexpr S16 MAX_BUFFER_RING_SIZE     = 8192;
 
@@ -68,7 +69,18 @@ bool LLPacketRing::pushPacket(const LLPacketBuffer& packet)
 {
     if (mNumBufferedPackets >= (S16)mRing.size() && !expandRing())
     {
-        LL_WARNS("PacketRing") << "buffer full at " << mNumBufferedPackets << " packets, leaving one out" << LL_ENDL;
+        // A flood that fills the ring leaves a packet out with every one
+        // that comes in, so it is told of a second at a time.
+        ++mLeftOutSinceWarning;
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        if (!mWarnedLeftOut || now - mLastLeftOutWarning >= 1.0)
+        {
+            LL_WARNS("PacketRing") << "buffer full at " << mNumBufferedPackets << " packets, " << mLeftOutSinceWarning
+                                   << " left out" << LL_ENDL;
+            mWarnedLeftOut = true;
+            mLastLeftOutWarning = now;
+            mLeftOutSinceWarning = 0;
+        }
         return false;
     }
     const S16 ring_size = (S16)mRing.size();

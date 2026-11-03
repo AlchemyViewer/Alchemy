@@ -73,4 +73,8 @@ private:
     S16 mHeadIndex          { 0 };
     S16 mNumBufferedPackets { 0 };
     S32 mNumBufferedBytes   { 0 };
+
+    S32  mLeftOutSinceWarning { 0 };
+    F64  mLastLeftOutWarning  { 0.0 };
+    bool mWarnedLeftOut       { false };
 };

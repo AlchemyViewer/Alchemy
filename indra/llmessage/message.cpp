@@ -1159,36 +1159,6 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         }
 
-        // A queue full at its ceiling has no room for the packet, which is
-        // left out as the network might have dropped it: neither acked nor
-        // its number recorded, so that its sender sends it again.
-        const bool has_room = (isHighPriorityMessage(pkt) ? mHighPriorityInbound : mLowPriorityInbound).hasRoom();
-
-        if (cdp && has_room)
-        {
-            // ACK inbound reliable packet ASAP, so its sender stops resending
-            // it while it waits in the queue, whatever checkMessages() makes
-            // of it, which does not ack it again.
-            if ((data[0] & LL_RELIABLE_FLAG))
-            {
-                cdp->collectRAck(recv_packet_id);
-                pkt.setAcked(true);
-            }
-
-            // Check packet sequencing here, in true socket-arrival order, before
-            // this packet is sorted into the high/low priority inbound queue.
-            // Skip duplicates of reliable packets already handled, marked resent
-            // or not, same as checkMessages()/logValidMsg() would do further
-            // downstream.
-            bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
-            bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
-            if (!recv_reliable || !cdp->checkDuplicate(recv_packet_id, recv_resent))
-            {
-                cdp->checkPacketInID(recv_packet_id, recv_resent);
-                pkt.setPacketIDChecked(true);
-            }
-        }
-
         auto enqueue = [this](const LLPacketBuffer& buffered)
         {
             if (isHighPriorityMessage(buffered))
@@ -1201,13 +1171,54 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         };
 
+        auto take = [&](LLPacketBuffer& arrived)
+        {
+            // A queue full at its ceiling has no room for the packet, which is
+            // left out as the network might have dropped it: neither acked nor
+            // its number recorded, so that its sender sends it again.
+            const bool has_room = (isHighPriorityMessage(arrived) ? mHighPriorityInbound : mLowPriorityInbound).hasRoom();
+
+            if (cdp)
+            {
+                // Skip duplicates of reliable packets already handled, marked resent
+                // or not, same as checkMessages()/logValidMsg() would do further
+                // downstream.
+                const bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
+                const bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
+                const bool duplicate = recv_reliable && cdp->checkDuplicate(recv_packet_id, recv_resent);
+
+                // ACK inbound reliable packet ASAP, so its sender stops resending
+                // it while it waits in the queue, whatever checkMessages() makes
+                // of it, which does not ack it again. A copy of a packet already
+                // taken is acked with no room for it, as it would be with room.
+                if (recv_reliable && (has_room || duplicate))
+                {
+                    cdp->collectRAck(recv_packet_id);
+                    arrived.setAcked(true);
+                }
+
+                // Check packet sequencing here, in true socket-arrival order, before
+                // this packet is sorted into the high/low priority inbound queue.
+                if (has_room && !duplicate)
+                {
+                    cdp->checkPacketInID(recv_packet_id, recv_resent);
+                    arrived.setPacketIDChecked(true);
+                }
+            }
+
+            enqueue(arrived);
+        };
+
 #if AL_NET_IMPAIRMENT
         std::vector<LLPacketBuffer> released;
         mNetImpairment.advance(released);
 
+        // A packet held back arrives when it is released: checkMessages() acks
+        // it and checks its number as it reads it, and a queue with no room for
+        // it then leaves it out unacked.
         if (!mNetImpairment.hold(pkt))
         {
-            enqueue(pkt);
+            take(pkt);
         }
 
         // Anything released rejoins *behind* the packet that just arrived, which is what puts it
@@ -1217,7 +1228,7 @@ S32 LLMessageSystem::bufferInboundPacket()
             enqueue(late);
         }
 #else
-        enqueue(pkt);
+        take(pkt);
 #endif
     }
 
