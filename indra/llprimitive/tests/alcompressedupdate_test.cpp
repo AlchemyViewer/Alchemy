@@ -242,5 +242,13 @@ namespace
         CHECK(read.unpackTAMessage(other_dp));
         CHECK(read.mMode == 0);
         CHECK_FALSE(other_dp.hasNext());
+
+        UNSCOPED_INFO("a larger one too");
+        read.mMode = LLTextureAnim::LOOP;
+        U8 larger[4 + 17] = { 17, 0, 0, 0, LLTextureAnim::ON | LLTextureAnim::LOOP };
+        LLDataPackerBinaryBuffer larger_dp(larger, sizeof(larger));
+        CHECK(read.unpackTAMessage(larger_dp));
+        CHECK(read.mMode == 0);
+        CHECK_FALSE(larger_dp.hasNext());
     }
 }

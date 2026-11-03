@@ -706,13 +706,21 @@ namespace
             CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 1) == 1);
         }
         {
+            INFO("a copy of it read straight from the socket is acked as it is read");
+            send(1, 1);
+            read_until(system, 2);
+            REQUIRE(system.mPacketsIn == 2);
+            CHECK(sDuplicateTestsHandled == 1);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 1) == 2);
+        }
+        {
             INFO("taken into the queue and then read");
             send(2, 1);
             queue_until(system, 1);
             REQUIRE(system.getNumBufferedPackets() == 1);
             CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 1);
             read_queued(system);
-            REQUIRE(system.mPacketsIn == 2);
+            REQUIRE(system.mPacketsIn == 3);
             CHECK(sDuplicateTestsHandled == 2);
             CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 1);
         }
@@ -722,7 +730,7 @@ namespace
             queue_until(system, 1);
             REQUIRE(system.getNumBufferedPackets() == 1);
             read_queued(system);
-            REQUIRE(system.mPacketsIn == 3);
+            REQUIRE(system.mPacketsIn == 4);
             CHECK(sDuplicateTestsHandled == 2);
             CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 2);
         }
@@ -742,7 +750,7 @@ namespace
             REQUIRE(system.mInvalidOnCircuitPackets == 2);
             CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 4) == 0);
         }
-        CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 4);
+        CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 5);
     }
 }
 

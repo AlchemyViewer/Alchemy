@@ -38,10 +38,10 @@ namespace
         ll_test::HeadlessUI& ui = ll_test::HeadlessUI::get();
 
         // The first Url in the text, from where it starts to where it ends.
-        static std::string found(const char* text)
+        static std::string found(const char* text, bool is_content_trusted = false)
         {
             LLUrlMatch match;
-            if (!LLUrlRegistry::instance().findUrl(text, match))
+            if (!LLUrlRegistry::instance().findUrl(text, match, &LLUrlRegistryNullCallback, is_content_trusted))
             {
                 return "";
             }
@@ -101,5 +101,13 @@ namespace
         UNSCOPED_INFO("and none where there is no other");
         CHECK(found("@http://a.example.com alone") == std::string(""));
         CHECK(found("x@http://a.example.com") == std::string(""));
+
+        // Trusted icon tags are not linked in a text with a Hand in it, and
+        // the text after the link is a text of its own, as after a link a
+        // widget found.
+        UNSCOPED_INFO("an icon after it in trusted text with a Hand before it");
+        CHECK(found("Hand @http://a.example.com <icon>Inv_Object</icon>", true) == std::string("<icon>Inv_Object</icon>"));
+        UNSCOPED_INFO("and none with a Hand after it");
+        CHECK(found("@http://a.example.com Hand <icon>Inv_Object</icon>", true) == std::string(""));
     }
 }
