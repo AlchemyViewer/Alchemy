@@ -695,6 +695,13 @@ void LLWorld::updateRegions(F32 max_update_time)
     // Before the regions' updates, since it may remove one.
     mRegionRetirement.update();
 
+    // The cache removals object updates asked for, which let go of regions'
+    // cached objects, before the regions' updates walk them.
+    if (LLVOCache::instanceExists())
+    {
+        LLVOCache::getInstance()->removeRequestedEntries();
+    }
+
     LLViewerRegion::calcNewObjectCreationThrottle();
     if(LLViewerRegion::isNewObjectCreationThrottleDisabled())
     {

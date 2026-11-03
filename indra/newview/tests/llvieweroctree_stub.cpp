@@ -75,6 +75,7 @@ void LLViewerOctreeEntryData::setSpatialExtents(const LLVector4a& min, const LLV
 void LLViewerOctreeEntryData::setPositionGroup(const LLVector4a& pos) {}
 void LLViewerOctreeEntryData::setGroup(LLViewerOctreeGroup* group) {}
 void LLViewerOctreeEntryData::setOctreeEntry(LLViewerOctreeEntry* entry) {}
+void LLViewerOctreeEntryData::removeOctreeEntry() {}
 U32 LLViewerOctreeEntryData::sCurVisible{};
 
 LLViewerOctreePartition::LLViewerOctreePartition() = default;

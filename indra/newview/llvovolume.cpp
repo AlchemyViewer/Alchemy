@@ -451,13 +451,16 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
                 if (cut != ALCompressedVolume::ECut::TEXTURE_ANIM)
                 {
                     // An update that ends before the end of its texture
-                    // entry is bogus data, which flushes the region's cache.
+                    // entry is bogus data, which flushes the region's cache
+                    // once the update is done with: the flush lets go of the
+                    // region's cached objects, and the update may be read
+                    // from one of them.
                     dp->dumpBufferToLog();
                     LL_WARNS() << "Flushing cache files" << LL_ENDL;
 
                     if(LLVOCache::instanceExists() && getRegion())
                     {
-                        LLVOCache::getInstance()->removeEntry(getRegion()->getHandle()) ;
+                        LLVOCache::getInstance()->requestRemoval(getRegion()->getHandle());
                     }
                 }
                 LL_WARNS("UpdateFail") << (cut == ALCompressedVolume::ECut::VOLUME_PARAMS ? "Volume parameters"

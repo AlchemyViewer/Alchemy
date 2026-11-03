@@ -3256,7 +3256,15 @@ void LLViewerRegion::dumpCache()
 
 void LLViewerRegion::clearVOCacheFromMemory()
 {
-    mImpl->mCacheMap.clear();
+    // The map holds the only references to its entries, and the sets, the
+    // waiting list, the cache's tree, the drawables' octree entries and the
+    // eviction walk's cursor hold bare pointers to them.
+    std::vector<LLPointer<LLVOCacheEntry>> released;
+    LLVOCacheEntry::releaseAll(mImpl->mCacheMap, { &mImpl->mActiveSet, &mImpl->mWaitingSet, &mImpl->mVisibleEntries },
+                               [this](LLVOCacheEntry* entry) { removeFromVOCacheTree(entry); },
+                               LLAppViewer::instance()->isQuitting() ? released : sRegionCacheCleanup);
+    mImpl->mWaitingList.clear();
+    mLastVisitedEntry = NULL;
 }
 
 void LLViewerRegion::unpackRegionHandshake()
