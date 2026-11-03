@@ -1136,9 +1136,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
         {
             mLODFromHighFile[loaded_lod] = false;
         }
-        // </SK:Nexii>
-        // <SK:Nexii> Mesh uploader LODs by name
-        if (loaded_lod == LLModel::LOD_HIGH)
+        else
         {
             splitSuffixedModels(mModelLoader->mFilename);
         }
@@ -1964,8 +1962,17 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             return -1;
         }
         const std::string core = core_of(model);
+        if (legacy)
+        {
+            return -1;
+        }
+        // The shape for parts with no _PHYS of their own goes to physics whether or not a part shares its name.
+        if (core == DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS))
+        {
+            return LLModel::LOD_PHYSICS;
+        }
         const S32 lod = suffix_lod(core);
-        return lod >= 0 && bases.count(stripSuffix(core)) && !legacy ? lod : -1;
+        return lod >= 0 && bases.count(stripSuffix(core)) ? lod : -1;
     };
 
     // LODs an earlier file filled and this one does not are generated again.
@@ -2057,13 +2064,20 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         if (was_from_file[lod] && !split[lod])
         {
             release(lod);
+            if (lod != LLModel::LOD_PHYSICS)
+            {
+                updateLodControls(lod);
+            }
         }
     }
     // Physics copied from a LOD follows that LOD when this file replaces it.
     const S32 physics_from = mPhysicsSearchLOD;
     auto follow_physics = [&]()
     {
-        if (physics_from >= LLModel::LOD_IMPOSTOR && physics_from <= LLModel::LOD_HIGH && (split[physics_from] || was_from_file[physics_from]))
+        // A physics file of its own is left alone; only physics copied from that LOD follows it.
+        const bool own_physics_file = !mLODFile[LLModel::LOD_PHYSICS].empty() && !was_from_file[LLModel::LOD_PHYSICS];
+        if (!own_physics_file && physics_from >= LLModel::LOD_IMPOSTOR && physics_from <= LLModel::LOD_HIGH
+            && (split[physics_from] || was_from_file[physics_from]))
         {
             mModel[LLModel::LOD_PHYSICS] = mModel[physics_from];
             mScene[LLModel::LOD_PHYSICS] = mScene[physics_from];
@@ -2107,10 +2121,25 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         {
             continue;
         }
-        if (lod != LLModel::LOD_PHYSICS && mModel[lod].size() != kept.size())
+        // A LOD needs every model and submodel, each by its own name: a partial set is dropped and the LOD generated.
+        auto complete = [&]()
         {
-            // A LOD needs every model and submodel; the file's partial set is dropped and the LOD generated.
+            if (mModel[lod].size() != kept.size())
+            {
+                return false;
+            }
+            std::set<std::string> names;
+            for (const LLPointer<LLModel>& model : mModel[lod])
+            {
+                names.insert(model->mLabel);
+            }
+            return std::all_of(kept.begin(), kept.end(), [&](const LLPointer<LLModel>& model)
+                               { return names.count(model->mLabel + getLodSuffix(lod)) > 0; });
+        };
+        if (lod != LLModel::LOD_PHYSICS && !complete())
+        {
             release(lod);
+            updateLodControls(lod);
             std::ostringstream out;
             out << "Only some models have a " << getLodSuffix(lod) << " model in the file; generating that LOD instead";
             LLFloaterModelPreview::addStringToLog(out, true);
@@ -2130,6 +2159,7 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             {
                 fmp->mLODMode[lod] = LOD_FROM_FILE;
                 fmp->childSetValue("lod_file_" + lod_name[lod], filename);
+                updateLodControls(lod);
             }
         }
         std::ostringstream out;

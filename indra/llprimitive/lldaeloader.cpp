@@ -2146,7 +2146,11 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
                         {
                             // Don't change model's name if possible, it will play havoc with scenes that already use said model.
                             size_t ext_pos = getSuffixPosition(model->mLabel);
-                            if (ext_pos != std::string::npos)
+                            if (mLod == LLModel::LOD_HIGH)
+                            {
+                                label = model->mLabel; // <SK:Nexii> Mesh uploader LODs by name: the instance is named as its model is
+                            }
+                            else if (ext_pos != std::string::npos)
                             {
                                 label = model->mLabel.substr(0, ext_pos);
                             }
