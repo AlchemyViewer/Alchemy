@@ -185,6 +185,8 @@ public:
     LLVector3 getUploadPivot(const LLModel* model) const { return mUploadPivotAllowed ? getWantedPivot(model) : LLVector3::zero; }
     // What each model's stored domains are shifted by so that its origin lands on its pivot.
     LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
+    // One model to upload, counting a root and its submodels once: what Custom and metres are for.
+    bool isSingleModel() const;
     // </SK:Nexii>
 
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
