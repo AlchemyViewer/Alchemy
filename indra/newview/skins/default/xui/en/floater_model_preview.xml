@@ -1383,11 +1383,11 @@
            <radio_group
              layout="topleft"
              follows="top|left"
-             height="16"
+             height="52"
              left_pad="0"
              name="pivot_mode"
              top_delta="0"
-             width="300">
+             width="90">
              <radio_item
                layout="topleft"
                height="16"
@@ -1402,20 +1402,20 @@
                layout="topleft"
                height="16"
                label="Centre"
-               left_pad="0"
+               left="0"
                name="pivot_mode_centre"
                tool_tip="The centre of the bounding box, as uploads place it without a pivot."
-               top_delta="0"
+               top_pad="2"
                value="centre"
                width="80"/>
              <radio_item
                layout="topleft"
                height="16"
                label="Custom"
-               left_pad="0"
+               left="0"
                name="pivot_mode_custom"
                tool_tip="Set the pivot below, starting from the one last shown. For a single model only."
-               top_delta="0"
+               top_pad="2"
                value="custom"
                width="80"/>
            </radio_group>
@@ -1426,11 +1426,11 @@
              increment="50"
              label="X"
              label_width="12"
-             left="70"
+             left_pad="10"
              max_val="100"
              min_val="-100"
              name="pivot_x"
-             top_pad="6"
+             top_delta="-2"
              value="0"
              width="80"/>
            <spinner
@@ -1473,12 +1473,12 @@
            </combo_box>
            <text
              follows="top|left"
-             height="32"
-             left="20"
+             height="44"
+             left="170"
              name="pivot_status"
              text_color="Yellow"
              top_pad="6"
-             width="590"
+             width="440"
              word_wrap="true"/>
            <!-- </SK:Nexii> -->
      </panel>
