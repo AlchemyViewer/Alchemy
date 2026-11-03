@@ -34,6 +34,7 @@ set(
 
 set(
   alrender_HEADERS
+  alblendstencil.h
   alcutoutimage.h
   aldepthpyramid.h
   alfarplane.h

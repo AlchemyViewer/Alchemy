@@ -65,6 +65,7 @@
 #include "alwhitebalancesolver.h"
 #include "alcurvemodel.h"
 #include "alfarplane.h"
+#include "alblendstencil.h"
 #include "alfarplaneoverlay.h"
 #include "alselectionoutline.h"
 #include "alwaterstencil.h"
@@ -8422,11 +8423,14 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     // buffer the exposure already shaped would feed the exposure back into itself.
     LL_PROFILE_GPU_ZONE("exposure meter grid");
 
+    LLRenderTarget& gbuffer = mRT->deferredScreen;
+    static LLCachedControl<F32> incident_strength(gSavedSettings, "AlchemyExposureIncidentStrength", 1.f);
+    const F32 meter_strength = llclamp(incident_strength(), 0.f, 1.f);
+
     // Where the water lies over the sky, which the meter takes as sky (luminanceF.glsl): the G-buffer's normals copied
     // under the water's stencil (ALWaterStencil::SURFACE_BIT), and nothing elsewhere. The target shares the G-buffer's
     // depth and stencil, and is the light map's description, whose storage the lighting has let go of by now. The
     // water is the main view's alone, and only where it was drawn (drawsWater) does any pixel carry its stencil.
-    LLRenderTarget& gbuffer = mRT->deferredScreen;
     ALTransientTargets water_scope(mTransientTargets);
     LLRenderTarget* water = water_scope.acquire(
         ALRenderTargetDesc{ .width = gbuffer.getWidth(), .height = gbuffer.getHeight(), .color = { GL_RGBA8 } }, gbuffer,
@@ -8453,9 +8457,48 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         water->flush();
     }
 
+    // Where a blended surface shades (ALBlendStencil::BLENDED_BIT), which the albedo cannot speak for: the G-buffer
+    // stops at the opaque surface behind it, so the meter reads those pixels as reflective metering would
+    // (luminanceF.glsl). Wanted only where the meter divides by albedo, and only the main view marks it.
+    ALTransientTargets blend_scope(mTransientTargets);
+    LLRenderTarget*    blend = nullptr;
+    if (meter_strength > 0.f && mRT == &mMainRT && gCopyProgram.isComplete())
+    {
+        blend = blend_scope.acquire(
+            ALRenderTargetDesc{ .width = gbuffer.getWidth(), .height = gbuffer.getHeight(), .color = { GL_R8 } }, gbuffer,
+            "exposure.meter.blend");
+    }
+    if (blend)
+    {
+        blend->bindTarget();
+        const LLColor4 clear_color = gGL.getClearColor();
+        gGL.setClearColor(LLColor4::transparent);
+        blend->clear(GL_COLOR_BUFFER_BIT);
+        gGL.setClearColor(clear_color);
+        {
+            LLGLDepthTest no_depth(GL_FALSE, GL_FALSE);
+            LLGLDisable   no_blend(GL_BLEND);
+            ALBlendStencil::OnBlended on_blended;
+            gCopyProgram.bind();
+            // White, copied where the blended bit is set: the mask is the stencil's, as a texture.
+            const S32 white_channel = gCopyProgram.enableTexture(LLShaderMgr::DIFFUSE_MAP);
+            if (white_channel > -1)
+            {
+                gGL.getTextureSlot(white_channel)->bindSampled(LLViewerFetchedTexture::sWhiteImagep, ALSamplers::PointClamp);
+            }
+            mScreenTriangleVB->setBuffer();
+            mScreenTriangleVB->drawArrays(LLRender::TRIANGLES, 0, 3);
+            gCopyProgram.unbindTexture(LLShaderMgr::DIFFUSE_MAP);
+            gCopyProgram.unbind();
+        }
+        blend->flush();
+    }
+
     dst->bindTarget();
 
     LLGLDepthTest depth(GL_FALSE, GL_FALSE);
+    // The grid's alpha is a weight now and not an opacity: it is written, never blended.
+    LLGLDisable   no_blend(GL_BLEND);
 
     gLuminanceProgram.bind();
 
@@ -8481,6 +8524,36 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         }
     }
 
+    // Incident metering: the albedo the meter divides out, so that it measures the light falling on the surfaces and
+    // not the light they reflect, a white wall in dim light not being middle grey (luminanceF.glsl). The light is
+    // estimated from the G-buffer and not read by a sensor, so it is only as good as the albedo. The attachment is
+    // sRGB, which the lighting pass reads decoded to linear, so this does too. At strength 0 (reflective metering)
+    // nothing is bound or read.
+    static LLCachedControl<LLVector3> incident_tuning(gSavedSettings, "AlchemyExposureIncidentTuning", LLVector3(0.1f, 0.02f, 0.12f));
+    // Whatever the setting holds, the floor is above zero and the ramp's ends apart: the shader divides by the one and
+    // smoothsteps the other.
+    const LLVector3 tuning       = incident_tuning();
+    const F32       albedo_floor = llclamp(tuning.mV[VX], 0.001f, 1.f);
+    const F32       trusted_from = llclamp(tuning.mV[VY], 0.f, 1.f);
+    const F32       trusted_to   = llmax(tuning.mV[VZ], trusted_from + 0.001f);
+    gLuminanceProgram.uniform4f(LLShaderMgr::METER_ALBEDO_PARAMS, meter_strength, albedo_floor, trusted_from, trusted_to);
+    const S32 albedo_channel = meter_strength > 0.f
+        ? gLuminanceProgram.bindTexture(LLShaderMgr::METER_ALBEDO_MAP, &gbuffer, ALSamplers::PointClamp | ALSampler::SRGBDecode, 0)
+        : -1;
+    // Without the mask (a view that does not mark one) the unit holds nothing, which the meter reads as nothing blended.
+    const S32 blend_channel = meter_strength > 0.f ? gLuminanceProgram.enableTexture(LLShaderMgr::METER_BLEND_MAP) : -1;
+    if (blend_channel > -1)
+    {
+        if (blend)
+        {
+            blend->bindTexture(0, blend_channel, ALSamplers::PointClamp);
+        }
+        else
+        {
+            gGL.getTextureSlot(blend_channel)->unbind();
+        }
+    }
+
     // A bilinear tap averages a 2x2 block, so taps two texels apart cover a patch.
     const F32 patch_w = (F32)src->getWidth() / (F32)dst->getWidth();
     const F32 patch_h = (F32)src->getHeight() / (F32)dst->getHeight();
@@ -8497,6 +8570,14 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     if (water_channel > -1)
     {
         gGL.getTextureSlot(water_channel)->unbind();
+    }
+    if (albedo_channel > -1)
+    {
+        gGL.getTextureSlot(albedo_channel)->unbind();
+    }
+    if (blend_channel > -1)
+    {
+        gGL.getTextureSlot(blend_channel)->unbind();
     }
     gLuminanceProgram.unbind();
     dst->flush();
@@ -8516,6 +8597,7 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     static LLCachedControl<F32> speed_down(gSavedSettings, "AlchemyExposureSpeedDown", 1.f);
     static LLCachedControl<U32> metering_mode(gSavedSettings, "AlchemyExposureMeteringMode", 1);
     static LLCachedControl<F32> sky_weight(gSavedSettings, "AlchemyExposureSkyWeight", 1.f);
+    static LLCachedControl<F32> incident_strength(gSavedSettings, "AlchemyExposureIncidentStrength", 1.f);
 
     // A classic sky reproduces pre-PBR lighting, which assumed a fixed exposure.
     const bool meter = dynamic_exposure_enabled && !LLRender::sClassicMode;
@@ -8585,7 +8667,12 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     const F32 low = llclamp(low_percent() * 0.01f, 0.f, 0.99f);
     const F32 high = llclamp(high_percent() * 0.01f, low + 0.01f, 1.f);
     shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, log2f(EXPOSURE_KEY) + compensation(), llmin(min_ev(), max_ev()),
+    // The key of the grid's values. At strength 0 (reflective metering) they are the light reflected, and middle grey
+    // is their key; at 1 (incident metering) they are the light that falls on the surfaces, whose key is 1, so that
+    // white reads as white and a grey card as 0.18.
+    // For a scene whose surfaces average middle grey the two meter alike, and between them the key follows.
+    const F32 key_ev = (1.f - llclamp(incident_strength(), 0.f, 1.f)) * log2f(EXPOSURE_KEY);
+    shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, key_ev + compensation(), llmin(min_ev(), max_ev()),
                       llmax(min_ev(), max_ev()), meter ? 1.f : 0.f);
     shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llmax(speed_up(), 0.f), llmax(speed_down(), 0.f));
 

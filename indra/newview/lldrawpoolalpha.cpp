@@ -47,6 +47,7 @@
 #include "llspatialpartition.h"
 #include "llglcommonfunc.h"
 #include "llvoavatar.h"
+#include "alblendstencil.h"
 
 #include "llenvironment.h"
 
@@ -290,7 +291,12 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
 
     // If the face is more than 90% transparent, then don't update the Depth buffer for Dof
     // We don't want the nearly invisible objects to cause of DoF effects
-    renderAlpha(getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, false, rigged);
+    {
+        // The albedo the exposure meter divides by stops at the opaque surface behind a blended one, so this pass marks
+        // where it shades (alblendstencil.h). Not the depth-only pass for depth of field, which shades nothing.
+        ALBlendStencil::Mark blended;
+        renderAlpha(getVertexDataMask() | LLVertexBuffer::MAP_TEXTURE_INDEX | LLVertexBuffer::MAP_TANGENT | LLVertexBuffer::MAP_TEXCOORD1 | LLVertexBuffer::MAP_TEXCOORD2, false, rigged);
+    }
 
     gGL.setColorMask(true, false);
 
