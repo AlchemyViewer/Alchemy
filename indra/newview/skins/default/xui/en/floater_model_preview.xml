@@ -1473,7 +1473,7 @@
            </combo_box>
            <text
              follows="top|left"
-             height="44"
+             height="90"
              left="170"
              name="pivot_status"
              text_color="Yellow"
