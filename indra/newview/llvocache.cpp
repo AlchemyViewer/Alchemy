@@ -1454,10 +1454,15 @@ void LLVOCache::removeEntry(U64 handle)
 
 void LLVOCache::requestRemoval(U64 handle)
 {
-    if (std::find(mRequestedRemovals.begin(), mRequestedRemovals.end(), handle) == mRequestedRemovals.end())
+    if (!isRemovalRequested(handle))
     {
         mRequestedRemovals.push_back(handle);
     }
+}
+
+bool LLVOCache::isRemovalRequested(U64 handle) const
+{
+    return std::find(mRequestedRemovals.begin(), mRequestedRemovals.end(), handle) != mRequestedRemovals.end();
 }
 
 void LLVOCache::removeRequestedEntries()

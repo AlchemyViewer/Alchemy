@@ -817,14 +817,17 @@ namespace
         LLVOCache::instance().writeToCache(handle, id, makeEntries(3), true, false);
         REQUIRE(LLVOCache::instance().getCacheEntries() == 1u);
 
+        CHECK_FALSE(LLVOCache::instance().isRemovalRequested(handle));
         LLVOCache::instance().requestRemoval(handle);
         LLVOCache::instance().requestRemoval(handle);
         UNSCOPED_INFO("the region is still cached once its removal is asked for");
+        CHECK(LLVOCache::instance().isRemovalRequested(handle));
         CHECK(LLVOCache::instance().getCacheEntries() == 1u);
         CHECK(std::filesystem::exists(objectFile(handle, ".slc")));
 
         LLVOCache::instance().removeRequestedEntries();
         UNSCOPED_INFO("and gone once the removals are carried out");
+        CHECK_FALSE(LLVOCache::instance().isRemovalRequested(handle));
         CHECK(LLVOCache::instance().getCacheEntries() == 0u);
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
 
@@ -846,6 +849,7 @@ namespace
 
         std::vector<LLVOCacheEntry*> left_tree;
         std::vector<LLPointer<LLVOCacheEntry>> keep;
+        sRemovedOctreeEntries.clear();
         LLVOCacheEntry::releaseAll(entries, { &active, &visible }, [&](LLVOCacheEntry* entry) { left_tree.push_back(entry); }, keep);
 
         CHECK(entries.empty());
@@ -854,6 +858,10 @@ namespace
         UNSCOPED_INFO("every entry left the tree");
         CHECK(left_tree.size() == 6u);
         CHECK(std::find(left_tree.begin(), left_tree.end(), watched.get()) != left_tree.end());
+        UNSCOPED_INFO("and its octree entry");
+        CHECK(sRemovedOctreeEntries.size() == 6u);
+        const LLViewerOctreeEntryData* watched_data = watched.get();
+        CHECK(std::find(sRemovedOctreeEntries.begin(), sRemovedOctreeEntries.end(), watched_data) != sRemovedOctreeEntries.end());
         UNSCOPED_INFO("and is held by keep alone besides the test");
         CHECK(keep.size() == 6u);
         CHECK(watched->getNumRefs() == 2);

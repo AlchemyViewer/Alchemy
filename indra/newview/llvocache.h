@@ -360,6 +360,7 @@ public:
     // Removes a region's entry as removeEntry does, once removeRequestedEntries runs: the removal lets go of the
     // region's objects in memory, one of which an object update asking for it is read from.
     void requestRemoval(U64 handle);
+    bool isRemovalRequested(U64 handle) const;
     void removeRequestedEntries();
     void removeGenericExtrasForHandle(U64 handle);
 
