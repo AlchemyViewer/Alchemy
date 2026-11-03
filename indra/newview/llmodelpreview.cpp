@@ -313,6 +313,7 @@ void LLModelPreview::rebuildUploadData()
     LLSpinCtrl* scale_spinner = mFMP->getChild<LLSpinCtrl>("import_scale");
 
     F32 scale = (F32)scale_spinner->getValue().asReal();
+    mPivotScale = scale; // <SK:Nexii> Mesh uploader pivot: the scale the transforms below carry
 
     LLMatrix4 scale_mat;
     scale_mat.initScale(LLVector3(scale, scale, scale));
@@ -2550,40 +2551,52 @@ void LLModelPreview::updateStatusMessages()
     // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls where the pivot puts them but fits
     // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
     {
-        bool has_physics = false;
-        bool analyzed = true;
-        bool rigged = false;
+        // Each part is judged on its own, so one rigged or unanalyzed part holds only itself at the centre.
+        const bool uploading_skin = mFMP->childGetValue("upload_skin").asBoolean();
+        bool any_rigged = false;
+        bool any_unanalyzed = false;
         bool pivot_without_physics = false; // a pivoted part that collides with a default hull centred on itself
+        mPivotHeld.clear();
         for (const LLModelInstance& instance : mUploadData)
         {
-            rigged |= instance.mModel && !instance.mModel->mSkinWeights.empty();
+            const LLModel* model = instance.mModel;
+            if (!model)
+            {
+                continue;
+            }
+            // Skin weights left out of the upload make a static mesh, which can take a pivot.
+            const bool rigged = uploading_skin && !model->mSkinWeights.empty();
             // The hulls uploaded are the physics model's, or the base model's without one.
             const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
             bool instance_physics = false;
+            bool unanalyzed = false;
             if (physics && physics->getNumVolumeFaces() > 0)
             {
                 instance_physics = true;
-                analyzed &= !physics->mPhysics.mHull.empty();
+                unanalyzed = physics->mPhysics.mHull.empty();
             }
-            else if (!physics && instance.mModel && !instance.mModel->mPhysics.mHull.empty())
+            else if (!physics && !model->mPhysics.mHull.empty())
             {
                 instance_physics = true;
             }
-            has_physics |= instance_physics;
-            pivot_without_physics |= !instance_physics && !getWantedPivot(instance.mModel).isExactlyZero();
+            if (rigged || unanalyzed)
+            {
+                mPivotHeld.insert(model);
+            }
+            any_rigged |= rigged;
+            any_unanalyzed |= unanalyzed && !rigged;
+            pivot_without_physics |= !rigged && !instance_physics && !getWantedPivot(model).isExactlyZero();
         }
 
         std::string pivot_status;
-        mUploadPivotAllowed = true;
-        if (rigged)
+        mUploadPivotAllowed = mPivotHeld.size() < mUploadData.size();
+        if (any_rigged)
         {
             pivot_status = mFMP->getString("pivot_status_rigged");
-            mUploadPivotAllowed = false;
         }
-        else if (has_physics && !analyzed)
+        else if (any_unanalyzed)
         {
             pivot_status = mFMP->getString("pivot_status_analyze");
-            mUploadPivotAllowed = false;
         }
         else if (pivot_without_physics)
         {

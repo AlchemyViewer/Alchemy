@@ -182,7 +182,7 @@ public:
     static LLVector3 getFileOriginPivot(const LLModel* model);
     // The pivot the mode asks for, and the one in effect: centred while the physics or rigging rules it out.
     LLVector3 getWantedPivot(const LLModel* model) const;
-    LLVector3 getUploadPivot(const LLModel* model) const { return mUploadPivotAllowed ? getWantedPivot(model) : LLVector3::zero; }
+    LLVector3 getUploadPivot(const LLModel* model) const { return mPivotHeld.count(model) ? LLVector3::zero : getWantedPivot(model); }
     // What each model's stored domains are shifted by so that its origin lands on its pivot.
     LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
     // One model to upload, counting a root and its submodels once: what Custom and metres are for.
@@ -294,7 +294,9 @@ protected:
     // <SK:Nexii> Mesh uploader pivot
     EPivotMode  mPivotMode{PIVOT_FILE};
     LLVector3   mCustomPivot;
-    bool        mUploadPivotAllowed{true};
+    bool        mUploadPivotAllowed{true};   // some part may take a pivot
+    std::set<const LLModel*> mPivotHeld; // parts held at the centre: rigged, or with physics not yet analyzed
+    F32         mPivotScale{1.f};        // the import scale the upload data was last built with
     bool        mLODFromHighFile[LLModel::NUM_LODS]{}; // <SK:Nexii> Mesh uploader LODs by name
     // </SK:Nexii>
 
