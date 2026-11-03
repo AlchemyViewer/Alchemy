@@ -703,12 +703,14 @@ LLVector3 LLFloaterModelPreview::getPivotHalfExtents() const
     if (mModelPreview->isSingleModel())
     {
         // The pivot moves along the mesh's own axes, so a rotated instance measures along them.
-        // The transform carries the import scale already.
+        // The transform carries the import scale it was built with; a scale changed since is applied here.
         const LLMatrix4& mat = mModelPreview->mUploadData[0].mTransform;
+        const F32 built = mModelPreview->mPivotScale;
+        const F32 rescale = built > 0.f ? (F32)childGetValue("import_scale").asReal() / built : 1.f;
         LLVector3 half;
         for (S32 i = 0; i < 3; ++i)
         {
-            half.mV[i] = LLVector3(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]).length() * 0.5f;
+            half.mV[i] = LLVector3(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]).length() * 0.5f * rescale;
         }
         return half;
     }
