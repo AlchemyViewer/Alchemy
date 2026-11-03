@@ -36,12 +36,10 @@
 #include "llstringtable.h"
 
 // Anonymous enumeration to provide constants in this file.
-// *NOTE: These values may be used in sscanf statements below as their
-// value-1, so search for '2047' if you cange NV_BUFFER_LEN or '63' if
-// you change U64_BUFFER_LEN.
+// *NOTE: This value may be used in sscanf statements below as its
+// value-1, so search for '63' if you change U64_BUFFER_LEN.
 enum
 {
-    NV_BUFFER_LEN = 2048,
     U64_BUFFER_LEN = 64
 };
 
@@ -154,7 +152,8 @@ void LLNameValue::init(const char *name, const char *data, const char *type, con
     else if (!strcmp(mStringType, "VEC3"))
     {
         mType = NVT_VEC3;
-        F32 t1, t2, t3;
+        // A component the value does not give reads as 0.
+        F32 t1 = 0.f, t2 = 0.f, t3 = 0.f;
 
         // two options here. . .  data can either look like 0, 1, 2 or <0, 1, 2>
 
@@ -356,179 +355,85 @@ LLNameValue::LLNameValue(const char *name, const char *type, const char *nvclass
 }
 
 
+namespace
+{
+    bool is_nv_space(char c)
+    {
+        return c == ' ' || c == '\n' || c == '\t' || c == '\r';
+    }
+
+    // Moves pos past the whitespace at it.
+    void skip_nv_space(const char* data, size_t& pos)
+    {
+        while (is_nv_space(data[pos]))
+        {
+            ++pos;
+        }
+    }
+
+    // Reads the word at pos, up to the whitespace or the end of the line,
+    // and moves pos past it.
+    std::string read_nv_word(const char* data, size_t& pos)
+    {
+        const size_t start = pos;
+        while (data[pos] && !is_nv_space(data[pos]))
+        {
+            ++pos;
+        }
+        return std::string(data + start, pos - start);
+    }
+
+    bool nv_begins_with(const char* data, const char* prefix)
+    {
+        return !strncmp(prefix, data, strlen(prefix));      /* Flawfinder: ignore */
+    }
+}
+
 // data is in the format:
 // "NameValueName   Type    Class   Data"
 LLNameValue::LLNameValue(const char *data)
 {
     baseInit();
-    static char name[NV_BUFFER_LEN];    /*Flawfinder: ignore*/
-    static char type[NV_BUFFER_LEN];    /*Flawfinder: ignore*/
-    static char nvclass[NV_BUFFER_LEN]; /*Flawfinder: ignore*/
-    static char nvsendto[NV_BUFFER_LEN];    /*Flawfinder: ignore*/
-    static char nvdata[NV_BUFFER_LEN];  /*Flawfinder: ignore*/
 
-    S32 i;
+    size_t pos = 0;
+    skip_nv_space(data, pos);
+    const std::string name = read_nv_word(data, pos);
+    skip_nv_space(data, pos);
+    const std::string type = read_nv_word(data, pos);
+    skip_nv_space(data, pos);
 
-    S32 character_count = 0;
-    S32 length = 0;
-
-    // go to first non-whitespace character
-    while (1)
+    // A line with no name or no type holds no pair, and is left with no name.
+    if (name.empty() || type.empty())
     {
-        if (  (*(data + character_count) == ' ')
-            ||(*(data + character_count) == '\n')
-            ||(*(data + character_count) == '\t')
-            ||(*(data + character_count) == '\r'))
+        return;
+    }
+
+    // do we have a class argument? If not, default to read-write
+    std::string nvclass = "READ_WRITE";
+    for (S32 i = NVC_READ_ONLY; i < NVC_EOF; i++)
+    {
+        if (nv_begins_with(data + pos, NameValueClassStrings[i]))
         {
-            character_count++;
-        }
-        else
-        {
+            nvclass = read_nv_word(data, pos);
+            skip_nv_space(data, pos);
             break;
         }
     }
 
-    // read in the name
-    sscanf((data + character_count), "%2047s", name);   /*Flawfinder: ignore*/
-
-    // bump past it and add null terminator
-    length = (S32)strlen(name);         /* Flawfinder: ignore */
-    name[length] = 0;
-    character_count += length;
-
-    // go to the next non-whitespace character
-    while (1)
+    // Do we have a sendto argument? If not, default to sim only
+    std::string nvsendto = "SIM";
+    for (S32 i = NVS_SIM; i < NVS_EOF; i++)
     {
-        if (  (*(data + character_count) == ' ')
-            ||(*(data + character_count) == '\n')
-            ||(*(data + character_count) == '\t')
-            ||(*(data + character_count) == '\r'))
+        if (nv_begins_with(data + pos, NameValueSendtoStrings[i]))
         {
-            character_count++;
-        }
-        else
-        {
+            nvsendto = read_nv_word(data, pos);
+            skip_nv_space(data, pos);
             break;
         }
     }
 
-    // read in the type
-    sscanf((data + character_count), "%2047s", type);   /*Flawfinder: ignore*/
-
-    // bump past it and add null terminator
-    length = (S32)strlen(type);     /* Flawfinder: ignore */
-    type[length] = 0;
-    character_count += length;
-
-    // go to the next non-whitespace character
-    while (1)
-    {
-        if (  (*(data + character_count) == ' ')
-            ||(*(data + character_count) == '\n')
-            ||(*(data + character_count) == '\t')
-            ||(*(data + character_count) == '\r'))
-        {
-            character_count++;
-        }
-        else
-        {
-            break;
-        }
-    }
-
-    // do we have a type argument?
-    for (i = NVC_READ_ONLY; i < NVC_EOF; i++)
-    {
-        if (!strncmp(NameValueClassStrings[i], data + character_count, strlen(NameValueClassStrings[i])))       /* Flawfinder: ignore */
-        {
-            break;
-        }
-    }
-
-    if (i != NVC_EOF)
-    {
-        // yes we do!
-        // read in the class
-        sscanf((data + character_count), "%2047s", nvclass);    /*Flawfinder: ignore*/
-
-        // bump past it and add null terminator
-        length = (S32)strlen(nvclass);      /* Flawfinder: ignore */
-        nvclass[length] = 0;
-        character_count += length;
-
-        // go to the next non-whitespace character
-        while (1)
-        {
-            if (  (*(data + character_count) == ' ')
-                ||(*(data + character_count) == '\n')
-                ||(*(data + character_count) == '\t')
-                ||(*(data + character_count) == '\r'))
-            {
-                character_count++;
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        // no type argument given, default to read-write
-        strncpy(nvclass, "READ_WRITE", sizeof(nvclass) -1);     /* Flawfinder: ignore */
-        nvclass[sizeof(nvclass) -1] = '\0';
-    }
-
-    // Do we have a sendto argument?
-    for (i = NVS_SIM; i < NVS_EOF; i++)
-    {
-        if (!strncmp(NameValueSendtoStrings[i], data + character_count, strlen(NameValueSendtoStrings[i])))     /* Flawfinder: ignore */
-        {
-            break;
-        }
-    }
-
-    if (i != NVS_EOF)
-    {
-        // found a sendto argument
-        sscanf((data + character_count), "%2047s", nvsendto);   /*Flawfinder: ignore*/
-
-        // add null terminator
-        length = (S32)strlen(nvsendto);     /* Flawfinder: ignore */
-        nvsendto[length] = 0;
-        character_count += length;
-
-        // seek to next non-whitespace characer
-        while (1)
-        {
-            if (  (*(data + character_count) == ' ')
-                ||(*(data + character_count) == '\n')
-                ||(*(data + character_count) == '\t')
-                ||(*(data + character_count) == '\r'))
-            {
-                character_count++;
-            }
-            else
-            {
-                break;
-            }
-        }
-    }
-    else
-    {
-        // no sendto argument given, default to sim only
-        strncpy(nvsendto, "SIM", sizeof(nvsendto) -1);      /* Flawfinder: ignore */
-        nvsendto[sizeof(nvsendto) -1] ='\0';
-    }
-
-
-    // copy the rest character by character into data
-    length = 0;
-
-    while ( (*(nvdata + length++) = *(data + character_count++)) )
-        ;
-
-    init(name, nvdata, type, nvclass, nvsendto);
+    // the rest of the line is the value
+    init(name.c_str(), data + pos, type.c_str(), nvclass.c_str(), nvsendto.c_str());
 }
 
 

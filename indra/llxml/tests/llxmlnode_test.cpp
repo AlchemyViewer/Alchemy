@@ -28,6 +28,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "../llxmlnode.h"
+#include "llsd.h"
 
 #include <cmath>
 #include <sstream>
@@ -181,6 +182,72 @@ namespace
         REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
         UNSCOPED_INFO("interior whitespace kept");
         CHECK(node->getValue() == std::string("x   y"));
+    }
+
+    // An XML-RPC value parsed from text, as a login reply is.
+    bool xmlrpc_value(const std::string& xml, LLSD& value)
+    {
+        LLXMLNodePtr node;
+        REQUIRE(LLXMLNode::parseBuffer(xml.data(), xml.size(), node, nullptr));
+        return node->fromXMLRPCValue(value);
+    }
+
+    // The parser decodes an entity, so text that spells one after decoding
+    // keeps it.
+    TEST_CASE("llxmlnode: an XML-RPC value decodes each entity once", "[llxmlnode]")
+    {
+        LLSD value;
+        REQUIRE(xmlrpc_value("<value><string>a &amp;lt; b &lt; c</string></value>", value));
+        CHECK(value.asString() == "a &lt; b < c");
+
+        REQUIRE(xmlrpc_value("<value>&amp;amp;</value>", value));
+        CHECK(value.asString() == "&amp;");
+
+        REQUIRE(xmlrpc_value("<value><unknowntype>&amp;gt;</unknowntype></value>", value));
+        CHECK(value.asString() == "&gt;");
+
+        REQUIRE(xmlrpc_value("<value><struct><member><name>a&amp;lt;b</name>"
+                             "<value><string>x</string></value></member></struct></value>", value));
+        CHECK(value.has("a&lt;b"));
+        CHECK_FALSE(value.has("a<b"));
+    }
+
+    // A login reply's numbers come from the network: one that does not read
+    // makes the reply malformed rather than throwing out of the login.
+    TEST_CASE("llxmlnode: an XML-RPC number that does not read makes the value malformed", "[llxmlnode]")
+    {
+        LLSD value;
+        REQUIRE(xmlrpc_value("<value><int> 42 </int></value>", value));
+        CHECK(value.asInteger() == 42);
+        REQUIRE(xmlrpc_value("<value><i4>-7</i4></value>", value));
+        CHECK(value.asInteger() == -7);
+        REQUIRE(xmlrpc_value("<value><double>2.5</double></value>", value));
+        CHECK(value.asReal() == 2.5);
+        REQUIRE(xmlrpc_value("<value><boolean>1</boolean></value>", value));
+        CHECK(value.asBoolean());
+
+        const char* const malformed[] = {
+            "<value><int>abc</int></value>",
+            "<value><int></int></value>",
+            "<value><int>99999999999</int></value>",
+            "<value><i4>-99999999999</i4></value>",
+            "<value><double>x</double></value>",
+            "<value><double>1e999</double></value>",
+            "<value><double>inf</double></value>",
+            "<value><double>nan</double></value>",
+            "<value><double></double></value>",
+            "<value><boolean>yes</boolean></value>",
+            "<value><boolean>99999999999</boolean></value>",
+            "<value><array><data><value><int>abc</int></value></data></array></value>",
+            "<value><struct><member><name>n</name><value><double>x</double></value></member></struct></value>",
+        };
+        for (const char* xml : malformed)
+        {
+            CAPTURE(xml);
+            bool read = true;
+            CHECK_NOTHROW(read = xmlrpc_value(xml, value));
+            CHECK_FALSE(read);
+        }
     }
 
     TEST_CASE("llxmlnode: line numbers are reported for elements and their attributes", "[llxmlnode]")

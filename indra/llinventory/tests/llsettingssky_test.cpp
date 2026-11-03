@@ -273,4 +273,24 @@ namespace
         UNSCOPED_INFO("the setter keeps both layers");
         CHECK(sky->getMieConfigs().size() == size_t(2));
     }
+
+    // The default sky's rotations take azimuth, then altitude. At position 0 the sun lies on the horizon at
+    // azimuth 80 degrees, and the moon an eighth of pi further round and up.
+    TEST_CASE("llsettingssky: the default sun and moon stand at their azimuth and altitude", "[llsettingssky]")
+    {
+        const LLSD defaults = LLSettingsSky::defaults(0.0f);
+        const auto check_direction = [](const char* what, const LLSD& rotation, F32 azimuth, F32 altitude)
+        {
+            // +x right, +y at, +z up, as convert_azimuth_and_altitude_to_quat lays them out
+            const LLVector3 expected(cosf(azimuth) * cosf(altitude), sinf(azimuth) * cosf(altitude), sinf(altitude));
+            const LLVector3 direction = LLVector3::x_axis * LLQuaternion(rotation);
+            INFO(what << ": " << direction << " where " << expected << " was wanted");
+            CHECK_THAT(direction.mV[VX], Catch::Matchers::WithinAbs(expected.mV[VX], 1.0e-5f));
+            CHECK_THAT(direction.mV[VY], Catch::Matchers::WithinAbs(expected.mV[VY], 1.0e-5f));
+            CHECK_THAT(direction.mV[VZ], Catch::Matchers::WithinAbs(expected.mV[VZ], 1.0e-5f));
+        };
+        check_direction("sun", defaults[LLSettingsSky::SETTING_SUN_ROTATION], 80.0f * DEG_TO_RAD, 0.0f);
+        check_direction("moon", defaults[LLSettingsSky::SETTING_MOON_ROTATION],
+                        80.0f * DEG_TO_RAD + F_PI * 0.125f, F_PI * 0.125f);
+    }
 }

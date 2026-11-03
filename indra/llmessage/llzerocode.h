@@ -35,12 +35,12 @@
 // first header_size bytes of the buffer (the packet header - flags,
 // sequence number, offset, etc.) untouched aside from the flag bit below.
 //
-//   Runs of zero bytes in the body are replaced by a two-byte token:
-//     0x00 N        - represents N zero bytes, for N in 1..254
-//     0x00 0x00 N   - represents (255 + N) zero bytes (wrap/overflow case,
-//                     produced by decode()'s wire format but never emitted
-//                     by encode(), which instead starts a fresh 0x00 token
-//                     every 255 zero bytes)
+//   Runs of zero bytes in the body are replaced by a 0x00 byte and a count:
+//     0x00 N        - represents N zero bytes, for N in 1..255; encode()
+//                     starts a fresh token every 255 zero bytes
+//     0x00 0x00 N   - represents (256 + N) zero bytes, each further 0x00
+//                     before the count adding 256 (read by decode(), never
+//                     written by encode())
 namespace LLZeroCode
 {
     // High bit of the first header byte: set by encode() and cleared by
@@ -191,7 +191,9 @@ namespace LLZeroCode
                 }
                 else
                 {
-                    if ((U32)(outptr - dst) + (*inptr) > dst_capacity)
+                    // The run's first zero is already written, so it has
+                    // the count less one to go.
+                    if ((U32)(outptr - dst) + (*inptr) - 1 > dst_capacity)
                     {
                         // Discard rather than decode on into a scrambled
                         // buffer, the same as the two cases above.

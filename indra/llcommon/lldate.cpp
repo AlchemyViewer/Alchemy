@@ -31,6 +31,7 @@
 
 #include <time.h>
 #include <locale.h>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <limits>
@@ -253,6 +254,24 @@ namespace
         return p;
     }
 
+    // The double fromStream() makes of the fraction ".hh": "0.hh" read by
+    // fast_float, as it reads it. Dividing by 100 instead may become a
+    // multiply by 0.01 under fast math, which rounds differently.
+    F64 hundredths_as_read(int hundredths)
+    {
+        static const std::array<F64, 100> FRACTIONS = []()
+        {
+            std::array<F64, 100> fractions{};
+            for (int h = 0; h < 100; ++h)
+            {
+                const char text[] = { '0', '.', (char)('0' + h / 10), (char)('0' + h % 10) };
+                fast_float::from_chars(text, text + sizeof(text), fractions[h]);
+            }
+            return fractions;
+        }();
+        return FRACTIONS[hundredths];
+    }
+
     // Format "YYYY-MM-DDTHH:MM:SS[.ff]Z" into buf and return the length.
     // buf must hold at least 32 chars.
     size_t format_iso8601(F64 seconds_since_epoch, char* buf, size_t cap)
@@ -267,8 +286,24 @@ namespace
         // Counted down, so a date before 1970 is the second before it and the
         // hundredths on from that second, as after 1970.
         const S64 total_usec = (S64)std::floor(seconds_since_epoch * (F64)USEC_PER_SEC);
-        const time_t secs = (time_t)floor_div(total_usec, 1000000);
-        const int hundredths = (int)(floor_mod(total_usec, 1000000) / 10000);
+        time_t secs = (time_t)floor_div(total_usec, 1000000);
+        int hundredths = (int)(floor_mod(total_usec, 1000000) / 10000);
+
+        // A date read from text is its whole seconds plus its fraction read as
+        // a double, which can land just below the hundredth written, and
+        // counted down it would write the hundredth before. Where the next
+        // hundredth reads back as exactly this date, that is the one written;
+        // any other fraction still cuts.
+        const time_t next_secs = (hundredths == 99) ? secs + 1 : secs;
+        const int next_hundredths = (hundredths == 99) ? 0 : hundredths + 1;
+        const F64 next_as_read = (next_hundredths == 0)
+            ? (F64)next_secs
+            : (F64)next_secs + hundredths_as_read(next_hundredths);
+        if (next_as_read == seconds_since_epoch)
+        {
+            secs = next_secs;
+            hundredths = next_hundredths;
+        }
 
         struct tm exp_time;
         if (!utc_fields(secs, exp_time))

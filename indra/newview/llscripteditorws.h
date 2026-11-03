@@ -34,8 +34,10 @@
 #include "llhandle.h"
 #include "lltimer.h"
 #include "lleventtimer.h"
+#include "llcoros.h" // <SK:Nexii>
 
 #include <memory>
+#include <mutex> // <SK:Nexii>
 #include <string>
 #include <vector>
 #include <map>
@@ -132,7 +134,9 @@ private:
 
     // Client handshake response data, written as the client answers, on
     // the server's thread, and read on the main one: under the lock.
-    mutable LLMutex mHandshakeMutex;
+    // <SK:Nexii> Not an LLMutex: the async handlers' coroutines take it too.
+    mutable std::mutex mHandshakeMutex;
+    // </SK:Nexii>
     std::string  mClientName;      ///< Name of the external editor client
     std::string  mClientVersion;   ///< Version of the external editor client
     std::string  mProtocolVersion; ///< JSON-RPC protocol version supported by client
@@ -340,12 +344,27 @@ protected:
         return [weak_base, fn = std::move(fn)]
                (const std::string& method, const LLSD& id, const LLSD& params) -> LLSD
         {
-            auto base = weak_base.lock();
-            if (!base)
+            // <SK:Nexii> Fix the script editor server's coroutine safety
+            // An async handler's reference may be the server's last; it is let
+            // go on the main coroutine, since stopping the server takes an LLMutex.
+            struct Release
+            {
+                std::shared_ptr<LLWebsocketMgr::WSServer> mRef;
+                ~Release()
+                {
+                    if (mRef && !LLCoros::on_main_coro())
+                    {
+                        LL_WARNS_IF(!LLJSONRPCConnection::postToMainThread([ref = std::move(mRef)]() {}), "ScriptEditorWS")
+                            << "Main loop not taking work; server reference let go on a coroutine" << LL_ENDL;
+                    }
+                }
+            } release{ weak_base.lock() };
+            if (!release.mRef)
             {
                 return LLSD();
             }
-            auto server = std::static_pointer_cast<LLScriptEditorWSServer>(base);
+            auto* server = static_cast<LLScriptEditorWSServer*>(release.mRef.get());
+            // </SK:Nexii>
             return fn(*server, method, id, params);
         };
     }
@@ -393,7 +412,9 @@ private:
     std::unordered_map<U32, S32> mConnectionSubscriptionCounts;
     // Written on the server's thread as connections come and go, read on
     // the main one as messages go out: under the lock either way.
-    mutable LLMutex                                   mConnectionsMutex;
+    // <SK:Nexii> Not an LLMutex: the async handlers' coroutines take it too.
+    mutable std::mutex                                mConnectionsMutex;
+    // </SK:Nexii>
     std::map<U32, LLScriptEditorWSConnection::wptr_t> mActiveConnections;
 
     // The manager sends through the server and names prims as it does.

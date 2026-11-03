@@ -515,7 +515,8 @@ void process_layer_data(LLMessageSystem *mesgsys, void **user_data)
 
     if(!regionp)
     {
-        LL_WARNS() << "Invalid region for layer data." << LL_ENDL;
+        // Once for each simulator: a retired region's simulator sends on until it disables the circuit.
+        LL_WARNS_ONCE() << "Invalid region for layer data from " << mesgsys->getSender() << LL_ENDL;
         return;
     }
     S32 size;

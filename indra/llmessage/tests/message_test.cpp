@@ -43,6 +43,25 @@
 #include <vector>
 #endif
 
+namespace ll_test
+{
+    // What the message system does with a circuit's acks as packets come in
+    // from its host.
+    struct CircuitProbe
+    {
+        // A reliable packet came in, to be acked.
+        static void receiveReliable(LLCircuitData& circuit, TPACKETID id)
+        {
+            circuit.collectRAck(id);
+        }
+
+        static size_t acksWaiting(const LLCircuitData& circuit)
+        {
+            return circuit.mAcks.size();
+        }
+    };
+}
+
 namespace
 {
     struct Response : public LLHTTPNode::Response
@@ -129,6 +148,149 @@ namespace
         CHECK(response->mStatus == HTTP_NOT_FOUND);
     }
 
+    // CloseCircuit alone, as the template the viewer reads has it.
+    const char* const CLOSE_CIRCUIT_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    CloseCircuit Fixed 0xFFFFFFFD NotTrusted Unencoded\n"
+        "}\n";
+
+    // A message template file of the test's own, there while this lives.
+    class CloseCircuitTemplateFile
+    {
+    public:
+        CloseCircuitTemplateFile(const std::string& path)
+            : mPath(path)
+        {
+            llofstream file(mPath.c_str());
+            file << CLOSE_CIRCUIT_TEMPLATE;
+        }
+
+        ~CloseCircuitTemplateFile()
+        {
+            if (LLFile::remove(mPath) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mPath << LL_ENDL;
+            }
+        }
+
+        CloseCircuitTemplateFile(const CloseCircuitTemplateFile&) = delete;
+        CloseCircuitTemplateFile& operator=(const CloseCircuitTemplateFile&) = delete;
+
+    private:
+        std::string mPath;
+    };
+
+    // gMessageSystem is the system under test while this lives, and what it
+    // was before once it ends: disableCircuit asks gMessageSystem for the
+    // circuit's code.
+    class CloseCircuitSystemScope
+    {
+    public:
+        explicit CloseCircuitSystemScope(LLMessageSystem& system)
+            : mPrior(gMessageSystem)
+        {
+            gMessageSystem = &system;
+        }
+
+        ~CloseCircuitSystemScope()
+        {
+            gMessageSystem = mPrior;
+        }
+
+        CloseCircuitSystemScope(const CloseCircuitSystemScope&) = delete;
+        CloseCircuitSystemScope& operator=(const CloseCircuitSystemScope&) = delete;
+
+    private:
+        LLMessageSystem* mPrior;
+    };
+
+    // A socket of the test's own, standing for the other end of a circuit.
+    class PeerSocket
+    {
+    public:
+        PeerSocket()
+        {
+            start_net(mSocket, mPort);
+        }
+
+        ~PeerSocket()
+        {
+            end_net(mSocket);
+        }
+
+        PeerSocket(const PeerSocket&) = delete;
+        PeerSocket& operator=(const PeerSocket&) = delete;
+
+        bool isOpen() const { return mSocket >= 0; }
+        LLHost host() const { return LLHost("127.0.0.1", mPort); }
+
+        // The next packet to arrive within seconds, or nothing.
+        std::vector<U8> receive(F32 seconds)
+        {
+            char buffer[NET_BUFFER_SIZE];
+            LLTimer waited;
+            while (waited.getElapsedTimeF32() < seconds)
+            {
+                const S32 size = receive_packet(mSocket, buffer);
+                if (size > 0)
+                {
+                    return std::vector<U8>(buffer, buffer + size);
+                }
+                ms_sleep(5);
+            }
+            return {};
+        }
+
+    private:
+        S32 mSocket = -1;
+        int mPort = NET_USE_OS_ASSIGNED_PORT;
+    };
+
+    // The other end of a circuit closed here stops sending on it only where
+    // it is told so; otherwise it resends what goes unacked until it times
+    // the circuit out.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: closeCircuit tells the other end with CloseCircuit", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const CloseCircuitTemplateFile message_template(template_path);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const CloseCircuitSystemScope scope(system);
+
+        PeerSocket peer;
+        REQUIRE(peer.isOpen());
+        system.enableCircuit(peer.host(), false);
+        REQUIRE(system.mCircuitInfo.findCircuit(peer.host()) != nullptr);
+
+        system.closeCircuit(peer.host());
+
+        // The six-byte header, then CloseCircuit's number as a Fixed
+        // message's: all four bytes, high first.
+        const std::vector<U8> packet = peer.receive(1.f);
+        REQUIRE(packet.size() >= 10);
+        CHECK(packet[5] == 0);
+        CHECK(packet[6] == 0xFF);
+        CHECK(packet[7] == 0xFF);
+        CHECK(packet[8] == 0xFF);
+        CHECK(packet[9] == 0xFD);
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: closeCircuit sends nothing to a host it has no circuit with", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const CloseCircuitTemplateFile message_template(template_path);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const CloseCircuitSystemScope scope(system);
+
+        PeerSocket peer;
+        REQUIRE(peer.isOpen());
+        system.closeCircuit(peer.host());
+        CHECK(peer.receive(0.25f).empty());
+        CHECK(system.mCircuitInfo.findCircuit(peer.host()) == nullptr);
+    }
+
     TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a system whose template failed to load still closes its socket", "[LLMessageSystem]")
         // a system whose template failed to load still closes its socket
     {
@@ -153,6 +315,158 @@ namespace
         CHECK(bound == (int)port);
         UNSCOPED_INFO("and end_net leaves no socket");
         CHECK(socket == -1);
+    }
+
+    // A message template file of the test's own, there while this lives.
+    class TemplateFile
+    {
+    public:
+        TemplateFile(const std::string& path, const char* text)
+            : mPath(path)
+        {
+            llofstream file(mPath.c_str());
+            file << text;
+        }
+
+        ~TemplateFile()
+        {
+            if (LLFile::remove(mPath) != 0)
+            {
+                LL_WARNS() << "Could not remove " << mPath << LL_ENDL;
+            }
+        }
+
+        TemplateFile(const TemplateFile&) = delete;
+        TemplateFile& operator=(const TemplateFile&) = delete;
+
+    private:
+        std::string mPath;
+    };
+
+    // One message, AckBudgetTest, whose one block holds bytes of any length:
+    // its packet is the 6-byte header, the 4-byte number of a Low message,
+    // the 2-byte length and the bytes.
+    const char* const ACK_BUDGET_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    AckBudgetTest Low 1 NotTrusted Unencoded\n"
+        "    {\n"
+        "        Payload Single\n"
+        "        { Data Variable 2 }\n"
+        "    }\n"
+        "}\n";
+
+    // gMessageSystem is `system` while this lives, and what it was before
+    // once it ends.
+    class UseMessageSystem
+    {
+    public:
+        explicit UseMessageSystem(LLMessageSystem& system)
+            : mPrior(gMessageSystem)
+        {
+            gMessageSystem = &system;
+        }
+
+        ~UseMessageSystem()
+        {
+            gMessageSystem = mPrior;
+        }
+
+        UseMessageSystem(const UseMessageSystem&) = delete;
+        UseMessageSystem& operator=(const UseMessageSystem&) = delete;
+
+    private:
+        LLMessageSystem* mPrior;
+    };
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: acks appended to a packet fit in the MTU with their count", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, ACK_BUDGET_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+
+        // Packets go to the system's own socket, which reads none of them.
+        const LLHost host("127.0.0.1", system.getListenPort());
+        system.enableCircuit(host, false);
+        LLCircuitData* circuit = system.mCircuitInfo.findCircuit(host);
+        REQUIRE(circuit != nullptr);
+
+        // Sends AckBudgetTest holding `data_size` bytes, and says how long
+        // its packet was.
+        auto send = [&](S32 data_size)
+        {
+            const std::vector<U8> data(data_size, 0x5a);
+            system.newMessage("AckBudgetTest");
+            system.nextBlock("Payload");
+            system.addBinaryData("Data", data.data(), data_size);
+            return system.sendMessage(host);
+        };
+
+        UNSCOPED_INFO("the message alone");
+        CHECK(send(1184) == 1196);
+
+        for (TPACKETID id = 1; id <= 30; ++id)
+        {
+            ll_test::CircuitProbe::receiveReliable(*circuit, id);
+        }
+
+        {
+            INFO("4 bytes to the MTU hold an ack but not the count after it");
+            CHECK(send(1184) == 1196);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 30);
+        }
+        {
+            INFO("5 bytes hold one and its count");
+            CHECK(send(1183) == MTUBYTES);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 29);
+        }
+        {
+            INFO("100 bytes hold 24 and their count");
+            CHECK(send(1088) == 1100 + 24 * 4 + 1);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 5);
+        }
+    }
+
+    // The viewer opens every circuit to a simulator with no circuit code, as
+    // EnableSimulator does, and CloseCircuit, DisableSimulator and a region's
+    // retirement disable it.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: disableCircuit removes a circuit opened without a circuit code", "[LLMessageSystem]")
+    {
+        const LLHost host("127.0.0.1", 13000);
+        gMessageSystem->enableCircuit(host, true);
+        REQUIRE(gMessageSystem->mCircuitInfo.findCircuit(host) != nullptr);
+        REQUIRE(gMessageSystem->findCircuitCode(host) == 0);
+
+        gMessageSystem->disableCircuit(host);
+        CHECK(gMessageSystem->mCircuitInfo.findCircuit(host) == nullptr);
+
+        // A later EnableSimulator opens it again.
+        gMessageSystem->enableCircuit(host, true);
+        const LLCircuitData* reopened = gMessageSystem->mCircuitInfo.findCircuit(host);
+        REQUIRE(reopened != nullptr);
+        CHECK(reopened->isAlive());
+        CHECK(reopened->getTrusted());
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: disableCircuit removes a circuit and the circuit code it has", "[LLMessageSystem]")
+    {
+        const LLHost host("127.0.0.1", 13001);
+        const U32 code = 1234;
+        const U64 ip_port = ((U64)host.getAddress() << 32) | host.getPort();
+        LLUUID session_id;
+        session_id.generate();
+        REQUIRE(gMessageSystem->addCircuitCode(code, session_id));
+        gMessageSystem->mIPPortToCircuitCode[ip_port] = code;
+        gMessageSystem->mCircuitCodeToIPPort[code] = ip_port;
+        gMessageSystem->enableCircuit(host, false);
+        REQUIRE(gMessageSystem->findCircuitCode(host) == code);
+
+        gMessageSystem->disableCircuit(host);
+        CHECK(gMessageSystem->mCircuitInfo.findCircuit(host) == nullptr);
+        CHECK(gMessageSystem->findCircuitCode(host) == 0);
+        CHECK(gMessageSystem->mCircuitCodeToIPPort.count(code) == 0);
     }
 
 #if !LL_WINDOWS
@@ -201,5 +515,112 @@ namespace
         CHECK(after == before);
     }
 #endif
+
+    // One message, DuplicateTest, whose one block holds a U32.
+    const char* const DUPLICATE_TEST_TEMPLATE =
+        "version 2.0\n"
+        "{\n"
+        "    DuplicateTest Low 1 NotTrusted Unencoded\n"
+        "    {\n"
+        "        Payload Single\n"
+        "        { Data U32 }\n"
+        "    }\n"
+        "}\n";
+
+    // A socket of the test's own, closed when this ends.
+    class SenderSocket
+    {
+    public:
+        SenderSocket()
+        {
+            mPort = NET_USE_OS_ASSIGNED_PORT;
+            mResult = start_net(mSocket, mPort);
+        }
+
+        ~SenderSocket()
+        {
+            end_net(mSocket);
+        }
+
+        SenderSocket(const SenderSocket&) = delete;
+        SenderSocket& operator=(const SenderSocket&) = delete;
+
+        S32 mSocket = -1;
+        int mPort = 0;
+        S32 mResult = -1;
+    };
+
+    S32 sDuplicateTestsHandled = 0;
+
+    void handle_duplicate_test(LLMessageSystem*, void**)
+    {
+        ++sDuplicateTestsHandled;
+    }
+
+    // Reads what has come in until the system has taken `packets` packets
+    // in all, or a second has passed.
+    void read_until(LLMessageSystem& system, U32 packets)
+    {
+        LockMessageChecker lmc(&system);
+        const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+        while (system.mPacketsIn < packets && LLTimer::getTotalSeconds() < give_up)
+        {
+            if (!lmc.checkMessages())
+            {
+                ms_sleep(1);
+            }
+        }
+    }
+
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a reliable packet that arrives twice unmarked is handled once", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, DUPLICATE_TEST_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+        system.setHandlerFunc("DuplicateTest", handle_duplicate_test);
+        sDuplicateTestsHandled = 0;
+
+        // The packets come from a socket of the test's own, on a circuit the
+        // system has to it, as it has to a simulator.
+        const SenderSocket sender;
+        REQUIRE(sender.mResult == 0);
+        system.enableCircuit(LLHost("127.0.0.1", sender.mPort), true);
+        const LLHost receiver("127.0.0.1", system.getListenPort());
+
+        // DuplicateTest numbered `id`: the flags, the packet number, no extra
+        // header, the number of Low message 1 and its U32.
+        auto send = [&](U8 flags, U8 id)
+        {
+            const U8 packet[] = { flags, 0, 0, 0, id, 0, 0xff, 0xff, 0x00, 0x01, 1, 2, 3, 4 };
+            REQUIRE(send_packet(sender.mSocket, (const char*)packet, (int)sizeof(packet), receiver.getAddress(), receiver.getPort()));
+        };
+
+        {
+            INFO("both copies in before either is read");
+            send(LL_RELIABLE_FLAG, 1);
+            send(LL_RELIABLE_FLAG, 1);
+            read_until(system, 2);
+            REQUIRE(system.mPacketsIn == 2);
+            CHECK(sDuplicateTestsHandled == 1);
+        }
+        {
+            INFO("the second copy in after the first is handled");
+            send(LL_RELIABLE_FLAG, 2);
+            read_until(system, 3);
+            send(LL_RELIABLE_FLAG, 2);
+            read_until(system, 4);
+            REQUIRE(system.mPacketsIn == 4);
+            CHECK(sDuplicateTestsHandled == 2);
+        }
+        {
+            INFO("a copy marked resent, as before");
+            send(LL_RELIABLE_FLAG | LL_RESENT_FLAG, 2);
+            read_until(system, 5);
+            REQUIRE(system.mPacketsIn == 5);
+            CHECK(sDuplicateTestsHandled == 2);
+        }
+    }
 }
 

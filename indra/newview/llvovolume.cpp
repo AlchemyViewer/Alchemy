@@ -366,6 +366,12 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
 
     // Do base class updates...
     U32 retval = LLViewerObject::processUpdateMessage(mesgsys, user_data, block_num, update_type, dp);
+    if (isDead())
+    {
+        // The base class refused the update, or killed the object to recover
+        // from it: the rest is not to be read.
+        return retval;
+    }
 
     LLUUID sculpt_id;
     U8 sculpt_type = 0;
@@ -487,11 +493,14 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
         else
         {
             S32 texture_length = mesgsys->getSizeFast(_PREHASH_ObjectData, block_num, _PREHASH_TextureEntry);
-            if (texture_length)
+            if (texture_length > 0)
             {
-                U8                          tdpbuffer[1024];
-                LLDataPackerBinaryBuffer    tdp(tdpbuffer, 1024);
-                mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer, 0, block_num, 1024);
+                // The field holds a texture entry as a data packer packs it.
+                // The packer reads no further than the field, so an entry
+                // longer than the field is refused.
+                boost::container::small_vector<U8, 1024> tdpbuffer(texture_length);
+                mesgsys->getBinaryDataFast(_PREHASH_ObjectData, _PREHASH_TextureEntry, tdpbuffer.data(), 0, block_num, texture_length);
+                LLDataPackerBinaryBuffer    tdp(tdpbuffer.data(), texture_length);
                 S32 result = unpackTEMessage(tdp);
                 if (result & teDirtyBits)
                 {

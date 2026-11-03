@@ -367,6 +367,101 @@ namespace
 
     }
 
+    // Such a start location once asked the login for uri:&0&0&0. Invalid,
+    // the login goes to the last location instead.
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a location with nothing after its specifier is invalid", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        for (const char* text : { "secondlife:///secondlife", "secondlife:///secondlife/",
+                                  "secondlife://Aditi/secondlife", "https://maps.secondlife.com/secondlife",
+                                  "https://maps.secondlife.com/secondlife/", "/", "secondlife://%01/1/2/3" })
+        {
+            CAPTURE(text);
+            const LLSLURL slurl(text);
+            CHECK(slurl.getType() == LLSLURL::INVALID);
+            CHECK_FALSE(slurl.isValid());
+        }
+
+        LLGridManager::getInstance()->setGridChoice("my.grid.com");
+        for (const char* text : { "https://my.grid.com/region", "https://my.grid.com/region/", "/" })
+        {
+            CAPTURE(text);
+            const LLSLURL slurl(text);
+            CHECK(slurl.getType() == LLSLURL::INVALID);
+        }
+    }
+
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a secondlife SLURL with no host takes its region from the path", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("foo.bar.com");
+        LLSLURL slurl("secondlife:///myregion/1/2/3");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "myregion");
+        CHECK(slurl.getPosition() == LLVector3(1, 2, 3));
+        CHECK(slurl.getGrid() == "util.agni.lindenlab.com");
+
+        slurl = LLSLURL("secondlife:///myregion");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "myregion");
+        CHECK(slurl.getPosition() == LLVector3(128, 128, 0));
+    }
+
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a region is unescaped once from the host or the path", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        LLSLURL slurl("secondlife://my%2520region/1/2/3");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+        CHECK(slurl.getRegion() == "my%20region");
+
+        slurl = LLSLURL("secondlife://my%20region/1/2/3");
+        CHECK(slurl.getRegion() == "my region");
+
+        slurl = LLSLURL("secondlife:///secondlife/my%2520region/1/2/3");
+        CHECK(slurl.getRegion() == "my%20region");
+
+        slurl = LLSLURL("https://maps.secondlife.com/secondlife/my%2520region/1/2/3");
+        CHECK(slurl.getRegion() == "my%20region");
+    }
+
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: a position that is not a number is invalid", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        for (const char* text : { "secondlife://myregion/nan/1/2", "https://maps.secondlife.com/secondlife/myregion/1/nan/3",
+                                  "/myregion/1/2/nan" })
+        {
+            CAPTURE(text);
+            const LLSLURL slurl(text);
+            CHECK(slurl.getType() == LLSLURL::INVALID);
+        }
+
+        const LLSLURL slurl("/myregion/1/2/3");
+        CHECK(slurl.getType() == LLSLURL::LOCATION);
+    }
+
     TEST_CASE_METHOD(slurlTest, "LLSlurl: construction from grid/region/vector combos", "[LLSlurl]")
     {
         llofstream gridfile(TEST_FILENAME);

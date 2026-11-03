@@ -95,11 +95,6 @@ LLVOTree::LLVOTree(const LLUUID &id, const LLPCode pcode, LLViewerRegion *region
 
 LLVOTree::~LLVOTree()
 {
-    if (mData)
-    {
-        delete[] mData;
-        mData = NULL;
-    }
 }
 
 //static
@@ -302,9 +297,9 @@ U32 LLVOTree::processUpdateMessage(LLMessageSystem *mesgsys,
     //
     //  Load Instance-Specific data
     //
-    if (mData)
+    if (!mData.empty())
     {
-        mSpecies = ((U8 *)mData)[0];
+        mSpecies = mData[0];
     }
 
     if (!sSpeciesTable.empty() && !sSpeciesTable.count(mSpecies))

@@ -694,4 +694,108 @@ namespace
         CHECK(fixed[1] == 2);
         CHECK(fixed[2] == 0);
     }
+
+    // A fixed-point value with nothing left to read it from reads as zero in
+    // either form and says it failed.
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer unpackFixed past the end reads zero", "[datapacker_test]")
+    {
+        U8 byte = 0x80;
+        LLDataPackerBinaryBuffer reader(&byte, 0);
+
+        F32 value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "signed", true, 8, 7));
+        CHECK(value == 0.f);
+
+        value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "unsigned", false, 8, 8));
+        CHECK(value == 0.f);
+
+        value = 123.f;
+        CHECK_FALSE(reader.unpackFixed(value, "wide", true, 14, 16));
+        CHECK(value == 0.f);
+    }
+
+    std::vector<U8> bytes_of(const boost::container::small_vector_base<U8>& value)
+    {
+        return std::vector<U8>(value.begin(), value.end());
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer unpackBinaryData into a small vector takes every byte the data holds", "[datapacker_test]")
+    {
+        std::vector<U8> data(5000);
+        for (size_t i = 0; i < data.size(); ++i)
+        {
+            data[i] = (U8)(i * 7);
+        }
+        std::vector<U8> buffer(data.size() + 4 + 2);
+        LLDataPackerBinaryBuffer writer(buffer.data(), (S32)buffer.size());
+        REQUIRE(writer.packBinaryData(data.data(), (S32)data.size(), "data"));
+        REQUIRE(writer.packU16(0xBEEF, "after"));
+
+        LLDataPackerBinaryBuffer reader(buffer.data(), writer.getCurrentSize());
+        boost::container::small_vector<U8, 64> value;
+        CHECK(reader.unpackBinaryData(value, "data"));
+        CHECK(bytes_of(value) == data);
+        U16 after = 0;
+        CHECK(reader.unpackU16(after, "after"));
+        CHECK(after == 0xBEEF);
+        CHECK_FALSE(reader.hasNext());
+    }
+
+    // Data that fits a small vector's inline size stays in it.
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer unpackBinaryData keeps data that fits in a small vector's own storage", "[datapacker_test]")
+    {
+        U8 buffer[] = { 3, 0, 0, 0, 7, 8, 9 };
+        LLDataPackerBinaryBuffer reader(buffer, sizeof(buffer));
+        boost::container::small_vector<U8, 8> value;
+        const U8* inline_storage = value.data();
+        CHECK(reader.unpackBinaryData(value, "data"));
+        CHECK(bytes_of(value) == std::vector<U8>{ 7, 8, 9 });
+        CHECK(value.data() == inline_storage);
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerBinaryBuffer unpackBinaryData into a small vector refuses data past the buffer", "[datapacker_test]")
+    {
+        U8 buffer[] = { 6, 0, 0, 0, 1, 2, 3, 4, 5 };
+        LLDataPackerBinaryBuffer reader(buffer, sizeof(buffer));
+        boost::container::small_vector<U8, 4> value = { 9 };
+        CHECK_FALSE(reader.unpackBinaryData(value, "data"));
+        CHECK(value.empty());
+
+        U8 negative[] = { 0xff, 0xff, 0xff, 0xff, 1 };
+        LLDataPackerBinaryBuffer negative_reader(negative, sizeof(negative));
+        value = { 9 };
+        CHECK_FALSE(negative_reader.unpackBinaryData(value, "data"));
+        CHECK(value.empty());
+
+        U8 short_size[] = { 1, 0 };
+        LLDataPackerBinaryBuffer short_reader(short_size, sizeof(short_size));
+        value = { 9 };
+        CHECK_FALSE(short_reader.unpackBinaryData(value, "data"));
+        CHECK(value.empty());
+
+        U8 empty[] = { 0, 0, 0, 0 };
+        LLDataPackerBinaryBuffer empty_reader(empty, sizeof(empty));
+        value = { 9 };
+        CHECK(empty_reader.unpackBinaryData(value, "data"));
+        CHECK(value.empty());
+    }
+
+    TEST_CASE("datapacker_test: LLDataPackerAsciiBuffer and LLDataPackerAsciiFile unpackBinaryData into a small vector read their lines", "[datapacker_test]")
+    {
+        char text[] = "0000000003 01 02 03 \n0000000100 01 02 \n";
+        LLDataPackerAsciiBuffer reader(text, sizeof(text));
+        boost::container::small_vector<U8, 4> value;
+        CHECK(reader.unpackBinaryData(value, "data"));
+        CHECK(bytes_of(value) == std::vector<U8>{ 1, 2, 3 });
+        CHECK_FALSE(reader.unpackBinaryData(value, "short"));
+        CHECK(value.empty());
+
+        std::istringstream istr("data\t0000000002 04 05 \nshort\t0000009999 01 \n");
+        LLDataPackerAsciiFile file_reader(istr, 2);
+        CHECK(file_reader.unpackBinaryData(value, "data"));
+        CHECK(bytes_of(value) == std::vector<U8>{ 4, 5 });
+        CHECK_FALSE(file_reader.unpackBinaryData(value, "short"));
+        CHECK(value.empty());
+    }
 }

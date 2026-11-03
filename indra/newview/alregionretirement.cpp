@@ -270,9 +270,14 @@ void ALRegionRetirement::finish()
     regionp->saveObjectCache();
     const F64 saved = LLTimer::getTotalSeconds();
     LLWorld::getInstance()->removeRegion(host);
-    // As DisableSimulator does: what the simulator still sends is dropped by the message system, not handled for a
-    // region that is gone.
-    gMessageSystem->disableCircuit(host);
+    // The circuit is left for the simulator to close with DisableSimulator, as it would without retirement: until then
+    // what it sends is acked, its pings answered, and its messages for the region that is gone dropped. Where asked,
+    // it is closed here instead, the simulator told so with CloseCircuit.
+    static LLCachedControl<bool> close_circuit(gSavedSettings, "AlchemyRetireDepartedRegionsCloseCircuit", false);
+    if (close_circuit)
+    {
+        gMessageSystem->closeCircuit(host);
+    }
     const F64 removed = LLTimer::getTotalSeconds();
 
     LL_INFOS("RegionRetirement") << "Retired " << name << ": " << mObjectCount << " objects retired over " << mFrames

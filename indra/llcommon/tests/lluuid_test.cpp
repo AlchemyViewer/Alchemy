@@ -190,6 +190,23 @@ namespace
         "std::hash<LLUUID> must be declared avalanching");
 
     // Default construction is null.
+    // The first call reads the address and every later one gives the copy it
+    // kept, so a byte the first call missed shows as the two disagreeing: the
+    // first leaves the caller's byte, the copy holds 0.
+    TEST_CASE("LLUUID: getNodeID gives all six bytes of the address on every call", "[LLUUID]")
+    {
+        unsigned char first[6];
+        memset(first, 0xA5, sizeof(first));
+        if (LLUUID::getNodeID(first) != 1)
+        {
+            SKIP("this machine gives no node ID");
+        }
+        unsigned char second[6];
+        memset(second, 0x5A, sizeof(second));
+        REQUIRE(LLUUID::getNodeID(second) == 1);
+        CHECK(memcmp(first, second, sizeof(first)) == 0);
+    }
+
     TEST_CASE("LLUUID: default construction is null and so are null and tnull", "[LLUUID]")
     {
         LLUUID id;
