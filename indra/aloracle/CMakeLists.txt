@@ -35,9 +35,19 @@ target_sources(aloracle PRIVATE aloracle_llsd.cpp aloracle_lluri.cpp aloracle_ll
 target_sources(aloracle PRIVATE aloracle_llquantize.cpp)
 target_link_libraries(aloracle PRIVATE llmath)
 
-# llmessage: zerocoding, and template messages read and written back.
-target_sources(aloracle PRIVATE aloracle_llmessage.cpp)
+# llmessage: zerocoding, template messages read and written back, particle
+# systems, name-value pairs and terrain patches.
+target_sources(
+  aloracle
+  PRIVATE aloracle_llmessage.cpp aloracle_llpartdata.cpp aloracle_llnamevalue.cpp aloracle_patch.cpp
+)
 target_link_libraries(aloracle PRIVATE llmessage)
+
+# llprimitive: texture entries, shapes, extra parameters and texture
+# animations, with tinygltf's implementation, which it leaves to whoever links
+# it.
+target_sources(aloracle PRIVATE aloracle_llprimitive.cpp aloracle_tinygltf.cpp)
+target_link_libraries(aloracle PRIVATE llprimitive)
 
 if(AL_BUILD_TESTS)
   # The tests call the library through aloracle.h alone.
