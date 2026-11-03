@@ -56,6 +56,7 @@
 #include "lllocalgltfmaterials.h" // import a glTF mesh's materials as mesh-owned local materials
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
+#include "llmodelpreview.h"      // LLModelPreview::getFileOriginPivot, the uploader's origin rule
 #include "llnotificationsutil.h" // warn when a loaded mesh has no UVs
 #include "llscrolllistctrl.h"
 #include "llselectmgr.h"    // deselect before re-parenting onto the avatar
@@ -579,8 +580,27 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             lods_of[key][slot] = mdl; // value-initialised to nulls on first use
         }
     }
+    // A static part stands on the origin its file gives, as the uploader's From file pivot places it:
+    // its geometry moves by the offset that brings that origin to the prim's, and the part moves back.
+    auto shift_face = [](LLVolumeFace& face, const LLVector4a& offset)
+    {
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            face.mPositions[v].add(offset);
+        }
+        if (face.mExtents)
+        {
+            face.mExtents[0].add(offset);
+            face.mExtents[1].add(offset);
+        }
+        if (face.mCenter)
+        {
+            face.mCenter->add(offset);
+        }
+    };
+
     // A LOD or physics model's faces as a volume the repository can serve, built as the part's own is.
-    auto make_volume = [&](LLModel* mdl) -> LLPointer<LLVolume>
+    auto make_volume = [&](LLModel* mdl, const LLVector4a& offset) -> LLPointer<LLVolume>
     {
         std::vector<LLVolumeFace> lod_faces;
         lod_faces.reserve(mdl->getNumVolumeFaces());
@@ -592,6 +612,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             {
                 populateFaceWeights(face, *mdl, lod_weights);
             }
+            shift_face(face, offset);
             lod_faces.push_back(face);
         }
         LLVolumeParams lod_params;
@@ -603,7 +624,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         return volume;
     };
     // A physics model as the triangle list the physics display draws, as a downloaded physics mesh is.
-    auto make_physics = [](const LLModel* mdl) -> std::shared_ptr<LLModel::Decomposition>
+    auto make_physics = [](const LLModel* mdl, const LLVector3& offset) -> std::shared_ptr<LLModel::Decomposition>
     {
         auto decomp = std::make_shared<LLModel::Decomposition>();
         std::vector<LLVector3>& pos = decomp->mPhysicsShapeMesh.mPositions;
@@ -616,7 +637,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 const U16 idx = face.mIndices[i];
                 if (idx < face.mNumVertices)
                 {
-                    pos.emplace_back(face.mPositions[idx].getF32ptr());
+                    pos.emplace_back(LLVector3(face.mPositions[idx].getF32ptr()) + offset);
                     norm.emplace_back(face.mNormals[idx].getF32ptr());
                 }
             }
@@ -638,6 +659,10 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             {
                 continue;
             }
+            // Rigged parts are placed by their skeleton, so only a static part takes its file's origin.
+            const LLVector3 pivot_offset = unit_rigged ? LLVector3::zero : LLModelPreview::getFileOriginPivot(mdl) * -0.5f;
+            LLVector4a pivot_offset4;
+            pivot_offset4.load3(pivot_offset.mV);
 
             std::vector<LLVolumeFace> faces;
             faces.reserve(mdl->getNumVolumeFaces());
@@ -647,6 +672,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
             {
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
+                shift_face(face, pivot_offset4);
                 // Keep the loader's model-local geometry for both rigged and static
                 // units; the instance transform is applied as the object transform
                 // below (mirroring the upload), so geometry/normals/tangents stay in
@@ -753,7 +779,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 decomposeInstanceMatrix(instance.mTransform, pos, rot, scl);
                 part.mScale    = scl;
                 part.mRotation = rot;
-                part.mOffset   = pos; // scene-space; spawn uses per-part differences
+                part.mOffset   = (-pivot_offset) * instance.mTransform; // scene-space at the pivot; spawn uses per-part differences
             }
 
             LLVolumeParams vparams;
@@ -776,12 +802,12 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 {
                     if (LLModel* lod_mdl = own->second[lod])
                     {
-                        part.mLODVolumes[lod] = make_volume(lod_mdl);
+                        part.mLODVolumes[lod] = make_volume(lod_mdl, pivot_offset4);
                     }
                 }
                 if (LLModel* physics_mdl = own->second[3])
                 {
-                    part.mPhysics = make_physics(physics_mdl);
+                    part.mPhysics = make_physics(physics_mdl, pivot_offset);
                 }
             }
 
