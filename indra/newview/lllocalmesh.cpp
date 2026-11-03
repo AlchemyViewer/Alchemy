@@ -551,6 +551,78 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             }
         }
     }
+    // Each part's own LOD and physics models, by the part's label (NAME, or NAMEb for a submodel):
+    // slots 0-2 are LOD0-2, slot 3 the physics shape.
+    std::map<std::string, std::array<LLModel*, 4>, std::less<>> lods_of;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (!mdl || mdl->getNumVolumeFaces() <= 0)
+            {
+                continue;
+            }
+            const std::string_view core = core_label(mdl);
+            const std::string_view base = base_of(core);
+            if (base.empty() || bases.find(base) == bases.end())
+            {
+                continue;
+            }
+            const std::string_view suffix = core.substr(base.size());
+            const size_t slot = suffix == "_PHYS" ? 3 : (size_t)(suffix.back() - '0');
+            std::string key(base);
+            if (mdl->mSubmodelID > 0)
+            {
+                key += mdl->mLabel.back();
+            }
+            lods_of[key][slot] = mdl; // value-initialised to nulls on first use
+        }
+    }
+    // A LOD or physics model's faces as a volume the repository can serve, built as the part's own is.
+    auto make_volume = [&](LLModel* mdl) -> LLPointer<LLVolume>
+    {
+        std::vector<LLVolumeFace> lod_faces;
+        lod_faces.reserve(mdl->getNumVolumeFaces());
+        const LLModel::JointWeightCache lod_weights(*mdl);
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            LLVolumeFace face = mdl->getVolumeFace(fi);
+            if (unit_rigged)
+            {
+                populateFaceWeights(face, *mdl, lod_weights);
+            }
+            lod_faces.push_back(face);
+        }
+        LLVolumeParams lod_params;
+        lod_params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        LLPointer<LLVolume> volume = new LLVolume(lod_params, 1.f);
+        volume->copyFacesFrom(lod_faces);
+        volume->cacheOptimize(true);
+        volume->setMeshAssetLoaded(true);
+        return volume;
+    };
+    // A physics model as the triangle list the physics display draws, as a downloaded physics mesh is.
+    auto make_physics = [](const LLModel* mdl) -> std::shared_ptr<LLModel::Decomposition>
+    {
+        auto decomp = std::make_shared<LLModel::Decomposition>();
+        std::vector<LLVector3>& pos = decomp->mPhysicsShapeMesh.mPositions;
+        std::vector<LLVector3>& norm = decomp->mPhysicsShapeMesh.mNormals;
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            const LLVolumeFace& face = mdl->getVolumeFace(fi);
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                const U16 idx = face.mIndices[i];
+                if (idx < face.mNumVertices)
+                {
+                    pos.emplace_back(face.mPositions[idx].getF32ptr());
+                    norm.emplace_back(face.mNormals[idx].getF32ptr());
+                }
+            }
+        }
+        return decomp->mPhysicsShapeMesh.mPositions.empty() ? nullptr : decomp;
+    };
 
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
@@ -696,6 +768,22 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
             }
             part.mVolume->setMeshAssetLoaded(true);
+
+            auto own = lods_of.find(mdl->mLabel);
+            if (own != lods_of.end())
+            {
+                for (S32 lod = LLModel::LOD_IMPOSTOR; lod < LLModel::LOD_HIGH; ++lod)
+                {
+                    if (LLModel* lod_mdl = own->second[lod])
+                    {
+                        part.mLODVolumes[lod] = make_volume(lod_mdl);
+                    }
+                }
+                if (LLModel* physics_mdl = own->second[3])
+                {
+                    part.mPhysics = make_physics(physics_mdl);
+                }
+            }
 
             if (!mdl->mSkinInfo.mJointNames.empty())
             {
@@ -1156,10 +1244,24 @@ bool LLLocalMeshMgr::isLocal(const LLUUID& world_id) const
     return findPart(world_id) != nullptr;
 }
 
-LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id) const
+LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id, S32 lod) const
 {
     const LLLocalMeshPart* part = findPart(world_id);
-    return part ? part->mVolume.get() : nullptr;
+    if (!part)
+    {
+        return nullptr;
+    }
+    if (lod >= LLModel::LOD_IMPOSTOR && lod < LLModel::LOD_HIGH && part->mLODVolumes[lod].notNull())
+    {
+        return part->mLODVolumes[lod].get();
+    }
+    return part->mVolume.get();
+}
+
+LLModel::Decomposition* LLLocalMeshMgr::getDecompositionForWorldID(const LLUUID& world_id) const
+{
+    const LLLocalMeshPart* part = findPart(world_id);
+    return part ? part->mPhysics.get() : nullptr;
 }
 
 const LLMeshSkinInfo* LLLocalMeshMgr::getSkinInfoForWorldID(const LLUUID& world_id) const
