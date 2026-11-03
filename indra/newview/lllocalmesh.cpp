@@ -27,6 +27,9 @@
 #include "lllocalmesh.h"
 
 #include <algorithm>     // std::sort (stable rez-order listing of spawned copies)
+#include <array>
+#include <set>
+#include <string_view>
 #include <unordered_map> // mSpawnedCopies: instance id -> copy (O(1) per-copy lookup/erase)
 #include <unordered_set> // dedup avatars when rebuilding overrides across copies
 
@@ -516,12 +519,50 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         importGLTFMaterials(gltf_mat_by_name, new_owned_materials);
     }
 
+    // A model named NAME_LOD0-2 or NAME_PHYS beside a NAME is one of NAME's
+    // lower LODs or its physics shape, as the uploader reads the file, not a
+    // part of its own. A submodel's letter follows the suffix: NAME_LOD2b.
+    static const std::array<std::string_view, 4> lod_suffixes{ "_LOD0", "_LOD1", "_LOD2", "_PHYS" };
+    auto core_label = [](const LLModel* mdl) -> std::string_view
+    {
+        std::string_view label(mdl->mLabel);
+        return mdl->mSubmodelID > 0 && !label.empty() ? label.substr(0, label.size() - 1) : label;
+    };
+    auto base_of = [&](std::string_view label) -> std::string_view
+    {
+        for (std::string_view suffix : lod_suffixes)
+        {
+            if (label.size() > suffix.size() && label.substr(label.size() - suffix.size()) == suffix)
+            {
+                return label.substr(0, label.size() - suffix.size());
+            }
+        }
+        return {};
+    };
+    std::set<std::string, std::less<>> bases;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            const LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (mdl && !mdl->mSubmodelID && base_of(mdl->mLabel).empty())
+            {
+                bases.emplace(mdl->mLabel);
+            }
+        }
+    }
+
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
         for (LLModelInstance& instance : iter->second)
         {
             LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
             if (!mdl || mdl->getNumVolumeFaces() <= 0)
+            {
+                continue;
+            }
+            const std::string_view base = base_of(core_label(mdl));
+            if (!base.empty() && bases.find(base) != bases.end())
             {
                 continue;
             }
