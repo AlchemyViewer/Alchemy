@@ -26,11 +26,13 @@
 
 #include "skcombatlockout.h"
 
+#include "llagent.h"
 #include "llagentcamera.h"
 #include "llappviewer.h"
 #include "lldrawpoolalpha.h"
 #include "llframetimer.h"
 #include "llselectmgr.h"
+#include "llviewerparcelmgr.h"
 #include "pipeline.h"
 
 namespace
@@ -148,7 +150,10 @@ void SKCombatLockout::update()
         sLastAimSeconds = now;
     }
 
-    const bool want = (now - sLastAimSeconds) < TAIL_SECONDS;
+    // Only where the agent can take damage, as the top bar's health shows.
+    LLViewerParcelMgr* vpm = LLViewerParcelMgr::getInstance();
+    const bool damage = vpm->allowAgentDamage(gAgent.getRegion(), vpm->getAgentParcel());
+    const bool want = damage && (now - sLastAimSeconds) < TAIL_SECONDS;
     if (want == sActive)
     {
         return;
