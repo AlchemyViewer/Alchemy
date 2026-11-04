@@ -626,10 +626,10 @@ enum
 /// buffers sized for patches of 16, so it refuses a layer of any other patch
 /// size (decode_layer_group_header), where the library reads a patch size of
 /// 32 too, into heights of that size.
-/// LLBitPack::bitUnpack reads on past its data, so data that a step would
-/// read past the end of, as data does that ends before END_OF_PATCHES, is
-/// ALORACLE_BAD_ARGUMENT: the library reads it from a copy with room past its
-/// end, and gives nothing it read. So is a land or wind patch size but 16 or
+/// Data that a step would read past the end of, as data does that ends before
+/// END_OF_PATCHES, is ALORACLE_BAD_ARGUMENT, and the library gives nothing it
+/// read, where the viewer keeps the whole land patches before that end and
+/// neither of wind's. So is a land or wind patch size but 16 or
 /// 32, for which decompress_patch's 32 by 32 transform reads beyond the
 /// coefficients it was given, and init_patch_decompressor writes past its
 /// tables over 32; a wind patch whose header is END_OF_PATCHES, which

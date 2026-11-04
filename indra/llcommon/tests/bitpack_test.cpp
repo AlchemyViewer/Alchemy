@@ -103,4 +103,87 @@ namespace
         bitunpack.bitUnpack((U8*) &res, sizeof(res)*8);
         CHECK(num == res);
     }
+
+    TEST_CASE("LLBitPack: a read past the data takes zeros and not what lies after it", "[LLBitPack]")
+    {
+        U8 buffer[] = { 0xA5, 0x5A, 0xFF, 0xFF };
+        LLBitPack reader(buffer, 2);
+
+        U8 read = 0;
+        reader.bitUnpack(&read, 8);
+        CHECK(read == 0xA5);
+        reader.bitUnpack(&read, 8);
+        CHECK(read == 0x5A);
+        CHECK_FALSE(reader.readPastEnd());
+
+        read = 0x11;
+        reader.bitUnpack(&read, 8);
+        CHECK(read == 0);
+        CHECK(reader.readPastEnd());
+    }
+
+    TEST_CASE("LLBitPack: bits of the data's last byte are within it until they run out", "[LLBitPack]")
+    {
+        U8 buffer[] = { 0xFF, 0xFF };
+        LLBitPack reader(buffer, 1);
+
+        U8 read = 0;
+        reader.bitUnpack(&read, 3);
+        CHECK(read == 0x07);
+        reader.bitUnpack(&read, 5);
+        CHECK(read == 0x1F);
+        CHECK_FALSE(reader.readPastEnd());
+
+        reader.bitUnpack(&read, 1);
+        CHECK(read == 0);
+        CHECK(reader.readPastEnd());
+    }
+
+    TEST_CASE("LLBitPack: a read that crosses the data's end keeps the bits it had", "[LLBitPack]")
+    {
+        U8 buffer[] = { 0xFF, 0xFF };
+        LLBitPack reader(buffer, 1);
+
+        U16 read = 0xEEEE;
+        reader.bitUnpack((U8*)&read, 16);
+        CHECK(read == 0x00FF);
+        CHECK(reader.readPastEnd());
+    }
+
+    TEST_CASE("LLBitPack: the bytes a read takes past the data go on being counted", "[LLBitPack]")
+    {
+        U8 buffer[] = { 0xFF };
+        LLBitPack reader(buffer, 1);
+
+        U8 read[4] = { 0 };
+        CHECK(reader.bitUnpack(read, 4 * 8) == 4);
+        CHECK(reader.mBufferSize == 4);
+    }
+
+    TEST_CASE("LLBitPack: data of no bytes reads as zeros from no buffer", "[LLBitPack]")
+    {
+        LLBitPack reader(nullptr, 0);
+        CHECK_FALSE(reader.readPastEnd());
+
+        U8 read = 0x11;
+        reader.bitUnpack(&read, 8);
+        CHECK(read == 0);
+        CHECK(reader.readPastEnd());
+    }
+
+    TEST_CASE("LLBitPack: resetting reads the data again from its start", "[LLBitPack]")
+    {
+        U8 buffer[] = { 0xA5 };
+        LLBitPack reader(buffer, 1);
+
+        U8 read[2] = { 0 };
+        reader.bitUnpack(read, 2 * 8);
+        REQUIRE(reader.readPastEnd());
+
+        reader.resetBitPacking();
+        CHECK_FALSE(reader.readPastEnd());
+        reader.bitUnpack(read, 8);
+        CHECK(read[0] == 0xA5);
+        CHECK_FALSE(reader.readPastEnd());
+    }
 }

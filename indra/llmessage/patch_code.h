@@ -41,11 +41,15 @@ void    end_patch_coding(LLBitPack &bitpack);
 void    init_patch_decoding(LLBitPack &bitpack);
 void    decode_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp);
 // Reads the group header of a layer off the wire, and says whether the layer
-// may be decoded: only where its patch size is NORMAL_PATCH_SIZE. The decoders
-// write as many coefficients and rows as the header says into what they are
-// handed, and the land and wind that receive them are laid out for that size.
+// may be decoded: only where the data holds the whole header and its patch size
+// is NORMAL_PATCH_SIZE. The decoders write as many coefficients and rows as the
+// header says into what they are handed, and the land and wind that receive
+// them are laid out for that size.
 [[nodiscard]] bool decode_layer_group_header(LLBitPack &bitpack, LLGroupHeader *gopp);
+// A header the data ends inside reads as END_OF_PATCHES.
 void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph);
+// A patch the data ends inside reads as zeros from there, and is not to be kept:
+// bitpack.readPastEnd() says so.
 void    decode_patch(LLBitPack &bitpack, S32 *patches);
 
 #endif

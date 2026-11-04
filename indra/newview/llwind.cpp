@@ -36,6 +36,7 @@
 #include "llwind.h"
 
 // linden libraries
+#include "llbitpack.h"
 #include "llgl.h"
 #include "patch_dct.h"
 #include "patch_code.h"
@@ -88,8 +89,10 @@ void LLWind::init()
 
 void LLWind::decompress(LLBitPack &bitpack, LLGroupHeader *group_headerp)
 {
-    LLPatchHeader  patch_header;
-    S32 buffer[16*16];
+    LLPatchHeader  header_x;
+    LLPatchHeader  header_y;
+    S32 buffer_x[16*16];
+    S32 buffer_y[16*16];
 
     init_patch_decompressor(group_headerp->patch_size);
 
@@ -99,14 +102,21 @@ void LLWind::decompress(LLBitPack &bitpack, LLGroupHeader *group_headerp)
     set_group_of_patch_header(group_headerp);
 
     // X component
-    decode_patch_header(bitpack, &patch_header);
-    decode_patch(bitpack, buffer);
-    decompress_patch(mVelX, buffer, &patch_header);
+    decode_patch_header(bitpack, &header_x);
+    decode_patch(bitpack, buffer_x);
 
     // Y component
-    decode_patch_header(bitpack, &patch_header);
-    decode_patch(bitpack, buffer);
-    decompress_patch(mVelY, buffer, &patch_header);
+    decode_patch_header(bitpack, &header_y);
+    decode_patch(bitpack, buffer_y);
+
+    // The two go together: data that ends inside either keeps neither.
+    if (bitpack.readPastEnd())
+    {
+        return;
+    }
+
+    decompress_patch(mVelX, buffer_x, &header_x);
+    decompress_patch(mVelY, buffer_y, &header_y);
 
     S32 i, j, k;
 

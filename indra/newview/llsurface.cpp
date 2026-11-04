@@ -630,6 +630,12 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
 
 
         decode_patch(bitpack, patch);
+        if (bitpack.readPastEnd())
+        {
+            // The data ended inside this patch. The patches before it stay, as
+            // they do before a patch outside the region.
+            return;
+        }
         decompress_patch(patchp->getDataZ(), patch, &ph);
 
         // Update edges for neighbors.  Need to guarantee that this gets done before we generate vertical stats.
