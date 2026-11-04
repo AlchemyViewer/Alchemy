@@ -8425,7 +8425,9 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
 
     LLRenderTarget& gbuffer = mRT->deferredScreen;
     static LLCachedControl<F32> incident_strength(gSavedSettings, "AlchemyExposureIncidentStrength", 1.f);
-    const F32 meter_strength = llclamp(incident_strength(), 0.f, 1.f);
+    // Incident metering is the main view's: only its alpha pass marks the stencil that the mask below is made from, and
+    // any other pack, the material preview's among them, meters the light reflected, as it did.
+    F32 meter_strength = renderPack() == ALRenderResourcePlan::Pack::Main ? llclamp(incident_strength(), 0.f, 1.f) : 0.f;
 
     // Where the water lies over the sky, which the meter takes as sky (luminanceF.glsl): the G-buffer's normals copied
     // under the water's stencil (ALWaterStencil::SURFACE_BIT), and nothing elsewhere. The target shares the G-buffer's
@@ -8462,7 +8464,7 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     // (luminanceF.glsl). Wanted only where the meter divides by albedo, and only the main view marks it.
     ALTransientTargets blend_scope(mTransientTargets);
     LLRenderTarget*    blend = nullptr;
-    if (meter_strength > 0.f && mRT == &mMainRT && gCopyProgram.isComplete())
+    if (meter_strength > 0.f && gCopyProgram.isComplete())
     {
         blend = blend_scope.acquire(
             ALRenderTargetDesc{ .width = gbuffer.getWidth(), .height = gbuffer.getHeight(), .color = { GL_R8 } }, gbuffer,
@@ -8493,6 +8495,15 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
         }
         blend->flush();
     }
+
+    // Without the mask the meter does not divide by albedo at all: the shader reads neither the albedo nor the mask,
+    // where a unit left unbound holds nothing reliable (ALTextureSlot::unbind leaves a white placeholder, which would
+    // read as every pixel blended). generateExposure takes its key from what was metered.
+    if (!blend)
+    {
+        meter_strength = 0.f;
+    }
+    mMeterIncident = meter_strength;
 
     dst->bindTarget();
 
@@ -8540,18 +8551,10 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     const S32 albedo_channel = meter_strength > 0.f
         ? gLuminanceProgram.bindTexture(LLShaderMgr::METER_ALBEDO_MAP, &gbuffer, ALSamplers::PointClamp | ALSampler::SRGBDecode, 0)
         : -1;
-    // Without the mask (a view that does not mark one) the unit holds nothing, which the meter reads as nothing blended.
-    const S32 blend_channel = meter_strength > 0.f ? gLuminanceProgram.enableTexture(LLShaderMgr::METER_BLEND_MAP) : -1;
+    const S32 blend_channel = blend ? gLuminanceProgram.enableTexture(LLShaderMgr::METER_BLEND_MAP) : -1;
     if (blend_channel > -1)
     {
-        if (blend)
-        {
-            blend->bindTexture(0, blend_channel, ALSamplers::PointClamp);
-        }
-        else
-        {
-            gGL.getTextureSlot(blend_channel)->unbind();
-        }
+        blend->bindTexture(0, blend_channel, ALSamplers::PointClamp);
     }
 
     // A bilinear tap averages a 2x2 block, so taps two texels apart cover a patch.
@@ -8597,7 +8600,6 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     static LLCachedControl<F32> speed_down(gSavedSettings, "AlchemyExposureSpeedDown", 1.f);
     static LLCachedControl<U32> metering_mode(gSavedSettings, "AlchemyExposureMeteringMode", 1);
     static LLCachedControl<F32> sky_weight(gSavedSettings, "AlchemyExposureSkyWeight", 1.f);
-    static LLCachedControl<F32> incident_strength(gSavedSettings, "AlchemyExposureIncidentStrength", 1.f);
 
     // A classic sky reproduces pre-PBR lighting, which assumed a fixed exposure.
     const bool meter = dynamic_exposure_enabled && !LLRender::sClassicMode;
@@ -8667,11 +8669,12 @@ void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool
     const F32 low = llclamp(low_percent() * 0.01f, 0.f, 0.99f);
     const F32 high = llclamp(high_percent() * 0.01f, low + 0.01f, 1.f);
     shader->uniform1f(LLShaderMgr::DT, gFrameIntervalSeconds);
-    // The key of the grid's values. At strength 0 (reflective metering) they are the light reflected, and middle grey
-    // is their key; at 1 (incident metering) they are the light that falls on the surfaces, whose key is 1, so that
-    // white reads as white and a grey card as 0.18.
+    // The key of the grid's values, by the strength generateLuminance metered at, which is not always the setting's: the
+    // main view's alone, and none where no mask could be made. At strength 0 (reflective metering) they are the light
+    // reflected, and middle grey is their key; at 1 (incident metering) they are the light that falls on the surfaces,
+    // whose key is 1, so that white reads as white and a grey card as 0.18.
     // For a scene whose surfaces average middle grey the two meter alike, and between them the key follows.
-    const F32 key_ev = (1.f - llclamp(incident_strength(), 0.f, 1.f)) * log2f(EXPOSURE_KEY);
+    const F32 key_ev = (1.f - mMeterIncident) * log2f(EXPOSURE_KEY);
     shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS, key_ev + compensation(), llmin(min_ev(), max_ev()),
                       llmax(min_ev(), max_ev()), meter ? 1.f : 0.f);
     shader->uniform4f(LLShaderMgr::DYNAMIC_EXPOSURE_PARAMS2, low, high, llmax(speed_up(), 0.f), llmax(speed_down(), 0.f));
