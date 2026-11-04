@@ -30,8 +30,10 @@
 #include "../patch_dct.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <algorithm>
+#include <limits>
 #include <vector>
 
 namespace
@@ -137,5 +139,145 @@ namespace
             CHECK(header.quant_wbits == END_OF_PATCHES);
             CHECK(std::all_of(received.begin(), received.end(), [](S32 value) { return value == UNTOUCHED; }));
         }
+    }
+
+    // A writer at a patch, past its group header, with nothing of a patch written.
+    struct Writer
+    {
+        std::vector<U8> mBytes = std::vector<U8>(PATCH_CELLS * 8, 0);
+        LLBitPack mPack{ mBytes.data(), (U32)mBytes.size() };
+
+        Writer()
+        {
+            init_patch_coding(mPack);
+            LLGroupHeader group;
+            group.stride = NORMAL_PATCH_SIZE;
+            group.patch_size = NORMAL_PATCH_SIZE;
+            group.layer_type = 'L';
+            code_patch_group_header(mPack, &group);
+        }
+
+        // Writes a header that leaves word bits of 3, under a quantization of 7.
+        void atWordBitsOfThree()
+        {
+            std::vector<S32> small(PATCH_CELLS, 0);
+            LLPatchHeader header;
+            header.dc_offset = 0.f;
+            header.range = 1;
+            header.quant_wbits = 0x52;
+            header.patchids = 0;
+            REQUIRE(code_patch_header(mPack, &header, small.data()));
+            REQUIRE((header.quant_wbits & 0xf) + 2 == 3);
+        }
+    };
+
+    TEST_CASE("layer patch: no quantization byte the encoder writes is the end code", "[patch_code]")
+    {
+        const U32 group_bits = Writer().mPack.mTotalBits;
+        for (S32 byte = 0; byte < 256; ++byte)
+        {
+            for (S32 magnitude : { 0, 4, 100 })
+            {
+                CAPTURE(byte, magnitude);
+                Writer writer;
+                std::vector<S32> coefficients(PATCH_CELLS, 0);
+                coefficients[0] = magnitude;
+                LLPatchHeader header;
+                header.dc_offset = 0.f;
+                header.range = 1;
+                header.quant_wbits = (U8)byte;
+                header.patchids = 0;
+
+                if (code_patch_header(writer.mPack, &header, coefficients.data()))
+                {
+                    CHECK(header.quant_wbits != END_OF_PATCHES);
+                    CHECK(writer.mPack.mTotalBits == group_bits + 8 + 32 + 16 + 10);
+                }
+                else
+                {
+                    UNSCOPED_INFO("the header that would read as the end code alone is refused");
+                    CHECK(header.quant_wbits == END_OF_PATCHES);
+                    CHECK(writer.mPack.mTotalBits == group_bits);
+                }
+            }
+        }
+    }
+
+    TEST_CASE("layer patch: a quantization of 8 with word bits of 3 is refused and word bits of 4 are not", "[patch_code]")
+    {
+        Writer writer;
+        const U32 before = writer.mPack.mTotalBits;
+
+        // Word bits of 4 start at 2 and an empty patch takes them to 3.
+        std::vector<S32> empty(PATCH_CELLS, 0);
+        LLPatchHeader header;
+        header.dc_offset = 0.f;
+        header.range = 1;
+        header.quant_wbits = 0x62;
+        header.patchids = 0;
+        CHECK_FALSE(code_patch_header(writer.mPack, &header, empty.data()));
+        CHECK(writer.mPack.mTotalBits == before);
+
+        // A magnitude in bit 3 takes them to 4.
+        std::vector<S32> wider(PATCH_CELLS, 0);
+        wider[0] = 8;
+        header.quant_wbits = 0x62;
+        CHECK(code_patch_header(writer.mPack, &header, wider.data()));
+        CHECK(header.quant_wbits == 0x62);
+    }
+
+    TEST_CASE("layer patch: a magnitude past its word bits is refused with nothing written", "[patch_code]")
+    {
+        const S32 magnitude = GENERATE(8, -8, 9, -9, 1000, -1000, std::numeric_limits<S32>::min(), std::numeric_limits<S32>::max());
+        CAPTURE(magnitude);
+
+        Writer writer;
+        writer.atWordBitsOfThree();
+        const U32 before = writer.mPack.mTotalBits;
+
+        // The first coefficients fit: refusing the last leaves none of them written.
+        std::vector<S32> coefficients(PATCH_CELLS, 0);
+        coefficients[0] = 7;
+        coefficients[1] = -7;
+        coefficients[PATCH_CELLS - 1] = magnitude;
+        CHECK_FALSE(code_patch(writer.mPack, coefficients.data(), 0));
+        CHECK(writer.mPack.mTotalBits == before);
+    }
+
+    TEST_CASE("layer patch: the largest magnitude its word bits hold reads back", "[patch_code]")
+    {
+        Writer writer;
+        writer.atWordBitsOfThree();
+
+        std::vector<S32> sent(PATCH_CELLS, 0);
+        sent[0] = 7;
+        sent[1] = -7;
+        sent[2] = 1;
+        REQUIRE(code_patch(writer.mPack, sent.data(), 0));
+        code_end_of_data(writer.mPack);
+        end_patch_coding(writer.mPack);
+
+        LLBitPack reader(writer.mBytes.data(), writer.mPack.mBufferSize);
+        init_patch_decoding(reader);
+        LLGroupHeader group;
+        decode_patch_group_header(reader, &group);
+        LLPatchHeader header;
+        std::vector<S32> received(PATCH_CELLS, UNTOUCHED);
+        REQUIRE(decode_expected_patch(reader, &header, received.data()));
+        CHECK(received == sent);
+    }
+
+    TEST_CASE("layer patch: a magnitude post quantization leaves unwritten is not refused", "[patch_code]")
+    {
+        Writer writer;
+        writer.atWordBitsOfThree();
+
+        // A postquant of PATCH_CELLS - 2 writes coefficients 0 and 1 and clears the one after.
+        std::vector<S32> coefficients(PATCH_CELLS, 0);
+        coefficients[0] = 7;
+        coefficients[2] = 1000;
+        coefficients[5] = 1000;
+        CHECK(code_patch(writer.mPack, coefficients.data(), PATCH_CELLS - 2));
+        CHECK(coefficients[2] == 0);
     }
 }

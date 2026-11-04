@@ -33,9 +33,13 @@ class LLPatchHeader;
 
 void    init_patch_coding(LLBitPack &bitpack);
 void    code_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp);
-void    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch);
+// False, writing nothing, where the header's quantization byte comes to
+// END_OF_PATCHES, which every decoder takes for the end of the layer.
+bool    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch);
 void    code_end_of_data(LLBitPack &bitpack);
-void    code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant);
+// False, writing nothing, where a coefficient it would write is past the word
+// bits of the header before it.
+bool    code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant);
 void    end_patch_coding(LLBitPack &bitpack);
 
 void    init_patch_decoding(LLBitPack &bitpack);
