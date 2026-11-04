@@ -543,7 +543,22 @@ public:
     // takes the bytes its data holds whatever the size before it names. Empty
     // for neither, or where the data is cut short.
     static void unpackCompressedData(LLDataPacker& dp, U32 flags, boost::container::small_vector_base<U8>& data);
+
+    // A texture entry as a packer or a TextureEntry field holds it, with room
+    // in place for as long as the packers write for the most faces they pack,
+    // and the zero the parse puts after it.
+    static constexpr size_t TE_INLINE_BYTES = 4608;
+    typedef boost::container::small_vector<U8, TE_INLINE_BYTES> te_bytes_t;
+
+    // Applies a texture entry read whole from a packer, without the size
+    // before it, as unpackTEMessage applies one it reads.
+    S32 unpackTEEntry(boost::container::small_vector_base<U8>& packed);
+
     S32 applyParsedTEMessage(LLTEContents& tec);
+
+    // Whether the primitive keeps a texture entry it unpacked, whose values
+    // the faces it gains take (setNumTEs).
+    bool hasTEEntry() const { return !mTEEntry.empty(); }
 
 #ifdef CHECK_FOR_FINITE
     inline void setPosition(const LLVector3& pos);
@@ -623,6 +638,11 @@ public:
 private:
     void updateNumBumpmap(const U8 index, const U8 bump);
 
+    // Applies the faces of tec from first_face on.
+    S32 applyParsedTEFaces(LLTEContents& tec, U32 first_face);
+    // The faces from first_face on take the values mTEEntry gives them.
+    void applyTEEntry(U8 first_face);
+
 protected:
     LLPCode             mPrimitiveCode;     // Primitive code
     LLVector3           mVelocity;          // how fast are we moving?
@@ -634,6 +654,11 @@ protected:
     U8                  mNumTEs;            // # of faces on the primitve
     U8                  mNumBumpmapTEs;     // number of bumpmap TEs.
     U32                 mMiscFlags;         // home for misc bools
+
+    // The texture entry last unpacked, as it arrived. It gives a value for
+    // every face, so a face the primitive gains later, as a mesh's asset
+    // loads, takes its own value from it rather than the last face's.
+    std::vector<U8>     mTEEntry;
 
 public:
     static LLVolumeMgr* sVolumeManager;

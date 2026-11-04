@@ -88,8 +88,10 @@ void LLWind::init()
 
 void LLWind::decompress(LLBitPack &bitpack, LLGroupHeader *group_headerp)
 {
-    LLPatchHeader  patch_header;
-    S32 buffer[16*16];
+    LLPatchHeader  header_x;
+    LLPatchHeader  header_y;
+    S32 buffer_x[16*16];
+    S32 buffer_y[16*16];
 
     init_patch_decompressor(group_headerp->patch_size);
 
@@ -98,15 +100,16 @@ void LLWind::decompress(LLBitPack &bitpack, LLGroupHeader *group_headerp)
     group_headerp->stride = group_headerp->patch_size;
     set_group_of_patch_header(group_headerp);
 
-    // X component
-    decode_patch_header(bitpack, &patch_header);
-    decode_patch(bitpack, buffer);
-    decompress_patch(mVelX, buffer, &patch_header);
+    // A layer holds both components or is refused whole, leaving the velocities as they were.
+    if (!decode_expected_patch(bitpack, &header_x, buffer_x)
+        || !decode_expected_patch(bitpack, &header_y, buffer_y))
+    {
+        LL_WARNS_ONCE("Messaging") << "Refused a wind layer that ends before its two patches" << LL_ENDL;
+        return;
+    }
 
-    // Y component
-    decode_patch_header(bitpack, &patch_header);
-    decode_patch(bitpack, buffer);
-    decompress_patch(mVelY, buffer, &patch_header);
+    decompress_patch(mVelX, buffer_x, &header_x);
+    decompress_patch(mVelY, buffer_y, &header_y);
 
     S32 i, j, k;
 

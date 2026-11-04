@@ -293,8 +293,9 @@ LLSLURL::LLSLURL(const std::string& slurl)
 
             // Grab the parameters
             mAppPath = path_array;
-            // and the query
-            mAppQuery = slurl_uri.query();
+            // and the query, as the link writes it: the dispatcher reads its
+            // keys and values out of it, unescaping each once
+            mAppQuery = slurl_uri.escapedQuery();
             mAppQueryMap = slurl_uri.queryMap();
             return;
         }

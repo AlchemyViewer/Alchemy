@@ -28,6 +28,7 @@
 #include "llurldispatcher.h"
 
 // viewer includes
+#include "alapplinks.h"
 #include "llagent.h"            // teleportViaLocation()
 #include "llcommandhandler.h"
 #include "llfloaterhelpbrowser.h"
@@ -303,13 +304,7 @@ public:
         // a global position, and teleport to it
         if (tokens.size() < 1) return false;
 
-        LLVector3 coords(128, 128, 0);
-        if (tokens.size() <= 4)
-        {
-            coords = LLVector3((F32)tokens[1].asReal(),
-                               (F32)tokens[2].asReal(),
-                               (F32)tokens[3].asReal());
-        }
+        const LLVector3 coords = ALAppLinks::teleportPosition(tokens);
 
         // Region names may be %20 escaped.
         std::string region_name = LLURI::unescape(tokens[0]);

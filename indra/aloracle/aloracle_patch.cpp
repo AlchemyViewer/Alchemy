@@ -130,7 +130,7 @@ int32_t aloracle_layer_decode(int32_t type, const uint8_t* data, size_t size, al
                         break;
                     }
                     // decode_patch_header leaves the word bits as the patch
-                    // before set them, and LLWind decodes with them.
+                    // before set them, and LLWind refuses the layer.
                     return ALORACLE_BAD_ARGUMENT;
                 }
 

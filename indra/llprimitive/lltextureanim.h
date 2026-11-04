@@ -43,7 +43,10 @@ public:
     void packTAMessage(LLMessageSystem *mesgsys) const;
     void packTAMessage(LLDataPacker &dp) const;
     void unpackTAMessage(LLMessageSystem *mesgsys, const S32 block_num);
-    void unpackTAMessage(LLDataPacker &dp);
+    // False where the block runs past the end of the data, which leaves the
+    // animation off. A block of another size than an animation's is read
+    // past, and leaves it off too.
+    bool unpackTAMessage(LLDataPacker &dp);
     bool equals(const LLTextureAnim &other) const;
     LLSD asLLSD() const;
     operator LLSD() const { return asLLSD(); }

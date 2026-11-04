@@ -5,7 +5,9 @@ add_library(llprimitive STATIC)
 target_sources(
   llprimitive
   PRIVATE
+    alcompressedupdate.cpp
     alobjectmotion.cpp
+    alobjectupdate.cpp
     lldaeloader.cpp
     llgltfmaterial.cpp
     llmaterialid.cpp
@@ -24,7 +26,10 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alcompressedupdate.h
         alobjectmotion.h
+        alobjectorphans.h
+        alobjectupdate.h
         lldaeloader.h
         llgltfmaterial.h
         llgltfmaterial_templates.h
@@ -65,7 +70,10 @@ if(AL_BUILD_TESTS)
     llprimitive_tests
     PROJECT llprimitive
     SOURCES
+      tests/alcompressedupdate_test.cpp
       tests/alobjectmotion_test.cpp
+      tests/alobjectorphans_test.cpp
+      tests/alobjectupdate_test.cpp
       tests/llgltfmaterial_test.cpp
       tests/llmaterial_test.cpp
       tests/llmaterialid_test.cpp
