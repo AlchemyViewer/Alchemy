@@ -25,7 +25,8 @@
 // pixels (position.z 1). Each point lands in the histogram bin of its log2 luminance, and the
 // target's additive blend sums, per bin, the points' weights and their weighted log2
 // luminances. The sums keep the mean exact; the bins only decide which points the percentile
-// trim keeps.
+// trim keeps. A non-sky point also counts only as much as its patch's albedo has earned (the grid's
+// alpha, luminanceF.glsl), which is all of it unless the meter is reading the light on surfaces.
 
 in vec3 position; // xy: the meter texel, z: which part of it
 
@@ -53,6 +54,8 @@ float meterWeight(vec2 uv, float mode)
     return 1.0 - smoothstep(0.15, 0.3, sqrt(d2));
 }
 
+/// Places one of the grid's points (each texel makes two, its ground and its sky) in the histogram bin of its log2
+/// luminance, carrying its weight and its weight times its EV, the sums that the percentile trim reads (exposureF.glsl).
 void main()
 {
     ivec2 texel = ivec2(position.xy);
@@ -60,9 +63,10 @@ void main()
     bool is_sky = position.z > 0.5;
     float L = is_sky ? grid.g : grid.r;
     float share = is_sky ? grid.b : 1.0 - grid.b;
+    float earned = is_sky ? 1.0 : grid.a;
 
     vec2 uv = (position.xy + 0.5) / vec2(textureSize(meterMap, 0));
-    float w = share * meterWeight(uv, meter_params.x) * (is_sky ? meter_params.y : 1.0);
+    float w = share * earned * meterWeight(uv, meter_params.x) * (is_sky ? meter_params.y : 1.0);
 
     // Held to the histogram's range, so the first and last bins cannot drag the mean with
     // values far outside it.
