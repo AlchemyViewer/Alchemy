@@ -754,7 +754,10 @@ void LLCircuitData::checkPacketInID(TPACKETID id, bool receive_resent)
             // Modular forward distance, so a small gap that spans the 24-bit
             // packet-id wrap fills in normally; a genuinely old id yields a
             // huge forward distance and still takes the out-of-order path.
-            if (LLModularMath::subtract<width>(id, index) < 16)
+            // So does an id past the 24 bits, which the wire can carry: the
+            // distance ignores its high bits, but the walk below wraps at 24
+            // bits and would never reach it.
+            if (id < LL_MAX_OUT_PACKET_ID && LLModularMath::subtract<width>(id, index) < 16)
             {
                 while (index != id)
                 {

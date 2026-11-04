@@ -58,6 +58,7 @@
 #include "alassetblocklist.h"
 #include "albakeproxies.h"
 #include "alobjectmotion.h"
+#include "alobjectupdate.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -1294,8 +1295,10 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
             //this is the redundant position and region update, but it is necessary in case the viewer misses the following
             //position and region update messages from sim.
             //this redundant update should not cause any problems.
-            LLVector3 delta_pos =  mRegionp->getOriginAgent() - regionp->getOriginAgent();
-            setPositionParent(getPosition() + delta_pos); //update to the new region position immediately.
+            if (const auto position = ALObjectUpdate::positionOnCrossing(getPosition(), mRegionp->getOriginAgent(), regionp->getOriginAgent(), isRoot()))
+            {
+                setPositionParent(*position); //update to the new region position immediately.
+            }
             setRegion(regionp) ; //change the region.
         }
         else
@@ -1962,6 +1965,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // Fix object parenting.
     //
     bool b_changed_status = false;
+    // Whether this update names a parent the viewer has not got.
+    bool awaits_parent = false;
 
     if (OUT_TERSE_IMPROVED != update_type)
     {
@@ -2105,6 +2110,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                         port = mRegionp->getHost().getPort();
                     }
                     gObjectList.orphanize(this, parent_id, ip, port);
+                    awaits_parent = true;
 
                     // Hide particles, icon and HUD
                     hideExtraDisplayItems( true );
@@ -2191,6 +2197,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                         // We're an orphan, flag things appropriately.
                         gObjectList.orphanize(this, parent_id, ip, port);
+                        awaits_parent = true;
                     }
                 }
 
@@ -2266,6 +2273,13 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                 }
             }
+        }
+
+        // An orphan goes by what its latest update says: where that names no parent, or one the viewer has, it waits
+        // no longer for the one it was given before.
+        if (mOrphaned && !awaits_parent)
+        {
+            gObjectList.unorphanize(this);
         }
     }
 
@@ -5229,8 +5243,29 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
         LLPrimitive::setNumTEs(num_tes);
         setChanged(TEXTURE);
 
+        if (hasTEEntry())
+        {
+            // The faces gained took their values from the texture entry last
+            // unpacked. Each takes the render material the parameter block
+            // names for it, and the override the region holds for it, rather
+            // than the last face's.
+            if (original_tes < getNumTEs())
+            {
+                for (int i = original_tes; i < getNumTEs(); ++i)
+                {
+                    LLTextureEntry* tep = getTE(i);
+                    const LLUUID id = getRenderMaterialID(i);
+                    tep->setGLTFMaterialOverride(nullptr);
+                    if (id.notNull() || tep->getGLTFMaterial())
+                    {
+                        setRenderMaterialID(i, id, false, false);
+                    }
+                }
+                gGLTFMaterialList.applyQueuedOverrides(this);
+            }
+        }
         // touch up GLTF materials
-        if (original_tes > 0)
+        else if (original_tes > 0)
         {
             for (int i = original_tes; i < getNumTEs(); ++i)
             {
@@ -7908,7 +7943,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     { // update existing parameter block
         for (S32 te = start_idx; te < end_idx; ++te)
         {
-            param_block->setMaterial(te, id);
+            // Only where the block names another material: a face given no
+            // material where it names none takes no entry for it.
+            if (param_block->getMaterial(te) != id)
+            {
+                param_block->setMaterial(te, id);
+            }
         }
     }
 
