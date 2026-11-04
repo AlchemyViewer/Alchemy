@@ -31,6 +31,8 @@
 #include "llchatmsgbox.h"
 #include "lltextbox.h"
 
+#include "alapplinks.h"
+
 #include "llavatariconctrl.h"
 #include "llcommandhandler.h"
 #include "llfloaterreg.h"
@@ -102,24 +104,20 @@ public:
             }
             return true;
         }
-        if (verb == "block")
+        if (verb == "block" || verb == "unblock")
         {
-            if (params.size() > 2)
+            if (const std::optional<ALAppLinks::ObjectMute> request = ALAppLinks::objectMute(params))
             {
-                const std::string object_name = LLURI::unescape(params[2].asString());
-                LLMute mute(object_id, object_name, LLMute::OBJECT);
-                LLMuteList::getInstance()->add(mute);
-                ALFloaterBlocked::showMuteAndSelect(mute.mID);
-            }
-            return true;
-        }
-        if (verb == "unblock")
-        {
-            if (params.size() > 2)
-            {
-                const std::string object_name = params[2].asString();
-                LLMute mute(object_id, object_name, LLMute::OBJECT);
-                LLMuteList::getInstance()->remove(mute);
+                LLMute mute(object_id, request->mName, LLMute::OBJECT);
+                if (request->mBlock)
+                {
+                    LLMuteList::getInstance()->add(mute);
+                    ALFloaterBlocked::showMuteAndSelect(mute.mID);
+                }
+                else
+                {
+                    LLMuteList::getInstance()->remove(mute);
+                }
             }
             return true;
         }

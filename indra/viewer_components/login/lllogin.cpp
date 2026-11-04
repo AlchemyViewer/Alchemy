@@ -37,6 +37,9 @@
 #include "lleventcoro.h"
 #include "llexception.h"
 #include "stringize.h"
+#if AL_SESSION_CAPTURE
+#include "alsessioncapture.h"
+#endif
 
 //*********************
 // LLLogin
@@ -181,6 +184,12 @@ void LLLogin::Impl::loginCoro(std::string uri, LLSD login_params)
             }
 
             LL_DEBUGS("LLLogin") << "Auth Response: " << mAuthResponse << LL_ENDL;
+#if AL_SESSION_CAPTURE
+            if (ALSessionCapture::capturing())
+            {
+                ALSessionCapture::instance().recordLogin(request, mAuthResponse);
+            }
+#endif
             status = mAuthResponse["status"].asString();
 
             // Okay, we've received our final status event for this

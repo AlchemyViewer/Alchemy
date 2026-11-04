@@ -124,6 +124,11 @@ class LLViewerObject
     public LLRefCount,
     public LLGLUpdate
 {
+#if AL_SESSION_CAPTURE
+    // Records the update flags, name-value pairs and particles as they are held.
+    friend class ALObjectCapture;
+#endif
+
 protected:
     virtual ~LLViewerObject(); // use unref()
 

@@ -29,6 +29,8 @@
 #include "llviewerobject.h"
 #include "llscripteditorws.h"
 
+#include "alcompressedupdate.h"
+
 #include "llaudioengine.h"
 #include "indra_constants.h"
 #include "llmath.h"
@@ -1886,6 +1888,18 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     return retval;
                 }
 
+                // So is one whose sound or name values run past its end,
+                // before any of what follows the entries is applied.
+                ALCompressedSoundAndNames sound_and_names;
+                if (!sound_and_names.unpack(*dp, value))
+                {
+                    LL_WARNS("UpdateFail") << "Sound or name values past the end of the compressed update for " << getID()
+                                           << ", refusing the update" << LL_ENDL;
+                    mRegionp->addCacheMissFull(getLocalID());
+                    gObjectList.killObject(this);
+                    return retval;
+                }
+
                 // Mark all extra parameters not used
                 for (auto& entry : mExtraParameterList)
                 {
@@ -1909,18 +1923,15 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                 if (value & 0x10)
                 {
-                    dp->unpackUUID(sound_uuid, "SoundUUID");
-                    dp->unpackF32(gain, "SoundGain");
-                    dp->unpackU8(sound_flags, "SoundFlags");
-                    dp->unpackF32(cutoff, "SoundRadius");
+                    sound_uuid = sound_and_names.mSoundID;
+                    gain = sound_and_names.mSoundGain;
+                    sound_flags = sound_and_names.mSoundFlags;
+                    cutoff = sound_and_names.mSoundRadius;
                 }
 
                 if (value & 0x100)
                 {
-                    std::string name_value_list;
-                    dp->unpackString(name_value_list, "NV");
-
-                    setNameValueList(name_value_list);
+                    setNameValueList(sound_and_names.mNameValues);
                 }
 
                 mTotalCRC = crc;
