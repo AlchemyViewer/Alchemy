@@ -54,6 +54,8 @@ float meterWeight(vec2 uv, float mode)
     return 1.0 - smoothstep(0.15, 0.3, sqrt(d2));
 }
 
+/// Places one of the grid's points (each texel makes two, its ground and its sky) in the histogram bin of its log2
+/// luminance, carrying its weight and its weight times its EV, the sums that the percentile trim reads (exposureF.glsl).
 void main()
 {
     ivec2 texel = ivec2(position.xy);

@@ -8417,6 +8417,15 @@ void LLPipeline::captureScopeSample(LLRenderTarget* src)
     mScopeSample.flush();
 }
 
+/// Draws the exposure meter's grid, one texel of `dst` per patch of `src`: the patch's mean ground luminance (r), mean
+/// sky luminance (g), sky share (b) and, under incident metering, the share of its exposure that its albedo has earned
+/// (a). Sky is told by depth, and the water over nothing by its map, made here (luminanceF.glsl).
+/// Incident metering, the light on the surfaces and not the light they reflect, is the main view's: the ground
+/// luminance is divided by the albedo, and the pixels of blended surfaces, which the albedo cannot speak for, are read
+/// as the key through a mask made from the stencil. In any other pack, or where the mask cannot be made, the meter is
+/// reflective. The strength metered at is left in mMeterIncident for generateExposure.
+/// @param src the HDR scene to meter, before bloom
+/// @param dst the grid target
 void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
 {
     // The exposure meter's grid (luminanceF.glsl), from the scene before bloom: metering a
@@ -8586,6 +8595,13 @@ void LLPipeline::generateLuminance(LLRenderTarget* src, LLRenderTarget* dst)
     dst->flush();
 }
 
+/// Turns the meter's grid into the exposure: a histogram of its points by log2 luminance, weighted by position and by
+/// sky, its trimmed mean exposed to the key, and the fade from the last exposure, written to `dst` as the scale, the EV
+/// and the target (exposureHistogramV.glsl, exposureF.glsl). With the meter off, or under a classic sky, the scale is 1.
+/// @param src the grid made by generateLuminance
+/// @param dst receives the exposure
+/// @param use_history true to fade from the last frame's exposure; false to take this grid's own at once, as a
+///        one-off render such as the material preview does
 void LLPipeline::generateExposure(LLRenderTarget* src, LLRenderTarget* dst, bool use_history)
 {
     LL_PROFILE_GPU_ZONE("exposure");

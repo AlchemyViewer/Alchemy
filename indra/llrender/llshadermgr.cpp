@@ -1581,6 +1581,8 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 }
 
 //virtual
+/// Fills the reserved attribute and uniform name lists. The order of the pushes is the order of the enums in
+/// llshadermgr.h, so a name added to one is added at the same place in the other.
 void LLShaderMgr::initAttribsAndUniforms()
 {
     //MUST match order of enum in LLVertexBuffer.h

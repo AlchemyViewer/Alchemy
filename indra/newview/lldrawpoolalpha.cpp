@@ -249,6 +249,9 @@ void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
     }
 }
 
+/// Draws the blended surfaces over the lit scene: source-alpha blending, the destination's alpha kept as glow (or as
+/// coverage in a bake), and ALBlendStencil::BLENDED_BIT marked where its colour pass shades, for the exposure meter.
+/// @param rigged true to draw the rigged surfaces, with depth writes; false for the rest.
 void LLDrawPoolAlpha::forwardRender(bool rigged)
 {
     gPipeline.enableLightsDynamic();

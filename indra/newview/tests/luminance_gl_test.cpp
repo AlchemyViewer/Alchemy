@@ -76,25 +76,27 @@ namespace
     constexpr F32 TRUSTED_TO     = 0.12f;
     constexpr F32 NOMINAL_ALBEDO = 0.18f;
 
+    /// The sRGB encoding of a linear value.
     F32 srgbEncode(F32 linear)
     {
         return linear <= 0.0031308f ? 12.92f * linear : 1.055f * std::pow(linear, 1.f / 2.4f) - 0.055f;
     }
 
+    /// The linear value of an sRGB-encoded one.
     F32 srgbDecode(F32 encoded)
     {
         return encoded <= 0.04045f ? encoded / 12.92f : std::pow((encoded + 0.055f) / 1.055f, 2.4f);
     }
 
-    // The albedo the G-buffer's sRGB8 attachment holds for `linear`, which is what the meter reads back: stored in eight
-    // bits, so a little off what was asked for.
+    /// The albedo the G-buffer's sRGB8 attachment holds for `linear`, which is what the meter reads back: stored in eight
+    /// bits, so a little off what was asked for.
     F32 storedAlbedo(F32 linear)
     {
         return srgbDecode(std::round(srgbEncode(linear) * 255.f) / 255.f);
     }
 
-    // A patch of mean luminance `lum` and mean albedo `albedo` as luminanceF.glsl writes it at `strength`: the luminance
-    // divided by the albedo to that power, and the share of the exposure the albedo has earned.
+    /// A patch of mean luminance `lum` and mean albedo `albedo` as luminanceF.glsl writes it at `strength`: the luminance
+    /// divided by the albedo to that power, and the share of the exposure the albedo has earned.
     Patch incident(F32 lum, F32 albedo, F32 strength)
     {
         Patch patch;
@@ -123,6 +125,7 @@ namespace
                         { { "interface/copyV.glsl", GL_VERTEX_SHADER }, { "interface/copyF.glsl", GL_FRAGMENT_SHADER } });
         }
 
+        /// Releases the render targets: those that share the G-buffer's depth and stencil first, the G-buffer last.
         ~LuminanceMeter()
         {
             mPost.unloadPrograms();
@@ -135,10 +138,10 @@ namespace
             glClearStencil(0);
         }
 
-        // The G-buffer, its normal in `normal_format`, cleared as the frame clears it, magenta with the far plane's
-        // depth, and the world laid over the left half; the water's depth over the lower half and its own pixels
-        // marked in the stencil, as the water's draws leave them; and the screen, sharing the G-buffer's depth and
-        // stencil, holding each part's luminance.
+        /// The G-buffer, its normal in `normal_format`, cleared as the frame clears it, magenta with the far plane's
+        /// depth, and the world laid over the left half; the water's depth over the lower half and its own pixels
+        /// marked in the stencil, as the water's draws leave them; and the screen, sharing the G-buffer's depth and
+        /// stencil, holding each part's luminance.
         void setUp(U32 normal_format)
         {
             const ALRenderTargetDesc gbuffer{ .width   = W,
@@ -198,8 +201,8 @@ namespace
             ll_test::PostChainGL::write(mScreen, scene);
         }
 
-        // The G-buffer's albedo, its first attachment: the linear albedo `top` over the upper half and `bottom` over the
-        // lower. It is sRGB8, which the meter reads decoded, so what goes in is the encoded value.
+        /// The G-buffer's albedo, its first attachment: the linear albedo `top` over the upper half and `bottom` over the
+        /// lower. It is sRGB8, which the meter reads decoded, so what goes in is the encoded value.
         void setAlbedo(F32 top, F32 bottom)
         {
             std::vector<F32> albedo(size_t(W) * H * 4, 1.f);
@@ -214,8 +217,8 @@ namespace
             ll_test::PostChainGL::write(mGBuffer, albedo);
         }
 
-        // What LLDrawPoolAlpha::forwardRender leaves in the stencil where a blended surface's fragments pass: the blended
-        // bit over the rectangle, with no depth test and no colour written, so that nothing else changes.
+        /// What LLDrawPoolAlpha::forwardRender leaves in the stencil where a blended surface's fragments pass: the blended
+        /// bit over the rectangle, with no depth test and no colour written, so that nothing else changes.
         void markBlended(GLint x, GLint y, GLsizei width, GLsizei height)
         {
             mScreen.bindTarget();
@@ -235,8 +238,8 @@ namespace
             mScreen.flush();
         }
 
-        // LLPipeline::generateLuminance's mask of the blended surfaces: cleared, then white copied into it where the
-        // stencil holds the blended bit. (The pipeline's white is the viewer's white texture, here a target of one texel.)
+        /// LLPipeline::generateLuminance's mask of the blended surfaces: cleared, then white copied into it where the
+        /// stencil holds the blended bit. (The pipeline's white is the viewer's white texture, here a target of one texel.)
         void drawBlendMap()
         {
             mBlend.bindTarget();
@@ -275,9 +278,9 @@ namespace
             mWater.flush();
         }
 
-        // The grid as generateLuminance draws it, the water's map bound where `with_water` and the unit left holding
-        // nothing otherwise, each patch's texel in rows from the bottom. Above strength 0 the albedo and the blended mask
-        // are bound, as generateLuminance binds them: it meters reflectively, at 0, where it could not make the mask.
+        /// The grid as generateLuminance draws it, the water's map bound where `with_water` and the unit left holding
+        /// nothing otherwise, each patch's texel in rows from the bottom. Above strength 0 the albedo and the blended mask
+        /// are bound, as generateLuminance binds them: it meters reflectively, at 0, where it could not make the mask.
         std::vector<Patch> meter(bool with_water, F32 strength = 0.f)
         {
             mGrid.bindTarget();
@@ -351,9 +354,9 @@ namespace
         return std::fabs(value - expected) <= 1e-3f * std::fmax(1.f, std::fabs(expected));
     }
 
-    // The same through the albedo, which the GPU reads decoded from sRGB8. How closely the decode follows the curve is the
-    // driver's: one run's came out a fifth of a percent off, in either direction. A wrong floor, ramp, exponent or mask
-    // moves a patch by far more than half a percent.
+    /// The same through the albedo, which the GPU reads decoded from sRGB8. How closely the decode follows the curve is the
+    /// driver's: one run's came out a fifth of a percent off, in either direction. A wrong floor, ramp, exponent or mask
+    /// moves a patch by far more than half a percent.
     bool closeToDecoded(F32 value, F32 expected)
     {
         return std::fabs(value - expected) <= 5e-3f * std::fmax(1.f, std::fabs(expected));
@@ -416,6 +419,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: without the water's map no water
     }
 }
 
+/// At strengths 0, 0.5 and 1 the world's patches hold the luminance over the albedo to that power, and the sky's are untouched.
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: incident metering divides the world's luminance by its albedo, as far as the strength says",
                  "[luminance_gl]")
 {
@@ -456,6 +460,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: incident metering divides the wo
     }
 }
 
+/// Across albedos, from well above the floor to next to black, a patch is divided by the floored albedo and earns the ramp's share.
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: a surface that reflects little earns little of the exposure", "[luminance_gl]")
 {
     // Well above the floor and the ramp, at the ramp's top, inside the ramp, below the floor, and next to black.
@@ -475,6 +480,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: a surface that reflects little e
     CHECK(closeToDecoded(patch.mEarned, want.mEarned));
 }
 
+/// Taps that a blended surface shades read as the key, which meters them as reflective metering does, whatever lies behind them.
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key whatever lies behind them", "[luminance_gl]")
 {
     setUp(GL_RGB10_A2);
@@ -517,6 +523,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key w
     CHECK(closeTo(whole.mEarned, 1.f));
 }
 
+/// The mask is where blended surfaces were drawn and nowhere else, across texels holding the water's bit, and the mark leaves the water's map as it was.
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: the blended mask is where blended surfaces were drawn and nothing else", "[luminance_gl]")
 {
     setUp(GL_RGB10_A2);
