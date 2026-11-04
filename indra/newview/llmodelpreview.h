@@ -187,6 +187,8 @@ public:
     LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
     // One model to upload, counting a root and its submodels once: what Custom and metres are for.
     bool isSingleModel() const;
+    // Whether this instance uploads skinned, from its base or its High model: such mesh takes no pivot.
+    bool uploadsRigged(const LLModelInstance& instance) const;
     // </SK:Nexii>
 
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
