@@ -116,15 +116,8 @@ namespace
         while ((S32)read.patches.size() < MOST_PATCHES)
         {
             LLPatchHeader header;
-            decode_patch_header(reader, &header);
-            if (header.quant_wbits == END_OF_PATCHES)
-            {
-                read.came_to_end = true;
-                break;
-            }
             std::vector<S32> coefficients(PATCH_CELLS);
-            decode_patch(reader, coefficients.data());
-            if (reader.readPastEnd())
+            if (!decode_expected_patch(reader, &header, coefficients.data()))
             {
                 read.came_to_end = true;
                 break;

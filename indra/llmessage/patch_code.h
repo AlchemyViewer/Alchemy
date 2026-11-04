@@ -55,10 +55,10 @@ void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph);
 // A patch the data ends inside reads as zeros from there, and is not to be kept:
 // bitpack.readPastEnd() says so.
 void    decode_patch(LLBitPack &bitpack, S32 *patches);
-// Reads a patch of a layer that holds a known number of them, its header and
-// then its coefficients. False, having read no coefficients, where the header
-// is the layer's end code: decode_patch would read them with the word bits of
-// the patch before. False too where the data ends inside the patch.
+// Reads a layer's next patch, its header and then its coefficients. False,
+// having read no coefficients, where the header is the layer's end code:
+// decode_patch would read them with the word bits of the patch before. False
+// too where the data ends inside the patch, which is not to be kept.
 [[nodiscard]] bool decode_expected_patch(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patches);
 
 #endif
