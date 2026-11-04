@@ -72,6 +72,7 @@
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
 #include "alderenderlist.h"
 // [/SL:KB]
+#include "alobjectupdate.h"
 #include <zlib.h>
 #include "object_flags.h"
 
@@ -2091,6 +2092,12 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
 
     LL_DEBUGS("ObjectUpdate") << "creating " << uuid << " local_id " << local_id << LL_ENDL;
 
+    if (!ALObjectUpdate::makesObject(pcode))
+    {
+        LL_WARNS() << "No object for an update of pcode " << (S32)pcode << LL_ENDL;
+        return NULL;
+    }
+
     LLViewerObject *objectp = LLViewerObject::createObject(uuid, pcode, regionp);
     if (!objectp)
     {
@@ -2127,6 +2134,12 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     }
 
     LL_DEBUGS("ObjectUpdate") << "createObject creating " << fullid << LL_ENDL;
+
+    if (!ALObjectUpdate::makesObject(pcode))
+    {
+        LL_WARNS() << "No object for an update of pcode " << (S32)pcode << LL_ENDL;
+        return NULL;
+    }
 
     LLViewerObject *objectp = LLViewerObject::createObject(fullid, pcode, regionp);
     if (!objectp)
