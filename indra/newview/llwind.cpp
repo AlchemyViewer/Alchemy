@@ -36,7 +36,6 @@
 #include "llwind.h"
 
 // linden libraries
-#include "llbitpack.h"
 #include "llgl.h"
 #include "patch_dct.h"
 #include "patch_code.h"
@@ -101,17 +100,11 @@ void LLWind::decompress(LLBitPack &bitpack, LLGroupHeader *group_headerp)
     group_headerp->stride = group_headerp->patch_size;
     set_group_of_patch_header(group_headerp);
 
-    // X component
-    decode_patch_header(bitpack, &header_x);
-    decode_patch(bitpack, buffer_x);
-
-    // Y component
-    decode_patch_header(bitpack, &header_y);
-    decode_patch(bitpack, buffer_y);
-
-    // The two go together: data that ends inside either keeps neither.
-    if (bitpack.readPastEnd())
+    // A layer holds both components or is refused whole, leaving the velocities as they were.
+    if (!decode_expected_patch(bitpack, &header_x, buffer_x)
+        || !decode_expected_patch(bitpack, &header_y, buffer_y))
     {
+        LL_WARNS_ONCE("Messaging") << "Refused a wind layer that ends before its two patches" << LL_ENDL;
         return;
     }
 

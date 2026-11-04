@@ -42,6 +42,7 @@
 #include "v3math.h"
 #include "v4math.h"
 
+#include "alobjectupdate.h"
 #include "alscriptdiskmasters.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -1260,7 +1261,11 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
 //physically delete the cache entry
 void LLViewerRegion::killCacheEntry(U32 local_id)
 {
-    killCacheEntry(getCacheEntry(local_id));
+    if (LLVOCacheEntry::killLocalID(local_id, mImpl->mCacheMap, mImpl->mGLTFOverridesLLSD,
+                                    [this](LLVOCacheEntry* entry) { killCacheEntry(entry); }))
+    {
+        mGLTFOverridesDirty = true;
+    }
 }
 
 U32 LLViewerRegion::getNumOfActiveCachedObjects() const
@@ -2104,21 +2109,22 @@ LLViewerObject* LLViewerRegion::addNewObject(LLVOCacheEntry* entry)
 
 //update object cache if the object receives a full-update or terse update
 //update_type == EObjectUpdateType::OUT_TERSE_IMPROVED or EObjectUpdateType::OUT_FULL
-LLViewerObject* LLViewerRegion::updateCacheEntry(U32 local_id, LLViewerObject* objectp)
+LLViewerObject* LLViewerRegion::updateCacheEntry(U32 local_id, LLViewerObject* objectp, const LLUUID& update_id)
 {
     LLVOCacheEntry* entry = getCacheEntry(local_id);
     if (!entry)
     {
         return objectp; //not in the cache, do nothing.
     }
-    if(!objectp) //object not created
+    const bool same_object = update_id.isNull() || entry->isObject(update_id);
+    if(!objectp && same_object) //object not created
     {
         //create a new object from cache.
         objectp = addNewObject(entry);
     }
 
     //remove from cache.
-    killCacheEntry(entry, true);
+    killCacheEntry(entry, same_object);
 
     return objectp;
 }
@@ -3339,6 +3345,19 @@ void LLViewerRegion::unpackRegionHandshake()
     setIsEstateManager(is_estate_manager);
     setWaterHeight(water_height);
     setBillableFactor(billable_factor);
+
+    // Under another ID, what the cache holds is no longer the region's: it is let go, and loaded again below for the
+    // new ID, rather than answer probes and be saved under an ID it does not belong to. A handshake comes outside any
+    // update of an object, so nothing is being read from an entry.
+    if (ALObjectUpdate::handshakeEndsCache(mCacheLoaded, mImpl->mCacheID, cache_id))
+    {
+        LL_INFOS("Messaging") << "Region " << sim_name << " has a new object cache ID, letting its cache go" << LL_ENDL;
+        clearVOCacheFromMemory();
+        mImpl->mGLTFOverridesLLSD.clear();
+        mGLTFOverridesDirty = false;
+        mOrphanMap.clear();
+        mCacheLoaded = false;
+    }
     setCacheID(cache_id);
 
     LLUUID region_id;

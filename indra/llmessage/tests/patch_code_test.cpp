@@ -303,30 +303,30 @@ namespace
         }
     }
 
-    TEST_CASE("patch_code: a wind layer says it read past only where it was cut short", "[patch_code]")
+    TEST_CASE("patch_code: a wind layer holds both its patches only where it is whole", "[patch_code]")
     {
         std::vector<U8> bytes = layerOfPatches('7', slopedPatch(), { 0, 0 }, false);
 
-        // As LLWind::decompress reads it.
-        const auto readPast = [&](U32 length)
+        // As LLWind::decompress reads it, which applies the patches only where
+        // this holds.
+        const auto bothPatches = [&](U32 length)
         {
             LLBitPack reader(bytes.data(), length);
             LLGroupHeader group;
             decode_patch_group_header(reader, &group);
-            LLPatchHeader header;
-            S32 coefficients[PATCH_CELLS];
-            decode_patch_header(reader, &header);
-            decode_patch(reader, coefficients);
-            decode_patch_header(reader, &header);
-            decode_patch(reader, coefficients);
-            return reader.readPastEnd();
+            LLPatchHeader header_x;
+            LLPatchHeader header_y;
+            S32 buffer_x[PATCH_CELLS];
+            S32 buffer_y[PATCH_CELLS];
+            return decode_expected_patch(reader, &header_x, buffer_x)
+                && decode_expected_patch(reader, &header_y, buffer_y);
         };
 
-        CHECK_FALSE(readPast((U32)bytes.size()));
+        CHECK(bothPatches((U32)bytes.size()));
         for (U32 cut = 0; cut < bytes.size(); ++cut)
         {
             CAPTURE(cut);
-            CHECK(readPast(cut));
+            CHECK_FALSE(bothPatches(cut));
         }
     }
 }
