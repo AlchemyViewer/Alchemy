@@ -556,6 +556,10 @@ public:
 
     S32 applyParsedTEMessage(LLTEContents& tec);
 
+    // Whether the primitive keeps a texture entry it unpacked, whose values
+    // the faces it gains take (setNumTEs).
+    bool hasTEEntry() const { return !mTEEntry.empty(); }
+
 #ifdef CHECK_FOR_FINITE
     inline void setPosition(const LLVector3& pos);
     inline void setPosition(const F32 x, const F32 y, const F32 z);
@@ -634,6 +638,11 @@ public:
 private:
     void updateNumBumpmap(const U8 index, const U8 bump);
 
+    // Applies the faces of tec from first_face on.
+    S32 applyParsedTEFaces(LLTEContents& tec, U32 first_face);
+    // The faces from first_face on take the values mTEEntry gives them.
+    void applyTEEntry(U8 first_face);
+
 protected:
     LLPCode             mPrimitiveCode;     // Primitive code
     LLVector3           mVelocity;          // how fast are we moving?
@@ -645,6 +654,11 @@ protected:
     U8                  mNumTEs;            // # of faces on the primitve
     U8                  mNumBumpmapTEs;     // number of bumpmap TEs.
     U32                 mMiscFlags;         // home for misc bools
+
+    // The texture entry last unpacked, as it arrived. It gives a value for
+    // every face, so a face the primitive gains later, as a mesh's asset
+    // loads, takes its own value from it rather than the last face's.
+    std::vector<U8>     mTEEntry;
 
 public:
     static LLVolumeMgr* sVolumeManager;

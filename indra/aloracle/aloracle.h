@@ -633,9 +633,9 @@ enum
 /// 32, for which decompress_patch's 32 by 32 transform reads beyond the
 /// coefficients it was given, and init_patch_decompressor writes past its
 /// tables over 32; a wind patch whose header is END_OF_PATCHES, which
-/// decode_patch_header leaves without word bits and LLWind decodes with
-/// those of the patch before it; an unknown type, which the viewer drops
-/// unread; and more than 2^31 - 1 bytes.
+/// decode_patch_header leaves without word bits and LLWind refuses the layer
+/// for; an unknown type, which the viewer drops unread; and more than 2^31 - 1
+/// bytes.
 ALORACLE_API int32_t aloracle_layer_decode(int32_t type, const uint8_t* data, size_t size, aloracle_bytes* value);
 
 #ifdef __cplusplus
