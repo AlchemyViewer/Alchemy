@@ -2104,21 +2104,22 @@ LLViewerObject* LLViewerRegion::addNewObject(LLVOCacheEntry* entry)
 
 //update object cache if the object receives a full-update or terse update
 //update_type == EObjectUpdateType::OUT_TERSE_IMPROVED or EObjectUpdateType::OUT_FULL
-LLViewerObject* LLViewerRegion::updateCacheEntry(U32 local_id, LLViewerObject* objectp)
+LLViewerObject* LLViewerRegion::updateCacheEntry(U32 local_id, LLViewerObject* objectp, const LLUUID& update_id)
 {
     LLVOCacheEntry* entry = getCacheEntry(local_id);
     if (!entry)
     {
         return objectp; //not in the cache, do nothing.
     }
-    if(!objectp) //object not created
+    const bool same_object = update_id.isNull() || entry->isObject(update_id);
+    if(!objectp && same_object) //object not created
     {
         //create a new object from cache.
         objectp = addNewObject(entry);
     }
 
     //remove from cache.
-    killCacheEntry(entry, true);
+    killCacheEntry(entry, same_object);
 
     return objectp;
 }

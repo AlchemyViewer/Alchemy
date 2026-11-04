@@ -622,7 +622,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         if(update_cache)
         {
             //update object cache if the object receives a full-update or terse update
-            objectp = regionp->updateCacheEntry(local_id, objectp);
+            objectp = regionp->updateCacheEntry(local_id, objectp, update_type == OUT_FULL ? fullid : LLUUID::null);
         }
 
         // This looks like it will break if the local_id of the object doesn't change

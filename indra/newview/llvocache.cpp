@@ -449,6 +449,11 @@ LLDataPackerBinaryBuffer *LLVOCacheEntry::getDP() const
     return &mDP;
 }
 
+bool LLVOCacheEntry::isObject(const LLUUID& id) const
+{
+    return mDP.getBufferSize() >= UUID_BYTES && memcmp(mDP.getBuffer(), id.mData, UUID_BYTES) == 0;
+}
+
 void LLVOCacheEntry::recordHit()
 {
     mHitCount++;

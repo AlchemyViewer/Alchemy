@@ -837,6 +837,35 @@ namespace
         CHECK(LLVOCache::instance().getCacheEntries() == 1u);
     }
 
+    TEST_CASE("LLVOCacheEntry: an entry is the object of the UUID its data opens with", "[LLVOCache]")
+    {
+        const LLUUID object_id("44444444-4444-4444-4444-444444444444");
+        const LLUUID other_id("55555555-5555-5555-5555-555555555555");
+
+        std::vector<U8> body(object_id.mData, object_id.mData + UUID_BYTES);
+        body.resize(UUID_BYTES + 24, 0xAB);
+        LLDataPackerBinaryBuffer dp(body.data(), (S32)body.size());
+        LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(7, 1234, dp);
+        CHECK(entry->isObject(object_id));
+        CHECK_FALSE(entry->isObject(other_id));
+        CHECK_FALSE(entry->isObject(LLUUID::null));
+
+        UNSCOPED_INFO("and reading it moves nothing that reads the entry after");
+        LLDataPackerBinaryBuffer* read_back = entry->getDP();
+        REQUIRE(read_back);
+        read_back->reset();
+        LLUUID read_id;
+        read_back->unpackUUID(read_id, "ID");
+        CHECK(read_id == object_id);
+
+        UNSCOPED_INFO("data too short to hold one is no object's");
+        LLDataPackerBinaryBuffer short_dp(body.data(), UUID_BYTES - 1);
+        LLPointer<LLVOCacheEntry> short_entry = new LLVOCacheEntry(8, 1234, short_dp);
+        CHECK_FALSE(short_entry->isObject(object_id));
+        LLPointer<LLVOCacheEntry> empty_entry = new LLVOCacheEntry();
+        CHECK_FALSE(empty_entry->isObject(LLUUID::null));
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

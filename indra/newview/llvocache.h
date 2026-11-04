@@ -137,6 +137,8 @@ public:
     void dump() const;
     S32 writeToBuffer(U8 *data_buffer) const;
     LLDataPackerBinaryBuffer *getDP() const;
+    // Whether this entry is the object of this UUID, which its data opens with.
+    bool isObject(const LLUUID& id) const;
     void recordHit();
 
     /*virtual*/ void setOctreeEntry(LLViewerOctreeEntry* entry);
