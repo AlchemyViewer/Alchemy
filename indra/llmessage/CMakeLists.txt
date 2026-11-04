@@ -168,6 +168,15 @@ target_sources(
 target_link_libraries(llmessage PRIVATE al::flags PUBLIC llcommon llfilesystem llmath llcorehttp)
 target_precompile_headers(llmessage REUSE_FROM llprecompiled)
 
+# The session recording, in a dev build that asks for it.
+if(AL_SESSION_CAPTURE)
+  target_sources(
+    llmessage
+    PRIVATE alsessioncapture.cpp
+    PUBLIC FILE_SET HEADERS FILES alsessioncapture.h
+  )
+endif()
+
 # tests
 if(AL_BUILD_TESTS)
   # These four stand in for parts of llmessage and llcorehttp with stubs of
@@ -193,12 +202,20 @@ if(AL_BUILD_TESTS)
   target_link_libraries(llmessage_test_pipes PRIVATE al::flags llmessage)
   set_target_properties(llmessage_test_pipes PROPERTIES FOLDER "Tests/llmessage")
 
+  # The session recording's file, where the tree has the recording.
+  set(session_capture_test "")
+  if(AL_SESSION_CAPTURE)
+    set(session_capture_test tests/alsessioncapture_test.cpp)
+  endif()
+
   al_add_test_binary(
     llmessage_tests
     PROJECT llmessage
     SOURCES
       tests/alnetimpairment_test.cpp
+      ${session_capture_test}
       tests/io_test.cpp
+      tests/layerpatch_test.cpp
       tests/llavatarnamecache_test.cpp
       tests/llbuffer_test.cpp
       tests/llcorehttputil_test.cpp

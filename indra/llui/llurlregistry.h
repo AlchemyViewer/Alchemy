@@ -94,6 +94,11 @@ private:
     // a Url, which reads each pattern as its entry does
     void buildUrlSet();
 
+    // The entry whose Url comes first in the text, and where it starts and
+    // ends; null where none has one there
+    LLUrlEntryBase* firstUrlEntry(const std::string& text, bool is_content_trusted, bool skip_non_mentions,
+                                  U32& match_start, U32& match_end);
+
     std::vector<LLUrlEntryBase *> mUrlEntry;
     ALRegexSet mUrlSet;
     // Each entry's index in the set, in the order of mUrlEntry; -1 for one

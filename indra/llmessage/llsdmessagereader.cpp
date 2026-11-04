@@ -282,7 +282,8 @@ S32 getElementSize(const LLSD& llsd)
     case LLSD::TypeDate:
         return sizeof(LLDate);
     case LLSD::TypeURI:
-        return sizeof(LLURI);
+        // its text, as getString() reads it
+        return static_cast<S32>(llsd.asString().size());
     case LLSD::TypeBinary:
     {
         std::vector<U8> data = llsd;
