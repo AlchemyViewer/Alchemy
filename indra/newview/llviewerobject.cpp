@@ -58,6 +58,7 @@
 #include "alassetblocklist.h"
 #include "albakeproxies.h"
 #include "alobjectmotion.h"
+#include "alobjectupdate.h"
 #include "llaudiosourcevo.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -1294,8 +1295,10 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
             //this is the redundant position and region update, but it is necessary in case the viewer misses the following
             //position and region update messages from sim.
             //this redundant update should not cause any problems.
-            LLVector3 delta_pos =  mRegionp->getOriginAgent() - regionp->getOriginAgent();
-            setPositionParent(getPosition() + delta_pos); //update to the new region position immediately.
+            if (const auto position = ALObjectUpdate::positionOnCrossing(getPosition(), mRegionp->getOriginAgent(), regionp->getOriginAgent(), isRoot()))
+            {
+                setPositionParent(*position); //update to the new region position immediately.
+            }
             setRegion(regionp) ; //change the region.
         }
         else

@@ -26,6 +26,9 @@
 
 #include "lluuid.h"
 #include "llvolume.h"
+#include "v3math.h"
+
+#include <optional>
 
 class LLXform;
 
@@ -62,4 +65,11 @@ struct ALObjectUpdate
     // Whether putting child under parent would close a loop: parent is child,
     // or below it.
     static bool closesLoop(const LLXform* child, const LLXform* parent);
+
+    // Where an object goes as it crosses from the region at old_origin to the
+    // one at new_origin. A root's position is against its region, so it moves
+    // by the difference of their origins. A child's is against its parent, and
+    // stays, which is none.
+    static std::optional<LLVector3> positionOnCrossing(const LLVector3& position, const LLVector3& old_origin,
+                                                       const LLVector3& new_origin, bool is_root);
 };

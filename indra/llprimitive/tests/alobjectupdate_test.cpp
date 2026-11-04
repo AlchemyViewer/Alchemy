@@ -131,4 +131,25 @@ namespace
         CHECK_FALSE(ALObjectUpdate::killReachesCache(HOLDER, AGENT, false));
         CHECK_FALSE(ALObjectUpdate::killReachesCache(LLUUID::null, AGENT, false));
     }
+
+    TEST_CASE("ALObjectUpdate: a root crossing regions moves by the difference of their origins", "[ALObjectUpdate]")
+    {
+        // Going east across a boundary 256 m away: 250 in the old region is -6 in the new.
+        const LLVector3 old_origin(0.f, 0.f, 0.f);
+        const LLVector3 new_origin(256.f, 0.f, 0.f);
+        const auto position = ALObjectUpdate::positionOnCrossing(LLVector3(250.f, 30.f, 22.f), old_origin, new_origin, true);
+        REQUIRE(position.has_value());
+        CHECK(*position == LLVector3(-6.f, 30.f, 22.f));
+
+        UNSCOPED_INFO("and the regions' place in the agent's frame does not matter");
+        const auto shifted = ALObjectUpdate::positionOnCrossing(LLVector3(250.f, 30.f, 22.f), LLVector3(-512.f, 256.f, 0.f),
+                                                                LLVector3(-256.f, 256.f, 0.f), true);
+        REQUIRE(shifted.has_value());
+        CHECK(*shifted == LLVector3(-6.f, 30.f, 22.f));
+    }
+
+    TEST_CASE("ALObjectUpdate: a child crossing regions stays against its parent", "[ALObjectUpdate]")
+    {
+        CHECK_FALSE(ALObjectUpdate::positionOnCrossing(LLVector3(1.f, 2.f, 3.f), LLVector3::zero, LLVector3(256.f, 0.f, 0.f), false).has_value());
+    }
 }

@@ -71,3 +71,14 @@ bool ALObjectUpdate::closesLoop(const LLXform* child, const LLXform* parent)
     }
     return false;
 }
+
+// static
+std::optional<LLVector3> ALObjectUpdate::positionOnCrossing(const LLVector3& position, const LLVector3& old_origin,
+                                                            const LLVector3& new_origin, bool is_root)
+{
+    if (!is_root)
+    {
+        return std::nullopt;
+    }
+    return position + (old_origin - new_origin);
+}
