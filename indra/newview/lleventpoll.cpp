@@ -39,6 +39,9 @@
 #include "lleventcoro.h"
 #include "llcorehttputil.h"
 #include "lleventfilter.h"
+#if AL_SESSION_CAPTURE
+#include "alsessioncapture.h"
+#endif
 
 namespace LLEventPolling
 {
@@ -99,6 +102,12 @@ namespace Details
     void LLEventPollImpl::handleMessage(const std::string &msg_name, const LLSD &body)
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
+#if AL_SESSION_CAPTURE
+        if (ALSessionCapture::capturing())
+        {
+            ALSessionCapture::instance().recordEvent(mSenderIp, msg_name, body);
+        }
+#endif
         LLSD message;
         message["sender"] = mSenderIp;
         message["body"] = body;
@@ -110,6 +119,12 @@ namespace Details
     {
         LL_PROFILE_ZONE_SCOPED_CATEGORY_APP;
         std::string msg_name = content["message"].asString();
+#if AL_SESSION_CAPTURE
+        if (ALSessionCapture::capturing())
+        {
+            ALSessionCapture::instance().recordEvent(mSenderIp, msg_name, content["body"]);
+        }
+#endif
         LLSD message;
         message["sender"] = mSenderIp;
         message["body"] = content["body"];

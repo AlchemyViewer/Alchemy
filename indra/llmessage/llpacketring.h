@@ -8,9 +8,8 @@
  * popPacket().
  *
  * The ring starts at DEFAULT_BUFFER_RING_SIZE slots and grows in increments
- * of BUFFER_RING_EXPANSION up to MAX_BUFFER_RING_SIZE.  Once at the ceiling,
- * pushPacket() silently overwrites the oldest queued packet to make room for
- * the incoming one.
+ * of BUFFER_RING_EXPANSION up to MAX_BUFFER_RING_SIZE.  Once full at the
+ * ceiling, pushPacket() refuses the incoming packet.
  *
  * $LicenseInfo:firstyear=2001&license=viewerlgpl$
  * Second Life Viewer Source Code
@@ -47,9 +46,14 @@ public:
     LLPacketRing();
     ~LLPacketRing();
 
-    // Copy 'packet' onto the tail of the ring, growing the ring or
-    // overwriting the oldest entry when the ring is at capacity.
-    void pushPacket(const LLPacketBuffer& packet);
+    // Copy 'packet' onto the tail of the ring, growing the ring when it is
+    // full. A ring full at its ceiling leaves the packet out and returns
+    // false: the oldest packet it holds may be a reliable one already acked,
+    // which its sender would never send again.
+    bool pushPacket(const LLPacketBuffer& packet);
+
+    // Whether pushPacket() would take a packet now.
+    bool hasRoom() const;
 
     // Copy the head (oldest) packet into 'packet'.
     // Returns true if a packet was available, false if the ring was empty.
@@ -69,4 +73,8 @@ private:
     S16 mHeadIndex          { 0 };
     S16 mNumBufferedPackets { 0 };
     S32 mNumBufferedBytes   { 0 };
+
+    S32  mLeftOutSinceWarning { 0 };
+    F64  mLastLeftOutWarning  { 0.0 };
+    bool mWarnedLeftOut       { false };
 };

@@ -81,6 +81,9 @@
 #include "llmessagelog.h"
 #include "llpounceable.h"
 #include "llproxy.h"
+#if AL_SESSION_CAPTURE
+#include "alsessioncapture.h"
+#endif
 
 // Constants
 //const char* MESSAGE_LOG_FILENAME = "message.log";
@@ -521,12 +524,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
         S32 num_acks = 0;
         S32 true_rcv_size = 0;
         bool recv_packet_id_checked = false;
+        bool recv_acked = false;
 
         U8* buffer = mTrueReceiveBuffer;
 
         if (!faked_message)
         {
-            mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked);
+            mTrueReceiveSize = receivePacketOrDrop((char *)mTrueReceiveBuffer, recv_packet_id_checked, recv_acked);
             receive_size = mTrueReceiveSize;
         }
         else
@@ -604,6 +608,13 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
                 mCurrentRecvPacketID = ntohl(packet_id_net);
             }
             host = getSender();
+#if AL_SESSION_CAPTURE
+            if (ALSessionCapture::capturing())
+            {
+                ALSessionCapture::instance().recordPacket(false, host, faked_message ? fake_buffer : mTrueReceiveBuffer,
+                                                          mTrueReceiveSize, buffer, receive_size, faked_message);
+            }
+#endif
 
             const bool resetPacketId = true;
             cdp = findCircuit(host, resetPacketId);
@@ -649,8 +660,12 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
             {
                 // We need to ACK here to suppress
                 // further resends of packets we've
-                // already seen.
-                cdp->collectRAck(mCurrentRecvPacketID);
+                // already seen, unless this copy was
+                // acked as it came in.
+                if (!recv_acked)
+                {
+                    cdp->collectRAck(mCurrentRecvPacketID);
+                }
 
                 LL_DEBUGS("Messaging") << "Discarding duplicate from " << host << LL_ENDL;
                 if(mVerboseLog)
@@ -731,8 +746,12 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
                     // Add to the recently received list for duplicate suppression
                     cdp->mRecentlyReceivedReliablePackets[mCurrentRecvPacketID] = getMessageTimeUsecs();
 
-                    // Put it onto the list of packets to be acked
-                    cdp->collectRAck(mCurrentRecvPacketID);
+                    // Put it onto the list of packets to be acked, unless
+                    // it was acked as it came in
+                    if (!recv_acked)
+                    {
+                        cdp->collectRAck(mCurrentRecvPacketID);
+                    }
                     mReliablePacketsIn++;
                 }
             }
@@ -965,9 +984,10 @@ void LLMessageSystem::setNetImpairment(F32 loss_percent, F32 burst_packets, F32 
 }
 #endif
 
-S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked)
+S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_checked, bool& already_acked)
 {
     packet_id_already_checked = false;
+    already_acked = false;
 
 #if AL_NET_IMPAIRMENT
     // Steady-state traffic arrives here, one direct socket read per call. The drain that feeds the
@@ -995,6 +1015,7 @@ S32 LLMessageSystem::receivePacketOrDrop(char* datap, bool& packet_id_already_ch
         mLastSender      = pkt.getHost();
         mLastReceivingIF = pkt.getReceivingInterface();
         packet_id_already_checked = pkt.getPacketIDChecked();
+        already_acked = pkt.getAcked();
 
         if (packet_size > 0)
         {
@@ -1148,28 +1169,6 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         }
 
-        if (cdp)
-        {
-            // ACK inbound reliable packet ASAP
-            if ((data[0] & LL_RELIABLE_FLAG))
-            {
-                cdp->collectRAck(recv_packet_id);
-            }
-
-            // Check packet sequencing here, in true socket-arrival order, before
-            // this packet is sorted into the high/low priority inbound queue.
-            // Skip duplicates of reliable packets already handled, marked resent
-            // or not, same as checkMessages()/logValidMsg() would do further
-            // downstream.
-            bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
-            bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
-            if (!recv_reliable || !cdp->checkDuplicate(recv_packet_id, recv_resent))
-            {
-                cdp->checkPacketInID(recv_packet_id, recv_resent);
-                pkt.setPacketIDChecked(true);
-            }
-        }
-
         auto enqueue = [this](const LLPacketBuffer& buffered)
         {
             if (isHighPriorityMessage(buffered))
@@ -1182,13 +1181,54 @@ S32 LLMessageSystem::bufferInboundPacket()
             }
         };
 
+        auto take = [&](LLPacketBuffer& arrived)
+        {
+            // A queue full at its ceiling has no room for the packet, which is
+            // left out as the network might have dropped it: neither acked nor
+            // its number recorded, so that its sender sends it again.
+            const bool has_room = (isHighPriorityMessage(arrived) ? mHighPriorityInbound : mLowPriorityInbound).hasRoom();
+
+            if (cdp)
+            {
+                // Skip duplicates of reliable packets already handled, marked resent
+                // or not, same as checkMessages()/logValidMsg() would do further
+                // downstream.
+                const bool recv_resent = (data[0] & LL_RESENT_FLAG) != 0;
+                const bool recv_reliable = (data[0] & LL_RELIABLE_FLAG) != 0;
+                const bool duplicate = recv_reliable && cdp->checkDuplicate(recv_packet_id, recv_resent);
+
+                // ACK inbound reliable packet ASAP, so its sender stops resending
+                // it while it waits in the queue, whatever checkMessages() makes
+                // of it, which does not ack it again. A copy of a packet already
+                // taken is acked with no room for it, as it would be with room.
+                if (recv_reliable && (has_room || duplicate))
+                {
+                    cdp->collectRAck(recv_packet_id);
+                    arrived.setAcked(true);
+                }
+
+                // Check packet sequencing here, in true socket-arrival order, before
+                // this packet is sorted into the high/low priority inbound queue.
+                if (has_room && !duplicate)
+                {
+                    cdp->checkPacketInID(recv_packet_id, recv_resent);
+                    arrived.setPacketIDChecked(true);
+                }
+            }
+
+            enqueue(arrived);
+        };
+
 #if AL_NET_IMPAIRMENT
         std::vector<LLPacketBuffer> released;
         mNetImpairment.advance(released);
 
+        // A packet held back arrives when it is released: checkMessages() acks
+        // it and checks its number as it reads it, and a queue with no room for
+        // it then leaves it out unacked.
         if (!mNetImpairment.hold(pkt))
         {
-            enqueue(pkt);
+            take(pkt);
         }
 
         // Anything released rejoins *behind* the packet that just arrived, which is what puts it
@@ -1198,7 +1238,7 @@ S32 LLMessageSystem::bufferInboundPacket()
             enqueue(late);
         }
 #else
-        enqueue(pkt);
+        take(pkt);
 #endif
     }
 
@@ -1701,6 +1741,14 @@ S32 LLMessageSystem::sendMessage(const LLHost &host)
         buf_ptr[buffer_length++] = count;
         is_ack_appended = true;
     }
+
+#if AL_SESSION_CAPTURE
+    if (ALSessionCapture::capturing())
+    {
+        ALSessionCapture::instance().recordPacket(true, host, buf_ptr, (S32)buffer_length, (const U8*)mSendBuffer,
+                                                  mSendSize, false);
+    }
+#endif
 
     bool success;
     success = sendPacketToSocket((char *)buf_ptr, buffer_length, host);

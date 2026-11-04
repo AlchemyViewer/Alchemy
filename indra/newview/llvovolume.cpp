@@ -34,6 +34,7 @@
 #include <sstream>
 #include <tuple>
 
+#include "alcompressedupdate.h"
 #include "llviewercontrol.h"
 #include "lldir.h"
 #include "llimagepng.h"
@@ -436,49 +437,63 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
     {
         if (update_type != OUT_TERSE_IMPROVED)
         {
-            LLVolumeParams volume_params;
-            bool res = LLVolumeMessage::unpackVolumeParams(&volume_params, *dp);
-            if (!res)
+            U32 value = dp->getPassFlags();
+
+            // The volume's fields are read whole before any is applied. An
+            // update cut short in one of them holds nothing after it to read,
+            // so it is refused, as the base class refuses one cut short in
+            // its extra parameters: the object is dropped and asked for whole
+            // again.
+            ALCompressedVolume volume;
+            const ALCompressedVolume::ECut cut = volume.unpack(*dp, value);
+            if (cut != ALCompressedVolume::ECut::NONE)
+            {
+                if (cut != ALCompressedVolume::ECut::TEXTURE_ANIM)
+                {
+                    // An update that ends before the end of its texture
+                    // entry is bogus data, which flushes the region's cache
+                    // once the update is done with: the flush lets go of the
+                    // region's cached objects, and the update may be read
+                    // from one of them.
+                    dp->dumpBufferToLog();
+                    LL_WARNS() << "Flushing cache files" << LL_ENDL;
+
+                    if(LLVOCache::instanceExists() && getRegion())
+                    {
+                        LLVOCache::getInstance()->requestRemoval(getRegion()->getHandle());
+                    }
+                }
+                LL_WARNS("UpdateFail") << (cut == ALCompressedVolume::ECut::VOLUME_PARAMS ? "Volume parameters"
+                                           : cut == ALCompressedVolume::ECut::TEXTURE_ENTRY ? "Texture entry"
+                                                                                             : "Texture animation")
+                                       << " past the end of the compressed update for " << getID() << ", refusing the update"
+                                       << LL_ENDL;
+                mRegionp->addCacheMissFull(getLocalID());
+                gObjectList.killObject(this);
+                return retval;
+            }
+
+            if (!volume.mVolumeParamsInRange)
             {
                 LL_WARNS() << "Bogus volume parameters in object " << getID() << LL_ENDL;
                 LL_WARNS() << getRegion()->getOriginGlobal() << LL_ENDL;
             }
 
-            volume_params.setSculptID(sculpt_id, sculpt_type);
+            volume.mVolumeParams.setSculptID(sculpt_id, sculpt_type);
 
-            if (setVolume(volume_params, 0))
+            if (setVolume(volume.mVolumeParams, 0))
             {
                 markForUpdate();
             }
-            S32 res2 = unpackTEMessage(*dp);
-            if (TEM_INVALID == res2)
+            S32 res2 = unpackTEEntry(volume.mTextureEntry);
+            if (res2 & TEM_CHANGE_MEDIA)
             {
-                // There's something bogus in the data that we're unpacking.
-                dp->dumpBufferToLog();
-                LL_WARNS() << "Flushing cache files" << LL_ENDL;
-
-                if(LLVOCache::instanceExists() && getRegion())
-                {
-                    LLVOCache::getInstance()->removeEntry(getRegion()->getHandle()) ;
-                }
-
-                LL_WARNS() << "Bogus TE data in " << getID() << LL_ENDL;
-            }
-            else
-            {
-                if (res2 & TEM_CHANGE_MEDIA)
-                {
-                    retval |= MEDIA_FLAGS_CHANGED;
-                }
+                retval |= MEDIA_FLAGS_CHANGED;
             }
 
-            U32 value = dp->getPassFlags();
-
-            if (value & 0x40)
+            if (volume.mHasTextureAnim)
             {
-                LLTextureAnim ta;
-                ta.unpackTAMessage(*dp); // always consume the block from the stream
-                applyTextureAnim(ta);
+                applyTextureAnim(volume.mTextureAnim);
             }
             else
             {

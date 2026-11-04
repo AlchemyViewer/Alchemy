@@ -151,11 +151,15 @@ void LLTextureAnim::unpackTAMessage(LLMessageSystem *mesgsys, const S32 block_nu
     htolememcpy(&mRate, data + 12, MVT_F32, sizeof(F32));
 }
 
-void LLTextureAnim::unpackTAMessage(LLDataPacker &dp)
+bool LLTextureAnim::unpackTAMessage(LLDataPacker &dp)
 {
-    S32 size;
+    S32 size = 0;
     U8 data[TA_BLOCK_SIZE];
-    dp.unpackBinaryData(data, TA_BLOCK_SIZE, size, "TextureAnimation");
+    if (!dp.unpackBinaryData(data, TA_BLOCK_SIZE, size, "TextureAnimation"))
+    {
+        mMode = 0;
+        return false;
+    }
     if (size != TA_BLOCK_SIZE)
     {
         if (size)
@@ -163,7 +167,7 @@ void LLTextureAnim::unpackTAMessage(LLDataPacker &dp)
             LL_WARNS() << "Bad size " << size << " for TA block, ignoring." << LL_ENDL;
         }
         mMode = 0;
-        return;
+        return true;
     }
 
     mMode = data[0];
@@ -173,6 +177,7 @@ void LLTextureAnim::unpackTAMessage(LLDataPacker &dp)
     htolememcpy(&mStart, data + 4, MVT_F32, sizeof(F32));
     htolememcpy(&mLength, data + 8, MVT_F32, sizeof(F32));
     htolememcpy(&mRate, data + 12, MVT_F32, sizeof(F32));
+    return true;
 }
 
 LLSD LLTextureAnim::asLLSD() const

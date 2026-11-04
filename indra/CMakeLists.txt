@@ -264,6 +264,16 @@ cmake_dependent_option(
   OFF
 )
 
+# A dev build that records each session for replay where
+# ALCHEMY_SESSION_CAPTURE_DIR names a directory (llmessage's
+# alsessioncapture.h), in every configuration but Release. A recording holds
+# the session's secrets, so only the test channel may be built with it, never
+# one released.
+option(AL_SESSION_CAPTURE "Record sessions where ALCHEMY_SESSION_CAPTURE_DIR names a directory" OFF)
+if(AL_SESSION_CAPTURE AND NOT BUILDING_TEST_CHANNEL)
+  message(FATAL_ERROR "AL_SESSION_CAPTURE is for the test channel's dev builds, not ${AL_CHANNEL}")
+endif()
+
 # WebRTC voice. Off in sanitized builds; see below.
 option(AL_USE_WEBRTC "Build with WebRTC voice" ON)
 
