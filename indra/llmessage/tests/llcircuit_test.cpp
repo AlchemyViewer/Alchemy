@@ -211,6 +211,23 @@ namespace ll_test
         {
             return circuit.checkDuplicate(id, resent);
         }
+
+        // A packet's number was counted in, the packet not marked resent.
+        static void checkIn(LLCircuitData& circuit, TPACKETID id)
+        {
+            circuit.checkPacketInID(id, false);
+        }
+
+        // The numbers a gap skipped that have not come, lowest first.
+        static std::vector<TPACKETID> missing(const LLCircuitData& circuit)
+        {
+            std::vector<TPACKETID> ids;
+            for (const auto& number : circuit.mPotentialLostPackets)
+            {
+                ids.push_back(number.first);
+            }
+            return ids;
+        }
     };
 }
 
@@ -451,5 +468,43 @@ namespace
         sMessageTime = handled_at + F64Seconds(12.0);
         circuit.clearDuplicateList(8);
         CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 7, true));
+    }
+
+    TEST_CASE("llcircuit: a number past the 24 bits opens no gap", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        CircuitProbe::checkIn(circuit, 5);
+
+        // The wire carries 32 bits and numbers wrap at 24. This number's low
+        // bits are the one expected next, so it looks no distance ahead, yet
+        // counting up from the number expected never reaches it.
+        CircuitProbe::checkIn(circuit, LL_MAX_OUT_PACKET_ID + 6);
+        CHECK(CircuitProbe::missing(circuit).empty());
+
+        // Nor does the highest number the wire can carry open one.
+        CircuitProbe::checkIn(circuit, 0xFFFFFFFF);
+        CHECK(CircuitProbe::missing(circuit).empty());
+
+        // Nor the first number past the top, from just below it.
+        CircuitProbe::checkIn(circuit, LL_MAX_OUT_PACKET_ID - 3);
+        CircuitProbe::checkIn(circuit, LL_MAX_OUT_PACKET_ID);
+        CHECK(CircuitProbe::missing(circuit).empty());
+
+        // Gaps are still counted after them.
+        CircuitProbe::checkIn(circuit, 20);
+        CircuitProbe::checkIn(circuit, 23);
+        CHECK(CircuitProbe::missing(circuit) == std::vector<TPACKETID>{ 21, 22 });
+    }
+
+    TEST_CASE("llcircuit: a gap across the wrap leaves its numbers missing", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+        CircuitProbe::checkIn(circuit, 0);
+        CircuitProbe::checkIn(circuit, LL_MAX_OUT_PACKET_ID - 3);
+        CircuitProbe::checkIn(circuit, 2);
+        CHECK(CircuitProbe::missing(circuit)
+              == std::vector<TPACKETID>{ 0, 1, LL_MAX_OUT_PACKET_ID - 2, LL_MAX_OUT_PACKET_ID - 1 });
     }
 }
