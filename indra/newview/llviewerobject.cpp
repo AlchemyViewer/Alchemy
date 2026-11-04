@@ -5229,8 +5229,29 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
         LLPrimitive::setNumTEs(num_tes);
         setChanged(TEXTURE);
 
+        if (hasTEEntry())
+        {
+            // The faces gained took their values from the texture entry last
+            // unpacked. Each takes the render material the parameter block
+            // names for it, and the override the region holds for it, rather
+            // than the last face's.
+            if (original_tes < getNumTEs())
+            {
+                for (int i = original_tes; i < getNumTEs(); ++i)
+                {
+                    LLTextureEntry* tep = getTE(i);
+                    const LLUUID id = getRenderMaterialID(i);
+                    tep->setGLTFMaterialOverride(nullptr);
+                    if (id.notNull() || tep->getGLTFMaterial())
+                    {
+                        setRenderMaterialID(i, id, false, false);
+                    }
+                }
+                gGLTFMaterialList.applyQueuedOverrides(this);
+            }
+        }
         // touch up GLTF materials
-        if (original_tes > 0)
+        else if (original_tes > 0)
         {
             for (int i = original_tes; i < getNumTEs(); ++i)
             {
@@ -7908,7 +7929,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     { // update existing parameter block
         for (S32 te = start_idx; te < end_idx; ++te)
         {
-            param_block->setMaterial(te, id);
+            // Only where the block names another material: a face given no
+            // material where it names none takes no entry for it.
+            if (param_block->getMaterial(te) != id)
+            {
+                param_block->setMaterial(te, id);
+            }
         }
     }
 
