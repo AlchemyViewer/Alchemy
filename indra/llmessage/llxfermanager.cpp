@@ -579,6 +579,17 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
 
     if (xferp->mPacketNum == 0) // first packet has size encoded as additional S32 at beginning of data
     {
+        if (fdata_size < (S32)sizeof(S32))
+        {
+            LL_WARNS("Xfer") << "Received a first packet of " << fdata_size
+                << " bytes, too short to hold its file's size, from " << mesgsys->getSender()
+                << " for " << xferp->getFileName() << LL_ENDL;
+            xferp->abort(LL_ERR_EOF);
+            removeXfer(xferp,mReceiveList);
+            startPendingDownloads();
+            return;
+        }
+
         ntohmemcpy(&xfer_size,fdata_buf,MVT_S32,sizeof(S32));
 
 // do any necessary things on first packet ie. allocate memory
