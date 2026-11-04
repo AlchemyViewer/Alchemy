@@ -65,6 +65,10 @@ protected:
     static bool unpackPathParams(LLPathParams* params, LLDataPacker& dp);
 
 public:
+    // The bytes packVolumeParams writes to a binary packer: a path's sixteen,
+    // then a profile's seven.
+    static constexpr S32 PACKED_VOLUME_PARAMS_SIZE = 23;
+
     /**
      * @brief This method constrains any volume params to make them valid.
      *

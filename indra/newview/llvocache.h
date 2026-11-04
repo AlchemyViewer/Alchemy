@@ -36,6 +36,10 @@
 #include <boost/unordered_map.hpp>
 #include <boost/unordered/unordered_node_map.hpp>
 
+#include <functional>
+#include <initializer_list>
+#include <vector>
+
 //---------------------------------------------------------------------------
 // Cache entries
 class LLCamera;
@@ -210,6 +214,12 @@ public:
 
     typedef boost::unordered_map<U32, LLGLTFOverrideCacheEntry>  vocache_gltf_overrides_map_t;
 
+    // Lets every entry of a region's map go, leaving nothing that points at one: each leaves the cache's tree
+    // through `leave_tree` and the octree entry it may share with a drawable, and is marked invalid, and `sets`,
+    // which hold bare pointers to the map's entries, are emptied. The map's references go to `keep`.
+    static void releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
+                           const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep);
+
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
     vocache_entry_set_t::const_iterator getChildrenEnd() const { return mChildrenList.end(); }
@@ -347,6 +357,11 @@ public:
     void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
     void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled);
     void removeEntry(U64 handle) ;
+    // Removes a region's entry as removeEntry does, once removeRequestedEntries runs: the removal lets go of the
+    // region's objects in memory, one of which an object update asking for it is read from.
+    void requestRemoval(U64 handle);
+    bool isRemovalRequested(U64 handle) const;
+    void removeRequestedEntries();
     void removeGenericExtrasForHandle(U64 handle);
 
     U32 getCacheEntries() { return mNumEntries; }
@@ -378,6 +393,7 @@ private:
     std::filesystem::path          mObjectCacheDirPath;
     header_entry_queue_t mHeaderEntryQueue;
     handle_entry_map_t   mHandleEntryMap;
+    std::vector<U64>     mRequestedRemovals;
 };
 
 #endif

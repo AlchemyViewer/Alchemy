@@ -2962,6 +2962,14 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
     LLViewerObject::unpackU32(&dp, local_id, "LocalID");
     LLViewerObject::unpackU32(&dp, crc, "CRC");
 
+    // Nor is one sent whole kept in it, to be let go before it is made: it is
+    // asked for again, to come once the cache has been removed.
+    if (cacheRemovalRequested())
+    {
+        addCacheMissFull(local_id);
+        return CACHE_UPDATE_DUPE;
+    }
+
     LLVOCacheEntry* entry = getCacheEntry(local_id, false);
 
     if (entry)
@@ -3100,9 +3108,23 @@ void LLViewerRegion::addToCreatedList(U32 local_id)
 
 // Get data packer for this object, if we have cached data
 // AND the CRC matches. JC
+bool LLViewerRegion::cacheRemovalRequested() const
+{
+    return LLVOCache::instanceExists() && LLVOCache::getInstance()->isRemovalRequested(mHandle);
+}
+
 bool LLViewerRegion::probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss_type)
 {
     //llassert(mCacheLoaded);  This assert failes often, changing to early-out -- davep, 2010/10/18
+
+    // An object a cache about to be removed holds would never be made from it,
+    // so it is asked for as the removed cache would have it asked for.
+    if (cacheRemovalRequested())
+    {
+        addCacheMiss(local_id, CACHE_MISS_TYPE_TOTAL);
+        cache_miss_type = CACHE_MISS_TYPE_TOTAL;
+        return false;
+    }
 
     LLVOCacheEntry* entry = getCacheEntry(local_id, false);
 
@@ -3256,7 +3278,15 @@ void LLViewerRegion::dumpCache()
 
 void LLViewerRegion::clearVOCacheFromMemory()
 {
-    mImpl->mCacheMap.clear();
+    // The map holds the only references to its entries, and the sets, the
+    // waiting list, the cache's tree, the drawables' octree entries and the
+    // eviction walk's cursor hold bare pointers to them.
+    std::vector<LLPointer<LLVOCacheEntry>> released;
+    LLVOCacheEntry::releaseAll(mImpl->mCacheMap, { &mImpl->mActiveSet, &mImpl->mWaitingSet, &mImpl->mVisibleEntries },
+                               [this](LLVOCacheEntry* entry) { removeFromVOCacheTree(entry); },
+                               LLAppViewer::instance()->isQuitting() ? released : sRegionCacheCleanup);
+    mImpl->mWaitingList.clear();
+    mLastVisitedEntry = NULL;
 }
 
 void LLViewerRegion::unpackRegionHandshake()

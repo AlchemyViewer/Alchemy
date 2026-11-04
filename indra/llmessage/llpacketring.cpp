@@ -29,6 +29,7 @@
 #include "llpacketring.h"
 
 #include "llerror.h"
+#include "llframetimer.h"
 
 constexpr S16 MAX_BUFFER_RING_SIZE     = 8192;
 
@@ -59,35 +60,39 @@ LLPacketRing::~LLPacketRing()
     mHeadIndex = 0;
 }
 
-void LLPacketRing::pushPacket(const LLPacketBuffer& packet)
+bool LLPacketRing::hasRoom() const
 {
-    S16 ring_size = (S16)mRing.size();
-    if (mNumBufferedPackets >= ring_size && ring_size < MAX_BUFFER_RING_SIZE)
+    return mNumBufferedPackets < (S16)mRing.size() || (S16)mRing.size() < MAX_BUFFER_RING_SIZE;
+}
+
+bool LLPacketRing::pushPacket(const LLPacketBuffer& packet)
+{
+    if (mNumBufferedPackets >= (S16)mRing.size() && !expandRing())
     {
-        expandRing();
-        ring_size = (S16)mRing.size();
+        // A flood that fills the ring leaves a packet out with every one
+        // that comes in, so it is told of a second at a time.
+        ++mLeftOutSinceWarning;
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        if (!mWarnedLeftOut || now - mLastLeftOutWarning >= 1.0)
+        {
+            LL_WARNS("PacketRing") << "buffer full at " << mNumBufferedPackets << " packets, " << mLeftOutSinceWarning
+                                   << " left out" << LL_ENDL;
+            mWarnedLeftOut = true;
+            mLastLeftOutWarning = now;
+            mLeftOutSinceWarning = 0;
+        }
+        return false;
     }
+    const S16 ring_size = (S16)mRing.size();
 
     LLPacketBuffer* slot = mRing[mHeadIndex];
-    S32 old_size = slot->getSize();
-
     *slot = packet;
 
     mHeadIndex = (mHeadIndex + 1) % ring_size;
 
-    if (mNumBufferedPackets < ring_size)
-    {
-        ++mNumBufferedPackets;
-        mNumBufferedBytes += packet.getSize();
-    }
-    else
-    {
-        // Ring is at maximum capacity; oldest packet was overwritten.
-        // This is VERY BAD because we've already ACKed the packet we're loosing
-        // (if it was "reliable").
-        LL_WARNS("PacketRing") << "buffer overflow at " << mNumBufferedPackets << " packets" << LL_ENDL;
-        mNumBufferedBytes += packet.getSize() - old_size;
-    }
+    ++mNumBufferedPackets;
+    mNumBufferedBytes += packet.getSize();
+    return true;
 }
 
 bool LLPacketRing::popPacket(LLPacketBuffer& packet)

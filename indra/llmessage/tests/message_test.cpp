@@ -35,6 +35,9 @@
 #include "message_prehash.h"
 #include "net.h"
 
+#include <algorithm>
+#include <array>
+
 #if !LL_WINDOWS
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -58,6 +61,18 @@ namespace ll_test
         static size_t acksWaiting(const LLCircuitData& circuit)
         {
             return circuit.mAcks.size();
+        }
+
+        // How many of the acks waiting are for packet `id`.
+        static size_t acksWaitingFor(const LLCircuitData& circuit, TPACKETID id)
+        {
+            return std::count(circuit.mAcks.begin(), circuit.mAcks.end(), id);
+        }
+
+        // The number the circuit takes the next packet in order to have.
+        static TPACKETID packetsInID(const LLCircuitData& circuit)
+        {
+            return circuit.mPacketsInID;
         }
     };
 }
@@ -620,6 +635,236 @@ namespace
             read_until(system, 5);
             REQUIRE(system.mPacketsIn == 5);
             CHECK(sDuplicateTestsHandled == 2);
+        }
+    }
+
+    // Takes what has come in into the inbound queue, as the viewer does when
+    // a frame's messages run over, until `packets` wait there or a second
+    // has passed.
+    void queue_until(LLMessageSystem& system, S32 packets)
+    {
+        const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+        while (system.drainUdpSocket() < packets && LLTimer::getTotalSeconds() < give_up)
+        {
+            ms_sleep(1);
+        }
+    }
+
+    // Reads every packet waiting in the inbound queue.
+    void read_queued(LLMessageSystem& system)
+    {
+        LockMessageChecker lmc(&system);
+        while (system.getNumBufferedPackets() > 0)
+        {
+            lmc.checkMessages();
+        }
+    }
+
+    // Reads what has come in until the system has refused `packets` packets
+    // in all, or a second has passed.
+    void read_until_refused(LLMessageSystem& system, U32 packets)
+    {
+        LockMessageChecker lmc(&system);
+        const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+        while (system.mInvalidOnCircuitPackets < packets && LLTimer::getTotalSeconds() < give_up)
+        {
+            if (!lmc.checkMessages())
+            {
+                ms_sleep(1);
+            }
+        }
+    }
+
+    // A packet taken into the inbound queue is acked as it comes in, before
+    // it is read, so that its sender stops resending it while it waits; one
+    // read straight from the socket is acked as it is read, unless it is
+    // refused.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a reliable packet is acked once whether or not it waited in the queue", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, DUPLICATE_TEST_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+        system.setHandlerFunc("DuplicateTest", handle_duplicate_test);
+        sDuplicateTestsHandled = 0;
+
+        const SenderSocket sender;
+        REQUIRE(sender.mResult == 0);
+        const LLHost sender_host("127.0.0.1", sender.mPort);
+        system.enableCircuit(sender_host, true);
+        const LLCircuitData* circuit = system.mCircuitInfo.findCircuit(sender_host);
+        REQUIRE(circuit != nullptr);
+        const LLHost receiver("127.0.0.1", system.getListenPort());
+
+        // Low message `message` numbered `id`: 1 is DuplicateTest, and 2 is
+        // no message the template has, which the system refuses.
+        auto send = [&](U8 id, U8 message)
+        {
+            const U8 packet[] = { LL_RELIABLE_FLAG, 0, 0, 0, id, 0, 0xff, 0xff, 0x00, message, 1, 2, 3, 4 };
+            REQUIRE(send_packet(sender.mSocket, (const char*)packet, (int)sizeof(packet), receiver.getAddress(), receiver.getPort()));
+        };
+
+        {
+            INFO("read straight from the socket");
+            send(1, 1);
+            read_until(system, 1);
+            REQUIRE(system.mPacketsIn == 1);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 1) == 1);
+        }
+        {
+            INFO("a copy of it read straight from the socket is acked as it is read");
+            send(1, 1);
+            read_until(system, 2);
+            REQUIRE(system.mPacketsIn == 2);
+            CHECK(sDuplicateTestsHandled == 1);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 1) == 2);
+        }
+        {
+            INFO("taken into the queue and then read");
+            send(2, 1);
+            queue_until(system, 1);
+            REQUIRE(system.getNumBufferedPackets() == 1);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 1);
+            read_queued(system);
+            REQUIRE(system.mPacketsIn == 3);
+            CHECK(sDuplicateTestsHandled == 2);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 1);
+        }
+        {
+            INFO("a copy of it taken into the queue: each copy acked once");
+            send(2, 1);
+            queue_until(system, 1);
+            REQUIRE(system.getNumBufferedPackets() == 1);
+            read_queued(system);
+            REQUIRE(system.mPacketsIn == 4);
+            CHECK(sDuplicateTestsHandled == 2);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 2) == 2);
+        }
+        {
+            INFO("a refused packet that waited in the queue was acked as it came in");
+            send(3, 2);
+            queue_until(system, 1);
+            REQUIRE(system.getNumBufferedPackets() == 1);
+            read_queued(system);
+            REQUIRE(system.mInvalidOnCircuitPackets == 1);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 3) == 1);
+        }
+        {
+            INFO("one read straight from the socket is not acked");
+            send(4, 2);
+            read_until_refused(system, 2);
+            REQUIRE(system.mInvalidOnCircuitPackets == 2);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 4) == 0);
+        }
+        CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == 5);
+    }
+
+    // The packets a full queue holds were acked as they came in, so taking
+    // the place of the oldest would lose a packet its sender never sends
+    // again. The packet the queue has no room for is left out unacked.
+    TEST_CASE_METHOD(LLMessageSystemTestData, "LLMessageSystem: a full inbound queue leaves a reliable packet out unacked", "[LLMessageSystem]")
+    {
+        const std::string template_path = mTestConfigDir + mSep + "message_template.msg";
+        const TemplateFile message_template(template_path, DUPLICATE_TEST_TEMPLATE);
+        LLMessageSystem system(template_path, NET_USE_OS_ASSIGNED_PORT, 1, 0, 0, false, 5.f, 100.f);
+        REQUIRE(system.isOK());
+        const UseMessageSystem use(system);
+        system.setHandlerFunc("DuplicateTest", handle_duplicate_test);
+        sDuplicateTestsHandled = 0;
+
+        const SenderSocket sender;
+        REQUIRE(sender.mResult == 0);
+        const LLHost sender_host("127.0.0.1", sender.mPort);
+        system.enableCircuit(sender_host, true);
+        const LLCircuitData* circuit = system.mCircuitInfo.findCircuit(sender_host);
+        REQUIRE(circuit != nullptr);
+        const LLHost receiver("127.0.0.1", system.getListenPort());
+
+        // A packet numbered `id` carrying message number `message`.
+        using MessageNumber = std::array<U8, 4>;
+        auto send = [&](U32 id, U8 flags, const MessageNumber& message)
+        {
+            const U8 packet[] = { flags, (U8)(id >> 24), (U8)(id >> 16), (U8)(id >> 8), (U8)id, 0,
+                                  message[0], message[1], message[2], message[3], 1, 2, 3, 4 };
+            REQUIRE(send_packet(sender.mSocket, (const char*)packet, (int)sizeof(packet), receiver.getAddress(), receiver.getPort()));
+        };
+
+        // Waits until the system has left `packets` packets out in all.
+        auto drain_until_left_out = [&](S32 packets)
+        {
+            const F64 give_up = LLTimer::getTotalSeconds() + 1.0;
+            while (system.getTotalNumDroppedPackets() < packets && LLTimer::getTotalSeconds() < give_up)
+            {
+                system.drainUdpSocket();
+                ms_sleep(1);
+            }
+            REQUIRE(system.getTotalNumDroppedPackets() == packets);
+        };
+
+        // Fills the ring `message` goes to up to its ceiling with reliable
+        // packets numbered from `first`, a few at a time so that the socket's
+        // buffer holds every one until it is queued, and sends one more,
+        // which is left out. Returns its number.
+        constexpr S32 FULL = 8192;
+        auto overflow = [&](U32 first, const MessageNumber& message) -> U32
+        {
+            const size_t acks_before = ll_test::CircuitProbe::acksWaiting(*circuit);
+            U32 id = first;
+            while (system.getNumBufferedPackets() < FULL)
+            {
+                const S32 batch = llmin(128, FULL - system.getNumBufferedPackets());
+                for (S32 i = 0; i < batch; ++i)
+                {
+                    send(id++, LL_RELIABLE_FLAG, message);
+                }
+                queue_until(system, (S32)(id - first));
+                REQUIRE(system.getNumBufferedPackets() == (S32)(id - first));
+            }
+            REQUIRE(ll_test::CircuitProbe::acksWaiting(*circuit) == acks_before + FULL);
+
+            const U32 left_out = id;
+            send(left_out, LL_RELIABLE_FLAG, message);
+            drain_until_left_out(1);
+            CHECK(system.getNumBufferedPackets() == FULL);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, left_out) == 0);
+            CHECK(ll_test::CircuitProbe::acksWaiting(*circuit) == acks_before + FULL);
+            UNSCOPED_INFO("nor is its number taken as come");
+            CHECK(ll_test::CircuitProbe::packetsInID(*circuit) == left_out);
+            return left_out;
+        };
+
+        SECTION("the low priority ring")
+        {
+            // DuplicateTest, Low 1.
+            const MessageNumber duplicate_test = { 0xff, 0xff, 0x00, 0x01 };
+            send(1, LL_RELIABLE_FLAG, duplicate_test);
+            read_until(system, 1);
+            REQUIRE(sDuplicateTestsHandled == 1);
+            const U32 left_out = overflow(2, duplicate_test);
+
+            UNSCOPED_INFO("a copy of a packet already read is acked all the same, as one it would drop");
+            send(1, LL_RELIABLE_FLAG | LL_RESENT_FLAG, duplicate_test);
+            drain_until_left_out(2);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, 1) == 2);
+
+            UNSCOPED_INFO("every packet queued is read, the first among them");
+            read_queued(system);
+            CHECK(sDuplicateTestsHandled == FULL + 1);
+
+            UNSCOPED_INFO("and the one left out is taken when it comes again");
+            send(left_out, LL_RELIABLE_FLAG | LL_RESENT_FLAG, duplicate_test);
+            read_until(system, FULL + 2);
+            CHECK(sDuplicateTestsHandled == FULL + 2);
+            CHECK(ll_test::CircuitProbe::acksWaitingFor(*circuit, left_out) == 1);
+        }
+
+        SECTION("the high priority ring")
+        {
+            // A Medium message, whose bytes after the number are none that
+            // isHighPriorityMessage keeps in the low priority ring.
+            const MessageNumber medium = { 0xff, 0x01, 0x01, 0x01 };
+            overflow(1, medium);
         }
     }
 }

@@ -39,6 +39,7 @@
 
 #include <fmt/xchar.h>
 
+#include <algorithm>
 #include <bitset>
 #include <sstream>
 
@@ -271,6 +272,31 @@ LLVOCacheEntry::LLVOCacheEntry(const U8*& cursor, const U8* end)
 LLVOCacheEntry::~LLVOCacheEntry()
 {
     mDP.freeBuffer();
+}
+
+// static
+void LLVOCacheEntry::releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
+                                const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep)
+{
+    keep.reserve(keep.size() + entries.size());
+    for (auto& [local_id, entry] : entries)
+    {
+        if (entry.isNull())
+        {
+            continue;
+        }
+        leave_tree(entry);
+        entry->removeOctreeEntry();
+        entry->setValid(false);
+        keep.push_back(std::move(entry));
+    }
+    entries.clear();
+
+    // Every entry a set can hold is one of the map's.
+    for (vocache_entry_set_t* set : sets)
+    {
+        set->clear();
+    }
 }
 
 void LLVOCacheEntry::updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp)
@@ -1424,6 +1450,29 @@ void LLVOCache::removeEntry(U64 handle)
     }
     HeaderEntryInfo* entry = iter->second ;
     removeEntry(entry) ;
+}
+
+void LLVOCache::requestRemoval(U64 handle)
+{
+    if (!isRemovalRequested(handle))
+    {
+        mRequestedRemovals.push_back(handle);
+    }
+}
+
+bool LLVOCache::isRemovalRequested(U64 handle) const
+{
+    return std::find(mRequestedRemovals.begin(), mRequestedRemovals.end(), handle) != mRequestedRemovals.end();
+}
+
+void LLVOCache::removeRequestedEntries()
+{
+    std::vector<U64> handles;
+    handles.swap(mRequestedRemovals);
+    for (U64 handle : handles)
+    {
+        removeEntry(handle);
+    }
 }
 
 void LLVOCache::clearCacheInMemory()

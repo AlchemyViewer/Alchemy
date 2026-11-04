@@ -211,6 +211,21 @@ namespace
         outValue = buffer;
         CHECK(outValue == inValue);
     }
+    // A handler reads a variable field by asking its size and reading as
+    // many bytes.
+    TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: a URI in a variable field is sized and read as its text", "[LLSDMessageReader]")
+    {
+        const std::string text = "https://example.com/cap/1234?x=1";
+        LLSDMessageReader msg = testType(LLURI(text));
+
+        const S32 size = msg.getSize("block", "var");
+        CHECK(size == (S32)text.size());
+        CHECK(msg.getSize("block", 0, "var") == size);
+
+        std::vector<char> buffer(size + 1, 'x');
+        msg.getString("block", "var", size + 1, buffer.data());
+        CHECK(std::string(buffer.data()) == text);
+    }
     TEST_CASE_METHOD(LLSDMessageReaderTestData, "LLSDMessageReader: getVector3 reads back an LLVector3", "[LLSDMessageReader]")
     {
          LLVector3 outValue, inValue = LLVector3(1,2,3);
