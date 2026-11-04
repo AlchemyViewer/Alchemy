@@ -31,6 +31,7 @@
 #include "../llslurl.h"
 #include "../../llxml/llcontrol.h"
 #include "llsdserialize.h"
+#include "lluri.h"
 
 namespace
 {
@@ -460,6 +461,35 @@ namespace
 
         const LLSLURL slurl("/myregion/1/2/3");
         CHECK(slurl.getType() == LLSLURL::LOCATION);
+    }
+
+    // The dispatcher reads an app SLURL's keys and values out of its query,
+    // as LLURI::queryMap reads them, unescaping each.
+    TEST_CASE_METHOD(slurlTest, "LLSlurl: an app SLURL's query is unescaped once", "[LLSlurl]")
+    {
+        llofstream gridfile(TEST_FILENAME);
+        gridfile << gSampleGridFile;
+        gridfile.close();
+
+        LLGridManager::getInstance()->initialize(TEST_FILENAME);
+
+        LLGridManager::getInstance()->setGridChoice("util.agni.lindenlab.com");
+        const LLSLURL slurl("secondlife:///app/foo/bar?name=a%26b%20c&pct=%2525");
+        REQUIRE(slurl.getType() == LLSLURL::APP);
+        CHECK(slurl.getAppQuery() == "name=a%26b%20c&pct=%2525");
+
+        const LLSD query = LLURI::queryMap(slurl.getAppQuery());
+        CHECK(query.size() == 2);
+        CHECK(query["name"].asString() == "a&b c");
+        CHECK(query["pct"].asString() == "%25");
+        CHECK(slurl.getAppQueryMap()["name"].asString() == "a&b c");
+        CHECK(slurl.getAppQueryMap()["pct"].asString() == "%25");
+
+        UNSCOPED_INFO("and its string has the query as the link wrote it");
+        const std::string written = slurl.getSLURLString();
+        const std::string::size_type path = written.find("/foo/bar");
+        REQUIRE(path != std::string::npos);
+        CHECK(written.substr(path) == "/foo/bar?name=a%26b%20c&pct=%2525");
     }
 
     TEST_CASE_METHOD(slurlTest, "LLSlurl: construction from grid/region/vector combos", "[LLSlurl]")

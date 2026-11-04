@@ -32,6 +32,8 @@
 #include "patch_code.h"
 #include "llbitpack.h"
 
+#include <cstdlib>
+
 U32 gPatchSize, gWordBits;
 
 void    init_patch_coding(LLBitPack &bitpack)
@@ -54,7 +56,7 @@ void    code_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
     gPatchSize = gopp->patch_size;
 }
 
-void    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch)
+bool    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch)
 {
     S32     i, j, temp, patch_size = gPatchSize, wbits = (ph->quant_wbits & 0xf) + 2;
     U32     max_wbits = wbits + 5, min_wbits = wbits>>1;
@@ -92,6 +94,11 @@ void    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch)
 
     ph->quant_wbits |= (wbits - 2);
 
+    if (END_OF_PATCHES == ph->quant_wbits)
+    {
+        return false;
+    }
+
     bitpack.bitPack((U8 *)&ph->quant_wbits, 8);
 #ifdef LL_BIG_ENDIAN
     U8 *offset = (U8 *)&ph->dc_offset;
@@ -118,6 +125,7 @@ void    code_patch_header(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patch)
 #endif
 
     gWordBits = wbits;
+    return true;
 }
 
 void    code_end_of_data(LLBitPack &bitpack)
@@ -125,7 +133,7 @@ void    code_end_of_data(LLBitPack &bitpack)
     bitpack.bitPack((U8 *)&END_OF_PATCHES, 8);
 }
 
-void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
+bool code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
 {
     S32     i, j, patch_size = gPatchSize, wbits = gWordBits;
     S32     temp;
@@ -139,6 +147,15 @@ void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
 
     if (postquant)
         patch[patch_size*patch_size - postquant] = 0;
+
+    // Word bits hold magnitudes up to 2^wbits - 1, and 2^wbits writes as 0.
+    for (i = 0; i < patch_size*patch_size - postquant; i++)
+    {
+        if (std::abs((S64)patch[i]) >= ((S64)1 << wbits))
+        {
+            return false;
+        }
+    }
 
     for (i = 0; i < patch_size*patch_size; i++)
     {
@@ -158,7 +175,7 @@ void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
             if (b_eob)
             {
                 bitpack.bitPack((U8 *)&ZERO_EOB, 2);
-                return;
+                return true;
             }
             else
             {
@@ -170,26 +187,17 @@ void code_patch(LLBitPack &bitpack, S32 *patch, S32 postquant)
             if (temp < 0)
             {
                 temp *= -1;
-                if (temp > (1<<wbits))
-                {
-                    temp = (1<<wbits);
-//                  printf("patch quatization exceeding allowable bits!");
-                }
                 bitpack.bitPack((U8 *)&NEGATIVE_VALUE, 3);
                 bitpack.bitPack((U8 *)&temp, wbits);
             }
             else
             {
-                if (temp > (1<<wbits))
-                {
-                    temp = (1<<wbits);
-//                  printf("patch quatization exceeding allowable bits!");
-                }
                 bitpack.bitPack((U8 *)&POSITIVE_VALUE, 3);
                 bitpack.bitPack((U8 *)&temp, wbits);
             }
         }
     }
+    return true;
 }
 
 
@@ -408,3 +416,13 @@ void    decode_patch(LLBitPack &bitpack, S32 *patches)
 #endif
 }
 
+bool    decode_expected_patch(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patches)
+{
+    decode_patch_header(bitpack, ph);
+    if (END_OF_PATCHES == ph->quant_wbits)
+    {
+        return false;
+    }
+    decode_patch(bitpack, patches);
+    return true;
+}

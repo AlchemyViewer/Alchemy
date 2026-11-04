@@ -402,7 +402,9 @@ public:
     void requestCacheMisses();
     void addCacheMissFull(const U32 local_id);
     //update object cache if the object receives a full-update or terse update
-    LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp);
+    // update_id is the UUID the update names, null for a terse update, which names none and is taken to be the object
+    // of the entry under its local ID. An entry for another object is left unmade.
+    LLViewerObject* updateCacheEntry(U32 local_id, LLViewerObject* objectp, const LLUUID& update_id);
     void findOrphans(U32 parent_id);
     void dumpCache  ();
     void clearVOCacheFromMemory();
@@ -478,6 +480,9 @@ private:
     void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
     void decodeBoundingInfo(LLVOCacheEntry* entry);
     bool isNonCacheableObjectCreated(U32 local_id);
+    // Whether the region's object cache is to be removed, letting go of its
+    // entries, before anything made from them would be.
+    bool cacheRemovalRequested() const;
 
 public:
     void applyCacheMiscExtras(LLViewerObject* obj);
