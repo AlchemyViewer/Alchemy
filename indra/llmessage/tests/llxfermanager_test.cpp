@@ -513,6 +513,91 @@ namespace
         CHECK(sCallbackResult == -2);
     }
 
+    TEST_CASE("LLXferManager: a requester told of a file that cannot start may ask for the same file again", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile local;
+        const TempFile next_local;
+        addUnstartable(session, FIRST_UNSTARTABLE, local);
+
+        U64 again = 0;
+        sOnFirstCallback = [&] { again = session.request(local.path(), "unstartable.tmp"); };
+
+        session.request(next_local.path(), "next.tmp");
+
+        CHECK(session.find(FIRST_UNSTARTABLE) == nullptr);
+        CHECK(sCallbacks == 1);
+        REQUIRE(again != 0);
+        CHECK(again != FIRST_UNSTARTABLE);
+        REQUIRE(session.find(again) != nullptr);
+        CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+    }
+
+    TEST_CASE("LLXferManager: a requester told of a file given up may ask for the same file again", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile local;
+        const U64 id = session.request(local.path());
+        REQUIRE_FALSE(session.simulator().receive(1.f).empty());
+
+        U64 again = 0;
+        sOnFirstCallback = [&] { again = session.request(local.path()); };
+
+        REQUIRE(session.deliver(id, 0, { 1, 2, 3 }));
+
+        CHECK(session.find(id) == nullptr);
+        REQUIRE(again != 0);
+        CHECK(again != id);
+        REQUIRE(session.find(again) != nullptr);
+        CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+
+        // The request made while told is a transfer of its own, told in turn.
+        REQUIRE(session.deliver(again, 0, { 1, 2, 3 }));
+        CHECK(session.find(again) == nullptr);
+        CHECK(sCallbacks == 2);
+    }
+
+    TEST_CASE("LLXferManager: a requester told of a finished file may ask for the same file again", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile local;
+        const U64 id = session.request(local.path());
+        REQUIRE_FALSE(session.simulator().receive(1.f).empty());
+
+        U64 again = 0;
+        sOnFirstCallback = [&] { again = session.request(local.path()); };
+
+        REQUIRE(session.deliver(id, LAST_PACKET, { 0, 0, 0, 0 }));
+
+        CHECK(session.find(id) == nullptr);
+        CHECK(sCallbacks == 1);
+        CHECK(sCallbackResult == LL_ERR_NOERR);
+        REQUIRE(again != 0);
+        CHECK(again != id);
+        REQUIRE(session.find(again) != nullptr);
+        CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+    }
+
+    TEST_CASE("LLXferManager: a file asked for again while it runs or waits stays one transfer", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        session.manager().setMaxIncomingXfers(1);
+        const TempFile running_local;
+        const TempFile waiting_local;
+        const U64 running = session.request(running_local.path(), "running.tmp");
+        const U64 waiting = session.request(waiting_local.path(), "waiting.tmp");
+        REQUIRE(session.find(running)->mStatus == e_LL_XFER_IN_PROGRESS);
+        REQUIRE(session.find(waiting)->mStatus == e_LL_XFER_PENDING);
+
+        CHECK(session.request(running_local.path(), "running.tmp") == running);
+        CHECK(session.request(waiting_local.path(), "waiting.tmp") == waiting);
+        CHECK(session.manager().mReceiveList.size() == 2);
+    }
+
     TEST_CASE("LLXferManager: a file given up lets the next file waiting start", "[LLXferManager]")
     {
         XferSession session;

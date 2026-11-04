@@ -394,6 +394,14 @@ bool LLXferManager::isLastPacket(S32 packet_num)
 
 ///////////////////////////////////////////////////////////
 
+// Whether a transfer on the receive list counts as the one a request asks for.
+// One that has ended stays on the list while whoever asked for it is told, and
+// they may ask for the same file again as they are told.
+static bool receive_under_way(const LLXfer* xferp)
+{
+    return xferp->mStatus == e_LL_XFER_PENDING || xferp->mStatus == e_LL_XFER_IN_PROGRESS;
+}
+
 U64 LLXferManager::requestFile(const std::string& local_filename,
                                 const std::string& remote_filename,
                                 ELLPath remote_path,
@@ -410,7 +418,7 @@ U64 LLXferManager::requestFile(const std::string& local_filename,
     for (xfer_list_t::iterator iter = mReceiveList.begin();
             iter != mReceiveList.end(); ++iter)
     {
-        if ((*iter)->getXferTypeTag() == LLXfer::XFER_FILE)
+        if ((*iter)->getXferTypeTag() == LLXfer::XFER_FILE && receive_under_way(*iter))
         {
             file_xfer_p = (LLXfer_File*)(*iter);
             if (file_xfer_p->matchesLocalFilename(local_filename)
@@ -472,7 +480,7 @@ void LLXferManager::requestVFile(const LLUUID& local_id,
     for (xfer_list_t::iterator iter = mReceiveList.begin();
             iter != mReceiveList.end(); ++iter)
     {   // Find any matching existing requests
-        if ((*iter)->getXferTypeTag() == LLXfer::XFER_VFILE)
+        if ((*iter)->getXferTypeTag() == LLXfer::XFER_VFILE && receive_under_way(*iter))
         {
             xfer_p = (LLXfer_VFile*) (*iter);
             if (xfer_p->matchesLocalFile(local_id, type)
