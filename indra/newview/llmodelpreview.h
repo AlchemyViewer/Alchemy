@@ -187,6 +187,8 @@ public:
     LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
     // One model to upload, counting a root and its submodels once: what Custom and metres are for.
     bool isSingleModel() const;
+    // Whether this instance uploads skinned, from its base or its High model: such mesh takes no pivot.
+    bool uploadsRigged(const LLModelInstance& instance) const;
     // </SK:Nexii>
     // <SK:Nexii> Mesh uploader LODs by name: a file's NAME_LOD0-2 and NAME_PHYS models fill those slots of NAME
     void splitSuffixedModels(const std::string& filename);
