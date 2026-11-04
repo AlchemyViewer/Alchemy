@@ -275,6 +275,18 @@ LLVOCacheEntry::~LLVOCacheEntry()
 }
 
 // static
+bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
+                                 const std::function<void(LLVOCacheEntry*)>& kill_entry)
+{
+    const auto iter = entries.find(local_id);
+    if (iter != entries.end() && iter->second->isValid())
+    {
+        kill_entry(iter->second);
+    }
+    return overrides.erase(local_id) > 0;
+}
+
+// static
 void LLVOCacheEntry::releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
                                 const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep)
 {
@@ -447,6 +459,11 @@ LLDataPackerBinaryBuffer *LLVOCacheEntry::getDP() const
     }
 
     return &mDP;
+}
+
+bool LLVOCacheEntry::isObject(const LLUUID& id) const
+{
+    return mDP.getBufferSize() >= UUID_BYTES && memcmp(mDP.getBuffer(), id.mData, UUID_BYTES) == 0;
 }
 
 void LLVOCacheEntry::recordHit()

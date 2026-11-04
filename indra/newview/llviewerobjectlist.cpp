@@ -72,6 +72,7 @@
 // [SL:KB] - Patch: World-Derender | Checked: 2011-12-15 (Catznip-3.2.1)
 #include "alderenderlist.h"
 // [/SL:KB]
+#include "alobjectupdate.h"
 #include <zlib.h>
 #include "object_flags.h"
 
@@ -103,7 +104,6 @@ LLViewerObjectList::LLViewerObjectList()
 {
     mCurLazyUpdateIndex = 0;
     mCurBin = 0;
-    mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
     mAgentPaused = false;
@@ -218,6 +218,38 @@ void LLViewerObjectList::setUUIDAndLocal(const LLUUID &id,
     //  << ", local ID " << local_id << ", ip " << ip << ":" << port << LL_ENDL;
 }
 
+// static
+bool LLViewerObjectList::killHeldForTeleport(const LLViewerObject* objectp)
+{
+    return objectp->isAttachment() && !objectp->isTempAttachment() && LLAgent::TELEPORT_NONE != gAgent.getTeleportState()
+        && gAgentAvatarp && objectp->permYouOwner() && gSavedSettings.getBOOL("BlockAttachmentKillsOnTeleport");
+}
+
+bool LLViewerObjectList::claimLocalID(const LLUUID& id, const U32 local_id, const U32 ip, const U32 port)
+{
+    LLUUID holder_id;
+    getUUIDFromLocal(holder_id, local_id, ip, port);
+
+    LLViewerObject* holderp = findObject(holder_id);
+    const LLViewerRegion* holder_region = holderp ? holderp->getRegion() : nullptr;
+    const bool holder_here = holder_region && holder_region->getHost() == LLHost(ip, port) && !killHeldForTeleport(holderp);
+
+    switch (ALObjectUpdate::claimLocalID(holder_id, holder_here, id, gAgentID))
+    {
+    case ALObjectUpdate::ELocalIDClaim::FREE:
+        break;
+    case ALObjectUpdate::ELocalIDClaim::REMOVES_HOLDER:
+        LL_DEBUGS("ObjectUpdate") << "local ID " << local_id << " goes from " << holder_id << " to " << id << LL_ENDL;
+        killObject(holderp);
+        LLSelectMgr::getInstance()->removeObjectFromSelections(holder_id);
+        break;
+    case ALObjectUpdate::ELocalIDClaim::REFUSED:
+        LL_WARNS_ONCE("ObjectUpdate") << "Dropped an update for " << id << " under the agent's local ID" << LL_ENDL;
+        return false;
+    }
+    return true;
+}
+
 S32 gFullObjectUpdates = 0;
 S32 gTerseObjectUpdates = 0;
 
@@ -325,6 +357,13 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         if(!objectp->isDead() && (objectp->mLocalID != entry->getLocalID() ||
             objectp->getRegion() != regionp))
         {
+            if (!claimLocalID(fullid, entry->getLocalID(), regionp->getHost().getAddress(), regionp->getHost().getPort())
+                || objectp->isDead())
+            {
+                recorder.objectUpdateFailure();
+                return NULL;
+            }
+
             removeFromLocalIDTable(objectp);
             setUUIDAndLocal(fullid, entry->getLocalID(),
                             regionp->getHost().getAddress(),
@@ -582,7 +621,7 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         if(update_cache)
         {
             //update object cache if the object receives a full-update or terse update
-            objectp = regionp->updateCacheEntry(local_id, objectp);
+            objectp = regionp->updateCacheEntry(local_id, objectp, update_type == OUT_FULL ? fullid : LLUUID::null);
         }
 
         // This looks like it will break if the local_id of the object doesn't change
@@ -602,6 +641,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
             //          << ", regionp " << (U32) regionp << ", object region " << (U32) objectp->getRegion()
             //          << LL_ENDL;
             //}
+            // The object's linkset may go with what had the local ID.
+            if (!claimLocalID(fullid, local_id, gMessageSystem->getSenderIP(), gMessageSystem->getSenderPort())
+                || objectp->isDead())
+            {
+                recorder.objectUpdateFailure();
+                continue;
+            }
+
             removeFromLocalIDTable(objectp);
             setUUIDAndLocal(fullid,
                             local_id,
@@ -2091,6 +2138,17 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
 
     LL_DEBUGS("ObjectUpdate") << "creating " << uuid << " local_id " << local_id << LL_ENDL;
 
+    if (!ALObjectUpdate::makesObject(pcode))
+    {
+        LL_WARNS() << "No object for an update of pcode " << (S32)pcode << LL_ENDL;
+        return NULL;
+    }
+
+    if (!claimLocalID(uuid, local_id, regionp->getHost().getAddress(), regionp->getHost().getPort()))
+    {
+        return NULL;
+    }
+
     LLViewerObject *objectp = LLViewerObject::createObject(uuid, pcode, regionp);
     if (!objectp)
     {
@@ -2127,6 +2185,17 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     }
 
     LL_DEBUGS("ObjectUpdate") << "createObject creating " << fullid << LL_ENDL;
+
+    if (!ALObjectUpdate::makesObject(pcode))
+    {
+        LL_WARNS() << "No object for an update of pcode " << (S32)pcode << LL_ENDL;
+        return NULL;
+    }
+
+    if (!claimLocalID(fullid, local_id, gMessageSystem->getSenderIP(), gMessageSystem->getSenderPort()))
+    {
+        return NULL;
+    }
 
     LLViewerObject *objectp = LLViewerObject::createObject(fullid, pcode, regionp);
     if (!objectp)
@@ -2216,19 +2285,22 @@ void LLViewerObjectList::orphanize(LLViewerObject *childp, U32 parent_id, U32 ip
     }
 
     // Unknown parent, add to orpaned child list
-    U64 parent_info = getIndex(parent_id, ip, port);
+    mOrphans.wait(childp->mID, getIndex(parent_id, ip, port));
+}
 
-    if (std::find(mOrphanParents.begin(), mOrphanParents.end(), parent_info) == mOrphanParents.end())
+void LLViewerObjectList::unorphanize(LLViewerObject* childp)
+{
+    mOrphans.release(childp->mID);
+
+    childp->mOrphaned = false;
+    if (childp->mDrawable.notNull() && childp->mDrawable->isState(LLDrawable::FORCE_INVISIBLE))
     {
-        mOrphanParents.push_back(parent_info);
+        childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
+        gPipeline.markRebuild(childp->mDrawable, LLDrawable::REBUILD_ALL);
     }
 
-    LLViewerObjectList::OrphanInfo oi(parent_info, childp->mID);
-    if (std::find(mOrphanChildren.begin(), mOrphanChildren.end(), oi) == mOrphanChildren.end())
-    {
-        mOrphanChildren.push_back(oi);
-        mNumOrphans++;
-    }
+    // Make certain particles, icon and HUD aren't hidden
+    childp->hideExtraDisplayItems(false);
 }
 
 
@@ -2250,95 +2322,58 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
     }
 
     // See if we are a parent of an orphan.
-    // Note:  This code is fairly inefficient but it should happen very rarely.
-    // It can be sped up if this is somehow a performance issue...
-    if (mOrphanParents.empty())
+    if (mOrphans.empty())
     {
         // no known orphan parents
         return;
     }
-    if (std::find(mOrphanParents.begin(), mOrphanParents.end(), getIndex(objectp->mLocalID, ip, port)) == mOrphanParents.end())
-    {
-        // did not find objectp in OrphanParent list
-        return;
-    }
 
-    U64 parent_info = getIndex(objectp->mLocalID, ip, port);
     bool orphans_found = false;
-    // Iterate through the orphan list, and set parents of matching children.
+    // Iterate through the orphans waiting for this parent, and set their parent.
 
-    for (std::vector<OrphanInfo>::iterator iter = mOrphanChildren.begin(); iter != mOrphanChildren.end(); )
+    for (const LLUUID& child_id : mOrphans.take(getIndex(objectp->mLocalID, ip, port)))
     {
-        if (iter->mParentInfo != parent_info)
-        {
-            ++iter;
-            continue;
-        }
-        LLViewerObject *childp = findObject(iter->mChildInfo);
-        if (childp)
-        {
-            if (childp == objectp)
-            {
-                LL_WARNS() << objectp->mID << " has self as parent, skipping!"
-                    << LL_ENDL;
-                ++iter;
-                continue;
-            }
-
-            LL_DEBUGS("ORPHANS") << "Reunited parent " << objectp->mID
-                << " with child " << childp->mID << LL_ENDL;
-            LL_DEBUGS("ORPHANS") << "Glob: " << objectp->getPositionGlobal() << LL_ENDL;
-            LL_DEBUGS("ORPHANS") << "Agent: " << objectp->getPositionAgent() << LL_ENDL;
-#ifdef ORPHAN_SPAM
-            addDebugBeacon(objectp->getPositionAgent(),"");
-#endif
-            gPipeline.markMoved(objectp->mDrawable);
-            objectp->setChanged(LLXform::MOVED);
-
-            // Flag the object as no longer orphaned
-            childp->mOrphaned = false;
-            if (childp->mDrawable.notNull())
-            {
-                // Make the drawable visible again and set the drawable parent
-                childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
-                childp->setDrawableParent(objectp->mDrawable); // LLViewerObjectList::findOrphans()
-                gPipeline.markRebuild( childp->mDrawable, LLDrawable::REBUILD_ALL);
-            }
-
-            // Make certain particles, icon and HUD aren't hidden
-            childp->hideExtraDisplayItems( false );
-
-            objectp->addChild(childp);
-            orphans_found = true;
-            ++iter;
-        }
-        else
+        LLViewerObject *childp = findObject(child_id);
+        if (!childp)
         {
             LL_INFOS() << "Missing orphan child, removing from list" << LL_ENDL;
-
-            iter = mOrphanChildren.erase(iter);
+            continue;
         }
-    }
 
-    // Remove orphan parent and children from lists now that they've been found
-    {
-        std::vector<U64>::iterator iter = std::find(mOrphanParents.begin(), mOrphanParents.end(), parent_info);
-        if (iter != mOrphanParents.end())
+        LL_DEBUGS("ORPHANS") << "Reunited parent " << objectp->mID
+            << " with child " << childp->mID << LL_ENDL;
+        LL_DEBUGS("ORPHANS") << "Glob: " << objectp->getPositionGlobal() << LL_ENDL;
+        LL_DEBUGS("ORPHANS") << "Agent: " << objectp->getPositionAgent() << LL_ENDL;
+#ifdef ORPHAN_SPAM
+        addDebugBeacon(objectp->getPositionAgent(),"");
+#endif
+        gPipeline.markMoved(objectp->mDrawable);
+        objectp->setChanged(LLXform::MOVED);
+
+        // One this object is itself under stands alone, rather than close a loop.
+        bool link = !ALObjectUpdate::closesLoop(childp, objectp);
+
+        // Flag the object as no longer orphaned
+        childp->mOrphaned = false;
+        if (childp->mDrawable.notNull())
         {
-            mOrphanParents.erase(iter);
+            // Make the drawable visible again and set the drawable parent
+            childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
+            link = link && childp->setDrawableParent(objectp->mDrawable); // LLViewerObjectList::findOrphans()
+            gPipeline.markRebuild( childp->mDrawable, LLDrawable::REBUILD_ALL);
         }
-    }
 
-    for (std::vector<OrphanInfo>::iterator iter = mOrphanChildren.begin(); iter != mOrphanChildren.end(); )
-    {
-        if (iter->mParentInfo == parent_info)
+        // Make certain particles, icon and HUD aren't hidden
+        childp->hideExtraDisplayItems( false );
+
+        if (link)
         {
-            iter = mOrphanChildren.erase(iter);
-            mNumOrphans--;
+            objectp->addChild(childp);
+            orphans_found = true;
         }
         else
         {
-            ++iter;
+            LL_WARNS() << childp->mID << " would close a parenting loop under " << objectp->mID << ", standing alone" << LL_ENDL;
         }
     }
 
@@ -2355,27 +2390,6 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
 }
 
 ////////////////////////////////////////////////////////////////////////////
-
-LLViewerObjectList::OrphanInfo::OrphanInfo()
-    : mParentInfo(0)
-{
-}
-
-LLViewerObjectList::OrphanInfo::OrphanInfo(const U64 parent_info, const LLUUID child_info)
-    : mParentInfo(parent_info), mChildInfo(child_info)
-{
-}
-
-bool LLViewerObjectList::OrphanInfo::operator==(const OrphanInfo &rhs) const
-{
-    return (mParentInfo == rhs.mParentInfo) && (mChildInfo == rhs.mChildInfo);
-}
-
-bool LLViewerObjectList::OrphanInfo::operator!=(const OrphanInfo &rhs) const
-{
-    return !operator==(rhs);
-}
-
 
 LLDebugBeacon::~LLDebugBeacon()
 {

@@ -837,6 +837,84 @@ namespace
         CHECK(LLVOCache::instance().getCacheEntries() == 1u);
     }
 
+    TEST_CASE("LLVOCacheEntry: an entry is the object of the UUID its data opens with", "[LLVOCache]")
+    {
+        const LLUUID object_id("44444444-4444-4444-4444-444444444444");
+        const LLUUID other_id("55555555-5555-5555-5555-555555555555");
+
+        std::vector<U8> body(object_id.mData, object_id.mData + UUID_BYTES);
+        body.resize(UUID_BYTES + 24, 0xAB);
+        LLDataPackerBinaryBuffer dp(body.data(), (S32)body.size());
+        LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(7, 1234, dp);
+        CHECK(entry->isObject(object_id));
+        CHECK_FALSE(entry->isObject(other_id));
+        CHECK_FALSE(entry->isObject(LLUUID::null));
+
+        UNSCOPED_INFO("and reading it moves nothing that reads the entry after");
+        LLDataPackerBinaryBuffer* read_back = entry->getDP();
+        REQUIRE(read_back);
+        read_back->reset();
+        LLUUID read_id;
+        read_back->unpackUUID(read_id, "ID");
+        CHECK(read_id == object_id);
+
+        UNSCOPED_INFO("data too short to hold one is no object's");
+        LLDataPackerBinaryBuffer short_dp(body.data(), UUID_BYTES - 1);
+        LLPointer<LLVOCacheEntry> short_entry = new LLVOCacheEntry(8, 1234, short_dp);
+        CHECK_FALSE(short_entry->isObject(object_id));
+        LLPointer<LLVOCacheEntry> empty_entry = new LLVOCacheEntry();
+        CHECK_FALSE(empty_entry->isObject(LLUUID::null));
+    }
+
+    TEST_CASE("LLVOCacheEntry: a kill takes a local ID's overrides whether or not it has a valid entry", "[LLVOCache]")
+    {
+        constexpr U32 VALID = 1;
+        constexpr U32 INVALID = 2;
+        constexpr U32 NO_ENTRY = 3;
+        constexpr U32 NO_OVERRIDES = 4;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[VALID] = vocacheTest::makeEntry(VALID, 1, 16);
+        entries[INVALID] = vocacheTest::makeEntry(INVALID, 2, 16);
+        entries[INVALID]->setValid(false);
+        entries[NO_OVERRIDES] = vocacheTest::makeEntry(NO_OVERRIDES, 4, 16);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        for (U32 local_id : { VALID, INVALID, NO_ENTRY })
+        {
+            overrides[local_id].mLocalId = local_id;
+        }
+
+        std::vector<LLVOCacheEntry*> killed;
+        const auto kill_entry = [&](LLVOCacheEntry* entry) { killed.push_back(entry); };
+
+        CHECK(LLVOCacheEntry::killLocalID(VALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(VALID) == 0);
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[VALID].get());
+
+        killed.clear();
+        UNSCOPED_INFO("an entry already invalid is not killed twice");
+        CHECK(LLVOCacheEntry::killLocalID(INVALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(INVALID) == 0);
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("a local ID with no entry at all");
+        CHECK(LLVOCacheEntry::killLocalID(NO_ENTRY, entries, overrides, kill_entry));
+        CHECK(overrides.empty());
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("an entry with no overrides is killed and says it took none");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(NO_OVERRIDES, entries, overrides, kill_entry));
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[NO_OVERRIDES].get());
+
+        UNSCOPED_INFO("and a local ID with neither takes nothing");
+        killed.clear();
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
+        CHECK(killed.empty());
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);
