@@ -39,6 +39,7 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <fstream>
+#include <functional>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -235,11 +236,19 @@ namespace
 
     S32 sCallbacks = 0;
     S32 sCallbackResult = 0;
+    // What the requester does the first time it is told of a file.
+    std::function<void()> sOnFirstCallback;
 
     void countCallback(void**, S32 result, LLExtStat)
     {
         ++sCallbacks;
         sCallbackResult = result;
+        if (sOnFirstCallback)
+        {
+            const std::function<void()> first = std::move(sOnFirstCallback);
+            sOnFirstCallback = nullptr;
+            first();
+        }
     }
 
     // A viewer's message system and transfer manager, as gMessageSystem and
@@ -264,10 +273,12 @@ namespace
             }
             sCallbacks = 0;
             sCallbackResult = 0;
+            sOnFirstCallback = nullptr;
         }
 
         ~XferSession()
         {
+            sOnFirstCallback = nullptr;
             // The circuit counts the reliable packets it still holds on
             // gMessageSystem as it goes, and the simulator here acks none.
             if (isReady())
@@ -402,6 +413,102 @@ namespace
         REQUIRE(isAbortXfer(answer));
         CHECK(readLittleEndian<U64>(answer, 10) == ID);
         CHECK(readLittleEndian<S32>(answer, 18) == LL_ERR_CANNOT_OPEN_FILE);
+    }
+
+    // A file that cannot start, as where its temporary file cannot be made.
+    class UnstartableXfer : public LLXfer_File
+    {
+    public:
+        UnstartableXfer()
+            : LLXfer_File(-1)
+        {
+        }
+
+        S32 startDownload() override { return -1; }
+    };
+
+    // Waiting its turn on the receive list, as requestFile leaves a file, for
+    // the next request to start.
+    void addUnstartable(XferSession& session, U64 id, const TempFile& local)
+    {
+        LLXfer_File* xfer = new UnstartableXfer();
+        xfer->initializeRequest(id, local.path(), "unstartable.tmp", LL_PATH_CACHE, session.simulator().host(), false,
+                                countCallback, nullptr);
+        session.manager().mReceiveList.push_back(xfer);
+    }
+
+    constexpr U64 FIRST_UNSTARTABLE = 0x0123456789ABCD01ull;
+    constexpr U64 SECOND_UNSTARTABLE = 0x0123456789ABCD02ull;
+
+    TEST_CASE("LLXferManager: a file that cannot start gives the file up and the next one starts", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        session.manager().setMaxIncomingXfers(1);
+        const TempFile unstartable_local;
+        const TempFile next_local;
+        addUnstartable(session, FIRST_UNSTARTABLE, unstartable_local);
+
+        const U64 next = session.request(next_local.path(), "next.tmp");
+
+        CHECK(session.find(FIRST_UNSTARTABLE) == nullptr);
+        CHECK(sCallbacks == 1);
+        CHECK(sCallbackResult == -1);
+        CHECK_FALSE(LLFile::isfile(unstartable_local.path()));
+        REQUIRE(session.find(next) != nullptr);
+        CHECK(session.find(next)->mStatus == e_LL_XFER_IN_PROGRESS);
+
+        const std::vector<U8> answer = session.simulator().receive(1.f);
+        REQUIRE(isAbortXfer(answer));
+        CHECK(readLittleEndian<U64>(answer, 10) == FIRST_UNSTARTABLE);
+        CHECK(readLittleEndian<S32>(answer, 18) == -1);
+    }
+
+    TEST_CASE("LLXferManager: a requester told of a file that cannot start may ask for another", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile first_local;
+        const TempFile second_local;
+        const TempFile asked_local;
+        const TempFile next_local;
+        addUnstartable(session, FIRST_UNSTARTABLE, first_local);
+        addUnstartable(session, SECOND_UNSTARTABLE, second_local);
+
+        U64 asked = 0;
+        sOnFirstCallback = [&] { asked = session.request(asked_local.path(), "asked.tmp"); };
+
+        const U64 next = session.request(next_local.path(), "next.tmp");
+
+        CHECK(session.find(FIRST_UNSTARTABLE) == nullptr);
+        CHECK(session.find(SECOND_UNSTARTABLE) == nullptr);
+        CHECK(sCallbacks == 2);
+        REQUIRE(session.find(next) != nullptr);
+        CHECK(session.find(next)->mStatus == e_LL_XFER_IN_PROGRESS);
+        REQUIRE(asked != 0);
+        REQUIRE(session.find(asked) != nullptr);
+        CHECK(session.find(asked)->mStatus == e_LL_XFER_IN_PROGRESS);
+    }
+
+    TEST_CASE("LLXferManager: a requester told of a file that cannot start may give up another", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile first_local;
+        const TempFile second_local;
+        const TempFile next_local;
+        addUnstartable(session, FIRST_UNSTARTABLE, first_local);
+        addUnstartable(session, SECOND_UNSTARTABLE, second_local);
+
+        // The later of the two on the list is tried and told first.
+        sOnFirstCallback = [&] { session.manager().abortRequestById(FIRST_UNSTARTABLE, -2); };
+
+        session.request(next_local.path(), "next.tmp");
+
+        CHECK(session.find(FIRST_UNSTARTABLE) == nullptr);
+        CHECK(session.find(SECOND_UNSTARTABLE) == nullptr);
+        CHECK(sCallbacks == 2);
+        CHECK(sCallbackResult == -2);
     }
 
     TEST_CASE("LLXferManager: a file given up lets the next file waiting start", "[LLXferManager]")

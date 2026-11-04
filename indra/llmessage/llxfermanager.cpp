@@ -37,6 +37,8 @@
 #include "lluuid.h"
 #include "u64.h"
 
+#include <vector>
+
 const F32 LL_XFER_REGISTRATION_TIMEOUT = 60.0f;  // timeout if a registered transfer hasn't been requested in 60 seconds
 const F32 LL_PACKET_TIMEOUT = 3.0f;             // packet timeout at 3 s
 const S32 LL_PACKET_RETRY_LIMIT = 10;            // packet retransmission limit
@@ -1233,6 +1235,7 @@ void LLXferManager::startPendingDownloads()
 
     if((start_count > 0) && (pending_count > 0))
     {
+        std::vector<U64> unstarted;
         S32 result;
         for (std::list<LLXfer*>::iterator iter = pending_downloads.begin();
              iter != pending_downloads.end(); ++iter)
@@ -1244,7 +1247,22 @@ void LLXferManager::startPendingDownloads()
             if(result)
             {
                 xferp->abort(result);
+                unstarted.push_back(xferp->mID);
                 ++start_count;
+            }
+        }
+
+        // Whoever asked for a file may, as it is told, ask for another or give
+        // up another, which comes back here and changes the list. So each is
+        // told once the loop over pending_downloads is done, and found again
+        // by its ID.
+        for (const U64 id : unstarted)
+        {
+            xferp = findXferByID(id, mReceiveList);
+            if (xferp)
+            {
+                xferp->processEOF();
+                removeXfer(xferp, mReceiveList);
             }
         }
     }
