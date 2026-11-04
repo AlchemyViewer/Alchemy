@@ -276,9 +276,9 @@ namespace
         }
 
         // The grid as generateLuminance draws it, the water's map bound where `with_water` and the unit left holding
-        // nothing otherwise, each patch's texel in rows from the bottom. Above strength 0 the albedo is bound, and the
-        // blended mask where `with_mask`, the unit left holding nothing otherwise.
-        std::vector<Patch> meter(bool with_water, F32 strength = 0.f, bool with_mask = false)
+        // nothing otherwise, each patch's texel in rows from the bottom. Above strength 0 the albedo and the blended mask
+        // are bound, as generateLuminance binds them: it meters reflectively, at 0, where it could not make the mask.
+        std::vector<Patch> meter(bool with_water, F32 strength = 0.f)
         {
             mGrid.bindTarget();
             {
@@ -305,14 +305,7 @@ namespace
                 const S32 blend  = strength > 0.f ? mMeter.enableTexture(LLShaderMgr::METER_BLEND_MAP) : -1;
                 if (blend > -1)
                 {
-                    if (with_mask)
-                    {
-                        mBlend.bindTexture(0, blend, ALSamplers::PointClamp);
-                    }
-                    else
-                    {
-                        gGL.getTextureSlot(blend)->unbind();
-                    }
+                    mBlend.bindTexture(0, blend, ALSamplers::PointClamp);
                 }
                 mMeter.uniform4f(LLShaderMgr::METER_ALBEDO_PARAMS, strength, ALBEDO_FLOOR, TRUSTED_FROM, TRUSTED_TO);
                 const F32 patch_w = (F32)W / (F32)GRID_W;
@@ -434,6 +427,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: incident metering divides the wo
     constexpr F32 BOTTOM = 0.25f;
     setAlbedo(TOP, BOTTOM);
     drawWaterMap();
+    drawBlendMap();
     const std::vector<Patch> grid = meter(true, strength);
 
     for (U32 gy = 0; gy < GRID_H; ++gy)
@@ -470,6 +464,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: a surface that reflects little e
     setUp(GL_RGB10_A2);
     setAlbedo(albedo, albedo);
     drawWaterMap();
+    drawBlendMap();
     const std::vector<Patch> grid = meter(true, 1.f);
 
     // The world's upper left patch.
@@ -482,8 +477,6 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: a surface that reflects little e
 
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key whatever lies behind them", "[luminance_gl]")
 {
-    const bool with_mask = GENERATE(true, false);
-    CAPTURE(with_mask);
     setUp(GL_RGB10_A2);
     // Dark enough behind that, unmarked, a patch earns nothing of the exposure.
     constexpr F32 BEHIND = 0.02f;
@@ -494,7 +487,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key w
     markBlended(0, H / 2, W / 8, H / 2);
     drawWaterMap();
     drawBlendMap();
-    const std::vector<Patch> grid = meter(true, 1.f, with_mask);
+    const std::vector<Patch> grid = meter(true, 1.f);
 
     const F32 behind = storedAlbedo(BEHIND);
     for (U32 gy = 0; gy < GRID_H; ++gy)
@@ -506,7 +499,7 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key w
             CAPTURE(patch.mGround, patch.mEarned);
 
             F32 albedo = behind;
-            if (with_mask && gy == 1)
+            if (gy == 1)
             {
                 // The whole patch (1, 1) reads as the key, and half of (0, 1) does.
                 albedo = gx == 1 ? NOMINAL_ALBEDO : 0.5f * NOMINAL_ALBEDO + 0.5f * behind;
@@ -518,13 +511,10 @@ TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: blended pixels read as the key w
         }
     }
 
-    if (with_mask)
-    {
-        // The whole patch is the reflective reading: the luminance over the key, and all of its exposure earned.
-        const Patch& whole = grid[size_t(1) * GRID_W + 1];
-        CHECK(closeTo(whole.mGround, WORLD_LUM / NOMINAL_ALBEDO));
-        CHECK(closeTo(whole.mEarned, 1.f));
-    }
+    // The whole patch is the reflective reading: the luminance over the key, and all of its exposure earned.
+    const Patch& whole = grid[size_t(1) * GRID_W + 1];
+    CHECK(closeTo(whole.mGround, WORLD_LUM / NOMINAL_ALBEDO));
+    CHECK(closeTo(whole.mEarned, 1.f));
 }
 
 TEST_CASE_METHOD(LuminanceMeter, "luminance_gl: the blended mask is where blended surfaces were drawn and nothing else", "[luminance_gl]")
