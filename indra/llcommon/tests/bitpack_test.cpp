@@ -144,9 +144,10 @@ namespace
         U8 buffer[] = { 0xFF, 0xFF };
         LLBitPack reader(buffer, 1);
 
-        U16 read = 0xEEEE;
-        reader.bitUnpack((U8*)&read, 16);
-        CHECK(read == 0x00FF);
+        U8 read[2] = { 0xEE, 0xEE };
+        reader.bitUnpack(read, 2 * 8);
+        CHECK(read[0] == 0xFF);
+        CHECK(read[1] == 0);
         CHECK(reader.readPastEnd());
     }
 

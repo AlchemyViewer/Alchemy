@@ -415,7 +415,8 @@ namespace
         CHECK(readLittleEndian<S32>(answer, 18) == LL_ERR_CANNOT_OPEN_FILE);
     }
 
-    // A file that cannot start, as where its temporary file cannot be made.
+    // A file that cannot start: its temporary file is in a folder that is not
+    // there, so startDownload cannot make it.
     class UnstartableXfer : public LLXfer_File
     {
     public:
@@ -424,16 +425,17 @@ namespace
         {
         }
 
-        S32 startDownload() override { return -1; }
+        void loseTemporaryFolder() { mTempFilename = gDirUtilp->add(gDirUtilp->getTempFilename(), "unstartable.tmp"); }
     };
 
     // Waiting its turn on the receive list, as requestFile leaves a file, for
     // the next request to start.
     void addUnstartable(XferSession& session, U64 id, const TempFile& local)
     {
-        LLXfer_File* xfer = new UnstartableXfer();
+        UnstartableXfer* xfer = new UnstartableXfer();
         xfer->initializeRequest(id, local.path(), "unstartable.tmp", LL_PATH_CACHE, session.simulator().host(), false,
                                 countCallback, nullptr);
+        xfer->loseTemporaryFolder();
         session.manager().mReceiveList.push_back(xfer);
     }
 

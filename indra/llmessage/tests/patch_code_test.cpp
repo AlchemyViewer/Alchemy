@@ -229,17 +229,23 @@ namespace
 
     TEST_CASE("patch_code: a patch header the data ends inside reads as the end of the patches", "[patch_code]")
     {
+        // The encoder takes the patch size from the group header it last packed.
+        U8 group_bytes[4];
+        LLBitPack group_writer(group_bytes, sizeof(group_bytes));
+        LLGroupHeader group{};
+        group.patch_size = NORMAL_PATCH_SIZE;
+        code_patch_group_header(group_writer, &group);
+
         // A header of 66 bits, which take nine bytes.
         U8 bytes[16] = { 0 };
         LLBitPack writer(bytes, sizeof(bytes));
-        U8 quant_wbits = 0x88;
-        F32 dc_offset = 20.f;
-        U16 range = 10;
-        U16 patch_ids = (3 << 5) | 7;
-        writer.bitPack(&quant_wbits, 8);
-        writer.bitPack((U8*)&dc_offset, 32);
-        writer.bitPack((U8*)&range, 16);
-        writer.bitPack((U8*)&patch_ids, 10);
+        LLPatchHeader sent;
+        sent.quant_wbits = 0x88;
+        sent.dc_offset = 20.f;
+        sent.range = 10;
+        sent.patchids = (3 << 5) | 7;
+        S32 coefficients[PATCH_CELLS] = { 0 };
+        code_patch_header(writer, &sent, coefficients);
         const U32 length = writer.flushBitPack();
         REQUIRE(length == 9);
 
@@ -258,10 +264,10 @@ namespace
         LLBitPack reader(bytes, length);
         LLPatchHeader header;
         decode_patch_header(reader, &header);
-        CHECK(header.quant_wbits == quant_wbits);
-        CHECK(header.dc_offset == dc_offset);
-        CHECK(header.range == range);
-        CHECK(header.patchids == patch_ids);
+        CHECK(header.quant_wbits == sent.quant_wbits);
+        CHECK(header.dc_offset == sent.dc_offset);
+        CHECK(header.range == sent.range);
+        CHECK(header.patchids == sent.patchids);
         CHECK_FALSE(reader.readPastEnd());
     }
 
