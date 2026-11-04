@@ -29,6 +29,7 @@
 #include "llmessageconfig.h"
 #include "llsd.h"
 #include "lltimer.h"
+#include "llzerocode.h"
 #include "message.h"
 #include "net.h"
 
@@ -234,6 +235,34 @@ namespace
         return packet.size() >= 19 && packet[6] == 19;
     }
 
+    // The ID a RequestXfer carries, or 0 for any other packet. Its body is
+    // zero-coded where that made it shorter, and its number is then coded too.
+    U64 requestXferID(const std::vector<U8>& packet)
+    {
+        std::vector<U8> body = packet;
+        if (!packet.empty() && (packet[0] & LLZeroCode::FLAG))
+        {
+            body.resize(NET_BUFFER_SIZE);
+            bool overflow = false;
+            body.resize(LLZeroCode::decode(packet.data(), (U32)packet.size(), body.data(), (U32)body.size(),
+                                           LL_PACKET_ID_SIZE, overflow));
+        }
+        const bool is_request = body.size() >= 18 && body[6] == 0xFF && body[7] == 0xFF && body[8] == 0x00 && body[9] == 156;
+        return is_request ? readLittleEndian<U64>(body, 10) : 0;
+    }
+
+    // The ID in the next RequestXfer the simulator's socket receives within a
+    // second of each packet, passing over other packets, or 0 where none comes.
+    U64 nextRequestedID(const SimulatorSocket& simulator)
+    {
+        std::vector<U8> packet = simulator.receive(1.f);
+        while (!packet.empty() && requestXferID(packet) == 0)
+        {
+            packet = simulator.receive(1.f);
+        }
+        return packet.empty() ? 0 : requestXferID(packet);
+    }
+
     S32 sCallbacks = 0;
     S32 sCallbackResult = 0;
     // What the requester does the first time it is told of a file.
@@ -377,18 +406,29 @@ namespace
         CHECK(sCallbacks == 1);
     }
 
-    // A file whose data cannot be written, as where its temporary file cannot
-    // be opened.
-    class UnwritableXfer : public LLXfer_File
+    // A file whose temporary file is in a folder that is not there, so it can
+    // neither be made nor written. On the receive list, waiting its turn as
+    // requestFile leaves a file.
+    class FolderlessXfer : public LLXfer_File
     {
     public:
-        UnwritableXfer()
+        FolderlessXfer()
             : LLXfer_File(-1)
         {
         }
 
-        S32 receiveData(char*, S32) override { return LL_ERR_CANNOT_OPEN_FILE; }
+        void loseTemporaryFolder() { mTempFilename = gDirUtilp->add(gDirUtilp->getTempFilename(), "folderless.tmp"); }
     };
+
+    FolderlessXfer* addFolderless(XferSession& session, U64 id, const TempFile& local)
+    {
+        FolderlessXfer* xfer = new FolderlessXfer();
+        xfer->initializeRequest(id, local.path(), "folderless.tmp", LL_PATH_CACHE, session.simulator().host(), false,
+                                countCallback, nullptr);
+        xfer->loseTemporaryFolder();
+        session.manager().mReceiveList.push_back(xfer);
+        return xfer;
+    }
 
     TEST_CASE("LLXferManager: a file that cannot be written gives the file up", "[LLXferManager]")
     {
@@ -397,46 +437,34 @@ namespace
         const TempFile local;
 
         constexpr U64 ID = 0x0123456789ABCDEFull;
-        LLXfer_File* xfer = new UnwritableXfer();
-        xfer->initializeRequest(ID, local.path(), "remote.tmp", LL_PATH_CACHE, session.simulator().host(), false,
-                                countCallback, nullptr);
-        session.manager().mReceiveList.push_back(xfer);
+        addFolderless(session, ID, local)->mStatus = e_LL_XFER_IN_PROGRESS;
 
-        REQUIRE(session.deliver(ID, 0, { 1, 0, 0, 0, 'a' }));
+        // The file's data goes to its temporary file once its buffer is full.
+        const std::vector<U8> data(LL_XFER_LARGE_PAYLOAD, 0x5A);
+        constexpr U32 MOST_PACKETS = 32;
+        U32 packets = 0;
+        while (session.find(ID) != nullptr && packets < MOST_PACKETS)
+        {
+            REQUIRE(session.deliver(ID, packets, data));
+            ++packets;
+        }
+        CAPTURE(packets);
+        CHECK(packets > 1);
 
         CHECK(session.find(ID) == nullptr);
         CHECK(sCallbacks == 1);
         CHECK(sCallbackResult == LL_ERR_CANNOT_OPEN_FILE);
         CHECK_FALSE(LLFile::isfile(local.path()));
 
-        const std::vector<U8> answer = session.simulator().receive(1.f);
+        // Each packet before it was confirmed.
+        std::vector<U8> answer = session.simulator().receive(1.f);
+        while (isConfirmXferPacket(answer))
+        {
+            answer = session.simulator().receive(1.f);
+        }
         REQUIRE(isAbortXfer(answer));
         CHECK(readLittleEndian<U64>(answer, 10) == ID);
         CHECK(readLittleEndian<S32>(answer, 18) == LL_ERR_CANNOT_OPEN_FILE);
-    }
-
-    // A file that cannot start: its temporary file is in a folder that is not
-    // there, so startDownload cannot make it.
-    class UnstartableXfer : public LLXfer_File
-    {
-    public:
-        UnstartableXfer()
-            : LLXfer_File(-1)
-        {
-        }
-
-        void loseTemporaryFolder() { mTempFilename = gDirUtilp->add(gDirUtilp->getTempFilename(), "unstartable.tmp"); }
-    };
-
-    // Waiting its turn on the receive list, as requestFile leaves a file, for
-    // the next request to start.
-    void addUnstartable(XferSession& session, U64 id, const TempFile& local)
-    {
-        UnstartableXfer* xfer = new UnstartableXfer();
-        xfer->initializeRequest(id, local.path(), "unstartable.tmp", LL_PATH_CACHE, session.simulator().host(), false,
-                                countCallback, nullptr);
-        xfer->loseTemporaryFolder();
-        session.manager().mReceiveList.push_back(xfer);
     }
 
     constexpr U64 FIRST_UNSTARTABLE = 0x0123456789ABCD01ull;
@@ -449,7 +477,7 @@ namespace
         session.manager().setMaxIncomingXfers(1);
         const TempFile unstartable_local;
         const TempFile next_local;
-        addUnstartable(session, FIRST_UNSTARTABLE, unstartable_local);
+        addFolderless(session, FIRST_UNSTARTABLE, unstartable_local);
 
         const U64 next = session.request(next_local.path(), "next.tmp");
 
@@ -474,8 +502,8 @@ namespace
         const TempFile second_local;
         const TempFile asked_local;
         const TempFile next_local;
-        addUnstartable(session, FIRST_UNSTARTABLE, first_local);
-        addUnstartable(session, SECOND_UNSTARTABLE, second_local);
+        addFolderless(session, FIRST_UNSTARTABLE, first_local);
+        addFolderless(session, SECOND_UNSTARTABLE, second_local);
 
         U64 asked = 0;
         sOnFirstCallback = [&] { asked = session.request(asked_local.path(), "asked.tmp"); };
@@ -499,8 +527,8 @@ namespace
         const TempFile first_local;
         const TempFile second_local;
         const TempFile next_local;
-        addUnstartable(session, FIRST_UNSTARTABLE, first_local);
-        addUnstartable(session, SECOND_UNSTARTABLE, second_local);
+        addFolderless(session, FIRST_UNSTARTABLE, first_local);
+        addFolderless(session, SECOND_UNSTARTABLE, second_local);
 
         // The later of the two on the list is tried and told first.
         sOnFirstCallback = [&] { session.manager().abortRequestById(FIRST_UNSTARTABLE, -2); };
@@ -519,12 +547,12 @@ namespace
         REQUIRE(session.isReady());
         const TempFile local;
         const TempFile next_local;
-        addUnstartable(session, FIRST_UNSTARTABLE, local);
+        addFolderless(session, FIRST_UNSTARTABLE, local);
 
         U64 again = 0;
-        sOnFirstCallback = [&] { again = session.request(local.path(), "unstartable.tmp"); };
+        sOnFirstCallback = [&] { again = session.request(local.path(), "folderless.tmp"); };
 
-        session.request(next_local.path(), "next.tmp");
+        const U64 next = session.request(next_local.path(), "next.tmp");
 
         CHECK(session.find(FIRST_UNSTARTABLE) == nullptr);
         CHECK(sCallbacks == 1);
@@ -532,6 +560,11 @@ namespace
         CHECK(again != FIRST_UNSTARTABLE);
         REQUIRE(session.find(again) != nullptr);
         CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+
+        // The next file starts in the loop, and the one asked for as its
+        // requester was told after it.
+        CHECK(nextRequestedID(session.simulator()) == next);
+        CHECK(nextRequestedID(session.simulator()) == again);
     }
 
     TEST_CASE("LLXferManager: a requester told of a file given up may ask for the same file again", "[LLXferManager]")
@@ -552,6 +585,7 @@ namespace
         CHECK(again != id);
         REQUIRE(session.find(again) != nullptr);
         CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+        CHECK(nextRequestedID(session.simulator()) == again);
 
         // The request made while told is a transfer of its own, told in turn.
         REQUIRE(session.deliver(again, 0, { 1, 2, 3 }));
@@ -579,6 +613,7 @@ namespace
         CHECK(again != id);
         REQUIRE(session.find(again) != nullptr);
         CHECK(session.find(again)->mStatus == e_LL_XFER_IN_PROGRESS);
+        CHECK(nextRequestedID(session.simulator()) == again);
     }
 
     TEST_CASE("LLXferManager: a file asked for again while it runs or waits stays one transfer", "[LLXferManager]")

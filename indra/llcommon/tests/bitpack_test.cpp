@@ -151,13 +151,17 @@ namespace
         CHECK(reader.readPastEnd());
     }
 
-    TEST_CASE("LLBitPack: the bytes a read takes past the data go on being counted", "[LLBitPack]")
+    TEST_CASE("LLBitPack: every byte a read takes past the data is zero and counted", "[LLBitPack]")
     {
-        U8 buffer[] = { 0xFF };
+        U8 buffer[] = { 0xFF, 0xFF, 0xFF, 0xFF };
         LLBitPack reader(buffer, 1);
 
-        U8 read[4] = { 0 };
+        U8 read[4] = { 0xEE, 0xEE, 0xEE, 0xEE };
         CHECK(reader.bitUnpack(read, 4 * 8) == 4);
+        CHECK(read[0] == 0xFF);
+        CHECK(read[1] == 0);
+        CHECK(read[2] == 0);
+        CHECK(read[3] == 0);
         CHECK(reader.mBufferSize == 4);
     }
 
