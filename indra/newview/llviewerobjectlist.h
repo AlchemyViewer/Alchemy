@@ -210,6 +210,13 @@ public:
                                 LLViewerObject* objectp); // Requires knowledge of message system info!
 
     bool removeFromLocalIDTable(LLViewerObject* objectp);
+    // Makes way for id to take a local ID of the region at ip and port. An object of another UUID under it goes, as a
+    // kill would take it, since no kill by local ID can reach it once the table has moved on. False where the agent's
+    // avatar has it: the avatar keeps it, and id's update is to be dropped.
+    bool claimLocalID(const LLUUID& id, const U32 local_id, const U32 ip, const U32 port);
+    // Whether a kill leaves objectp alone for the teleport under way: it is one of the agent's own attachments, which
+    // the region left behind kills as the agent goes.
+    static bool killHeldForTeleport(const LLViewerObject* objectp);
     // Used ONLY by the orphaned object code.
     U64 getIndex(const U32 local_id, const U32 ip, const U32 port);
 

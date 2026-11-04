@@ -219,6 +219,38 @@ void LLViewerObjectList::setUUIDAndLocal(const LLUUID &id,
     //  << ", local ID " << local_id << ", ip " << ip << ":" << port << LL_ENDL;
 }
 
+// static
+bool LLViewerObjectList::killHeldForTeleport(const LLViewerObject* objectp)
+{
+    return objectp->isAttachment() && !objectp->isTempAttachment() && LLAgent::TELEPORT_NONE != gAgent.getTeleportState()
+        && gAgentAvatarp && objectp->permYouOwner() && gSavedSettings.getBOOL("BlockAttachmentKillsOnTeleport");
+}
+
+bool LLViewerObjectList::claimLocalID(const LLUUID& id, const U32 local_id, const U32 ip, const U32 port)
+{
+    LLUUID holder_id;
+    getUUIDFromLocal(holder_id, local_id, ip, port);
+
+    LLViewerObject* holderp = findObject(holder_id);
+    const LLViewerRegion* holder_region = holderp ? holderp->getRegion() : nullptr;
+    const bool holder_here = holder_region && holder_region->getHost() == LLHost(ip, port) && !killHeldForTeleport(holderp);
+
+    switch (ALObjectUpdate::claimLocalID(holder_id, holder_here, id, gAgentID))
+    {
+    case ALObjectUpdate::ELocalIDClaim::FREE:
+        break;
+    case ALObjectUpdate::ELocalIDClaim::REMOVES_HOLDER:
+        LL_DEBUGS("ObjectUpdate") << "local ID " << local_id << " goes from " << holder_id << " to " << id << LL_ENDL;
+        killObject(holderp);
+        LLSelectMgr::getInstance()->removeObjectFromSelections(holder_id);
+        break;
+    case ALObjectUpdate::ELocalIDClaim::REFUSED:
+        LL_WARNS_ONCE("ObjectUpdate") << "Dropped an update for " << id << " under the agent's local ID" << LL_ENDL;
+        return false;
+    }
+    return true;
+}
+
 S32 gFullObjectUpdates = 0;
 S32 gTerseObjectUpdates = 0;
 
@@ -326,6 +358,13 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         if(!objectp->isDead() && (objectp->mLocalID != entry->getLocalID() ||
             objectp->getRegion() != regionp))
         {
+            if (!claimLocalID(fullid, entry->getLocalID(), regionp->getHost().getAddress(), regionp->getHost().getPort())
+                || objectp->isDead())
+            {
+                recorder.objectUpdateFailure();
+                return NULL;
+            }
+
             removeFromLocalIDTable(objectp);
             setUUIDAndLocal(fullid, entry->getLocalID(),
                             regionp->getHost().getAddress(),
@@ -603,6 +642,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
             //          << ", regionp " << (U32) regionp << ", object region " << (U32) objectp->getRegion()
             //          << LL_ENDL;
             //}
+            // The object's linkset may go with what had the local ID.
+            if (!claimLocalID(fullid, local_id, gMessageSystem->getSenderIP(), gMessageSystem->getSenderPort())
+                || objectp->isDead())
+            {
+                recorder.objectUpdateFailure();
+                continue;
+            }
+
             removeFromLocalIDTable(objectp);
             setUUIDAndLocal(fullid,
                             local_id,
@@ -2098,6 +2145,11 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
         return NULL;
     }
 
+    if (!claimLocalID(uuid, local_id, regionp->getHost().getAddress(), regionp->getHost().getPort()))
+    {
+        return NULL;
+    }
+
     LLViewerObject *objectp = LLViewerObject::createObject(uuid, pcode, regionp);
     if (!objectp)
     {
@@ -2138,6 +2190,11 @@ LLViewerObject *LLViewerObjectList::createObject(const LLPCode pcode, LLViewerRe
     if (!ALObjectUpdate::makesObject(pcode))
     {
         LL_WARNS() << "No object for an update of pcode " << (S32)pcode << LL_ENDL;
+        return NULL;
+    }
+
+    if (!claimLocalID(fullid, local_id, gMessageSystem->getSenderIP(), gMessageSystem->getSenderPort()))
+    {
         return NULL;
     }
 

@@ -27,6 +27,7 @@
 #include "../alobjectupdate.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 namespace
 {
@@ -46,5 +47,42 @@ namespace
         CHECK_FALSE(ALObjectUpdate::makesObject(0x3E));
         CHECK_FALSE(ALObjectUpdate::makesObject(0xAE));
         CHECK_FALSE(ALObjectUpdate::makesObject(0xCE));
+    }
+
+    const LLUUID AGENT("11111111-1111-1111-1111-111111111111");
+    const LLUUID HOLDER("22222222-2222-2222-2222-222222222222");
+    const LLUUID TAKER("33333333-3333-3333-3333-333333333333");
+
+    TEST_CASE("ALObjectUpdate: a local ID no other object has is free to take", "[ALObjectUpdate]")
+    {
+        using Claim = ALObjectUpdate::ELocalIDClaim;
+        const bool holder_here = GENERATE(true, false);
+        CAPTURE(holder_here);
+        CHECK(ALObjectUpdate::claimLocalID(LLUUID::null, holder_here, TAKER, AGENT) == Claim::FREE);
+        UNSCOPED_INFO("an object already under it takes its own again");
+        CHECK(ALObjectUpdate::claimLocalID(TAKER, holder_here, TAKER, AGENT) == Claim::FREE);
+        CHECK(ALObjectUpdate::claimLocalID(AGENT, holder_here, AGENT, AGENT) == Claim::FREE);
+    }
+
+    TEST_CASE("ALObjectUpdate: another object under a taken local ID goes", "[ALObjectUpdate]")
+    {
+        using Claim = ALObjectUpdate::ELocalIDClaim;
+        CHECK(ALObjectUpdate::claimLocalID(HOLDER, true, TAKER, AGENT) == Claim::REMOVES_HOLDER);
+        UNSCOPED_INFO("the agent's avatar takes one like any other");
+        CHECK(ALObjectUpdate::claimLocalID(HOLDER, true, AGENT, AGENT) == Claim::REMOVES_HOLDER);
+    }
+
+    TEST_CASE("ALObjectUpdate: the agent's avatar keeps its local ID and the other update is dropped", "[ALObjectUpdate]")
+    {
+        using Claim = ALObjectUpdate::ELocalIDClaim;
+        CHECK(ALObjectUpdate::claimLocalID(AGENT, true, TAKER, AGENT) == Claim::REFUSED);
+    }
+
+    TEST_CASE("ALObjectUpdate: a row a kill would not reach leaves its local ID free", "[ALObjectUpdate]")
+    {
+        using Claim = ALObjectUpdate::ELocalIDClaim;
+        CHECK(ALObjectUpdate::claimLocalID(HOLDER, false, TAKER, AGENT) == Claim::FREE);
+        UNSCOPED_INFO("the agent's avatar, once it has left the region, included");
+        CHECK(ALObjectUpdate::claimLocalID(AGENT, false, TAKER, AGENT) == Claim::FREE);
     }
 }

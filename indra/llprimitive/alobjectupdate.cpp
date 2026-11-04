@@ -40,3 +40,13 @@ bool ALObjectUpdate::makesObject(LLPCode pcode)
         return false;
     }
 }
+
+// static
+ALObjectUpdate::ELocalIDClaim ALObjectUpdate::claimLocalID(const LLUUID& holder, bool holder_here, const LLUUID& taker, const LLUUID& agent_id)
+{
+    if (holder.isNull() || holder == taker || !holder_here)
+    {
+        return ELocalIDClaim::FREE;
+    }
+    return holder == agent_id ? ELocalIDClaim::REFUSED : ELocalIDClaim::REMOVES_HOLDER;
+}
