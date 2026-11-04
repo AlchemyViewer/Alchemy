@@ -351,6 +351,10 @@ namespace
         CHECK(session.manager().mReceiveList.empty());
         CHECK(session.manager().mSendList.empty());
 
+        CHECK(sCallbacks == 1);
+        CHECK(sCallbackResult == LL_ERR_EOF);
+        CHECK_FALSE(LLFile::isfile(local.path()));
+
         const std::vector<U8> answer = session.simulator().receive(1.f);
         REQUIRE(isAbortXfer(answer));
         CHECK(readLittleEndian<U64>(answer, 10) == id);
@@ -359,6 +363,45 @@ namespace
         // A packet that comes after is for a transfer no longer there.
         REQUIRE(session.deliver(id, 0, std::vector<U8>(8, 0x01)));
         CHECK(session.simulator().receive(0.05f).empty());
+        CHECK(sCallbacks == 1);
+    }
+
+    // A file whose data cannot be written, as where its temporary file cannot
+    // be opened.
+    class UnwritableXfer : public LLXfer_File
+    {
+    public:
+        UnwritableXfer()
+            : LLXfer_File(-1)
+        {
+        }
+
+        S32 receiveData(char*, S32) override { return LL_ERR_CANNOT_OPEN_FILE; }
+    };
+
+    TEST_CASE("LLXferManager: a file that cannot be written gives the file up", "[LLXferManager]")
+    {
+        XferSession session;
+        REQUIRE(session.isReady());
+        const TempFile local;
+
+        constexpr U64 ID = 0x0123456789ABCDEFull;
+        LLXfer_File* xfer = new UnwritableXfer();
+        xfer->initializeRequest(ID, local.path(), "remote.tmp", LL_PATH_CACHE, session.simulator().host(), false,
+                                countCallback, nullptr);
+        session.manager().mReceiveList.push_back(xfer);
+
+        REQUIRE(session.deliver(ID, 0, { 1, 0, 0, 0, 'a' }));
+
+        CHECK(session.find(ID) == nullptr);
+        CHECK(sCallbacks == 1);
+        CHECK(sCallbackResult == LL_ERR_CANNOT_OPEN_FILE);
+        CHECK_FALSE(LLFile::isfile(local.path()));
+
+        const std::vector<U8> answer = session.simulator().receive(1.f);
+        REQUIRE(isAbortXfer(answer));
+        CHECK(readLittleEndian<U64>(answer, 10) == ID);
+        CHECK(readLittleEndian<S32>(answer, 18) == LL_ERR_CANNOT_OPEN_FILE);
     }
 
     TEST_CASE("LLXferManager: a file given up lets the next file waiting start", "[LLXferManager]")
@@ -377,6 +420,7 @@ namespace
         REQUIRE(session.deliver(first, 0, { 1, 2, 3 }));
 
         CHECK(session.find(first) == nullptr);
+        CHECK(sCallbacks == 1);
         REQUIRE(session.find(second) != nullptr);
         CHECK(session.find(second)->mStatus == e_LL_XFER_IN_PROGRESS);
     }

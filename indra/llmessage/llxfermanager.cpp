@@ -577,6 +577,17 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
 
     S32 result = 0;
 
+    // The sender and whoever asked for the file are told, as they are of a file
+    // the sender gives up, and the next file waiting takes its place. The
+    // error goes first: it is what keeps processEOF from keeping the file.
+    const auto give_up = [&](S32 error)
+    {
+        xferp->abort(error);
+        xferp->processEOF();
+        removeXfer(xferp,mReceiveList);
+        startPendingDownloads();
+    };
+
     if (xferp->mPacketNum == 0) // first packet has size encoded as additional S32 at beginning of data
     {
         if (fdata_size < (S32)sizeof(S32))
@@ -584,9 +595,7 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
             LL_WARNS("Xfer") << "Received a first packet of " << fdata_size
                 << " bytes, too short to hold its file's size, from " << mesgsys->getSender()
                 << " for " << xferp->getFileName() << LL_ENDL;
-            xferp->abort(LL_ERR_EOF);
-            removeXfer(xferp,mReceiveList);
-            startPendingDownloads();
+            give_up(LL_ERR_EOF);
             return;
         }
 
@@ -605,10 +614,8 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
 
     if (result == LL_ERR_CANNOT_OPEN_FILE)
     {
-            xferp->abort(LL_ERR_CANNOT_OPEN_FILE);
-            removeXfer(xferp,mReceiveList);
-            startPendingDownloads();
-            return;
+        give_up(LL_ERR_CANNOT_OPEN_FILE);
+        return;
     }
 
     xferp->mPacketNum++;  // expect next packet
