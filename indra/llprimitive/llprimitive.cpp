@@ -262,7 +262,14 @@ LLTextureEntry* LLPrimitive::getTE(const U8 index) const
 //===============================================================
 void LLPrimitive::setNumTEs(const U8 num_tes)
 {
+    const U8 old_num_tes = getNumTEs();
+    // A face gained starts as a copy of the last, and takes the values of the
+    // entry last unpacked where there is one.
     mTextureList.setSize(num_tes);
+    if (num_tes > old_num_tes)
+    {
+        applyTEEntry(old_num_tes);
+    }
 }
 
 //===============================================================
@@ -1307,10 +1314,27 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
 
 namespace
 {
-    // Room for a texture entry as long as the packers write for the most
-    // faces they pack, and the zero the parse puts after it.
-    constexpr size_t TE_INLINE_BYTES = 4608;
-    typedef boost::container::small_vector<U8, TE_INLINE_BYTES> te_bytes_t;
+    // Reads a message's TextureEntry field whole into packed; block_num < 0
+    // reads block 0.
+    void read_te_field(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, boost::container::small_vector_base<U8>& packed)
+    {
+        S32 size;
+        if (block_num < 0)
+        {
+            size = mesgsys->getSizeFast(block_name, _PREHASH_TextureEntry);
+        }
+        else
+        {
+            size = mesgsys->getSizeFast(block_name, block_num, _PREHASH_TextureEntry);
+        }
+
+        packed.clear();
+        if (size > 0)
+        {
+            packed.resize(size);
+            mesgsys->getBinaryDataFast(block_name, _PREHASH_TextureEntry, packed.data(), 0, std::max(block_num, 0), size);
+        }
+    }
 
     // Parses a packed TextureEntry field of any length into tec, for
     // face_count faces.
@@ -1372,23 +1396,8 @@ namespace
 // static
 S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num, LLTEContents& tec, U8 face_count)
 {
-    S32 size;
-    if (block_num < 0)
-    {
-        size = mesgsys->getSizeFast(block_name, _PREHASH_TextureEntry);
-    }
-    else
-    {
-        size = mesgsys->getSizeFast(block_name, block_num, _PREHASH_TextureEntry);
-    }
-
     te_bytes_t packed;
-    if (size > 0)
-    {
-        packed.resize(size);
-        // if block_num < 0 ask for block 0
-        mesgsys->getBinaryDataFast(block_name, _PREHASH_TextureEntry, packed.data(), 0, std::max(block_num, 0), size);
-    }
+    read_te_field(mesgsys, block_name, block_num, packed);
     return parse_te_entry(packed, tec, face_count);
 }
 
@@ -1414,10 +1423,15 @@ void LLPrimitive::unpackCompressedData(LLDataPacker& dp, U32 flags, boost::conta
 
 S32 LLPrimitive::applyParsedTEMessage(LLTEContents& tec)
 {
+    return applyParsedTEFaces(tec, 0);
+}
+
+S32 LLPrimitive::applyParsedTEFaces(LLTEContents& tec, U32 first_face)
+{
     S32 retval = 0;
 
     LLColor4 color;
-    for (U32 i = 0; i < tec.face_count; i++)
+    for (U32 i = first_face; i < tec.face_count; i++)
     {
         LLUUID& req_id = ((LLUUID*)tec.image_data)[i];
         retval |= setTETexture(i, req_id);
@@ -1445,11 +1459,9 @@ S32 LLPrimitive::applyParsedTEMessage(LLTEContents& tec)
 
 S32 LLPrimitive::unpackTEMessage(LLMessageSystem* mesgsys, char const* block_name, const S32 block_num)
 {
-    LLTEContents tec;
-    S32 retval = parseTEMessage(mesgsys, block_name, block_num, tec);
-    if (!retval)
-        return retval;
-    return applyParsedTEMessage(tec);
+    te_bytes_t packed;
+    read_te_field(mesgsys, block_name, block_num, packed);
+    return unpackTEEntry(packed);
 }
 
 S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
@@ -1460,13 +1472,35 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
         LL_WARNS() << "Bad texture entry block!  Abort!" << LL_ENDL;
         return TEM_INVALID;
     }
+    return unpackTEEntry(packed);
+}
 
+S32 LLPrimitive::unpackTEEntry(boost::container::small_vector_base<U8>& packed)
+{
     LLTEContents tec;
     if (!parse_te_entry(packed, tec, getNumTEs()))
     {
+        // An entry refused, or none, leaves the one kept as it was.
         return 0;
     }
+    // Kept as it arrived, without the zero the parse ends it with.
+    mTEEntry.assign(packed.begin(), packed.end() - 1);
     return applyParsedTEMessage(tec);
+}
+
+void LLPrimitive::applyTEEntry(U8 first_face)
+{
+    if (mTEEntry.empty())
+    {
+        return;
+    }
+
+    te_bytes_t packed(mTEEntry.begin(), mTEEntry.end());
+    LLTEContents tec;
+    if (parse_te_entry(packed, tec, getNumTEs()))
+    {
+        applyParsedTEFaces(tec, first_face);
+    }
 }
 
 U8  LLPrimitive::getExpectedNumTEs() const
