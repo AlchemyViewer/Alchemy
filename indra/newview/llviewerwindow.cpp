@@ -6328,22 +6328,19 @@ void LLViewerWindow::drawMouselookInstructions()
     {
         const LLFontGL* font = LLFontGL::getFontSansSerifBig();
 
-        if (draw_mouselook_instructions)
-        {
-            // Draw instructions for mouselook ("Press ESC to return to World View" partially transparent at the bottom of the screen.)
-            static const std::string instructions = LLTrans::getString("LeaveMouselook");
+        // Draw instructions for mouselook ("Press ESC to return to World View" partially transparent at the bottom of the screen.)
+        static const std::string instructions = LLTrans::getString("LeaveMouselook");
 
-            //to be on top of Bottom bar when it is opened
-            const S32 INSTRUCTIONS_BOTTOM_PAD = 50;
+        //to be on top of Bottom bar when it is opened
+        const S32 INSTRUCTIONS_BOTTOM_PAD = 50;
 
-            font->renderUTF8(
-                instructions, 0,
-                getWorldViewRectScaled().getCenterX(),
-                getWorldViewRectScaled().mBottom + INSTRUCTIONS_BOTTOM_PAD,
-                LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
-                LLFontGL::HCENTER, LLFontGL::TOP,
-                LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
-        }
+        font->renderUTF8(
+            instructions, 0,
+            getWorldViewRectScaled().getCenterX(),
+            getWorldViewRectScaled().mBottom + INSTRUCTIONS_BOTTOM_PAD,
+            LLColor4(1.0f, 1.0f, 1.0f, 0.5f),
+            LLFontGL::HCENTER, LLFontGL::TOP,
+            LLFontGL::BOLD, LLFontGL::DROP_SHADOW);
     }
 }
 
