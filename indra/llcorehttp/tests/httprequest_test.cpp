@@ -890,6 +890,102 @@ TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET to the peer is a
 }
 
 
+namespace
+{
+
+// Sends a GET to the peer's redirect with these options, waits for its answer,
+// checks it against wanted, and stops the service again.
+void checkRedirectAnswer(HttpRequestTestData & state, const HttpOptions::ptr_t & options, const HttpStatus & wanted)
+{
+    ScopedCurlInit ready;
+
+    std::string url_base(get_base_url());
+
+    TestHandler2 handler(&state, "handler");
+    LLCore::HttpHandler::ptr_t handlerp(&handler, NoOpDeletor);
+    state.mHandlerCalls = 0;
+
+    HttpRequest * req = NULL;
+
+    try
+    {
+        HttpRequest::createService();
+        HttpRequest::startThread();
+        req = new HttpRequest();
+
+        state.mStatus = wanted;
+        HttpHandle handle = req->requestGet(HttpRequest::DEFAULT_POLICY_ID,
+                                            url_base + "redirect/",
+                                            options,
+                                            HttpHeaders::ptr_t(),
+                                            handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        int count(0);
+        int limit(LOOP_COUNT_LONG);
+        while (count++ < limit && state.mHandlerCalls < 1)
+        {
+            req->update(1000000);
+            usleep(LOOP_SLEEP_INTERVAL);
+        }
+        UNSCOPED_INFO("Request executed in reasonable time");
+        CHECK(count < limit);
+        CHECK(state.mHandlerCalls == 1);
+
+        state.mStatus = HttpStatus();
+        handle = req->requestStopThread(handlerp);
+        REQUIRE(handle != LLCORE_HTTP_HANDLE_INVALID);
+
+        count = 0;
+        limit = LOOP_COUNT_LONG;
+        while (count++ < limit && state.mHandlerCalls < 2)
+        {
+            req->update(1000000);
+            usleep(LOOP_SLEEP_INTERVAL);
+        }
+        UNSCOPED_INFO("Second request executed in reasonable time");
+        CHECK(count < limit);
+
+        count = 0;
+        limit = LOOP_COUNT_SHORT;
+        while (count++ < limit && ! HttpService::isStopped())
+        {
+            usleep(LOOP_SLEEP_INTERVAL);
+        }
+        CHECK(HttpService::isStopped());
+
+        delete req;
+        req = NULL;
+
+        HttpRequest::destroyService();
+    }
+    catch (...)
+    {
+        stop_thread(req);
+        delete req;
+        HttpRequest::destroyService();
+        throw;
+    }
+}
+
+}
+
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET follows a redirect to plain http by default", "[HttpRequest_Tests]")
+{
+    checkRedirectAnswer(*this, std::make_shared<HttpOptions>(), HttpStatus(200));
+}
+
+
+TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET that keeps its redirects on https fails one to plain http", "[HttpRequest_Tests]")
+{
+    HttpOptions::ptr_t options(std::make_shared<HttpOptions>());
+    options->setRedirectsHttpsOnly(true);
+
+    checkRedirectAnswer(*this, options, HttpStatus(HttpStatus::EXT_CURL_EASY, CURLE_UNSUPPORTED_PROTOCOL));
+}
+
+
 TEST_CASE_METHOD(HttpRequestTestData, "HttpRequest Tests: a GET with a byte range sends its Range header and takes a 200 for the whole body", "[HttpRequest_Tests]")
 {
     ScopedCurlInit ready;

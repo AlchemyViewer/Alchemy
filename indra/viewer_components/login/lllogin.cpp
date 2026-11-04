@@ -30,6 +30,7 @@
 
 #include "lllogin.h"
 
+#include <boost/algorithm/string/predicate.hpp>
 #include <boost/bind.hpp>
 
 #include "llcoros.h"
@@ -40,6 +41,15 @@
 #if AL_SESSION_CAPTURE
 #include "alsessioncapture.h"
 #endif
+
+namespace
+{
+    // Whether a URI goes over TLS. A scheme's case doesn't matter.
+    bool isSecureURI(const std::string& uri)
+    {
+        return boost::algorithm::istarts_with(uri, "https://");
+    }
+}
 
 //*********************
 // LLLogin
@@ -201,13 +211,25 @@ void LLLogin::Impl::loginCoro(std::string uri, LLSD login_params)
                 break;
             }
 
-            sendProgressEvent("offline", "indeterminate", mAuthResponse["responses"]);
-
             // Here the login service at the current URI is redirecting us
             // to some other URI ("indeterminate" -- why not "redirect"?).
             // The response should contain another uri to try, with its
-            // own auth method.
-            request["uri"] = mAuthResponse["responses"]["next_url"].asString();
+            // own auth method. The next attempt sends the same credentials,
+            // so a login that went over TLS doesn't let an answer take them
+            // off it.
+            const std::string next_uri = mAuthResponse["responses"]["next_url"].asString();
+            if (isSecureURI(request["uri"].asString()) && !isSecureURI(next_uri))
+            {
+                LL_WARNS("LLLogin") << "Not following a redirect of a secure login to '" << next_uri << "'" << LL_ENDL;
+                sendProgressEvent("offline", "fail.login",
+                                  LLSDMap("reason", "InsecureRedirect")
+                                         ("message_id", "LoginFailedInsecureRedirect"));
+                return;
+            }
+
+            sendProgressEvent("offline", "indeterminate", mAuthResponse["responses"]);
+
+            request["uri"] = next_uri;
             request["method"] = mAuthResponse["responses"]["next_method"].asString();
         } // loop back to try the redirected URI
 

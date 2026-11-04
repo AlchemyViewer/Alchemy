@@ -557,6 +557,10 @@ HttpStatus HttpOpRequest::prepareRequest(HttpService * service)
         lastModified = (curl_off_t)mReqOptions->getLastModified();
     }
     check_curl_easy_setopt(mCurlHandle, CURLOPT_FOLLOWLOCATION, follow_redirect);
+    if (mReqOptions && mReqOptions->getRedirectsHttpsOnly())
+    {
+        check_curl_easy_setopt(mCurlHandle, CURLOPT_REDIR_PROTOCOLS, long(CURLPROTO_HTTPS));
+    }
 
     check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_VERIFYPEER, sslPeerV);
     check_curl_easy_setopt(mCurlHandle, CURLOPT_SSL_VERIFYHOST, sslHostV);
