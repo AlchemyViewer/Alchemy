@@ -1894,6 +1894,17 @@ LLVector3 LLModelPreview::getWantedPivot(const LLModel* model) const
     }
 }
 
+bool LLModelPreview::uploadsRigged(const LLModelInstance& instance) const
+{
+    // The upload takes its skin from the High model, which may carry weights its base does not.
+    if (!mFMP || !mFMP->childGetValue("upload_skin").asBoolean())
+    {
+        return false;
+    }
+    const LLModel* high = instance.mLOD[LLModel::LOD_HIGH];
+    return (instance.mModel && !instance.mModel->mSkinWeights.empty()) || (high && !high->mSkinWeights.empty());
+}
+
 bool LLModelPreview::isSingleModel() const
 {
     // A model with more than eight materials uploads as a root and its submodels, sharing one transform.
@@ -1906,7 +1917,8 @@ LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets(
     LLMeshUploadThread::position_offsets_t offsets;
     for (const LLModelInstance& instance : mUploadData)
     {
-        offsets[instance.mModel.get()] = getUploadPivot(instance.mModel) * -0.5f;
+        // Rigged mesh is placed by its skeleton and keeps the default position domain, whatever the pivot.
+        offsets[instance.mModel.get()] = uploadsRigged(instance) ? LLVector3::zero : getUploadPivot(instance.mModel) * -0.5f;
     }
     return offsets;
 }
@@ -2259,7 +2271,6 @@ void LLModelPreview::updateStatusMessages()
     // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
     {
         // Each part is judged on its own, so one rigged or unanalyzed part holds only itself at the centre.
-        const bool uploading_skin = mFMP->childGetValue("upload_skin").asBoolean();
         bool any_rigged = false;
         bool any_unanalyzed = false;
         bool pivot_without_physics = false; // a pivoted part that collides with a default hull centred on itself
@@ -2272,7 +2283,7 @@ void LLModelPreview::updateStatusMessages()
                 continue;
             }
             // Skin weights left out of the upload make a static mesh, which can take a pivot.
-            const bool rigged = uploading_skin && !model->mSkinWeights.empty();
+            const bool rigged = uploadsRigged(instance);
             // The hulls uploaded are the physics model's, or the base model's without one.
             const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
             bool instance_physics = false;
