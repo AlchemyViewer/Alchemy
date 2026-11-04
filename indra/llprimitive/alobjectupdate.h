@@ -49,4 +49,11 @@ struct ALObjectUpdate
     // to another region, or be gone altogether, which leaves the table's row
     // stale and the local ID free.
     static ELocalIDClaim claimLocalID(const LLUUID& holder, bool holder_here, const LLUUID& taker, const LLUUID& agent_id);
+
+    // Whether a kill reaches the region's object cache. id is the UUID under
+    // the local ID killed, and null where the viewer has made no object of it:
+    // one culled or not yet visible, whose entry would otherwise bring it back.
+    // The agent's avatar is never killed. A region whose objects are all sent,
+    // culling_enabled, is the one where a kill means the object is gone.
+    static bool killReachesCache(const LLUUID& id, const LLUUID& agent_id, bool culling_enabled);
 };

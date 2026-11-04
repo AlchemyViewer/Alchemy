@@ -85,4 +85,18 @@ namespace
         UNSCOPED_INFO("the agent's avatar, once it has left the region, included");
         CHECK(ALObjectUpdate::claimLocalID(AGENT, false, TAKER, AGENT) == Claim::FREE);
     }
+
+    TEST_CASE("ALObjectUpdate: a kill reaches the cache whether or not the object was made", "[ALObjectUpdate]")
+    {
+        CHECK(ALObjectUpdate::killReachesCache(HOLDER, AGENT, true));
+        UNSCOPED_INFO("a local ID no object has");
+        CHECK(ALObjectUpdate::killReachesCache(LLUUID::null, AGENT, true));
+    }
+
+    TEST_CASE("ALObjectUpdate: a kill leaves the cache alone for the agent's avatar and without culling", "[ALObjectUpdate]")
+    {
+        CHECK_FALSE(ALObjectUpdate::killReachesCache(AGENT, AGENT, true));
+        CHECK_FALSE(ALObjectUpdate::killReachesCache(HOLDER, AGENT, false));
+        CHECK_FALSE(ALObjectUpdate::killReachesCache(LLUUID::null, AGENT, false));
+    }
 }

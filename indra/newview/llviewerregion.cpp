@@ -1260,7 +1260,11 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
 //physically delete the cache entry
 void LLViewerRegion::killCacheEntry(U32 local_id)
 {
-    killCacheEntry(getCacheEntry(local_id));
+    if (LLVOCacheEntry::killLocalID(local_id, mImpl->mCacheMap, mImpl->mGLTFOverridesLLSD,
+                                    [this](LLVOCacheEntry* entry) { killCacheEntry(entry); }))
+    {
+        mGLTFOverridesDirty = true;
+    }
 }
 
 U32 LLViewerRegion::getNumOfActiveCachedObjects() const

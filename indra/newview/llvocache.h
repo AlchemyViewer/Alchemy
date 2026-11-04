@@ -222,6 +222,12 @@ public:
     static void releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
                            const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep);
 
+    // What a kill of local_id takes from a region's cache: its entry, through `kill_entry`, where it has a valid one,
+    // and its glTF overrides whether or not it has, since an object given the local ID later would take them. True
+    // where it took any overrides.
+    static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
+                            const std::function<void(LLVOCacheEntry*)>& kill_entry);
+
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
     vocache_entry_set_t::const_iterator getChildrenEnd() const { return mChildrenList.end(); }

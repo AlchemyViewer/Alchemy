@@ -30,6 +30,7 @@
 #include "alscriptstudio.h"
 #include "alscripttypes.h"
 #include "alnotecarditems.h"
+#include "alobjectupdate.h"
 
 // Linden libraries
 #include "llanimationstates.h"
@@ -4010,7 +4011,6 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         if (id == LLUUID::null)
         {
             LL_DEBUGS("Messaging") << "Unknown kill for local " << local_id << LL_ENDL;
-            continue;
         }
         else
         {
@@ -4046,7 +4046,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
             gObjectList.killObject(objectp);
         }
 
-        if(delete_object && regionp)
+        if (regionp && ALObjectUpdate::killReachesCache(id, gAgentID, delete_object))
         {
             regionp->killCacheEntry(local_id);
         }
@@ -4054,7 +4054,10 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         // We should remove the object from selection after it is marked dead by gObjectList to make LLToolGrab,
         // which is using the object, release the mouse capture correctly when the object dies.
         // See LLToolGrab::handleHoverActive() and LLToolGrab::handleHoverNonPhysical().
-        LLSelectMgr::getInstance()->removeObjectFromSelections(id);
+        if (id.notNull())
+        {
+            LLSelectMgr::getInstance()->removeObjectFromSelections(id);
+        }
 
     }   // end for loop
 

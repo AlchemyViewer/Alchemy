@@ -866,6 +866,55 @@ namespace
         CHECK_FALSE(empty_entry->isObject(LLUUID::null));
     }
 
+    TEST_CASE("LLVOCacheEntry: a kill takes a local ID's overrides whether or not it has a valid entry", "[LLVOCache]")
+    {
+        constexpr U32 VALID = 1;
+        constexpr U32 INVALID = 2;
+        constexpr U32 NO_ENTRY = 3;
+        constexpr U32 NO_OVERRIDES = 4;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[VALID] = vocacheTest::makeEntry(VALID, 1, 16);
+        entries[INVALID] = vocacheTest::makeEntry(INVALID, 2, 16);
+        entries[INVALID]->setValid(false);
+        entries[NO_OVERRIDES] = vocacheTest::makeEntry(NO_OVERRIDES, 4, 16);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        for (U32 local_id : { VALID, INVALID, NO_ENTRY })
+        {
+            overrides[local_id].mLocalId = local_id;
+        }
+
+        std::vector<LLVOCacheEntry*> killed;
+        const auto kill_entry = [&](LLVOCacheEntry* entry) { killed.push_back(entry); };
+
+        CHECK(LLVOCacheEntry::killLocalID(VALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(VALID) == 0);
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[VALID].get());
+
+        killed.clear();
+        UNSCOPED_INFO("an entry already invalid is not killed twice");
+        CHECK(LLVOCacheEntry::killLocalID(INVALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(INVALID) == 0);
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("a local ID with no entry at all");
+        CHECK(LLVOCacheEntry::killLocalID(NO_ENTRY, entries, overrides, kill_entry));
+        CHECK(overrides.empty());
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("an entry with no overrides is killed and says it took none");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(NO_OVERRIDES, entries, overrides, kill_entry));
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[NO_OVERRIDES].get());
+
+        UNSCOPED_INFO("and a local ID with neither takes nothing");
+        killed.clear();
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
+        CHECK(killed.empty());
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

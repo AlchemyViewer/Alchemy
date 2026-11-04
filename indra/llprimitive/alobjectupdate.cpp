@@ -50,3 +50,9 @@ ALObjectUpdate::ELocalIDClaim ALObjectUpdate::claimLocalID(const LLUUID& holder,
     }
     return holder == agent_id ? ELocalIDClaim::REFUSED : ELocalIDClaim::REMOVES_HOLDER;
 }
+
+// static
+bool ALObjectUpdate::killReachesCache(const LLUUID& id, const LLUUID& agent_id, bool culling_enabled)
+{
+    return culling_enabled && id != agent_id;
+}
