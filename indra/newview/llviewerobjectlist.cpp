@@ -104,7 +104,6 @@ LLViewerObjectList::LLViewerObjectList()
 {
     mCurLazyUpdateIndex = 0;
     mCurBin = 0;
-    mNumOrphans = 0;
     mNumNewObjects = 0;
     mWasPaused = false;
     mAgentPaused = false;
@@ -2286,19 +2285,22 @@ void LLViewerObjectList::orphanize(LLViewerObject *childp, U32 parent_id, U32 ip
     }
 
     // Unknown parent, add to orpaned child list
-    U64 parent_info = getIndex(parent_id, ip, port);
+    mOrphans.wait(childp->mID, getIndex(parent_id, ip, port));
+}
 
-    if (std::find(mOrphanParents.begin(), mOrphanParents.end(), parent_info) == mOrphanParents.end())
+void LLViewerObjectList::unorphanize(LLViewerObject* childp)
+{
+    mOrphans.release(childp->mID);
+
+    childp->mOrphaned = false;
+    if (childp->mDrawable.notNull() && childp->mDrawable->isState(LLDrawable::FORCE_INVISIBLE))
     {
-        mOrphanParents.push_back(parent_info);
+        childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
+        gPipeline.markRebuild(childp->mDrawable, LLDrawable::REBUILD_ALL);
     }
 
-    LLViewerObjectList::OrphanInfo oi(parent_info, childp->mID);
-    if (std::find(mOrphanChildren.begin(), mOrphanChildren.end(), oi) == mOrphanChildren.end())
-    {
-        mOrphanChildren.push_back(oi);
-        mNumOrphans++;
-    }
+    // Make certain particles, icon and HUD aren't hidden
+    childp->hideExtraDisplayItems(false);
 }
 
 
@@ -2320,95 +2322,58 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
     }
 
     // See if we are a parent of an orphan.
-    // Note:  This code is fairly inefficient but it should happen very rarely.
-    // It can be sped up if this is somehow a performance issue...
-    if (mOrphanParents.empty())
+    if (mOrphans.empty())
     {
         // no known orphan parents
         return;
     }
-    if (std::find(mOrphanParents.begin(), mOrphanParents.end(), getIndex(objectp->mLocalID, ip, port)) == mOrphanParents.end())
-    {
-        // did not find objectp in OrphanParent list
-        return;
-    }
 
-    U64 parent_info = getIndex(objectp->mLocalID, ip, port);
     bool orphans_found = false;
-    // Iterate through the orphan list, and set parents of matching children.
+    // Iterate through the orphans waiting for this parent, and set their parent.
 
-    for (std::vector<OrphanInfo>::iterator iter = mOrphanChildren.begin(); iter != mOrphanChildren.end(); )
+    for (const LLUUID& child_id : mOrphans.take(getIndex(objectp->mLocalID, ip, port)))
     {
-        if (iter->mParentInfo != parent_info)
-        {
-            ++iter;
-            continue;
-        }
-        LLViewerObject *childp = findObject(iter->mChildInfo);
-        if (childp)
-        {
-            if (childp == objectp)
-            {
-                LL_WARNS() << objectp->mID << " has self as parent, skipping!"
-                    << LL_ENDL;
-                ++iter;
-                continue;
-            }
-
-            LL_DEBUGS("ORPHANS") << "Reunited parent " << objectp->mID
-                << " with child " << childp->mID << LL_ENDL;
-            LL_DEBUGS("ORPHANS") << "Glob: " << objectp->getPositionGlobal() << LL_ENDL;
-            LL_DEBUGS("ORPHANS") << "Agent: " << objectp->getPositionAgent() << LL_ENDL;
-#ifdef ORPHAN_SPAM
-            addDebugBeacon(objectp->getPositionAgent(),"");
-#endif
-            gPipeline.markMoved(objectp->mDrawable);
-            objectp->setChanged(LLXform::MOVED);
-
-            // Flag the object as no longer orphaned
-            childp->mOrphaned = false;
-            if (childp->mDrawable.notNull())
-            {
-                // Make the drawable visible again and set the drawable parent
-                childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
-                childp->setDrawableParent(objectp->mDrawable); // LLViewerObjectList::findOrphans()
-                gPipeline.markRebuild( childp->mDrawable, LLDrawable::REBUILD_ALL);
-            }
-
-            // Make certain particles, icon and HUD aren't hidden
-            childp->hideExtraDisplayItems( false );
-
-            objectp->addChild(childp);
-            orphans_found = true;
-            ++iter;
-        }
-        else
+        LLViewerObject *childp = findObject(child_id);
+        if (!childp)
         {
             LL_INFOS() << "Missing orphan child, removing from list" << LL_ENDL;
-
-            iter = mOrphanChildren.erase(iter);
+            continue;
         }
-    }
 
-    // Remove orphan parent and children from lists now that they've been found
-    {
-        std::vector<U64>::iterator iter = std::find(mOrphanParents.begin(), mOrphanParents.end(), parent_info);
-        if (iter != mOrphanParents.end())
+        LL_DEBUGS("ORPHANS") << "Reunited parent " << objectp->mID
+            << " with child " << childp->mID << LL_ENDL;
+        LL_DEBUGS("ORPHANS") << "Glob: " << objectp->getPositionGlobal() << LL_ENDL;
+        LL_DEBUGS("ORPHANS") << "Agent: " << objectp->getPositionAgent() << LL_ENDL;
+#ifdef ORPHAN_SPAM
+        addDebugBeacon(objectp->getPositionAgent(),"");
+#endif
+        gPipeline.markMoved(objectp->mDrawable);
+        objectp->setChanged(LLXform::MOVED);
+
+        // One this object is itself under stands alone, rather than close a loop.
+        bool link = !ALObjectUpdate::closesLoop(childp, objectp);
+
+        // Flag the object as no longer orphaned
+        childp->mOrphaned = false;
+        if (childp->mDrawable.notNull())
         {
-            mOrphanParents.erase(iter);
+            // Make the drawable visible again and set the drawable parent
+            childp->mDrawable->clearState(LLDrawable::FORCE_INVISIBLE);
+            link = link && childp->setDrawableParent(objectp->mDrawable); // LLViewerObjectList::findOrphans()
+            gPipeline.markRebuild( childp->mDrawable, LLDrawable::REBUILD_ALL);
         }
-    }
 
-    for (std::vector<OrphanInfo>::iterator iter = mOrphanChildren.begin(); iter != mOrphanChildren.end(); )
-    {
-        if (iter->mParentInfo == parent_info)
+        // Make certain particles, icon and HUD aren't hidden
+        childp->hideExtraDisplayItems( false );
+
+        if (link)
         {
-            iter = mOrphanChildren.erase(iter);
-            mNumOrphans--;
+            objectp->addChild(childp);
+            orphans_found = true;
         }
         else
         {
-            ++iter;
+            LL_WARNS() << childp->mID << " would close a parenting loop under " << objectp->mID << ", standing alone" << LL_ENDL;
         }
     }
 
@@ -2425,27 +2390,6 @@ void LLViewerObjectList::findOrphans(LLViewerObject* objectp, U32 ip, U32 port)
 }
 
 ////////////////////////////////////////////////////////////////////////////
-
-LLViewerObjectList::OrphanInfo::OrphanInfo()
-    : mParentInfo(0)
-{
-}
-
-LLViewerObjectList::OrphanInfo::OrphanInfo(const U64 parent_info, const LLUUID child_info)
-    : mParentInfo(parent_info), mChildInfo(child_info)
-{
-}
-
-bool LLViewerObjectList::OrphanInfo::operator==(const OrphanInfo &rhs) const
-{
-    return (mParentInfo == rhs.mParentInfo) && (mChildInfo == rhs.mChildInfo);
-}
-
-bool LLViewerObjectList::OrphanInfo::operator!=(const OrphanInfo &rhs) const
-{
-    return !operator==(rhs);
-}
-
 
 LLDebugBeacon::~LLDebugBeacon()
 {

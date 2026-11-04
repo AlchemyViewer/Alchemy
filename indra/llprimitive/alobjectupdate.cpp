@@ -26,6 +26,8 @@
 
 #include "alobjectupdate.h"
 
+#include "xform.h"
+
 // static
 bool ALObjectUpdate::makesObject(LLPCode pcode)
 {
@@ -55,4 +57,17 @@ ALObjectUpdate::ELocalIDClaim ALObjectUpdate::claimLocalID(const LLUUID& holder,
 bool ALObjectUpdate::killReachesCache(const LLUUID& id, const LLUUID& agent_id, bool culling_enabled)
 {
     return culling_enabled && id != agent_id;
+}
+
+// static
+bool ALObjectUpdate::closesLoop(const LLXform* child, const LLXform* parent)
+{
+    for (const LLXform* above = parent; above; above = above->getParent())
+    {
+        if (above == child)
+        {
+            return true;
+        }
+    }
+    return false;
 }

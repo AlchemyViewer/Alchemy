@@ -28,6 +28,7 @@ target_sources(
       FILES
         alcompressedupdate.h
         alobjectmotion.h
+        alobjectorphans.h
         alobjectupdate.h
         lldaeloader.h
         llgltfmaterial.h
@@ -71,6 +72,7 @@ if(AL_BUILD_TESTS)
     SOURCES
       tests/alcompressedupdate_test.cpp
       tests/alobjectmotion_test.cpp
+      tests/alobjectorphans_test.cpp
       tests/alobjectupdate_test.cpp
       tests/llgltfmaterial_test.cpp
       tests/llmaterial_test.cpp

@@ -1962,6 +1962,8 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
     // Fix object parenting.
     //
     bool b_changed_status = false;
+    // Whether this update names a parent the viewer has not got.
+    bool awaits_parent = false;
 
     if (OUT_TERSE_IMPROVED != update_type)
     {
@@ -2105,6 +2107,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                         port = mRegionp->getHost().getPort();
                     }
                     gObjectList.orphanize(this, parent_id, ip, port);
+                    awaits_parent = true;
 
                     // Hide particles, icon and HUD
                     hideExtraDisplayItems( true );
@@ -2191,6 +2194,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
 
                         // We're an orphan, flag things appropriately.
                         gObjectList.orphanize(this, parent_id, ip, port);
+                        awaits_parent = true;
                     }
                 }
 
@@ -2266,6 +2270,13 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     }
                 }
             }
+        }
+
+        // An orphan goes by what its latest update says: where that names no parent, or one the viewer has, it waits
+        // no longer for the one it was given before.
+        if (mOrphaned && !awaits_parent)
+        {
+            gObjectList.unorphanize(this);
         }
     }
 

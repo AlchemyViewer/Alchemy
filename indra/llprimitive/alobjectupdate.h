@@ -27,6 +27,8 @@
 #include "lluuid.h"
 #include "llvolume.h"
 
+class LLXform;
+
 struct ALObjectUpdate
 {
     // Whether an update of this type makes an object: a volume, an avatar,
@@ -56,4 +58,8 @@ struct ALObjectUpdate
     // The agent's avatar is never killed. A region whose objects are all sent,
     // culling_enabled, is the one where a kill means the object is gone.
     static bool killReachesCache(const LLUUID& id, const LLUUID& agent_id, bool culling_enabled);
+
+    // Whether putting child under parent would close a loop: parent is child,
+    // or below it.
+    static bool closesLoop(const LLXform* child, const LLXform* parent);
 };

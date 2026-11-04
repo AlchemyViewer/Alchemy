@@ -39,6 +39,7 @@
 
 // project includes
 #include "llviewerobject.h"
+#include "alobjectorphans.h"
 #include "alobjectroster.h"
 #include "lleventcoro.h"
 #include "llcoros.h"
@@ -166,26 +167,15 @@ public:
 
     S32 findReferences(LLDrawable *drawablep) const; // Find references to drawable in all objects, and return value.
 
-    S32 getOrphanParentCount() const { return (S32) mOrphanParents.size(); }
-    S32 getOrphanCount() const { return mNumOrphans; }
+    S32 getOrphanParentCount() const { return mOrphans.parentCount(); }
+    S32 getOrphanCount() const { return mOrphans.childCount(); }
     S32 getAvatarCount() const { return mNumAvatars; }
     void orphanize(LLViewerObject *childp, U32 parent_id, U32 ip, U32 port);
+    // childp waits for no parent any more, an update having named none or one the viewer has.
+    void unorphanize(LLViewerObject* childp);
     void findOrphans(LLViewerObject* objectp, U32 ip, U32 port);
 
 public:
-    // Class for keeping track of orphaned objects
-    class OrphanInfo
-    {
-    public:
-        OrphanInfo();
-        OrphanInfo(const U64 parent_info, const LLUUID child_info);
-        bool operator==(const OrphanInfo &rhs) const;
-        bool operator!=(const OrphanInfo &rhs) const;
-        U64 mParentInfo;
-        LLUUID mChildInfo;
-    };
-
-
     U32 mCurBin; // Current bin we're working on...
 
     // Statistics data (see also LLViewerStats)
@@ -223,9 +213,7 @@ public:
     S32 mNumUnknownUpdates;
     S32 mNumDeadObjectUpdates;
 protected:
-    std::vector<U64>    mOrphanParents; // LocalID/ip,port of orphaned objects
-    std::vector<OrphanInfo> mOrphanChildren;    // UUID's of orphaned objects
-    S32 mNumOrphans;
+    ALObjectOrphans mOrphans;   // Each by the parent's LocalID/ip,port
     S32 mNumAvatars;
 
     typedef std::vector<LLPointer<LLViewerObject> > vobj_list_t;

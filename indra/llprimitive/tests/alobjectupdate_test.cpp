@@ -26,6 +26,8 @@
 
 #include "../alobjectupdate.h"
 
+#include "xform.h"
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -47,6 +49,36 @@ namespace
         CHECK_FALSE(ALObjectUpdate::makesObject(0x3E));
         CHECK_FALSE(ALObjectUpdate::makesObject(0xAE));
         CHECK_FALSE(ALObjectUpdate::makesObject(0xCE));
+    }
+
+    TEST_CASE("ALObjectUpdate: a parent below a child would close a loop", "[ALObjectUpdate]")
+    {
+        LLXform top;
+        LLXform middle;
+        LLXform bottom;
+        REQUIRE(middle.setParent(&top));
+        REQUIRE(bottom.setParent(&middle));
+
+        CHECK(ALObjectUpdate::closesLoop(&top, &middle));
+        CHECK(ALObjectUpdate::closesLoop(&top, &bottom));
+        CHECK(ALObjectUpdate::closesLoop(&middle, &bottom));
+        UNSCOPED_INFO("an object is its own loop");
+        CHECK(ALObjectUpdate::closesLoop(&top, &top));
+    }
+
+    TEST_CASE("ALObjectUpdate: a parent above or apart from a child closes no loop", "[ALObjectUpdate]")
+    {
+        LLXform top;
+        LLXform middle;
+        LLXform bottom;
+        LLXform apart;
+        REQUIRE(middle.setParent(&top));
+        REQUIRE(bottom.setParent(&middle));
+
+        CHECK_FALSE(ALObjectUpdate::closesLoop(&bottom, &middle));
+        CHECK_FALSE(ALObjectUpdate::closesLoop(&bottom, &top));
+        CHECK_FALSE(ALObjectUpdate::closesLoop(&apart, &bottom));
+        CHECK_FALSE(ALObjectUpdate::closesLoop(&bottom, &apart));
     }
 
     const LLUUID AGENT("11111111-1111-1111-1111-111111111111");
