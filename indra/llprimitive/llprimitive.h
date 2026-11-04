@@ -543,6 +543,17 @@ public:
     // takes the bytes its data holds whatever the size before it names. Empty
     // for neither, or where the data is cut short.
     static void unpackCompressedData(LLDataPacker& dp, U32 flags, boost::container::small_vector_base<U8>& data);
+
+    // A texture entry as a packer or a TextureEntry field holds it, with room
+    // in place for as long as the packers write for the most faces they pack,
+    // and the zero the parse puts after it.
+    static constexpr size_t TE_INLINE_BYTES = 4608;
+    typedef boost::container::small_vector<U8, TE_INLINE_BYTES> te_bytes_t;
+
+    // Applies a texture entry read whole from a packer, without the size
+    // before it, as unpackTEMessage applies one it reads.
+    S32 unpackTEEntry(boost::container::small_vector_base<U8>& packed);
+
     S32 applyParsedTEMessage(LLTEContents& tec);
 
 #ifdef CHECK_FOR_FINITE

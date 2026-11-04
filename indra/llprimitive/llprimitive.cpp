@@ -1307,11 +1307,6 @@ S32 LLPrimitive::parseTEMessage(LLMessageSystem* mesgsys, char const* block_name
 
 namespace
 {
-    // Room for a texture entry as long as the packers write for the most
-    // faces they pack, and the zero the parse puts after it.
-    constexpr size_t TE_INLINE_BYTES = 4608;
-    typedef boost::container::small_vector<U8, TE_INLINE_BYTES> te_bytes_t;
-
     // Parses a packed TextureEntry field of any length into tec, for
     // face_count faces.
     S32 parse_te_entry(boost::container::small_vector_base<U8>& packed, LLTEContents& tec, U8 face_count)
@@ -1460,7 +1455,11 @@ S32 LLPrimitive::unpackTEMessage(LLDataPacker &dp)
         LL_WARNS() << "Bad texture entry block!  Abort!" << LL_ENDL;
         return TEM_INVALID;
     }
+    return unpackTEEntry(packed);
+}
 
+S32 LLPrimitive::unpackTEEntry(boost::container::small_vector_base<U8>& packed)
+{
     LLTEContents tec;
     if (!parse_te_entry(packed, tec, getNumTEs()))
     {

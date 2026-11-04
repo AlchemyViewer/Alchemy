@@ -40,6 +40,9 @@
 
 #include "message.h" // for getting the port
 #include "llstl.h"
+#if AL_SESSION_CAPTURE
+#include "alsessioncapture.h"
+#endif
 
 using namespace LLCore;
 
@@ -279,6 +282,13 @@ void HttpCoroHandler::onCompleted(LLCore::HttpHandle handle, LLCore::HttpRespons
         // cancel yet.  Patience!
         return;
     }
+
+#if AL_SESSION_CAPTURE
+    if (ALSessionCapture::capturing())
+    {
+        ALSessionCapture::instance().recordHttp(*response);
+    }
+#endif
 
     if (!status)
     {

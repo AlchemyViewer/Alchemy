@@ -181,7 +181,8 @@ static bool matchRegex(const std::string& text, const LLUrlEntryBase& entry, U32
     return true;
 }
 
-bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LLUrlLabelCallback &cb, bool is_content_trusted, bool skip_non_mentions)
+LLUrlEntryBase* LLUrlRegistry::firstUrlEntry(const std::string& text, bool is_content_trusted, bool skip_non_mentions,
+                                             U32& match_start, U32& match_end)
 {
     // which entries' patterns match anywhere in the text, in one pass,
     // where the set can say: the others cannot match, and are passed over,
@@ -192,13 +193,14 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
     {
         if (could_match.empty() && mUrlSetHasAll)
         {
-            return false;
+            return nullptr;
         }
         std::sort(could_match.begin(), could_match.end());
     }
 
     // find the first matching regex from all url entries in the registry
-    U32 match_start = 0, match_end = 0;
+    match_start = 0;
+    match_end = 0;
     LLUrlEntryBase *match_entry = NULL;
 
     std::vector<LLUrlEntryBase *>::iterator it;
@@ -253,17 +255,35 @@ bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LL
         }
     }
 
+    return match_entry;
+}
+
+bool LLUrlRegistry::findUrl(const std::string &text, LLUrlMatch &match, const LLUrlLabelCallback &cb, bool is_content_trusted, bool skip_non_mentions)
+{
+    U32 match_start = 0, match_end = 0;
+    LLUrlEntryBase* match_entry = firstUrlEntry(text, is_content_trusted, skip_non_mentions, match_start, match_end);
+
+    // A link straight after @ is an email with an empty username, and no
+    // link (see MAINT-5371). The text after it is searched as a text of its
+    // own, as a text widget searches the text after a link it found.
+    std::string rest;
+    const std::string* searched = &text;
+    size_t offset = 0;
+    while (match_entry && match_start > 0 && (*searched)[match_start - 1] == '@')
+    {
+        offset += match_end + 1;
+        rest = text.substr(offset);
+        searched = &rest;
+        match_entry = firstUrlEntry(rest, is_content_trusted, skip_non_mentions, match_start, match_end);
+    }
+
     // did we find a match? if so, return its details in the match object
     if (match_entry)
     {
-        // Skip if link is an email with an empty username (starting with @). See MAINT-5371.
-        if (match_start > 0 && text.substr(match_start - 1, 1) == "@")
-            return false;
-
         // fill in the LLUrlMatch object and return it
-        std::string url = text.substr(match_start, match_end - match_start + 1);
+        std::string url = searched->substr(match_start, match_end - match_start + 1);
 
-        match.setValues(match_start, match_end,
+        match.setValues(static_cast<U32>(offset) + match_start, static_cast<U32>(offset) + match_end,
                         match_entry->getUrl(url),
                         match_entry->getLabel(url, cb),
                         match_entry->getQuery(url),

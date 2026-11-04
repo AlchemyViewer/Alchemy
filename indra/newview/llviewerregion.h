@@ -478,6 +478,9 @@ private:
     void addCacheMiss(U32 id, LLViewerRegion::eCacheMissType miss_type);
     void decodeBoundingInfo(LLVOCacheEntry* entry);
     bool isNonCacheableObjectCreated(U32 local_id);
+    // Whether the region's object cache is to be removed, letting go of its
+    // entries, before anything made from them would be.
+    bool cacheRemovalRequested() const;
 
 public:
     void applyCacheMiscExtras(LLViewerObject* obj);
