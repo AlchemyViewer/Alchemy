@@ -103,6 +103,7 @@ def histogram(grid, settings):
 # pipeline.cpp generateExposure's uniforms, then exposureF.glsl, statement for statement
 
 def exposure_params(settings, meter=True):
+    """generateExposure's two uniform vectors: (key + compensation, min EV, max EV, meter on) and (low and high percentile, speed up and down); the key follows the incident strength."""
     low = min(max(settings["low_percent"] * 0.01, 0.0), 0.99)
     high = min(max(settings["high_percent"] * 0.01, low + 0.01), 1.0)
     key_ev = (1.0 - min(max(settings["incident_strength"], 0.0), 1.0)) * math.log2(KEY)
@@ -165,6 +166,7 @@ def mean_albedo(albedo, blended):
 
 
 def smoothstep(lo, hi, x):
+    """GLSL's smoothstep: 0 below lo, 1 above hi, a cubic between."""
     t = min(max((x - lo) / (hi - lo), 0.0), 1.0)
     return t * t * (3.0 - 2.0 * t)
 
@@ -314,6 +316,7 @@ def check_broken_history(ck):
 
 
 def check_albedo(ck):
+    """(g) Incident metering: white and grey meter alike, near black has no say, a blended pixel meters as reflective does, and the key follows the strength."""
     print("(g) incident metering: the light on surfaces, not the light they reflect")
     by_light = dict(DEFAULTS, incident_strength=1.0)
     light = 2.0
@@ -352,6 +355,7 @@ def check_albedo(ck):
 
 
 def main():
+    """Runs every check, prints the result, and returns 0 only if all of them held."""
     ck = Checker()
     check_calibration(ck)
     check_hot_spot(ck)

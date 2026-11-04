@@ -86,6 +86,9 @@ float lum(vec3 col)
     return dot(vec3(0.2126, 0.7152, 0.0722), col);
 }
 
+/// One patch of the meter's grid: taps across the patch of the scene, told apart by depth into sky and ground, written as
+/// the ground's mean luminance (divided by its mean albedo under incident metering), the sky's mean luminance, the sky's
+/// share, and the share of the exposure the albedo has earned.
 void main()
 {
     vec2 scene_size = vec2(textureSize(diffuseRect, 0));
