@@ -152,4 +152,20 @@ namespace
     {
         CHECK_FALSE(ALObjectUpdate::positionOnCrossing(LLVector3(1.f, 2.f, 3.f), LLVector3::zero, LLVector3(256.f, 0.f, 0.f), false).has_value());
     }
+
+    const LLUUID CACHE_ID("66666666-6666-6666-6666-666666666666");
+    const LLUUID OTHER_CACHE_ID("77777777-7777-7777-7777-777777777777");
+
+    TEST_CASE("ALObjectUpdate: a handshake under another cache ID ends the cache a region has loaded", "[ALObjectUpdate]")
+    {
+        CHECK(ALObjectUpdate::handshakeEndsCache(true, CACHE_ID, OTHER_CACHE_ID));
+    }
+
+    TEST_CASE("ALObjectUpdate: a handshake leaves the cache where it names the same ID or none is loaded", "[ALObjectUpdate]")
+    {
+        UNSCOPED_INFO("the same ID again, as for a change to the region's settings");
+        CHECK_FALSE(ALObjectUpdate::handshakeEndsCache(true, CACHE_ID, CACHE_ID));
+        UNSCOPED_INFO("the first handshake, before a cache has been loaded for any");
+        CHECK_FALSE(ALObjectUpdate::handshakeEndsCache(false, LLUUID::null, CACHE_ID));
+    }
 }

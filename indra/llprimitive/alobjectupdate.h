@@ -72,4 +72,9 @@ struct ALObjectUpdate
     // stays, which is none.
     static std::optional<LLVector3> positionOnCrossing(const LLVector3& position, const LLVector3& old_origin,
                                                        const LLVector3& new_origin, bool is_root);
+
+    // Whether a region handshake ends the object cache a region holds: it has
+    // loaded one, under loaded_id, and the handshake names another. A handshake
+    // may come again on the same circuit, for a change to the region's settings.
+    static bool handshakeEndsCache(bool cache_loaded, const LLUUID& loaded_id, const LLUUID& handshake_id);
 };

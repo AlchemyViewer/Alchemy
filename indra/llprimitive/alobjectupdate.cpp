@@ -82,3 +82,9 @@ std::optional<LLVector3> ALObjectUpdate::positionOnCrossing(const LLVector3& pos
     }
     return position + (old_origin - new_origin);
 }
+
+// static
+bool ALObjectUpdate::handshakeEndsCache(bool cache_loaded, const LLUUID& loaded_id, const LLUUID& handshake_id)
+{
+    return cache_loaded && loaded_id != handshake_id;
+}
