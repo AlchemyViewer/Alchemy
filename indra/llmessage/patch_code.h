@@ -42,5 +42,10 @@ void    init_patch_decoding(LLBitPack &bitpack);
 void    decode_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp);
 void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph);
 void    decode_patch(LLBitPack &bitpack, S32 *patches);
+// Reads a patch of a layer that holds a known number of them, its header and
+// then its coefficients. False, having read no coefficients, where the header
+// is the layer's end code: decode_patch would read them with the word bits of
+// the patch before.
+[[nodiscard]] bool decode_expected_patch(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patches);
 
 #endif

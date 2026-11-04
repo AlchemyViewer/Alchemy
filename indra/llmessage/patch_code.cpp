@@ -408,3 +408,13 @@ void    decode_patch(LLBitPack &bitpack, S32 *patches)
 #endif
 }
 
+bool    decode_expected_patch(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patches)
+{
+    decode_patch_header(bitpack, ph);
+    if (END_OF_PATCHES == ph->quant_wbits)
+    {
+        return false;
+    }
+    decode_patch(bitpack, patches);
+    return true;
+}
