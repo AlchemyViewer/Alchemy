@@ -228,6 +228,12 @@ void    decode_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
     gPatchSize = gopp->patch_size;
 }
 
+bool    decode_layer_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
+{
+    decode_patch_group_header(bitpack, gopp);
+    return gopp->patch_size == NORMAL_PATCH_SIZE;
+}
+
 void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
 {
     U8 retvalu8;
