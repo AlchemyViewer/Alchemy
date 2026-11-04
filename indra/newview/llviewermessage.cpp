@@ -30,6 +30,7 @@
 #include "alscriptstudio.h"
 #include "alscripttypes.h"
 #include "alnotecarditems.h"
+#include "alobjectupdate.h"
 
 // Linden libraries
 #include "llanimationstates.h"
@@ -3711,43 +3712,51 @@ void send_agent_update(bool force_send, bool send_reliable)
     msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstance()->getLeftAxis());
     msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstance()->getUpAxis());
 
-    static F32 last_draw_disatance_step = 1024;
-    F32 memory_limited_draw_distance = gAgentCamera.mDrawDistance;
-    const F32 mem_factor = LLMemory::getSystemMemoryBudgetFactor();
-    if (mem_factor > 1.f)
+    static LLCachedControl<bool> limit_draw_distance(gSavedSettings, "ALLimitDrawDistance", false);
+    if (limit_draw_distance)
     {
-        // We are critically low on memory or recovering,
-        // limit requested draw distance
-        memory_limited_draw_distance = llmax(gAgentCamera.mDrawDistance / mem_factor, gAgentCamera.mDrawDistance / 2.f);
-    }
-
-    if (tp_state == LLAgent::TELEPORT_ARRIVING || LLStartUp::getStartupState() < STATE_MISC)
-    {
-        // Inform interest list, prioritize closer area.
-        // Reason: currently server doesn't distance sort attachments, by restricting range
-        // we reduce the number of attachments sent to the viewer, thus prioritizing
-        // closer ones.
-        // Todo: revise and remove once server gets distance sorting.
-        last_draw_disatance_step = llmax((F32)(gAgentCamera.mDrawDistance / 2.f), 50.f);
-        last_draw_disatance_step = llmin(last_draw_disatance_step, memory_limited_draw_distance);
-        msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
-    }
-    else if (last_draw_disatance_step < memory_limited_draw_distance)
-    {
-        static LLFrameTimer last_step_time;
-        if (last_step_time.getElapsedTimeF32() > 1.f)
+        static F32 last_draw_disatance_step     = 1024;
+        F32        memory_limited_draw_distance = gAgentCamera.mDrawDistance;
+        const F32  mem_factor                   = LLMemory::getSystemMemoryBudgetFactor();
+        if (mem_factor > 1.f)
         {
-            // gradually increase draw distance
-            last_step_time.reset();
-            F32 step = memory_limited_draw_distance * 0.1f;
-            last_draw_disatance_step = llmin(last_draw_disatance_step + step, memory_limited_draw_distance);
+            // We are critically low on memory or recovering,
+            // limit requested draw distance
+            memory_limited_draw_distance = llmax(gAgentCamera.mDrawDistance / mem_factor, gAgentCamera.mDrawDistance / 2.f);
         }
-        msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
+
+        if (tp_state == LLAgent::TELEPORT_ARRIVING || LLStartUp::getStartupState() < STATE_MISC)
+        {
+            // Inform interest list, prioritize closer area.
+            // Reason: currently server doesn't distance sort attachments, by restricting range
+            // we reduce the number of attachments sent to the viewer, thus prioritizing
+            // closer ones.
+            // Todo: revise and remove once server gets distance sorting.
+            last_draw_disatance_step = llmax((F32)(gAgentCamera.mDrawDistance / 2.f), 50.f);
+            last_draw_disatance_step = llmin(last_draw_disatance_step, memory_limited_draw_distance);
+            msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
+        }
+        else if (last_draw_disatance_step < memory_limited_draw_distance)
+        {
+            static LLFrameTimer last_step_time;
+            if (last_step_time.getElapsedTimeF32() > 1.f)
+            {
+                // gradually increase draw distance
+                last_step_time.reset();
+                F32 step                 = memory_limited_draw_distance * 0.1f;
+                last_draw_disatance_step = llmin(last_draw_disatance_step + step, memory_limited_draw_distance);
+            }
+            msg->addF32Fast(_PREHASH_Far, last_draw_disatance_step);
+        }
+        else
+        {
+            last_draw_disatance_step = memory_limited_draw_distance;
+            msg->addF32Fast(_PREHASH_Far, memory_limited_draw_distance);
+        }
     }
     else
     {
-        last_draw_disatance_step = memory_limited_draw_distance;
-        msg->addF32Fast(_PREHASH_Far, memory_limited_draw_distance);
+        msg->addF32Fast(_PREHASH_Far, gAgentCamera.mDrawDistance);
     }
 
     msg->addU32Fast(_PREHASH_ControlFlags, control_flags);
@@ -4002,7 +4011,6 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         if (id == LLUUID::null)
         {
             LL_DEBUGS("Messaging") << "Unknown kill for local " << local_id << LL_ENDL;
-            continue;
         }
         else
         {
@@ -4019,8 +4027,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         if (objectp)
         {
 // [SL:KB] - Patch: Appearance-TeleportAttachKill | Checked: Catznip-4.0
-                if ( (objectp->isAttachment()) && (!objectp->isTempAttachment()) && (LLAgent::TELEPORT_NONE != gAgent.getTeleportState()) &&
-                     (gAgentAvatarp) && (objectp->permYouOwner()) && (gSavedSettings.getBOOL("BlockAttachmentKillsOnTeleport")) )
+                if (LLViewerObjectList::killHeldForTeleport(objectp))
                 {
                     //gAgentAvatarp->addPendingDetach(objectp->getRootEdit()->getID());
                     continue;
@@ -4039,7 +4046,7 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
             gObjectList.killObject(objectp);
         }
 
-        if(delete_object && regionp)
+        if (regionp && ALObjectUpdate::killReachesCache(id, gAgentID, delete_object))
         {
             regionp->killCacheEntry(local_id);
         }
@@ -4047,7 +4054,10 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         // We should remove the object from selection after it is marked dead by gObjectList to make LLToolGrab,
         // which is using the object, release the mouse capture correctly when the object dies.
         // See LLToolGrab::handleHoverActive() and LLToolGrab::handleHoverNonPhysical().
-        LLSelectMgr::getInstance()->removeObjectFromSelections(id);
+        if (id.notNull())
+        {
+            LLSelectMgr::getInstance()->removeObjectFromSelections(id);
+        }
 
     }   // end for loop
 

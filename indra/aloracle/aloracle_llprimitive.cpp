@@ -326,7 +326,8 @@ int32_t aloracle_texture_entry_pack(const uint8_t* faces, size_t size, aloracle_
             setFace(primitive, face, list[face]);
         }
 
-        std::vector<U8> buffer(4 + LLTEContents::MAX_TE_BUFFER);
+        // packTEMessage writes the entry as binary data, after its S32 size.
+        std::vector<U8> buffer(4 + primitive.packTEEntry().size());
         LLDataPackerBinaryBuffer dp(buffer.data(), (S32)buffer.size());
         primitive.packTEMessage(dp);
         return aloracle::give(viewOf(buffer, 4, dp.getCurrentSize()), entry);

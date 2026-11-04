@@ -42,6 +42,7 @@
 
 #include "llvieweroctree_stub.cpp"
 
+#include <algorithm>
 #include <filesystem>
 #include <fstream>
 
@@ -805,6 +806,144 @@ namespace
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
         UNSCOPED_INFO("and no extras file for a region the header does not hold");
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+    }
+
+    // Removing a region's entry lets go of its objects in memory, and an
+    // object update that finds the cache bogus is read from one of them.
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: a removal asked for waits for the removals asked for to be carried out", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1023 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), true, false);
+        REQUIRE(LLVOCache::instance().getCacheEntries() == 1u);
+
+        CHECK_FALSE(LLVOCache::instance().isRemovalRequested(handle));
+        LLVOCache::instance().requestRemoval(handle);
+        LLVOCache::instance().requestRemoval(handle);
+        UNSCOPED_INFO("the region is still cached once its removal is asked for");
+        CHECK(LLVOCache::instance().isRemovalRequested(handle));
+        CHECK(LLVOCache::instance().getCacheEntries() == 1u);
+        CHECK(std::filesystem::exists(objectFile(handle, ".slc")));
+
+        LLVOCache::instance().removeRequestedEntries();
+        UNSCOPED_INFO("and gone once the removals are carried out");
+        CHECK_FALSE(LLVOCache::instance().isRemovalRequested(handle));
+        CHECK(LLVOCache::instance().getCacheEntries() == 0u);
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
+
+        UNSCOPED_INFO("which leaves none asked for");
+        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), true, false);
+        LLVOCache::instance().removeRequestedEntries();
+        CHECK(LLVOCache::instance().getCacheEntries() == 1u);
+    }
+
+    TEST_CASE("LLVOCacheEntry: an entry is the object of the UUID its data opens with", "[LLVOCache]")
+    {
+        const LLUUID object_id("44444444-4444-4444-4444-444444444444");
+        const LLUUID other_id("55555555-5555-5555-5555-555555555555");
+
+        std::vector<U8> body(object_id.mData, object_id.mData + UUID_BYTES);
+        body.resize(UUID_BYTES + 24, 0xAB);
+        LLDataPackerBinaryBuffer dp(body.data(), (S32)body.size());
+        LLPointer<LLVOCacheEntry> entry = new LLVOCacheEntry(7, 1234, dp);
+        CHECK(entry->isObject(object_id));
+        CHECK_FALSE(entry->isObject(other_id));
+        CHECK_FALSE(entry->isObject(LLUUID::null));
+
+        UNSCOPED_INFO("and reading it moves nothing that reads the entry after");
+        LLDataPackerBinaryBuffer* read_back = entry->getDP();
+        REQUIRE(read_back);
+        read_back->reset();
+        LLUUID read_id;
+        read_back->unpackUUID(read_id, "ID");
+        CHECK(read_id == object_id);
+
+        UNSCOPED_INFO("data too short to hold one is no object's");
+        LLDataPackerBinaryBuffer short_dp(body.data(), UUID_BYTES - 1);
+        LLPointer<LLVOCacheEntry> short_entry = new LLVOCacheEntry(8, 1234, short_dp);
+        CHECK_FALSE(short_entry->isObject(object_id));
+        LLPointer<LLVOCacheEntry> empty_entry = new LLVOCacheEntry();
+        CHECK_FALSE(empty_entry->isObject(LLUUID::null));
+    }
+
+    TEST_CASE("LLVOCacheEntry: a kill takes a local ID's overrides whether or not it has a valid entry", "[LLVOCache]")
+    {
+        constexpr U32 VALID = 1;
+        constexpr U32 INVALID = 2;
+        constexpr U32 NO_ENTRY = 3;
+        constexpr U32 NO_OVERRIDES = 4;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[VALID] = vocacheTest::makeEntry(VALID, 1, 16);
+        entries[INVALID] = vocacheTest::makeEntry(INVALID, 2, 16);
+        entries[INVALID]->setValid(false);
+        entries[NO_OVERRIDES] = vocacheTest::makeEntry(NO_OVERRIDES, 4, 16);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        for (U32 local_id : { VALID, INVALID, NO_ENTRY })
+        {
+            overrides[local_id].mLocalId = local_id;
+        }
+
+        std::vector<LLVOCacheEntry*> killed;
+        const auto kill_entry = [&](LLVOCacheEntry* entry) { killed.push_back(entry); };
+
+        CHECK(LLVOCacheEntry::killLocalID(VALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(VALID) == 0);
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[VALID].get());
+
+        killed.clear();
+        UNSCOPED_INFO("an entry already invalid is not killed twice");
+        CHECK(LLVOCacheEntry::killLocalID(INVALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(INVALID) == 0);
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("a local ID with no entry at all");
+        CHECK(LLVOCacheEntry::killLocalID(NO_ENTRY, entries, overrides, kill_entry));
+        CHECK(overrides.empty());
+        CHECK(killed.empty());
+
+        UNSCOPED_INFO("an entry with no overrides is killed and says it took none");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(NO_OVERRIDES, entries, overrides, kill_entry));
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[NO_OVERRIDES].get());
+
+        UNSCOPED_INFO("and a local ID with neither takes nothing");
+        killed.clear();
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
+        CHECK(killed.empty());
+    }
+
+    TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
+    {
+        LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);
+        const LLPointer<LLVOCacheEntry> watched = entries[2];
+        LLVOCacheEntry::vocache_entry_set_t active;
+        LLVOCacheEntry::vocache_entry_set_t visible;
+        active.insert(entries[1].get());
+        active.insert(watched.get());
+        visible.insert(entries[5].get());
+
+        std::vector<LLVOCacheEntry*> left_tree;
+        std::vector<LLPointer<LLVOCacheEntry>> keep;
+        sRemovedOctreeEntries.clear();
+        LLVOCacheEntry::releaseAll(entries, { &active, &visible }, [&](LLVOCacheEntry* entry) { left_tree.push_back(entry); }, keep);
+
+        CHECK(entries.empty());
+        CHECK(active.empty());
+        CHECK(visible.empty());
+        UNSCOPED_INFO("every entry left the tree");
+        CHECK(left_tree.size() == 6u);
+        CHECK(std::find(left_tree.begin(), left_tree.end(), watched.get()) != left_tree.end());
+        UNSCOPED_INFO("and its octree entry");
+        CHECK(sRemovedOctreeEntries.size() == 6u);
+        const LLViewerOctreeEntryData* watched_data = watched.get();
+        CHECK(std::find(sRemovedOctreeEntries.begin(), sRemovedOctreeEntries.end(), watched_data) != sRemovedOctreeEntries.end());
+        UNSCOPED_INFO("and is held by keep alone besides the test");
+        CHECK(keep.size() == 6u);
+        CHECK(watched->getNumRefs() == 2);
+        CHECK_FALSE(watched->isValid());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: staysInMemory keeps entries seen lately or inside the rear sphere", "[LLVOCache]")
