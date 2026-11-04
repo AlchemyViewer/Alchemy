@@ -287,6 +287,17 @@ void LLModelPreview::rebuildUploadData()
     assert_main_thread();
 
     mDefaultPhysicsShapeP = NULL;
+    // <SK:Nexii> Mesh uploader LODs by name: physics set to use a LOD is that LOD as it stands now, however
+    // it changed since (a new high file, the file's own LODs, generation, a LOD file of its own)
+    if (mPhysicsSearchLOD >= LLModel::LOD_IMPOSTOR && mPhysicsSearchLOD <= LLModel::LOD_HIGH
+        && mLODFile[LLModel::LOD_PHYSICS].empty() && !mLODFromHighFile[LLModel::LOD_PHYSICS]
+        && mModel[LLModel::LOD_PHYSICS] != mModel[mPhysicsSearchLOD])
+    {
+        mModel[LLModel::LOD_PHYSICS] = mModel[mPhysicsSearchLOD];
+        mScene[LLModel::LOD_PHYSICS] = mScene[mPhysicsSearchLOD];
+        mVertexBuffer[LLModel::LOD_PHYSICS].clear();
+    }
+    // </SK:Nexii>
     // <SK:Nexii> Mesh uploader LODs by name: physics from the high file names its default shape as a physics file does
     if (mLODFromHighFile[LLModel::LOD_PHYSICS])
     {
@@ -1852,17 +1863,6 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         }
     }
 
-    // <SK:Nexii> Mesh uploader LODs by name: physics copied from a LOD follows it once it is generated again
-    if (mPhysicsSearchLOD >= LLModel::LOD_IMPOSTOR && mPhysicsSearchLOD <= LLModel::LOD_HIGH
-        && mLODFile[LLModel::LOD_PHYSICS].empty() && !mLODFromHighFile[LLModel::LOD_PHYSICS]
-        && (which_lod == -1 || which_lod == mPhysicsSearchLOD))
-    {
-        mModel[LLModel::LOD_PHYSICS] = mModel[mPhysicsSearchLOD];
-        mScene[LLModel::LOD_PHYSICS] = mScene[mPhysicsSearchLOD];
-        mVertexBuffer[LLModel::LOD_PHYSICS].clear();
-    }
-    // </SK:Nexii>
-
     dropFacesCopiesOfLostModels();
 
     LL_INFOS("Upload") << "LOD " << which_lod << ", Mesh optimizer processed meshes : " << meshes_processed
@@ -1960,7 +1960,9 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         }
     };
 
-    // A suffixed model with no base is named as the loader always named it, without its suffix.
+    // A suffixed model with no base is named as the loader always named it, without its suffix. Models
+    // are found first, so every instance of one shared model takes the new name, not only the first.
+    std::set<LLModel*> leftovers;
     for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
     {
         for (LLModelInstance& instance : scene_pair.second)
@@ -1968,8 +1970,21 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             LLModel* model = instance.mModel;
             if (model && suffix_lod(core_of(model)) >= 0 && lod_of(model) < 0)
             {
-                model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
-                instance.mLabel = model->mLabel; // a submodel keeps its letter, so it isn't taken for its root
+                leftovers.insert(model);
+            }
+        }
+    }
+    for (LLModel* model : leftovers)
+    {
+        model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
+    }
+    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
+    {
+        for (LLModelInstance& instance : scene_pair.second)
+        {
+            if (leftovers.count(instance.mModel))
+            {
+                instance.mLabel = instance.mModel->mLabel; // a submodel keeps its letter, so it isn't taken for its root
             }
         }
     }
@@ -2027,24 +2042,8 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             }
         }
     }
-    // Physics copied from a LOD follows that LOD when this file replaces it.
-    const S32 physics_from = mPhysicsSearchLOD;
-    auto follow_physics = [&]()
-    {
-        // A physics file of its own is left alone; only physics copied from that LOD follows it. A LOD
-        // released for generation is copied once generated (genMeshOptimizerLODs), not while empty here.
-        const bool own_physics_file = !mLODFile[LLModel::LOD_PHYSICS].empty() && !was_from_file[LLModel::LOD_PHYSICS];
-        if (!own_physics_file && physics_from >= LLModel::LOD_IMPOSTOR && physics_from <= LLModel::LOD_HIGH
-            && split[physics_from])
-        {
-            mModel[LLModel::LOD_PHYSICS] = mModel[physics_from];
-            mScene[LLModel::LOD_PHYSICS] = mScene[physics_from];
-            mVertexBuffer[LLModel::LOD_PHYSICS].clear();
-        }
-    };
     if (kept.size() == mModel[LLModel::LOD_HIGH].size())
     {
-        follow_physics();
         return;
     }
     mModel[LLModel::LOD_HIGH] = kept;
@@ -2123,10 +2122,6 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
         std::ostringstream out;
         out << "Took " << mModel[lod].size() << " model(s) named " << getLodSuffix(lod) << " from the file for that slot";
         LLFloaterModelPreview::addStringToLog(out, false);
-    }
-    if (!split[LLModel::LOD_PHYSICS])
-    {
-        follow_physics();
     }
 }
 // </SK:Nexii>
