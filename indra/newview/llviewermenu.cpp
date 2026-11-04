@@ -4892,6 +4892,7 @@ class LLViewMouselook : public view_listener_t
         {
             SKOTSCamera::requestShoulder(); // <SK:Nexii> Over-the-shoulder view: the mouselook key opens it, scrolling in does not
             gAgentCamera.changeCameraToMouselook();
+            SKOTSCamera::cancelRequest(); // <SK:Nexii> Over-the-shoulder view: a refused mouselook leaves no request behind
         }
         else
         {

@@ -279,6 +279,11 @@ void SKOTSCamera::requestShoulder()
         && !(remember && gSavedSettings.getBOOL("SKOTSLastViewFirstPerson"));
 }
 
+void SKOTSCamera::cancelRequest()
+{
+    sShoulderRequested = false;
+}
+
 void SKOTSCamera::onEnterMouselook()
 {
     sShoulder = sShoulderRequested;

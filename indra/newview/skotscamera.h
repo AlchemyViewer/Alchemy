@@ -43,6 +43,7 @@ namespace SKOTSCamera
     // Asks for the next mouselook entry to open over the shoulder. Only the mouselook key asks;
     // scrolling in and scripts still enter first person.
     void requestShoulder();
+    void cancelRequest(); // Drops a request mouselook did not take up
 
     // Picks the view on entering mouselook from the request and the last view toggled to.
     void onEnterMouselook();

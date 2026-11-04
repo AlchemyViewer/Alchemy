@@ -128,6 +128,6 @@
      top_pad="10"
      width="406"
      wrap="true">
-Bind Shoulder / First Person and Swap Shoulder under Preferences &gt; Controls &gt; Movement.
+Bind Shoulder / First Person and Swap Shoulder under Preferences &gt; Controls, in the camera rows for first person mode (Mouselook).
     </text>
 </floater>
