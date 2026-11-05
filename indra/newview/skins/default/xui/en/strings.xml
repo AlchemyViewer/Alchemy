@@ -136,6 +136,7 @@ https://www.alchemyviewer.org/downloads</string>
 If you feel this is an error, please contact Support.</string>
 	<string name="LoginIntermediateOptionalUpdateAvailable">Optional viewer update available: [VERSION]</string>
 	<string name="LoginFailedRequiredUpdate">Required viewer update: [VERSION]</string>
+	<string name="LoginFailedInsecureRedirect">The login server tried to send your login to an address that isn't secure, so the login was stopped.</string>
 	<string name="LoginFailedAlreadyLoggedIn">This agent is already logged in.
 </string>
 	<string name="LoginFailedAuthenticationFailed">Sorry! We couldn't log you in.

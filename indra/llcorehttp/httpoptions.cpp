@@ -44,6 +44,7 @@ HttpOptions::HttpOptions() :
     mMaxRetryBackoff(HTTP_RETRY_BACKOFF_MAX_DEFAULT),
     mUseRetryAfter(HTTP_USE_RETRY_AFTER_DEFAULT),
     mFollowRedirects(true),
+    mRedirectsHttpsOnly(false),
     mVerifyPeer(sDefaultVerifyPeer),
     mVerifyHost(false),
     mDNSCacheTimeout(-1L),
@@ -103,6 +104,11 @@ void HttpOptions::setUseRetryAfter(bool use_retry)
 void HttpOptions::setFollowRedirects(bool follow_redirect)
 {
     mFollowRedirects = follow_redirect;
+}
+
+void HttpOptions::setRedirectsHttpsOnly(bool https_only)
+{
+    mRedirectsHttpsOnly = https_only;
 }
 
 void HttpOptions::setSSLVerifyPeer(bool verify)
