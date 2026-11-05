@@ -12,13 +12,5 @@
 	<text_editor name="autorespond_rto_response">
 		ログイン後に変更できます。
 	</text_editor>
-	<text name="adhoc_ignore_label">
-		アドホック（会話）の拒否：
-	</text>
-	<combo_box name="adhoc_preference_combo">
-		<item label="切り" name="adhoc_preference_allow_none"/>
-		<item label="フレンドのみ" name="adhoc_preference_allow_friends"/>
-		<item label="全て" name="adhoc_preference_allow_all"/>
-	</combo_box>
 	<check_box name="AlchemyReportIgnoredAdHocSession" label="無視された会話チャットを報告する"/>
 </panel>

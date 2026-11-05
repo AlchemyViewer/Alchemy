@@ -2,6 +2,7 @@
 <panel label="チャット" name="chat">
 	<tab_container name="chat_tab_container">
 		<panel label="一般" name="chat_prefs_general"/>
+		<panel label="通知" name="chat_prefs_notifications"/>
 		<panel label="コマンド" name="chat_prefs_cmd"/>
 		<panel label="拒否するメッセージ" name="chat_prefs_moderation"/>
 	</tab_container>

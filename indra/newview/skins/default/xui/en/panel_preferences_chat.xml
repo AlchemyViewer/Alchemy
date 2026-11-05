@@ -25,6 +25,14 @@
             filename="panel_preferences_chat_general.xml"
             layout="topleft"
             follows="top|left" />
+        <!-- <SK:Nexii> Chat notifications moved out of General -->
+        <panel
+            label="Notifications"
+            name="chat_prefs_notifications"
+            filename="panel_preferences_chat_notifications.xml"
+            layout="topleft"
+            follows="top|left" />
+        <!-- </SK:Nexii> -->
         <panel
             label="Commands"
             name="chat_prefs_cmd"

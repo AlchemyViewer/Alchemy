@@ -559,7 +559,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
         || (dialog == IM_FROM_TASK && LLMuteList::getInstance()->isMuted(session_id));
     bool is_owned_by_me = false;
     bool is_friend = LLAvatarTracker::instance().getBuddyInfo(from_id) != NULL;
-    bool accept_im_from_only_friend = gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly");
+    bool accept_im_from_only_friend = gSavedPerAccountSettings.getS32("SKContactIMs") != 0; // <SK:Nexii>
     bool is_linden = chat.mSourceType != CHAT_SOURCE_OBJECT &&
         LLMuteList::isLinden(name);
 
@@ -1453,7 +1453,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             {
                 return;
             }
-            else if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && (LLAvatarTracker::instance().getBuddyInfo(from_id) == NULL))
+            else if (!sk_contact_allowed(SKContact::IM, from_id, is_linden)) // <SK:Nexii>
             {
                 return;
             }

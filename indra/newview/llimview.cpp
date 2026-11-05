@@ -119,6 +119,27 @@ const LLUUID LLOutgoingCallDialog::OCD_KEY = LLUUID("7CF78E11-0CFE-498D-ADB9-141
 //
 LLIMMgr* gIMMgr = NULL;
 
+// <SK:Nexii> Per-channel contact filters
+bool sk_contact_allowed(SKContact channel, const LLUUID& from_id, bool from_linden)
+{
+    if (from_linden || from_id == gAgentID)
+    {
+        return true;
+    }
+
+    // 0 everyone, 1 friends only, 2 nobody
+    S32 level = 0;
+    switch (channel)
+    {
+    case SKContact::IM:         level = gSavedPerAccountSettings.getS32("SKContactIMs"); break;
+    case SKContact::Call:       level = gSavedPerAccountSettings.getS32("SKContactCalls"); break;
+    case SKContact::Conference: level = gSavedPerAccountSettings.getS32("AlchemyIgnoreAdHocSessions"); break;
+    case SKContact::GroupChat:  level = gSavedPerAccountSettings.getS32("SKContactGroupChat"); break;
+    case SKContact::GroupCall:  level = gSavedPerAccountSettings.getS32("SKContactGroupCalls"); break;
+    }
+    return level <= 0 || (level == 1 && LLAvatarTracker::instance().isBuddy(from_id));
+}
+// </SK:Nexii>
 
 bool LLSessionTimeoutTimer::tick()
 {
@@ -3219,16 +3240,21 @@ void LLIMMgr::addMessage(
     bool is_group_chat = false;
     bool skip_message = false;
     bool from_linden = LLMuteList::isLinden(from);
-    if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && !from_linden)
-    {
-        // Evaluate if we need to skip this message when that setting is true (default is false)
-        skip_message = (LLAvatarTracker::instance().getBuddyInfo(other_participant_id) == NULL);    // Skip non friends...
-        skip_message &= !(other_participant_id == gAgentID);    // You are your best friend... Don't skip yourself
-    }
+    skip_message = !sk_contact_allowed(SKContact::IM, other_participant_id, from_linden); // <SK:Nexii>
 
     bool new_session = !hasSession(new_session_id);
     if (new_session)
     {
+        // <SK:Nexii> Per-channel contact filters
+        if (gAgent.isInGroup(new_session_id) && !sk_contact_allowed(SKContact::GroupChat, other_participant_id, from_linden))
+        {
+            clearPendingInvitation(new_session_id);
+            clearPendingAgentListUpdates(new_session_id);
+            LLIMModel::getInstance()->sendLeaveSession(new_session_id, other_participant_id);
+            return;
+        }
+        // </SK:Nexii>
+
         // Group chat session was initiated by muted resident, do not start this session viewerside
         // do not send leave msg either, so we are able to get group messages from other participants
         if ((IM_SESSION_INVITE == dialog) && gAgent.isInGroup(new_session_id) &&
@@ -3256,7 +3282,7 @@ void LLIMMgr::addMessage(
         LLIMModel::LLIMSession* session = LLIMModel::instance().findIMSession(new_session_id);
         if (session)
         {
-            skip_message &= !session->isGroupSessionType();         // Do not skip group chats...
+            skip_message &= session->isP2PSessionType(); // <SK:Nexii> Conferences and groups have filters of their own
             if (skip_message)
             {
                 gIMMgr->leaveSession(new_session_id);
@@ -3668,6 +3694,14 @@ void LLIMMgr::inviteToSession(
         }
     }
 
+    // <SK:Nexii> Per-channel contact filters
+    if (notify_box_type == "InviteAdHoc" && !sk_contact_allowed(SKContact::Conference, caller_id, is_linden))
+    {
+        LL_INFOS("IMVIEW") << "Ignoring conference invite from " << caller_name << LL_ENDL;
+        return;
+    }
+    // </SK:Nexii>
+
     LLVoiceChannel* channelp = LLVoiceChannel::getChannelByID(session_id);
     if (channelp && channelp->callStarted())
     {
@@ -3677,8 +3711,15 @@ void LLIMMgr::inviteToSession(
     }
     if (voice_invite)
     {
-        bool isRejectGroupCall = (gSavedSettings.getBOOL("VoiceCallsRejectGroup") && (notify_box_type == "VoiceInviteGroup"));
-        bool isRejectNonFriendCall = (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly") && (LLAvatarTracker::instance().getBuddyInfo(caller_id) == NULL));
+        // <SK:Nexii> Per-channel contact filters
+        bool is_group_call = (notify_box_type == "VoiceInviteGroup");
+        SKContact channel = is_group_call ? SKContact::GroupCall
+                          : (notify_box_type == "VoiceInviteAdHoc") ? SKContact::Conference
+                          : SKContact::Call;
+        bool allowed = sk_contact_allowed(channel, caller_id, is_linden);
+        bool isRejectGroupCall = is_group_call && (!allowed || gSavedSettings.getBOOL("VoiceCallsRejectGroup"));
+        bool isRejectNonFriendCall = !is_group_call && !allowed;
+        // </SK:Nexii>
         if  (isRejectGroupCall || isRejectNonFriendCall || gAgent.isDoNotDisturb())
         {
             if (gAgent.isDoNotDisturb() && !isRejectGroupCall && !isRejectNonFriendCall)

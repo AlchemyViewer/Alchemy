@@ -2213,8 +2213,6 @@ void LLFloaterPreference::setPersonalInfo(const std::string& visibility)
     getChildView("log_path_button")->setEnabled(true);
     getChildView("chat_font_size")->setEnabled(true);
     getChildView("conversation_log_combo")->setEnabled(true);
-    getChild<LLUICtrl>("voice_call_friends_only_check")->setEnabled(true);
-    getChild<LLUICtrl>("voice_call_friends_only_check")->setValue(gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"));
 
 #ifdef LL_DISCORD
     // The account's settings, so only once there is an account. The sharing
@@ -2832,10 +2830,6 @@ bool LLPanelPreference::postBuild()
     {
         getChild<LLCheckBoxCtrl>("music_enabled")->set(gSavedSettings.getBOOL("AudioStreamingMusic"));
     }
-    if (hasChild("voice_call_friends_only_check", true))
-    {
-        getChild<LLCheckBoxCtrl>("voice_call_friends_only_check")->setCommitCallback(boost::bind(&showFriendsOnlyWarning, _1, _2));
-    }
     if (hasChild("allow_multiple_viewer_check", true))
     {
         getChild<LLCheckBoxCtrl>("allow_multiple_viewer_check")->setCommitCallback(boost::bind(&showMultipleViewersWarning, _1, _2));
@@ -2929,15 +2923,6 @@ void LLPanelPreference::saveSettings()
             view_stack.push_back(*iter);
         }
     }
-
-    if (LLStartUp::getStartupState() == STATE_STARTED)
-    {
-        LLControlVariable* control = gSavedPerAccountSettings.getControl("VoiceCallsFriendsOnly");
-        if (control)
-        {
-            mSavedValues[control] = control->getValue();
-        }
-    }
 }
 
 void LLPanelPreference::showMultipleViewersWarning(LLUICtrl* checkbox, const LLSD& value)
@@ -2945,18 +2930,6 @@ void LLPanelPreference::showMultipleViewersWarning(LLUICtrl* checkbox, const LLS
     if (checkbox && checkbox->getValue())
     {
         LLNotificationsUtil::add("AllowMultipleViewers");
-    }
-}
-
-void LLPanelPreference::showFriendsOnlyWarning(LLUICtrl* checkbox, const LLSD& value)
-{
-    if (checkbox)
-    {
-        gSavedPerAccountSettings.setBOOL("VoiceCallsFriendsOnly", checkbox->getValue().asBoolean());
-        if (checkbox->getValue())
-        {
-            LLNotificationsUtil::add("FriendsAndGroupsOnly");
-        }
     }
 }
 
