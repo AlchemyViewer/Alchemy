@@ -801,6 +801,11 @@ public:
     bool            mUploadSkin;
     bool            mUploadJoints;
     bool            mLockScaleIfJointPosition;
+    // <SK:Nexii> Mesh uploader pivot: added to each base model's stored domains
+    typedef boost::unordered_map<const LLModel*, LLVector3> position_offsets_t;
+    position_offsets_t mPositionOffsets;
+    LLVector3       getPositionOffset(const LLModel* model) const;
+    // </SK:Nexii>
     volatile bool   mDiscarded;
 
     LLHost          mHost;
@@ -815,7 +820,8 @@ public:
                        const LLUUID destination_folder_id = LLUUID::null,
                        bool do_upload = true,
                        LLHandle<LLWholeModelFeeObserver> fee_observer = (LLHandle<LLWholeModelFeeObserver>()),
-                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                       const position_offsets_t& position_offsets = position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
     ~LLMeshUploadThread();
 
     bool finished() const { return mFinished; }
@@ -1008,7 +1014,8 @@ public:
                      const LLUUID& destination_folder_id = LLUUID::null,
                      bool do_upload = true,
                      LLHandle<LLWholeModelFeeObserver> fee_observer= (LLHandle<LLWholeModelFeeObserver>()),
-                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                     const LLMeshUploadThread::position_offsets_t& position_offsets = LLMeshUploadThread::position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
 
     S32 getMeshSize(const LLUUID& mesh_id, S32 lod) const;
 
