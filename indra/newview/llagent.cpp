@@ -34,6 +34,7 @@
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 #include "llagentlistener.h"
 #include "llagentwearables.h"
 #include "llagentui.h"
@@ -2223,6 +2224,12 @@ std::ostream& operator<<(std::ostream &s, const LLAgent &agent)
 //-----------------------------------------------------------------------------
 bool LLAgent::needsRenderAvatar()
 {
+    // <SK:Nexii> Over-the-shoulder view shows the avatar in mouselook
+    if (SKOTSCamera::isShoulder() && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELF))
+    {
+        return mShowAvatar && mOutfitChosen;
+    }
+    // </SK:Nexii>
 //  if (gAgentCamera.cameraMouselook() && !LLVOAvatar::sVisibleInFirstPerson)
 // [RLVa:KB] - Checked: RLVa-2.0.2
     if ( (gAgentCamera.cameraMouselook() && !LLVOAvatar::sVisibleInFirstPerson) || (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELF)) )
@@ -2238,7 +2245,7 @@ bool LLAgent::needsRenderAvatar()
 bool LLAgent::needsRenderHead()
 {
 // [RLVa:KB] - Checked: RLVa-2.0.2
-    return ((mShowAvatar && !gAgentCamera.cameraMouselook())) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD));
+    return ((mShowAvatar && (!gAgentCamera.cameraMouselook() || SKOTSCamera::isShoulder()))) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD)); // <SK:Nexii> Over-the-shoulder view
 // [/RLVa:KB]
 //  return (mShowAvatar && !gAgentCamera.cameraMouselook());
 }

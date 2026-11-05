@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llvoavatarself.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 #include "llvoavatar.h"
 
 #include "pipeline.h"
@@ -1125,6 +1126,12 @@ void LLVOAvatarSelf::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
 {
+    // <SK:Nexii> Over-the-shoulder view shows attachments as in third person
+    if (camera_mode == CAMERA_MODE_MOUSELOOK && SKOTSCamera::isShoulder())
+    {
+        camera_mode = CAMERA_MODE_THIRD_PERSON;
+    }
+    // </SK:Nexii>
     for (attachment_map_t::iterator iter = mAttachmentPoints.begin();
          iter != mAttachmentPoints.end();
          ++iter)

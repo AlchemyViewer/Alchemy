@@ -270,4 +270,28 @@
          tool_tip="Camera spin around clockwise sitting"
          value="Clockwise Sitting" />
     </rows>
+    <!-- <SK:Nexii> combat/ots: over-the-shoulder view -->
+    <rows
+     name="ots_toggle_view"
+     value="ots_toggle_view">
+        <columns
+         column="lst_action"
+         font="SansSerif"
+         halign="left"
+         name="lst_action"
+         tool_tip="Switch between the over-the-shoulder view and first person without leaving mouselook"
+         value="Shoulder / First Person" />
+    </rows>
+    <rows
+     name="ots_swap_shoulder"
+     value="ots_swap_shoulder">
+        <columns
+         column="lst_action"
+         font="SansSerif"
+         halign="left"
+         name="lst_action"
+         tool_tip="Move the over-the-shoulder camera to the other shoulder"
+         value="Swap Shoulder" />
+    </rows>
+    <!-- </SK:Nexii> -->
 </contents>

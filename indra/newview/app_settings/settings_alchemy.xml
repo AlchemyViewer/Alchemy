@@ -2003,6 +2003,118 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <!-- <SK:Nexii> combat/ots: over-the-shoulder view for mouselook -->
+        <key>SKOTSEnabled</key>
+        <map>
+            <key>Comment</key>
+            <string>Enter mouselook in the over-the-shoulder view</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKOTSCameraDistance</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: camera distance behind the avatar (metres)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>3.0</real>
+        </map>
+        <key>SKOTSCameraSide</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: camera offset to the left, negative for the right shoulder (metres)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>-0.5</real>
+        </map>
+        <key>SKOTSCameraHeight</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: camera height above the avatar root (metres)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.5</real>
+        </map>
+        <key>SKOTSFocusDistance</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: distance ahead of the avatar the camera looks at (metres)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>10.0</real>
+        </map>
+        <key>SKOTSCameraCollision</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: pull the camera in front of solid world geometry; avatars and phantom objects never block it</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>SKOTSRememberLastView</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: enter mouselook in whichever view, shoulder or first person, was last toggled to</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKOTSLastViewFirstPerson</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: the view last toggled to was first person</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKOTSAvatarConverge</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: aim converges on the hitbox of the avatar under the crosshair</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>SKOTSConvergeSmoothingHalfLife</key>
+        <map>
+            <key>Comment</key>
+            <string>Over-the-shoulder view: half-life of the aim convergence depth smoothing, 0 to disable (seconds)</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>0.06</real>
+        </map>
+        <!-- </SK:Nexii> -->
         <key>AlchemyMouselookIFF</key>
         <map>
             <key>Comment</key>

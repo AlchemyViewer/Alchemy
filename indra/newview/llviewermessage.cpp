@@ -115,6 +115,7 @@
 #include "llviewerwindow.h"
 #include "llvlmanager.h"
 #include "llvoavatarself.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 #include "llvovolume.h"
 #include "llworld.h"
 #include "pipeline.h"
@@ -3587,6 +3588,15 @@ void send_agent_update(bool force_send, bool send_reliable)
     LLVector3 camera_at = LLViewerCamera::getInstance()->getAtAxis();
     LLQuaternion body_rotation = gAgent.getFrameAgent().getQuaternion();
     LLQuaternion head_rotation = gAgent.getHeadRotation();
+    // <SK:Nexii> Over-the-shoulder view reports the eye aimed at the crosshair and turns the head the same way; the body
+    // is left alone, since the region moves the avatar along it
+    LLVector3 camera_left = LLViewerCamera::getInstance()->getLeftAxis();
+    LLVector3 camera_up = LLViewerCamera::getInstance()->getUpAxis();
+    if (SKOTSCamera::reportedCamera(camera_pos_agent, camera_at, camera_left, camera_up))
+    {
+        SKOTSCamera::convergeHead(camera_at, head_rotation);
+    }
+    // </SK:Nexii>
     U8 render_state = gAgent.getRenderState();
 
     U8 flags = AU_FLAGS_NONE;
@@ -3709,8 +3719,8 @@ void send_agent_update(bool force_send, bool send_reliable)
 
     msg->addVector3Fast(_PREHASH_CameraCenter, camera_pos_agent);
     msg->addVector3Fast(_PREHASH_CameraAtAxis, camera_at);
-    msg->addVector3Fast(_PREHASH_CameraLeftAxis, LLViewerCamera::getInstance()->getLeftAxis());
-    msg->addVector3Fast(_PREHASH_CameraUpAxis, LLViewerCamera::getInstance()->getUpAxis());
+    msg->addVector3Fast(_PREHASH_CameraLeftAxis, camera_left); // <SK:Nexii> Over-the-shoulder view
+    msg->addVector3Fast(_PREHASH_CameraUpAxis, camera_up); // <SK:Nexii> Over-the-shoulder view
 
     static LLCachedControl<bool> limit_draw_distance(gSavedSettings, "ALLimitDrawDistance", false);
     if (limit_draw_distance)

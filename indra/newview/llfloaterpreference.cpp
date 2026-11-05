@@ -3810,9 +3810,13 @@ void LLPanelPreferenceControls::populateControlTable()
     // Each file represents individual visual group (movement/camera/media...)
     if (mEditingMode == LLKeyConflictHandler::MODE_FIRST_PERSON)
     {
-        // Don't display whole camera and editing groups
+        // Don't display whole editing group // <SK:Nexii> combat/ots: camera group is shown
         addControlTableRows("control_table_contents_movement.xml");
         addControlTableSeparator();
+        // <SK:Nexii> combat/ots: list the camera group too, as the over-the-shoulder view works inside mouselook
+        addControlTableRows("control_table_contents_camera.xml");
+        addControlTableSeparator();
+        // </SK:Nexii>
         addControlTableRows("control_table_contents_media.xml");
     }
     // MODE_THIRD_PERSON; MODE_EDIT_AVATAR; MODE_SITTING
