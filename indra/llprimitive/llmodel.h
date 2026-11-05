@@ -186,7 +186,8 @@ public:
         bool lock_scale_if_joint_position,
         EWriteModelMode write_mode = WRITE_BINARY,
         bool as_slm = false,
-        int submodel_id = 0);
+        int submodel_id = 0,
+        const LLVector3& position_offset = LLVector3::zero); // <SK:Nexii> Mesh uploader pivot: shifts the stored domains off the prim's origin
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
