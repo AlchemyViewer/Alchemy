@@ -37,6 +37,8 @@
 #include "lluuid.h"
 #include "u64.h"
 
+#include <vector>
+
 const F32 LL_XFER_REGISTRATION_TIMEOUT = 60.0f;  // timeout if a registered transfer hasn't been requested in 60 seconds
 const F32 LL_PACKET_TIMEOUT = 3.0f;             // packet timeout at 3 s
 const S32 LL_PACKET_RETRY_LIMIT = 10;            // packet retransmission limit
@@ -392,6 +394,14 @@ bool LLXferManager::isLastPacket(S32 packet_num)
 
 ///////////////////////////////////////////////////////////
 
+// Whether a transfer on the receive list counts as the one a request asks for.
+// One that has ended stays on the list while whoever asked for it is told, and
+// they may ask for the same file again as they are told.
+static bool receive_under_way(const LLXfer* xferp)
+{
+    return xferp->mStatus == e_LL_XFER_PENDING || xferp->mStatus == e_LL_XFER_IN_PROGRESS;
+}
+
 U64 LLXferManager::requestFile(const std::string& local_filename,
                                 const std::string& remote_filename,
                                 ELLPath remote_path,
@@ -408,7 +418,7 @@ U64 LLXferManager::requestFile(const std::string& local_filename,
     for (xfer_list_t::iterator iter = mReceiveList.begin();
             iter != mReceiveList.end(); ++iter)
     {
-        if ((*iter)->getXferTypeTag() == LLXfer::XFER_FILE)
+        if ((*iter)->getXferTypeTag() == LLXfer::XFER_FILE && receive_under_way(*iter))
         {
             file_xfer_p = (LLXfer_File*)(*iter);
             if (file_xfer_p->matchesLocalFilename(local_filename)
@@ -470,7 +480,7 @@ void LLXferManager::requestVFile(const LLUUID& local_id,
     for (xfer_list_t::iterator iter = mReceiveList.begin();
             iter != mReceiveList.end(); ++iter)
     {   // Find any matching existing requests
-        if ((*iter)->getXferTypeTag() == LLXfer::XFER_VFILE)
+        if ((*iter)->getXferTypeTag() == LLXfer::XFER_VFILE && receive_under_way(*iter))
         {
             xfer_p = (LLXfer_VFile*) (*iter);
             if (xfer_p->matchesLocalFile(local_id, type)
@@ -577,8 +587,28 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
 
     S32 result = 0;
 
+    // The sender and whoever asked for the file are told, as they are of a file
+    // the sender gives up, and the next file waiting takes its place. The
+    // error goes first: it is what keeps processEOF from keeping the file.
+    const auto give_up = [&](S32 error)
+    {
+        xferp->abort(error);
+        xferp->processEOF();
+        removeXfer(xferp,mReceiveList);
+        startPendingDownloads();
+    };
+
     if (xferp->mPacketNum == 0) // first packet has size encoded as additional S32 at beginning of data
     {
+        if (fdata_size < (S32)sizeof(S32))
+        {
+            LL_WARNS("Xfer") << "Received a first packet of " << fdata_size
+                << " bytes, too short to hold its file's size, from " << mesgsys->getSender()
+                << " for " << xferp->getFileName() << LL_ENDL;
+            give_up(LL_ERR_EOF);
+            return;
+        }
+
         ntohmemcpy(&xfer_size,fdata_buf,MVT_S32,sizeof(S32));
 
 // do any necessary things on first packet ie. allocate memory
@@ -594,10 +624,8 @@ void LLXferManager::processReceiveData (LLMessageSystem *mesgsys, void ** /*user
 
     if (result == LL_ERR_CANNOT_OPEN_FILE)
     {
-            xferp->abort(LL_ERR_CANNOT_OPEN_FILE);
-            removeXfer(xferp,mReceiveList);
-            startPendingDownloads();
-            return;
+        give_up(LL_ERR_CANNOT_OPEN_FILE);
+        return;
     }
 
     xferp->mPacketNum++;  // expect next packet
@@ -1215,6 +1243,7 @@ void LLXferManager::startPendingDownloads()
 
     if((start_count > 0) && (pending_count > 0))
     {
+        std::vector<U64> unstarted;
         S32 result;
         for (std::list<LLXfer*>::iterator iter = pending_downloads.begin();
              iter != pending_downloads.end(); ++iter)
@@ -1226,7 +1255,22 @@ void LLXferManager::startPendingDownloads()
             if(result)
             {
                 xferp->abort(result);
+                unstarted.push_back(xferp->mID);
                 ++start_count;
+            }
+        }
+
+        // Whoever asked for a file may, as it is told, ask for another or give
+        // up another, which comes back here and changes the list. So each is
+        // told once the loop over pending_downloads is done, and found again
+        // by its ID.
+        for (const U64 id : unstarted)
+        {
+            xferp = findXferByID(id, mReceiveList);
+            if (xferp)
+            {
+                xferp->processEOF();
+                removeXfer(xferp, mReceiveList);
             }
         }
     }

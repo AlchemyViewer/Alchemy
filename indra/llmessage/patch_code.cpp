@@ -236,6 +236,12 @@ void    decode_patch_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
     gPatchSize = gopp->patch_size;
 }
 
+bool    decode_layer_group_header(LLBitPack &bitpack, LLGroupHeader *gopp)
+{
+    decode_patch_group_header(bitpack, gopp);
+    return !bitpack.readPastEnd() && gopp->patch_size == NORMAL_PATCH_SIZE;
+}
+
 void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
 {
     U8 retvalu8;
@@ -287,6 +293,17 @@ void    decode_patch_header(LLBitPack &bitpack, LLPatchHeader *ph)
     bitpack.bitUnpack((U8 *)&retvalu16, 10);
 #endif
     ph->patchids = retvalu16;
+
+    if (bitpack.readPastEnd())
+    {
+        // The data ended inside the header, which ends the patches as the end
+        // code does: a reader of zeros would otherwise never meet one.
+        ph->quant_wbits = END_OF_PATCHES;
+        ph->dc_offset = 0;
+        ph->range = 0;
+        ph->patchids = 0;
+        return;
+    }
 
     gWordBits = (ph->quant_wbits & 0xf) + 2;
 }
@@ -424,5 +441,5 @@ bool    decode_expected_patch(LLBitPack &bitpack, LLPatchHeader *ph, S32 *patche
         return false;
     }
     decode_patch(bitpack, patches);
-    return true;
+    return !bitpack.readPastEnd();
 }

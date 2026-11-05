@@ -623,13 +623,13 @@ enum
 ///     wrote, little-endian, the one at x, y the (y * patch_size + x)th
 /// LLSurface stops at a patch whose x or y is past its region's patches,
 /// which the library, with no region, does not. The viewer decompresses into
-/// buffers sized for patches of 16, so a patch size of 32 writes past
-/// LLWind's coefficients and velocities, and in LLSurface past the patch
-/// and, on the region's last row of patches, past the surface.
-/// LLBitPack::bitUnpack reads on past its data, so data that a step would
-/// read past the end of, as data does that ends before END_OF_PATCHES, is
-/// ALORACLE_BAD_ARGUMENT: the library reads it from a copy with room past its
-/// end, and gives nothing it read. So is a land or wind patch size but 16 or
+/// buffers sized for patches of 16, so it refuses a layer of any other patch
+/// size (decode_layer_group_header), where the library reads a patch size of
+/// 32 too, into heights of that size.
+/// Data that a step would read past the end of, as data does that ends before
+/// END_OF_PATCHES, is ALORACLE_BAD_ARGUMENT, and the library gives nothing it
+/// read, where the viewer keeps the whole land patches before that end and
+/// neither of wind's. So is a land or wind patch size but 16 or
 /// 32, for which decompress_patch's 32 by 32 transform reads beyond the
 /// coefficients it was given, and init_patch_decompressor writes past its
 /// tables over 32; a wind patch whose header is END_OF_PATCHES, which
