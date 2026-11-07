@@ -160,6 +160,7 @@ if(AL_BUILD_VIEWER)
     alfloaterexploresounds.cpp
     alfloaterfeedback.cpp
     alfloaterfeedbackpreview.cpp
+    alfloaterfontreset.cpp
     alfloatergenerictext.cpp
     alfloatergroupprofile.cpp
     alfloaterlightbox.cpp
@@ -171,6 +172,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.cpp
     alfloaterscopes.cpp
     alfloatertransactionlog.cpp
+    alimportedfonts.cpp
     alrenderisolation.cpp
     alrendersizeoverride.cpp
     alsceneexplorerpredicate.cpp
@@ -1042,6 +1044,7 @@ if(AL_BUILD_VIEWER)
     alfloaterexploresounds.h
     alfloaterfeedback.h
     alfloaterfeedbackpreview.h
+    alfloaterfontreset.h
     alfloatergenerictext.h
     alfloatergroupprofile.h
     alfloaterlightbox.h
@@ -1053,6 +1056,7 @@ if(AL_BUILD_VIEWER)
     alfloatersceneexplorerfilters.h
     alfloaterscopes.h
     alfloatertransactionlog.h
+    alimportedfonts.h
     alrenderisolation.h
     alrendersizeoverride.h
     alsceneexplorerpredicate.h

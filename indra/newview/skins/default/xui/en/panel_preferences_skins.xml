@@ -318,4 +318,70 @@ Jan 1, 2001
      function="Pref.UIFontSelected"
      parameter="EmojiBase" />
   </combo_box>
+
+  <text
+   type="string"
+   length="1"
+   follows="left|top"
+   height="14"
+   layout="topleft"
+   font="SansSerifBold"
+   left="300"
+   name="imported_fonts_header"
+   top="290"
+   width="200">
+   Imported Fonts
+  </text>
+  <scroll_list
+   draw_heading="false"
+   follows="left|top"
+   height="70"
+   layout="topleft"
+   left="300"
+   name="imported_font_list"
+   top_pad="4"
+   width="200">
+  </scroll_list>
+  <button
+   enabled="true"
+   follows="left|top"
+   height="19"
+   label="Add..."
+   layout="topleft"
+   left="300"
+   name="add_imported_font"
+   tool_tip="Choose TrueType, OpenType, or WOFF2 font files to add to the viewer. Copies are stored in your user profile."
+   top_pad="4"
+   width="62">
+    <button.commit_callback
+     function="Pref.ImportFont" />
+  </button>
+  <button
+   enabled="false"
+   follows="left|top"
+   height="19"
+   label="Remove"
+   layout="topleft"
+   left_pad="6"
+   name="remove_imported_font"
+   tool_tip="Remove the selected imported font. Deletes only the copy the viewer made; your original file is untouched."
+   top_delta="0"
+   width="62">
+    <button.commit_callback
+     function="Pref.RemoveImportedFont" />
+  </button>
+  <button
+   enabled="true"
+   follows="left|top"
+   height="19"
+   label="Reset Fonts"
+   layout="topleft"
+   left="300"
+   name="reset_fonts"
+   tool_tip="Restore the viewer's built-in UI, monospace, and emoji fonts. Use this if a custom font makes the UI unreadable. Imported fonts are kept."
+   top_pad="6"
+   width="130">
+    <button.commit_callback
+     function="Pref.ResetFonts" />
+  </button>
 </panel>

@@ -384,6 +384,8 @@ public:
 
     static std::string getFontPathLocal();
     static std::string getFontPathSystem();
+    static std::string getFontPathUser();
+    static std::string getImportedFontsOverlayPath();
 
     // The shadow of the UI transform, kept on the CPU for the three things
     // that need to know where a local coordinate lands without asking the

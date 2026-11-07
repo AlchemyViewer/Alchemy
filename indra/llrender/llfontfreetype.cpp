@@ -462,6 +462,46 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
     return num_faces;
 }
 
+LLFontFreetype::FaceInfo LLFontFreetype::probeFaceInfo(const std::string& filename)
+{
+    FaceInfo info;
+
+    auto contents = LLFile::getContents(filename);
+    if (contents.empty())
+        return info;
+
+    FT_Open_Args openArgs;
+    memset(&openArgs, 0, sizeof(openArgs));
+    openArgs.memory_base = reinterpret_cast<const FT_Byte*>(contents.data());
+    openArgs.memory_size = static_cast<FT_Long>(contents.size());
+    openArgs.flags = FT_OPEN_MEMORY;
+
+    FT_Face probe = nullptr;
+    if (FT_Open_Face(gFTLibrary, &openArgs, 0, &probe) != 0)
+        return info;
+
+    info.family = probe->family_name ? probe->family_name : "";
+
+    info.bold   = (probe->style_flags & FT_STYLE_FLAG_BOLD) != 0;
+    info.italic = (probe->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
+    if (!info.bold || !info.italic)
+    {
+        std::string style = probe->style_name ? probe->style_name : "";
+        LLStringUtil::toLower(style);
+        if (style.find("bold") != std::string::npos)
+            info.bold = true;
+        if (style.find("italic") != std::string::npos || style.find("oblique") != std::string::npos)
+            info.italic = true;
+    }
+
+    info.fixed_width = (probe->face_flags & FT_FACE_FLAG_FIXED_WIDTH) != 0;
+    info.has_color   = FT_HAS_COLOR(probe);
+    info.valid       = !info.family.empty();
+
+    FT_Done_Face(probe);
+    return info;
+}
+
 void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font,
                                      const char_functor_t& functor) const
 {
