@@ -29,6 +29,7 @@
 #include "llappviewer.h"
 
 #include "alcrashreporter.h"
+#include "alimportedfonts.h"
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -3102,6 +3103,19 @@ bool LLAppViewer::initConfiguration()
                 }
             }
         }
+    }
+
+    // Clear font overrides before fonts load when --resetfonts was passed.
+    if (gSavedSettings.getBOOL("AlchemyResetFontsOnStartup"))
+    {
+        LL_INFOS() << "--resetfonts: clearing AlchemyUIFontOverrides" << LL_ENDL;
+        gSavedSettings.setLLSD("AlchemyUIFontOverrides", LLSD::emptyMap());
+    }
+
+    // Regenerate the imported-fonts overlay on startup.
+    if (ALImportedFonts::getImported().size() > 0)
+    {
+        ALImportedFonts::regenerateOverlay();
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

@@ -348,6 +348,22 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& 
         success = parse_single_fonts_file(this, path) || success;
     }
 
+    {
+        const std::string overlay = LLFontGL::getImportedFontsOverlayPath();
+        if (!overlay.empty() && gDirUtilp->fileExists(overlay))
+        {
+            if (!parse_single_fonts_file(this, overlay))
+            {
+                LL_WARNS() << "fonts.xml: failed to parse imported-fonts overlay "
+                           << overlay << LL_ENDL;
+            }
+            else
+            {
+                success = true;
+            }
+        }
+    }
+
     // Resolve cross-family <use> and per-family inherit="true" once across
     // the merged registry, after all skinned fonts.xml files have been read.
     // Doing this per-file would double-append references for entries that
@@ -1697,6 +1713,12 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     bool is_first_found = true;
 
     string_vec_t font_search_paths;
+    // Imported fonts first so they can shadow bundled ones.
+    const std::string user_font_path = LLFontGL::getFontPathUser();
+    if (!user_font_path.empty())
+    {
+        font_search_paths.push_back(user_font_path);
+    }
     font_search_paths.push_back(LLFontGL::getFontPathLocal());
     font_search_paths.push_back(LLFontGL::getFontPathSystem());
 #if LL_DARWIN

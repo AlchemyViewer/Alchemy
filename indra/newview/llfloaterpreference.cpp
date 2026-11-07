@@ -36,6 +36,8 @@
 
 #include "alavatargroups.h"
 #include "alchattimestamp.h"
+#include "alfloaterfontreset.h"
+#include "alimportedfonts.h"
 #include "llaudioengine.h"
 #include "lllogchat.h"
 #include "llstyle.h"
@@ -409,6 +411,9 @@ LLFloaterPreference::LLFloaterPreference(const LLSD& key)
     mCommitCallbackRegistrar.add("Pref.SelectSkin", boost::bind(&LLFloaterPreference::onSelectSkin, this, _2));
     mCommitCallbackRegistrar.add("Pref.UIFontSelected", boost::bind(&LLFloaterPreference::onUIFontSelected, this, _1, _2));
     mCommitCallbackRegistrar.add("Pref.UIFontFileEntered", boost::bind(&LLFloaterPreference::onUIFontFileEntered, this, _1, _2));
+    mCommitCallbackRegistrar.add("Pref.ImportFont", boost::bind(&LLFloaterPreference::onImportFont, this));
+    mCommitCallbackRegistrar.add("Pref.RemoveImportedFont", boost::bind(&LLFloaterPreference::onRemoveImportedFont, this));
+    mCommitCallbackRegistrar.add("Pref.ResetFonts", boost::bind(&LLFloaterPreference::onResetFonts, this));
 
     mCommitCallbackRegistrar.add("Pref.ResetControlDefault", [](LLUICtrl* ctrl, const LLSD& userdata)
         {
@@ -550,6 +555,7 @@ bool LLFloaterPreference::postBuild()
     loadUserSkins();
 
     populateUIFontDropdowns();
+    refreshImportedFontList();
 
     LLSliderCtrl* fov_slider = getChild<LLSliderCtrl>("camera_fov");
     fov_slider->setMinValue(LLViewerCamera::getInstance()->getMinView());
@@ -1155,6 +1161,137 @@ void LLFloaterPreference::onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userda
         if (!combo->setSelectedByValue(LLSD(raw), true))
             combo->setSelectedByValue(LLSD(""), true);
     }
+}
+
+void LLFloaterPreference::refreshImportedFontList()
+{
+    LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list");
+    if (!list) return;
+
+    list->clearRows();
+    const LLSD imported = ALImportedFonts::getImported();
+    for (LLSD::array_const_iterator it = imported.beginArray(); it != imported.endArray(); ++it)
+    {
+        const LLSD& entry = *it;
+        const std::string name  = entry["name"].asString();
+        const std::string label = entry["label"].asString();
+
+        std::string display = (label.empty() ? name : label) + ALImportedFonts::categorySuffix(entry);
+
+        LLSD row;
+        row["id"] = name;
+        row["alt_value"] = display;   // friendly label for notifications
+        row["columns"][0]["value"] = display;
+        list->addElement(row);
+    }
+
+    LLButton* remove_btn = findChild<LLButton>("remove_imported_font");
+    if (remove_btn)
+        remove_btn->setEnabled(list->getItemCount() > 0);
+}
+
+void LLFloaterPreference::onImportFont()
+{
+    LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterPreference::onImportFontCallback, this, _1),
+                                         LLFilePicker::FFLOAD_FONT, true);
+}
+
+void LLFloaterPreference::onImportFontCallback(const std::vector<std::string>& filenames)
+{
+    if (filenames.empty())
+        return;
+
+    ALImportedFonts::ImportResult result;
+    ALImportedFonts::importFiles(filenames, result);
+
+    if (result.anyCopied())
+    {
+        LLSD args;
+        args["COUNT"] = result.files_copied;
+        LLNotificationsUtil::add("ImportFontSuccess", args);
+    }
+
+    if (!result.failed.empty())
+    {
+        std::string joined;
+        bool any_unsupported = false;
+        for (size_t i = 0; i < result.failed.size(); ++i)
+        {
+            if (i)
+                joined += ", ";
+            joined += gDirUtilp->getBaseFileName(result.failed[i].source);
+            if (result.failed[i].reason == ALImportedFonts::ImportResult::RejectReason::UNSUPPORTED_TYPE)
+                any_unsupported = true;
+        }
+
+        LLSD args;
+        args["FILES"] = joined;
+        LLNotificationsUtil::add(any_unsupported ? "ImportFontFailureType" : "ImportFontFailure", args);
+    }
+
+    if (result.anyCopied())
+    {
+        refreshImportedFontList();
+        scheduleFontDropdownRefresh();
+    }
+}
+
+void LLFloaterPreference::onRemoveImportedFont()
+{
+    LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list");
+    if (!list) return;
+
+    const LLScrollListItem* item = list->getFirstSelected();
+    if (!item) return;
+
+    const std::string family = item->getValue().asString();
+    if (family.empty())
+        return;
+
+    const std::string label = item->getAltValue().asString();
+
+    LLSD args;
+    args["FONT"] = label.empty() ? family : label;
+    LLSD payload;
+    payload["FONT"] = family;
+    payload["LABEL"] = args["FONT"];
+    LLNotificationsUtil::add("ConfirmRemoveImportedFont", args, payload,
+                             boost::bind(&LLFloaterPreference::callbackRemoveImportedFont, this, _1, _2));
+}
+
+void LLFloaterPreference::callbackRemoveImportedFont(const LLSD& notification, const LLSD& response)
+{
+    const S32 option = LLNotificationsUtil::getSelectedOption(notification, response);
+    if (option != 0) // not OK
+        return;
+
+    const std::string family = notification["payload"]["FONT"].asString();
+    if (ALImportedFonts::removeFamily(family))
+    {
+        LLSD args;
+        args["FONT"] = notification["payload"]["LABEL"].asString();
+        LLNotificationsUtil::add("RemoveImportedFontSuccess", args);
+        refreshImportedFontList();
+        scheduleFontDropdownRefresh();
+    }
+}
+
+void LLFloaterPreference::scheduleFontDropdownRefresh()
+{
+    // Re-resolve the open Preferences instance after the font reload.
+    LLEventTimer::run_after(0.25f, []()
+    {
+        LLFloaterPreference* prefs = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
+        if (prefs && prefs->getChild<LLScrollListCtrl>("imported_font_list"))
+        {
+            prefs->populateUIFontDropdowns();
+        }
+    });
+}
+
+void LLFloaterPreference::onResetFonts()
+{
+    ALFloaterFontReset::showConfirm();
 }
 
 LLFloaterPreference::~LLFloaterPreference()

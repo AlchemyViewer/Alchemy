@@ -42,6 +42,7 @@
 #include "llcommunicationchannel.h"
 #include "llfloaterreg.h"
 #include "llhudicon.h"
+#include "alfloaterfontreset.h"
 #include "llmeshrepository.h"
 #include "llnotificationhandler.h"
 #include "llpanellogin.h"
@@ -3216,6 +3217,13 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
 {
     // hide tooltips on keypress
     LLToolTipMgr::instance().blockToolTips();
+
+    // Ctrl/Cmd+Alt+Shift+F opens the font-reset dialog.
+    if ((key == 'f' || key == 'F') && (mask & MASK_CONTROL) && (mask & MASK_ALT) && (mask & MASK_SHIFT))
+    {
+        ALFloaterFontReset::showConfirm();
+        return true;
+    }
 
     // Menus get handled on key down instead of key up
     // so keybindings have to be recorded before that

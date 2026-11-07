@@ -13504,6 +13504,51 @@ are wearing now.
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="ImportFontSuccess"
+   type="alertmodal">
+    <tag>inform</tag>
+    Imported [COUNT] font file(s). They are now available in the font lists above.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ImportFontFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    Could not import these file(s): [FILES].
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ImportFontFailureType"
+   type="alertmodal">
+    <tag>fail</tag>
+    Could not import these file(s): [FILES]. Only TrueType (.ttf), OpenType (.otf), and WOFF2 (.woff2) fonts are supported.
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ConfirmRemoveImportedFont"
+   type="alertmodal">
+    <tag>confirm</tag>
+    Remove the imported font [FONT]? This deletes the copy the viewer made; your original file is not affected.
+    <usetemplate
+     ignoretext="Confirm removing imported fonts"
+     name="okcancelignore"
+     notext="Cancel"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="RemoveImportedFontSuccess"
+   type="alertmodal">
+    <tag>inform</tag>
+    Removed the imported font [FONT].
+  </notification>
+
+  <notification
    icon="alert.tga"
    name="RegionTrackerAdd"
    type="alert">

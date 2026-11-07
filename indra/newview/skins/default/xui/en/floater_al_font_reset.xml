@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater
+ can_close="true"
+ can_drag_on_left="false"
+ can_minimize="false"
+ can_resize="false"
+ can_tear_off="false"
+ height="150"
+ layout="topleft"
+ name="al_font_reset"
+ single_instance="true"
+ title="Reset Fonts"
+ width="420">
+    <text
+     font="InterLarge"
+     follows="left|top|right"
+     height="70"
+     layout="topleft"
+     left="20"
+     name="reset_explain"
+     right="-20"
+     top="18"
+     word_wrap="true">Reset the viewer's custom UI, monospace, and emoji font settings to the built-in defaults. Imported font files will not be deleted.</text>
+
+    <button
+     font="InterLarge"
+     follows="left|top"
+     height="23"
+     label="Cancel"
+     label_selected="Cancel"
+     layout="topleft"
+     left="20"
+     name="cancel_btn"
+     top_pad="14"
+     width="110" />
+
+    <button
+     font="InterLarge"
+     follows="left|top"
+     height="23"
+     label="Reset Fonts"
+     label_selected="Reset Fonts"
+     layout="topleft"
+     left_pad="8"
+     name="reset_btn"
+     top_delta="0"
+     width="130" />
+</floater>

@@ -2436,6 +2436,32 @@ std::string LLFontGL::getFontPathLocal()
     return local_path;
 }
 
+// static
+std::string LLFontGL::getFontPathUser()
+{
+    if (gDirUtilp == nullptr)
+        return {};
+
+    const std::string user_app_dir = gDirUtilp->getOSUserAppDir();
+    if (user_app_dir.empty())
+        return {};
+
+    return gDirUtilp->add(user_app_dir, "fonts") + gDirUtilp->getDirDelimiter();
+}
+
+// static
+std::string LLFontGL::getImportedFontsOverlayPath()
+{
+    if (gDirUtilp == nullptr)
+        return {};
+
+    const std::string user_app_dir = gDirUtilp->getOSUserAppDir();
+    if (user_app_dir.empty())
+        return {};
+
+    return gDirUtilp->add(gDirUtilp->add(user_app_dir, "fonts"), "imported_fonts.xml");
+}
+
 void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const
 {
     // slant_amt shifts the bottom edge horizontally relative to the top
