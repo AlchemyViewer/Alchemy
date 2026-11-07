@@ -134,6 +134,7 @@ class FakeXMLRPCListener: public LLEventTrackable
     LLSD mEvent;
     bool mImmediateResponse;
     LLSD mResponse;
+    size_t mRequests{ 0 };
     Debug mDebug;
 
 public:
@@ -161,10 +162,15 @@ public:
         mResponse = r;
     }
 
+    // How many requests have come, and the last of them.
+    size_t requests() const { return mRequests; }
+    LLSD lastRequest() const { return mEvent; }
+
     bool handle_event(const LLSD& event)
     {
         mDebug(STRINGIZE("FakeXMLRPCListener called!: " << event));
         mEvent = event;
+        ++mRequests;
         if(mImmediateResponse)
         {
             sendReply();
@@ -342,5 +348,141 @@ namespace
         listener.waitFor(prev, 11.0);
 
         CHECK(listener.lastEvent()["state"].asString() == "offline");
+    }
+
+    // A login's answer that sends it on to another URI.
+    LLSD redirectTo(const std::string& uri)
+    {
+        LLSD data;
+        data["status"] = "Complete";
+        data["errorcode"] = 0;
+        data["error"] = "dummy response";
+        data["transfer_rate"] = 0;
+        data["responses"]["login"] = "indeterminate";
+        data["responses"]["next_url"] = uri;
+        data["responses"]["next_method"] = "login_to_simulator";
+        return data;
+    }
+
+    // Starts a login at from_uri, answers it with a redirect to to_uri, and
+    // gives what the login does next: the event that ends it, or that of its
+    // next attempt, after which listener and the requests can be read.
+    LLSD afterRedirect(const std::string& from_uri, const std::string& to_uri,
+                       LLLogin& login, LoginListener& listener, FakeXMLRPCListener& xmlrpc)
+    {
+        LLSD credentials;
+        credentials["first"] = "who";
+        credentials["last"] = "what";
+        credentials["passwd"] = "secret";
+
+        login.connect(from_uri, credentials);
+        llcoro::suspend();
+        REQUIRE(xmlrpc.requests() == 1);
+
+        xmlrpc.setResponse(redirectTo(to_uri));
+        xmlrpc.sendReply();
+        return listener.waitFor(
+            "the login to end or try again",
+            [&listener]()->bool
+            {
+                const LLSD event(listener.lastEvent());
+                return event["change"].asString() == "fail.login"
+                    || event["data"]["attempt"].asInteger() == 2;
+            });
+    }
+
+    // Answers a login's attempt with a refusal, so that its coroutine ends.
+    void endLogin(LoginListener& listener, FakeXMLRPCListener& xmlrpc)
+    {
+        LLSD data;
+        data["status"] = "Complete";
+        data["errorcode"] = 0;
+        data["error"] = "dummy response";
+        data["transfer_rate"] = 0;
+        data["responses"]["login"] = "false";
+        xmlrpc.setResponse(data);
+        xmlrpc.sendReply();
+        listener.waitFor(
+            "the login to end",
+            [&listener]()->bool{ return listener.lastEvent()["change"].asString() == "fail.login"; });
+    }
+
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: a secure login isn't sent on to a plain URI", "[LLViewerLogin]")
+    {
+        LLEventStream xmlrpcPump("LLXMLRPCTransaction");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
+
+        LLLogin login;
+        LoginListener listener("test_ear");
+        LLTempBoundListener conn2 = listener.listenTo(login.getEventPump());
+
+        const LLSD event(afterRedirect("https://login.bar.com/", "http://login.bar.com/",
+                                       login, listener, dummyXMLRPC));
+
+        CHECK(event["state"].asString() == "offline");
+        CHECK(event["change"].asString() == "fail.login");
+        CHECK(event["data"]["reason"].asString() == "InsecureRedirect");
+        CHECK(event["data"]["message_id"].asString() == "LoginFailedInsecureRedirect");
+        CHECK(dummyXMLRPC.requests() == 1);
+    }
+
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: a secure login isn't sent on to a URI with no scheme", "[LLViewerLogin]")
+    {
+        LLEventStream xmlrpcPump("LLXMLRPCTransaction");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
+
+        LLLogin login;
+        LoginListener listener("test_ear");
+        LLTempBoundListener conn2 = listener.listenTo(login.getEventPump());
+
+        // The scheme's case doesn't make the login any less secure.
+        const LLSD event(afterRedirect("HTTPS://login.bar.com/", "login.bar.com",
+                                       login, listener, dummyXMLRPC));
+
+        CHECK(event["change"].asString() == "fail.login");
+        CHECK(dummyXMLRPC.requests() == 1);
+    }
+
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: a secure login is sent on to another secure URI", "[LLViewerLogin]")
+    {
+        LLEventStream xmlrpcPump("LLXMLRPCTransaction");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
+
+        LLLogin login;
+        LoginListener listener("test_ear");
+        LLTempBoundListener conn2 = listener.listenTo(login.getEventPump());
+
+        const LLSD event(afterRedirect("https://login.bar.com/", "HTTPS://login2.bar.com/",
+                                       login, listener, dummyXMLRPC));
+
+        CHECK(event["change"].asString() == "authenticating");
+        CHECK(dummyXMLRPC.requests() == 2);
+        CHECK(dummyXMLRPC.lastRequest()["uri"].asString() == "HTTPS://login2.bar.com/");
+        CHECK(dummyXMLRPC.lastRequest()["method"].asString() == "login_to_simulator");
+
+        endLogin(listener, dummyXMLRPC);
+    }
+
+    TEST_CASE_METHOD(llviewerlogin_data, "LLViewerLogin: a plain login is sent on to a plain URI", "[LLViewerLogin]")
+    {
+        LLEventStream xmlrpcPump("LLXMLRPCTransaction");
+        FakeXMLRPCListener dummyXMLRPC("dummy_xmlrpc");
+        LLTempBoundListener conn1 = dummyXMLRPC.listenTo(xmlrpcPump);
+
+        LLLogin login;
+        LoginListener listener("test_ear");
+        LLTempBoundListener conn2 = listener.listenTo(login.getEventPump());
+
+        const LLSD event(afterRedirect("http://localhost:8002/", "http://localhost:8003/",
+                                       login, listener, dummyXMLRPC));
+
+        CHECK(event["change"].asString() == "authenticating");
+        CHECK(dummyXMLRPC.requests() == 2);
+        CHECK(dummyXMLRPC.lastRequest()["uri"].asString() == "http://localhost:8003/");
+
+        endLogin(listener, dummyXMLRPC);
     }
 }

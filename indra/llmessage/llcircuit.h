@@ -50,6 +50,7 @@ const F32Milliseconds LL_AVERAGED_PING_MIN(100);    // increased to avoid retran
 const U32Milliseconds INITIAL_PING_VALUE_MSEC(1000); // initial value for the ping delay, or for ping delay for an unknown circuit
 
 const TPACKETID LL_MAX_OUT_PACKET_ID = 0x01000000;
+const size_t LL_MAX_RECENT_RELIABLE_PACKETS = 65536; // how many reliable packets a circuit remembers for duplicate suppression
 const int LL_ERR_CIRCUIT_GONE   = -23017;
 const int LL_ERR_TCP_TIMEOUT    = -23016;
 
@@ -171,6 +172,7 @@ protected:
     TPACKETID       nextPacketOutID();
     void                setPacketInID(TPACKETID id);
     void                    checkPacketInID(TPACKETID id, bool receive_resent);
+    void            recordReliablePacket(TPACKETID packetnum);  // Remember a reliable packet for duplicate suppression
     void            setPingDelay(U32Milliseconds ping);
     bool            checkCircuitTimeout();  // Return false if the circuit is dead and should be cleaned up
 

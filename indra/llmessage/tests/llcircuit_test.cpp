@@ -204,7 +204,13 @@ namespace ll_test
         static void handled(LLCircuitData& circuit, TPACKETID id)
         {
             circuit.checkPacketInID(id, false);
-            circuit.mRecentlyReceivedReliablePackets[id] = LLMessageSystem::getMessageTimeUsecs();
+            circuit.recordReliablePacket(id);
+        }
+
+        // How many reliable packets the circuit remembers.
+        static size_t recentCount(const LLCircuitData& circuit)
+        {
+            return circuit.mRecentlyReceivedReliablePackets.size();
         }
 
         static bool checkDuplicate(LLCircuitData& circuit, TPACKETID id, bool resent)
@@ -417,6 +423,50 @@ namespace
         sMessageTime += F64Seconds(6.0);
         CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 7, false));
         CHECK(CircuitProbe::checkDuplicate(circuit, 7, true));
+    }
+
+    TEST_CASE("llcircuit: a peer that never pings leaves only the newest reliable packets remembered", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+
+        const TPACKETID PAST_THE_BOUND = 100;
+        const TPACKETID COUNT = static_cast<TPACKETID>(LL_MAX_RECENT_RELIABLE_PACKETS) + PAST_THE_BOUND;
+        for (TPACKETID id = 0; id < COUNT; ++id)
+        {
+            CircuitProbe::handled(circuit, id);
+        }
+
+        CHECK(CircuitProbe::recentCount(circuit) == LL_MAX_RECENT_RELIABLE_PACKETS);
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, 0, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, PAST_THE_BOUND - 1, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, PAST_THE_BOUND, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, COUNT - 1, true));
+    }
+
+    TEST_CASE("llcircuit: the reliable packets forgotten across a wrap are the ones before it", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        // Enough numbers before the wrap to fill the list, and a few after.
+        const TPACKETID FIRST = LL_MAX_OUT_PACKET_ID - static_cast<TPACKETID>(LL_MAX_RECENT_RELIABLE_PACKETS);
+        LLCircuitData circuit(LLHost(), FIRST, HEARTBEAT, TIMEOUT);
+
+        for (TPACKETID id = FIRST; id < LL_MAX_OUT_PACKET_ID; ++id)
+        {
+            CircuitProbe::handled(circuit, id);
+        }
+        const TPACKETID AFTER_THE_WRAP = 10;
+        for (TPACKETID id = 0; id < AFTER_THE_WRAP; ++id)
+        {
+            CircuitProbe::handled(circuit, id);
+        }
+
+        CHECK(CircuitProbe::recentCount(circuit) == LL_MAX_RECENT_RELIABLE_PACKETS);
+        CHECK(CircuitProbe::checkDuplicate(circuit, 0, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, AFTER_THE_WRAP - 1, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, FIRST, true));
+        CHECK_FALSE(CircuitProbe::checkDuplicate(circuit, FIRST + AFTER_THE_WRAP - 1, true));
+        CHECK(CircuitProbe::checkDuplicate(circuit, FIRST + AFTER_THE_WRAP, true));
     }
 
     TEST_CASE("llcircuit: a ping keeps a number handled moments ago that its sender has had acked", "[llcircuit]")

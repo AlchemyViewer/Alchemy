@@ -181,8 +181,6 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
     const LLHost& host = msg->getSender();
 
     LLViewerRegion* region = LLWorld::instance().getRegion(host);
-    llassert(region);
-
     if (region)
     {
         U32 local_id = data.get("id").asInteger();
@@ -256,7 +254,11 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             LL_DEBUGS("GLTF") << "GLTF Material Override: " << cache.mObjectId << " " << cache.mLocalId << " " << cache.mRegionHandle << " (sides:" << (cache.mSides.size()) << ")" << LL_ENDL;
             region->cacheFullUpdateGLTFOverride(std::move(cache));
         }
-
+    }
+    else
+    {
+        // a region's circuit can still deliver an override after the region was removed
+        LL_WARNS("GLTF") << "Dropping GLTF material override from unknown region " << host << LL_ENDL;
     }
 }
 

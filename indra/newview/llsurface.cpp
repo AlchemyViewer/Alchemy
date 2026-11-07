@@ -601,14 +601,11 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
     gopp->stride = mGridsPerEdge;
     set_group_of_patch_header(gopp);
 
-    while (1)
+    // Up to the layer's end code or the end of its data, whichever comes first.
+    // The patches before a patch cut short stay, as they do before a patch
+    // outside the region.
+    while (decode_expected_patch(bitpack, &ph, patch))
     {
-        decode_patch_header(bitpack, &ph);
-        if (ph.quant_wbits == END_OF_PATCHES)
-        {
-            break;
-        }
-
         i = ph.patchids >> 5;
         j = ph.patchids & 0x1F;
 
@@ -628,8 +625,6 @@ void LLSurface::decompressDCTPatch(LLBitPack &bitpack, LLGroupHeader *gopp, bool
 
         patchp = &mPatchList[j*mPatchesPerEdge + i];
 
-
-        decode_patch(bitpack, patch);
         decompress_patch(patchp->getDataZ(), patch, &ph);
 
         // Update edges for neighbors.  Need to guarantee that this gets done before we generate vertical stats.

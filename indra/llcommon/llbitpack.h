@@ -138,6 +138,8 @@ public:
         return mBufferSize;
     }
 
+    // Past the data's end, which mMaxSize gives, a read takes zeros, and
+    // mBufferSize goes on counting the bytes it took.
     U32 bitUnpack(U8 *total_retval, U32 total_dsize)
     {
         U32 dsize;
@@ -162,14 +164,8 @@ public:
             {
                 if (mLoadSize == 0)
                 {
-#ifdef _DEBUG
-                    if (mBufferSize > mMaxSize)
-                    {
-                        LL_ERRS() << "mBufferSize exceeding mMaxSize" << LL_ENDL;
-                        LL_ERRS() << mBufferSize << " > " << mMaxSize << LL_ENDL;
-                    }
-#endif
-                    mLoad = *(mBuffer + mBufferSize++);
+                    mLoad = mBufferSize < mMaxSize ? *(mBuffer + mBufferSize) : 0x00;
+                    mBufferSize++;
                     mLoadSize = MAX_DATA_BITS;
                 }
                 *retval <<= 1;
@@ -180,6 +176,12 @@ public:
             }
         }
         return mBufferSize;
+    }
+
+    // Whether a read has taken a byte past the data's end.
+    bool readPastEnd() const
+    {
+        return mBufferSize > mMaxSize;
     }
 
     U32 flushBitPack()

@@ -744,7 +744,7 @@ bool LLMessageSystem::checkMessages(LockMessageChecker&, S64 frame_count,
                 if (cdp && recv_reliable)
                 {
                     // Add to the recently received list for duplicate suppression
-                    cdp->mRecentlyReceivedReliablePackets[mCurrentRecvPacketID] = getMessageTimeUsecs();
+                    cdp->recordReliablePacket(mCurrentRecvPacketID);
 
                     // Put it onto the list of packets to be acked, unless
                     // it was acked as it came in

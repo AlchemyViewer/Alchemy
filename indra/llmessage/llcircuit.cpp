@@ -627,6 +627,26 @@ bool LLCircuitData::checkDuplicate(TPACKETID packetnum, bool resent)
 }
 
 
+void LLCircuitData::recordReliablePacket(TPACKETID packetnum)
+{
+    mRecentlyReceivedReliablePackets[packetnum] = LLMessageSystem::getMessageTimeUsecs();
+
+    // Only the peer's pings let the list shrink (clearDuplicateList), so a
+    // peer that sends reliable packets and no pings would grow it without
+    // end. The oldest number is the first past the highest, since numbers
+    // wrap, or the lowest if nothing is past it.
+    if (mRecentlyReceivedReliablePackets.size() > LL_MAX_RECENT_RELIABLE_PACKETS)
+    {
+        packet_time_map::iterator oldest = mRecentlyReceivedReliablePackets.upper_bound(mHighestPacketID);
+        if (oldest == mRecentlyReceivedReliablePackets.end())
+        {
+            oldest = mRecentlyReceivedReliablePackets.begin();
+        }
+        mRecentlyReceivedReliablePackets.erase(oldest);
+    }
+}
+
+
 void LLCircuit::dumpResends()
 {
     circuit_data_map::iterator end = mCircuitData.end();

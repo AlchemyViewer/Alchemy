@@ -4218,6 +4218,7 @@ bool LLAgent::teleportCore(bool is_local)
     {
         LL_INFOS("Teleport") << "Setting teleport state to TELEPORT_LOCAL" << LL_ENDL;
         gAgent.setTeleportState( LLAgent::TELEPORT_LOCAL );
+        gTeleportDisplayTimer.reset();
     }
     else
     {
