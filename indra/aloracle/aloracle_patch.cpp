@@ -38,11 +38,6 @@
 
 namespace
 {
-    // The most bytes one step of the decode can read: a patch of 32 by 32
-    // whose every coefficient takes its 3 bits and the most word bits, 17,
-    // and a byte it had begun. A header reads fewer.
-    constexpr size_t STEP_BYTES = (LARGE_PATCH_SIZE * LARGE_PATCH_SIZE * (3 + 17)) / 8 + 1;
-
     LLSD describe(const LLPatchHeader& header, const std::vector<F32>& heights)
     {
         LLSD::Binary bytes;
@@ -81,12 +76,10 @@ int32_t aloracle_layer_decode(int32_t type, const uint8_t* data, size_t size, al
             return ALORACLE_BAD_ARGUMENT;
         }
 
-        // LLBitPack reads on past its size. Each step reads here into zeros
-        // the library owns, and one that read a byte past the data refuses
-        // the data before anything it read is used.
-        bytes.resize(size + STEP_BYTES, '\0');
+        // A step that read a byte past the data refuses the data before
+        // anything it read is used.
         LLBitPack bitpack(reinterpret_cast<U8*>(bytes.data()), (U32)size);
-        const auto within = [&] { return bitpack.mBufferSize <= size; };
+        const auto within = [&] { return !bitpack.readPastEnd(); };
 
         LLGroupHeader group;
         decode_patch_group_header(bitpack, &group);

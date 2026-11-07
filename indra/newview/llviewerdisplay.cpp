@@ -295,17 +295,39 @@ void display_stats()
     }
 }
 
-static void update_tp_display(bool minimized)
+// How long a teleport may go unfinished before the viewer gives up on it.
+static F32 teleport_expiry_time()
 {
-    static LLCachedControl<F32> teleport_arrival_delay(gSavedSettings, "TeleportArrivalDelay");
-    static LLCachedControl<F32> teleport_local_delay(gSavedSettings, "TeleportLocalDelay");
-
     S32 attach_count = 0;
     if (isAgentAvatarValid())
     {
         attach_count = gAgentAvatarp->getAttachmentCount();
     }
-    F32 teleport_save_time = TELEPORT_EXPIRY + TELEPORT_EXPIRY_PER_ATTACHMENT * attach_count;
+    return TELEPORT_EXPIRY + TELEPORT_EXPIRY_PER_ATTACHMENT * attach_count;
+}
+
+// A teleport inside the region shows no display until its TeleportLocal comes,
+// so update_tp_display doesn't run for it until then. Gives up on one whose
+// answer never came, since otherwise every later teleport is refused as one
+// made while teleporting.
+static void give_up_on_unanswered_local_teleport()
+{
+    if (!gTeleportDisplay
+        && gAgent.getTeleportState() == LLAgent::TELEPORT_LOCAL
+        && gTeleportDisplayTimer.getElapsedTimeF32() > teleport_expiry_time())
+    {
+        LL_WARNS("Teleport") << "Giving up on a teleport inside the region after "
+                             << gTeleportDisplayTimer.getElapsedTimeF32() << " seconds with no answer" << LL_ENDL;
+        gAgent.setTeleportState(LLAgent::TELEPORT_NONE);
+    }
+}
+
+static void update_tp_display(bool minimized)
+{
+    static LLCachedControl<F32> teleport_arrival_delay(gSavedSettings, "TeleportArrivalDelay");
+    static LLCachedControl<F32> teleport_local_delay(gSavedSettings, "TeleportLocalDelay");
+
+    F32 teleport_save_time = teleport_expiry_time();
     F32 teleport_elapsed = gTeleportDisplayTimer.getElapsedTimeF32();
     F32 teleport_percent = teleport_elapsed * (100.f / teleport_save_time);
     if (gAgent.getTeleportState() != LLAgent::TELEPORT_START && teleport_percent > 100.f)
@@ -525,6 +547,8 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         return;
     }
     gPipeline.applyRenderInputs();
+
+    give_up_on_unanswered_local_teleport();
 
     gSnapshot = for_snapshot;
 

@@ -76,6 +76,7 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
     -- '/503/4/'            "Retry-After: (*#*(@*(@(")"
     -- '/503/5/'            "Retry-After: aklsjflajfaklsfaklfasfklasdfklasdgahsdhgasdiogaioshdgo"
     -- '/503/6/'            "Retry-After: 1 2 3 4 5 6 7 8 9 10"
+    - '/redirect/'      307 response sending the request on to '/'
 
     Some combinations make no sense, there's no effort to protect
     you from that.
@@ -150,7 +151,12 @@ class TestHTTPRequestHandler(BaseHTTPRequestHandler):
         if "/sleep/" in self.path:
             time.sleep(30)
 
-        if "/503/" in self.path:
+        if "/redirect/" in self.path:
+            self.send_response(307)
+            self.send_header("Location", "/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+        elif "/503/" in self.path:
             # Tests for various kinds of 'Retry-After' header parsing
             body = None
             if "/503/0/" in self.path:

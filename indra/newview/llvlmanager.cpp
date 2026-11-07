@@ -92,7 +92,14 @@ void LLVLManager::unpackData(const S32 num_packets)
         LLBitPack bit_pack(datap->mData, datap->mSize);
         LLGroupHeader goph;
 
-        decode_patch_group_header(bit_pack, &goph);
+        if (!decode_layer_group_header(bit_pack, &goph))
+        {
+            LL_WARNS_ONCE("Messaging") << "Refused layer " << (S32)datap->mType
+                << " of " << datap->mSize << " bytes and patch size " << (S32)goph.patch_size
+                << " for region " << datap->mRegionp->getName() << LL_ENDL;
+            continue;
+        }
+
         if (LAND_LAYER_CODE == datap->mType)
         {
             datap->mRegionp->getLand().decompressDCTPatch(bit_pack, &goph, false);
@@ -105,6 +112,13 @@ void LLVLManager::unpackData(const S32 num_packets)
         else if (CLOUD_LAYER_CODE == datap->mType)
         {
 
+        }
+
+        if (bit_pack.readPastEnd())
+        {
+            LL_WARNS_ONCE("Messaging") << "Layer " << (S32)datap->mType
+                << " of " << datap->mSize << " bytes ended before its patches did"
+                << " for region " << datap->mRegionp->getName() << LL_ENDL;
         }
     }
 

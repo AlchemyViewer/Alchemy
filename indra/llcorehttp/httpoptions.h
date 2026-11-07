@@ -140,6 +140,15 @@ public:
         return mFollowRedirects;
     }
 
+    /// Fails the request if a redirect it would follow goes anywhere but
+    /// https, for a request whose body and headers must stay on TLS.
+    /// Default: false
+    void                setRedirectsHttpsOnly(bool https_only);
+    bool                getRedirectsHttpsOnly() const
+    {
+        return mRedirectsHttpsOnly;
+    }
+
     /// Instructs the LLCore::HTTPRequest to verify that the exchanged security
     /// certificate is authentic.
     /// Default: sDefaultVerifyPeer
@@ -201,6 +210,7 @@ protected:
     HttpTime            mMaxRetryBackoff;
     bool                mUseRetryAfter;
     bool                mFollowRedirects;
+    bool                mRedirectsHttpsOnly;
     bool                mVerifyPeer;
     bool                mVerifyHost;
     int                 mDNSCacheTimeout;

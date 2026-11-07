@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 // include this to get winsock2 because openssl attempts to include winsock1
 #include "llwin32headers.h"
+#include <boost/algorithm/string/predicate.hpp>
 #include <openssl/x509_vfy.h>
 #include <openssl/ssl.h>
 #include "llsecapi.h"
@@ -212,6 +213,10 @@ LLXMLRPCTransaction::Impl::Impl
 
     httpOpts->setSSLVerifyPeer(vefifySSLCert);
     httpOpts->setSSLVerifyHost(vefifySSLCert);
+
+    // The body holds the login's credentials or a payment's details, and a 307
+    // or 308 sends it on as it is.
+    httpOpts->setRedirectsHttpsOnly(boost::algorithm::istarts_with(mURI, "https://"));
 
     // LLRefCounted starts with a 1 ref, so don't add a ref in the smart pointer
     httpHeaders = std::make_shared<LLCore::HttpHeaders>();

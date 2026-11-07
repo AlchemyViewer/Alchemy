@@ -234,6 +234,7 @@ if(AL_BUILD_TESTS)
       tests/llxorcipher_test.cpp
       tests/llzerocode_test.cpp
       tests/message_test.cpp
+      tests/patch_code_test.cpp
     LIBRARIES llfilesystem llmath llcorehttp llmessage llcommon
     SUPPORT llmessage_test_checks llmessage_test_pipes
   )
