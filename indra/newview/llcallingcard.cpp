@@ -266,7 +266,7 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
             LL_WARNS() << "!! Add buddy for existing buddy: " << agent_id
                     << " [" << (e_r->isOnline() ? "Online" : "Offline") << "->" << (n_r->isOnline() ? "Online" : "Offline")
                     << ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
-                    << ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
+                    << ", " <<  e_r->getRightsGrantedFrom() << "->" << n_r->getRightsGrantedFrom()
                     << "]" << LL_ENDL;
         }
     }
