@@ -122,6 +122,29 @@ namespace
         CHECK(str_val == orig_str_val);
     }
 
+    TEST_CASE("LLString: removeCRLF removes a trailing carriage return and a run of them", "[LLString]")
+    {
+        std::string s("a\r");
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("a trailing CR");
+        CHECK(s == std::string("a"));
+
+        s = "\r";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("nothing but a CR");
+        CHECK(s.empty());
+
+        s = "a\r\rb";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("two CRs in a row");
+        CHECK(s == std::string("ab"));
+
+        s = "\r\r\r\n";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("a run of CRs before a LF");
+        CHECK(s == std::string("\n"));
+    }
+
     TEST_CASE("LLString: replaceTabsWithSpaces puts n spaces for each tab", "[LLString]")
     {
         std::string str_val("Hello.\n\n\t \t Lindenlabs. \t\t");

@@ -1713,20 +1713,7 @@ template<class T>
 void LLStringUtilBase<T>::removeCRLF(string_type& string)
 {
     const T CR = 13;
-
-    size_type cr_count = 0;
-    size_type len = string.size();
-    size_type i;
-    for( i = 0; i < len - cr_count; i++ )
-    {
-        if( string[i+cr_count] == CR )
-        {
-            cr_count++;
-        }
-
-        string[i] = string[i+cr_count];
-    }
-    string.erase(i, cr_count);
+    std::erase(string, CR);
 }
 
 //static
