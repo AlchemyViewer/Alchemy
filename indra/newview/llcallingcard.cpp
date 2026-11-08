@@ -730,7 +730,7 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
                 mBuddyStatusQueue.push(std::make_pair(agent_id, online));
             }
 
-            if(tracking_id == agent_id)
+            if(!online && tracking_id == agent_id)
             {
                 // we were tracking someone who went offline
                 deleteTrackingData();
