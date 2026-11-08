@@ -470,8 +470,16 @@ bool LLInventoryModel::isObjectDescendentOf(const LLUUID& obj_id,
     if (obj_id == cat_id) return true;
 
     const LLInventoryObject* obj = getObject(obj_id);
+    // The thing and every folder the model holds, at most, before a walk up
+    // has gone round folders that hold each other.
+    size_t steps_left = mCategoryMap.size() + 1;
     while(obj)
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            return false;
+        }
         const LLUUID& parent_id = obj->getParentUUID();
         if( parent_id.isNull() )
         {
@@ -496,11 +504,18 @@ const LLViewerInventoryCategory *LLInventoryModel::getFirstNondefaultParent(cons
         LL_WARNS(LOG_INV) << "Non-existent object [ id: " << obj_id << " ] " << LL_ENDL;
         return NULL;
     }
-    // Search up the parent chain until we get to root or an acceptable folder.
-    // This assumes there are no cycles in the tree else we'll get a hang.
+    // Search up the parent chain until we get to root or an acceptable folder,
+    // past no more folders than the model holds, which only folders that hold
+    // each other would take it beyond.
     LLUUID parent_id = obj->getParentUUID();
+    size_t steps_left = mCategoryMap.size();
     while (!parent_id.isNull())
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            break;
+        }
         const LLViewerInventoryCategory *cat = getCategory(parent_id);
         if (!cat) break;
         const LLFolderType::EType folder_type = cat->getPreferredType();
@@ -532,8 +547,16 @@ const LLViewerInventoryCategory* LLInventoryModel::getFirstDescendantOf(const LL
         current_cat = getCategory(getObject(obj_id)->getParentUUID());
     }
 
+    // Past no more folders than the model holds, which only folders that hold
+    // each other would take the walk beyond.
+    size_t steps_left = mCategoryMap.size();
     while (current_cat != NULL)
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            break;
+        }
         const LLUUID& current_parent_id = current_cat->getParentUUID();
 
         if (current_parent_id == master_parent_id)
