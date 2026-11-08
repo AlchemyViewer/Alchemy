@@ -896,10 +896,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     boost::char_separator<char> sep("|", "", boost::keep_empty_tokens);
                     tokenizer tokens(str_bucket, sep);
                     tokenizer::iterator iter = tokens.begin();
+                    // A part the bucket leaves out is empty.
+                    const auto next_part = [&]() { return iter != tokens.end() ? *iter++ : std::string(); };
 
-                    asset_type = (LLAssetType::EType)(atoi((*(iter++)).c_str()));
-                    iter++; // wearable type if applicable, otherwise asset type
-                    item_name = std::string((*(iter++)).c_str());
+                    asset_type = (LLAssetType::EType)(atoi(next_part().c_str()));
+                    next_part(); // wearable type if applicable, otherwise asset type
+                    item_name = std::string(next_part().c_str());
                 }
             }
             else
@@ -984,17 +986,11 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 info->mHost = sender;
             }
 
-            std::string str(message);
-
-            // Tokenize the string.
-            // TODO: Support escaped tokens ("||" -> "|")
-            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-            boost::char_separator<char> sep("|", "", boost::keep_empty_tokens);
-            tokenizer tokens(str, sep);
-            tokenizer::iterator iter = tokens.begin();
-
-            std::string subj(*iter++);
-            std::string mes(*iter++);
+            // The message is the subject, a bar and the body, which may hold
+            // bars of its own. A message with no bar is all subject.
+            const size_t bar = message.find('|');
+            std::string subj = message.substr(0, bar);
+            std::string mes = bar == std::string::npos ? std::string() : message.substr(bar + 1);
 
             // Send the notification down the new path.
             // For requested notices, we don't want to send the popups.
