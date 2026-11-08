@@ -86,6 +86,19 @@ std::string replace_wildcards(std::string input, const LLUUID& id, const std::st
 
 extern void on_new_message(const LLSD& msg);
 
+// The text a binary bucket holds, up to its first NUL or to its end. Nothing
+// says a bucket ends in a NUL, and one sent over HTTP is no longer than its
+// bytes, so the NUL is looked for only within it.
+static std::string bucket_text(const U8* bucket, S32 size)
+{
+    if (!bucket || size <= 0)
+    {
+        return std::string();
+    }
+    const char* text = reinterpret_cast<const char*>(bucket);
+    return std::string(text, std::find(text, text + size, '\0'));
+}
+
 // Strip out "Resident" for display, but only if the message came from a user
 // (rather than a script)
 static std::string clean_name_from_im(const std::string& name, EInstantMessage type)
@@ -1104,7 +1117,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     // still might be able to figure out the type... even though the offer is not retrievable.
 
                     // Should be safe to remove once DRTSIM-451 fully deploys
-                    std::string str_bucket(reinterpret_cast<char *>(binary_bucket));
+                    std::string str_bucket = bucket_text(binary_bucket, binary_bucket_size);
                     std::string str_type(str_bucket.substr(0, str_bucket.find('|')));
 
                     std::stringstream type_convert(str_type);
@@ -1378,7 +1391,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     name,
                     buffer,
                     IM_OFFLINE == offline,
-                    ll_safe_string((char*)binary_bucket),
+                    bucket_text(binary_bucket, binary_bucket_size),
                     IM_SESSION_INVITE,
                     parent_estate_id,
                     region_id,
@@ -1405,7 +1418,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     name,
                     buffer,
                     (IM_OFFLINE == offline),
-                    ll_safe_string((char*)binary_bucket),   // session name
+                    bucket_text(binary_bucket, binary_bucket_size),   // session name
                     IM_SESSION_INVITE,
                     parent_estate_id,
                     region_id,
