@@ -696,9 +696,11 @@ void send_join_group_response(LLUUID group_id, LLUUID transaction_id, bool accep
 
         EInstantMessage type = accept_invite ? IM_GROUP_INVITATION_ACCEPT : IM_GROUP_INVITATION_DECLINE;
 
+        std::string my_name;
+        LLAgentUI::buildFullname(my_name);
         send_improved_im(group_id,
-            std::string("name"),
-            std::string("message"),
+            my_name,
+            LLStringUtil::null,
             IM_ONLINE,
             type,
             transaction_id);
