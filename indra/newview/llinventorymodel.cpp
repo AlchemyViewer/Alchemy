@@ -1614,6 +1614,12 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
         // Simply add this item
         new_item = new LLViewerInventoryItem(item);
         addItem(new_item);
+        if (!getItem(new_item->getUUID()))
+        {
+            // addItem refused it, as it does an item of no type, so it goes
+            // in no folder either.
+            return mask;
+        }
 
         if(item->getParentUUID().isNull())
         {
