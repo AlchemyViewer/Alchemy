@@ -4027,7 +4027,13 @@ void LLInventoryModel::removeInventoryFolder(LLUUID agent_id,
     gInventory.accountForUpdate(update);
     for(uuid_vec_t::iterator it = folder_ids.begin(); it != folder_ids.end(); ++it)
     {
-        gInventory.deleteObject(*it);
+        // What the folder held goes with it, and a folder named after one
+        // that held it has gone already.
+        if (gInventory.getCategory(*it))
+        {
+            gInventory.onDescendentsPurgedFromServer(*it);
+            gInventory.deleteObject(*it);
+        }
     }
 }
 
