@@ -534,9 +534,13 @@ void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str,
 
     std::string::size_type lenMsg = utf8str.length(), lenIt = 0;
 
-    const char* pstrIt = utf8str.data(); std::string strTemp;
+    std::string strTemp;
     while (lenIt < lenMsg)
     {
+        // The window starts where this piece does, past the separator the
+        // last piece stopped at, so that separator is neither the first byte
+        // searched nor the last byte taken.
+        const char* pstrIt = utf8str.data() + lenIt;
         if (lenIt + maxlen < lenMsg)
         {
             // Find the last split character
@@ -570,11 +574,10 @@ void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str,
         split_list.push_back(strTemp);
 
         lenIt += strTemp.length();
-        pstrIt = utf8str.data() + lenIt;
         // A view carries no terminator, so the end has to be checked before
         // the byte is read. c_str() used to make the one-past-the-end read
         // land on the NUL.
-        if (lenIt < lenMsg && *pstrIt == split_token)
+        if (lenIt < lenMsg && utf8str[lenIt] == split_token)
             lenIt++;
     }
 }

@@ -1537,8 +1537,8 @@ namespace
     }
 
     // utf8str_split splits at the last split-token at or before maxlen bytes,
-    // falling back to a hard byte cut when no token is in range. Non-final
-    // chunks retain the trailing split-token (current implementation).
+    // falling back to a hard byte cut when no token is in range. The token a
+    // piece is cut at belongs to no piece.
     TEST_CASE_METHOD(llstring_utf_data, "LLStringUTF: utf8str_split splits at the last split-token at or before maxlen bytes", "[LLStringUTF]")
     {
         {
@@ -1547,8 +1547,24 @@ namespace
             REQUIRE(out.size() == size_t(3));
             auto it = out.begin();
             CHECK(*it++ == std::string("Hello"));
-            CHECK(*it++ == std::string("there "));
+            CHECK(*it++ == std::string("there"));
             CHECK(*it == std::string("world"));
+        }
+        // Every piece after the first starts just past a token, and its window
+        // is searched from there: no piece ends with the token it was cut at.
+        {
+            std::list<std::string> out;
+            utf8str_split(out, "aaaa bbbb cccc dddd", 6, ' ');
+            const std::list<std::string> expected = { "aaaa", "bbbb", "cccc", "dddd" };
+            CHECK(out == expected);
+        }
+        // A token exactly maxlen bytes past a piece's start is in range, so the
+        // piece takes the whole window.
+        {
+            std::list<std::string> out;
+            utf8str_split(out, "a,b,c,d,e", 3, ',');
+            const std::list<std::string> expected = { "a,b", "c,d", "e" };
+            CHECK(out == expected);
         }
         {
             std::list<std::string> out;
