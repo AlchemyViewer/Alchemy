@@ -4360,10 +4360,21 @@ void LLInventoryModel::processMoveInventoryItem(LLMessageSystem* msg, void**)
             LL_DEBUGS() << "moving item " << item_id << " to folder "
                      << folder_id << LL_ENDL;
             update_list_t update;
-            LLCategoryUpdate old_folder(item->getParentUUID(), -1);
-            update.push_back(old_folder);
-            LLCategoryUpdate new_folder(folder_id, 1);
-            update.push_back(new_folder);
+            if (item->getParentUUID() == folder_id)
+            {
+                // A move within the folder changes it by nothing. Counted as
+                // a thing out and a thing in, the second fails the count check
+                // the first has just made stale, and the folder stays a thing
+                // short.
+                update.push_back(LLCategoryUpdate(folder_id, 0));
+            }
+            else
+            {
+                LLCategoryUpdate old_folder(item->getParentUUID(), -1);
+                update.push_back(old_folder);
+                LLCategoryUpdate new_folder(folder_id, 1);
+                update.push_back(new_folder);
+            }
             gInventory.accountForUpdate(update);
 
             new_item->setParent(folder_id);
