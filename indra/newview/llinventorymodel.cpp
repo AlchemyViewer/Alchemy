@@ -304,9 +304,13 @@ public:
             size_t count = wearable_ids.size();
             for (S32 i = 0; i < count; ++i)
             {
+                // A wearable the model refused is not there to wear.
                 LLViewerInventoryItem* wearable_item;
                 wearable_item = gInventory.getItem(wearable_ids[i]);
-                LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+                if (wearable_item)
+                {
+                    LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+                }
             }
         }
 
@@ -4345,8 +4349,12 @@ void LLInventoryModel::processBulkUpdateInventory(LLMessageSystem* msg, void**)
     {
         for (const auto& wearable_id : wearable_ids)
         {
+            // A wearable the model refused is not there to wear.
             LLViewerInventoryItem* wearable_item = gInventory.getItem(wearable_id);
-            LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+            if (wearable_item)
+            {
+                LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+            }
         }
     }
 
