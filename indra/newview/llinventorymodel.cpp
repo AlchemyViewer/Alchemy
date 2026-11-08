@@ -548,7 +548,13 @@ const LLViewerInventoryCategory* LLInventoryModel::getFirstDescendantOf(const LL
 
     if (current_cat == NULL)
     {
-        current_cat = getCategory(getObject(obj_id)->getParentUUID());
+        // Something the model doesn't hold has no folders above it.
+        const LLInventoryObject* obj = getObject(obj_id);
+        if (!obj)
+        {
+            return NULL;
+        }
+        current_cat = getCategory(obj->getParentUUID());
     }
 
     // Past no more folders than the model holds, which only folders that hold
