@@ -1758,6 +1758,13 @@ void LLStringUtilBase<T>::replaceChar( string_type& string, T target, T replacem
 template<class T>
 void LLStringUtilBase<T>::replaceString( string_type& string, string_view_type target, string_view_type replacement )
 {
+    // An empty target is found at every position, the one just past each
+    // replacement included, so the loop below would never end.
+    if (target.empty())
+    {
+        return;
+    }
+
     // Either view is allowed to point into `string` itself, and both are read
     // after a replace that can have moved the buffer they point into -- target
     // on every turn of the loop below, not only the first. Copy in that one

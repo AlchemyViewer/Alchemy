@@ -1141,6 +1141,25 @@ namespace
         }
     }
 
+    // An empty target is found everywhere, and replacing it never moves the
+    // search past it.
+    TEST_CASE("LLString: replaceString with an empty target leaves the string as it was", "[LLString]")
+    {
+        std::string s("abc");
+        LLStringUtil::replaceString(s, "", "");
+        UNSCOPED_INFO("empty target and replacement");
+        CHECK(s == std::string("abc"));
+
+        LLStringUtil::replaceString(s, "", "x");
+        UNSCOPED_INFO("empty target, some replacement");
+        CHECK(s == std::string("abc"));
+
+        std::string empty;
+        LLStringUtil::replaceString(empty, "", "x");
+        UNSCOPED_INFO("empty string, empty target");
+        CHECK(empty.empty());
+    }
+
     // copyInto has the same shape: src may view dst, the append path appends
     // from it, and the insert path assigns dst out from under it first.
     TEST_CASE("LLString: copyInto takes a source that views the destination", "[LLString]")
