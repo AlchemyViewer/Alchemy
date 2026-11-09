@@ -1397,15 +1397,25 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     }
     else
     {
-        if (category_map.has("agent_id"))
+        // A folder the reply names no owner of is its parent's: one made
+        // earlier in this reply, or one the model holds. Else it is the
+        // agent's, whose inventory every request but a library fetch is of,
+        // and a library fetch's folders are under the one it asked for.
+        const auto parent_owner = [this](const LLUUID& parent_id) -> std::optional<LLUUID>
         {
-            new_cat = new LLViewerInventoryCategory(category_map["agent_id"].asUUID());
-        }
-        else
-        {
-            LL_DEBUGS() << "No owner provided, folder might be assigned wrong owner" << LL_ENDL;
-            new_cat = new LLViewerInventoryCategory(LLUUID::null);
-        }
+            const deferred_category_map_t::const_iterator made = mCategoriesCreated.find(parent_id);
+            if (made != mCategoriesCreated.end())
+            {
+                return made->second->getOwnerID();
+            }
+            if (const LLViewerInventoryCategory* parent = gInventory.getCategory(parent_id))
+            {
+                return parent->getOwnerID();
+            }
+            return std::nullopt;
+        };
+        new_cat = new LLViewerInventoryCategory(
+            ALInventorySync::newFolderOwner(category_map, parent_owner, gAgent.getID()));
     }
     bool rv = new_cat->unpackMessage(category_map);
     // *NOTE: unpackMessage does not unpack version or descendent count.
