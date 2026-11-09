@@ -83,3 +83,9 @@ uuid_vec_t ALInventorySync::unlisted(const std::vector<Child>& children, Listing
     }
     return left_out;
 }
+
+// static
+bool ALInventorySync::isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner)
+{
+    return library_owner.notNull() && owner == library_owner;
+}
