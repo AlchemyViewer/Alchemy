@@ -2222,6 +2222,12 @@ bool idle_startup()
             LLAvatarTracker::instance().addBuddyList(list);
             do_startup_frame();
         }
+        else
+        {
+            // With no list the tracker still stops holding what the circuit
+            // says of residents it hasn't heard of.
+            LLAvatarTracker::instance().addBuddyList(LLAvatarTracker::buddy_map_t());
+        }
 
         bool show_hud = false;
         LLSD tutorial_setting = response["tutorial_setting"];

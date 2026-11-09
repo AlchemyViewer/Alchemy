@@ -32,6 +32,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "alfriendbacklog.h"
 #include "lluserrelations.h"
 #include "lluuid.h"
 #include "v3dmath.h"
@@ -110,8 +111,9 @@ public:
     // add or remove agents from buddy list. Each method takes a set
     // of buddies and returns how many were actually added or removed.
     typedef std::map<LLUUID, LLRelationship*> buddy_map_t;
-    typedef std::queue<std::pair<LLUUID, bool>> buddy_status_queue_t;
 
+    // Applies the login's friends list, which may be empty, and then what the circuit said meanwhile about the
+    // friends it names.
     S32 addBuddyList(const buddy_map_t& buddies);
     //S32 removeBuddyList(const buddy_list_t& exes);
     void copyBuddyList(buddy_map_t& buddies) const;
@@ -196,7 +198,8 @@ protected:
     //LLInventoryObserver* mInventoryObserver;
 
     buddy_map_t mBuddyInfo;
-    buddy_status_queue_t mBuddyStatusQueue;
+    // what the circuit said of residents not in mBuddyInfo before the login's list was applied
+    ALFriendBacklog mBacklog;
 
     typedef std::set<LLUUID> changed_buddy_t;
     changed_buddy_t mChangedBuddyIDs;

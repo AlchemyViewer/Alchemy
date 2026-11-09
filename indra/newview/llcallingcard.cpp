@@ -271,18 +271,14 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
         }
     }
 
-    // It's possible that the buddy list getting propagated from the inventory may have happened after we actually got the buddy list.
-    // Any buddies that we got prior will reside in a special queue that we must process and update statuses accordingly with.
-    // Do that here.
-    // -Geenz 2025-03-12
-    while (!mBuddyStatusQueue.empty())
+    // The circuit is listened to before the login's list is applied, so notices about friends may have come
+    // first; they apply now to those the list names. From here on a notice about anyone else is about someone who
+    // is not a friend.
+    for (const ALFriendBacklog::Notice& notice : mBacklog.applyList())
     {
-        auto buddyStatus = mBuddyStatusQueue.front();
-        mBuddyStatusQueue.pop();
-
-        if (mBuddyInfo.find(buddyStatus.first) != mBuddyInfo.end())
+        if (mBuddyInfo.find(notice.mID) != mBuddyInfo.end())
         {
-            setBuddyOnline(buddyStatus.first, buddyStatus.second);
+            setBuddyOnline(notice.mID, notice.mKind == ALFriendBacklog::Kind::ONLINE);
         }
     }
 
@@ -345,12 +341,10 @@ void LLAvatarTracker::setBuddyOnline(const LLUUID& id, bool is_online)
         addChangedMask(LLFriendObserver::ONLINE, id);
         LL_DEBUGS() << "Set buddy " << id << (is_online ? " Online" : " Offline") << LL_ENDL;
     }
-    else
+    else if (!mBacklog.hold({ id, is_online ? ALFriendBacklog::Kind::ONLINE : ALFriendBacklog::Kind::OFFLINE }))
     {
         LL_WARNS() << "!! No buddy info found for " << id
                 << ", setting to " << (is_online ? "Online" : "Offline") << LL_ENDL;
-        LL_WARNS() << "Did we receive a buddy status update before the buddy info?" << LL_ENDL;
-        mBuddyStatusQueue.push(std::make_pair(id, is_online));
     }
 }
 
@@ -728,11 +722,14 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
             {
                 setBuddyOnline(agent_id,online);
             }
+            else if (mBacklog.hold({ agent_id, online ? ALFriendBacklog::Kind::ONLINE : ALFriendBacklog::Kind::OFFLINE }))
+            {
+                LL_DEBUGS() << "Holding an online notification for " << agent_id << ", who is "
+                    << (online ? "ONLINE" : "OFFLINE") << ", until the friends list is applied" << LL_ENDL;
+            }
             else
             {
-                LL_DEBUGS() << "Received online notification for unknown buddy: "
-                    << agent_id << " is " << (online ? "ONLINE" : "OFFLINE") << " Adding buddy to buddy queue." << LL_ENDL;
-                mBuddyStatusQueue.push(std::make_pair(agent_id, online));
+                LL_DEBUGS() << "Received online notification for " << agent_id << ", who is not a friend" << LL_ENDL;
             }
 
             if(!online && tracking_id == agent_id)
