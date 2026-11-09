@@ -2614,6 +2614,7 @@ if(AL_BUILD_TESTS)
       tests/llagentaccess_test.cpp
       tests/llagentbenefits_test.cpp
       tests/llautoreplace_test.cpp
+      tests/llgroupdata_test.cpp
       tests/llhttpretrypolicy_test.cpp
       tests/llversioninfo_test.cpp
       tests/llviewerassetstats_test.cpp
