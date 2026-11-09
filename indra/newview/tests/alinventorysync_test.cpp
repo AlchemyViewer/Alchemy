@@ -1,0 +1,145 @@
+/**
+ * @file alinventorysync_test.cpp
+ * @brief Tests of how the viewer keeps its inventory in step with the server's.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Alchemy Viewer Source Code
+ * Copyright (C) 2026, Rye <rye@alchemyviewer.org>
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation;
+ * version 2.1 of the License only.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "../alinventorysync.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <initializer_list>
+
+namespace
+{
+    using Sync = ALInventorySync;
+
+    const LLUUID FOLDER("10000000-0000-4000-8000-000000000001");
+    const LLUUID ITEM("10000000-0000-4000-8000-000000000002");
+    const LLUUID LINK("10000000-0000-4000-8000-000000000003");
+    const LLUUID OTHER_FOLDER("10000000-0000-4000-8000-000000000004");
+    const LLUUID OTHER_ITEM("10000000-0000-4000-8000-000000000005");
+    const LLUUID OTHER_LINK("10000000-0000-4000-8000-000000000006");
+
+    // A folder holding a folder, an item and a link of each pair.
+    const std::vector<Sync::Child> CHILDREN = {
+        { FOLDER, false }, { ITEM, false }, { LINK, true },
+        { OTHER_FOLDER, false }, { OTHER_ITEM, false }, { OTHER_LINK, true },
+    };
+
+    // An AIS3 `_embedded` map of these ids, as a reply keys its folders,
+    // items or links.
+    LLSD keyed(std::initializer_list<LLUUID> ids)
+    {
+        LLSD map = LLSD::emptyMap();
+        for (const LLUUID& id : ids)
+        {
+            map[id.asString()] = LLSD::emptyMap();
+        }
+        return map;
+    }
+
+    TEST_CASE("alinventorysync: a whole listing leaves out each child it doesn't name", "[alinventorysync]")
+    {
+        const uuid_set_t listed = { FOLDER, ITEM, LINK };
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, listed, 7, 6)
+              == uuid_vec_t{ OTHER_FOLDER, OTHER_ITEM, OTHER_LINK });
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, {}, 7, 6)
+              == uuid_vec_t{ FOLDER, ITEM, LINK, OTHER_FOLDER, OTHER_ITEM, OTHER_LINK });
+    }
+
+    TEST_CASE("alinventorysync: a listing of links alone leaves out only the links it doesn't name", "[alinventorysync]")
+    {
+        const uuid_set_t listed = { LINK };
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::LinksOnly, listed, 7, 6) == uuid_vec_t{ OTHER_LINK });
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::LinksOnly, {}, 7, 6) == uuid_vec_t{ LINK, OTHER_LINK });
+    }
+
+    TEST_CASE("alinventorysync: a listing as new as the folder held or newer leaves out what it doesn't name", "[alinventorysync]")
+    {
+        const uuid_set_t listed = { FOLDER, ITEM, LINK, OTHER_FOLDER, OTHER_ITEM };
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, listed, 6, 6) == uuid_vec_t{ OTHER_LINK });
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, listed, 9, 6) == uuid_vec_t{ OTHER_LINK });
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, listed, 1, Sync::VERSION_UNKNOWN) == uuid_vec_t{ OTHER_LINK });
+    }
+
+    TEST_CASE("alinventorysync: a listing older than the folder held or of no version leaves nothing out", "[alinventorysync]")
+    {
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, {}, 5, 6).empty());
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::LinksOnly, {}, 5, 6).empty());
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, {}, Sync::VERSION_UNKNOWN, 6).empty());
+        CHECK(Sync::unlisted(CHILDREN, Sync::Listing::Whole, {}, Sync::VERSION_UNKNOWN, Sync::VERSION_UNKNOWN).empty());
+    }
+
+    TEST_CASE("alinventorysync: an AIS3 reply lists the whole folder where its embedded has every kind", "[alinventorysync]")
+    {
+        LLSD embedded;
+        embedded["categories"] = keyed({});
+        embedded["links"] = keyed({});
+        embedded["items"] = keyed({});
+        for (const bool outfit : { false, true })
+        {
+            for (const bool fetch : { false, true })
+            {
+                INFO("outfit folder " << outfit << " fetch " << fetch);
+                CHECK(Sync::embeddedListing(embedded, outfit, fetch) == Sync::Listing::Whole);
+            }
+        }
+    }
+
+    TEST_CASE("alinventorysync: an AIS3 fetch lists an outfit folder by its links alone", "[alinventorysync]")
+    {
+        LLSD links;
+        links["links"] = keyed({ LINK });
+        CHECK(Sync::embeddedListing(links, true, true) == Sync::Listing::LinksOnly);
+        // Not a fetch, or not a folder of outfit links: the links are not
+        // all it holds.
+        CHECK_FALSE(Sync::embeddedListing(links, true, false).has_value());
+        CHECK_FALSE(Sync::embeddedListing(links, false, true).has_value());
+    }
+
+    TEST_CASE("alinventorysync: an AIS3 reply missing a kind lists nothing in full", "[alinventorysync]")
+    {
+        LLSD categories;
+        categories["categories"] = keyed({ FOLDER });
+        CHECK_FALSE(Sync::embeddedListing(categories, false, true).has_value());
+        CHECK_FALSE(Sync::embeddedListing(categories, true, true).has_value());
+
+        LLSD no_links;
+        no_links["categories"] = keyed({ FOLDER });
+        no_links["items"] = keyed({ ITEM });
+        CHECK_FALSE(Sync::embeddedListing(no_links, false, true).has_value());
+
+        CHECK_FALSE(Sync::embeddedListing(LLSD(), true, true).has_value());
+    }
+
+    TEST_CASE("alinventorysync: an AIS3 reply names the keys of the kinds its listing covers", "[alinventorysync]")
+    {
+        LLSD embedded;
+        embedded["categories"] = keyed({ FOLDER });
+        embedded["links"] = keyed({ LINK, OTHER_LINK });
+        embedded["items"] = keyed({ ITEM });
+        CHECK(Sync::embeddedIds(embedded, Sync::Listing::Whole) == uuid_set_t{ FOLDER, ITEM, LINK, OTHER_LINK });
+        CHECK(Sync::embeddedIds(embedded, Sync::Listing::LinksOnly) == uuid_set_t{ LINK, OTHER_LINK });
+    }
+}

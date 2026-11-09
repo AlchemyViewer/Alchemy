@@ -264,6 +264,7 @@ if(AL_BUILD_VIEWER)
     alviewcapture.cpp
     algradehistory.cpp
     alhoverglow.cpp
+    alinventorysync.cpp
     allegacynotificationwellwindow.cpp
     allightboxdirectory.cpp
     almotionpredictor.cpp
@@ -1158,6 +1159,7 @@ if(AL_BUILD_VIEWER)
     algroupchanges.h
     algroupmembers.h
     alhoverglow.h
+    alinventorysync.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almaturitypreference.h
@@ -2581,6 +2583,7 @@ if(AL_BUILD_TESTS)
       tests/algradehistory_test.cpp
       tests/algroupchanges_test.cpp
       tests/algroupmembers_test.cpp
+      tests/alinventorysync_test.cpp
       tests/almaturitypreference_test.cpp
       tests/almotionpredictor_test.cpp
       tests/almutelookup_test.cpp
@@ -2667,6 +2670,7 @@ if(AL_BUILD_TESTS)
       alfeedback.cpp
       alfeedbackoutbox.cpp
       algradehistory.cpp
+      alinventorysync.cpp
       almotionpredictor.cpp
       alnotecardembedded.cpp
       alrecovery.cpp

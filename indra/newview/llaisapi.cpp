@@ -28,6 +28,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llaisapi.h"
 
+#include "alinventorysync.h"
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llcallbacklist.h"
@@ -1097,6 +1098,7 @@ void AISUpdate::clearParseResults()
     mItemsUpdated.clear();
     mCategoriesCreated.clear();
     mCategoriesUpdated.clear();
+    mChildrenUnlisted.clear();
     mObjectsDeletedIds.clear();
     mItemIds.clear();
     mCategoryIds.clear();
@@ -1443,6 +1445,8 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
                             << " for category " << category_id << LL_ENDL;
                     }
 
+                    // What the folder holds that the listing leaves out.
+                    parseUnlisted(category_id, new_cat->getPreferredType(), category_map["_embedded"], version);
                     new_cat->setVersion(version);
                 }
             }
@@ -1503,21 +1507,63 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     }
 }
 
+static bool is_outfit_folder(LLFolderType::EType type)
+{
+    return type == LLFolderType::FT_CURRENT_OUTFIT || type == LLFolderType::FT_OUTFIT;
+}
+
 void AISUpdate::parseDescendentCount(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded)
 {
     // We can only determine true descendent count if this contains all descendent types.
-    if (embedded.has("categories") &&
-        embedded.has("links") &&
-        embedded.has("items"))
+    const std::optional<ALInventorySync::Listing> listing =
+        ALInventorySync::embeddedListing(embedded, is_outfit_folder(type), mFetch);
+    if (listing == ALInventorySync::Listing::Whole)
     {
         mCatDescendentsKnown[category_id] = embedded["categories"].size();
         mCatDescendentsKnown[category_id] += embedded["links"].size();
         mCatDescendentsKnown[category_id] += embedded["items"].size();
     }
-    else if (mFetch && embedded.has("links") && (type == LLFolderType::FT_CURRENT_OUTFIT || type == LLFolderType::FT_OUTFIT))
+    else if (listing == ALInventorySync::Listing::LinksOnly)
     {
         // COF and outfits contain links only
         mCatDescendentsKnown[category_id] = embedded["links"].size();
+    }
+}
+
+void AISUpdate::parseUnlisted(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded, S32 version)
+{
+    const LLViewerInventoryCategory* held = gInventory.getCategory(category_id);
+    const std::optional<ALInventorySync::Listing> listing =
+        ALInventorySync::embeddedListing(embedded, is_outfit_folder(type), mFetch);
+    if (!held || !listing)
+    {
+        return;
+    }
+
+    LLInventoryModel::cat_array_t* categories = nullptr;
+    LLInventoryModel::item_array_t* items = nullptr;
+    gInventory.getDirectDescendentsOf(category_id, categories, items);
+    std::vector<ALInventorySync::Child> children;
+    if (categories)
+    {
+        for (const LLPointer<LLViewerInventoryCategory>& category : *categories)
+        {
+            children.push_back({ category->getUUID(), false });
+        }
+    }
+    if (items)
+    {
+        for (const LLPointer<LLViewerInventoryItem>& item : *items)
+        {
+            children.push_back({ item->getUUID(), item->getIsLinkType() });
+        }
+    }
+
+    for (const LLUUID& child_id : ALInventorySync::unlisted(children, *listing,
+                                                            ALInventorySync::embeddedIds(embedded, *listing),
+                                                            version, held->getVersion()))
+    {
+        mChildrenUnlisted.emplace_back(child_id, category_id);
     }
 }
 
@@ -1779,6 +1825,19 @@ void AISUpdate::doUpdate()
         LL_DEBUGS("Inventory") << "updated item " << item_id << LL_ENDL;
         //LL_DEBUGS("Inventory") << ll_pretty_print_sd(new_item->asLLSD()) << LL_ENDL;
         gInventory.updateItem(new_item);
+    }
+
+    // REMOVE WHAT FETCHED FOLDERS NO LONGER LIST
+    for (const auto& [child_id, folder_id] : mChildrenUnlisted)
+    {
+        // Unless it has moved since, by this update or another.
+        const LLInventoryObject* child = gInventory.getObject(child_id);
+        if (child && child->getParentUUID() == folder_id)
+        {
+            LL_DEBUGS("Inventory") << "removed " << child_id << ", which fetched folder " << folder_id
+                                   << " no longer lists" << LL_ENDL;
+            gInventory.onObjectDeletedFromServer(child_id, false, false, false);
+        }
     }
 
     // DELETE OBJECTS
