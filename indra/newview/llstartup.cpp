@@ -2203,28 +2203,19 @@ bool idle_startup()
         if(buddy_list.isDefined())
         {
             LLAvatarTracker::buddy_map_t list;
-            LLUUID agent_id;
-            S32 has_rights = 0, given_rights = 0;
             for(LLSD::array_const_iterator it = buddy_list.beginArray(),
                 end = buddy_list.endArray(); it != end; ++it)
             {
-                LLSD buddy_id = (*it)["buddy_id"];
-                if(buddy_id.isDefined())
+                // Each entry stands alone: one that names no friend is skipped,
+                // and a right it leaves out is a right not granted.
+                const LLUUID agent_id = (*it)["buddy_id"].asUUID();
+                if (agent_id.isNull())
                 {
-                    agent_id = buddy_id.asUUID();
+                    continue;
                 }
 
-                LLSD buddy_rights_has = (*it)["buddy_rights_has"];
-                if(buddy_rights_has.isDefined())
-                {
-                    has_rights = buddy_rights_has.asInteger();
-                }
-
-                LLSD buddy_rights_given = (*it)["buddy_rights_given"];
-                if(buddy_rights_given.isDefined())
-                {
-                    given_rights = buddy_rights_given.asInteger();
-                }
+                const S32 has_rights = (*it)["buddy_rights_has"].asInteger();
+                const S32 given_rights = (*it)["buddy_rights_given"].asInteger();
 
                 list[agent_id] = new LLRelationship(given_rights, has_rights, false);
             }

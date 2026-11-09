@@ -1751,8 +1751,14 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 const std::string& notification_name = panel.getNotificationName();
                 if (notification_name == "OfferFriendship" && panel.isControlPanelEnabled())
                 {
-                    add_notification = false;
-                    break;
+                    // Only an offer still open from this sender stands for this
+                    // one; another resident's says nothing of it.
+                    LLNotificationPtr open_offer = LLNotifications::instance().find(panel.getID());
+                    if (open_offer && open_offer->getPayload()["from_id"].asUUID() == from_id)
+                    {
+                        add_notification = false;
+                        break;
+                    }
                 }
             }
 

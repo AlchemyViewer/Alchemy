@@ -60,8 +60,7 @@ public:
     LLTrackingData(const LLUUID& avatar_id, const std::string& name);
     bool haveTrackingInfo();
     void setTrackedCoarseLocation(const LLVector3d& global_pos);
-    void agentFound(const LLUUID& prey,
-                    const LLVector3d& estimated_global_pos);
+    void agentFound(const LLVector3d& estimated_global_pos);
 
 public:
     LLUUID mAvatarID;
@@ -267,7 +266,7 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
             LL_WARNS() << "!! Add buddy for existing buddy: " << agent_id
                     << " [" << (e_r->isOnline() ? "Online" : "Offline") << "->" << (n_r->isOnline() ? "Online" : "Offline")
                     << ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
-                    << ", " <<  e_r->getRightsGrantedTo() << "->" << n_r->getRightsGrantedTo()
+                    << ", " <<  e_r->getRightsGrantedFrom() << "->" << n_r->getRightsGrantedFrom()
                     << "]" << LL_ENDL;
         }
     }
@@ -607,7 +606,6 @@ void LLAvatarTracker::processAgentFound(LLMessageSystem* msg, void**)
 
     msg->getUUIDFast(_PREHASH_AgentBlock, _PREHASH_Hunter, id);
     msg->getUUIDFast(_PREHASH_AgentBlock, _PREHASH_Prey, id);
-    // *FIX: should make sure prey id matches.
     LLVector3d estimated_global_pos;
     msg->getF64Fast(_PREHASH_LocationBlock, _PREHASH_GlobalX,
                  estimated_global_pos.mdV[VX]);
@@ -620,10 +618,17 @@ void LLAvatarTracker::agentFound(const LLUUID& prey,
                                  const LLVector3d& estimated_global_pos)
 {
     if(!mTrackingData) return;
+    // A reply for anyone else, such as one to a find sent before the tracked
+    // friend changed, says nothing of where the tracked friend is.
+    if (prey != mTrackingData->mAvatarID)
+    {
+        LL_WARNS() << "Found " << prey << " but tracking " << mTrackingData->mAvatarID << LL_ENDL;
+        return;
+    }
     //if we get a valid reply from the server, that means the agent
     //is our friend and mappable, so enable interest list based updates
     LLAvatarTracker::instance().setTrackedAgentValid(true);
-    mTrackingData->agentFound(prey, estimated_global_pos);
+    mTrackingData->agentFound(estimated_global_pos);
 }
 
 //  static
@@ -727,10 +732,10 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
             {
                 LL_DEBUGS() << "Received online notification for unknown buddy: "
                     << agent_id << " is " << (online ? "ONLINE" : "OFFLINE") << " Adding buddy to buddy queue." << LL_ENDL;
-                mBuddyStatusQueue.push(std::make_pair(agent_id, true));
+                mBuddyStatusQueue.push(std::make_pair(agent_id, online));
             }
 
-            if(tracking_id == agent_id)
+            if(!online && tracking_id == agent_id)
             {
                 // we were tracking someone who went offline
                 deleteTrackingData();
@@ -844,14 +849,8 @@ LLTrackingData::LLTrackingData(const LLUUID& avatar_id, const std::string& name)
     }
 }
 
-void LLTrackingData::agentFound(const LLUUID& prey,
-                                const LLVector3d& estimated_global_pos)
+void LLTrackingData::agentFound(const LLVector3d& estimated_global_pos)
 {
-    if(prey != mAvatarID)
-    {
-        LL_WARNS() << "LLTrackingData::agentFound() - found " << prey
-                << " but looking for " << mAvatarID << LL_ENDL;
-    }
     mHaveInfo = true;
     mAgentGone.setTimerExpirySec(OFFLINE_SECONDS);
     mGlobalPositionEstimate = estimated_global_pos;
