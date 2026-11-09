@@ -1147,6 +1147,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almotionpredictor.h
+    almutelookup.h
     alobjectproperties.h
     alobjectroster.h
     alprobereach.h
@@ -2552,6 +2553,7 @@ if(AL_BUILD_TESTS)
       tests/alfriendbacklog_test.cpp
       tests/algradehistory_test.cpp
       tests/almotionpredictor_test.cpp
+      tests/almutelookup_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
       tests/alprobereach_test.cpp

@@ -44,6 +44,8 @@
 
 #include "llmutelist.h"
 
+#include "almutelookup.h"
+
 #include "pipeline.h"
 
 #include <boost/tokenizer.hpp>
@@ -507,7 +509,7 @@ bool LLMuteList::remove(const LLMute& mute, U32 flags)
     bool found = false;
 
     // First, remove from main list.
-    mute_set_t::iterator it = mMutes.find(mute);
+    mute_set_t::iterator it = ALMuteLookup::findById(mMutes, mute);
     if (it != mMutes.end())
     {
         LLMute localmute = *it;
@@ -801,7 +803,7 @@ bool LLMuteList::isMuted(const LLUUID& id, const std::string& name, U32 flags) c
 
     // don't need name or type for lookup
     LLMute mute(id_to_check);
-    mute_set_t::const_iterator mute_it = mMutes.find(mute);
+    mute_set_t::const_iterator mute_it = ALMuteLookup::findById(mMutes, mute);
     if (mute_it != mMutes.end())
     {
         // If any of the flags the caller passed are set, this item isn't considered muted for this caller.
