@@ -1146,6 +1146,7 @@ if(AL_BUILD_VIEWER)
     alhoverglow.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
+    almaturitypreference.h
     almotionpredictor.h
     alobjectproperties.h
     alobjectroster.h
@@ -2550,6 +2551,7 @@ if(AL_BUILD_TESTS)
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
       tests/algradehistory_test.cpp
+      tests/almaturitypreference_test.cpp
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
