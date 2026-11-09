@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llinventorymodelbackgroundfetch.h"
 
+#include "alinventorysync.h"
 #include "llaisapi.h"
 #include "llagent.h"
 #include "llappviewer.h"
@@ -45,6 +46,10 @@
 #include "bufferarray.h"
 #include "bufferstream.h"
 #include "llcorehttputil.h"
+
+#include <tuple>
+
+static_assert(ALInventorySync::VERSION_UNKNOWN == LLViewerInventoryCategory::VERSION_UNKNOWN);
 
 // History (may be apocryphal)
 //
@@ -1396,6 +1401,12 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
     {
         LLSD folders(content["folders"]);
 
+        // What the reply lists anywhere, and each folder it lists whole --
+        // every folder asked for is asked for with its folders and items --
+        // with the version the reply lists and the version held before it.
+        uuid_set_t listed;
+        std::vector<std::tuple<LLUUID, S32, S32>> listed_folders;
+
         for (LLSD::array_const_iterator folder_it = folders.beginArray();
             folder_it != folders.endArray();
             ++folder_it)
@@ -1452,6 +1463,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             {
                 continue;
             }
+            listed_folders.emplace_back(parent_id, version, pcat->getVersion());
 
             LLSD categories(folder_sd["categories"]);
             for (LLSD::array_const_iterator category_it = categories.beginArray();
@@ -1461,6 +1473,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 LLSD category(*category_it);
                 LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
                 tcategory->fromLLSD(category);
+                listed.insert(tcategory->getUUID());
 
                 const bool recursive(getIsRecursive(tcategory->getUUID()));
                 if (recursive)
@@ -1481,6 +1494,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 LLSD item(*item_it);
                 LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
                 titem->unpackMessage(item);
+                listed.insert(titem->getUUID());
 
                 gInventory.updateItem(titem);
             }
@@ -1492,6 +1506,37 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 cat->setVersion(version);
                 cat->setDescendentCount(descendents);
                 cat->determineFolderType();
+            }
+        }
+
+        // What each folder listed still holds that the reply lists nowhere,
+        // once what it moved elsewhere has moved.
+        for (const auto& [folder_id, listed_version, held_version] : listed_folders)
+        {
+            LLInventoryModel::cat_array_t* categories = nullptr;
+            LLInventoryModel::item_array_t* items = nullptr;
+            gInventory.getDirectDescendentsOf(folder_id, categories, items);
+            std::vector<ALInventorySync::Child> children;
+            if (categories)
+            {
+                for (const LLPointer<LLViewerInventoryCategory>& category : *categories)
+                {
+                    children.push_back({ category->getUUID(), false });
+                }
+            }
+            if (items)
+            {
+                for (const LLPointer<LLViewerInventoryItem>& item : *items)
+                {
+                    children.push_back({ item->getUUID(), item->getIsLinkType() });
+                }
+            }
+            for (const LLUUID& child_id : ALInventorySync::unlisted(children, ALInventorySync::Listing::Whole, listed,
+                                                                    listed_version, held_version))
+            {
+                LL_DEBUGS(LOG_INV) << "removed " << child_id << ", which fetched folder " << folder_id
+                                   << " no longer lists" << LL_ENDL;
+                gInventory.onObjectDeletedFromServer(child_id, false, false, false);
             }
         }
     }
