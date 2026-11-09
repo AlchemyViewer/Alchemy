@@ -26,6 +26,7 @@
 
 #include "lluuid.h"
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -33,7 +34,9 @@
 // friend it has not heard of yet: that they are online, that the friendship has ended, that rights have changed.
 // The list was made at login, before anything the circuit says, so such notices are held until the list is applied
 // and then handed back in the order they came, to be applied over it to whoever it made a friend. Once the list is
-// applied, a notice about a resident not in it names someone who is not a friend, and is not held.
+// applied, a notice about a resident not in it names someone who is not a friend, and is not held, unless the agent
+// has accepted their friendship offer: the server may tell of the new friend before it answers the acceptance, so
+// notices about them are held until it answers.
 class ALFriendBacklog
 {
 public:
@@ -53,11 +56,10 @@ public:
         S32    mRights = 0; // for RIGHTS_TO and RIGHTS_FROM
     };
 
-    // Holds a notice about a resident not in the friends list, while the list may yet name them. Says whether it
-    // was held.
+    // Holds a notice about a resident not in the friends list, while they may yet be in it. Says whether it was held.
     bool hold(const Notice& notice)
     {
-        if (mListApplied)
+        if (mListApplied && !isExpected(notice.mID))
         {
             return false;
         }
@@ -65,18 +67,52 @@ public:
         return true;
     }
 
-    // The login's friends list has been applied: hands back what was held until now, in the order it came, and
-    // holds nothing from now on.
+    // The login's friends list has been applied: hands back what was held until now, in the order it came, but for
+    // the notices about residents whose acceptance is unanswered. Holds nothing more about anyone else.
     std::vector<Notice> applyList()
     {
         mListApplied = true;
-        return std::exchange(mHeld, {});
+        return take([this](const Notice& notice) { return !isExpected(notice.mID); });
+    }
+
+    // The agent accepted id's friendship offer, and the server has yet to answer.
+    void expect(const LLUUID& id)
+    {
+        if (!isExpected(id))
+        {
+            mExpected.push_back(id);
+        }
+    }
+
+    // id became a friend, or the server refused or never answered the acceptance: hands back what was held about
+    // them, in the order it came, and holds no more about them once the list is applied.
+    std::vector<Notice> answered(const LLUUID& id)
+    {
+        mExpected.erase(std::remove(mExpected.begin(), mExpected.end(), id), mExpected.end());
+        return take([&id](const Notice& notice) { return notice.mID == id; });
     }
 
     bool isListApplied() const { return mListApplied; }
+    bool isExpected(const LLUUID& id) const { return std::find(mExpected.begin(), mExpected.end(), id) != mExpected.end(); }
     size_t heldCount() const { return mHeld.size(); }
 
 private:
+    // The notices held that taken() picks, in the order they came, leaving the rest held.
+    template <class Pred>
+    std::vector<Notice> take(Pred taken)
+    {
+        std::vector<Notice> picked;
+        std::vector<Notice> kept;
+        for (const Notice& notice : mHeld)
+        {
+            (taken(notice) ? picked : kept).push_back(notice);
+        }
+        mHeld = std::move(kept);
+        return picked;
+    }
+
     std::vector<Notice> mHeld;
+    // residents whose friendship offer the agent accepted, until the server answers
+    std::vector<LLUUID> mExpected;
     bool                mListApplied = false;
 };

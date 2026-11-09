@@ -171,7 +171,13 @@ public:
     // buddy list in the functor or bad things will happen.
     void applyFunctor(LLRelationshipFunctor& f);
 
+    // friend_id is a friend now: the server answered the agent's acceptance of their offer, or they accepted the
+    // agent's.
     static void formFriendship(const LLUUID& friend_id);
+    // The agent accepted friend_id's offer: what the circuit says of them is held until the server answers, with
+    // formFriendship or friendshipRefused.
+    void expectFriendship(const LLUUID& friend_id);
+    void friendshipRefused(const LLUUID& friend_id);
 
 protected:
     void deleteTrackingData();

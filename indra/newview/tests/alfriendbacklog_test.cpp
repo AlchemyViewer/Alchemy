@@ -95,6 +95,57 @@ namespace
         CHECK_FALSE(backlog.hold({ ALICE, Kind::RIGHTS_FROM, 1 }));
     }
 
+    // The resident whose offer the agent accepted is no friend until the server answers, and the server may tell
+    // of them first: an online notice then waits for the answer.
+    TEST_CASE("alfriendbacklog: notices about a resident whose offer was accepted wait for the answer", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        CHECK(backlog.applyList().empty());
+
+        backlog.expect(ALICE);
+        CHECK(backlog.isExpected(ALICE));
+        CHECK(backlog.hold({ ALICE, Kind::ONLINE }));
+        CHECK_FALSE(backlog.hold({ BOB, Kind::ONLINE }));
+
+        const std::vector<ALFriendBacklog::Notice> held = backlog.answered(ALICE);
+        REQUIRE(held.size() == 1);
+        CHECK(held[0].mID == ALICE);
+        CHECK(held[0].mKind == Kind::ONLINE);
+        CHECK_FALSE(backlog.isExpected(ALICE));
+        CHECK(backlog.heldCount() == 0);
+    }
+
+    TEST_CASE("alfriendbacklog: once the acceptance is answered nothing more is held about them", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        CHECK(backlog.applyList().empty());
+        backlog.expect(ALICE);
+        CHECK(backlog.hold({ ALICE, Kind::ONLINE }));
+        CHECK(backlog.answered(ALICE).size() == 1);
+
+        CHECK_FALSE(backlog.hold({ ALICE, Kind::OFFLINE }));
+        CHECK(backlog.answered(ALICE).empty());
+    }
+
+    // An offer accepted during startup: the notices about that resident outlast the list, which may not name them.
+    TEST_CASE("alfriendbacklog: notices about a resident whose acceptance is unanswered outlast the friends list", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        backlog.expect(ALICE);
+        CHECK(backlog.hold({ ALICE, Kind::ONLINE }));
+        CHECK(backlog.hold({ BOB, Kind::ONLINE }));
+
+        const std::vector<ALFriendBacklog::Notice> at_list = backlog.applyList();
+        REQUIRE(at_list.size() == 1);
+        CHECK(at_list[0].mID == BOB);
+
+        CHECK(backlog.hold({ ALICE, Kind::OFFLINE }));
+        const std::vector<ALFriendBacklog::Notice> answered = backlog.answered(ALICE);
+        REQUIRE(answered.size() == 2);
+        CHECK(answered[0].mKind == Kind::ONLINE);
+        CHECK(answered[1].mKind == Kind::OFFLINE);
+    }
+
     TEST_CASE("alfriendbacklog: what was held is handed back once", "[alfriendbacklog]")
     {
         ALFriendBacklog backlog;

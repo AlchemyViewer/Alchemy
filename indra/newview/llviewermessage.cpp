@@ -172,19 +172,23 @@ const U8 AU_FLAGS_NONE              = 0x00;
 const U8 AU_FLAGS_HIDETITLE         = 0x01;
 const U8 AU_FLAGS_CLIENT_AUTOPILOT  = 0x02;
 
+// The resident whose offer the agent accepted is a friend once the server says so: the capability answers success,
+// or the simulator acknowledges AcceptFriendship.
 void accept_friendship_coro(std::string url, LLSD notification)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
         httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLSD payload = notification["payload"];
+    const LLUUID from_id = payload["from_id"].asUUID();
     if (url.empty())
     {
         LL_WARNS("Friendship") << "Empty capability!" << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(from_id);
         return;
     }
 
-    LLSD payload = notification["payload"];
     url += "?from=" + payload["from_id"].asString();
     url += "&agent_name=\"" + LLURI::escape(gAgentAvatarp->getFullname()) + "\"";
 
@@ -198,22 +202,40 @@ void accept_friendship_coro(std::string url, LLSD notification)
     {
         LL_WARNS("Friendship") << "HTTP status, " << status.toTerseString() <<
             ". friendship offer accept failed." << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(from_id);
     }
     else
     {
         if (!result.has("success") || !result["success"].asBoolean())
         {
             LL_WARNS("Friendship") << "Server failed to process accepted friendship. " << httpResults << LL_ENDL;
+            LLAvatarTracker::instance().friendshipRefused(from_id);
         }
         else
         {
             LL_DEBUGS("Friendship") << "Adding friend to list" << httpResults << LL_ENDL;
+            LLAvatarTracker::formFriendship(from_id);
             // add friend to recent people list
             LLRecentPeople::instance().add(payload["from_id"]);
 
             LLNotificationsUtil::add("FriendshipAcceptedByMe",
                 notification["substitutions"], payload);
         }
+    }
+}
+
+// The simulator acknowledged AcceptFriendship, or the circuit gave it up.
+static void on_accept_friendship_acked(void** user_data, S32 result)
+{
+    const std::unique_ptr<LLUUID> from_id(reinterpret_cast<LLUUID*>(user_data));
+    if (result == LL_ERR_NOERR)
+    {
+        LLAvatarTracker::formFriendship(*from_id);
+    }
+    else
+    {
+        LL_WARNS("Friendship") << "AcceptFriendship was not acknowledged, error " << result << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(*from_id);
     }
 }
 
@@ -280,8 +302,7 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
         case 0:
         {
             // accept
-            LLAvatarTracker::formFriendship(payload["from_id"]);
-
+            const LLUUID from_id = payload["from_id"].asUUID();
             const LLUUID fid = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
 
             // This will also trigger an onlinenotification if the user is online
@@ -290,12 +311,14 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
             if (!url.empty() && payload.has("online") && !payload["online"].asBoolean())
             {
                 LL_DEBUGS("Friendship") << "Accepting friendship via capability" << LL_ENDL;
+                LLAvatarTracker::instance().expectFriendship(from_id);
                 LLCoros::instance().launch("LLMessageSystem::acceptFriendshipOffer",
                     boost::bind(accept_friendship_coro, url, notification));
             }
             else if (payload.has("session_id") && payload["session_id"].asUUID().notNull())
             {
                 LL_DEBUGS("Friendship") << "Accepting friendship via viewer message" << LL_ENDL;
+                LLAvatarTracker::instance().expectFriendship(from_id);
                 msg->newMessageFast(_PREHASH_AcceptFriendship);
                 msg->nextBlockFast(_PREHASH_AgentData);
                 msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
@@ -304,7 +327,16 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
                 msg->addUUIDFast(_PREHASH_TransactionID, payload["session_id"]);
                 msg->nextBlockFast(_PREHASH_FolderData);
                 msg->addUUIDFast(_PREHASH_FolderID, fid);
-                msg->sendReliable(LLHost(payload["sender"].asString()));
+                // The callback owns the id once the message is queued; a message that isn't never calls it.
+                LLUUID* acked_id = new LLUUID(from_id);
+                if (!msg->sendReliable(LLHost(payload["sender"].asString()), LL_DEFAULT_RELIABLE_RETRIES, true,
+                                       LL_PING_BASED_TIMEOUT_DUMMY, on_accept_friendship_acked,
+                                       reinterpret_cast<void**>(acked_id)))
+                {
+                    LL_WARNS("Friendship") << "AcceptFriendship could not be sent" << LL_ENDL;
+                    delete acked_id;
+                    LLAvatarTracker::instance().friendshipRefused(from_id);
+                }
 
                 // add friend to recent people list
                 LLRecentPeople::instance().add(payload["from_id"]);

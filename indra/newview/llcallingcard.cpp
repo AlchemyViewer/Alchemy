@@ -835,18 +835,42 @@ void LLAvatarTracker::formFriendship(const LLUUID& id)
 {
     if(id.notNull())
     {
-        LLRelationship* buddy_info = get_ptr_in_map(instance().mBuddyInfo, id);
+        LLAvatarTracker& at = LLAvatarTracker::instance();
+        bool changed = false;
+        LLRelationship* buddy_info = get_ptr_in_map(at.mBuddyInfo, id);
         if(!buddy_info)
         {
-            LLAvatarTracker& at = LLAvatarTracker::instance();
             //The default for relationship establishment is to have both parties
             //visible online to each other.
             buddy_info = new LLRelationship(LLRelationship::GRANT_ONLINE_STATUS,LLRelationship::GRANT_ONLINE_STATUS, false);
             at.mBuddyInfo[id] = buddy_info;
             at.addChangedMask(LLFriendObserver::ADD, id);
+            changed = true;
+        }
+        // What the circuit said of them while the acceptance was unanswered applies now.
+        for (const ALFriendBacklog::Notice& notice : at.mBacklog.answered(id))
+        {
+            at.applyHeldNotice(notice);
+            changed = true;
+        }
+        if (changed)
+        {
             at.notifyObservers();
         }
     }
+}
+
+void LLAvatarTracker::expectFriendship(const LLUUID& id)
+{
+    if (id.notNull())
+    {
+        mBacklog.expect(id);
+    }
+}
+
+void LLAvatarTracker::friendshipRefused(const LLUUID& id)
+{
+    mBacklog.answered(id);
 }
 
 void LLAvatarTracker::processTerminateFriendship(LLMessageSystem* msg, void**)
