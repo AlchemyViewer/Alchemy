@@ -42,7 +42,9 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -71,6 +73,34 @@ namespace
             INFO("local file name '" << local << "'");
             CHECK_NOTHROW(LLXfer_File(local, true, -1));
         }
+    }
+
+    TEST_CASE("LLXferManager: a requested name shorter than the legacy cache prefix names no cache file", "[LLXferManager]")
+    {
+        // Each name is read out of a buffer that goes on with the prefix, so
+        // a comparison that runs past a name's end finds the prefix there.
+        const std::string_view buffer = "data/held.tmp";
+        for (size_t length = 0; length < std::string_view("data/").size(); ++length)
+        {
+            const std::string_view name = buffer.substr(0, length);
+            INFO("requested name '" << name << "'");
+            CHECK_FALSE(LLXferManager::legacyCacheName(name).has_value());
+        }
+    }
+
+    TEST_CASE("LLXferManager: a requested name under the legacy cache prefix names the cache file after it", "[LLXferManager]")
+    {
+        const std::optional<std::string_view> held = LLXferManager::legacyCacheName("data/held.tmp");
+        REQUIRE(held.has_value());
+        CHECK(*held == "held.tmp");
+
+        const std::optional<std::string_view> bare = LLXferManager::legacyCacheName("data/");
+        REQUIRE(bare.has_value());
+        CHECK(bare->empty());
+
+        CHECK_FALSE(LLXferManager::legacyCacheName("held.tmp").has_value());
+        CHECK_FALSE(LLXferManager::legacyCacheName("Data/held.tmp").has_value());
+        CHECK_FALSE(LLXferManager::legacyCacheName("/data/held.tmp").has_value());
     }
 
     // The xfer messages, as the template the viewer reads has them.

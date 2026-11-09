@@ -729,14 +729,15 @@ bool LLXferManager::validateVFileForTransfer(const std::string& filename)
 }
 */
 
-static bool remove_prefix(std::string& filename, const std::string& prefix)
+// static
+std::optional<std::string_view> LLXferManager::legacyCacheName(std::string_view filename)
 {
-    if (std::equal(prefix.begin(), prefix.end(), filename.begin()))
+    static constexpr std::string_view LEGACY_CACHE_PREFIX = "data/";
+    if (!filename.starts_with(LEGACY_CACHE_PREFIX))
     {
-        filename = filename.substr(prefix.length());
-        return true;
+        return std::nullopt;
     }
-    return false;
+    return filename.substr(LEGACY_CACHE_PREFIX.size());
 }
 
 static bool verify_cache_filename(const std::string& filename)
@@ -837,9 +838,9 @@ void LLXferManager::processFileRequest (LLMessageSystem *mesgsys, void ** /*user
         {
             // this handles legacy simulators that are passing objects
             // by giving a filename that explicitly names the cache directory
-            static const std::string legacy_cache_prefix = "data/";
-            if (remove_prefix(local_filename, legacy_cache_prefix))
+            if (const std::optional<std::string_view> cache_name = legacyCacheName(local_filename))
             {
+                local_filename = std::string(*cache_name);
                 local_path = LL_PATH_CACHE;
             }
         }
