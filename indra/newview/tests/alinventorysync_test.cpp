@@ -142,4 +142,70 @@ namespace
         CHECK(Sync::embeddedIds(embedded, Sync::Listing::Whole) == uuid_set_t{ FOLDER, ITEM, LINK, OTHER_LINK });
         CHECK(Sync::embeddedIds(embedded, Sync::Listing::LinksOnly) == uuid_set_t{ LINK, OTHER_LINK });
     }
+
+    const LLUUID AGENT("20000000-0000-4000-8000-000000000001");
+    const LLUUID LIBRARY("20000000-0000-4000-8000-000000000002");
+
+    // A folder as the cache's walk reads one.
+    struct CacheFolder
+    {
+        LLUUID id;
+        LLUUID owner;
+        bool complete = true;
+        std::vector<CacheFolder*> children = {};
+
+        const LLUUID& getUUID() const { return id; }
+        const LLUUID& getOwnerID() const { return owner; }
+    };
+
+    std::vector<CacheFolder*> cached(CacheFolder& root)
+    {
+        return Sync::cachedFolders(
+            &root,
+            [](CacheFolder* folder, const auto& visit)
+            {
+                for (CacheFolder* child : folder->children)
+                {
+                    visit(child);
+                }
+            },
+            [](CacheFolder* folder) { return folder->complete; });
+    }
+
+    TEST_CASE("alinventorysync: the cache keeps each complete folder from a complete root down", "[alinventorysync]")
+    {
+        CacheFolder leaf{ LINK, AGENT };
+        CacheFolder child{ ITEM, AGENT, true, { &leaf } };
+        CacheFolder root{ FOLDER, AGENT, true, { &child } };
+        CHECK(cached(root) == std::vector<CacheFolder*>{ &root, &child, &leaf });
+    }
+
+    TEST_CASE("alinventorysync: the cache leaves out a root whose count disagrees and keeps what is complete below it", "[alinventorysync]")
+    {
+        CacheFolder below_incomplete{ OTHER_ITEM, AGENT };
+        CacheFolder incomplete{ OTHER_FOLDER, AGENT, false, { &below_incomplete } };
+        CacheFolder complete{ ITEM, AGENT };
+        CacheFolder root{ FOLDER, AGENT, false, { &complete, &incomplete } };
+        CHECK(cached(root) == std::vector<CacheFolder*>{ &complete, &below_incomplete });
+
+        CacheFolder lone_root{ FOLDER, AGENT, false };
+        CHECK(cached(lone_root).empty());
+    }
+
+    TEST_CASE("alinventorysync: the cache keeps no folder of another owner nor any folder below one", "[alinventorysync]")
+    {
+        CacheFolder below{ OTHER_ITEM, AGENT };
+        CacheFolder library{ OTHER_FOLDER, LIBRARY, true, { &below } };
+        CacheFolder root{ FOLDER, AGENT, true, { &library } };
+        CHECK(cached(root) == std::vector<CacheFolder*>{ &root });
+    }
+
+    TEST_CASE("alinventorysync: the cache keeps a folder met twice once", "[alinventorysync]")
+    {
+        CacheFolder shared{ LINK, AGENT };
+        CacheFolder first{ ITEM, AGENT, true, { &shared } };
+        CacheFolder second{ OTHER_ITEM, AGENT, true, { &shared } };
+        CacheFolder root{ FOLDER, AGENT, true, { &first, &second, &root } };
+        CHECK(cached(root) == std::vector<CacheFolder*>{ &root, &first, &second, &shared });
+    }
 }
