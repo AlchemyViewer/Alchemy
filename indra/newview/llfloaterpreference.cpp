@@ -47,6 +47,7 @@
 #include "llagent.h"
 #include "llagentcamera.h"
 #include "alcrashreporter.h"
+#include "llcallbacklist.h"
 #include "llcheckboxctrl.h"
 #include "llclipboard.h"
 #include "llcolorswatch.h"
@@ -1278,15 +1279,26 @@ void LLFloaterPreference::callbackRemoveImportedFont(const LLSD& notification, c
 
 void LLFloaterPreference::scheduleFontDropdownRefresh()
 {
-    // Re-resolve the open Preferences instance after the font reload.
-    LLEventTimer::run_after(0.25f, []()
+    // Refresh only once the font reload completes, rather than assuming
+    // it takes a fixed 0.25s: LLFontGL::initClass bumps
+    // sResolutionGeneration when a reload finishes, the same completion
+    // signal the text layout and font text cache check. Poll it until
+    // it changes; the 0.25s is only the poll cadence.
+    const S32 generation = LLFontGL::sResolutionGeneration;
+    doPeriodically([generation]()
     {
+        if (LLFontGL::sResolutionGeneration == generation)
+        {
+            return false;
+        }
+        // Re-resolve the open Preferences instance after the font reload.
         LLFloaterPreference* prefs = LLFloaterReg::findTypedInstance<LLFloaterPreference>("preferences");
         if (prefs && prefs->getChild<LLScrollListCtrl>("imported_font_list"))
         {
             prefs->populateUIFontDropdowns();
         }
-    });
+        return true;
+    }, 0.25f);
 }
 
 void LLFloaterPreference::onResetFonts()

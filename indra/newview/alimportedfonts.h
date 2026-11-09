@@ -53,6 +53,7 @@ public:
             TOO_LARGE,
             UNREADABLE,
             COPY_FAILED,
+            OVERLAY_FAILED,
         };
 
         struct Failure

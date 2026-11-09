@@ -137,6 +137,15 @@ bool LLKeyConflictHandler::isReservedByMenu(const KEY &key, const MASK &mask)
     {
         return false;
     }
+    // Ctrl/Cmd+Alt+Shift+F is hardcoded in LLViewerWindow::handleKey to
+    // open the font-reset dialog, mirroring the predicate there. Treat
+    // it as reserved like a menu accelerator so keybinding recording
+    // (LLSetKeyBindDialog) and registerControl() report a conflict
+    // instead of silently assigning a combo that can never fire.
+    if ((key == 'f' || key == 'F') && (mask & MASK_CONTROL) && (mask & MASK_ALT) && (mask & MASK_SHIFT))
+    {
+        return true;
+    }
     // At the moment controls are only applicable inworld,
     // ignore gLoginMenuBarView
     return gMenuBarView && gMenuBarView->hasAccelerator(key, mask);
@@ -149,7 +158,7 @@ bool LLKeyConflictHandler::isReservedByMenu(const LLKeyData &data)
     {
         return false;
     }
-    return gMenuBarView && gMenuBarView->hasAccelerator(data.mKey, data.mMask);
+    return isReservedByMenu(data.mKey, data.mMask);
 }
 
 bool LLKeyConflictHandler::registerControl(const std::string &control_name, U32 index, EMouseClickType mouse, KEY key, MASK mask, bool ignore_mask)

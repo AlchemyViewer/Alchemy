@@ -125,7 +125,9 @@ namespace
         }
     }
 
-    void upsertFace(LLSD& entry, const std::string& file, const char* style)
+    // Returns the superseded file for the style, or empty if there was
+    // none (or it is the same file being stored again).
+    std::string upsertFace(LLSD& entry, const std::string& file, const char* style)
     {
         LLSD files = entry["files"];
         if (!files.isArray())
@@ -135,9 +137,10 @@ namespace
         {
             if ((*fit)["style"].asString() == style)
             {
+                const std::string old_file = (*fit)["file"].asString();
                 (*fit)["file"] = file;
                 entry["files"]  = files;
-                return;
+                return old_file != file ? old_file : std::string();
             }
         }
 
@@ -146,6 +149,41 @@ namespace
         face["style"] = style;
         files.append(face);
         entry["files"] = files;
+        return {};
+    }
+
+    bool isFontFileReferenced(const LLSD& list, const std::string& file)
+    {
+        if (file.empty() || !list.isArray())
+            return false;
+
+        for (LLSD::array_const_iterator eit = list.beginArray(); eit != list.endArray(); ++eit)
+        {
+            const LLSD files = (*eit)["files"];
+            if (!files.isArray())
+                continue;
+            for (LLSD::array_const_iterator fit = files.beginArray(); fit != files.endArray(); ++fit)
+            {
+                if ((*fit)["file"].asString() == file)
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    // Remove a copied font file from the per-user font directory (the
+    // same destination construction importFiles uses for `dest`), but
+    // only if no remaining font entry still references it.
+    void deleteFontFileIfUnreferenced(const std::string& file, const LLSD& remaining)
+    {
+        if (file.empty() || isFontFileReferenced(remaining, file))
+            return;
+
+        const std::string dir = ALImportedFonts::getUserFontDir(false);
+        if (dir.empty())
+            return;
+
+        LLFile::remove(gDirUtilp->add(dir, file), 0);
     }
 
     // Returns true when a new family entry was created.
@@ -159,8 +197,9 @@ namespace
         {
             if ((*it)["name"].asString() == family_key)
             {
-                upsertFace(*it, copied_file, style);
+                const std::string superseded = upsertFace(*it, copied_file, style);
                 gSavedSettings.setLLSD(kSettingImported, list);
+                deleteFontFileIfUnreferenced(superseded, list);
                 return false;
             }
         }
@@ -177,18 +216,30 @@ namespace
         return true;
     }
 
-    void deleteFamilyFiles(const LLSD& entry)
+    void deleteFamilyFiles(const LLSD& entry, const LLSD& remaining)
     {
-        const std::string dir = ALImportedFonts::getUserFontDir(false);
-        if (dir.empty())
-            return;
-
         const LLSD files = entry["files"];
+        std::vector<std::string> seen;
         for (LLSD::array_const_iterator fit = files.beginArray(); fit != files.endArray(); ++fit)
         {
             const std::string file = (*fit)["file"].asString();
-            if (!file.empty())
-                LLFile::remove(gDirUtilp->add(dir, file), 0);
+            if (file.empty())
+                continue;
+            // The same file may be listed more than once in the removed
+            // entry (or across removed entries); delete it at most once.
+            bool already_seen = false;
+            for (const std::string& done : seen)
+            {
+                if (done == file)
+                {
+                    already_seen = true;
+                    break;
+                }
+            }
+            if (already_seen)
+                continue;
+            seen.push_back(file);
+            deleteFontFileIfUnreferenced(file, remaining);
         }
     }
 
@@ -333,6 +384,27 @@ std::string ALImportedFonts::regenerateOverlay()
             else if (style == kStyleBoldItalic) by_style[3] = file;
         }
 
+        // The registry requires a NORMAL template: NORMAL lookups only
+        // match style 0, non-NORMAL styles inherit from NORMAL, and a
+        // family override falls back to NORMAL. A family imported with
+        // only e.g. a BOLD face therefore has no usable NORMAL entry
+        // (and inherit="true" styles warn about the missing parent).
+        // Synthesize NORMAL from the first available face in slot
+        // order, rather than leaving the family broken until a NORMAL
+        // face happens to be imported. This is overlay-only, so a
+        // later NORMAL import supersedes it automatically.
+        if (by_style[0].empty())
+        {
+            for (int i = 1; i < 4; ++i)
+            {
+                if (!by_style[i].empty())
+                {
+                    by_style[0] = by_style[i];
+                    break;
+                }
+            }
+        }
+
         out += "  <font name=\"" + xml_escape(name) + "\" label=\"" + xml_escape(label) + "\"";
         if (category == kCategoryMonospace)
             out += " monospace=\"true\"";
@@ -360,14 +432,36 @@ std::string ALImportedFonts::regenerateOverlay()
 
     out += "</fonts>\n";
 
-    LLFILE* fp = LLFile::fopen(path, LLFILE_MODE("wb"));
+    // Write to a temp file and rename it over the old overlay only
+    // after the write and close both succeed, so a failure preserves
+    // the prior overlay instead of truncating it. Empty return signals
+    // failure to callers (see importFiles).
+    const std::string tmp_path = path + ".tmp";
+    LLFILE* fp = LLFile::fopen(tmp_path, LLFILE_MODE("wb"));
     if (!fp)
     {
         LL_WARNS() << "Imported fonts: could not write overlay " << path << LL_ENDL;
-        return path;
+        return {};
     }
-    fwrite(out.data(), 1, out.size(), fp);
-    LLFile::close(fp);
+    if (fwrite(out.data(), 1, out.size(), fp) != out.size())
+    {
+        LL_WARNS() << "Imported fonts: could not write overlay " << path << LL_ENDL;
+        LLFile::close(fp);
+        LLFile::remove(tmp_path);
+        return {};
+    }
+    if (LLFile::close(fp) != 0)
+    {
+        LL_WARNS() << "Imported fonts: could not write overlay " << path << LL_ENDL;
+        LLFile::remove(tmp_path);
+        return {};
+    }
+    if (LLFile::rename(tmp_path, path) != 0)
+    {
+        // rename already warned; keep the old overlay and drop the temp.
+        LLFile::remove(tmp_path);
+        return {};
+    }
     return path;
 }
 
@@ -384,6 +478,12 @@ bool ALImportedFonts::importFiles(const std::vector<std::string>& sources, Impor
             result.failed.push_back({ source, ImportResult::RejectReason::COPY_FAILED });
         return false;
     }
+
+    // Copied files only count as imported once the overlay that makes
+    // them available has been written; see regenerateOverlay() below.
+    S32 copied_count = 0;
+    S32 families_count = 0;
+    std::vector<std::string> copied_sources;
 
     for (const std::string& source : sources)
     {
@@ -442,12 +542,24 @@ bool ALImportedFonts::importFiles(const std::vector<std::string>& sources, Impor
         if (addFaceToImported(makeFamilyKey(info.family), info.family, dest_leaf,
                               styleFromInfo(info), category))
         {
-            result.families_added++;
+            families_count++;
         }
-        result.files_copied++;
+        copied_count++;
+        copied_sources.push_back(source);
     }
 
-    regenerateOverlay();
+    if (regenerateOverlay().empty())
+    {
+        // The prior overlay was preserved, so the copied files are not
+        // available through the registry: report them as failed rather
+        // than as a successful import.
+        for (const std::string& source : copied_sources)
+            result.failed.push_back({ source, ImportResult::RejectReason::OVERLAY_FAILED });
+        return false;
+    }
+
+    result.families_added = families_count;
+    result.files_copied = copied_count;
     notifyRegistryChanged();
     return result.anyCopied();
 }
@@ -460,24 +572,32 @@ bool ALImportedFonts::removeFamily(const std::string& family_name)
         return false;
 
     LLSD kept = LLSD::emptyArray();
-    bool removed = false;
+    LLSD removed_entries = LLSD::emptyArray();
     for (LLSD::array_const_iterator it = list.beginArray(); it != list.endArray(); ++it)
     {
         if ((*it)["name"].asString() == family_name)
         {
-            deleteFamilyFiles(*it);
-            removed = true;
+            removed_entries.append(*it);
             continue;
         }
         kept.append(*it);
     }
 
-    if (!removed)
+    if (!removed_entries.isArray() || removed_entries.size() == 0)
         return false;
 
     gSavedSettings.setLLSD(kSettingImported, kept);
     pruneOverridesForFamily(family_name);
-    regenerateOverlay();
+    // Delete the removed families' files only where no remaining
+    // entry still references them.
+    for (LLSD::array_const_iterator it = removed_entries.beginArray(); it != removed_entries.endArray(); ++it)
+    {
+        deleteFamilyFiles(*it, kept);
+    }
+    if (regenerateOverlay().empty())
+    {
+        return false;
+    }
     notifyRegistryChanged();
     return true;
 }
