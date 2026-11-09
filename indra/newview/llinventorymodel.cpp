@@ -31,6 +31,7 @@
 
 #include "llinventorymodel.h"
 
+#include "alinventorysync.h"
 #include "llaisapi.h"
 #include "llagent.h"
 #include "llagentwearables.h"
@@ -2506,10 +2507,6 @@ void LLInventoryModel::cache(
         return;
     }
 
-    cat_array_t categories;
-    categories.push_back(root_cat);
-    item_array_t items;
-
     // Lambda to check if a category should be cached
     // Only cache if it has known version and matching descendent counts
     auto should_cache_category = [](LLViewerInventoryCategory* cat) -> bool {
@@ -2522,79 +2519,38 @@ void LLInventoryModel::cache(
         return (descendents_server == descendents_actual);
     };
 
-    // Track which folders we've verified as cacheable descendants
-    std::unordered_set<LLUUID> processed_folders;
-    processed_folders.insert(parent_folder_id);
-
-    // First pass: identify all cacheable descendant folders
-    // Use pair of (folder_id, should_save_children)
-    std::deque<std::pair<LLUUID, bool>> folders_to_check;
-    folders_to_check.push_back(std::make_pair(parent_folder_id, should_cache_category(root_cat)));
-
-    while (!folders_to_check.empty())
+    // Get child categories directly from the parent-child tree
+    auto for_each_child = [this](LLViewerInventoryCategory* folder, const auto& visit)
     {
-        auto [current_id, save_children] = folders_to_check.front();
-        folders_to_check.pop_front();
-
-        if (save_children) // else incorrect count or version
-        {
-            auto item_it = mParentChildItemTree.find(current_id);
-            if (item_it != mParentChildItemTree.end() && item_it->second)
-            {
-                for (LLViewerInventoryItem* item : *(item_it->second))
-                {
-                    if (item)
-                    {
-                        items.push_back(item);
-                    }
-                }
-            }
-        }
-
-        // Get child categories directly from the parent-child tree
-        auto cat_it = mParentChildCategoryTree.find(current_id);
+        auto cat_it = mParentChildCategoryTree.find(folder->getUUID());
         if (cat_it != mParentChildCategoryTree.end() && cat_it->second)
         {
             for (LLViewerInventoryCategory* child_cat : *(cat_it->second))
             {
-                if (!child_cat)
-                {
-                    continue;
-                }
+                visit(child_cat);
+            }
+        }
+    };
 
-                // Verify ownership matches (library vs agent inventory)
-                if (child_cat->getOwnerID() != root_cat->getOwnerID())
+    // Each complete folder and its items. An incomplete one, the root
+    // included, is left for the next login to fetch, an empty cache
+    // replacing the last where none is complete.
+    cat_array_t categories;
+    item_array_t items;
+    for (LLViewerInventoryCategory* cat : ALInventorySync::cachedFolders(root_cat, for_each_child, should_cache_category))
+    {
+        categories.push_back(cat);
+        auto item_it = mParentChildItemTree.find(cat->getUUID());
+        if (item_it != mParentChildItemTree.end() && item_it->second)
+        {
+            for (LLViewerInventoryItem* item : *(item_it->second))
+            {
+                if (item)
                 {
-                    LL_WARNS(LOG_INV) << "Owner mismatch in category tree: expected "
-                                      << root_cat->getOwnerID() << " got "
-                                      << child_cat->getOwnerID() << " for category "
-                                      << child_cat->getName() << LL_ENDL;
-                    continue;
-                }
-
-                const LLUUID& child_id = child_cat->getUUID();
-
-                // Only process each folder once
-                if (processed_folders.insert(child_id).second)
-                {
-                    if (should_cache_category(child_cat))
-                    {
-                        categories.push_back(child_cat);
-                        folders_to_check.push_back(std::make_pair(child_id, true));
-                    }
-                    else
-                    {
-                        folders_to_check.push_back(std::make_pair(child_id, false));
-                    }
+                    items.push_back(item);
                 }
             }
         }
-    }
-
-    if (categories.empty() && items.empty())
-    {
-        LL_WARNS(LOG_INV) << "Nothing to cache for " << parent_folder_id << LL_ENDL;
-        return;
     }
 
     // Use temporary file to avoid potential conflicts with other

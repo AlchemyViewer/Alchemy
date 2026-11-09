@@ -24,16 +24,18 @@
 
 #pragma once
 
+#include "llerror.h"
 #include "llsd.h"
 #include "lluuid.h"
 
+#include <deque>
 #include <optional>
 #include <vector>
 
-// How the viewer keeps its inventory in step with the server's: what a
-// fetch's reply lists of a folder, and what that leaves out. Rules over
-// plain values, which AIS3's updates and the background fetch apply to the
-// inventory model.
+// How the viewer keeps its inventory in step with the server's: rules over
+// plain values, and over any folder type with LLViewerInventoryCategory's
+// accessors, which the inventory model, AIS3's updates and the background
+// fetch apply.
 class ALInventorySync
 {
 public:
@@ -72,4 +74,60 @@ public:
     // made since may have outrun.
     static uuid_vec_t unlisted(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed,
                                S32 listed_version, S32 held_version);
+
+    // The folders an inventory's cache keeps, from its root down through
+    // the folders of the root's owner, in the order met: each complete
+    // folder, the root among them only where it is complete, whose record
+    // and items the cache holds. An incomplete folder is kept out, and the
+    // complete ones below it kept. `is_complete(folder)` says whether a
+    // folder is; `for_each_child(folder, visit)` calls `visit(child)` for
+    // each folder directly under one.
+    template <typename Folder, typename ForEachChild, typename IsComplete>
+    static std::vector<Folder*> cachedFolders(Folder* root, ForEachChild&& for_each_child, IsComplete&& is_complete);
 };
+
+template <typename Folder, typename ForEachChild, typename IsComplete>
+std::vector<Folder*> ALInventorySync::cachedFolders(Folder* root, ForEachChild&& for_each_child, IsComplete&& is_complete)
+{
+    std::vector<Folder*> kept;
+    if (!root)
+    {
+        return kept;
+    }
+    if (is_complete(root))
+    {
+        kept.push_back(root);
+    }
+
+    uuid_set_t met = { root->getUUID() };
+    std::deque<Folder*> walk = { root };
+    while (!walk.empty())
+    {
+        Folder* folder = walk.front();
+        walk.pop_front();
+        for_each_child(folder, [&](Folder* child)
+        {
+            if (!child)
+            {
+                return;
+            }
+            // The library and the agent's inventory are cached apart.
+            if (child->getOwnerID() != root->getOwnerID())
+            {
+                LL_WARNS("Inventory") << "Owner mismatch in category tree: expected " << root->getOwnerID() << " got "
+                                      << child->getOwnerID() << " for category " << child->getUUID() << LL_ENDL;
+                return;
+            }
+            if (!met.insert(child->getUUID()).second)
+            {
+                return;
+            }
+            if (is_complete(child))
+            {
+                kept.push_back(child);
+            }
+            walk.push_back(child);
+        });
+    }
+    return kept;
+}
