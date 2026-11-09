@@ -264,4 +264,45 @@ namespace
         CHECK_FALSE(Sync::isLibraryFolder(LLUUID::null, LLUUID::null));
         CHECK_FALSE(Sync::isLibraryFolder(AGENT, LLUUID::null));
     }
+
+    // A folder as one found out of step is: its version, and the fetches
+    // asked for of it, which LLViewerInventoryCategory::fetch sends only for
+    // a folder of unknown version.
+    struct StepFolder
+    {
+        S32 version = Sync::VERSION_UNKNOWN;
+        S32 fetches = 0;
+
+        S32 getVersion() const { return version; }
+        void setVersion(S32 to) { version = to; }
+        bool fetch()
+        {
+            if (version != Sync::VERSION_UNKNOWN)
+            {
+                return false;
+            }
+            ++fetches;
+            return true;
+        }
+    };
+
+    TEST_CASE("alinventorysync: a folder out of step forgets its version and is fetched when next asked for", "[alinventorysync]")
+    {
+        StepFolder folder{ 7 };
+        Sync::markOutOfStep(folder);
+        CHECK(folder.version == Sync::VERSION_UNKNOWN);
+        // Nothing is asked for yet.
+        CHECK(folder.fetches == 0);
+
+        CHECK(folder.fetch());
+        CHECK(folder.fetches == 1);
+    }
+
+    TEST_CASE("alinventorysync: a folder out of step of unknown version is asked for now", "[alinventorysync]")
+    {
+        StepFolder folder;
+        Sync::markOutOfStep(folder);
+        CHECK(folder.version == Sync::VERSION_UNKNOWN);
+        CHECK(folder.fetches == 1);
+    }
 }

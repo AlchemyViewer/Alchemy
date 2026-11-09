@@ -94,7 +94,26 @@ public:
     // Whether a folder of `owner` is the library's, whose owner the login
     // names as `library_owner`. A login that names none has no library.
     static bool isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner);
+
+    // Has a folder found out of step with the server's fetched when next
+    // asked for, by forgetting its version. One whose version is already
+    // unknown is asked for now, as `fetch()` asks for it.
+    template <typename Folder>
+    static void markOutOfStep(Folder& folder);
 };
+
+template <typename Folder>
+void ALInventorySync::markOutOfStep(Folder& folder)
+{
+    if (folder.getVersion() == VERSION_UNKNOWN)
+    {
+        folder.fetch();
+    }
+    else
+    {
+        folder.setVersion(VERSION_UNKNOWN);
+    }
+}
 
 template <typename ParentOwner>
 LLUUID ALInventorySync::newFolderOwner(const LLSD& category_map, ParentOwner&& parent_owner, const LLUUID& fallback)

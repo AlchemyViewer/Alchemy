@@ -898,7 +898,11 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                         << " since folder no longer exists at server. Descendent count: server == " << cat->getDescendentCount()
                         << ", viewer == " << cat->getViewerDescendentCount()
                         << LL_ENDL;
-                    gInventory.fetchDescendentsOf(cat->getParentUUID());
+                    // The folder it was in is out of step, and is fetched when next asked for.
+                    if (LLViewerInventoryCategory* parent = gInventory.getCategory(cat->getParentUUID()))
+                    {
+                        ALInventorySync::markOutOfStep(*parent);
+                    }
                     // Note: don't delete folder here - contained items will be deparented (or deleted)
                     // and since we are clearly out of sync we can't be sure we won't get rid of something we need.
                     // For example folder could have been moved or renamed with items intact, let it fetch first.
@@ -911,10 +915,15 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 {
                     LL_WARNS("Inventory") << "Purge failed for '" << item->getName()
                         << "' since item no longer exists at server." << LL_ENDL;
-                    gInventory.fetchDescendentsOf(item->getParentUUID());
+                    const LLUUID parent_id = item->getParentUUID();
                     // since item not on the server and exists at viewer, so it needs an update at the least,
                     // so delete it, in worst case item will be refetched with new params.
                     gInventory.onObjectDeletedFromServer(targetId);
+                    // The folder it was in is out of step, and is fetched when next asked for.
+                    if (LLViewerInventoryCategory* parent = gInventory.getCategory(parent_id))
+                    {
+                        ALInventorySync::markOutOfStep(*parent);
+                    }
                 }
             }
         }
@@ -1892,15 +1901,13 @@ void AISUpdate::doUpdate()
                 else
                 {
                     // We do not account for update if version is UNKNOWN, so we shouldn't riase version
-                    // either or viewer will get stuck on descendants count -1, try to refetch folder instead
-                    //
-                    // Todo: proper backoff?
+                    // either or viewer will get stuck on descendants count -1. The viewer's version is
+                    // known here, so forget it, and the folder is fetched when next asked for.
 
                     LL_WARNS() << "Possible version mismatch for category " << cat->getName()
                         << ", viewer version " << cat->getVersion()
-                        << " AIS version " << version << " !!!Rerequesting category!!!" << LL_ENDL;
-                    const S32 LONG_EXPIRY = 360;
-                    cat->fetch(LONG_EXPIRY);
+                        << " AIS version " << version << " !!!Forgetting local version!!!" << LL_ENDL;
+                    ALInventorySync::markOutOfStep(*cat);
                 }
             }
         }
