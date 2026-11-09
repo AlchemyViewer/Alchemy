@@ -512,6 +512,7 @@ bool LLMuteList::remove(const LLMute& mute, U32 flags)
     mute_set_t::iterator it = ALMuteLookup::findById(mMutes, mute);
     if (it != mMutes.end())
     {
+        found = true;
         LLMute localmute = *it;
         bool remove = true;
         if(flags)
@@ -564,6 +565,7 @@ bool LLMuteList::remove(const LLMute& mute, U32 flags)
         string_set_t::iterator legacy_it = mLegacyMutes.find(mute.mName);
         if (legacy_it != mLegacyMutes.end())
         {
+            found = true;
             // Database representation of legacy mute is UUID null.
             LLMute mute(LLUUID::null, *legacy_it, LLMute::BY_NAME);
             updateRemove(mute);
