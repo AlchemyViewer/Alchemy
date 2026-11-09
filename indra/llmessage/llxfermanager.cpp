@@ -762,8 +762,11 @@ static bool verify_cache_filename(const std::string& filename)
     }
     for(size_t i=0; i<(len-4); ++i)
     {
-        char c = filename[i];
-        bool ok = isalnum(c) || '_'==c || '-'==c;
+        // The name's bytes, as ASCII: a byte past it is none of these,
+        // whatever the C library's locale takes it for.
+        const char c = filename[i];
+        const bool ok = ('0' <= c && c <= '9') || ('A' <= c && c <= 'Z') || ('a' <= c && c <= 'z')
+                        || '_'==c || '-'==c;
         if (!ok)
         {
             return false;
