@@ -133,7 +133,7 @@ void ALPanelBlockList::refresh()
         {
             case LLMute::AGENT:
                 {
-                    sdAgentRow["value"] = LLSD().with("id", muteEntry.mID).with("name", muteEntry.mName);
+                    sdAgentRow["value"] = LLSD().with("id", muteEntry.mID).with("name", muteEntry.mName).with("type", (S32)muteEntry.mType);
                     sdAgentColumns[0]["value"] = muteEntry.mName;
                     sdAgentColumns[1]["value"] = muteEntry.getDisplayType();
                     sdAgentColumns[2]["value"] = (muteEntry.mFlags & LLMute::flagTextChat) == 0;
@@ -145,7 +145,7 @@ void ALPanelBlockList::refresh()
                 break;
             default:
                 {
-                    sdGenericRow["value"] = LLSD().with("id", muteEntry.mID).with("name", muteEntry.mName);
+                    sdGenericRow["value"] = LLSD().with("id", muteEntry.mID).with("name", muteEntry.mName).with("type", (S32)muteEntry.mType);
                     sdGenericColumns[0]["value"] = muteEntry.mName;
                     sdGenericColumns[1]["value"] = muteEntry.getDisplayType();
                     m_pBlockList->addElement(sdGenericRow, ADD_BOTTOM);
@@ -266,7 +266,7 @@ void ALPanelBlockList::onRemoveSelection()
     {
         LLScrollListItem* pSelItem = *itItem; const LLSD sdValue = pSelItem->getValue();
 
-        LLMute selMute(sdValue["id"].asUUID(), sdValue["name"].asString());
+        LLMute selMute(sdValue["id"].asUUID(), sdValue["name"].asString(), (LLMute::EType)sdValue["type"].asInteger());
         if (LLMuteList::getInstance()->remove(selMute))
         {
             m_pBlockList->deleteSingleItem(pSelItem);
