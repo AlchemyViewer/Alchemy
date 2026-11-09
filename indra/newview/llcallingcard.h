@@ -189,6 +189,9 @@ protected:
     void processNotify(LLMessageSystem* msg, bool online);
     void processChange(LLMessageSystem* msg);
 
+    // Applies a notice held until its resident's place in the friends list was known, if they are a friend.
+    void applyHeldNotice(const ALFriendBacklog::Notice& notice);
+
 protected:
     static LLAvatarTracker sInstance;
     LLTrackingData* mTrackingData;

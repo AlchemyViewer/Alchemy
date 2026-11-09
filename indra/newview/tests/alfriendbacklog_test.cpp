@@ -71,6 +71,30 @@ namespace
         CHECK(backlog.applyList().empty());
     }
 
+    // The login's list was made before the circuit said a friendship ended or a friend's rights changed: what it
+    // said comes back to be laid over the list, in the order it came, with the rights it gave.
+    TEST_CASE("alfriendbacklog: an ended friendship and changed rights before the friends list come back in order", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        CHECK(backlog.hold({ ALICE, Kind::RIGHTS_FROM, 3 }));
+        CHECK(backlog.hold({ BOB, Kind::TERMINATED }));
+        CHECK(backlog.hold({ ALICE, Kind::RIGHTS_TO, 5 }));
+
+        const std::vector<ALFriendBacklog::Notice> held = backlog.applyList();
+        REQUIRE(held.size() == 3);
+        CHECK(held[0].mID == ALICE);
+        CHECK(held[0].mKind == Kind::RIGHTS_FROM);
+        CHECK(held[0].mRights == 3);
+        CHECK(held[1].mID == BOB);
+        CHECK(held[1].mKind == Kind::TERMINATED);
+        CHECK(held[2].mID == ALICE);
+        CHECK(held[2].mKind == Kind::RIGHTS_TO);
+        CHECK(held[2].mRights == 5);
+
+        CHECK_FALSE(backlog.hold({ BOB, Kind::TERMINATED }));
+        CHECK_FALSE(backlog.hold({ ALICE, Kind::RIGHTS_FROM, 1 }));
+    }
+
     TEST_CASE("alfriendbacklog: what was held is handed back once", "[alfriendbacklog]")
     {
         ALFriendBacklog backlog;

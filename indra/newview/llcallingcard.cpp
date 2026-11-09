@@ -276,10 +276,7 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
     // is not a friend.
     for (const ALFriendBacklog::Notice& notice : mBacklog.applyList())
     {
-        if (mBuddyInfo.find(notice.mID) != mBuddyInfo.end())
-        {
-            setBuddyOnline(notice.mID, notice.mKind == ALFriendBacklog::Kind::ONLINE);
-        }
+        applyHeldNotice(notice);
     }
 
     // do not notify observers here - list can be large so let it be done on idle.
@@ -287,6 +284,38 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
     return new_buddy_count;
 }
 
+
+void LLAvatarTracker::applyHeldNotice(const ALFriendBacklog::Notice& notice)
+{
+    LLRelationship* buddy = get_ptr_in_map(mBuddyInfo, notice.mID);
+    if (!buddy)
+    {
+        // not a friend after all
+        return;
+    }
+
+    switch (notice.mKind)
+    {
+    case ALFriendBacklog::Kind::ONLINE:
+    case ALFriendBacklog::Kind::OFFLINE:
+        setBuddyOnline(notice.mID, notice.mKind == ALFriendBacklog::Kind::ONLINE);
+        break;
+    case ALFriendBacklog::Kind::TERMINATED:
+        mBuddyInfo.erase(notice.mID);
+        addChangedMask(LLFriendObserver::REMOVE, notice.mID);
+        delete buddy;
+        break;
+    case ALFriendBacklog::Kind::RIGHTS_TO:
+        buddy->setRightsTo(notice.mRights);
+        addChangedMask(LLFriendObserver::POWERS, notice.mID);
+        break;
+    case ALFriendBacklog::Kind::RIGHTS_FROM:
+        buddy->setRightsFrom(notice.mRights);
+        LLViewerObject::markObjectsForUpdate(notice.mID);
+        addChangedMask(LLFriendObserver::POWERS, notice.mID);
+        break;
+    }
+}
 
 void LLAvatarTracker::copyBuddyList(buddy_map_t& buddies) const
 {
@@ -657,11 +686,19 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
                 buddy_it->second->setRightsTo(new_rights);
                 mChangedBuddyIDs.insert(agent_related);
             }
+            else
+            {
+                mBacklog.hold({ agent_related, ALFriendBacklog::Kind::RIGHTS_TO, new_rights });
+            }
         }
         else
         {
             auto buddy_it = mBuddyInfo.find(agent_id);
-            if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
+            if (buddy_it == mBuddyInfo.end())
+            {
+                mBacklog.hold({ agent_id, ALFriendBacklog::Kind::RIGHTS_FROM, new_rights });
+            }
+            else
             {
                 S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
                 if (change && !gAgent.isDoNotDisturb())
@@ -820,7 +857,11 @@ void LLAvatarTracker::processTerminateFriendship(LLMessageSystem* msg, void**)
     {
         LLAvatarTracker& at = LLAvatarTracker::instance();
         LLRelationship* buddy = get_ptr_in_map(at.mBuddyInfo, id);
-        if(!buddy) return;
+        if(!buddy)
+        {
+            at.mBacklog.hold({ id, ALFriendBacklog::Kind::TERMINATED });
+            return;
+        }
         at.mBuddyInfo.erase(id);
         at.addChangedMask(LLFriendObserver::REMOVE, id);
         delete buddy;

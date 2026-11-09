@@ -30,22 +30,27 @@
 #include <vector>
 
 // The friends tracker listens to the circuit before the login's friends list is applied, so a notice can name a
-// friend it has not heard of yet. Such notices are held until the list is applied and then handed back in the order
-// they came, to be applied to whoever the list made a friend. Once the list is applied, a notice about a resident
-// not in it names someone who is not a friend, and is not held.
+// friend it has not heard of yet: that they are online, that the friendship has ended, that rights have changed.
+// The list was made at login, before anything the circuit says, so such notices are held until the list is applied
+// and then handed back in the order they came, to be applied over it to whoever it made a friend. Once the list is
+// applied, a notice about a resident not in it names someone who is not a friend, and is not held.
 class ALFriendBacklog
 {
 public:
     enum class Kind : U8
     {
-        ONLINE,  // OnlineNotification
-        OFFLINE, // OfflineNotification
+        ONLINE,      // OnlineNotification
+        OFFLINE,     // OfflineNotification
+        TERMINATED,  // TerminateFriendship
+        RIGHTS_TO,   // ChangeUserRights: the rights the agent grants the friend
+        RIGHTS_FROM, // ChangeUserRights: the rights the friend grants the agent
     };
 
     struct Notice
     {
         LLUUID mID;
         Kind   mKind = Kind::ONLINE;
+        S32    mRights = 0; // for RIGHTS_TO and RIGHTS_FROM
     };
 
     // Holds a notice about a resident not in the friends list, while the list may yet name them. Says whether it
