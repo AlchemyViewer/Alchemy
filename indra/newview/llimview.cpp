@@ -4235,9 +4235,8 @@ public:
         {
             //throw an error dialog and close the temp session's floater
             gIMMgr->showSessionStartError(body["error"].asString(), temp_session_id);
+            gIMMgr->clearPendingAgentListUpdates(temp_session_id);
         }
-
-        gIMMgr->clearPendingAgentListUpdates(session_id);
     }
 };
 

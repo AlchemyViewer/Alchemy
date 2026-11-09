@@ -2266,7 +2266,9 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     msg->getUUIDFast(_PREHASH_MessageBlock, _PREHASH_RegionID, region_id);
     msg->getVector3Fast(_PREHASH_MessageBlock, _PREHASH_Position, position);
     msg->getBinaryDataFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket, binary_bucket, 0, 0, MTUBYTES);
-    binary_bucket_size = msg->getSizeFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket);
+    // A zero-coded bucket can expand past the buffer, which holds only what
+    // fit in it.
+    binary_bucket_size = llmin(msg->getSizeFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket), MTUBYTES);
     EInstantMessage dialog = (EInstantMessage)d;
     LLHost sender = msg->getSender();
 

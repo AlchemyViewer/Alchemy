@@ -304,9 +304,13 @@ public:
             size_t count = wearable_ids.size();
             for (S32 i = 0; i < count; ++i)
             {
+                // A wearable the model refused is not there to wear.
                 LLViewerInventoryItem* wearable_item;
                 wearable_item = gInventory.getItem(wearable_ids[i]);
-                LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+                if (wearable_item)
+                {
+                    LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+                }
             }
         }
 
@@ -470,8 +474,16 @@ bool LLInventoryModel::isObjectDescendentOf(const LLUUID& obj_id,
     if (obj_id == cat_id) return true;
 
     const LLInventoryObject* obj = getObject(obj_id);
+    // The thing and every folder the model holds, at most, before a walk up
+    // has gone round folders that hold each other.
+    size_t steps_left = mCategoryMap.size() + 1;
     while(obj)
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            return false;
+        }
         const LLUUID& parent_id = obj->getParentUUID();
         if( parent_id.isNull() )
         {
@@ -496,11 +508,18 @@ const LLViewerInventoryCategory *LLInventoryModel::getFirstNondefaultParent(cons
         LL_WARNS(LOG_INV) << "Non-existent object [ id: " << obj_id << " ] " << LL_ENDL;
         return NULL;
     }
-    // Search up the parent chain until we get to root or an acceptable folder.
-    // This assumes there are no cycles in the tree else we'll get a hang.
+    // Search up the parent chain until we get to root or an acceptable folder,
+    // past no more folders than the model holds, which only folders that hold
+    // each other would take it beyond.
     LLUUID parent_id = obj->getParentUUID();
+    size_t steps_left = mCategoryMap.size();
     while (!parent_id.isNull())
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            break;
+        }
         const LLViewerInventoryCategory *cat = getCategory(parent_id);
         if (!cat) break;
         const LLFolderType::EType folder_type = cat->getPreferredType();
@@ -529,11 +548,25 @@ const LLViewerInventoryCategory* LLInventoryModel::getFirstDescendantOf(const LL
 
     if (current_cat == NULL)
     {
-        current_cat = getCategory(getObject(obj_id)->getParentUUID());
+        // Something the model doesn't hold has no folders above it.
+        const LLInventoryObject* obj = getObject(obj_id);
+        if (!obj)
+        {
+            return NULL;
+        }
+        current_cat = getCategory(obj->getParentUUID());
     }
 
+    // Past no more folders than the model holds, which only folders that hold
+    // each other would take the walk beyond.
+    size_t steps_left = mCategoryMap.size();
     while (current_cat != NULL)
     {
+        if (steps_left-- == 0)
+        {
+            LL_WARNS_ONCE(LOG_INV) << "Inventory folders hold each other; stopped walking up them" << LL_ENDL;
+            break;
+        }
         const LLUUID& current_parent_id = current_cat->getParentUUID();
 
         if (current_parent_id == master_parent_id)
@@ -1591,6 +1624,12 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
         // Simply add this item
         new_item = new LLViewerInventoryItem(item);
         addItem(new_item);
+        if (!getItem(new_item->getUUID()))
+        {
+            // addItem refused it, as it does an item of no type, so it goes
+            // in no folder either.
+            return mask;
+        }
 
         if(item->getParentUUID().isNull())
         {
@@ -4027,7 +4066,13 @@ void LLInventoryModel::removeInventoryFolder(LLUUID agent_id,
     gInventory.accountForUpdate(update);
     for(uuid_vec_t::iterator it = folder_ids.begin(); it != folder_ids.end(); ++it)
     {
-        gInventory.deleteObject(*it);
+        // What the folder held goes with it, and a folder named after one
+        // that held it has gone already.
+        if (gInventory.getCategory(*it))
+        {
+            gInventory.onDescendentsPurgedFromServer(*it);
+            gInventory.deleteObject(*it);
+        }
     }
 }
 
@@ -4310,8 +4355,12 @@ void LLInventoryModel::processBulkUpdateInventory(LLMessageSystem* msg, void**)
     {
         for (const auto& wearable_id : wearable_ids)
         {
+            // A wearable the model refused is not there to wear.
             LLViewerInventoryItem* wearable_item = gInventory.getItem(wearable_id);
-            LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+            if (wearable_item)
+            {
+                LLAppearanceMgr::instance().wearItemOnAvatar(wearable_item->getUUID(), true, true);
+            }
         }
     }
 
@@ -4354,10 +4403,21 @@ void LLInventoryModel::processMoveInventoryItem(LLMessageSystem* msg, void**)
             LL_DEBUGS() << "moving item " << item_id << " to folder "
                      << folder_id << LL_ENDL;
             update_list_t update;
-            LLCategoryUpdate old_folder(item->getParentUUID(), -1);
-            update.push_back(old_folder);
-            LLCategoryUpdate new_folder(folder_id, 1);
-            update.push_back(new_folder);
+            if (item->getParentUUID() == folder_id)
+            {
+                // A move within the folder changes it by nothing. Counted as
+                // a thing out and a thing in, the second fails the count check
+                // the first has just made stale, and the folder stays a thing
+                // short.
+                update.push_back(LLCategoryUpdate(folder_id, 0));
+            }
+            else
+            {
+                LLCategoryUpdate old_folder(item->getParentUUID(), -1);
+                update.push_back(old_folder);
+                LLCategoryUpdate new_folder(folder_id, 1);
+                update.push_back(new_folder);
+            }
             gInventory.accountForUpdate(update);
 
             new_item->setParent(folder_id);
