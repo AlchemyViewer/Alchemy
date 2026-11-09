@@ -34,6 +34,7 @@
 #include "llgroupmgr.h"
 
 #include "algroupchanges.h"
+#include "algroupmembers.h"
 
 #include <vector>
 #include <algorithm>
@@ -2248,6 +2249,8 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
     std::string default_title = titles.size() ? titles[0].asString() : LLStringUtil::null;
     U64 default_powers = llstrtou64(defaults["default_powers"].asString().c_str(), NULL, 16);
 
+    // The reply's members, laid over the group's once all are read.
+    LLGroupMgrGroupData::member_list_t reply_members;
     auto members_end = members.endMap();
     for (auto it = members.beginMap(); it != members_end; ++it)
     {
@@ -2294,27 +2297,14 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
             is_owner = true;
         }
 
-        LLGroupMemberData* data = new LLGroupMemberData(member_id,
+        reply_members[member_id] = new LLGroupMemberData(member_id,
             donated_square_meters, member_powers, title, online_status, is_owner);
-
-        if (group_datap->mRoleMemberDataComplete)
-        {
-            if (LLGroupMemberData* member_old = group_datap->mMembers[member_id])
-            {
-                auto role_end = member_old->roleEnd();
-                for (auto role_it = member_old->roleBegin(); role_it != role_end; ++role_it)
-                {
-                    data->addRole(role_it->first, role_it->second);
-                }
-            }
-            else
-            {
-                group_datap->mRoleMemberDataComplete = false;
-            }
-        }
-
-        group_datap->mMembers[member_id] = data;
     }
+
+    // A reply from the first member is the whole list as it is now, so it replaces the members held; one from
+    // later in the list adds to them.
+    const size_t members_added = ALGroupMembers::merge(group_datap->mMembers, reply_members, page_start == 0,
+                                                       group_datap->mRoleMemberDataComplete);
 
     U32 member_count = (U32)group_datap->mMembers.size();
 
@@ -2339,7 +2329,7 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
         sendGroupTitlesRequest(group_id);
     }
 
-    if (page_size && members_loaded >= page_size && member_count > members_before)
+    if (page_size && members_loaded >= page_size && members_added > 0)
     {
         LLCoros::instance().launch("LLGroupMgr::groupMembersRequestCoro", [&]()
             {
