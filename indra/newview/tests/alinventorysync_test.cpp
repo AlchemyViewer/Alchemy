@@ -26,6 +26,8 @@
 
 #include "../alinventorysync.h"
 
+#include "indra_constants.h"
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <initializer_list>
@@ -243,5 +245,23 @@ namespace
     {
         CHECK(Sync::newFolderOwner(replyFolder(FOLDER, AGENT), heldOwner, LIBRARY) == AGENT);
         CHECK(Sync::newFolderOwner(replyFolder(ITEM, LIBRARY), heldOwner, AGENT) == LIBRARY);
+    }
+
+    TEST_CASE("alinventorysync: a folder is the library's where its owner is the one the login names", "[alinventorysync]")
+    {
+        // A grid whose library is not Linden Lab's library account's.
+        CHECK(Sync::isLibraryFolder(LIBRARY, LIBRARY));
+        CHECK_FALSE(Sync::isLibraryFolder(AGENT, LIBRARY));
+        CHECK_FALSE(Sync::isLibraryFolder(ALEXANDRIA_LINDEN_ID, LIBRARY));
+
+        // Linden Lab's grids, whose logins name that account.
+        CHECK(Sync::isLibraryFolder(ALEXANDRIA_LINDEN_ID, ALEXANDRIA_LINDEN_ID));
+        CHECK_FALSE(Sync::isLibraryFolder(AGENT, ALEXANDRIA_LINDEN_ID));
+    }
+
+    TEST_CASE("alinventorysync: a login that names no library owner has no library folder", "[alinventorysync]")
+    {
+        CHECK_FALSE(Sync::isLibraryFolder(LLUUID::null, LLUUID::null));
+        CHECK_FALSE(Sync::isLibraryFolder(AGENT, LLUUID::null));
     }
 }

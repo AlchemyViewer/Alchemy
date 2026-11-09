@@ -90,6 +90,10 @@ public:
     // finds it, else `fallback`.
     template <typename ParentOwner>
     static LLUUID newFolderOwner(const LLSD& category_map, ParentOwner&& parent_owner, const LLUUID& fallback);
+
+    // Whether a folder of `owner` is the library's, whose owner the login
+    // names as `library_owner`. A login that names none has no library.
+    static bool isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner);
 };
 
 template <typename ParentOwner>
