@@ -195,7 +195,11 @@ protected:
     void processNotify(LLMessageSystem* msg, bool online);
     void processChange(LLMessageSystem* msg);
 
-    // Applies a notice held until its resident's place in the friends list was known, if they are a friend.
+    // Makes id a friend, with the rights a new friendship starts with, unless they are one. Says whether they were
+    // made one.
+    bool befriend(const LLUUID& id);
+    // Applies a notice held until its resident's place in the friends list was known: makes them a friend, for a
+    // friendship formed, or else applies it if they are one.
     void applyHeldNotice(const ALFriendBacklog::Notice& notice);
 
 protected:
@@ -207,7 +211,8 @@ protected:
     //LLInventoryObserver* mInventoryObserver;
 
     buddy_map_t mBuddyInfo;
-    // what the circuit said of residents not in mBuddyInfo before the login's list was applied
+    // what the circuit said of residents not in mBuddyInfo, and the friendships formed, before the login's list was
+    // applied
     ALFriendBacklog mBacklog;
 
     typedef std::set<LLUUID> changed_buddy_t;

@@ -153,4 +153,51 @@ namespace
         CHECK(backlog.applyList().size() == 1);
         CHECK(backlog.applyList().empty());
     }
+
+    // An acceptance read from the offline messages can come before the login's list, which already names that
+    // friend with their rights: the friendship waits its turn, so that the list's entry is applied first.
+    TEST_CASE("alfriendbacklog: a friendship formed before the friends list is held in turn with the notices", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        CHECK(backlog.hold({ ALICE, Kind::ONLINE }));
+        CHECK(backlog.formed(ALICE));
+        CHECK(backlog.hold({ ALICE, Kind::RIGHTS_FROM, 3 }));
+
+        const std::vector<ALFriendBacklog::Notice> held = backlog.applyList();
+        REQUIRE(held.size() == 3);
+        CHECK(held[0].mKind == Kind::ONLINE);
+        CHECK(held[1].mID == ALICE);
+        CHECK(held[1].mKind == Kind::FORMED);
+        CHECK(held[2].mKind == Kind::RIGHTS_FROM);
+        CHECK(held[2].mRights == 3);
+    }
+
+    TEST_CASE("alfriendbacklog: once the friends list is applied a friendship formed is not held", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        CHECK(backlog.applyList().empty());
+        CHECK_FALSE(backlog.formed(ALICE));
+        CHECK(backlog.heldCount() == 0);
+    }
+
+    // Before the list is applied an answer leaves what was held where it is, to come back with the list in turn with
+    // the rest, and the resident is no longer expected, so it is not kept back past the list.
+    TEST_CASE("alfriendbacklog: an acceptance answered before the friends list leaves its notices to the list", "[alfriendbacklog]")
+    {
+        ALFriendBacklog backlog;
+        backlog.expect(ALICE);
+        backlog.expect(BOB);
+        CHECK(backlog.hold({ ALICE, Kind::ONLINE }));
+        CHECK(backlog.answered(ALICE).empty());
+        CHECK_FALSE(backlog.isExpected(ALICE));
+        CHECK(backlog.formed(BOB));
+        CHECK_FALSE(backlog.isExpected(BOB));
+
+        const std::vector<ALFriendBacklog::Notice> held = backlog.applyList();
+        REQUIRE(held.size() == 2);
+        CHECK(held[0].mID == ALICE);
+        CHECK(held[0].mKind == Kind::ONLINE);
+        CHECK(held[1].mID == BOB);
+        CHECK(held[1].mKind == Kind::FORMED);
+    }
 }

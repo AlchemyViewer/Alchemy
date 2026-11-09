@@ -285,8 +285,27 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
 }
 
 
+bool LLAvatarTracker::befriend(const LLUUID& id)
+{
+    if (get_ptr_in_map(mBuddyInfo, id))
+    {
+        return false;
+    }
+    //The default for relationship establishment is to have both parties
+    //visible online to each other.
+    mBuddyInfo[id] = new LLRelationship(LLRelationship::GRANT_ONLINE_STATUS, LLRelationship::GRANT_ONLINE_STATUS, false);
+    addChangedMask(LLFriendObserver::ADD, id);
+    return true;
+}
+
 void LLAvatarTracker::applyHeldNotice(const ALFriendBacklog::Notice& notice)
 {
+    if (notice.mKind == ALFriendBacklog::Kind::FORMED)
+    {
+        befriend(notice.mID);
+        return;
+    }
+
     LLRelationship* buddy = get_ptr_in_map(mBuddyInfo, notice.mID);
     if (!buddy)
     {
@@ -313,6 +332,9 @@ void LLAvatarTracker::applyHeldNotice(const ALFriendBacklog::Notice& notice)
         buddy->setRightsFrom(notice.mRights);
         LLViewerObject::markObjectsForUpdate(notice.mID);
         addChangedMask(LLFriendObserver::POWERS, notice.mID);
+        break;
+    case ALFriendBacklog::Kind::FORMED:
+        // applied above
         break;
     }
 }
@@ -836,17 +858,13 @@ void LLAvatarTracker::formFriendship(const LLUUID& id)
     if(id.notNull())
     {
         LLAvatarTracker& at = LLAvatarTracker::instance();
-        bool changed = false;
-        LLRelationship* buddy_info = get_ptr_in_map(at.mBuddyInfo, id);
-        if(!buddy_info)
+        // The login's list, yet to be applied, may name them already, with their rights: the friendship is applied
+        // over it with the rest of what was held.
+        if (at.mBacklog.formed(id))
         {
-            //The default for relationship establishment is to have both parties
-            //visible online to each other.
-            buddy_info = new LLRelationship(LLRelationship::GRANT_ONLINE_STATUS,LLRelationship::GRANT_ONLINE_STATUS, false);
-            at.mBuddyInfo[id] = buddy_info;
-            at.addChangedMask(LLFriendObserver::ADD, id);
-            changed = true;
+            return;
         }
+        bool changed = at.befriend(id);
         // What the circuit said of them while the acceptance was unanswered applies now.
         for (const ALFriendBacklog::Notice& notice : at.mBacklog.answered(id))
         {
