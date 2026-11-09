@@ -122,6 +122,29 @@ namespace
         CHECK(str_val == orig_str_val);
     }
 
+    TEST_CASE("LLString: removeCRLF removes a trailing carriage return and a run of them", "[LLString]")
+    {
+        std::string s("a\r");
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("a trailing CR");
+        CHECK(s == std::string("a"));
+
+        s = "\r";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("nothing but a CR");
+        CHECK(s.empty());
+
+        s = "a\r\rb";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("two CRs in a row");
+        CHECK(s == std::string("ab"));
+
+        s = "\r\r\r\n";
+        LLStringUtil::removeCRLF(s);
+        UNSCOPED_INFO("a run of CRs before a LF");
+        CHECK(s == std::string("\n"));
+    }
+
     TEST_CASE("LLString: replaceTabsWithSpaces puts n spaces for each tab", "[LLString]")
     {
         std::string str_val("Hello.\n\n\t \t Lindenlabs. \t\t");
@@ -1116,6 +1139,25 @@ namespace
             UNSCOPED_INFO("replacement containing the target terminates");
             CHECK(s == std::string("aaaaaa"));
         }
+    }
+
+    // An empty target is found everywhere, and replacing it never moves the
+    // search past it.
+    TEST_CASE("LLString: replaceString with an empty target leaves the string as it was", "[LLString]")
+    {
+        std::string s("abc");
+        LLStringUtil::replaceString(s, "", "");
+        UNSCOPED_INFO("empty target and replacement");
+        CHECK(s == std::string("abc"));
+
+        LLStringUtil::replaceString(s, "", "x");
+        UNSCOPED_INFO("empty target, some replacement");
+        CHECK(s == std::string("abc"));
+
+        std::string empty;
+        LLStringUtil::replaceString(empty, "", "x");
+        UNSCOPED_INFO("empty string, empty target");
+        CHECK(empty.empty());
     }
 
     // copyInto has the same shape: src may view dst, the append path appends
