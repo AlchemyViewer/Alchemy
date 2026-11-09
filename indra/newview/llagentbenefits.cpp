@@ -146,6 +146,16 @@ S32 LLAgentBenefits::getGroupMembershipLimit() const
     return m_group_membership_limit;
 }
 
+bool LLAgentBenefits::hasRoomForGroup(size_t group_count, bool already_member) const
+{
+    if (m_group_membership_limit < 0)
+    {
+        return true;
+    }
+    const size_t counted = (already_member && group_count > 0) ? group_count - 1 : group_count;
+    return counted < static_cast<size_t>(m_group_membership_limit);
+}
+
 S32 LLAgentBenefits::getPicksLimit() const
 {
     return m_picks_limit;

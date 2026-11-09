@@ -3365,7 +3365,7 @@ bool LLAgent::setUserGroupFlags(const LLUUID& group_id, bool accept_notices, boo
 
 bool LLAgent::canJoinGroups() const
 {
-    return (S32)mGroups.size() < LLAgentBenefitsMgr::current().getGroupMembershipLimit();
+    return LLAgentBenefitsMgr::current().hasRoomForGroup(mGroups.size());
 }
 
 LLQuaternion LLAgent::getHeadRotation()

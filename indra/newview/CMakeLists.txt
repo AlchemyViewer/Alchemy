@@ -2608,6 +2608,7 @@ if(AL_BUILD_TESTS)
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
+      tests/llagentbenefits_test.cpp
       tests/llautoreplace_test.cpp
       tests/llhttpretrypolicy_test.cpp
       tests/llversioninfo_test.cpp
@@ -2686,6 +2687,7 @@ if(AL_BUILD_TESTS)
       alscriptweightspane.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
+      llagentbenefits.cpp
       llautoreplace.cpp
       llhttpretrypolicy.cpp
       llversioninfo.cpp
