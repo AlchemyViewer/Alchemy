@@ -31,6 +31,7 @@
 #include "alscripttypes.h"
 #include "alnotecarditems.h"
 #include "alobjectupdate.h"
+#include "alteleportprogress.h"
 
 // Linden libraries
 #include "llanimationstates.h"
@@ -3022,17 +3023,7 @@ void process_teleport_progress(LLMessageSystem* msg, void**)
     msg->getStringFast(_PREHASH_Info, _PREHASH_Message, buffer);
     LL_DEBUGS("Messaging") << "teleport progress: " << buffer << " flags: " << teleport_flags << LL_ENDL;
 
-    //Sorta hacky...default to using simulator raw messages
-    //if we don't find the coresponding mapping in our progress mappings
-    std::string message = buffer;
-
-    if (LLAgent::sTeleportProgressMessages.find(buffer) !=
-        LLAgent::sTeleportProgressMessages.end() )
-    {
-        message = LLAgent::sTeleportProgressMessages[buffer];
-    }
-
-    gAgent.setTeleportMessage(LLAgent::sTeleportProgressMessages[message]);
+    gAgent.setTeleportMessage(ALTeleportProgress::text(LLAgent::sTeleportProgressMessages, buffer));
 }
 
 class LLFetchInWelcomeArea : public LLInventoryFetchDescendentsObserver

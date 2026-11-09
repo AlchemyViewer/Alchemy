@@ -1151,6 +1151,7 @@ if(AL_BUILD_VIEWER)
     alobjectroster.h
     alprobereach.h
     alregionretirement.h
+    alteleportprogress.h
     alagentlocationformat.h
     alcrashreporter.h
     alfeedback.h
@@ -2602,6 +2603,7 @@ if(AL_BUILD_TESTS)
       tests/alscripttheme_test.cpp
       tests/alscripttypes_test.cpp
       tests/alscriptweightspane_test.cpp
+      tests/alteleportprogress_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altextureboost_test.cpp
       tests/altexturetable_test.cpp
