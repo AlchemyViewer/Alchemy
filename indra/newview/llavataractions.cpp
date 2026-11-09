@@ -1696,8 +1696,11 @@ void LLAvatarActions::requestFriendship(const LLUUID& target_id, const std::stri
 {
     const LLUUID calling_card_folder_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
 
+    std::string agent_name;
+    LLAgentUI::buildFullname(agent_name);
+
     send_improved_im(target_id,
-                     target_name,
+                     agent_name,
                      message,
                      IM_ONLINE,
                      IM_FRIENDSHIP_OFFERED,
