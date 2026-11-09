@@ -28,6 +28,8 @@
 #include "llnotecard.h"
 #include "llstreamtools.h"
 
+#include <algorithm>
+
 LLNotecard::LLNotecard(S32 max_text)
     : mMaxText(max_text),
       mVersion(0),
@@ -234,7 +236,11 @@ bool LLNotecard::exportEmbeddedItemsStream( std::ostream& out_stream )
     out_stream << "LLEmbeddedItems version 1\n";
     out_stream << "{\n";
 
-    out_stream << llformat("count %d\n", mItems.size() );
+    // A null item is skipped below, so the count leaves it out too: the reader
+    // expects exactly as many entries as the count says.
+    const auto count = std::count_if(mItems.begin(), mItems.end(),
+                                     [](const LLPointer<LLInventoryItem>& item) { return item.notNull(); });
+    out_stream << llformat("count %d\n", static_cast<S32>(count));
 
     S32 idx = 0;
     for (std::vector<LLPointer<LLInventoryItem> >::iterator iter = mItems.begin();

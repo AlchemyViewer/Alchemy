@@ -62,6 +62,7 @@ if(AL_BUILD_TESTS)
     PROJECT llinventory
     SOURCES
       tests/inventorymisc_test.cpp
+      tests/llnotecard_test.cpp
       tests/llparcel_test.cpp
       tests/llpermissions_test.cpp
       tests/llsaleinfo_test.cpp
