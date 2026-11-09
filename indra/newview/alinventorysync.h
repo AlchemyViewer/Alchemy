@@ -84,7 +84,27 @@ public:
     // each folder directly under one.
     template <typename Folder, typename ForEachChild, typename IsComplete>
     static std::vector<Folder*> cachedFolders(Folder* root, ForEachChild&& for_each_child, IsComplete&& is_complete);
+
+    // The owner of a folder an AIS3 reply makes: the one the reply names,
+    // or where it names none, its parent's, as `parent_owner(parent_id)`
+    // finds it, else `fallback`.
+    template <typename ParentOwner>
+    static LLUUID newFolderOwner(const LLSD& category_map, ParentOwner&& parent_owner, const LLUUID& fallback);
 };
+
+template <typename ParentOwner>
+LLUUID ALInventorySync::newFolderOwner(const LLSD& category_map, ParentOwner&& parent_owner, const LLUUID& fallback)
+{
+    if (category_map.has("agent_id"))
+    {
+        return category_map["agent_id"].asUUID();
+    }
+    if (const std::optional<LLUUID> owner = parent_owner(category_map["parent_id"].asUUID()))
+    {
+        return *owner;
+    }
+    return fallback;
+}
 
 template <typename Folder, typename ForEachChild, typename IsComplete>
 std::vector<Folder*> ALInventorySync::cachedFolders(Folder* root, ForEachChild&& for_each_child, IsComplete&& is_complete)

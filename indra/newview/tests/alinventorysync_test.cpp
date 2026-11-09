@@ -208,4 +208,40 @@ namespace
         CacheFolder root{ FOLDER, AGENT, true, { &first, &second, &root } };
         CHECK(cached(root) == std::vector<CacheFolder*>{ &root, &first, &second, &shared });
     }
+
+    // A folder as an AIS3 reply has it, under `parent`, with `agent_id`
+    // where it names an owner.
+    LLSD replyFolder(const LLUUID& parent, const std::optional<LLUUID>& owner = std::nullopt)
+    {
+        LLSD map;
+        map["category_id"] = OTHER_FOLDER;
+        map["parent_id"] = parent;
+        if (owner)
+        {
+            map["agent_id"] = *owner;
+        }
+        return map;
+    }
+
+    // The owner of each folder the viewer holds: the library's root, FOLDER.
+    std::optional<LLUUID> heldOwner(const LLUUID& folder_id)
+    {
+        return folder_id == FOLDER ? std::optional<LLUUID>(LIBRARY) : std::nullopt;
+    }
+
+    TEST_CASE("alinventorysync: a folder an AIS3 reply names no owner of is its parent's", "[alinventorysync]")
+    {
+        CHECK(Sync::newFolderOwner(replyFolder(FOLDER), heldOwner, AGENT) == LIBRARY);
+    }
+
+    TEST_CASE("alinventorysync: a folder an AIS3 reply names no owner of under a folder the viewer doesn't hold is the fallback's", "[alinventorysync]")
+    {
+        CHECK(Sync::newFolderOwner(replyFolder(ITEM), heldOwner, AGENT) == AGENT);
+    }
+
+    TEST_CASE("alinventorysync: a folder an AIS3 reply names the owner of is that owner's", "[alinventorysync]")
+    {
+        CHECK(Sync::newFolderOwner(replyFolder(FOLDER, AGENT), heldOwner, LIBRARY) == AGENT);
+        CHECK(Sync::newFolderOwner(replyFolder(ITEM, LIBRARY), heldOwner, AGENT) == LIBRARY);
+    }
 }
