@@ -33,6 +33,8 @@
 
 #include "llgroupmgr.h"
 
+#include "algroupchanges.h"
+
 #include <vector>
 #include <algorithm>
 
@@ -1512,41 +1514,7 @@ void LLGroupMgr::addPendingPropertyRequest(const LLUUID& id)
 
 void LLGroupMgr::notifyObservers(LLGroupChange gc)
 {
-    for (group_map_t::iterator gi = mGroups.begin(); gi != mGroups.end(); ++gi)
-    {
-        LLUUID group_id = gi->first;
-        if (gi->second->mChanged)
-        {
-            // notify LLGroupMgrObserver
-            // Copy the map because observers may remove themselves on update
-            observer_multimap_t observers = mObservers;
-
-            // find all observers for this group id
-            observer_multimap_t::iterator oi = observers.lower_bound(group_id);
-            observer_multimap_t::iterator end = observers.upper_bound(group_id);
-            for (; oi != end; ++oi)
-            {
-                oi->second->changed(gc);
-            }
-            gi->second->mChanged = false;
-
-
-            // notify LLParticularGroupObserver
-            observer_map_t::iterator obs_it = mParticularObservers.find(group_id);
-            if(obs_it == mParticularObservers.end())
-                return;
-
-//          observer_set_t& obs = obs_it->second;
-// [RLVa:KB] - Checked: RLVa-2.2 (General bugfix)
-            // Iterate over a *copy* of the observer list
-            observer_set_t obs = obs_it->second;
-// [/RLVa:KB]
-            for (observer_set_t::iterator ob_it = obs.begin(); ob_it != obs.end(); ++ob_it)
-            {
-                (*ob_it)->changed(group_id, gc);
-            }
-        }
-    }
+    ALGroupChanges::notify(mGroups, mObservers, mParticularObservers, gc);
 }
 
 void LLGroupMgr::addGroup(LLGroupMgrGroupData* group_datap)

@@ -1143,6 +1143,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     alviewcapture.h
     algradehistory.h
+    algroupchanges.h
     alhoverglow.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
@@ -2549,6 +2550,7 @@ if(AL_BUILD_TESTS)
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
       tests/algradehistory_test.cpp
+      tests/algroupchanges_test.cpp
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
