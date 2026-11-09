@@ -1713,11 +1713,16 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     bool is_first_found = true;
 
     string_vec_t font_search_paths;
-    // Imported fonts first so they can shadow bundled ones.
-    const std::string user_font_path = LLFontGL::getFontPathUser();
-    if (!user_font_path.empty())
+    // Imported fonts first so they can shadow bundled ones, except
+    // during a --resetfonts session, where the user directory is
+    // excluded so a user font cannot shadow a bundled one.
+    if (!LLFontGL::sResetFontsOnStartup)
     {
-        font_search_paths.push_back(user_font_path);
+        const std::string user_font_path = LLFontGL::getFontPathUser();
+        if (!user_font_path.empty())
+        {
+            font_search_paths.push_back(user_font_path);
+        }
     }
     font_search_paths.push_back(LLFontGL::getFontPathLocal());
     font_search_paths.push_back(LLFontGL::getFontPathSystem());

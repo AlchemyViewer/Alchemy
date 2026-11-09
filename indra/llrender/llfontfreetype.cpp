@@ -498,6 +498,43 @@ LLFontFreetype::FaceInfo LLFontFreetype::probeFaceInfo(const std::string& filena
     info.has_color   = FT_HAS_COLOR(probe);
     info.valid       = !info.family.empty();
 
+    if (info.valid && !FT_IS_SCALABLE(probe))
+    {
+        // Bitmap-only faces (including sbix, which FreeType reports as
+        // non-scalable) cannot be scaled by the viewer: ALFontFace::load
+        // sizes a face with FT_Set_Char_Size, which for such faces only
+        // succeeds when a strike's ppem exactly matches the requested
+        // size. A family name alone therefore does not make the font
+        // usable -- reject it unless at least one strike matches a size
+        // the viewer actually requests, instead of importing a font
+        // that then fails to load. Scalable faces (including scalable
+        // faces that also carry sbits) are unaffected.
+        // The required point sizes are the global <font_size> table in
+        // fonts.xml (SmallLSL, Small, Medium, Monospace, HugeLSL, Huge),
+        // tested at the viewer's current DPI -- the same size
+        // ALFontFace::load will request on the reload that follows
+        // import.
+        static const F32 kRequiredPointSizes[] = { 7.f, 9.f, 10.f, 11.f, 12.f, 16.f };
+        const F32 horz_dpi = LLFontGL::sHorizDPI > 0.f ? LLFontGL::sHorizDPI : 96.f;
+        const F32 vert_dpi = LLFontGL::sVertDPI > 0.f ? LLFontGL::sVertDPI : 96.f;
+
+        bool has_usable_strike = probe->num_fixed_sizes > 0 && probe->available_sizes != nullptr;
+        if (has_usable_strike)
+        {
+            has_usable_strike = false;
+            for (F32 point_size : kRequiredPointSizes)
+            {
+                if (FT_Set_Char_Size(probe, 0, static_cast<FT_F26Dot6>(point_size * 64.f),
+                                     (U32)horz_dpi, (U32)vert_dpi) == 0)
+                {
+                    has_usable_strike = true;
+                    break;
+                }
+            }
+        }
+        info.valid = has_usable_strike;
+    }
+
     FT_Done_Face(probe);
     return info;
 }

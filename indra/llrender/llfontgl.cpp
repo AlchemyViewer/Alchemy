@@ -68,6 +68,7 @@ bool LLFontGL::sFontsXmlDirty = false;
 bool LLFontGL::sDisplayFont = true ;
 bool LLFontGL::sUseDarkEmojiPalette = false;
 bool LLFontGL::sForceMonochromeEmoji = false;
+bool LLFontGL::sResetFontsOnStartup = false;
 std::string LLFontGL::sAppDir;
 
 LLColor4 LLFontGL::sShadowColor(0.f, 0.f, 0.f, 1.f);

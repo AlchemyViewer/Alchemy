@@ -461,6 +461,11 @@ public:
     // their native color rendering. Toggling triggers a font reload to
     // discard stale color-atlas glyphs.
     static bool sForceMonochromeEmoji;
+    // Threaded in from newview's AlchemyResetFontsOnStartup setting
+    // (--resetfonts). When true, LLFontRegistry::createFont does not
+    // search the per-user font directory, so a user font cannot shadow
+    // a bundled one during the reset session.
+    static bool sResetFontsOnStartup;
     static std::string sAppDir;         // For loading fonts
 
 private:
