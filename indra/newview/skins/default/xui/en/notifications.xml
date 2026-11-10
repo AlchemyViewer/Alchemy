@@ -13549,6 +13549,14 @@ are wearing now.
   </notification>
 
   <notification
+   icon="alertmodal.tga"
+   name="RemoveImportedFontFailure"
+   type="alertmodal">
+    <tag>fail</tag>
+    Could not remove the imported font [FONT]; it remains available.
+  </notification>
+
+  <notification
    icon="alert.tga"
    name="RegionTrackerAdd"
    type="alert">

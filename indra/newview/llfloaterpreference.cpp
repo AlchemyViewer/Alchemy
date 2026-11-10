@@ -56,6 +56,7 @@
 #include "lldiriterator.h"
 #include "lldirpicker.h"
 #include "lleventtimer.h"
+#include "lltimer.h"
 #include "llfeaturemanager.h"
 #include "llfilepicker.h"
 #include "llfocusmgr.h"
@@ -1286,6 +1287,12 @@ void LLFloaterPreference::callbackRemoveImportedFont(const LLSD& notification, c
         refreshImportedFontList();
         scheduleFontDropdownRefresh();
     }
+    else
+    {
+        LLSD args;
+        args["FONT"] = notification["payload"]["LABEL"].asString();
+        LLNotificationsUtil::add("RemoveImportedFontFailure", args);
+    }
 }
 
 void LLFloaterPreference::scheduleFontDropdownRefresh()
@@ -1294,11 +1301,14 @@ void LLFloaterPreference::scheduleFontDropdownRefresh()
     // it takes a fixed 0.25s: LLFontGL::initClass bumps
     // sResolutionGeneration when a reload finishes, the same completion
     // signal the text layout and font text cache check. Poll it until
-    // it changes; the 0.25s is only the poll cadence.
+    // it changes or a finite deadline passes; the 0.25s is only the
+    // poll cadence.
     const S32 generation = LLFontGL::sResolutionGeneration;
-    doPeriodically([generation]()
+    const F64 deadline = LLTimer::getTotalSeconds() + 5.0;
+    doPeriodically([generation, deadline]()
     {
-        if (LLFontGL::sResolutionGeneration == generation)
+        if (LLFontGL::sResolutionGeneration == generation
+            && LLTimer::getTotalSeconds() < deadline)
         {
             return false;
         }
