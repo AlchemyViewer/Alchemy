@@ -33,6 +33,7 @@ public:
     ALFloaterFontReset(const LLSD& key);
     ~ALFloaterFontReset() override = default;
 
+    // Show the reset confirmation dialog.
     static void showConfirm();
 
     bool postBuild() override;

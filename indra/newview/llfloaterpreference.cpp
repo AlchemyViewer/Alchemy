@@ -1193,8 +1193,19 @@ void LLFloaterPreference::refreshImportedFontList()
 
 void LLFloaterPreference::onImportFont()
 {
-    LLFilePickerReplyThread::startPicker(boost::bind(&LLFloaterPreference::onImportFontCallback, this, _1),
-                                         LLFilePicker::FFLOAD_FONT, true);
+    // The picker replies asynchronously; the floater may be destroyed
+    // in the meantime, so invoke the callback only while the
+    // lifetime-checked handle is still valid.
+    LLHandle<LLFloaterPreference> handle = getDerivedHandle<LLFloaterPreference>();
+    LLFilePickerReplyThread::startPicker([handle](const std::vector<std::string>& filenames,
+                                                  LLFilePicker::ELoadFilter, LLFilePicker::ESaveFilter)
+    {
+        if (handle.isDead())
+        {
+            return;
+        }
+        handle.get()->onImportFontCallback(filenames);
+    }, LLFilePicker::FFLOAD_FONT, true);
 }
 
 void LLFloaterPreference::onImportFontCallback(const std::vector<std::string>& filenames)

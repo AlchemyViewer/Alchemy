@@ -1713,16 +1713,15 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     bool is_first_found = true;
 
     string_vec_t font_search_paths;
-    // Imported fonts first so they can shadow bundled ones, except
-    // during a --resetfonts session, where the user directory is
-    // excluded so a user font cannot shadow a bundled one.
-    if (!LLFontGL::sResetFontsOnStartup)
+    // Imported fonts first so they can shadow bundled ones. During a
+    // --resetfonts session the user directory is searched last, so
+    // bundled (and system) fonts keep precedence for fallback and
+    // ordinary lookup, while an explicitly selected imported font --
+    // whose file exists only in the user directory -- still resolves.
+    const std::string user_font_path = LLFontGL::getFontPathUser();
+    if (!LLFontGL::sResetFontsOnStartup && !user_font_path.empty())
     {
-        const std::string user_font_path = LLFontGL::getFontPathUser();
-        if (!user_font_path.empty())
-        {
-            font_search_paths.push_back(user_font_path);
-        }
+        font_search_paths.push_back(user_font_path);
     }
     font_search_paths.push_back(LLFontGL::getFontPathLocal());
     font_search_paths.push_back(LLFontGL::getFontPathSystem());
@@ -1731,6 +1730,10 @@ LLFontGL *LLFontRegistry::createFont(const LLFontDescriptor& desc)
     font_search_paths.push_back(MACOSX_FONT_PATH_LIBRARY + MACOSX_FONT_SUPPLEMENTAL);
     font_search_paths.push_back(LLFontGL::getFontPathSystem() + MACOSX_FONT_SUPPLEMENTAL);
 #endif
+    if (LLFontGL::sResetFontsOnStartup && !user_font_path.empty())
+    {
+        font_search_paths.push_back(user_font_path);
+    }
 
     // The fontname string may contain multiple font file names separated by semicolons.
     // Break it apart and try loading each one, in order.

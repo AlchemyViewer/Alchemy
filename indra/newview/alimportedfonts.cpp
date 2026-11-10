@@ -33,6 +33,7 @@
 #include "lldir.h"
 #include "llfile.h"
 #include "llstring.h"
+#include "lluuid.h"
 #include "llviewercontrol.h"
 
 #include <cctype>
@@ -152,6 +153,7 @@ namespace
         return {};
     }
 
+    // True if any family/style entry in the list references the file.
     bool isFontFileReferenced(const LLSD& list, const std::string& file)
     {
         if (file.empty() || !list.isArray())
@@ -328,6 +330,12 @@ std::string ALImportedFonts::categorySuffix(const LLSD& family_entry)
 // static
 std::string ALImportedFonts::regenerateOverlay()
 {
+    return regenerateOverlay(getImported());
+}
+
+// static
+std::string ALImportedFonts::regenerateOverlay(const LLSD& imported)
+{
     // Create the user font directory if needed.
     if (getUserFontDir(true).empty())
         return {};
@@ -361,8 +369,8 @@ std::string ALImportedFonts::regenerateOverlay()
     out += "     AlchemyImportedFonts setting on every import/remove. -->\n";
     out += "<fonts>\n";
 
-    const LLSD imported = getImported();
-    for (LLSD::array_const_iterator eit = imported.beginArray(); eit != imported.endArray(); ++eit)
+    const LLSD list = imported.isArray() ? imported : LLSD::emptyArray();
+    for (LLSD::array_const_iterator eit = list.beginArray(); eit != list.endArray(); ++eit)
     {
         const LLSD& entry = *eit;
         const std::string name = entry["name"].asString();
@@ -521,9 +529,14 @@ bool ALImportedFonts::importFiles(const std::vector<std::string>& sources, Impor
         }
 
         // Copy with a collision-proof name; getExtension() omits the dot.
+        // The per-import UUID makes each import's stored file distinct
+        // even when the same source path is imported again (possibly
+        // with changed contents), so a later import can never replace
+        // a file an earlier family/style entry still references. The
+        // family/style record below stores this import's dest_leaf.
         const std::string ext       = gDirUtilp->getExtension(leaf);
         const std::string stem      = leaf.substr(0, leaf.size() - (ext.empty() ? 0 : ext.size() + 1));
-        const std::string dest_leaf = stem + "." + makeFileSuffix(source) + "." + ext;
+        const std::string dest_leaf = stem + "." + makeFileSuffix(source) + "." + LLUUID::generateNewID().asString() + "." + ext;
         const std::string dest      = gDirUtilp->add(dir, dest_leaf);
 
         std::error_code ec;
@@ -586,6 +599,15 @@ bool ALImportedFonts::removeFamily(const std::string& family_name)
     if (!removed_entries.isArray() || removed_entries.size() == 0)
         return false;
 
+    // Generate the prospective overlay first, so a failure leaves the
+    // saved setting, the overrides, and the referenced font files
+    // exactly as they were (the prior overlay is preserved by the
+    // atomic write in regenerateOverlay).
+    if (regenerateOverlay(kept).empty())
+    {
+        return false;
+    }
+
     gSavedSettings.setLLSD(kSettingImported, kept);
     pruneOverridesForFamily(family_name);
     // Delete the removed families' files only where no remaining
@@ -593,10 +615,6 @@ bool ALImportedFonts::removeFamily(const std::string& family_name)
     for (LLSD::array_const_iterator it = removed_entries.beginArray(); it != removed_entries.endArray(); ++it)
     {
         deleteFamilyFiles(*it, kept);
-    }
-    if (regenerateOverlay().empty())
-    {
-        return false;
     }
     notifyRegistryChanged();
     return true;

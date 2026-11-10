@@ -6719,8 +6719,8 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // the first font load so the renderer sees the right glyph types from
     // the start.
     LLFontGL::sForceMonochromeEmoji = gSavedSettings.getBOOL("AlchemyForceMonochromeEmoji");
-    // Same seeding for --resetfonts: createFont must already know not
-    // to search the user font directory on the first font load.
+    // Same seeding for --resetfonts: createFont must already know to
+    // search the user font directory last on the first font load.
     LLFontGL::sResetFontsOnStartup = gSavedSettings.getBOOL("AlchemyResetFontsOnStartup");
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
