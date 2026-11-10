@@ -75,6 +75,7 @@ public:
     // Remove an imported family and its copied files.
     static bool removeFamily(const std::string& family_name);
 
+    // The currently imported font families, from the saved setting.
     static LLSD getImported();
 
     // Display suffix for the family's category, e.g. " (mono)".
@@ -83,17 +84,24 @@ public:
     // Rewrite imported_fonts.xml from the current setting.
     static std::string regenerateOverlay();
 
+    // Path of the generated imported_fonts.xml overlay.
     static std::string getOverlayPath();
 
     // Per-user font directory.
     static std::string getUserFontDir(bool create = false);
 
+    // True if the file's extension is one an import accepts.
     static bool isSupportedFontFile(const std::string& path);
 
     // Clear font overrides, restoring the built-in defaults.
     static void resetOverrides();
 
 private:
+    // Rewrite imported_fonts.xml from the given imported list, without
+    // changing the saved setting. Used to generate a prospective
+    // overlay before committing a change; empty return on failure.
+    static std::string regenerateOverlay(const LLSD& imported);
+
     ALImportedFonts() = delete;
 };
 

@@ -384,7 +384,9 @@ public:
 
     static std::string getFontPathLocal();
     static std::string getFontPathSystem();
+    // Directory holding user-imported font files, or empty if unknown.
     static std::string getFontPathUser();
+    // Path of the generated imported_fonts.xml overlay, or empty if unknown.
     static std::string getImportedFontsOverlayPath();
 
     // The shadow of the UI transform, kept on the CPU for the three things
@@ -462,9 +464,10 @@ public:
     // discard stale color-atlas glyphs.
     static bool sForceMonochromeEmoji;
     // Threaded in from newview's AlchemyResetFontsOnStartup setting
-    // (--resetfonts). When true, LLFontRegistry::createFont does not
-    // search the per-user font directory, so a user font cannot shadow
-    // a bundled one during the reset session.
+    // (--resetfonts). When true, LLFontRegistry::createFont searches
+    // the per-user font directory last, so a user font cannot shadow
+    // a bundled one during the reset session while an explicitly
+    // selected imported font still resolves.
     static bool sResetFontsOnStartup;
     static std::string sAppDir;         // For loading fonts
 
