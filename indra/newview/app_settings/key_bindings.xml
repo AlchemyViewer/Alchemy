@@ -166,7 +166,6 @@
     <binding key="D" mask="SHIFT" command="slide_right"/>
     <binding key="W" mask="SHIFT" command="move_forward_sitting"/>
     <binding key="S" mask="SHIFT" command="move_backward_sitting"/>
-    <binding key="E" mask="SHIFT" command="spin_over_sitting"/>
     <binding key="C" mask="SHIFT" command="spin_under_sitting"/>
 
     <binding key="LEFT" mask="SHIFT" command="slide_left"/>
