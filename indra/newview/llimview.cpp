@@ -1382,7 +1382,8 @@ LLIMModel::LLIMSession* LLIMModel::findAdHocIMSession(const uuid_vec_t& ids)
     {
         LLIMSession* session = (*it).second;
 
-        if (!session->isAdHoc()) continue;
+        // An incoming conference's targets are only its inviter or its own id, not its participants
+        if (!session->isOutgoingAdHoc()) continue;
         if (session->mInitialTargetIDs.size() != num) continue;
 
         std::list<LLUUID> tmp_list(session->mInitialTargetIDs.begin(), session->mInitialTargetIDs.end());
@@ -3508,9 +3509,7 @@ LLUUID LLIMMgr::addSession(
     bool new_session = (session == NULL);
 
     //works only for outgoing ad-hoc sessions
-    if (new_session &&
-        ((IM_NOTHING_SPECIAL == dialog) || (IM_SESSION_P2P_INVITE == dialog) || (IM_SESSION_CONFERENCE_START == dialog)) &&
-        ids.size())
+    if (new_session && (IM_SESSION_CONFERENCE_START == dialog) && ids.size())
     {
         session = LLIMModel::getInstance()->findAdHocIMSession(ids);
         if (session)
