@@ -92,7 +92,7 @@ public:
     void setShowIcons(std::string param_name);
     bool getIconsVisible() const { return mShowIcons; }
     const std::string getIconParamName() const{return mIconParamName;}
-    std::string getAvatarName(LLAvatarName av_name);
+    std::string getAvatarName(const LLUUID& id, LLAvatarName av_name);
     virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
     /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
