@@ -2536,6 +2536,9 @@ void sendRadarAlert(const LLUUID& agent, const std::string& region_str, bool ent
 }
 
 static uuid_vec_t mVecAgents;
+// The region mVecAgents was taken in, so that the first update after the agent's
+// region changes (a teleport or a crossing) seeds the list rather than alerting.
+static U64 sVecAgentsRegionHandle = 0;
 
 // the deprecated coarse location handler
 void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
@@ -2546,6 +2549,7 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
 
     static LLCachedControl<bool> sRadarAlerts(gSavedSettings, "AlchemyRadarAlerts", false);
     LLViewerRegion* cur_region = gAgent.getRegion();
+    const bool radar_alerts = sRadarAlerts && this == cur_region && sVecAgentsRegionHandle == getHandle();
     uuid_vec_t region_agents;
 
     U8 x_pos = 0;
@@ -2606,7 +2610,7 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
                     uuid_vec_t::iterator end = mVecAgents.end();
                     if (find(mVecAgents.begin(), end, agent_id) == end)
                     {
-                        if (sRadarAlerts)
+                        if (radar_alerts)
                             sendRadarAlert(agent_id, this->getName(), true);
                     }
                 }
@@ -2620,12 +2624,13 @@ void LLViewerRegion::updateCoarseLocations(LLMessageSystem* msg)
             uuid_vec_t::iterator end = region_agents.end();
             if (find(region_agents.begin(), end, agent) == end)
             {
-                if (sRadarAlerts)
+                if (radar_alerts)
                     sendRadarAlert(agent, this->getName(), false);
             }
         }
         mVecAgents.clear();
         mVecAgents = region_agents;
+        sVecAgentsRegionHandle = getHandle();
     }
 }
 
