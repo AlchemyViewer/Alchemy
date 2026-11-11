@@ -190,18 +190,16 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
     {
         //
         // HACK: if we're dealing with a notification embedded in IM, update it
-        // otherwise remove its toast
         //
         if (ALViewType::as<LLIMToastNotifyPanel>(panelp.get()))
         {
             panelp->updateNotification();
         }
-        else
-        {
-            // if notification has changed, hide it
-            mChannel.get()->removeToastByNotificationID(p->getID());
-        }
     }
+
+    // if notification has changed, hide its toast; an offer can sit both in IM and in a toast,
+    // and the lookup above finds only the panel made last, or none once a newer one has gone
+    mChannel.get()->removeToastByNotificationID(p->getID());
 }
 
 
