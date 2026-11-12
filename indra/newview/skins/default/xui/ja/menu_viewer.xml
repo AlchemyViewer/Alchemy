@@ -131,6 +131,9 @@
 			<menu_item_call label="環境の個人設定…" name="adjustment_tool"/>
 			<menu_item_check label="雲の動きを一時停止" name="pause_clouds"/>
 		</menu>
+		<menu_item_check name="Sound Explorer" label="サウンドエクスプローラー"/>
+		<menu_item_check name="Poser" label="ポーザー"/>
+		<menu_item_check name="toggle_sound" label="サウンドのミュート／ミュート解除"/>
 	</menu>
 	<menu label="ビルド" name="BuildTools">
 		<menu_item_check label="ビルドツールを表示" name="Show Build Tools"/>
@@ -170,6 +173,9 @@
 			<menu_item_call label="スクリプトを実行中にする" name="Set Scripts to Running"/>
 			<menu_item_call label="スクリプトを実行停止にする" name="Set Scripts to Not Running"/>
 			<menu_item_call label="スクリプトを削除" name="Delete Scripts"/>
+			<menu_item_call name="Lua" label="スクリプトをSLuaとして再コンパイル"/>
+			<menu_item_call name="LSL on Luau" label="スクリプトをLSL（Luau）として再コンパイル"/>
+			<menu_item_check name="Script Editor Server" label="スクリプトエディターサーバー"/>
 		</menu>
 		<menu label="経路探索" name="Pathfinding">
 			<menu_item_call label="リージョンのオブジェクト" name="pathfinding_linksets_menu_item"/>
@@ -187,7 +193,7 @@
 			<menu_item_check label="プローブの更新" name="Probe Updates"/>
 			<menu_item_check label="範囲内を選択する" name="Select By Surrounding"/>
 			<menu_item_check label="選択のアウトラインを表示する" name="Show Selection Outlines"/>
-			<menu_item_check label="隠れた位置の選択も表示する" name="Show Hidden Selection"/>
+			<menu_item_check label="隠れた部分を表示" name="Show Hidden Selection"/>
 			<menu_item_check label="選択した光の効果範囲を表示する" name="Show Light Radius for Selection"/>
 			<menu_item_check label="反射プローブの影響範囲を表示する" name="Show Reflection Probe Volumes"/>
 			<menu_item_check label="選択ビームを表示する" name="Show Selection Beam"/>
@@ -378,6 +384,7 @@
 			<menu_item_call label="スレッド内で例外クラッシュを発生させる" name="Force an Exception Crash in a Thread"/>
 			<menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer"/>
 			<menu_item_call label="メモリリークをシミュレートする" name="Memory Leaking Simulation"/>
+			<menu_item_call name="Force LLError Message And Crash" label="LLErrorとメッセージとクラッシュを実行する"/>
 		</menu>
 		<menu label="ビデオ" name="Video">
 			<menu_item_call label="1080✕1920" name="1080x1920"/>
@@ -448,6 +455,8 @@
 			<menu_item_call label="シェーダーキャッシュをクリア" name="Shader Cache Clear"/>
 			<menu_item_call label="地形を再構築" name="Rebuild Terrain"/>
 			<menu_item_call label="キャッシュを直ちにクリア" name="Cache Clear"/>
+			<menu_item_check name="Render Avatar Cloth" label="アバターの衣服を描画"/>
+			<menu_item_check name="Collect UI Image Vertex Buffers" label="UI画像の頂点バッファを収集"/>
 		</menu>
 		<menu label="ネットワーク" name="Network">
 			<menu_item_check label="エージェントを一時停止する" name="AgentPause"/>

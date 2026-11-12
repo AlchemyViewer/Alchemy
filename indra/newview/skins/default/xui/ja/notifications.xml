@@ -790,7 +790,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 	</notification>
 	<notification name="EjectAvatarFullnameNoBan">
 		[AVATAR_NAMES]をあなたの土地から追放しますか？
-		<usetemplate name="okcancelbuttons" notext="Cancel" yestext="Eject"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="EjectAvatarMultiple">
 		以下の住民らをあなたの土地から追放しますか？
@@ -818,7 +818,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		この不動産から[AVATAR_NAMES]をキックしますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification label="Confirm Kick" name="EstateKickMultiple">
+	<notification label="キックの確認" name="EstateKickMultiple">
 		以下の住民らをこの不動産からキックしますか？
 
 [AVATAR_NAMES]
@@ -1350,7 +1350,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification label="アウトフィットの保存" name="SaveOutfitAs">
 		着用中のアウトフィットを新しいアウトフィットとして保存：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -1358,7 +1358,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification label="着用物の保存" name="SaveWearableAs">
 		アイテムを別名でインベントリに保存：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -1587,7 +1587,7 @@ Second Lifeを使ったことがない場合は、ログインする前にアカ
 	</notification>
 	<notification name="LoginCantRemoveCurUsername">
 		ログインしているユーザーを忘れた場合は、ログアウトする必要があります。
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="Confirm and log out"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="確認しログアウト"/>
 	</notification>
 	<notification name="LoginPacketNeverReceived">
 		接続に時間がかかっております。お使いのインターネット接続か、[SECOND_LIFE_GRID]の問題と考えられます。
@@ -1717,7 +1717,7 @@ Second Lifeを使ったことがない場合は、ログインする前にアカ
 	</notification>
 	<notification name="ConfirmTextureHeights">
 		標高範囲に、最高値よりも大きい値を最低値にしようとしています。このまま続行してもよろしいですか？
-		<usetemplate canceltext="聞かないでください" name="yesnocancelbuttons" notext="キャンセル" yestext="Ok"/>
+		<usetemplate canceltext="聞かないでください" name="yesnocancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="MaxAllowedAgentOnRegion">
 		許可できる住人は、[MAX_AGENTS]人までです。
@@ -2605,9 +2605,11 @@ Second Life
 	</notification>
 	<notification name="PurgeSelectedItems">
 		[COUNT]個のアイテムが完全に削除されます。ごみ箱内の選択した項目を削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="ConfirmEmptyTrash">
 		[COUNT]個のアイテムとフォルダーが完全に削除されます。ごみ箱の項目をすべて削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="TrashIsFull">
 		ゴミ箱があふれています。これはログイン時に問題を引き起こします。
@@ -3026,6 +3028,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="RegionTPAccessBlocked">
 		訪問しようとしているリージョンには現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="URBannedFromRegion">
 		あなたは、このリージョンへの立ち入りが禁止されています。
@@ -3472,6 +3475,7 @@ Your L$ balance is shown in the upper-right.
 期限を延長・更新するには[[URL] ここ]をクリックしてください。
 
 プレミアム会員の方は、[[PREMIUM_URL] ここ]をクリックしてボイスモーフィング特典をお受け取りください。
+		<usetemplate name="okignore" ignoretext="ボイスモーフィングの有効期限が切れるときの警告" yestext="ＯＫ"/>
 	</notification>
 	<notification name="VoiceEffectsNew">
 		新しいボイスモーフィング効果が登場！
@@ -3611,6 +3615,7 @@ Your L$ balance is shown in the upper-right.
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
 
 次の住人と共有：&lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
+		<usetemplate name="okcancelignore" ignoretext="アイテムを共有する前の警告" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		フォルダは一度に１つしか共有できません。
@@ -3620,7 +3625,7 @@ Your L$ balance is shown in the upper-right.
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
 
 次の住人と共有：&lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="Ok"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ItemsShared">
 		アイテムが共有されました。
@@ -3722,6 +3727,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="CannotUploadMaterial">
 		ファイルアップロード時に問題が発生しました。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification label="マテリアルの保存" name="SaveMaterialAs">
 		このマテリアルに名前をつけてください：
@@ -4772,7 +4778,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification label="設定を保存" name="SaveSettingAs">
 		現在の設定を以下のように保存します：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -5040,5 +5046,147 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		非フレンドへの自動応答モードがオンになっています。
 フレンド以外の人からインスタントメッセージを受信したときに、設定した自動応答で応答されるようになります。
 		<usetemplate ignoretext="ステータスを非フレンドへの自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
+	</notification>
+	<notification name="FoundLegacyNsisInstallation">
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CannotPasteFolderIntoSelf">
+		フォルダーをそれ自身やそのサブフォルダーの中に貼り付けることはできません。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ModelUploaderMissingPhysicsApple">
+		Apple Siliconでは、まだモデルのアップロードは利用できませんが、今後のリリースでサポートされる予定です。
+
+回避策：FinderでSecond Lifeアプリを右クリックし、「情報を見る」を選択して、「Rosettaを使用して開く」にチェックを入れます。
+	</notification>
+	<notification name="ModelUploaderMissingPhysics">
+		物理ライブラリが存在しないため、モデルアップローダの一部の機能が動作しないか、正しく動作しない可能性があります。
+	</notification>
+	<notification name="LandmarkLocationUnknown">
+		ビューアはリージョンの位置を取得できませんでした。リージョンが一時的に利用できないか、削除されたか、ランドマークの読み込みに失敗した可能性があります。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="DownloadingUpdate">
+		更新[VERSION]をダウンロードしています…
+ビューアは、ダウンロード完了後に再起動します。
+	</notification>
+	<notification name="RegionTPAccessBlocked_NotifyAdultsOnly">
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="DeleteWornItems">
+		<usetemplate name="okcancelbuttons" yestext="アイテムを外して削除" notext="キャンセル"/>
+	</notification>
+	<notification name="CantDeleteRequiredClothing">
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ThumbnailSelectionTooLarge">
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CantLinkNotecard">
+		リンクを作成する前に、ノートカードを保存する必要があります。
+	</notification>
+	<notification name="CantLinkMaterial">
+		リンクを作成する前に、マテリアルを保存する必要があります。
+	</notification>
+	<notification name="InventoryLimitReachedAIS">
+		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
+	</notification>
+	<notification name="ExternalEditorServerStarted">
+		外部エディターサーバーをポート[PORT]で開始しました。
+	</notification>
+	<notification name="ExternalEditorServerFailed">
+		外部エディターサーバーをポート[PORT]で開始できませんでした。
+	</notification>
+	<notification name="ExternalEditorServerStopped">
+		外部エディターサーバーを停止しました。
+	</notification>
+	<notification name="SnapshotSavedToComputer">
+		スナップショットは以下に保存されました：
+[FILEPATH]
+
+クリックでフォルダを開きます。
+	</notification>
+	<notification name="NearbyVoiceMutedByModerator">
+		モデレーターは、あなたのボイスチャットをミュートしました。
+この場所では、あなたが話しても誰も聞こえません。
+	</notification>
+	<notification name="NearbyVoiceUnmutedByModerator">
+		あなたのボイスチャットは、この場所にいる人々に聞こえるようになりました。
+	</notification>
+	<notification name="ConfirmLeaveAdhoc">
+		この会話から抜けてもよろしいですか？
+		<usetemplate name="okcancelignore" ignoretext="会話から抜ける前の確認" yestext="はい" notext="いいえ"/>
+	</notification>
+	<notification name="NewAOSet">
+		新しいＡＯセットの名前を指定します。
+（名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。）
+		<form name="form">
+			<input name="message">
+				新しいＡＯセット
+			</input>
+		</form>
+	</notification>
+	<notification name="NewAOCantContainNonASCII">
+		「[AO_SET_NAME]」という名前のＡＯセットを作成することができませんでした。
+名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="RenameAOMustBeASCII">
+		ＡＯセット「[AO_SET_NAME]」を名前変更することができませんでした。
+名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="RemoveAOSet">
+		リストからＡＯセット「[AO_SET_NAME]」を削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="削除する" notext="キャンセル"/>
+	</notification>
+	<notification name="AOForeignItemsFound">
+		アニメーションオーバーライダーは、構成に属さない項目を少なくとも１つ見つけました。
+移動されたアイテムがないか、「遺失物」フォルダを確認してください。
+	</notification>
+	<notification name="AOImportSetAlreadyExists">
+		すでにその名前のアニメーションセットは存在しています。
+	</notification>
+	<notification name="AOImportPermissionDenied">
+		ノートカードを読み取るための十分な権限がありません。
+	</notification>
+	<notification name="AOImportComplete">
+		アニメーションオーバーライダーのノートカードのインポートが完了しました！
+	</notification>
+	<notification name="AOImportCreateSetFailed">
+		インポートセット作成時にエラーが発生しました。
+	</notification>
+	<notification name="AOImportDownloadFailed">
+		ノートカードをダウンロードできませんでした。
+	</notification>
+	<notification name="AOImportNoText">
+		ノートカードが空であるか、読み取り不能です。
+	</notification>
+	<notification name="AOImportNoFolder">
+		アニメーションを読み取るフォルダーが見つかりませんでした。
+	</notification>
+	<notification name="AOImportNoStatePrefix">
+		ノートカードの[LINE]行目には有効な[ステート接頭辞がありません。
+	</notification>
+	<notification name="AOImportNoValidDelimiter">
+		ノートカードの[LINE]行目には有効な]デリミタがありません。
+	</notification>
+	<notification name="AOImportStateNameNotFound">
+		ステート名[NAME]が見つかりません。
+	</notification>
+	<notification name="AOImportAnimationNotFound">
+		アニメーション[NAME]が見つかりませんでした。インポートしたノートカードと同じフォルダーに存在することを確認してください。
+	</notification>
+	<notification name="AOImportInvalid">
+		ノートカードには使用可能なデータが含まれていませんでした。インポートを中止します。
+	</notification>
+	<notification name="AOImportRetryCreateSet">
+		アニメーションセット[NAME]のインポートフォルダを作成できませんでした。再試行しています…。
+	</notification>
+	<notification name="AOImportAbortCreateSet">
+		アニメーションセット[NAME]のインポートフォルダを作成できませんでした。中断します。
+	</notification>
+	<notification name="AOImportLinkFailed">
+		アニメーション「[NAME]」のアニメーションリンクの作成に失敗しました！
 	</notification>
 </notifications>

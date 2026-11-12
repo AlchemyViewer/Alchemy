@@ -48,6 +48,7 @@
 		<combo_box label="画像レイヤー" name="layer_types">
 			<combo_box.item label="カラー" name="Colors"/>
 			<combo_box.item label="色深度" name="Depth"/>
+			<combo_box.item name="Depth24" label="色深度（２４ビット）"/>
 		</combo_box>
 		<check_box label="インターフェース" name="ui_check"/>
 		<check_box label="L$残高" name="balance_check"/>

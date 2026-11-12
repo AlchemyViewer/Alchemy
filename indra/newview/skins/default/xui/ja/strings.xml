@@ -5761,7 +5761,7 @@ https://alchemyviewer.org/downloads からビューアを再インストール�
 		住人はこのリージョンを訪問できません。
 	</string>
 	<string name="UserDictionary">
-		[User]
+		［ユーザー］
 	</string>
 	<string name="experience_tools_experience">
 		体験
@@ -5975,4 +5975,33 @@ www.secondlife.com のウェブサイトに接続できるかご確認くださ�
 	<string name="AutoResponseModeNonFriendsDefault">
 		あなたがメッセージを送った住人は、[APP_NAME]ビューアの「自動応答モード」を有効にしており、邪魔されないよう要求しています。あなたのメッセージは、後で閲覧できるように住人のＩＭパネルに表示されます。
 	</string>
+	<string name="AboutSystem">
+		CPU：[CPU]
+メモリ：[MEMORY_MB] MB
+並列数：[CONCURRENCY]
+OSのバージョン：[OS_VERSION]
+グラフィックカードのメーカー：[GRAPHICS_CARD_VENDOR]
+グラフィックカード：[GRAPHICS_CARD]
+	</string>
+	<string name="AgniGridLabelShort">Agni（本番）</string>
+	<string name="AditiGridLabelShort">Aditi（ベータ）</string>
+	<string name="CompressingInventoryCache">インベントリのキャッシュを圧縮しています…</string>
+	<string name="ShutdownCleanup">リソースを解放しています…</string>
+	<string name="ReorderClothingTooltip">ドラッグするか矢印を使ってレイヤーを並べ替えます</string>
+	<string name="ServerUnavailable">サービスを利用できません。</string>
+	<string name="ScriptTakeMoneyCaution">オブジェクト「&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;」は、あなたのリンデンドルアカウントへの完全なアクセスを要求しています。アクセスを許可すると、いつでもアカウントから資金を引き出したり、アカウントを完全に空にしたりすることができ、追加の警告なしに継続的に資金を引き出すことが可能になります。</string>
+	<string name="PrivilegedLandAccessCaution">オブジェクト「&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;」は、あなたの土地への特権的なアクセスを要求しています。アクセスを許可すると、追加の警告なしにあなたの土地を売却される可能性があります。</string>
+	<string name="PrivilegedLandAccess">代理で土地を売却する</string>
+	<string name="Validator_ShouldBeNewLineOrASCIINoPipe">[NR]文字目の文字[CH]は、表示可能なASCII文字（パイプを除く）か改行である必要があります</string>
+	<string name="InventoryNoMaterial">インベントリ内にこのマテリアルの複製がありません。</string>
+	<string name="MBFreezeDetected">
+		[APP_NAME]がフリーズしたようです。この問題が頻繁に発生する場合は、https://support.secondlife.com からサポートにお問い合わせください。
+	</string>
+	<string name="New Settings">新しい自然環境の設定</string>
+	<string name="AvatarBirthDateFormatFull">[year,datetime,slt]年[mthnum,datetime,slt]月[day,datetime,slt]日</string>
+	<string name="ExternalEditorFailedToStart">WebSocketサーバーを開始できませんでした。ExternalWebsocketSyncEnableの設定がオンになっていることを確認してください。</string>
+	<string name="VSCodeLaunchFailed">VS Codeを起動できませんでした。「code」コマンドがPATHに含まれていることを確認してください。</string>
+	<string name="Space">スペース</string>
+	<string name="Command_Poser_Label">ポーザー</string>
+	<string name="Command_Poser_Tooltip">アバターとアニメーションオブジェクトにポーズをつけます。</string>
 </strings>

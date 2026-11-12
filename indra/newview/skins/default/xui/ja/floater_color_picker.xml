@@ -34,7 +34,7 @@
 		輝度：
 	</text>
 	<text name="hex_text">
-		Hex #
+		ＨＥＸ #
 	</text>
 	<check_box label="すぐ適用" name="apply_immediate"/>
 	<button label="ＯＫ" label_selected="ＯＫ" name="select_btn"/>

@@ -40,5 +40,17 @@
 	<button label="再起動のスケジュールを管理…"  name="manage_restart_btn"/>
 	<panel name="Combat">
 		<check_box label="ダメージを許可" name="allow_damage_check"/>
+		<text name="access_text" label="死亡時">
+			死亡時：
+		</text>
 	</panel>
+	<text name="estate_id_lbl">
+		不動産ＩＤ：
+	</text>
+	<line_editor name="estate_id" initial_value="不明"/>
+	<text name="grid_position_lbl">
+		グリッドの位置：
+	</text>
+	<line_editor name="grid_position_x" default_text="なし"/>
+	<line_editor name="grid_position_y" default_text="なし"/>
 </panel>

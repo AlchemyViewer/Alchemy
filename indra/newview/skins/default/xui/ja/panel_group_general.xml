@@ -50,4 +50,5 @@
 		</combo_box>
 		<check_box label="検索に表示" name="show_in_group_list" tool_tip="このグループを検索結果に表示させます。"/>
 	</panel>
+	<check_box name="receive_chat" label="グループＩＭを受信" tool_tip="このグループのグループチャットに参加するかどうかの設定を行います。"/>
 </panel>

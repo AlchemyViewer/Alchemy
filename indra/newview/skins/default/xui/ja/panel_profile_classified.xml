@@ -82,7 +82,10 @@
 						<button label="現在地に設定" name="set_to_curr_location_btn"/>
 						<text name="category_label" value="カテゴリ："/>
 						<text name="content_type_label" value="コンテンツの種類："/>
-						<icons_combo_box label="Generalコンテンツ" name="content_type_edit"/>
+						<icons_combo_box label="Generalコンテンツ" name="content_type_edit">
+							<icons_combo_box.item name="mature_ci" label="Moderateコンテンツ"/>
+							<icons_combo_box.item name="pg_ci" label="Generalコンテンツ"/>
+						</icons_combo_box>
 						<check_box label="毎週自動更新" name="auto_renew_edit"/>
 					</panel>
 				</panel>

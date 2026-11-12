@@ -116,6 +116,9 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			許可された能力
 		</text>
 		<scroll_list name="role_allowed_actions" tool_tip="各能力の詳細は、能力のタブをご覧ください。"/>
+		<text name="members_not_loaded">
+			メンバーが読み込まれていません
+		</text>
 	</panel>
 	<panel name="roles_header">
 		<text_editor name="role_action_description">

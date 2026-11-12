@@ -39,9 +39,9 @@
 			<text name="inventory_header">
 				Inventory:
 			</text>
-			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
-			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
-			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
+			<check_box label="新しくインベントリに送られて来たアイテムを自動的に受け取る" name="Auto_Accept_New_Inventory"/>
+			<check_box label="新しいアイテムを受け取った時に、自動的にインベントリフォルダを開いて表示する" name="Show_In_Inventory"/>
+			<check_box label="ノートカード、画像、ランドマークを受け取った時にすぐに表示する" name="Show_New_Inventory"/>
 			<text name="block_list_label">
 				（ブロックした人物やオブジェクト）
 			</text>

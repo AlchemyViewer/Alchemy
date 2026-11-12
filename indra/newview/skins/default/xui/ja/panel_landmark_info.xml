@@ -47,4 +47,7 @@
 			</panel>
 		</panel>
 	</scroll_container>
+	<string name="acquired_date_ampm">
+		[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）　[ampm,datetime,slt][hour12,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]
+	</string>
 </panel>

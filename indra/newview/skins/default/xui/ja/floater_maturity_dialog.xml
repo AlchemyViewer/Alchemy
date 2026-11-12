@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_maturity_dialog" title="レーティング">
+	<text name="location_rated_lbl">
+		選択した場所のレーティングはAdultです。
+	</text>
+	<text name="current_maturity_lbl">
+		現在のレーティング設定にはAdultコンテンツが含まれていません。許可すると設定が更新されます。
+	</text>
+	<button name="continue_btn" label="コンテンツを許可"/>
+	<button name="cancel_btn" label="キャンセル"/>
+</floater>

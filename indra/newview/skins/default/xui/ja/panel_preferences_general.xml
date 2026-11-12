@@ -65,4 +65,16 @@
 	<text_editor name="do_not_disturb_response">
 		ログイン後に変更できます。
 	</text_editor>
+	<text name="time_format_textbox">
+		時刻フォーマット：
+	</text>
+	<combo_box name="time_format_combobox">
+		<combo_box.item name="12H" label="午後1：00"/>
+		<combo_box.item name="24H" label="13：00"/>
+	</combo_box>
+	<combo_box name="group_title">
+		<combo_box.item name="no_tags" label="グループタグを表示しない"/>
+		<combo_box.item name="my_tag" label="自分のグループタグのみ"/>
+		<combo_box.item name="all_tags" label="すべてのグループタグ"/>
+	</combo_box>
 </panel>

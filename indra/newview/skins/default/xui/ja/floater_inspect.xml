@@ -8,7 +8,36 @@
 		<scroll_list.columns label="所有者" name="owner_name"/>
 		<scroll_list.columns label="制作者" name="creator_name"/>
 		<scroll_list.columns label="制作日" name="creation_date"/>
+		<scroll_list.columns name="description" label="説明"/>
+		<scroll_list.columns name="facecount" label="面数"/>
+		<scroll_list.columns name="vertexcount" label="頂点数"/>
+		<scroll_list.columns name="trianglecount" label="三角形の数"/>
+		<scroll_list.columns name="tramcount" label="ＴＭｅｍ"/>
+		<scroll_list.columns name="vramcount" label="ＶＲＡＭ"/>
 	</scroll_list>
 	<button label="所有者のプロフィール…" name="button owner" tool_tip="ハイライトされたオブジェクトの所有者のプロフィールを見る。"/>
 	<button label="制作者のプロフィール…" name="button creator" tool_tip="ハイライトされたオブジェクトの作成者のプロフィールを見る。"/>
+	<floater.string name="timeStampAMPM">
+		[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）　[ampm,datetime,slt][hour12,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]
+	</floater.string>
+	<floater.string name="Group">
+		（グループ）
+	</floater.string>
+	<floater.string name="stats_list">
+		統計情報：
+
+[NUM_OBJECTS]個のオブジェクト、[NUM_PRIMS]個のプリム
+
+面数：[NUM_FACES]面
+表示面：[NUM_VISIBLE_FACES]面
+頂点数：[NUM_VERTICES]個
+三角形の数：[NUM_TRIANGLES]個
+複雑度：[COMPLEXITY]
+
+テクスチャ：[NUM_TEXTURES]枚
+ＴＭｅｍ：[TEXTURE_MEMORY]㎅
+ＶＲＡＭ：[VRAM_USAGE]㎅
+	</floater.string>
+	<text_editor name="linksetstats_text" value="（読み込んでいます…）"/>
+	<menu_button name="options_btn" tool_tip="オプションを表示します。"/>
 </floater>

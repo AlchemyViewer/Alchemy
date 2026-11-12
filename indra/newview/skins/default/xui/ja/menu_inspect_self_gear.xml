@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="Gear Menu">
+	<context_menu name="Take Off >" label="取り外す">
+		<context_menu name="Clothes >" label="衣装">
+			<menu_item_call name="Shirt" label="シャツ"/>
+			<menu_item_call name="Pants" label="ズボン"/>
+			<menu_item_call name="Skirt" label="スカート"/>
+			<menu_item_call name="Shoes" label="靴"/>
+			<menu_item_call name="Socks" label="靴下"/>
+			<menu_item_call name="Jacket" label="ジャケット"/>
+			<menu_item_call name="Gloves" label="手袋"/>
+			<menu_item_call name="Self Undershirt" label="下着（上半身）"/>
+			<menu_item_call name="Self Underpants" label="下着（下半身）"/>
+			<menu_item_call name="Self Tattoo" label="タトゥ"/>
+			<menu_item_call name="Self Alpha" label="アルファ"/>
+			<menu_item_call name="All Clothes" label="すべての衣装"/>
+		</context_menu>
+		<context_menu name="Inspect Self Detach HUD" label="ＨＵＤ"/>
+		<context_menu name="Inspect Self Detach" label="取り外す"/>
+		<menu_item_call name="Detach All" label="すべて取り外す"/>
+	</context_menu>
+	<menu_item_call name="Chenge Outfit" label="アウトフィットの変更"/>
+	<menu_item_call name="Edit Outfit" label="アウトフィットの編集"/>
+	<menu_item_call name="Edit My Shape" label="シェイプの編集"/>
+	<menu_item_call name="Friends..." label="フレンド"/>
+	<menu_item_call name="Groups..." label="グループ"/>
+	<menu_item_call name="Profile..." label="プロフィール"/>
+	<menu_item_call name="Debug..." label="テクスチャのデバッグ"/>
+	<menu_item_call name="Dump XML" label="ＸＭＬとしてダンプ"/>
+</toggleable_menu>

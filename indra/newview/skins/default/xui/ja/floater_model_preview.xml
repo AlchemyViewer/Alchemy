@@ -361,6 +361,18 @@
 					<button label="キャンセル" name="decompose_cancel"/>
 					<button label="分析" name="Decompose"/>
 					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
+					<text name="method_label">
+						ステップ２：殻への変換（オプション）
+					</text>
+					<text name="analysis_method_label">
+						方法：
+					</text>
+					<text name="quality_label">
+						品質：
+					</text>
+					<text name="smooth_method_label">
+						滑らかさ：
+					</text>
 				</panel>
 			</panel>
 			<!-- MODIFIERS PANEL -->

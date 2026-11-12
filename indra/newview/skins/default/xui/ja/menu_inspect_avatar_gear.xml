@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="Gear Menu">
+	<menu_item_call name="view_profile" label="プロフィールの表示"/>
+	<menu_item_call name="im" label="ＩＭ"/>
+	<menu_item_call name="teleport" label="テレポート"/>
+	<menu_item_call name="request_teleport" label="テレポートのリクエスト"/>
+	<menu_item_call name="call" label="ボイスコール"/>
+	<menu_item_call name="add_friend" label="フレンド登録"/>
+	<menu_item_call name="invite_to_group" label="グループに招待"/>
+	<context_menu name="manage_menu">
+		<menu_item_call name="block" label="ブロック"/>
+		<menu_item_call name="unblock" label="ブロック解除"/>
+		<menu_item_call name="report" label="嫌がらせの報告"/>
+		<menu_item_call name="freeze" label="フリーズ"/>
+		<menu_item_call name="eject" label="追放"/>
+		<menu_item_call name="csr" label="ＣＳＲ"/>
+		<menu_item_call name="debug" label="テクスチャのデバッグ"/>
+		<menu_item_call name="Dump XML" label="ＸＭＬとしてダンプ"/>
+	</context_menu>
+	<menu_item_call name="zoom_in" label="ズームイン"/>
+	<menu_item_call name="find_on_map" label="マップ"/>
+	<menu_item_call name="share" label="共有"/>
+	<menu_item_call name="pay" label="支払う"/>
+</toggleable_menu>

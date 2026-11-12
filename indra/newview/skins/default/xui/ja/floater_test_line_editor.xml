@@ -27,4 +27,10 @@
 	<!-- "search_editor" is a specialized line_editor that shows read-only
 help text until the user clicks in the widget. -->
 	<search_editor label="検索語句を入力" name="search editor" tool_tip="エディタを検索"/>
+	<line_editor name="left_pad_editor1">
+		右側テキスト余白75px
+	</line_editor>
+	<line_editor name="left_pad_editor2">
+		左側テキスト余白25px、右側75px
+	</line_editor>
 </floater>

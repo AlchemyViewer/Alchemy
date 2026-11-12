@@ -27,4 +27,8 @@
 		午前　24：00　PST
 	</text>
 	<button name="media_toggle_btn" tool_tip="すべてのメディア（音楽、ビデオ、Webページ）を再生・停止します。"/>
+	<panel.string name="time_ampm">
+		[ampm, datetime, slt]　[hour12, datetime, slt]：[min, datetime, slt]　[timezone,datetime, slt]
+	</panel.string>
+	<text name="FPSText" tool_tip="現在のフレームレート"/>
 </panel>
