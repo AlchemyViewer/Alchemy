@@ -196,7 +196,7 @@ cmake -S indra --list-presets
 
 Preset names follow the pattern `<generator>[-<arch>][-os]`:
 
-- **`-os` suffix** — open-source only. Excludes proprietary components (KDU JPEG2000 codec, FMOD audio, and other non-free libraries).
+- **`-os` suffix** — open-source only. Excludes proprietary components (FMOD audio and other non-free libraries).
 - **No `-os` suffix** — sets `AL_ENABLE_PROPRIETARY=ON`. Requires licensed source for the proprietary components and is only useful if you have access to them.
 
 Most contributors want the `-os` variants.
@@ -341,10 +341,9 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 |:-------------------|:--------|:--------------------------------------------------------------------------|
 | `AL_USE_PNJ2K`     | ON in proprietary builds | Decode and encode textures with [pnj2k](https://github.com/AlchemyViewer/pnj2k), the Rust codec |
 | `AL_USE_OPENJPEG`  | ON in `-os` builds | OpenJPEG                                                       |
-| `AL_USE_KDU`       | OFF     | Kakadu (needs `AL_ENABLE_PROPRIETARY`)                                    |
 | `PNJ2K_SOURCE_DIR` | empty   | A checkout of pnj2k to build in place of the pinned revision              |
 
-A tree has one codec, and installs, builds and tests that one alone. Turning another on holds the tree's default off, so one option switches: `-DAL_USE_PNJ2K=ON` in an `-os` build, `-DAL_USE_OPENJPEG=ON` or `-DAL_USE_KDU=ON` in a proprietary one. OpenJPEG and Kakadu both on stop the configure, and so do all three off.
+A tree has one codec, and installs, builds and tests that one alone. Turning the other on holds the tree's default off, so one option switches: `-DAL_USE_PNJ2K=ON` in an `-os` build, `-DAL_USE_OPENJPEG=ON` in a proprietary one. Both off stops the configure.
 
 cargo builds pnj2k's C API as a static library from `indra/rust/pnj2k_libc`, which takes the revision of pnj2k's repository its `Cargo.lock` pins and fetches it on the first build, with the access to AlchemyViewer's repositories the private registry below takes. Where cargo cannot reach a repository git can, set `CARGO_NET_GIT_FETCH_WITH_CLI=true`.
 
@@ -357,7 +356,6 @@ Neither Rust static library, pnj2k's or Velopack's, is built with LTO, and the b
 | Option           | Default | Description                                                                 |
 |:-----------------|:--------|:----------------------------------------------------------------------------|
 | `AL_ENABLE_PROPRIETARY` | OFF | Allow the non-free libraries below                                     |
-| `AL_USE_KDU`     | OFF     | Kakadu JPEG2000 codec (needs `AL_ENABLE_PROPRIETARY`)                       |
 | `AL_USE_DISCORD` | ON      | Discord rich presence through the Social SDK (needs `AL_ENABLE_PROPRIETARY` and access to the private registry; held off on Linux arm64, which the SDK is not built for) |
 
 Some proprietary ports come from AlchemyViewer's private vcpkg registry,

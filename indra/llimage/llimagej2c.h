@@ -102,7 +102,6 @@ protected:
     friend class LLImageJ2CImpl;
     friend class LLImageJ2COJ;
     friend class ALImageJ2CRS;
-    friend class LLImageJ2CKDU;
     void decodeFailed();
     void updateRawDiscardLevel();
 

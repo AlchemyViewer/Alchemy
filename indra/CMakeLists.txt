@@ -160,18 +160,11 @@ option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 # Proprietary Libraries
 option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
-cmake_dependent_option(
-  AL_USE_KDU
-  "Enable support for the Kakadu JPEG2000 decoding library"
-  OFF
-  "AL_ENABLE_PROPRIETARY"
-  OFF
-)
 
-# The JPEG 2000 codec, one of three, and the only one a tree installs,
-# builds or tests. A proprietary build's is pnj2k, the Rust codec (see
-# cmake/Pnj2k.cmake), and an open-source build's is OpenJPEG, unless
-# another is asked for, which holds that one off. PNJ2K_SOURCE_DIR names a
+# The JPEG 2000 codec, one of two, and the only one a tree installs, builds
+# or tests. A proprietary build's is pnj2k, the Rust codec (see
+# cmake/Pnj2k.cmake), and an open-source build's is OpenJPEG, unless the
+# other is asked for, which holds that one off. PNJ2K_SOURCE_DIR names a
 # checkout of pnj2k to build in place of the revision rust/pnj2k_libc pins.
 if(AL_ENABLE_PROPRIETARY)
   option(AL_USE_OPENJPEG "Decode and encode JPEG 2000 with OpenJPEG" OFF)
@@ -179,7 +172,7 @@ if(AL_ENABLE_PROPRIETARY)
     AL_USE_PNJ2K
     "Decode and encode JPEG 2000 with pnj2k, the Rust codec"
     ON
-    "NOT AL_USE_OPENJPEG;NOT AL_USE_KDU"
+    "NOT AL_USE_OPENJPEG"
     OFF
   )
 else()
@@ -192,17 +185,8 @@ else()
     OFF
   )
 endif()
-if(AL_USE_OPENJPEG AND AL_USE_KDU)
-  message(
-    FATAL_ERROR
-    "AL_USE_OPENJPEG and AL_USE_KDU are both on: a tree builds one JPEG 2000 codec"
-  )
-endif()
-if(NOT (AL_USE_PNJ2K OR AL_USE_OPENJPEG OR AL_USE_KDU))
-  message(
-    FATAL_ERROR
-    "No JPEG 2000 codec is on: turn on AL_USE_PNJ2K, AL_USE_OPENJPEG or AL_USE_KDU"
-  )
+if(NOT (AL_USE_PNJ2K OR AL_USE_OPENJPEG))
+  message(FATAL_ERROR "No JPEG 2000 codec is on: turn on AL_USE_PNJ2K or AL_USE_OPENJPEG")
 endif()
 set(PNJ2K_SOURCE_DIR "" CACHE PATH "A checkout of pnj2k to build in place of the pinned revision")
 
@@ -407,10 +391,6 @@ if(AL_BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 
-if(AL_USE_KDU)
-  list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
-endif()
-
 if(AL_USE_DISCORD)
   list(APPEND VCPKG_MANIFEST_FEATURES "discord")
 endif()
@@ -586,7 +566,6 @@ set(
   Harfbuzz
   Hunspell
   ICU
-  LLKDU
   NDOF
   Pnj2k
   SDL3
@@ -640,7 +619,6 @@ add_subdirectory(llcharacter)
 add_subdirectory(llcommon)
 add_subdirectory(llcorehttp)
 add_subdirectory(llimage)
-add_subdirectory(llkdu)
 if(AL_USE_OPENJPEG)
   add_subdirectory(llimagej2coj)
 endif()

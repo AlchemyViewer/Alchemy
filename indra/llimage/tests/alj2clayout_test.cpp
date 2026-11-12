@@ -360,7 +360,6 @@ namespace
         CHECK(layout.mLength == S32(codestream.size()));
     }
 
-#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a single layer codestream's length is its first tile-part's", "[alj2clayout]")
     {
         LLPointer<LLImageRaw> raw = makeTexture(256, 4, 2);
@@ -372,7 +371,6 @@ namespace
         CHECK(layout.mLayers == 1);
         CHECK(layout.mLength == S32(codestream.size()));
     }
-#endif
 
     TEST_CASE("alj2clayout: the first packet's worth of bytes holds the whole layout", "[alj2clayout]")
     {
@@ -428,7 +426,6 @@ namespace
         CHECK_FALSE(ALJ2CLayout::parse(codestream.data(), S32(codestream.size())).isValid());
     }
 
-#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a codestream of several tiles leaves its length unknown", "[alj2clayout]")
     {
         LLPointer<LLImageRaw> raw = makeTexture(256, 3, 7);
@@ -440,7 +437,6 @@ namespace
         CHECK_FALSE(layout.isValid());
         CHECK(layout.calcDataSize(1) == 0);
     }
-#endif
 
     TEST_CASE("alj2clayout: an image learns its layout as the data comes in", "[alj2clayout]")
     {
@@ -521,7 +517,6 @@ namespace
         }
     }
 
-#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a single layer codestream decodes within the quality bar at every target", "[alj2clayout]")
     {
         for (S32 size : { 512, 1024 })
@@ -531,5 +526,4 @@ namespace
             checkTargets(encodeSingleLayer(raw), size, 3);
         }
     }
-#endif
 }

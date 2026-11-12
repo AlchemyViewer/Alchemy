@@ -44,9 +44,7 @@ target_sources(
 )
 
 target_link_libraries(llimage PRIVATE al::flags)
-if(AL_USE_KDU)
-  target_link_libraries(llimage PUBLIC llkdu)
-elseif(AL_USE_PNJ2K)
+if(AL_USE_PNJ2K)
   target_link_libraries(llimage PUBLIC llimagej2crs)
 else()
   target_link_libraries(llimage PUBLIC llimagej2coj)
@@ -74,8 +72,7 @@ if(AL_BUILD_TESTS)
   # The library itself: the locks images are read and written under,
   # LLImageJ2C over the build's codec, and the J2C codestream layout and the
   # byte targets it gives. The layout's cases on one layer and on several
-  # tiles encode through the build's codec's own API, pnj2k's or OpenJPEG's,
-  # and are left out under Kakadu.
+  # tiles encode through the build's codec's own API, pnj2k's or OpenJPEG's.
   al_add_test_binary(
     llimage_tests
     PROJECT llimage

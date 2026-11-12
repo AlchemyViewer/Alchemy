@@ -7,9 +7,9 @@
 **Data/IO layer:**
 - **llfilesystem** - Virtual filesystem and asset cache
 - **llxml** - XML parsing utilities (depends on llfilesystem)
-- **llimage** - Image decoding/encoding (JPEG, PNG, TGA, J2C via pnj2k, OpenJPEG or KDU)
+- **llimage** - Image decoding/encoding (JPEG, PNG, TGA, J2C via pnj2k or OpenJPEG)
 - **llimagej2crs** - JPEG 2000 decoding and encoding with pnj2k, the Rust codec, over its C API (`ALImageJ2CRS`, an `LLImageJ2CImpl` of its own): a proprietary build's codec, and an open-source build's with `AL_USE_PNJ2K`. Uploads are encoded in Second Life's upload profile, coded and resized by what the image holds (`LLImageJ2C::setEncodeContent`, `EJ2CContent`: colour, data, normal map; `LLImageJ2C::scaleForEncode`). Corrosion builds the C API as a static library (`cmake/Pnj2k.cmake`), rust's pnj2k_libc, or a checkout's own pnj2k-capi where `PNJ2K_SOURCE_DIR` names one; each thread keeps one pnj2k decoder and one encoder
-- **llimagej2coj** / **llkdu** - The other JPEG 2000 codec implementations: OpenJPEG, an open-source build's codec, and a proprietary build's with `AL_USE_OPENJPEG`; and KDU, proprietary, with `AL_USE_KDU`. A tree installs, builds and tests one codec, and llimage's tests encode through that one's API where LLImageJ2C does not write the codestream they need
+- **llimagej2coj** - JPEG 2000 decoding and encoding with OpenJPEG: an open-source build's codec, and a proprietary build's with `AL_USE_OPENJPEG`. A tree installs, builds and tests one codec, and llimage's tests encode through that one's API where LLImageJ2C does not write the codestream they need
 
 **Network layer:**
 - **llcorehttp** - Async HTTP client library (libcurl + OpenSSL). Used pervasively for API calls and asset fetches. Also the WebSocket server external editors connect to (Boost.Beast)

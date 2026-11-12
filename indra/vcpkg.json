@@ -210,12 +210,6 @@
         "hunspell"
       ]
     },
-    "kdu": {
-      "description": "Build with support for Kakadu JPEG2000",
-      "dependencies": [
-        "kdu"
-      ]
-    },
     "openal": {
       "description": "Build with support for the OpenAL Soft audio engine",
       "dependencies": [
