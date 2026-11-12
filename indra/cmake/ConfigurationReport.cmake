@@ -53,6 +53,8 @@ set(
   AL_ENABLE_TRACY_GPU
   AL_BUILD_TRACY_GUI
   AL_USE_VELOPACK
+  AL_USE_PNJ2K
+  AL_USE_OPENJPEG
   AL_ENABLE_RELEASE_DEBUG_LOGGING
   AL_BUILD_PACKAGE
   AL_BUILD_ORACLE
@@ -222,6 +224,8 @@ function(al_configuration_report)
 
   if(AL_USE_KDU)
     _al_report_row("JPEG2000" "Kakadu")
+  elseif(AL_USE_PNJ2K)
+    _al_report_row("JPEG2000" "pnj2k")
   else()
     _al_report_row("JPEG2000" "OpenJPEG")
   endif()

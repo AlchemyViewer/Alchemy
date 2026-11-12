@@ -19,7 +19,7 @@ Every platform needs a C++ toolchain plus:
 
 - **CMake** 4.0+
 - **Git**
-- **Rust** — only for the Velopack update client (`-DAL_USE_VELOPACK=ON`), whose C API the build compiles from `indra/rust`
+- **Rust** 1.89+, installed with [rustup](https://rustup.rs) — only for a build with [pnj2k](https://github.com/AlchemyViewer/pnj2k), the JPEG 2000 codec of proprietary builds, or with the Velopack update client (`-DAL_USE_VELOPACK=ON`); cargo compiles both from `indra/rust`. An open-source build, whose codec is OpenJPEG, needs none
 - **.NET SDK** — only for Velopack installers; on Linux the AppImage also needs `mksquashfs` (`squashfs-tools`)
 - **Python** 3 — only for the tests that spawn a Python peer (see [Running tests](#running-tests))
 
@@ -34,7 +34,7 @@ Install the following:
 - [Visual Studio 2026](https://visualstudio.microsoft.com/vs/community/) — select the **Desktop development with C++** workload
 - [CMake](https://cmake.org/download/) 4.0+
 - [Git for Windows](https://git-scm.com/install/windows)
-- [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe` and accept defaults (Velopack only)
+- [Rust](https://rust-lang.org/tools/install/) — run `rustup-init.exe` and accept defaults (pnj2k and Velopack only)
 - [.NET SDK](https://dotnet.microsoft.com/en-us/download) (packaging only)
 
 Sanity-check in a fresh terminal:
@@ -55,7 +55,7 @@ brew install git cmake zip unzip curl pkgconf automake autoconf autoconf-archive
     gettext libtool rustup dotnet
 ```
 
-Put Homebrew's rustup on the path and install a stable toolchain (Velopack only). The formula is keg-only and no longer provides `rustup-init`; add the `export` to your shell profile too:
+Put Homebrew's rustup on the path and install a stable toolchain (pnj2k and Velopack only). The formula is keg-only and no longer provides `rustup-init`; add the `export` to your shell profile too:
 
 ```
 export PATH="$(brew --prefix rustup)/bin:$PATH"
@@ -65,6 +65,12 @@ rustup default stable
 ### Linux
 
 Install system packages for your distro. Media plays through GStreamer; the VLC media plugin is left out on Linux unless configured with `-DAL_BUILD_VLC_PLUGIN=ON`, which also needs LibVLC's development package (`libvlc` on Arch, `libvlc-dev` on Debian and Ubuntu, `vlc-devel` on Fedora and openSUSE).
+
+A build with pnj2k or Velopack takes Rust from [rustup](https://rustup.rs) on every distro, since a distro's own `rustc` may be older than 1.89:
+
+```
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
 <details>
 <summary>Arch</summary>
@@ -329,6 +335,23 @@ Options are defined in [`indra/CMakeLists.txt`](../indra/CMakeLists.txt). The mo
 | `AL_USE_OPENAL`     | OFF     | OpenAL audio engine                                                  |
 | `AL_USE_FMODSTUDIO` | ON      | FMOD Studio audio engine, which takes precedence over the others (needs `AL_ENABLE_PROPRIETARY`, so off in `-os` builds, and access to the private registry) |
 
+### JPEG 2000 codec
+
+| Option             | Default | Description                                                               |
+|:-------------------|:--------|:--------------------------------------------------------------------------|
+| `AL_USE_PNJ2K`     | ON in proprietary builds | Decode and encode textures with [pnj2k](https://github.com/AlchemyViewer/pnj2k), the Rust codec |
+| `AL_USE_OPENJPEG`  | ON in `-os` builds | OpenJPEG                                                       |
+| `AL_USE_KDU`       | OFF     | Kakadu (needs `AL_ENABLE_PROPRIETARY`)                                    |
+| `PNJ2K_SOURCE_DIR` | empty   | A checkout of pnj2k to build in place of the pinned revision              |
+
+A tree has one codec, and installs, builds and tests that one alone. Turning another on holds the tree's default off, so one option switches: `-DAL_USE_PNJ2K=ON` in an `-os` build, `-DAL_USE_OPENJPEG=ON` or `-DAL_USE_KDU=ON` in a proprietary one. OpenJPEG and Kakadu both on stop the configure, and so do all three off.
+
+cargo builds pnj2k's C API as a static library from `indra/rust/pnj2k_libc`, which takes the revision of pnj2k's repository its `Cargo.lock` pins and fetches it on the first build, with the access to AlchemyViewer's repositories the private registry below takes. Where cargo cannot reach a repository git can, set `CARGO_NET_GIT_FETCH_WITH_CLI=true`.
+
+The library is built to give nothing of pnj2k's sources away: no debug information, no file or line in a panic's location, and symbols named by a hash. The last two are rustc `-Z` options, which the build turns on for that one cargo run with `RUSTC_BOOTSTRAP=1`, so a toolchain that drops either fails there. `cmake/Pnj2kAudit.cmake` then checks each new build of the library and stops the build on a path into pnj2k's sources or a symbol that spells one out.
+
+Neither Rust static library, pnj2k's or Velopack's, is built with LTO, and the build turns it off for pnj2k's cargo run whatever a profile asks. Each library carries the standard library. Without LTO both carry the same objects of it, and the macOS and Linux links, which take both libraries, take those once; with it a library carries a copy compiled again for itself, and such a link stops on duplicate symbols.
+
 ### Proprietary SDKs
 
 | Option           | Default | Description                                                                 |
@@ -551,11 +574,13 @@ dotnet tool restore
 
 ### `rustc` not found when configuring
 
-With `AL_USE_VELOPACK=ON` the build compiles Velopack's C API, `indra/rust/velopack_libc`, with cargo through [Corrosion](https://github.com/corrosion-rs/corrosion), which looks for `rustc` on the path and in `~/.cargo/bin`. Install a stable toolchain:
+A build with pnj2k, which a proprietary build takes by default, compiles its C API, `indra/rust/pnj2k_libc`, and one with `AL_USE_VELOPACK=ON` compiles Velopack's, `indra/rust/velopack_libc`, with cargo through [Corrosion](https://github.com/corrosion-rs/corrosion), which looks for `rustc` on the path and in `~/.cargo/bin`. Install a stable toolchain, 1.89 or later:
 
 ```
 rustup default stable
 ```
+
+`-DAL_USE_OPENJPEG=ON` builds a proprietary tree with OpenJPEG instead, which needs no Rust unless Velopack is on.
 
 On macOS, Homebrew's rustup keeps `rustc` and `cargo` in `$(brew --prefix rustup)/bin`, which must be on the path. A target the toolchain lacks, such as `x86_64-apple-darwin` for an x86_64 build on Apple silicon, is added with rustup while configuring; `-DRust_RUSTUP_INSTALL_MISSING_TARGET=OFF` stops that.
 

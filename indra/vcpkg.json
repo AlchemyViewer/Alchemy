@@ -87,7 +87,6 @@
       "platform": "linux"
     },
     "opengl-registry",
-    "openjpeg",
     {
       "name": "openssl",
       "features": [
@@ -235,10 +234,22 @@
         }
       ]
     },
+    "openjpeg": {
+      "description": "Build with OpenJPEG as the JPEG 2000 codec",
+      "dependencies": [
+        "openjpeg"
+      ]
+    },
     "openxr": {
       "description": "Build with support for OpenXR(experimental)",
       "dependencies": [
         "openxr-loader"
+      ]
+    },
+    "pnj2k": {
+      "description": "Build with pnj2k, the Rust JPEG 2000 codec",
+      "dependencies": [
+        "corrosion"
       ]
     },
     "sentry": {

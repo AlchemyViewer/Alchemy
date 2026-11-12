@@ -1,0 +1,31 @@
+# pnj2k's C API as the viewer links it: pnj2k-capi from pnj2k's repository at
+# the revision below, built as a static library, with include/pnj2k.h its
+# crates/pnj2k-capi/include/pnj2k.h at that revision.
+#
+# To move to a new revision: set it below, copy the header and the licences
+# from it, and run `cargo update -p pnj2k-capi` here, which moves only what
+# the new revision needs.
+[package]
+name = "pnj2k_libc"
+version = "0.1.0"
+publish = false
+description = "C API of the pnj2k JPEG 2000 codec"
+edition = "2024"
+rust-version = "1.89"
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["staticlib"]
+
+[dependencies]
+pnj2k-capi = { git = "https://github.com/AlchemyViewer/pnj2k", rev = "e7d203a5f023f349ea42986bf76bf54089f00c29" }
+
+# A workspace of its own, with its own Cargo.lock: in one workspace with
+# velopack_libc, every cargo run would fetch pnj2k's repository, a build
+# without pnj2k's included.
+[workspace]
+
+# As pnj2k's own workspace builds its C library, but for its thin LTO, which
+# cmake/Pnj2k.cmake turns off and says why.
+[profile.release]
+codegen-units = 1

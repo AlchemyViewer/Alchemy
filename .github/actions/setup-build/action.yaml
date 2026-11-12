@@ -238,6 +238,20 @@ runs:
           exit 1
         fi
 
+    # A proprietary build's JPEG 2000 codec is pnj2k, which cargo takes from
+    # its repository at the revision indra/rust/pnj2k_libc/Cargo.lock pins.
+    # cargo fetches through git, here and in the build, so that the token
+    # above reaches the repository.
+    - name: Fetch pnj2k
+      if: inputs.private-registry-token != ''
+      shell: bash
+      run: |
+        echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
+        if ! CARGO_NET_GIT_FETCH_WITH_CLI=true cargo fetch --locked --manifest-path indra/rust/pnj2k_libc/Cargo.toml; then
+          echo "::error::cargo cannot fetch pnj2k: the private registry token must read AlchemyViewer/pnj2k"
+          exit 1
+        fi
+
     - name: Install AWS CLI on macOS
       if: inputs.r2-cache-mode != '' && runner.os == 'macOS'
       shell: bash

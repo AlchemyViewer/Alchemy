@@ -27,13 +27,19 @@
 #include "alj2clayout.h"
 #include "llimagej2c.h"
 
+// The build's codec's own API, for the codestreams LLImageJ2C does not write.
+#if LL_PNJ2K
+#include "pnj2k.h"
+#elif LL_OPENJPEG
 #include "openjpeg.h"
+#endif
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <string>
 #include <vector>
 
 namespace
@@ -104,6 +110,66 @@ namespace
         return j2c;
     }
 
+#if LL_PNJ2K
+    // An LRCP codestream at half the raw size in one quality layer, which orders its packets
+    // by resolution alone, as Second Life's single-layer textures are; or the same cut into
+    // four tiles.
+    std::vector<U8> encodeSingleLayer(const LLImageRaw* raw, bool four_tiles = false)
+    {
+        const U32 size = U32(raw->getWidth());
+
+        pnj2k_source source{};
+        source.struct_size = sizeof(source);
+        source.pixels = raw->getData();
+        source.size = size_t(raw->getDataSize());
+        source.width = size;
+        source.height = size;
+        source.channels = U32(raw->getComponents());
+
+        pnj2k_layer layer{};
+        layer.struct_size = sizeof(layer);
+        layer.kind = PNJ2K_LAYER_BYTES;
+        layer.value = F64(raw->getDataSize() / 2);
+
+        pnj2k_codestream_params codestream{};
+        codestream.struct_size = sizeof(codestream);
+        codestream.fields = PNJ2K_CS_PROGRESSION | PNJ2K_CS_LAYERS;
+        codestream.progression = PNJ2K_PROGRESSION_LRCP;
+        codestream.layers = &layer;
+        codestream.layer_count = 1;
+        if (four_tiles)
+        {
+            codestream.fields |= PNJ2K_CS_TILES;
+            codestream.tile_width = size / 2;
+            codestream.tile_height = size / 2;
+        }
+
+        // Part 1's defaults for the rest: the 9/7 wavelet, five levels, the colour transform
+        // over three colour components. No quality cap, so that the layer takes its bytes.
+        pnj2k_encode_params params{};
+        params.struct_size = sizeof(params);
+        params.flags = PNJ2K_ENCODE_NO_QUALITY_CAP;
+        params.codestream = &codestream;
+
+        pnj2k_encoder* encoder = pnj2k_encoder_new(nullptr);
+        REQUIRE(encoder);
+        pnj2k_buffer out{};
+        out.struct_size = sizeof(out);
+        const pnj2k_status status = pnj2k_encode(encoder, &source, &params, &out);
+        const char* error = pnj2k_encoder_last_error(encoder);
+        const std::string why = error ? error : "";
+        std::vector<U8> bytes;
+        if (status == PNJ2K_OK)
+        {
+            bytes.assign(out.data, out.data + out.len);
+        }
+        pnj2k_buffer_free(&out);
+        pnj2k_encoder_free(encoder);
+        INFO(why);
+        REQUIRE(status == PNJ2K_OK);
+        return bytes;
+    }
+#elif LL_OPENJPEG
     struct MemoryOut
     {
         std::vector<U8> mBytes;
@@ -208,6 +274,7 @@ namespace
         out.mBytes.resize(out.mEnd);
         return out.mBytes;
     }
+#endif
 
     LLPointer<LLImageJ2C> imageFrom(const U8* data, S32 size)
     {
@@ -293,6 +360,7 @@ namespace
         CHECK(layout.mLength == S32(codestream.size()));
     }
 
+#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a single layer codestream's length is its first tile-part's", "[alj2clayout]")
     {
         LLPointer<LLImageRaw> raw = makeTexture(256, 4, 2);
@@ -304,6 +372,7 @@ namespace
         CHECK(layout.mLayers == 1);
         CHECK(layout.mLength == S32(codestream.size()));
     }
+#endif
 
     TEST_CASE("alj2clayout: the first packet's worth of bytes holds the whole layout", "[alj2clayout]")
     {
@@ -359,6 +428,7 @@ namespace
         CHECK_FALSE(ALJ2CLayout::parse(codestream.data(), S32(codestream.size())).isValid());
     }
 
+#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a codestream of several tiles leaves its length unknown", "[alj2clayout]")
     {
         LLPointer<LLImageRaw> raw = makeTexture(256, 3, 7);
@@ -370,6 +440,7 @@ namespace
         CHECK_FALSE(layout.isValid());
         CHECK(layout.calcDataSize(1) == 0);
     }
+#endif
 
     TEST_CASE("alj2clayout: an image learns its layout as the data comes in", "[alj2clayout]")
     {
@@ -450,6 +521,7 @@ namespace
         }
     }
 
+#if LL_PNJ2K || LL_OPENJPEG
     TEST_CASE("alj2clayout: a single layer codestream decodes within the quality bar at every target", "[alj2clayout]")
     {
         for (S32 size : { 512, 1024 })
@@ -459,4 +531,5 @@ namespace
             checkTargets(encodeSingleLayer(raw), size, 3);
         }
     }
+#endif
 }

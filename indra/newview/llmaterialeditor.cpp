@@ -2008,13 +2008,13 @@ static void pack_textures(
     if (normal_img)
     {
         // create a losslessly compressed version of the normal map
-        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, 2048, false, true);
+        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, EJ2CContent::Normal, 2048, false, true);
         LL_DEBUGS("MaterialEditor") << "Normal: " << normal_j2c->getDataSize() << LL_ENDL;
     }
 
     if (mr_img)
     {
-        mr_j2c = LLViewerTextureList::convertToUploadFile(mr_img);
+        mr_j2c = LLViewerTextureList::convertToUploadFile(mr_img, EJ2CContent::Data);
         LL_DEBUGS("MaterialEditor") << "Metallic/Roughness: " << mr_j2c->getDataSize() << LL_ENDL;
     }
 
