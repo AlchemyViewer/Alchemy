@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="particle_editor_floater" title="パーティクルエディター">
+	<layout_stack name="master_stack">
+		<layout_panel name="layout_master">
+			<accordion name="accordion_master">
+				<accordion_tab name="burst_tab" title="バースト／寿命">
+					<panel name="burst_panel">
+						<slider name="burst_rate" label="レート："/>
+						<slider name="burst_count" label="数："/>
+						<slider name="burst_radius" label="半径："/>
+						<slider name="burst_speed_max" label="最大速度："/>
+						<slider name="burst_speed_min" label="最小速度："/>
+						<slider name="source_max_age" label="発生源の最大寿命："/>
+						<slider name="particle_max_age" label="パーティクルの最大寿命："/>
+					</panel>
+				</accordion_tab>
+				<accordion_tab name="angle_tab" title="スケール／角度">
+					<panel name="angle_panel">
+						<slider name="scale_start_x" label="開始スケールX："/>
+						<slider name="scale_start_y" label="開始スケールY："/>
+						<slider name="scale_end_x" label="終了スケールX："/>
+						<slider name="scale_end_y" label="終了スケールY："/>
+						<slider name="angle_begin" label="開始角度："/>
+						<slider name="angle_end" label="終了角度："/>
+					</panel>
+				</accordion_tab>
+				<accordion_tab name="alpha_tab" title="アルファ／グロー">
+					<panel name="alpha_panel">
+						<slider name="start_alpha" label="開始アルファ："/>
+						<slider name="end_alpha" label="終了アルファ："/>
+						<slider name="start_glow" label="開始グロー："/>
+						<slider name="end_glow" label="終了グロー："/>
+					</panel>
+				</accordion_tab>
+				<accordion_tab name="omega_tab" title="加速度／角速度">
+					<panel name="omega_panel">
+						<text name="Acceleration_Label">
+							加速度：
+						</text>
+						<text name="Omega_Label">
+							角速度：
+						</text>
+					</panel>
+				</accordion_tab>
+				<accordion_tab name="color_tab" title="色／テクスチャ">
+					<panel name="color_panel">
+						<texture_picker name="texture_picker" label="テクスチャ"/>
+						<color_swatch name="start_color_selector" label="開始色"/>
+						<color_swatch name="end_color_selector" label="終了色"/>
+						<combo_box name="blend_func_src_combo">
+							<combo_box.item name="blend_one" label="ブレンド：1"/>
+							<combo_box.item name="blend_zero" label="ブレンド：0"/>
+							<combo_box.item name="blend_dest_color" label="ブレンド：出力先の色"/>
+							<combo_box.item name="blend_src_color" label="ブレンド：ソースの色"/>
+							<combo_box.item name="blend_one_minus_dest_color" label="ブレンド：1－出力先の色"/>
+							<combo_box.item name="blend_one_minus_src_color" label="ブレンド：1－ソースの色"/>
+							<combo_box.item name="blend_src_alpha" label="ブレンド：ソースのアルファ"/>
+							<combo_box.item name="blend_one_minus_src_alpha" label="ブレンド：1－ソースのアルファ"/>
+						</combo_box>
+						<combo_box name="blend_func_dest_combo">
+							<combo_box.item name="blend_one" label="ブレンド：1"/>
+							<combo_box.item name="blend_zero" label="ブレンド：0"/>
+							<combo_box.item name="blend_dest_color" label="ブレンド：出力先の色"/>
+							<combo_box.item name="blend_src_color" label="ブレンド：ソースの色"/>
+							<combo_box.item name="blend_one_minus_dest_color" label="ブレンド：1－出力先の色"/>
+							<combo_box.item name="blend_one_minus_src_color" label="ブレンド：1－ソースの色"/>
+							<combo_box.item name="blend_src_alpha" label="ブレンド：ソースのアルファ"/>
+							<combo_box.item name="blend_one_minus_src_alpha" label="ブレンド：1－ソースのアルファ"/>
+						</combo_box>
+					</panel>
+				</accordion_tab>
+			</accordion>
+		</layout_panel>
+		<layout_panel name="checkbox_panel">
+			<text name="Pattern_Label">
+				パターン：
+			</text>
+			<combo_box name="pattern_type_combo">
+				<combo_box.item name="explode" label="爆発"/>
+				<combo_box.item name="angle" label="角度"/>
+				<combo_box.item name="angle_cone" label="円錐"/>
+				<combo_box.item name="angle_cone_empty" label="空の円錐"/>
+				<combo_box.item name="drop" label="落下"/>
+			</combo_box>
+			<check_box name="bounce_checkbox" label="跳ね返り"/>
+			<check_box name="emissive_checkbox" label="発光"/>
+			<check_box name="wind_checkbox" label="風"/>
+			<check_box name="ribbon_checkbox" label="リボン"/>
+			<check_box name="follow_source_checkbox" label="発生源に追従"/>
+			<check_box name="follow_velocity_checkbox" label="速度方向に追従"/>
+			<check_box name="interpolate_color_checkbox" label="色を補間"/>
+			<check_box name="interpolate_scale_checkbox" label="スケールを補間"/>
+			<check_box name="target_position_checkbox" label="ターゲット位置"/>
+			<check_box name="target_linear_checkbox" label="ターゲットへ直線移動"/>
+			<button name="clear_target_button" tool_tip="ターゲットのオブジェクトまたはアバターをクリアします"/>
+			<button name="pick_target_button" tool_tip="ここをクリックして、パーティクルのターゲットにするオブジェクトまたはアバターを選択します。"/>
+			<button name="copy_button" label="コピー" tool_tip="パーティクルシステムのパラメータをＬＳＬスクリプトとしてクリップボードにコピーします。"/>
+			<button name="inject_button" label="適用" tool_tip="このパーティクルシステムを選択中のオブジェクトに適用します。"/>
+		</layout_panel>
+	</layout_stack>
+</floater>

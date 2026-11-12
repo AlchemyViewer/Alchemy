@@ -20,6 +20,7 @@
 			入会費はかかりません。
 		</text>
 		<button label="加入する" name="btn_join"/>
+		<button name="btn_activate" label="アクティブ化"/>
 	</panel>
 	<text_editor name="charter">
 		グループの理念、指針を記入してください。

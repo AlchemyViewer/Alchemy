@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Script studio problem menu">
+	<menu_item_call name="fix_kind" label="この種類をすべて修正"/>
+	<menu_item_call name="fix_all" label="すべての問題を修正"/>
+	<menu_item_call name="fix_migration" label="ＬＳＬからの残りを修正"/>
+	<menu_item_call name="copy" label="メッセージをコピー"/>
+	<menu_item_call name="copy_where" label="場所付きでコピー"/>
+	<menu_item_call name="copy_all" label="一覧をすべてコピー"/>
+	<menu_item_call name="clear_runtime" label="実行時エラーをクリア"/>
+	<menu_item_call name="off" label="この警告をオフにする"/>
+	<menu_item_check name="error" label="エラーとして扱う"/>
+	<menu_item_call name="settings" label="Lintの設定…"/>
+</context_menu>

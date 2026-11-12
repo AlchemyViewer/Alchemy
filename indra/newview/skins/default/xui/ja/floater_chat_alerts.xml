@@ -21,7 +21,7 @@
 		トリガー：
 	</text>
 	<check_box label="チャット" name="alerts_trigger_chat"/>
-	<check_box label="IM" name="alerts_trigger_im"/>
+	<check_box label="ＩＭ" name="alerts_trigger_im"/>
 	<check_box label="グループ" name="alerts_trigger_group"/>
 	<button label="エントリ保存" name="alerts_save_btn"/>
 	<button label="エントリ復元" name="alerts_revert_btn"/>

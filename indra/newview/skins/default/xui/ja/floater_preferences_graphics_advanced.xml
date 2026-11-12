@@ -172,4 +172,5 @@
 	<text name="GlowResolutionText">
 		低
 	</text>
+	<slider name="GlowResolution" label="グローの品質："/>
 </floater>

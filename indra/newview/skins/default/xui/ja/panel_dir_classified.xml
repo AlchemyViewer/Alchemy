@@ -27,4 +27,5 @@
 	</scroll_list>
 	<button name="prev_btn" tool_tip="前のページ"/>
 	<button name="next_btn" tool_tip="次のページ"/>
+	<button name="Search" label="検索"/>
 </panel>

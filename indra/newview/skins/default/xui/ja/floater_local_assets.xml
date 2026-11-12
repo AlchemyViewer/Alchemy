@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_local_assets" title="ローカルアセット">
+	<string name="tab_mesh">メッシュ</string>
+	<string name="tab_rezzed">Rez済み</string>
+	<string name="tab_anim">アニメーション</string>
+	<string name="tab_textures">テクスチャ</string>
+	<string name="tab_materials">マテリアル</string>
+</floater>

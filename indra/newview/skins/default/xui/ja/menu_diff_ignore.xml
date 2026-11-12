@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="menu_diff_ignore">
+	<menu_item_check name="whitespace" label="空白"/>
+	<menu_item_check name="trailing" label="行末の空白"/>
+	<menu_item_check name="blank_lines" label="空行"/>
+	<menu_item_check name="comments" label="コメント"/>
+	<menu_item_check name="case" label="大文字小文字"/>
+</context_menu>

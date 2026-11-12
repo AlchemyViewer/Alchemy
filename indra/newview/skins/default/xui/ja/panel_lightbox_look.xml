@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_lightbox_look">
+	<accordion name="look_accordion">
+		<accordion_tab name="atab_sec_tone" title="露光とトーン">
+			<panel name="sec_tone">
+				<setting_row name="tone_exposure" label="露光" tool_tip="トーンマッパーが適用する画像全体の明るさ"/>
+				<text name="tone_type_label" value="トーンマッピング"/>
+				<combo_box name="tone_type_combo" tool_tip="シーンの明るさをディスプレイに対応させるトーンマッピングの方式"/>
+				<button name="tone_type_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="tone_mix" label="トーンマップの配合" tool_tip="リニア（0）とトーンマップ済み（1）の色の配合。クラシック／従来の空ではこれが0に固定されます。"/>
+				<button name="sec_tone_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_tone_adv" title="露光とトーン - 詳細">
+			<panel name="sec_tone_adv">
+				<setting_row name="tone_aces_white" label="ＡＥＣＳの白色点" tool_tip="ＡＥＣＳブーステッドの白色点（他の方式には影響しません）"/>
+				<setting_row name="tone_reinhard_white" label="Reinhardの白色点" tool_tip="Reinhardの白色点（他の方式には影響しません）"/>
+				<setting_row name="tone_filmic_white" label="Filmicの白色点" tool_tip="Filmicの白色点（他の方式には影響しません）"/>
+				<setting_row name="tone_agx_contrast" label="AgXのコントラスト" tool_tip="AgXのコントラスト（他の方式には影響しません）"/>
+				<setting_row name="tone_agx_white" label="AgXの白色点" tool_tip="AgXの白色点（他の方式には影響しません）"/>
+				<button name="sec_tone_adv_reset" label="すべてリセット" tool_tip="トーンの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_autoexp" title="自動露光">
+			<accordion_tab.header_check_box name="autoexp_enable" tool_tip="自動露光：フレームを測光し、中間調が中間グレーになるよう露光を設定します。クラシックの空では露光は固定されます。これは設定の1つで、ルックと一緒に保存されます。"/>
+			<panel name="sec_autoexp">
+				<setting_row name="autoexp_compensation" label="補正" tool_tip="測光した露光を段数で明るく（+）または暗く（-）します：+1で画像の明るさが2倍になります"/>
+				<text name="autoexp_metering_label" value="測光"/>
+				<combo_box name="autoexp_metering_combo" tool_tip="フレームのどの部分で露光を測光するか">
+					<combo_box.item name="0" label="平均"/>
+					<combo_box.item name="1" label="中央重点"/>
+					<combo_box.item name="2" label="スポット"/>
+				</combo_box>
+				<button name="autoexp_metering_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="autoexp_min_ev" label="最も暗いシーン（ＥＶ）" tool_tip="暗いシーンをどこまで明るくするか（段数）：-3で最大8倍明るくします"/>
+				<setting_row name="autoexp_max_ev" label="最も明るいシーン（ＥＶ）" tool_tip="明るいシーンをどこまで暗くするか（段数）：4で最大16倍暗くします"/>
+				<button name="sec_autoexp_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_autoexp_adv" title="自動露光 - 詳細">
+			<panel name="sec_autoexp_adv">
+				<setting_row name="autoexp_speed_up" label="明るさへの順応" tool_tip="シーンが明るくなったときに露光が追従する速さ（1秒あたり）：3で1秒間に変化の95%に追従します"/>
+				<setting_row name="autoexp_speed_down" label="暗さへの順応" tool_tip="シーンが暗くなったときに露光が追従する速さ（1秒あたり）：1で1秒間に変化の63%に追従します"/>
+				<setting_row name="autoexp_low_percent" label="シャドウのカットオフ%" tool_tip="測光で無視するフレームの最も暗い部分の割合。深いシャドウで露光が動かないようにします"/>
+				<setting_row name="autoexp_high_percent" label="ハイライトのカットオフ%" tool_tip="この割合を超える部分を測光で無視し、太陽や輝点で露光が動かないようにします"/>
+				<setting_row name="autoexp_sky_weight" label="空の重み" tool_tip="空を露光にどれだけ反映するか：0で無視し、1でフレームの他の部分と同様に扱います"/>
+				<button name="sec_autoexp_adv_reset" label="すべてリセット" tool_tip="自動露光の詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_grading" title="カラーグレーディング">
+			<accordion_tab.header_check_box name="grading_enable" tool_tip="すべてのカラーグレーディングの主スイッチ：3D LUTと、基本、ホワイトバランス、スプリットトーン、リフト／ガンマ／ゲイン、トーンカーブのすべてのコントロール。セクションごとのスイッチとは異なり、これは設定の1つで、ルックと一緒に保存されます。"/>
+			<panel name="sec_grading">
+				<text name="grading_compare_note" value="セクションの見出しのチェックボックスを外すと、確認中だけそのセクションをオフにできます。" tool_tip="セクションをオフにしても何も保存されず、ルックも変更済みになりません。Lightboxを閉じるとすべてのセクションが元に戻ります。"/>
+				<text name="reference_label" value="参照用静止画：フレームを固定して比較します"/>
+				<button name="reference_grab" label="取得" tool_tip="現在のフレームを固定し、グレーディングを続けながら比較します。静止画はスコープが計測するのと同じ位置（すべてのポストパスの後、周辺減光と粒子の前）で取得され、周辺減光と粒子は両側に適用されるため、比較はグレードだけを対象にできます。Lightboxを閉じるかウィンドウのサイズを変えるとクリアされます。"/>
+				<button name="reference_clear" label="クリア" tool_tip="参照用静止画を破棄し、ライブ画像に戻ります"/>
+				<combo_box name="reference_mode" tool_tip="静止画をライブ画像に対してどう表示するか">
+					<combo_box.item name="ref_off" label="オフ"/>
+					<combo_box.item name="ref_wipe" label="ワイプ"/>
+					<combo_box.item name="ref_side" label="並べて表示"/>
+				</combo_box>
+				<slider name="reference_position" label="ワイプの位置" tool_tip="画面を横切る境界線の位置：左側が静止画、右側がライブ画像です"/>
+				<button name="sec_grading_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_basic" title="基本">
+			<accordion_tab.header_check_box name="section_basic" tool_tip="「基本」を適用するかどうか。比較中にこのセクションをオフにするにはチェックを外します：何も保存されず、ルックも変更済みにならず、Lightboxを閉じると元に戻ります。"/>
+			<panel name="sec_basic">
+				<text name="basic_hdr_wb" value="ホワイトバランス"/>
+				<setting_row name="basic_temp" label="色温度（K）" tool_tip="中立の昼光からの色温度のずれ（ケルビン）。負の値で暖かく、正の値で冷たくなります。タングステンは-2500、ゴールデンアワーは-1000、ブルーアワーは1500を試してください。"/>
+				<setting_row name="basic_tint" label="色合い" tool_tip="色温度と直交する緑／マゼンタの色合い。負の値でマゼンタ寄り、正の値で緑寄りになります。"/>
+				<button name="basic_wb_pick" label="無彩色を選択…" tool_tip="白またはグレーに見えるはずのものをワールドでクリックすると、そうなるよう上の2つのスライダーが求められます。十分に明るい場所を選んでください：深い影の面は色の情報が少なすぎて読み取れません。"/>
+				<text name="basic_hdr_tone" value="トーン"/>
+				<setting_row name="basic_contrast" label="コントラスト" tool_tip="中間グレーを中心としたS字カーブ。1は変化なし、それより下で平坦に、上で力強くなります。1.3を超えるとクリッピングが始まります。"/>
+				<setting_row name="basic_highlights" label="ハイライト" tool_tip="中間調に影響を与えずに、最も明るいトーンを回復（負）または強調（正）します。白飛びした空を戻すには-0.3を使います。"/>
+				<setting_row name="basic_shadows" label="シャドウ" tool_tip="中間調に影響を与えずに、最も暗いトーンを持ち上げ（正）たりつぶし（負）たりします。暗いシーンを明るくするには+0.2を使います。"/>
+				<setting_row name="basic_whites" label="白色点" tool_tip="純白になる入力レベル。1は変化なし。下げるとハイライトがにじみ、さらに下げるとブリーチバイパス風になります。"/>
+				<setting_row name="basic_blacks" label="黒色点" tool_tip="純黒になる入力レベル。0は変化なし。0.05で映画的に黒が深まり、0.1を超えるとシャドウのディテールが失われ始めます。"/>
+				<text name="basic_hdr_presence" value="存在感"/>
+				<setting_row name="basic_vibrance" label="自然な彩度" tool_tip="すでに鮮やかな色よりも、くすんだ色を強めに引き上げる彩度。「彩度」よりも肌に優しく、0.3で控えめに持ち上がります。"/>
+				<setting_row name="basic_saturation" label="彩度" tool_tip="均一な彩度。1は変化なし、0は白黒、1.2で鮮やかになります。"/>
+				<setting_row name="basic_brightness" label="明るさ" tool_tip="トーンマップの後、表示空間で画像全体を明るくまたは暗くします。全体の露光には「露光とトーン」を使ってください。"/>
+				<setting_row name="basic_hue_shift" label="色相の回転" tool_tip="すべての色相を色相環上で回転させます（度）。30で全体が暖かくなり、180で完全な補色になります。"/>
+				<button name="sec_basic_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_primaries" title="プライマリー">
+			<accordion_tab.header_check_box name="section_primaries" tool_tip="リフト／ガンマ／ゲインを適用するかどうか。比較中にこのセクションをオフにするにはチェックを外します：何も保存されず、ルックも変更済みにならず、Lightboxを閉じると元に戻ります。"/>
+			<panel name="sec_primaries">
+				<color_wheel name="wheel_lift" label="リフト" tool_tip="すべてのトーンに加算され、主にシャドウに現れます。パックをドラッグして色を付け、スライダーで黒の底を上げたりつぶしたりします。面をダブルクリックすると中立に戻ります。"/>
+				<color_wheel name="wheel_gamma" label="ガンマ" tool_tip="黒と白を動かさずに範囲の中央を曲げます。1を超えると中間調が明るくなり、1未満で暗くなります。"/>
+				<color_wheel name="wheel_gain" label="強度" tool_tip="すべてのトーンに乗算され、主にハイライトに現れます。パックをドラッグして白に色を付け、スライダーで強めたり抑えたりします。"/>
+				<button name="sec_primaries_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_split" title="スプリットトーン">
+			<accordion_tab.header_check_box name="section_split" tool_tip="スプリットトーンを適用するかどうか。比較中にこのセクションをオフにするにはチェックを外します：何も保存されず、ルックも変更済みにならず、Lightboxを閉じると元に戻ります。"/>
+			<panel name="sec_split">
+				<color_wheel name="wheel_split_shadow" label="シャドウ" tool_tip="暗いトーンに加える色。暖かいハイライトに対して冷たいティールを試してください。ここには主スイッチはありません：レンダラーが色の明るさを正規化します。"/>
+				<color_wheel name="wheel_split_midtone" label="中間調" tool_tip="中間のトーンに加える色。暖色は肌を引き立てます。"/>
+				<color_wheel name="wheel_split_highlight" label="ハイライト" tool_tip="明るいトーンに加える色。ティールのシャドウに対して暖かいアンバーを試してください。"/>
+				<curve_editor name="split_tone_graph" tool_tip="各色が及ぶトーンの範囲。中央のハンドルをドラッグすると分割点（「バランス」スライダー）が移動し、左右のハンドルでシャドウとハイライトの色が及ぶ範囲（「幅」スライダー）を設定します。各帯は適用される色で描かれ、量が減るにつれて薄くなります。グラフの端にあるハンドルはロックされているので、その「幅」スライダーを使ってください。"/>
+				<setting_row name="split_amount" label="量" tool_tip="シャドウとハイライトの色の強さ。中間調の色には下に専用の量があり、独立して働きます。"/>
+				<setting_row name="split_midtone_amount" label="中間調の量" tool_tip="中間調の色の強さ（シャドウとハイライトの量とは別）。"/>
+				<setting_row name="split_balance" label="バランス" tool_tip="シャドウとハイライトの間の分割点を移動します。負の値でシャドウの範囲が、正の値でハイライトの範囲が広がります。"/>
+				<setting_row name="split_shadow_width" label="シャドウの幅" tool_tip="分割点からどれだけ下でシャドウの色が最大の強さになるか。0.02でくっきりした境界、0.5でとても柔らかい境界になります。グラフの左のハンドルです。"/>
+				<setting_row name="split_highlight_width" label="ハイライトの幅" tool_tip="分割点からどれだけ上でハイライトの色が最大の強さになるか。0.02でくっきりした境界、0.5でとても柔らかい境界になります。グラフの右のハンドルです。"/>
+				<button name="sec_split_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_lut">
+			<accordion_tab.header_check_box name="section_lut" tool_tip="３Ｄ　ＬＵＴを適用するかどうか。比較中にこのセクションをオフにするにはチェックを外します：何も保存されず、ルックも変更済みにならず、ライトボックスを閉じると元に戻ります。"/>
+			<panel name="sec_lut">
+				<combo_box name="colorlut_combo" tool_tip="グレーディングに使うカラールックアップテーブル。ユーザーの「colorlut」フォルダーに置いたファイルがここに表示されます。">
+					<combo_box.item name="lut_none" label="なし"/>
+				</combo_box>
+				<button name="lut_combo_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="lut_strength" label="強度" tool_tip="ＬＵＴが画像をグレーディングする強さ"/>
+				<button name="lut_open_folder" label="フォルダを開く" tool_tip="ＬＵＴフォルダーをファイルブラウザーで開きます。.cubeや画像のLUTをそこに置くと、次にLightboxを開いたときに一覧に表示されます。"/>
+				<button name="sec_lut_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_curve" title="トーンカーブ">
+			<accordion_tab.header_check_box name="section_curve" tool_tip="トーンカーブを適用するかどうか。比較中にこのセクションをオフにするにはチェックを外します：何も保存されず、ルックも変更済みにならず、ライトボックスを閉じると元に戻ります。"/>
+			<panel name="sec_curve">
+				<text name="tone_curve_channel_label" value="チャンネル"/>
+				<combo_box name="tone_curve_channel" tool_tip="グラフで編集するカーブ。マスターは各チャンネルのカーブの後に3つのチャンネルすべてに適用されます。チャンネルでは合成後の結果と、形を変えた他のチャンネルが背後に表示されます。">
+					<combo_box.item name="master" label="マスター"/>
+					<combo_box.item name="red" label="赤"/>
+					<combo_box.item name="green" label="緑"/>
+					<combo_box.item name="blue" label="青"/>
+				</combo_box>
+				<menu_button name="tone_curve_presets" label="プリセット" tool_tip="選択したカーブを初期形状で置き換えます"/>
+				<button name="tone_curve_channel_rst" tool_tip="選択したカーブを直線にリセットします"/>
+				<curve_editor name="tone_curve_graph" tool_tip="点をドラッグして選択したカーブを整えます。空いている場所をダブルクリックすると点を追加し（最大１６個）、点をダブルクリックすると削除します。両端の点は上下にしか動きません。直線は変化なしです。カーブの背後には、マスター適用後のチャンネルの状態と、直線でない他のチャンネルが表示されます。"/>
+				<setting_row name="curve_amount" label="量" tool_tip="カーブをどれだけ適用するか。０で画像はそのまま、１で完全に適用します。"/>
+				<button name="sec_curve_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

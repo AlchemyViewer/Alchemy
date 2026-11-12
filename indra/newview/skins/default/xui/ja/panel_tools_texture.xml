@@ -159,4 +159,11 @@
 	<button name="btn_select_same_diff" label="全て検索" tool_tip="この面と同じ拡散反射（ディフューズ）マップを貼り付けた、すべての面を選択します。"/>
 	<button name="btn_select_same_norm" label="全て検索" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
 	<button name="btn_select_same_spec" label="全て検索" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
+	<button name="copy_color_btn" tool_tip="色のパラメータをコピー"/>
+	<button name="paste_color_btn" tool_tip="色のパラメータをペースト"/>
+	<button name="pipette_color_btn" tool_tip="スポイトツールで色のパラメータをペースト"/>
+	<button name="copy_texture_btn" tool_tip="テクスチャのパラメータをコピー"/>
+	<button name="paste_texture_btn" tool_tip="テクスチャのパラメータをペースト"/>
+	<button name="pipette_texture_btn" tool_tip="スポイトツールでテクスチャのパラメータをペースト"/>
+	<button name="btn_select_same_pbr" label="全て検索" tool_tip="この面と同じPBRマテリアルのすべての面を選択します"/>
 </panel>

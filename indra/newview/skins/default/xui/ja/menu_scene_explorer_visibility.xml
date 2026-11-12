@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_scene_explorer_visibility">
+	<menu_item_check name="show_avatars" label="アバターを表示" tool_tip="アバター（とそのアタッチメント）を専用のカテゴリに一覧表示します"/>
+	<menu_item_check name="show_derendered" label="非表示にしたものを表示" tool_tip="このリージョンで非表示にしたオブジェクト（と非表示にしたアバター）を専用のカテゴリに一覧表示します"/>
+	<menu_item_check name="show_owners" label="所有者を表示" tool_tip="所有者の名前が判明したら各行に追加します"/>
+	<menu_item_check name="full_region" label="リージョン全体を対象（360）" tool_tip="エクスプローラーを開いている間、カメラに見える範囲だけでなく、リージョン内のすべてのオブジェクトを送信するようシミュレーターに要求します"/>
+</toggleable_menu>

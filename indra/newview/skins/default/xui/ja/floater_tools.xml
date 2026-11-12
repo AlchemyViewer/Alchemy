@@ -400,6 +400,16 @@
 [VALUE]</panel.string>
 			<button name="copy_size_btn" tool_tip="サイズをコピーします。"/>
 			<button name="paste_size_btn" tool_tip="サイズをペーストします。"/>
+			<button name="copy_position_btn" tool_tip="位置をコピー"/>
+			<button name="paste_position_btn" tool_tip="位置をペースト"/>
+			<button name="pipette_position_btn" tool_tip="スポイトツールで位置をペースト"/>
+			<button name="pipette_size_btn" tool_tip="スポイトツールでサイズをペースト"/>
+			<button name="copy_rotation_btn" tool_tip="回転をコピー"/>
+			<button name="paste_rotation_btn" tool_tip="回転をペースト"/>
+			<button name="pipette_rotation_btn" tool_tip="スポイトツールで回転をペースト"/>
+			<button name="copy_primparams_btn" tool_tip="プリミティブのパラメータをコピー"/>
+			<button name="paste_primparams_btn" tool_tip="プリミティブのパラメータをペースト"/>
+			<button name="pipette_primparams_btn" tool_tip="スポイトツールでプリミティブのパラメータをペースト"/>
 		</panel>
 		<panel label="特徴" name="Features">
 			<panel.string name="None">
@@ -473,17 +483,25 @@
 			<spinner label="復元" name="Physics Restitution"/>
 			<button name="copy_features_btn" tool_tip="機能パラメータをコピー"/>
 			<button name="paste_features_btn" tool_tip="機能パラメータをペースト"/>
+			<button name="pipette_features_btn" tool_tip="スポイトツールで機能パラメータをペースト"/>
+			<button name="copy_light_btn" tool_tip="ライトと反射プローブのパラメータをコピー"/>
+			<button name="paste_light_btn" tool_tip="ライトと反射プローブのパラメータをペースト"/>
+			<button name="pipette_light_btn" tool_tip="スポイトツールでライトと反射プローブのパラメータをペースト"/>
 		</panel>
 		<panel label="テクスチャ" name="Texture"/>
 		<panel label="中身" name="Contents">
-			<flyout_button label="新しいスクリプト" name="button new script">
-				<flyout_button.item name="new_lsl_script" label="新規LSLスクリプト"/>
+			<flyout_button label="新しいスクリプト" name="button new script" tool_tip="このオブジェクトに新しいスクリプトを作成します">
+				<flyout_button.item name="new_lsl_script" label="新規ＬＳＬスクリプト"/>
 				<flyout_button.item name="new_lua_script" label="新規SLuaスクリプト"/>
 			</flyout_button>
 			<button label="権限" name="button permissions"/>
 			<filter_editor label="フィルタテキストを入力" name="contents_filter"/>
 			<button name="button new notecard" label="新しいノートカード"/>
-			<button name="button publish" label="Script Studioで開く" label_selected="編集を終了"/>
+			<button name="button publish" label="Script Studioで開く" label_selected="編集を終了" tool_tip="このオブジェクトをScript Studioのエクスプローラーで開きます"/>
+			<panel.string name="studio_label">Script Studioで開く</panel.string>
+			<panel.string name="studio_tooltip">このオブジェクトをScript Studioのエクスプローラーで開きます</panel.string>
+			<panel.string name="ide_label">IDEで開く</panel.string>
+			<panel.string name="ide_tooltip">WebSocket同期を通じて、このオブジェクトを外部エディターに公開します</panel.string>
 		</panel>
 	</tab_container>
 	<panel name="land info panel">
@@ -520,5 +538,6 @@
 	<check_box name="checkbox actual root" label="軸をルートとして編集"/>
 	<check_box name="checkbox select probes" label="反射プローブを選択する"/>
 	<text name="link_num_obj_count" tool_tip="このリンク数は正確でない可能性があります。"/>
+	<check_box name="checkbox selection" label="選択範囲の輪郭を表示"/>
 	<!-- end of tabs -->
 </floater>

@@ -31,4 +31,6 @@
 		[ampm, datetime, slt]　[hour12, datetime, slt]：[min, datetime, slt]　[timezone,datetime, slt]
 	</panel.string>
 	<text name="FPSText" tool_tip="現在のフレームレート"/>
+	<button name="presets_icon_camera" tool_tip="マイカメラプリセット"/>
+	<button name="presets_icon_graphic" tool_tip="グラフィックのプリセット。クリックするとLightboxを開きます。"/>
 </panel>

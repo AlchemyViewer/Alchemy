@@ -5,4 +5,8 @@
 	<menu_item_call label="ペースト" name="Paste"/>
 	<menu_item_call label="Webインスペクターを開く" name="open_webinspector"/>
 	<menu_item_call label="ソースを表示" name="show_page_source"/>
+	<menu_item_call name="undo" label="取り消し"/>
+	<menu_item_call name="redo" label="やり直し"/>
+	<menu_item_call name="delete" label="削除"/>
+	<menu_item_call name="select_all" label="すべて選択"/>
 </context_menu>

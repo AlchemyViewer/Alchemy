@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_al_feedback" title="フィードバックを送信">
+	<floater.string name="placeholder_problem">何が起きて、本来はどうなるはずでしたか？　再現手順があると非常に助かります。</floater.string>
+	<floater.string name="placeholder_idea">Alchemyに何をしてほしいですか？　それは何のためですか？</floater.string>
+	<floater.string name="placeholder_other">ご意見をお聞かせください。</floater.string>
+	<floater.string name="linked_crash">[DATE] [TIME]のクラッシュについて</floater.string>
+	<floater.string name="linked_freeze">[DATE] [TIME]のフリーズについて</floater.string>
+	<floater.string name="linked_crash_undated">前回のクラッシュについて</floater.string>
+	<floater.string name="linked_freeze_undated">前回のフリーズについて</floater.string>
+	<floater.string name="linked_tooltip_crash">このレポートはクラッシュに関連付けられているため、開発者は両方を合わせて確認できます。</floater.string>
+	<floater.string name="linked_tooltip_freeze">このレポートはフリーズに関連付けられているため、開発者は両方を合わせて確認できます。</floater.string>
+	<floater.string name="linked_tooltip_report">クラッシュレポート：[ID]</floater.string>
+	<floater.string name="unlink_crash">このクラッシュとは関係のない、独立したフィードバックとして送信します</floater.string>
+	<floater.string name="unlink_freeze">このフリーズとは関係のない、独立したフィードバックとして送信します</floater.string>
+	<floater.string name="include_avatar">アバター名を含める（[NAME]）</floater.string>
+	<floater.string name="include_avatar_logged_out">アバター名を含める（ログインするまで利用できません）</floater.string>
+	<floater.string name="no_previous_log">なし</floater.string>
+	<floater.string name="screenshot_tooltip">画面に表示されているもの（IMなどの開いているウィンドウを含む）です。これらを含めない場合は「インターフェースを隠す」にチェックを入れてください。</floater.string>
+	<floater.string name="screenshot_in_world">スクリーンショットはログイン後に撮影できます。</floater.string>
+	<floater.string name="screenshot_taking">スクリーンショットを撮影しています…</floater.string>
+	<floater.string name="screenshot_failed">スクリーンショットを撮影できませんでした。「撮り直す」で再試行してください。</floater.string>
+	<floater.string name="screenshot_none">スクリーンショットなし</floater.string>
+	<floater.string name="logs_location_hidden">ログには訪れた場所の名前が含まれるため、現在地が非表示になっている間は添付されません。</floater.string>
+	<floater.string name="label_send">送信</floater.string>
+	<floater.string name="label_send_held">送信（[SECONDS]）</floater.string>
+	<floater.string name="send_tooltip">このレポートをAlchemyの開発者に送信します（Ctrl＋Enter）</floater.string>
+	<floater.string name="send_busy">送信しています…</floater.string>
+	<floater.string name="send_held">次のレポートは[SECONDS]秒後に送信できます。</floater.string>
+	<floater.string name="send_too_short">もう少し詳しく書いてください。</floater.string>
+	<floater.string name="send_too_long">長すぎて送信できません。短くするか、ログは貼り付けずに添付してください。</floater.string>
+	<floater.string name="send_bad_email">メールアドレスを確認するか、空欄にしてください。</floater.string>
+	<floater.string name="email_hint">返信が必要な場合のみ入力してください。</floater.string>
+	<floater.string name="email_invalid">メールアドレスの形式ではないようです。</floater.string>
+	<floater.string name="sending">送信しています…</floater.string>
+	<floater.string name="restored">未送信のメッセージを復元しました。</floater.string>
+	<floater.string name="restored_queued">このレポートは自動送信を待っています。</floater.string>
+	<floater.string name="kept_sent">レポートはAlchemyの開発者に届きました。</floater.string>
+	<floater.string name="kept_given_up">レポートをサーバーに送信できなかったため、Alchemyは再試行を中止しました。このウィンドウから再度送信できます。</floater.string>
+	<floater.string name="queued_one">以前のレポートが自動送信を待っています。</floater.string>
+	<floater.string name="queued_many">以前のレポート[COUNT]件が自動送信を待っています。</floater.string>
+	<floater.string name="action_discard">破棄</floater.string>
+	<floater.string name="action_dont_send">送信しない</floater.string>
+	<floater.string name="action_try_again">再試行</floater.string>
+	<floater.string name="action_without_attachments">添付せずに送信</floater.string>
+	<floater.string name="action_github">GitHubで報告</floater.string>
+	<floater.string name="action_copy_message">メッセージをコピー</floater.string>
+	<floater.string name="title_screenshot">スクリーンショット</floater.string>
+	<floater.string name="title_session_log">今回のセッションのログ</floater.string>
+	<floater.string name="title_previous_log">前回のセッションのログ</floater.string>
+	<floater.string name="title_system_info">システム情報</floater.string>
+	<floater.string name="title_settings">変更した設定</floater.string>
+	<floater.string name="title_whats_in">レポートの内容</floater.string>
+	<floater.string name="whats_in">
+		レポートは、クラッシュレポートと同じAlchemy開発者のSentryプロジェクトに送られます。送信されるのは「送信」を押したときだけです。
+
+すべてのレポートに含まれるもの：
+- メッセージと、入力した場合はメールアドレス
+- ビューアのバージョン、チャンネル、ビルド
+- オペレーティングシステムとグラフィックカード
+- ビューアの起動・実行の進行状況と、その時いたリージョン（RLVaの制限で現在地が非表示の場合を除く）
+- クラッシュレポートが有効かどうかと、今回のビューア実行のID（同じ実行で起きたクラッシュとレポートを照合するため）
+
+「アバター名を含める」を選ぶと、開発者がインワールドであなたを見つけられるよう、アバター名とキーも送られます。選ばない場合、ログ内の名前とキーは伏せられますが、ログやシステム情報からあなたについて分かることもあります。身元が分からないレポートにしたい場合は、それらのチェックも外してください。
+
+チェックした添付ファイルは、「送信」を押した時点で「表示」で見たとおりの内容で送られます。ログは末尾の4MBが送られ、セッションの代理として機能するアドレスは伏せられます。RLVaで現在地が非表示の間は、ログは添付されません。変更した設定からは、キー、パスワード、トークン、メールアドレスが除かれ、あなた、ファイル、場所を特定しうるテキストは伏せ字になります。
+
+サーバーに届かなかったレポートは保存され、最大1週間、自動的に再送信されます。
+	</floater.string>
+	<radio_group name="kind">
+		<radio_item name="problem" label="不具合"/>
+		<radio_item name="idea" label="アイデア"/>
+		<radio_item name="other" label="その他"/>
+	</radio_group>
+	<button name="unlink_btn" label="関連付けを解除" tool_tip="このクラッシュとは関係のない、独立したフィードバックとして送信します"/>
+	<text name="include_label">
+		添付
+	</text>
+	<panel name="screenshot_preview" tool_tip="レポートに添付されるスクリーンショットです。クリックすると全体を表示します。"/>
+	<check_box name="screenshot_check" label="スクリーンショット"/>
+	<check_box name="hide_ui_check" label="インターフェースを隠す" tool_tip="ウィンドウ、チャット、HUDを含めず、ワールドだけのスクリーンショットを撮影します"/>
+	<button name="retake_btn" label="撮り直す" tool_tip="このウィンドウをどけて、スクリーンショットを撮り直します"/>
+	<button name="view_screenshot_btn" label="表示" tool_tip="スクリーンショット全体を表示します"/>
+	<text name="screenshot_shows">
+		開いているウィンドウ（ＩＭを含む）も写ります。
+	</text>
+	<check_box name="session_log_check" label="今回のセッションのログ"/>
+	<button name="view_session_log_btn" label="表示" tool_tip="今回のセッションのログで送られる内容を表示します"/>
+	<check_box name="previous_log_check" label="前回のセッションのログ"/>
+	<button name="view_previous_log_btn" label="表示" tool_tip="前回のセッションのログで送られる内容を表示します"/>
+	<check_box name="system_info_check" label="システム情報"/>
+	<button name="view_system_info_btn" label="表示" tool_tip="送られるシステム情報を表示します"/>
+	<check_box name="settings_check" label="変更した設定"/>
+	<button name="view_settings_btn" label="表示" tool_tip="送られる設定を表示します"/>
+	<text name="contact_label">
+		連絡先
+	</text>
+	<check_box name="include_avatar_check" label="アバター名を含める" tool_tip="開発者がインワールドであなたを見つけられるよう、アバター名とキーを送ります。含めない場合はログ内で伏せられますが、ログやシステム情報からあなたについて分かることもあります。"/>
+	<text name="email_label">
+		メール
+	</text>
+	<check_box name="remember_email_check" label="記憶する" tool_tip="次回のレポートでもこのアドレスを使います"/>
+	<text name="privacy_text">
+		「送信」を押したときにだけ、Alchemyの開発者に送信されます。
+	</text>
+	<button name="whats_in_btn" label="レポートの内容"/>
+	<button name="discard_btn" label="破棄" tool_tip="このレポートを破棄して最初からやり直します"/>
+	<button name="close_btn" label="閉じる" tool_tip="このウィンドウを閉じます。書いた内容は次回まで保持されます。"/>
+	<button name="send_btn" label="送信"/>
+</floater>

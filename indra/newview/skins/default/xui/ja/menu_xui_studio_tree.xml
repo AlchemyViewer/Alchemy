@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<menu name="menu_xui_studio_tree">
+	<menu_item_call name="reveal" label="ファイル内で表示"/>
+	<menu_item_call name="copy_path" label="名前のパスをコピー"/>
+	<menu_item_call name="copy_getchild" label="getChildの行をコピー"/>
+	<menu_item_call name="open_nested" label="この要素が指定するファイルを開く"/>
+	<menu_item_call name="move_up" label="上へ移動"/>
+	<menu_item_call name="move_down" label="下へ移動"/>
+	<menu_item_call name="move_in" label="中へ移動"/>
+	<menu_item_call name="move_out" label="外へ移動"/>
+	<menu_item_call name="cut" label="親の変更用に切り取り"/>
+	<menu_item_call name="paste" label="ここに移動"/>
+	<menu_item_call name="duplicate" label="複製"/>
+	<menu_item_call name="delete" label="削除"/>
+	<menu_item_call name="toggle_visible" label="表示の切り替え"/>
+	<menu_item_call name="expand_all" label="すべて展開"/>
+	<menu_item_call name="collapse_all" label="すべて折りたたむ"/>
+</menu>

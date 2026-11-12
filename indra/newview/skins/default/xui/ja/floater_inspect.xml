@@ -14,6 +14,16 @@
 		<scroll_list.columns name="trianglecount" label="三角形の数"/>
 		<scroll_list.columns name="tramcount" label="ＴＭｅｍ"/>
 		<scroll_list.columns name="vramcount" label="ＶＲＡＭ"/>
+		<scroll_list.columns name="land_impact" tool_tip="ランドインパクト：ルート行はリンクセットの合計、子の行はそのプリム自身の寄与分"/>
+		<scroll_list.columns name="rendercost" tool_tip="このプリムの描画コスト"/>
+		<scroll_list.columns name="physicscost" label="物理"/>
+		<scroll_list.columns name="streamingcost" label="ストリーミング"/>
+		<scroll_list.columns name="primcount" label="プリム数"/>
+		<scroll_list.columns name="distance" label="距離"/>
+		<scroll_list.columns name="scripts" label="スクリプト"/>
+		<scroll_list.columns name="lightglow" label="ライト／グロー"/>
+		<scroll_list.columns name="media" label="メディア"/>
+		<scroll_list.columns name="alphapbr" label="アルファ／PBR"/>
 	</scroll_list>
 	<button label="所有者のプロフィール…" name="button owner" tool_tip="ハイライトされたオブジェクトの所有者のプロフィールを見る。"/>
 	<button label="制作者のプロフィール…" name="button creator" tool_tip="ハイライトされたオブジェクトの作成者のプロフィールを見る。"/>

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_lightbox_scene">
+	<accordion name="scene_accordion">
+		<accordion_tab name="atab_sec_aa" title="アンチエイリアス">
+			<panel name="sec_aa">
+				<text name="aa_method_label" value="方式"/>
+				<combo_box name="aa_method_combo" tool_tip="アンチエイリアスの方式。変更すると一瞬カクつきます。">
+					<combo_box.item name="0" label="無効"/>
+				</combo_box>
+				<button name="aa_method_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="aa_quality_label" value="品質"/>
+				<combo_box name="aa_quality_combo" tool_tip="選択したアンチエイリアス方式の品質プリセット">
+					<combo_box.item name="0" label="低"/>
+					<combo_box.item name="1" label="中"/>
+					<combo_box.item name="2" label="高"/>
+					<combo_box.item name="3" label="最高"/>
+				</combo_box>
+				<button name="aa_quality_rst" tool_tip="デフォルトにリセットします"/>
+				<button name="sec_aa_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_reflect" title="反射">
+			<panel name="sec_reflect">
+				<check_box name="reflect_ssr" label="スクリーンスペース反射" tool_tip="画面上のジオメトリをレイマーチングで反射させます。切り替えるとシェーダーを再構築します（一瞬カクつきます）。"/>
+				<text name="reflect_detail_label" value="プローブの詳細度"/>
+				<combo_box name="reflect_detail_combo" tool_tip="反射プローブの更新方法。変更すると一瞬カクつきます。">
+					<combo_box.item name="0" label="静的のみ"/>
+					<combo_box.item name="1" label="静的＋動的"/>
+					<combo_box.item name="2" label="リアルタイム"/>
+				</combo_box>
+				<button name="reflect_detail_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="reflect_level_label" value="対象範囲"/>
+				<combo_box name="reflect_level_combo" tool_tip="シーンのどこまでをプローブの対象にするか">
+					<combo_box.item name="0" label="なし"/>
+					<combo_box.item name="1" label="手動のみ"/>
+					<combo_box.item name="2" label="手動＋地形"/>
+					<combo_box.item name="3" label="シーン全体"/>
+				</combo_box>
+				<button name="reflect_level_rst" tool_tip="デフォルトにリセットします"/>
+				<button name="sec_reflect_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_reflect_adv" title="反射 - 詳細">
+			<panel name="sec_reflect_adv">
+				<text name="reflect_hdr_ssr" value="スクリーンスペース反射"/>
+				<setting_row name="ssr_iterations" label="反復回数" tool_tip="交点を探すレイマーチングのステップ数。多いほど正確ですが遅くなります"/>
+				<setting_row name="ssr_raystep" label="レイのステップ" tool_tip="レイマーチングの1ステップで進む距離"/>
+				<setting_row name="ssr_distance_bias" label="距離のバイアス" tool_tip="反射のサンプル候補を除外するときに使うバイアス"/>
+				<setting_row name="ssr_depth_bias" label="深度の除外バイアス" tool_tip="サンプルを除外する前に深度バッファに対して使うバイアス"/>
+				<setting_row name="ssr_adaptive_step" label="適応ステップ" tool_tip="適応的なレイマーチングのステップの倍率"/>
+				<setting_row name="ssr_glossy_samples" label="光沢のサンプル数" tool_tip="光沢（粗い表面）の反射の最大サンプル数"/>
+				<text name="reflect_hdr_probes" value="反射プローブ"/>
+				<text name="reflect_count_label" value="最大プローブ数"/>
+				<combo_box name="reflect_count_combo" tool_tip="反射プローブの最大数">
+					<combo_box.item name="1" label="なし"/>
+					<combo_box.item name="32" label="低（32）"/>
+					<combo_box.item name="64" label="中（64）"/>
+					<combo_box.item name="128" label="高（128）"/>
+					<combo_box.item name="256" label="最高（256）"/>
+				</combo_box>
+				<button name="reflect_count_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="reflect_distance" label="プローブの距離" tool_tip="プローブを描画・更新する距離（メートル）"/>
+				<button name="sec_reflect_adv_reset" label="すべてリセット" tool_tip="反射の詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_mirrors" title="ミラー">
+			<panel name="sec_mirrors">
+				<check_box name="reflect_mirrors" label="ミラー" tool_tip="高品質な平面ミラーの面。切り替えると一瞬カクつきます。"/>
+				<text name="mirrors_res_label" value="解像度"/>
+				<combo_box name="mirrors_res_combo" tool_tip="ミラー（ヒーロープローブ）の面の解像度"/>
+				<button name="mirrors_res_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="mirrors_rate_label" value="更新頻度"/>
+				<combo_box name="mirrors_rate_combo" tool_tip="ミラーの面を更新する頻度">
+					<combo_box.item name="6" label="低"/>
+					<combo_box.item name="3" label="中"/>
+					<combo_box.item name="2" label="高"/>
+					<combo_box.item name="1" label="最高"/>
+				</combo_box>
+				<button name="mirrors_rate_rst" tool_tip="デフォルトにリセットします"/>
+				<button name="sec_mirrors_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_shadow" title="影とAO">
+			<panel name="sec_shadow">
+				<text name="shadow_detail_label" value="影"/>
+				<combo_box name="shadow_detail_combo" tool_tip="影を落とす光源。変更するとシェーダーを再構築します（一瞬カクつきます）。">
+					<combo_box.item name="0" label="なし"/>
+					<combo_box.item name="1" label="太陽／月"/>
+					<combo_box.item name="2" label="太陽／月＋プロジェクター"/>
+				</combo_box>
+				<button name="shadow_detail_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="shadow_filter_label" value="フィルタリング"/>
+				<combo_box name="shadow_filter_combo" tool_tip="影の境界を和らげるカーネルの幅。「最高」ではコンタクトハードニングに切り替わります：影を落とす物体が地面に接する部分では影がくっきりし、離れるほど柔らかくなります。上位の段階ほどテクスチャの読み込みが増えます。変更するとシェーダーを再構築します（一瞬カクつきます）。">
+					<combo_box.item name="0" label="低"/>
+					<combo_box.item name="1" label="中"/>
+					<combo_box.item name="2" label="高"/>
+					<combo_box.item name="3" label="最高（コンタクトハードニング）"/>
+				</combo_box>
+				<button name="shadow_filter_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="shadow_res_scale_label" value="解像度スケール"/>
+				<combo_box name="shadow_res_scale_combo" tool_tip="シャドウマップの解像度の倍率。変更するたびにシャドウマップを再確保します。x2はVRAMの少ないGPUではVRAMを使い切る場合があります。"/>
+				<button name="shadow_res_scale_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="shadow_avatar_label" value="アバターの影"/>
+				<combo_box name="shadow_avatar_combo" tool_tip="アバターのジオメトリのどこまでが影を落とすか">
+					<combo_box.item name="0" label="不透明のみ"/>
+					<combo_box.item name="1" label="アルファマスク"/>
+					<combo_box.item name="2" label="すべて"/>
+				</combo_box>
+				<button name="shadow_avatar_rst" tool_tip="デフォルトにリセットします"/>
+				<check_box name="shadow_ssao" label="アンビエントオクルージョン（SSAO）" tool_tip="スクリーンスペースのアンビエントオクルージョン。切り替えるとシェーダーを再構築します（一瞬カクつきます）。"/>
+				<button name="sec_shadow_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_shadow_adv" title="影とAO - 詳細">
+			<panel name="sec_shadow_adv">
+				<text name="shadow_hdr_tuning" value="影の調整"/>
+				<setting_row name="shadow_bias" label="バイアス" tool_tip="太陽／月の影の深度バイアス。シャドウアクネとピーターパン現象のバランスを調整します"/>
+				<setting_row name="shadow_offset" label="オフセット" tool_tip="太陽／月の影のサンプルオフセット"/>
+				<setting_row name="shadow_spot_bias" label="プロジェクターのバイアス" tool_tip="プロジェクター（スポットライト）の影の深度バイアス"/>
+				<setting_row name="shadow_spot_offset" label="プロジェクターのオフセット" tool_tip="プロジェクター（スポットライト）の影のサンプルオフセット"/>
+				<text name="shadow_hdr_ssao" value="アンビエントオクルージョン"/>
+				<setting_row name="ssao_blur_size" label="ぼかしのサイズ" tool_tip="オクルージョンのバッファを和らげるぼかしの幅。設定名とは異なり、影の境界にはもう影響しません：影のフィルタリングは発生元で重み付けされるため、このパスはアンビエントオクルージョンだけをぼかします。"/>
+				<setting_row name="ssao_scale" label="スケール" tool_tip="アンビエントオクルージョンのサンプリング半径の倍率"/>
+				<setting_row name="ssao_max_scale" label="最大スケール" tool_tip="スクリーンスペースのサンプリング半径の上限（ピクセル）"/>
+				<setting_row name="ssao_factor" label="係数" tool_tip="オクルージョンの強さの減衰係数"/>
+				<setting_row name="ssao_effect_value" label="遮蔽部の明度" tool_tip="完全に遮蔽された部分の明るさ（HSVの明度）の倍率。部分的な遮蔽では元の色に向かって混ざります"/>
+				<setting_row name="ssao_effect_saturation" label="遮蔽部の彩度" tool_tip="完全に遮蔽された部分の彩度の倍率。部分的な遮蔽では元の色に向かって混ざります"/>
+				<button name="sec_shadow_adv_reset" label="すべてリセット" tool_tip="影とAOの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_perf" title="パフォーマンス">
+			<panel name="sec_perf">
+				<setting_row name="perf_farclip" label="描画距離（m）" tool_tip="ワールドを描画する距離（メートル）"/>
+				<setting_row name="perf_volume_lod" label="オブジェクトの詳細度" tool_tip="オブジェクトの詳細度（LOD）の係数。高いほど遠くまで細部が表示されます"/>
+				<setting_row name="perf_max_complexity" label="アバターの最大複雑度" tool_tip="この描画コストを超えるアバターは単色のジェリードールとして描画されます。0＝無制限。"/>
+				<setting_row name="perf_max_nonimpostors" label="アニメーションするアバターの最大数" tool_tip="この数を超えるアバターは軽量なインポスターとして描画されます。0＝全員をアニメーションさせます。"/>
+				<button name="sec_perf_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_perf_adv" title="パフォーマンス - 詳細">
+			<panel name="sec_perf_adv">
+				<text name="perf_complexity_mode_label" value="アバターの表示"/>
+				<combo_box name="perf_complexity_mode_combo" tool_tip="アバターの複雑度の制限の適用方法">
+					<combo_box.item name="0" label="複雑度で制限"/>
+					<combo_box.item name="1" label="フレンドは常に表示"/>
+					<combo_box.item name="2" label="フレンドのみ表示"/>
+				</combo_box>
+				<button name="perf_complexity_mode_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="perf_avatar_lod" label="アバターの詳細度" tool_tip="アバターのメッシュの詳細度（LOD）の係数"/>
+				<setting_row name="perf_physics_lod" label="アバターの物理" tool_tip="アバターの物理（揺れ）の詳細度の係数"/>
+				<setting_row name="perf_terrain_lod" label="地形の詳細度" tool_tip="地形の詳細度（LOD）の係数"/>
+				<check_box name="perf_terrain_smoothing" label="地形をなめらかにする" tool_tip="高さのサンプルを通るなめらかな面として地形を描画します。シミュレーターの衝突判定は平坦な面のままなので、起伏のある地面では足やオブジェクトが数センチずれることがあります。"/>
+				<check_box name="perf_terrain_hex_tiling" label="地形テクスチャを六角形タイル化" tool_tip="六角形の格子の各セルで、地形テクスチャを異なるオフセットと回転で表示し、繰り返しが目立たないようにします。テクスチャごとの読み込みが1回から最大3回になります。地形のシェーダーを再構築します。"/>
+				<text name="perf_water_hextile_label" value="水面の繰り返し防止"/>
+				<combo_box name="perf_water_hextile_combo" tool_tip="六角形の格子の各セルで、水面の波のマップを異なるオフセットで表示し、繰り返しが目立たないようにします。タイル化したレイヤーごとの読み込みが1回から最大3回になります。水面のシェーダーを再構築します。">
+					<combo_box.item name="0" label="オフ"/>
+					<combo_box.item name="1" label="大きな波"/>
+					<combo_box.item name="2" label="大きな波と中くらいの波"/>
+				</combo_box>
+				<button name="perf_water_hextile_rst" tool_tip="デフォルトにリセットします"/>
+				<check_box name="perf_water_waves" label="水面の波" tool_tip="カメラ付近の水面を波の形に変位させます。高さは陰影に使う法線マップから積分するため、波頭が陰影の波頭と一致します。OpenGL 4.0が必要です。"/>
+				<setting_row name="perf_water_wave_height" label="波の高さ" tool_tip="法線マップを積分した高さに対する水面の波の高さ：1で陰影が示す傾きどおりに水面が持ち上がります"/>
+				<setting_row name="perf_tree_lod" label="樹木の詳細度" tool_tip="Lindenの樹木の詳細度（LOD）の係数"/>
+				<setting_row name="perf_flex_time" label="フレキシプリムの時間" tool_tip="フレキシブルプリムの更新時間の予算係数"/>
+				<setting_row name="perf_max_particles" label="最大パーティクル数" tool_tip="画面上のパーティクルの最大数"/>
+				<button name="sec_perf_adv_reset" label="すべてリセット" tool_tip="パフォーマンスの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_preview" title="プレビューとアクセシビリティ">
+			<panel name="sec_preview">
+				<text name="preview_mode_label" value="プレビューモード"/>
+				<combo_box name="preview_mode_combo" tool_tip="色覚特性をシミュレートするか、シーンの確認用に露光の疑似カラーマップを表示します">
+					<combo_box.item name="0" label="オフ"/>
+					<combo_box.item name="1" label="1型色覚（P型）"/>
+					<combo_box.item name="2" label="2型色覚（D型）"/>
+					<combo_box.item name="3" label="3型色覚（T型）"/>
+					<combo_box.item name="4" label="1色覚（全色盲）"/>
+					<combo_box.item name="5" label="青錐体1色覚"/>
+					<combo_box.item name="6" label="不完全な1色覚"/>
+					<combo_box.item name="7" label="露光の疑似カラー"/>
+				</combo_box>
+				<button name="preview_mode_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="preview_cvd_label" value="色覚補正"/>
+				<combo_box name="preview_cvd_combo" tool_tip="色覚特性を補うよう画像をダルトナイズします">
+					<combo_box.item name="0" label="オフ"/>
+					<combo_box.item name="1" label="1型色覚（P型）"/>
+					<combo_box.item name="2" label="2型色覚（D型）"/>
+					<combo_box.item name="3" label="3型色覚（T型）"/>
+				</combo_box>
+				<button name="preview_cvd_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="preview_cvd_amount" label="補正量" tool_tip="色覚補正の強さ"/>
+				<button name="sec_preview_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

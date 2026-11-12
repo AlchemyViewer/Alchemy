@@ -1,3 +1,7 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <panel label="移動" name="move_panel">
+	<tab_container name="moveview_tab_container">
+		<panel name="general_move_panel" label="一般"/>
+		<panel name="mlook_panel" label="マウス入力"/>
+	</tab_container>
 </panel>

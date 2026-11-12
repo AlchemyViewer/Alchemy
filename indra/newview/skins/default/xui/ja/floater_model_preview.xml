@@ -206,10 +206,10 @@
 			<!-- for log tab -->
 			<!-- LOD PANEL -->
 			<panel label="ＬｏＤ" name="lod_panel" title="詳細度">
-				<text name="source" value="ソース"/>
-				<text name="triangles" value="三角形数"/>
-				<text name="vertices" value="頂点数"/>
-				<text name="high_label" value="高"/>
+				<text name="source" value="ソース" initial_value="ソース"/>
+				<text name="triangles" value="三角形数" initial_value="三角形"/>
+				<text name="vertices" value="頂点数" initial_value="頂点"/>
+				<text name="high_label" value="高" initial_value="高"/>
 				<combo_box name="lod_source_high">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -221,7 +221,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="medium_label" value="中"/>
+				<text name="medium_label" value="中" initial_value="中"/>
 				<combo_box name="lod_source_medium">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -234,7 +234,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="low_label" value="低"/>
+				<text name="low_label" value="低" initial_value="低"/>
 				<combo_box name="lod_source_low">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -247,7 +247,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="lowest_label" value="最低"/>
+				<text name="lowest_label" value="最低" initial_value="最低"/>
 				<combo_box name="lod_source_lowest">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -261,7 +261,7 @@
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
 				<check_box name="gen_normals" label="法線を生成"/>
-				<text name="crease_label" value="折り目の角度："/>
+				<text name="crease_label" value="折り目の角度：" initial_value="折り目の角度："/>
 			</panel>
 			<!-- PHYSYCS PANEL -->
 			<panel label="物理効果" name="physics_panel">

@@ -18,6 +18,32 @@
 				<button name="voice_call_btn" tool_tip="ボイスチャット接続を開きます。"/>
 				<button name="close_btn" tool_tip="この会話を終了します。"/>
 				<button name="expand_collapse_btn" tool_tip="このペインを開閉します。"/>
+				<panel name="nearby_toolbar">
+					<button name="chat_history_btn" tool_tip="チャット履歴を表示します"/>
+				</panel>
+				<panel name="p2p_toolbar">
+					<button name="profile_btn" tool_tip="プロフィールを表示します"/>
+					<flyout_button name="teleport_btn" tool_tip="テレポートを送るか、リクエストします">
+						<flyout_button.item value="offer_teleport" label="テレポートを送る"/>
+						<flyout_button.item value="request_teleport" label="テレポートをリクエスト"/>
+					</flyout_button>
+					<button name="chat_history_btn" tool_tip="チャット履歴を表示します"/>
+					<button name="pay_btn" tool_tip="このアバターに支払います"/>
+				</panel>
+				<panel name="group_toolbar">
+					<button name="profile_btn" tool_tip="プロフィールを表示します"/>
+					<button name="chat_history_btn" tool_tip="チャット履歴を表示します"/>
+					<button name="view_notices_btn" tool_tip="グループの通知を表示します"/>
+					<flyout_button name="snooze_group_btn" tool_tip="グループチャットを一時的にミュートします">
+						<flyout_button.item value="0" label="次のメッセージまで"/>
+						<flyout_button.item value="5" label="5分"/>
+						<flyout_button.item value="15" label="15分"/>
+						<flyout_button.item value="30" label="30分"/>
+						<flyout_button.item value="45" label="45分"/>
+						<flyout_button.item value="60" label="1時間"/>
+						<flyout_button.item value="-1" label="次回のログインまで"/>
+					</flyout_button>
+				</panel>
 			</layout_panel>
 			<layout_panel name="chat_layout_panel">
 				<layout_stack name="input_panels">

@@ -773,7 +773,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 [AVATAR_NAMES]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification label="Confirm Kick" name="EstateKickSingle">
+	<notification label="キックの確認" name="EstateKickSingle">
 		この不動産から[AVATAR_NAMES]をキックしますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
@@ -787,7 +787,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		[AVATAR_NAMES]のこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
 		<usetemplate name="yesnocancelbuttons" canceltext="キャンセル" notext="すべての不動産" yestext="この不動産"/>
 	</notification>
-	<notification label="Confirm Ban" name="EstateBanMultiple">
+	<notification label="追放の確認" name="EstateBanMultiple">
 		以下の住民らをこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
 
 [AVATAR_NAMES]
@@ -1802,7 +1802,7 @@ https://www.alchemyviewer.org/downloads.html
 		<usetemplate ignoretext="ブラウザを起動して、スクリプトガイドを閲覧するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="WebLaunchLSLWiki">
-		LSLポータルでスクリプトに関する情報を確認しますか？
+		ＬＳＬポータルでスクリプトに関する情報を確認しますか？
 		<usetemplate ignoretext="ブラウザを起動してＬＳＬポータルを見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
 	</notification>
 	<notification name="ReturnToOwner">
@@ -4993,6 +4993,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		<usetemplate ignoretext="ステータスを非フレンドへの自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FoundLegacyNsisInstallation">
+		[APP_NAME]は旧バージョン[VERSION]のインストールを検出しました。旧バージョンをアンインストールするには、[https://community.secondlife.com/knowledgebase/english/how-to-uninstall-and-reinstall-second-life-r524 こちらの説明]に従ってください。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="CannotPasteFolderIntoSelf">
@@ -5016,15 +5017,21 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 ビューアは、ダウンロード完了後に再起動します。
 	</notification>
 	<notification name="RegionTPAccessBlocked_NotifyAdultsOnly">
+		訪問しようとしているリージョンのレーティングは[REGIONMATURITY_CAP]で、あなたのアカウントの種類では利用できません。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="DeleteWornItems">
+		削除しようとしているアイテムの一部は、アバターが着用中です。
+これらのアイテムをアバターから外しますか？
 		<usetemplate name="okcancelbuttons" yestext="アイテムを外して削除" notext="キャンセル"/>
 	</notification>
 	<notification name="CantDeleteRequiredClothing">
+		削除しようとしているアイテムの一部は、必須の衣類レイヤー（スキン、シェイプ、髪、目）です。
+削除する前に、それらのレイヤーを置き換える必要があります。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ThumbnailSelectionTooLarge">
+		一度に変更できるサムネイルは50個までです。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="CantLinkNotecard">
@@ -5133,5 +5140,282 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="AOImportLinkFailed">
 		アニメーション「[NAME]」のアニメーションリンクの作成に失敗しました！
+	</notification>
+	<notification name="ScriptStudioSaveChanges">
+		「[NAME]」への変更を保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保存" notext="保存しない" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioSaveChangesMany">
+		[COUNT]個のスクリプトに未保存の変更があります。閉じる前に保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="すべて保存" notext="保存しない" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioNewItem" label="新規アイテム">
+		新しい[KIND]の名前を入力してください：
+	</notification>
+	<notification name="ScriptStudioDescribe" label="説明">
+		[NAME]の説明を入力してください：
+	</notification>
+	<notification name="ScriptStudioSaveTheme" label="テーマを保存">
+		現在の色をテーマとして保存する名前を入力してください：
+	</notification>
+	<notification name="ScriptStudioThemeNotSaved">
+		テーマを[PATH]に保存できませんでした。
+	</notification>
+	<notification name="ScriptStudioThemeNameShipped">
+		「[NAME]」という名前の組み込みテーマがすでにあります。別の名前を選んでください。
+	</notification>
+	<notification name="ScriptStudioSnippetsNone">
+		保存できる自分のスニペットがありません。先に「新規」で作成するか、組み込みのスニペットを「コピー」してください。
+	</notification>
+	<notification name="ScriptStudioSnippetsTooLarge">
+		スニペットは[SIZE]バイトありますが、ノートカードに保持できるのは[LIMIT]バイトです。一部を削除するか、代わりに「XMLとして編集」で保管してください。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotSaved">
+		スニペットをノートカード「[NAME]」に保存できませんでした：[REASON]。
+	</notification>
+	<notification name="ScriptStudioSnippetsSaved">
+		[COUNT]個のスニペットを「ノートカード」フォルダーのノートカード「[NAME]」に保存しました。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotRead">
+		ノートカード「[NAME]」を読み込めませんでした：[REASON]。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotSnippets">
+		ノートカード「[NAME]」にはスニペットが含まれていません。「スニペット」タブの「インベントリに保存」で、スニペットを含むノートカードを作成できます。
+	</notification>
+	<notification name="ScriptStudioSnippetsAdded">
+		「[NAME]」のスニペット：[ADDED]個を追加、[RENAMED]個は名前が使用済みだったため番号付きの名前で追加、[SKIPPED]個はすでに持っていたもの。
+	</notification>
+	<notification name="ScriptStudioQuitUnsaved">
+		「[NAME]」に未保存の変更があります。保存しますか、次回開き直すために保持しますか、それとも破棄しますか？
+	</notification>
+	<notification name="ScriptStudioQuitUnsavedMany">
+		[COUNT]個のスクリプトとノートカードに未保存の変更があります。保存しますか、次回開き直すために保持しますか、それとも破棄しますか？
+	</notification>
+	<notification name="ScriptStudioKeptOne">
+		[NAMES]の未保存の変更を次回用に保持しました。Script Studioを開くと開き直されます。今すぐ開きますか？
+	</notification>
+	<notification name="ScriptStudioKept">
+		[COUNT]個のスクリプトとノートカードの未保存の変更を次回用に保持しました：[NAMES]。Script Studioを開くと開き直されます。今すぐ開きますか？
+	</notification>
+	<notification name="RecoveredUnsavedOne">
+		前回ビューアを閉じたときに、[NAMES]の未保存の変更が保持されました。開いて確認して保存するか、破棄してください。それまでは、Script Studioの「ファイル」＞「未保存の変更を復旧」にあります。
+	</notification>
+	<notification name="RecoveredUnsaved">
+		前回ビューアを閉じたときに、[COUNT]個のスクリプトとノートカードの未保存の変更が保持されました：[NAMES]。開いて確認して保存するか、破棄してください。それまでは、Script Studioの「ファイル」＞「未保存の変更を復旧」にあります。
+	</notification>
+	<notification name="ScriptStudioDeleteItemOpen">
+		オブジェクトから「[NAME]」を削除しますか？　この操作は元に戻せません。未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioDeleteItemsOpen">
+		[COUNT]個のアイテムをそれぞれのオブジェクトから削除しますか？　この操作は元に戻せません。開いているアイテムの未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioReplaceAll">
+		[SCRIPTS]の[PLACES]を「[WITH]」に置換しますか？　各スクリプトの変更は1回で取り消せます。開いていないものは、変更が未保存の状態で開かれます。
+		<usetemplate name="okcancelbuttons" yestext="置換" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioFixAll">
+		「[NAME]」で、「[EXAMPLE]」のような[FIXES]を問題ごとに1つずつ適用しますか？　1回で取り消すことも、先にプレビューすることもできます。[LEFT]
+		<usetemplate name="yesnocancelbuttons" yestext="修正" notext="プレビュー" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioPrefsChanged">
+		Script Studioの設定の変更を保持しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保持" notext="破棄" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioRevert">
+		「[NAME]」を最後に保存したバージョンに戻しますか？　未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="元に戻す" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioResetScripts">
+		[COUNT]個のスクリプトをリセットしますか？　それぞれ変数をクリアし、state_entryから再開します。
+		<usetemplate name="okcancelbuttons" yestext="リセット" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioStopScripts">
+		[COUNT]個のスクリプトを停止しますか？　再度開始するまで停止したままになります。
+		<usetemplate name="okcancelbuttons" yestext="停止" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioMastersSendUsers">
+		[FILES]がディスク上で変更されました。これにより、ファイルにリンクされたワールド内のスクリプト[COUNT]個（[PLACES]）が変更されます。今すぐ送信しますか？　送信しないスクリプトは「ファイルから送信」を待ちます。
+		<usetemplate name="okcancelbuttons" yestext="すべて送信" notext="送信しない"/>
+	</notification>
+	<notification name="ScriptStudioFileChanged">
+		[NAME]がディスク上で変更されましたが、このタブには未保存の変更があります。ディスクから再読み込みしますか、それとも自分の変更を残しますか？
+		<usetemplate name="okcancelbuttons" yestext="ディスクから読み込む" notext="自分の変更を残す"/>
+	</notification>
+	<notification name="ScriptStudioLinkUnsaved">
+		「[NAME]」には未保存の変更があり、[FILE]にリンクするとファイルの内容がスクリプトの内容になります。変更をファイルに書き込んで、ファイルの内容をすべて置き換えますか？　それとも変更を破棄して、ファイルをそのまま採用しますか？　破棄した変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="yesnocancelbuttons" yestext="ファイルに書き込む" notext="変更を破棄" canceltext="キャンセル"/>
+	</notification>
+	<notification name="SoftwareRenderer">
+		[APP_NAME]は[RENDERER]で描画しています。これはグラフィックカードではなくCPUで描画するため、非常に遅くなります。
+
+通常、これはグラフィックドライバーが読み込まれなかったことを意味します。よくある原因：
+- NVIDIAのドライバーにEGLプラットフォームライブラリがない（Waylandではegl-wayland、X11ではegl-x11）。
+- グラフィックカード用のMesaドライバーがインストールされていないか、/dev/driを開く権限がない。
+- GPUにアクセスできない仮想マシンやコンテナ、またはd3d12ドライバーのないWSL。
+		<usetemplate name="okignore" ignoretext="グラフィックがCPUで描画されているとき" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CannotDeleteSelectObjectsNoPermission">
+		「削除」を実行できません。
+
+修正権限のあるスクリプト付きオブジェクトを選択してください。
+	</notification>
+	<notification name="preexisting_tport">
+		申し訳ありませんが、システムはテレポートを開始できませんでした。数分後にもう一度お試しください。
+	</notification>
+	<notification name="InvalidTerrainAlphaNotFullyLoaded">
+		リージョンのテクスチャを設定できませんでした：
+地形テクスチャ[TEXTURE_NUM]は完全に読み込まれていませんが、ビット深度が[TEXTURE_BIT_DEPTH]のため透明部分を含むとみなされます。現在、地形テクスチャでは透明はサポートされていません。
+
+テクスチャ[TEXTURE_NUM]が不透明な場合は、完全に読み込まれるのを待ってから、もう一度「適用」をクリックしてください。
+
+アルファは、alphaMode="MASK"かつdoubleSided=falseの地形マテリアル（PBR Metallic Roughness）でのみサポートされています。
+	</notification>
+	<notification name="InvalidTerrainAlpha">
+		リージョンのテクスチャを設定できませんでした：
+地形テクスチャ[TEXTURE_NUM]に透明部分が含まれています。現在、地形テクスチャでは透明はサポートされていません。
+
+テクスチャ[TEXTURE_NUM]を不透明なRGB画像に置き換えてから、もう一度「適用」をクリックしてください。
+
+アルファは、alphaMode="MASK"かつdoubleSided=falseの地形マテリアル（PBR Metallic Roughness）でのみサポートされています。
+	</notification>
+	<notification name="InvalidTerrainMaterialNotLoaded">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]が読み込まれていません。
+
+マテリアルが読み込まれるのを待つか、マテリアル[MATERIAL_NUM]を有効なマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialLoadFailed">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]の読み込みに失敗しました。
+
+マテリアル[MATERIAL_NUM]を有効なマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialDoubleSided">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]は両面です。現在、PBR地形では両面マテリアルはサポートされていません。
+
+マテリアル[MATERIAL_NUM]をdoubleSided=falseのマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialAlphaMode">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]はサポートされていないalphaMode="[MATERIAL_ALPHA_MODE]"を使用しています。
+
+マテリアル[MATERIAL_NUM]をalphaMode="OPAQUE"またはalphaMode="MASK"のマテリアルに置き換えてください。
+	</notification>
+	<notification name="RegionAboutToShutdown">
+		入ろうとしているリージョンはまもなくシャットダウンします。
+	</notification>
+	<notification name="CutoutSnapshotSaved">
+		このスナップショットは切り抜きでした：切り抜きの対象だけが描画されました。スナップショットウィンドウで「切り抜き」のチェックを外すまで、オンのままです。
+	</notification>
+	<notification name="CutoutTargetMissing">
+		スナップショットは保存されませんでした：切り抜きの対象が視界にありません。カメラをそちらに向けるか、もう一度選択するか、スナップショットウィンドウで「切り抜き」のチェックを外してください。
+	</notification>
+	<notification name="LightBoxWhiteBalanceTooDark">
+		その場所は暗すぎて色を読み取れません。白またはグレーに見えるはずの、十分に明るいものを選んでください。
+	</notification>
+	<notification name="LightBoxWhiteBalanceUnreachable">
+		色温度と色合いではそれを中和できません。色付きの光の下にある無彩色の面ではなく、色の付いた面のようです。
+	</notification>
+	<notification name="LightBoxLookOverwrite">
+		「[NAME]」という名前のルックはすでに存在します。置き換えますか？
+
+この操作は元に戻せません。
+		<usetemplate name="okcancelbuttons" yestext="置き換える" notext="キャンセル"/>
+	</notification>
+	<notification name="LocalMeshNoUVs">
+		[FNAME]にはUV座標がないため、テクスチャやマテリアルをプレビューできません（テクスチャなし／白で描画されます）。UVマップ付きでメッシュを再エクスポートしてください。
+	</notification>
+	<notification name="NowOwnObjectInv">
+		オブジェクト[OBJECT_NAME]の所有者になり、インベントリに入れられました。
+	</notification>
+	<notification name="YouDiedAndGotTPLanding">
+		死亡したため、区画の着地点にテレポートされました
+	</notification>
+	<notification name="YouDiedAndGotTPTelehub">
+		死亡したため、リージョンのテレハブにテレポートされました
+	</notification>
+	<notification name="NoTransNoSaveToContents">
+		オブジェクトの所有権を譲渡する権限がないため、&lt;nolink&gt;「[OBJ_NAME]」&lt;/nolink&gt;をオブジェクトの中身に保存できません。
+	</notification>
+	<notification name="CantAttachObjectBeingRemoved">
+		オブジェクトはすでに取り外し中のため、装着できません。
+	</notification>
+	<notification name="ChatCommandCalc">
+		計算：[EXPRESSION] = [RESULT]
+	</notification>
+	<notification name="ChatCommandCalcFailed">
+		計算に失敗しました。
+	</notification>
+	<notification name="ChatCommandDiceRoll">
+		サイコロ：[RESULT]
+	</notification>
+	<notification name="AutoAcceptedInventory">
+		[NAME]からの[ITEM]を自動的に受け取り、インベントリに入れました。
+	</notification>
+	<notification name="AlchemyCrashReportConsent">
+		Alchemyの開発者にクラッシュレポートを送信しますか？
+
+レポートには、ビューアがクラッシュした場所、ログ、設定、アバター名が含まれます。レポートはAlchemyの開発者だけが閲覧できるSentryに送られ、この許可なしに送られることはありません。この設定は後で初期設定から変更できます。
+		<usetemplate name="okcancelbuttons" yestext="送信する" notext="送信しない"/>
+	</notification>
+	<notification name="AlchemyFeedbackAfterCrash">
+		[WHAT]何をしていたか覚えていれば、開発者に伝えることで原因の特定に役立ちます。
+	</notification>
+	<notification name="AlchemyFeedbackSent">
+		ありがとうございます。フィードバックはAlchemyの開発者に届きました。
+参照番号：[REF]
+	</notification>
+	<notification name="AlchemyFeedbackQueued">
+		フィードバックをまだサーバーに送信できませんでした。自動的に送信されます。
+	</notification>
+	<notification name="AlchemyFeedbackQueuedDisconnected">
+		切断されているため、フィードバックは次回Alchemyを起動したときに送信されます。
+	</notification>
+	<notification name="AlchemyFeedbackKeptSent">
+		以前送信したフィードバックがAlchemyの開発者に届きました。
+参照番号：[REF]
+	</notification>
+	<notification name="AlchemyFeedbackFailed">
+		フィードバックは送信されませんでした。[REASON]
+
+メッセージは「フィードバックを送信」に保存されています。
+	</notification>
+	<notification name="AlchemyFeedbackGivenUpRestored">
+		[DATE]に書いたフィードバックをAlchemyの開発者に送信できなかったため、Alchemyは再試行を中止しました。メッセージは「フィードバックを送信」に戻されています。
+	</notification>
+	<notification name="AlchemyFeedbackGivenUp">
+		[DATE]に書いたフィードバックをAlchemyの開発者に送信できなかったため、Alchemyは再試行を中止しました。
+	</notification>
+	<notification name="AlchemyFeedbackSendTest">
+		Alchemyの開発者にテストレポートを送信しますか？　システム情報と今回のセッションのログ、さらに「フィードバックを送信」で含める設定にしている場合はアバター名が含まれます。
+		<usetemplate name="okcancelbuttons" yestext="送信" notext="キャンセル"/>
+	</notification>
+	<notification name="SceneExplorerFullRegion">
+		リージョン全体を対象にすると、カメラに見える範囲だけでなく、リージョン内のすべてのオブジェクトをビューアに送信するようシミュレーターに要求します。混雑したリージョンでは大量のデータになり、落ち着くまで時間がかかる場合があります。
+
+これをオフにするか、シーンエクスプローラーを閉じると、シミュレーターは通常の状態に戻ります。
+		<usetemplate name="okignore" ignoretext="シーンエクスプローラーでリージョン全体を対象にするとき" yestext="ＯＫ"/>
+	</notification>
+	<notification name="LoadCameraPositionNoneSaved">
+		カメラの視点はまだ保存されていません。
+	</notification>
+	<notification name="LoadCameraPositionOutsideDrawDistance">
+		カメラの位置が描画距離より遠いため、カメラの視点を復元できません。
+	</notification>
+	<notification name="XUIStudioRemoveOrphans">
+		[LANG]のすべてのファイルから、すべての孤立した値を削除しますか？
+
+孤立した値とは、ベースにもう存在しないもの（名前がなくなった要素、名前のない要素、ベースの要素が持たない属性）に対して言語が書いている値です。マージはどれも適用しません。
+
+ファイルに書き込むため、ここから元に戻すことはできません。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="XUIStudioCloseDocument">
+		[FILE]には保存されていない編集があります。
+解放する前に保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保存" notext="保存しない" canceltext="キャンセル"/>
 	</notification>
 </notifications>

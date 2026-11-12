@@ -70,6 +70,9 @@
 					<text name="changes" value="体験がすべてのリージョンに表示されるには数分かかる場合があります。"/>
 					<button label="戻る" name="cancel_btn"/>
 					<button label="保存" name="save_btn"/>
+					<text name="edit_marketplace_label">
+						マーケットプレイスのストア：
+					</text>
 				</panel>
 			</scroll_container>
 		</panel>

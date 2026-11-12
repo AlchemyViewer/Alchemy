@@ -19,4 +19,19 @@
 		誰でもない
 	</text>
 	<text name="skin_notes_label" value="ノート："/>
+	<text name="ui_fonts_header">
+		カスタムUIフォント
+	</text>
+	<text name="ui_font_sansserif_label">
+		UIフォント：
+	</text>
+	<combo_box name="ui_font_sansserif" tool_tip="ほとんどのUIテキストで使うSansSerifファミリーを上書きします。fonts.xmlのフォントファミリーを選ぶか、右のボックスにファイル名を入力してください。"/>
+	<text name="ui_font_monospace_label">
+		等幅フォント：
+	</text>
+	<combo_box name="ui_font_monospace" tool_tip="コード／スクリプトエディターや行内の等幅テキストで使うMonospaceファミリーを上書きします。fonts.xmlのファミリーから選ぶか、ファイル名を指定してください。"/>
+	<text name="ui_font_emoji_label">
+		絵文字フォント：
+	</text>
+	<combo_box name="ui_font_emoji" tool_tip="絵文字が表示されるすべての場所（チャット、名前、UI）で使うカラー絵文字フォントを上書きします。EmojiBaseを経由するため、各チェーンのフィルターを保ったまま、絵文字を使うすべてのチェーンに反映されます。"/>
 </panel>

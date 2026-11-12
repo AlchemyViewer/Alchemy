@@ -1,0 +1,356 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="script_studio_prefs" title="Script Studioの設定">
+	<floater.string name="ThemeCustom">カスタム</floater.string>
+	<floater.string name="ThemeOwn">（自分用）</floater.string>
+	<floater.string name="PlaceInventory">インベントリ</floater.string>
+	<floater.string name="PlaceObject">スクリプトのオブジェクト</floater.string>
+	<floater.string name="PlaceDisk">ディスク上のフォルダー</floater.string>
+	<floater.string name="OrderWorldOff">インクルードの検索順序。チェックを外した場所はスキップされます。グレー表示の場所を使うには、上のボックスにチェックを入れてください。</floater.string>
+	<floater.string name="ThemeNewName">マイテーマ</floater.string>
+	<floater.string name="VimrcFromFile">ノートカードがない場合、vimrcはファイル[PATH]です。:mapと関連コマンド、let mapleader、:setに対応しています。</floater.string>
+	<floater.string name="VimrcFromNotecard">このノートカードがvimrcです。:mapと関連コマンド、let mapleader、:setに対応しています。</floater.string>
+	<floater.string name="VimrcUnknownNotecard">（まだインベントリにないノートカード）</floater.string>
+	<floater.string name="VimrcOnlyNotecards">vimrcにできるのはインベントリ内のノートカードのみです。</floater.string>
+	<floater.string name="HeadingEditor">エディター</floater.string>
+	<floater.string name="HeadingSyntax">構文</floater.string>
+	<floater.string name="NoFolder">フォルダーがありません。「追加…」で追加してください。</floater.string>
+	<floater.string name="SnippetUnnamed">（名前なし）</floater.string>
+	<floater.string name="SnippetNewName">新しいスニペット</floater.string>
+	<floater.string name="SnippetCopyName">[NAME]（コピー）</floater.string>
+	<floater.string name="SnippetBuiltin">ビューアに組み込まれています。変更できるバージョンを作るにはコピーしてください。</floater.string>
+	<floater.string name="SnippetsNotecardName">スクリプトのスニペット</floater.string>
+	<floater.string name="SnippetsNotecardNotMade">ノートカードを作成できませんでした</floater.string>
+	<floater.string name="SnippetsOnlyNotecards">スニペットを取り込めるのはインベントリ内のノートカードのみです。</floater.string>
+	<floater.string name="SnippetsFollowOnlyNotecards">スニペット用にフォローできるのはインベントリ内のノートカードのみです。</floater.string>
+	<floater.string name="SnippetFollowed">フォロー中のノートカード[NAME]から。自分用のバージョンを作るにはコピーするか、ノートカード側で変更してください。</floater.string>
+	<floater.string name="SnippetNotecardUnknown">（まだインベントリにないノートカード）</floater.string>
+	<floater.string name="SnippetNotecardTip">スニペットのノートカードをここにドロップするとフォローします：そのスニペットが自分のものと並んで提示され、誰が変更してもノートカードの現在の内容が使われます。変更されるまでキャッシュされます。</floater.string>
+	<floater.string name="LintLSL20001">外側のスコープの宣言を隠す宣言</floater.string>
+	<floater.string name="LintLSL20002">条件として使われている代入</floater.string>
+	<floater.string name="LintLSL20003">現在のステートへの変更</floater.string>
+	<floater.string name="LintLSL20004">リストまたは文字列を返す関数内でのステート変更</floater.string>
+	<floater.string name="LintLSL20005">関数内のif文の中でのステート変更</floater.string>
+	<floater.string name="LintLSL20007">空のif文</floater.string>
+	<floater.string name="LintLSL20009">宣言されたが使われていない変数、関数、ラベル</floater.string>
+	<floater.string name="LintLSL20011">リスト同士の==（長さだけを比較する）</floater.string>
+	<floater.string name="LintLSL20012">常に真になる条件</floater.string>
+	<floater.string name="LintLSL20013">常に偽になる条件</floater.string>
+	<floater.string name="LintLSL20014">空のループ本体</floater.string>
+	<floater.string name="LintLSL20016">間違ったラベルに到達する可能性のあるjump</floater.string>
+	<floater.string name="LintLSL20017">1つの関数内で２回宣言されたラベル</floater.string>
+	<floater.string name="LintLSL20018">文として使われている==</floater.string>
+	<floater.string name="LintLSL20019">非推奨の関数または定数</floater.string>
+	<floater.string name="LintLSL20020">置き換え先のある非推奨の関数または定数</floater.string>
+	<floater.string name="LintLSLSlLoopInvariantCall">ループの条件内のllGetListLength(l)で、ループ内でlが変化しないもの（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlSleepingCall">スクリプトをスリープさせる呼び出しで、Fast版ならスリープなしで同じことができるもの（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlMergeablePrimParams">連続するプリムパラメーターの呼び出しで、1回の呼び出しにまとめられるもの（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlCostlyListen">チャンネル０で誰に対しても行うlisten（チャットのすべての行を受信する）（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlFastTimer">０．１秒未満のタイマー（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlFastSensor">１秒未満のセンサーの繰り返し（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlIntegerPast32Bits">0xFFFFFFFFを超える整数（ＬＳＬでは-1として読まれる）（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlStringBuild">ループ内での文字列の連結（毎回新しく作り直される）（Studio独自）</floater.string>
+	<floater.string name="LintLSLSlRepeatedCall">１つのハンドラー内での同じ値の再取得（llGetOwner()など）（Studio独自）</floater.string>
+	<floater.string name="LintLuauUnknownGlobal">不明なグローバル（型チェッカーも報告します）</floater.string>
+	<floater.string name="LintLuauDeprecatedGlobal">非推奨のグローバル</floater.string>
+	<floater.string name="LintLuauGlobalUsedAsLocal">１つの関数内でのみ使われるグローバル</floater.string>
+	<floater.string name="LintLuauLocalShadow">別の名前を隠すローカル</floater.string>
+	<floater.string name="LintLuauSameLineStatement">１行に２つの文</floater.string>
+	<floater.string name="LintLuauMultiLineStatement">新しい文のようにインデントされた行に続く文</floater.string>
+	<floater.string name="LintLuauLocalUnused">使われていないローカル</floater.string>
+	<floater.string name="LintLuauFunctionUnused">使われていないローカル関数</floater.string>
+	<floater.string name="LintLuauImportUnused">使われていないrequire</floater.string>
+	<floater.string name="LintLuauBuiltinGlobalWrite">組み込みグローバルへの代入</floater.string>
+	<floater.string name="LintLuauPlaceholderRead">プレースホルダー_の読み取り</floater.string>
+	<floater.string name="LintLuauUnreachableCode">決して実行されないコード</floater.string>
+	<floater.string name="LintLuauUnknownType">型チェック内の不明な型名</floater.string>
+	<floater.string name="LintLuauForRange">まったく実行されないか、不自然に実行される数値forループ</floater.string>
+	<floater.string name="LintLuauUnbalancedAssignment">代入で名前より値が多いか少ない</floater.string>
+	<floater.string name="LintLuauImplicitReturn">一部のパスでのみ値を返す関数</floater.string>
+	<floater.string name="LintLuauDuplicateLocal">2回宣言された同じローカル</floater.string>
+	<floater.string name="LintLuauFormatString">不正な書式文字列</floater.string>
+	<floater.string name="LintLuauTableLiteral">テーブルリテラル内で２回指定されたキー</floater.string>
+	<floater.string name="LintLuauUninitializedLocal">値が与えられる前に読まれるローカル</floater.string>
+	<floater.string name="LintLuauDuplicateFunction">2回定義された同じ関数</floater.string>
+	<floater.string name="LintLuauDeprecatedApi">非推奨のAPI</floater.string>
+	<floater.string name="LintLuauTableOperations">正しく動作しない使い方をされたテーブル関数</floater.string>
+	<floater.string name="LintLuauDuplicateCondition">ifの連鎖内で２回現れる同じ条件</floater.string>
+	<floater.string name="LintLuauMisleadingAndOr">a and b or c（bがfalseまたはnilになりうる場合）</floater.string>
+	<floater.string name="LintLuauCommentDirective">不明な--!コメントディレクティブ</floater.string>
+	<floater.string name="LintLuauIntegerParsing">大きすぎて正確に表せない整数リテラル</floater.string>
+	<floater.string name="LintLuauComparisonPrecedence">not a == bや類似の比較</floater.string>
+	<floater.string name="LintLuauRedundantNativeAttribute">冗長な@native属性</floater.string>
+	<floater.string name="LintLuauSlCompoundAssign">x = x + 1（Luauではx += 1と書ける）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlNumberTruth">真偽値として読まれる数値、文字列、uuid、vector、quaternion、リスト（SLuaでは０、空白、ゼロ、NULL_KEYでも真とみなされる）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlNilSentinel">nilを返すfindを-1と比較、またはllcompatの-1を返すものをnilと比較（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlTableCompare">その場で作った{}とのテーブル比較（決して等しくならない）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlZeroIndex">ＬＳＬのように０から数えたリスト、文字列、ll関数のインデックス（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlCompatCall">ll版で同じ意味になるllcompatの関数（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlBooleanNumber">ＬＳＬのTRUEとFALSEのように、真偽値を数値と比較（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlGlobalAssign">ローカルで十分なのにトップレベルで値を与えたグローバル、またはブロック内でグローバルにした関数（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlForIndexAssign">ループ内で変更されたforループ自身の変数（LuauのforはＬＳＬのようにそこから続行しない）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlGlobalFunction">ローカル関数で十分なのにグローバルにしたトップレベルの関数（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlParenCondition">ＬＳＬで必要だったような、括弧で囲んだ条件（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlAlmostSwapped">a = bの後のb = a（入れ替えにならない）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlMustUse">値を返すだけの呼び出しで、その値が捨てられているもの（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlGeneralizedFor">for k, v in pairs(t)（Luauのforはt自体を走査できる）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlEmptyBlock">ブロックが空のif、else、ループ（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlIndexDivision">/ による除算でインデックスしたリスト（小数になる可能性がある）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlVectorProduct">ＬＳＬのドット積やクロス積のように、数値が必要な場所でのベクトル同士の乗算や%（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlSleepingCall">スクリプトをスリープさせる呼び出しで、Fast版ならスリープなしで同じことができるもの（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlMergeablePrimParams">連続するプリムパラメーターの呼び出しで、１回の呼び出しにまとめられるもの（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlCostlyListen">チャンネル０で誰に対しても行うlisten（チャットのすべての行を受信する）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlFastTimer">０．１秒未満のタイマー（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlFastSensor">１秒未満のセンサーの繰り返し（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlStringBuild">ループ内での文字列の連結（毎回新しく作り直される）（Studio独自）</floater.string>
+	<floater.string name="LintLuauSlRepeatedCall">１つのハンドラー内での同じ値の再取得（llGetOwner()など）（Studio独自）</floater.string>
+	<floater.string name="LintLuauName">
+		[DESCRIPTION]
+
+.luaurcでの名前：[NAME]
+	</floater.string>
+	<tab_container name="tabs">
+		<panel name="colors_tab" label="色">
+			<text name="theme_label">
+				テーマ
+			</text>
+			<combo_box name="theme" tool_tip="エディターの配色。「カスタム」では色見本で設定した色を使います"/>
+			<button name="save_theme" label="名前を付けて保存…" tool_tip="現在の色を自分のテーマとして保存します"/>
+			<button name="restore_skin" label="スキンの色" tool_tip="すべての色をスキンの色にリセットします"/>
+			<text name="font_label">
+				フォント
+			</text>
+			<font_field name="font" tool_tip="エディターのフォント（そのフォント自体で表示）。クリックすると、サンプルを見ながら書体、サイズ、スタイルを選べます"/>
+			<text name="preview_label">
+				プレビュー
+			</text>
+			<combo_box name="preview_language" tool_tip="プレビューに表示する言語"/>
+			<layout_stack name="colors_stack">
+				<layout_panel name="preview_panel">
+					<code_editor name="preview" tool_tip="エディターの見た目のプレビューです。ここに入力できますが、何も保存されません"/>
+				</layout_panel>
+			</layout_stack>
+		</panel>
+		<panel name="editor_tab" label="エディター">
+			<text name="typing_heading">
+				入力
+			</text>
+			<text name="tab_width_label">
+				タブ幅：
+			</text>
+			<spinner name="tab_width" tool_tip="タブストップ間の列数で、インデント1段分の幅です"/>
+			<check_box name="insert_spaces" label="タブではなくスペースでインデントする" tool_tip="オンにすると、Tabキー、改行、整形でスペースを使い、オフにするとタブを使います。インデントが検出されないスクリプトが対象です。"/>
+			<check_box name="detect_indentation" label="各スクリプトの既存のインデントに合わせる" tool_tip="開いたときに各スクリプトのタブ／スペースとインデント幅を読み取ります。ステータスバーで確認・変更できます。"/>
+			<check_box name="reindent_on_paste" label="貼り付けた行を挿入先に合わせてインデントする" tool_tip="貼り付けた行は、相対的なインデントを保ったまま挿入先のインデントに合わせます。1回の「取り消し」で元に戻せます。"/>
+			<check_box name="auto_close" label="括弧と引用符を入力時に閉じる" tool_tip="開き括弧や引用符を入力すると閉じ記号が追加されるか、選択範囲を囲みます。Backspaceで空のペアを削除します"/>
+			<text name="completion_heading">
+				補完
+			</text>
+			<check_box name="auto_complete" label="名前の入力中に補完候補を表示する" tool_tip="入力中に補完リストを開きます。オフにするとCtrl+Spaceを押したときだけ開きます。「LSLからSLua」のLuau型オプションがオンの間、SLuaのハンドラーはLuauの型付きで補完されます"/>
+			<text name="complete_after_label">
+				補完を開くまでの文字数：
+			</text>
+			<spinner name="complete_after" tool_tip="補完リストが開くまでに入力する名前の文字数"/>
+			<check_box name="accept_on_enter" label="Enterで選択中の補完を確定する（Tabは常に確定）" tool_tip="オフにすると、Enterは改行してリストを閉じ、Tabのみが補完を確定します"/>
+			<check_box name="fragment_completion" label="入力中の文からSLuaを補完する" tool_tip="補完とシグネチャヘルプは、入力中の文だけをスクリプトの前回のチェック結果と照合し、即座に応答します。オフにすると、スクリプトを変更したキー入力のたびに全体をチェックしてから応答します"/>
+			<text name="formatting_heading">
+				整形
+			</text>
+			<text name="blank_lines_label">
+				連続して残す空行の数：
+			</text>
+			<spinner name="blank_lines" tool_tip="整形で残す連続した空行の最大数。それを超える空行は削除されます"/>
+			<check_box name="format_spacing" label="インデントだけでなく、行内のスペースも整える" tool_tip="整形時に演算子の前後とカンマの後に1つのスペースを入れます。オフにするとインデントだけを修正します"/>
+			<text name="format_width_label">
+				次の幅を超える行を折り返す：
+			</text>
+			<spinner name="format_width" tool_tip="整形時に、この列数を超える行を、行内の括弧のカンマで区切ってそれぞれ別の行にします。0にすると折り返しません"/>
+			<check_box name="format_brace_spaces" label="SLuaの波括弧の内側にスペース：{ 1, 2 }" tool_tip="整形と「SLuaに変換」で、StyLuaと同様にテーブルやテーブル型の波括弧の内側にスペースを入れます：{ 1, 2 }、{ any }。オフにすると{1, 2}"/>
+			<text name="general_heading">
+				一般
+			</text>
+			<check_box name="restore_tabs" label="前回のセッションのタブを開き直す" tool_tip="ウィンドウを開いたときに前回のセッションのタブを開き直します。オフにすると要求したものだけを開きます"/>
+			<check_box name="panes_widen" label="エクスプローラーやインスペクターを開いたときにウィンドウを広げる" tool_tip="エクスプローラーやインスペクターを開くと、その幅だけウィンドウを広げ、折りたたむと元に戻します。オフにすると、ペインはエディターの領域を使います"/>
+			<text name="caret_heading">
+				キャレット
+			</text>
+			<text name="caret_style_label">
+				形状：
+			</text>
+			<combo_box name="caret_style" tool_tip="キャレットの描画方法。Vimのノーマルモードでは常にブロックで描画します">
+				<combo_box.item name="line" label="縦線"/>
+				<combo_box.item name="block" label="ブロック"/>
+				<combo_box.item name="underline" label="下線"/>
+			</combo_box>
+			<check_box name="caret_blink" label="点滅" tool_tip="オフにすると、キャレットは点滅しません"/>
+			<text name="hover_heading">
+				ホバー
+			</text>
+			<check_box name="hover_cards" label="名前や問題の上にマウスを置いたときに内容を表示する" tool_tip="宣言、ドキュメント、その場所の問題を示すカードを表示します"/>
+			<text name="hover_delay_label">
+				遅延（秒）：
+			</text>
+			<spinner name="hover_delay" tool_tip="名前の上にマウスを置いてからカードが表示されるまでの時間"/>
+			<check_box name="vim_clipboard" label="ヤンク、削除、プットでシステムのクリップボードを使う" tool_tip="レジスタ指定なしのy、d、x、pでシステムのクリップボードを使います（clipboard=unnamed）。オフにすると &quot;+ と &quot;* のみが使います。"/>
+			<text name="vimrc_label">
+				vimrcのノートカード：
+			</text>
+			<line_editor name="vimrc_notecard" label="ここにノートカードをドロップ" tool_tip="インベントリのノートカードをここにドロップすると、どこでログインしてもvimrcとして使います。変更されるまでキャッシュされます"/>
+			<button name="vimrc_edit" label="編集" tool_tip="vimrcをScript Studioで開きます：ノートカード、なければファイル（存在しない場合は作成）"/>
+			<button name="vimrc_clear" label="クリア" tool_tip="ノートカードの使用をやめ、設定フォルダー内のvimrcファイルを再度読み込みます"/>
+		</panel>
+		<panel name="build_tab" label="ビルド">
+			<text name="saving_heading">
+				保存
+			</text>
+			<check_box name="preflight" label="チェッカーがエラーを見つけたら保存を保留する" tool_tip="オンにすると、チェッカーのエラーがあれば再度保存するまで保存を保留します。オフにすると、保存してエラー数を報告します"/>
+			<check_box name="fix_on_save" label="保存時に安全な修正を適用する" tool_tip="保存前に、動作を変えない修正を1回の取り消し操作として適用します。何も削除しません"/>
+			<check_box name="format_on_save" label="保存時にスクリプトを整形する" tool_tip="保存前にスクリプト全体を1回の取り消し操作として整形します"/>
+			<check_box name="trim_on_save" label="保存時に行末の空白を削除する" tool_tip="保存前に行末のスペースとタブを1回の取り消し操作として削除します"/>
+			<text name="external_heading">
+				外部エディター
+			</text>
+			<line_editor name="external_editor" tool_tip="「外部エディターで編集」のコマンド：プログラムに続けて、ファイルを表す&quot;%s&quot;。空欄の場合はシステムのエディター"/>
+			<button name="external_browse" label="参照…" tool_tip="コマンドの元になるプログラムを選択します"/>
+			<button name="scripting_settings" label="その他のスクリプト設定…" tool_tip="ビューアのスクリプト設定を開きます：VS Codeとの連携とWebSocket同期"/>
+			<text name="includes_heading">
+				インクルード
+			</text>
+			<check_box name="preproc_world" label="オブジェクトとインベントリからインクルードする" tool_tip="#includeとrequireで、スクリプトのオブジェクトやインベントリ内のアイテムを使えるようにします。オフにするとディスク上のフォルダーのみ"/>
+			<check_box name="preproc_disk" label="ディスク上のフォルダーからファイルをインクルードする" tool_tip="#include（SLuaでは--#include）とrequireで、下のフォルダー内のファイルを読めるようにします。オフにするとディスクからは何も読みません。"/>
+			<pane_list name="include_folders" tool_tip="#includeを検索するフォルダ（上から順）。その中にあるディスク上のSLuaスクリプトは、隣にあるものをrequireできます。"/>
+			<button name="add_folder" label="追加…" tool_tip="検索するフォルダを追加します。"/>
+			<button name="remove_folder" label="削除" tool_tip="選択したフォルダの検索をやめます。"/>
+			<text name="order_label">
+				インクルードの検索順序（先頭から）：
+			</text>
+			<scroll_list name="include_order" tool_tip="インクルードの検索順序。最初に一致したものが使われ、チェックを外した場所はスキップされます。"/>
+			<button name="order_up" label="上へ" tool_tip="選択した場所を先に検索します。"/>
+			<button name="order_down" label="下へ" tool_tip="選択した場所を後で検索します。"/>
+			<text name="preproc_heading">
+				プリプロセッサー
+			</text>
+			<check_box name="preproc_enabled" label="保存時にすべてのスクリプトをプリプロセスする" tool_tip="保存時にすべてのスクリプトをプリプロセスし、ソースをFirestormの外枠に保持します。オフにすると、ディレクティブを含むスクリプトか、以前プリプロセッサーで保存したスクリプトのみ"/>
+			<check_box name="preproc_switch" label="switch文" tool_tip="ＬＳＬにswitch文を追加します。コンパイル前にjumpに変換されます。"/>
+			<check_box name="preproc_lazy" label="遅延リスト" tool_tip="Firestormのプリプロセッサーと同様に、ＬＳＬでlist[i]によりリストの要素を読めるようにします。"/>
+			<check_box name="preproc_extensions" label="break、continue、&amp;= |= ^=、inline" tool_tip="ＬＳＬにbreak、continue、&amp;= |= ^= &lt;&lt;= >>=、inline関数を追加します。コンパイル前に変換されます。"/>
+			<check_box name="preproc_compress" label="プリプロセス済みのコードを圧縮する" tool_tip="アセットを小さくするため、プリプロセス済みのコードからコメントと余分なスペースを削除します。"/>
+			<check_box name="preproc_line_comments" label="各行の出どころを記録する" tool_tip="VS Codeプラグインと同様に、プリプロセス済みのコードが別のファイルに移るか行を飛ばす箇所に、行番号とファイルを示す@lineコメントを書き込みます。ディスク上のファイルは、ディスクのルートではなくスクリプトのフォルダーからのパスで示されます。圧縮または最適化したＬＳＬでは削除されます。"/>
+			<check_box name="preproc_upload_header" label="保存内容に保存日時とハッシュを記録する" tool_tip="プリプロセスして保存したスクリプトは、コンパイル済み部分の先頭に数行のコメントを持ちます：保存日時と、ソースおよび展開後の内容のハッシュです。書かれたとおりに保存したスクリプトには付きません。"/>
+			<check_box name="preproc_upload_creator" label="保存した人も記録する" tool_tip="スクリプトを保存した人として、ヘッダーにあなたの名前も記録します。"/>
+			<check_box name="preproc_optimize" label="ＬＳＬを最適化：定数を畳み込み、未使用のコードを削除する" tool_tip="定数の畳み込みと未使用コードの削除を行い、各変更を「問題」に一覧表示します。計算はコンパイルターゲットに従います。"/>
+			<check_box name="preproc_shrink" label="名前を短縮する" tool_tip="プリプロセス済みのコード内のグローバル名を短縮します。ソースには本来の名前が残ります。"/>
+			<check_box name="preproc_addstrings" label="文字列定数を結合する" tool_tip="ＬＳＬ自体は行わない、隣接する文字列定数の結合を行います。"/>
+			<check_box name="preproc_inline" label="一度だけ呼ばれる関数をインライン展開する" tool_tip="１箇所からしか呼ばれない関数をその本体で置き換え、関数を削除します。"/>
+			<text name="defines_label">
+				すべてのスクリプト用のマクロ（1行に1つ、NAMEまたはNAME=value）：
+			</text>
+			<text_editor name="preproc_defines" tool_tip="すべてのスクリプトの前に定義されるマクロ：DEBUGは１、VERSION=2は２になります。スクリプト内の#defineや#undefが優先されます。"/>
+		</panel>
+		<panel name="lints_tab" label="Lint">
+			<text name="lints_lsl_heading">
+				ＬＳＬの警告
+			</text>
+			<scroll_list name="lints_lsl" tool_tip="ＬＳＬチェッカーからの警告。「オン」で報告し、「エラー」でエラーとして扱います（保存が保留される場合があります）。">
+				<scroll_list.columns name="on" label="オン"/>
+				<scroll_list.columns name="error" label="エラー"/>
+				<scroll_list.columns name="lint" label="警告"/>
+			</scroll_list>
+			<button name="lints_defaults" label="デフォルト" tool_tip="すべてのLintを警告としてオンにし、SLuaはグリッドのコンパイルと同様に旧型ソルバーのnonstrictでチェックします。"/>
+			<text name="lints_luau_heading">
+				SLuaのLint
+			</text>
+			<text name="luau_mode_label">
+				デフォルトの型チェック：
+			</text>
+			<combo_box name="luau_mode" tool_tip="--!コメントや.luaurcで指定されていない場合に使われます。ソルバーのデフォルト：旧ソルバーはnonstrict、新ソルバーはstrict">
+				<combo_box.item name="auto" label="ソルバーのデフォルト"/>
+				<combo_box.item name="nonstrict" label="厳格でない（グリッドのコンパイルと同じ）"/>
+				<combo_box.item name="strict" label="厳格"/>
+				<combo_box.item name="nocheck" label="チェックしない"/>
+			</combo_box>
+			<text name="luau_solver_label">
+				型ソルバー：
+			</text>
+			<combo_box name="luau_solver" tool_tip="SLua用のLuau型ソルバー。旧はグリッドのもの、新は異なるミスを見つけますが遅い場合があり、一部のメッセージは英語のみです。">
+				<combo_box.item name="old" label="旧（グリッドのチェックと同じ）"/>
+				<combo_box.item name="new" label="新"/>
+			</combo_box>
+			<scroll_list name="lints_luau" tool_tip="SLuaのLintルール。「オン」で報告し、「エラー」でエラーとして扱います（保存が保留される場合があります）">
+				<scroll_list.columns name="on" label="オン"/>
+				<scroll_list.columns name="error" label="エラー"/>
+			</scroll_list>
+			<text name="lints_luaurc">
+				スクリプトの隣にある.luaurcは、そのスクリプトについてこれらの設定（各Lintと型チェックモード）を上書きします。
+			</text>
+		</panel>
+		<panel name="snippets_tab" label="スニペット">
+			<text name="snippet_language_label">
+				言語：
+			</text>
+			<combo_box name="snippet_language" tool_tip="ＬＳＬまたはSLuaのスニペットを表示します"/>
+			<scroll_list name="snippet_list" tool_tip="自分のスニペット、フォロー中のノートカードのスニペット、ビューア組み込みのスニペットの順に表示します（変更するにはコピーしてください）。スニペットのノートカードをここにドロップすると、そのスニペットが自分のものに追加されます。">
+				<scroll_list.columns name="name" label="スニペット"/>
+				<scroll_list.columns name="prefix" label="プレフィックス"/>
+			</scroll_list>
+			<button name="snippet_new" label="新規" tool_tip="新しいスニペットを作成します"/>
+			<button name="snippet_copy" label="コピー" tool_tip="選択したスニペット（組み込みまたは自分のもの）を、変更できるよう自分のスニペットにコピーします"/>
+			<button name="snippet_delete" label="削除" tool_tip="選択したスニペットを削除します（自分のもののみ）"/>
+			<button name="snippet_to_inventory" label="インベントリに保存" tool_tip="自分のスニペット（LSLとSLua）を「ノートカード」フォルダーの新しいノートカードに保存し、保管や譲渡に使えるようにします。そのノートカードをここにドロップするとスニペットが追加されます。"/>
+			<text name="snippet_notecard_label">
+				フォローするノートカード：
+			</text>
+			<line_editor name="snippet_notecard" label="ここにノートカードをドロップ" tool_tip="スニペットのノートカードをここにドロップしてフォローします。"/>
+			<button name="snippet_notecard_clear" label="クリア" tool_tip="ノートカードのフォローをやめます：そのスニペットは提示されなくなります。"/>
+			<text name="snippet_name_label">
+				名前：
+			</text>
+			<line_editor name="snippet_name" tool_tip="「挿入」メニューと補完リストに表示される名前"/>
+			<text name="snippet_prefix_label">
+				プレフィックス：
+			</text>
+			<line_editor name="snippet_prefix" tool_tip="このスニペットを補完候補に出すために入力する文字列"/>
+			<text name="snippet_detail_label">
+				詳細：
+			</text>
+			<line_editor name="snippet_detail" tool_tip="名前の横に表示される短い説明"/>
+			<code_editor name="snippet_body" tool_tip="スニペットが挿入するテキスト"/>
+			<text name="snippet_help">
+				${1:text}、${2}、$1は順番に移動するタブストップ、$0は最後にキャレットが置かれる位置です。
+			</text>
+			<button name="snippet_xml" label="XMLとして編集…" tool_tip="スニペットのファイルをScript StudioでXMLとして開きます。"/>
+		</panel>
+		<panel name="templates_tab" label="テンプレート">
+			<text name="templates_note">
+				エクスプローラーで作成した新規スクリプトの初期テキスト。空の場合はグリッドのデフォルトです。
+			</text>
+			<code_editor name="template_lsl" tool_tip="新しいＬＳＬスクリプトの初期テキスト。空の場合はグリッドのデフォルト"/>
+			<code_editor name="template_slua" tool_tip="新しいSLuaスクリプトの初期テキスト。空の場合はグリッドのデフォルト"/>
+		</panel>
+		<panel name="convert_tab" label="ＬＳＬからSLua">
+			<text name="convert_note">
+				「コード」＞「SLuaに変換」でＬＳＬスクリプトをどのように書き出すか。各選択肢は、ＬＳＬの動作とまったく同じ意味になる部分だけを変更します。ＬＳＬのまま残した部分には、SLuaでの書き方を注記します。
+			</text>
+			<text name="convert_preset_label">
+				書き出し方：
+			</text>
+			<combo_box name="convert_preset" tool_tip="ＬＳＬと同じ意味になる範囲でSLua本来の書き方にするか、llcompatとtimerイベントを使ってSLuaで可能な限りＬＳＬに近づけるか">
+				<combo_box.item name="convert_modern" label="SLua本来の書き方"/>
+				<combo_box.item name="convert_close" label="可能な限りＬＳＬに近づける"/>
+				<combo_box.item name="convert_custom" label="以下の選択どおり"/>
+			</combo_box>
+			<check_box name="convert_timers" label="LLTimersでタイマー" tool_tip="llSetTimerEventのタイマーをLLTimersで実行し、スクリプトの現在のステートのtimerハンドラーを呼び出します。オフにすると、llcompat.SetTimerEventで動かすtimerイベントを使います。"/>
+			<check_box name="convert_detected" label="検出情報をハンドラーのテーブルから取得" tool_tip="touch_start内のllDetectedKey(0)をdetected[1]:getKey()にします。オフにするとllcompat.DetectedKey(0)。"/>
+			<check_box name="convert_calls" label="llcompatと同じ意味になる場合はSLuaのllを使う" tool_tip="真偽値の戻り値（if ll.SameGroup(id) then）、1つずらした定数インデックス、見つかったかどうかだけを問うfind（nilと比較）。オフにすると、すべてllcompatを使います。"/>
+			<check_box name="convert_idioms" label="呼び出しの代わりにSLuaにあるものを使う" tool_tip="ＬＳＬの呼び出しと同じ意味になる場合に、math、vector、quaternionの関数、^、print、os.time、table.findを使います。"/>
+			<check_box name="convert_uuid_keys" label="スクリプトのキーをSLuaのuuidにする" tool_tip="local owner: uuid = ll.GetOwner()。オフにすると、ＬＳＬと同様にスクリプトが保持するすべてのキーをテキストとして扱い（local owner: string = tostring(ll.GetOwner())）、&quot;&quot;やその他のテキストを与えられたキーがそれを保持・比較・送信できるようにします。"/>
+			<check_box name="convert_fields" label="ハンドラーをLLEventsのフィールドに代入する" tool_tip="SLua本来のスクリプトと同様に、function LLEvents.touch_start(detected) ... end と書きます。SLuaは代入されたハンドラーをLLEvents:onと同様に他のハンドラーと並べて登録しますが、LLEvents:offのために再取得できるのはLLEvents:handlersだけです。オフにするとLLEvents:on。"/>
+			<check_box name="convert_types" label="ローカル変数、パラメーター、戻り値にLuauの型を付ける" tool_tip="ＬＳＬの型から、local count: number = 0 や function names(who: string): string のように書きます。エディターが補完するハンドラーも同様に型付けされます：function LLEvents.on_rez(start_param: number)。"/>
+			<check_box name="convert_key_text_any" label="キーとして渡すテキストに型チェッカー用の:: anyを付ける" tool_tip="ll.Key2Name(name :: any)：SLuaのllはＬＳＬの関数と同様にキーをテキストとして受け取りますが、型チェッカーはuuidを要求します。オフにするとテキストをそのまま書き、型チェッカーが確認箇所として示します。uuid(x)はUUIDでないテキストでスクリプトを停止し、touuid(x)はnilを返します。"/>
+			<check_box name="convert_comments" label="2つの言語で異なる箇所ごとに -- LSL: コメントを付ける" tool_tip="SLuaでＬＳＬと意味が異なる箇所や、SLua独自の書き方がある箇所を、その行の上に記載します。オフにすると「出力」にのみ記載します。"/>
+			<check_box name="convert_keep_comments" label="スクリプト自身のコメントを、それぞれ元の位置に残す" tool_tip="//を--に、/* */を--[[ ]]にして、元のグローバル、関数、ハンドラー、文の上（行内で後ろにあった場合はその後、またはそれを含むものの末尾）に置きます。アスタリスクやスラッシュの罫線はダッシュに、//* ... //*/ は ---[[ ... --]] にします。オフにすると、SLuaにはコメントを残しません。"/>
+		</panel>
+		<panel name="keys_tab" label="キー"/>
+	</tab_container>
+	<button name="ok" label="ＯＫ" tool_tip="変更を確定します"/>
+	<button name="cancel" label="キャンセル" tool_tip="すべての色と設定を、このウィンドウを開いたときの状態に戻します"/>
+</floater>

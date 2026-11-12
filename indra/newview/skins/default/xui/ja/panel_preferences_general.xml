@@ -77,4 +77,5 @@
 		<combo_box.item name="my_tag" label="自分のグループタグのみ"/>
 		<combo_box.item name="all_tags" label="すべてのグループタグ"/>
 	</combo_box>
+	<check_box name="show_distance" label="距離" tool_tip="名前タグに距離をメートルで表示します"/>
 </panel>

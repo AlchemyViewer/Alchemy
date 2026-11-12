@@ -1,0 +1,292 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_lightbox_lens">
+	<accordion name="lens_accordion">
+		<accordion_tab name="atab_sec_dof" title="被写界深度">
+			<panel name="sec_dof">
+				<check_box name="dof_enable" label="被写界深度" tool_tip="カメラのレンズのように、焦点距離から離れた部分をぼかします。切り替えると一瞬カクつきます。"/>
+				<setting_row name="dof_fnumber" label="F値" tool_tip="絞りのF値。値を小さくすると焦点面が浅くなり、ぼけが強くなります。"/>
+				<setting_row name="dof_focal_length" label="焦点距離（㎜）" tool_tip="レンズの焦点距離（ミリメートル）。長いレンズほど背景が圧縮され、強くぼけます。"/>
+				<check_box name="dof_focus_locked" label="焦点をロック" tool_tip="現在の焦点距離をその場で固定します（セッション間では保存されません）"/>
+				<check_box name="dof_focus_pointer" label="ポインターに焦点を合わせる" tool_tip="マウスポインターの下にあるものに常に焦点を合わせ直します（セッション間では保存されません）"/>
+				<button name="sec_dof_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_dof_adv" title="被写界深度 - 詳細">
+			<panel name="sec_dof_adv">
+				<setting_row name="dof_fov" label="画角" tool_tip="被写界深度のモデルが仮想カメラに想定する垂直画角（度）"/>
+				<setting_row name="dof_max_cof" label="最大ぼけ（CoC）" tool_tip="錯乱円の最大サイズ。ぼけの強さの上限になります"/>
+				<setting_row name="dof_res_scale" label="解像度スケール" tool_tip="ぼけを計算する解像度。1＝フル解像度（最も鮮明で最も遅い）、0.25＝4分の1。"/>
+				<setting_row name="dof_transition" label="焦点の移行（秒）" tool_tip="カメラが距離の間で焦点を移すのにかかる秒数"/>
+				<check_box name="dof_near_blur" label="前景をぼかす（前ぼけ）" tool_tip="焦点距離より近いオブジェクトもぼかします"/>
+				<check_box name="dof_edit_mode" label="編集中も被写界深度を維持" tool_tip="ビルド／編集ツールを開いている間も被写界深度を有効にしたままにします"/>
+				<button name="sec_dof_adv_reset" label="すべてリセット" tool_tip="被写界深度の詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_bokeh" title="ボケ">
+			<panel name="sec_bokeh">
+				<text name="bokeh_blades_label" value="絞り"/>
+				<combo_box name="bokeh_blades_combo" tool_tip="ピンぼけしたハイライトの形状。円形は理想化されたレンズで、実際の絞りには羽根があり、多角形が見えます">
+					<combo_box.item name="0" label="円形"/>
+					<combo_box.item name="3" label="3枚羽根"/>
+					<combo_box.item name="5" label="5枚羽根"/>
+					<combo_box.item name="6" label="6枚羽根"/>
+					<combo_box.item name="7" label="7枚羽根"/>
+					<combo_box.item name="8" label="8枚羽根"/>
+					<combo_box.item name="9" label="9枚羽根"/>
+					<combo_box.item name="11" label="11枚羽根"/>
+				</combo_box>
+				<button name="bokeh_blades_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="bokeh_anamorphic" label="アナモルフィック" tool_tip="アナモルフィックレンズのように、ピンぼけしたハイライトを楕円に引き伸ばします。1.0は円形、1を超えると縦長になります。面積を保つため、ぼけの強さを変えずに形だけが変わります"/>
+				<setting_row name="bokeh_highlight_gain" label="ハイライトゲイン" tool_tip="明るいサンプルに追加の重みを与え、ピンぼけしたハイライトがはっきりした円盤に見えるようにします。0は単純な平均です"/>
+				<setting_row name="bokeh_cat_eye" label="キャッツアイ" tool_tip="口径食。イメージサークルの中心からの距離に応じてボケをレンズ形に切り取ります。横長の画面では上下よりかなり先に左右が切り取られます"/>
+				<button name="sec_bokeh_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_bokeh_adv" title="ボケ - 詳細">
+			<panel name="sec_bokeh_adv">
+				<setting_row name="bokeh_highlight_threshold" label="ハイライトのしきい値" tool_tip="ハイライトの強調が始まる明るさ。0ですべてを強調し、上げると本当のハイライトだけに効果を限定します"/>
+				<setting_row name="bokeh_highlight_clamp" label="ファイアフライの制限" tool_tip="1つの明るいサンプルが隣接する円盤に与える影響の上限。下げるとカメラの移動時に輝点がちらつかなくなります。0で上限を無効にします"/>
+				<setting_row name="bokeh_blade_rotation" label="羽根の回転" tool_tip="絞りの多角形を回転させます。円形の絞りでは効果はありません"/>
+				<setting_row name="bokeh_blade_curvature" label="羽根の曲率" tool_tip="開放時の丸い絞りのように、羽根を円に近づけます。円形の絞りでは効果はありません"/>
+				<setting_row name="bokeh_fringe_amount" label="ピンぼけの色縁" tool_tip="ピンぼけしたハイライトの縁に付く色かぶりで、焦点の前後で色相が反転します。画面全体にかかる「色収差」セクションとは別です"/>
+				<text name="bokeh_fringe_near_label" value="手前の色"/>
+				<color_swatch name="bokeh_fringe_near_tint" tool_tip="焦点面より手前のハイライトに付く色"/>
+				<button name="bokeh_fringe_near_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="bokeh_fringe_far_label" value="奥の色"/>
+				<color_swatch name="bokeh_fringe_far_tint" tool_tip="焦点面より奥のハイライトに付く色"/>
+				<button name="bokeh_fringe_far_rst" tool_tip="デフォルトにリセットします"/>
+				<button name="sec_bokeh_adv_reset" label="すべてリセット" tool_tip="ボケの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_aberration" title="レンズの収差">
+			<panel name="sec_aberration">
+				<setting_row name="aberration_spherical" label="球面収差" tool_tip="ピンぼけしたハイライトを縁の明るい泡のように中空にするか、中を埋めてなめらかなぼけにします。実際のガラスと同様に焦点の前後で反転します"/>
+				<setting_row name="aberration_field" label="像面の伸び" tool_tip="ピンぼけしたハイライトを画面の端に向かって引き伸ばします。正の値で中心の周りに渦を巻き、負の値で彗星状になります"/>
+				<setting_row name="aberration_field_falloff" label="像面の減衰" tool_tip="像面の伸びが隅からどこまで内側に及ぶか。高くすると画面の中央がきれいに保たれます"/>
+				<setting_row name="aberration_coma" label="コマ収差の非対称性" tool_tip="各ハイライトを、尾が画面中心から外を向く彗星状にします。光軸上ではゼロ、隅で最も強くなります"/>
+				<button name="sec_aberration_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_bloom" title="ブルーム（HDR）">
+			<panel name="sec_bloom">
+				<setting_row name="bloom_strength" label="強度" tool_tip="ブルームをシーンに合成する強さ"/>
+				<setting_row name="bloom_threshold" label="しきい値" tool_tip="ピクセルがブルームする輝度（リニア光）の下限。1.0がおおよそ白より明るい値です"/>
+				<setting_row name="bloom_scatter" label="拡散" tool_tip="オクターブごとのブルームの広がり。約2.5を超えるとフィルターにエイリアシングが出始めます。"/>
+				<button name="sec_bloom_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_bloom_adv" title="ブルーム（HDR） - 詳細">
+			<panel name="sec_bloom_adv">
+				<setting_row name="bloom_knee" label="ニー" tool_tip="しきい値より下のソフトニーの幅。広くするとブルームが緩やかに始まります"/>
+				<setting_row name="bloom_alpha_boost" label="プリムのグロー強調" tool_tip="従来のプリムのグローをHDRブルームに入力する際の倍率。光るオブジェクトを従来の明るさに合わせます"/>
+				<setting_row name="bloom_mips" label="ミップ数" tool_tip="ブルームのピラミッドの段数。ミップを増やすと広く柔らかいブルームになります。変更すると一瞬カクつきます。"/>
+				<text name="bloom_res_scale_label" value="基準解像度"/>
+				<combo_box name="bloom_res_scale_combo" tool_tip="ブルームのピラミッドを開始する解像度。低い解像度ほど速く、ミップごとに広く届きます。変更すると一瞬カクつきます。">
+					<combo_box.item name="0" label="フル"/>
+					<combo_box.item name="2" label="2分の1"/>
+					<combo_box.item name="3" label="4分の1"/>
+					<combo_box.item name="4" label="8分の1"/>
+				</combo_box>
+				<button name="bloom_res_scale_rst" tool_tip="デフォルトにリセットします"/>
+				<check_box name="bloom_halation" label="ハレーション" tool_tip="明るいハイライトの周りに暖色のハローを出します（より広いピラミッドの形式を使用）。切り替えると一瞬カクつきます。"/>
+				<setting_row name="bloom_halation_strength" label="ハレーションの強度" tool_tip="写真的なハレーションの量。0.25で穏やかな映画風になります"/>
+				<text name="bloom_halation_tint_label" value="ハレーションの色"/>
+				<color_swatch name="bloom_halation_tint" tool_tip="ハレーションのハローの色。デフォルトは暖かいアンバーです"/>
+				<button name="bloom_halation_tint_rst" tool_tip="デフォルトにリセットします"/>
+				<button name="sec_bloom_adv_reset" label="すべてリセット" tool_tip="ブルームの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_crossfilter" title="クロスフィルター">
+			<panel name="sec_crossfilter">
+				<setting_row name="crossfilter_strength" label="強度" tool_tip="エッチングされたガラスフィルターのように、画面内のすべての明るい点を星形の光条にします。ブルームのピラミッドを利用するため、ブルームの強度が0だと効果がなくなります"/>
+				<text name="crossfilter_points_label" value="光条の数"/>
+				<combo_box name="crossfilter_points_combo" tool_tip="各星の光条の数。光条は均等に配置されるため、奇数では非対称の星になります">
+					<combo_box.item name="2" label="2（線）"/>
+					<combo_box.item name="4" label="4（十字）"/>
+				</combo_box>
+				<button name="crossfilter_points_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="crossfilter_length" label="長さ" tool_tip="光条が届く距離。1.0が調整済みの値で、範囲は光条が格子状に崩れ始める手前までです"/>
+				<button name="sec_crossfilter_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_crossfilter_adv" title="クロスフィルター - 詳細">
+			<panel name="sec_crossfilter_adv">
+				<setting_row name="crossfilter_angle" label="角度" tool_tip="フィルターをねじ込み部分で回すように、星全体を回転させます"/>
+				<setting_row name="crossfilter_falloff" label="減衰" tool_tip="各光条が長さ方向にどれだけ速く薄れるか。低いと長く均一な光条、高いと小さくまとまった星になります。形状のみで、明るさは「強度」で決まります"/>
+				<setting_row name="crossfilter_chromatic" label="分散" tool_tip="光条に沿った虹色の広がり。実際のスターフィルターは回折格子なので、中心は白いまま先端に色が付きます"/>
+				<button name="sec_crossfilter_adv_reset" label="すべてリセット" tool_tip="クロスフィルターの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_glow" title="グロー（従来）">
+			<panel name="sec_glow">
+				<text name="glow_caption">
+					HDRレンダリングがオフのときに適用されます。
+				</text>
+				<check_box name="glow_enable" label="グロー" tool_tip="従来のスクリーンスペースのグロー"/>
+				<setting_row name="glow_strength" label="強度" tool_tip="グローの加算の強さ"/>
+				<setting_row name="glow_width" label="幅" tool_tip="グローのサンプルサイズ。広いほど柔らかくなりますが、やがてピクセル化します"/>
+				<button name="sec_glow_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_glow_adv" title="グロー（従来） - 詳細">
+			<panel name="sec_glow_adv">
+				<setting_row name="glow_iterations" label="反復回数" tool_tip="ぼかしのパス数。多いほど広くなめらかになりますが、遅くなります"/>
+				<setting_row name="glow_max_alpha" label="抽出アルファの上限" tool_tip="明るさから抽出する自動グローの上限"/>
+				<setting_row name="glow_min_lum" label="最小輝度" tool_tip="表面が自ら光り始める輝度。そこから1単位でフェードインします。1以上（デフォルトは9999）では何も光りません"/>
+				<setting_row name="glow_res_pow" label="解像度（2のべき乗）" tool_tip="グローマップの解像度を2のべき乗で指定します（9＝512、最大）"/>
+				<check_box name="glow_hdr" label="HDRグローマップ" tool_tip="グローマップにHDR形式を使用します"/>
+				<setting_row name="glow_warmth" label="暖かさの量" tool_tip="輝度による抽出（0）と暖かさによる抽出（1）の配合"/>
+				<setting_row name="glow_lum_weights" label="輝度の重み" tool_tip="輝度の抽出に使うチャンネルごとの重み（合計は1にしてください）"/>
+				<setting_row name="glow_warmth_weights" label="暖かさの重み" tool_tip="暖かさの最大値を取る前に使うチャンネルごとの重み"/>
+				<check_box name="glow_noise" label="グローのノイズ（ディザ）" tool_tip="グローにディザをかけてバンディングを減らします"/>
+				<button name="sec_glow_adv_reset" label="すべてリセット" tool_tip="グローの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_flare" title="レンズフレア">
+			<panel name="sec_flare">
+				<setting_row name="flare_strength" label="強度" tool_tip="レンズフレア全体の強さ。0で効果を完全にオフにします"/>
+				<text name="flare_streak_tint_label" value="光芒の色"/>
+				<color_swatch name="flare_streak_tint" tool_tip="アナモルフィックの光芒の色。デフォルトの寒色の青は、コーティングされた映画用レンズを模しています"/>
+				<button name="flare_streak_tint_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="flare_glow" label="グロー" tool_tip="太陽の周りの柔らかな中心のグローの強さ"/>
+				<setting_row name="flare_starburst" label="スターバースト" tool_tip="太陽から放射状に伸びる回折スパイクのスターバーストの強さ"/>
+				<button name="sec_flare_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_flare_adv" title="レンズフレア - 詳細">
+			<panel name="sec_flare_adv">
+				<text name="flare_hdr_streak" value="光芒"/>
+				<setting_row name="flare_streak_length" label="長さ" tool_tip="アナモルフィックの光芒が伸びる距離。1.0で画面の幅全体を横切ります"/>
+				<setting_row name="flare_streak_falloff" label="減衰" tool_tip="光芒が先端に向かってどれだけ速く薄れるか。低いほど尾が長くなります"/>
+				<setting_row name="flare_streak_thickness" label="太さ" tool_tip="光芒の縦方向の太さ。低いと細い線、高いと柔らかな帯になります"/>
+				<setting_row name="flare_streak_intensity" label="強度" tool_tip="光芒だけの明るさ（全体の強度とは別）"/>
+				<setting_row name="flare_chromatic_spread" label="色の広がり" tool_tip="光芒に沿った赤／青の分離。1で強い虹色の分離になります"/>
+				<text name="flare_hdr_glow" value="グロー"/>
+				<setting_row name="flare_glow_radius" label="半径" tool_tip="太陽の周りの柔らかなグローの大きさ"/>
+				<setting_row name="flare_glow_falloff" label="減衰" tool_tip="中心のグローの柔らかさ。低いと広がり、高いと小さくまとまります"/>
+				<text name="flare_hdr_ghosts" value="ゴースト"/>
+				<setting_row name="flare_ghost" label="強度" tool_tip="レンズのゴーストの円の強さ。0でゴーストを無効にします"/>
+				<setting_row name="flare_ghost_count" label="数" tool_tip="太陽から中心への線上にあるゴーストの円の数"/>
+				<setting_row name="flare_ghost_spacing" label="間隔" tool_tip="連続するゴースト間の距離"/>
+				<text name="flare_hdr_halo" value="ハロー"/>
+				<setting_row name="flare_halo" label="強度" tool_tip="太陽の反対側にあるハローのリングの強さ。0でハローを無効にします"/>
+				<setting_row name="flare_halo_radius" label="半径" tool_tip="ハローのリングの半径"/>
+				<setting_row name="flare_halo_width" label="幅" tool_tip="ハローのリングの太さ。小さいとくっきりした輪、大きいと拡散したリングになります"/>
+				<text name="flare_hdr_starburst" value="スターバースト"/>
+				<setting_row name="flare_starburst_spikes" label="スパイクの対数" tool_tip="この2倍の数のスパイクを描画します（羽根の枚数の半分、奇数の場合はすべて）"/>
+				<setting_row name="flare_starburst_sharpness" label="鋭さ" tool_tip="低い値は柔らかく広い光線、高い値は針のように細い光線になります"/>
+				<setting_row name="flare_starburst_length" label="長さ" tool_tip="スターバーストのスパイクの長さ"/>
+				<text name="flare_hdr_occlusion" value="遮蔽"/>
+				<setting_row name="flare_occlusion_scale" label="サイズ" tool_tip="遮蔽の判定範囲（太陽の円盤に対する倍率）。大きくすると、太陽の近くのオブジェクトで早めにフレアが暗くなります"/>
+				<setting_row name="flare_fade_time" label="フェード" tool_tip="太陽が現れたときにフレアがフェードインするまでの秒数。フェードアウトはこれより速くなります。長くすると木の葉越しでも落ち着いた見た目になります"/>
+				<button name="sec_flare_adv_reset" label="すべてリセット" tool_tip="レンズフレアの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_lensdirt" title="レンズの汚れ">
+			<panel name="sec_lensdirt">
+				<setting_row name="lensdirt_strength" label="強度" tool_tip="前玉の汚れが光を拾う強さ。ブルームやフレアがすでにある場所にだけ現れるため、平坦なシーンはきれいなままです"/>
+				<setting_row name="lensdirt_grime" label="汚れ" tool_tip="ガラスに付いた汚れの量。ほこりと砂粒のすべての層を一度に拡大縮小します"/>
+				<setting_row name="lensdirt_mote_scale" label="ほこりのサイズ" tool_tip="ほこりの粒の大きさ。1を超えると大きく疎らになり、1未満では小さく細かい汚れになります"/>
+				<setting_row name="lensdirt_smudge" label="拭きむら" tool_tip="個々の粒とは異なる、布で拭いた跡の広いむらの強さ"/>
+				<setting_row name="lensdirt_scratches" label="傷" tool_tip="ガラスを横切る傷の数。0は無傷です。ほこりが柔らかい場所でも傷は直線的で明るいため、少しでも目立ちます"/>
+				<button name="sec_lensdirt_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_lensdirt_adv" title="レンズの汚れ - 詳細">
+			<panel name="sec_lensdirt_adv">
+				<setting_row name="lensdirt_seed" label="シード" tool_tip="汚れの配置をシャッフルします。汚れは均一に広がらず溜まり、その溜まる場所がシードで変わるため、全体の密度も少し変わります"/>
+				<setting_row name="lensdirt_toe" label="トゥ" tool_tip="薄い汚れがどれだけ残るか。高い値は中間調をつぶし、最も明るい粒だけを残すため、「強度」に関係なくきれいに見えます"/>
+				<setting_row name="lensdirt_gain" label="ゲイン" tool_tip="トゥの後に適用される、生成した汚れの全体的な明るさ。主にトゥの微調整用です"/>
+				<setting_row name="lensdirt_bloom_response" label="ブルームへの反応" tool_tip="ブルームが汚れをどれだけ照らすか。0ではブルームがきれいなレンズのように通過します"/>
+				<setting_row name="lensdirt_flare_response" label="フレアへの反応" tool_tip="レンズフレアが汚れをどれだけ照らすか。フレアと汚れは同じ前玉で起きるため、最も実際のレンズらしく見える反応です"/>
+				<button name="sec_lensdirt_adv_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_ca" title="色収差">
+			<panel name="sec_ca">
+				<setting_row name="ca_strength" label="強度" tool_tip="色のにじみの強さ。0で無効、0.15で控えめな映画用レンズの雰囲気になります。"/>
+				<setting_row name="ca_falloff" label="減衰" tool_tip="にじみが中心から端に向かってどれだけ速く大きくなるか。高くすると中心がきれいに保たれます"/>
+				<setting_row name="ca_angle" label="角度" tool_tip="赤／青の分離方向を回転させます（度）。異方性が0以外の場合のみ影響します"/>
+				<setting_row name="ca_anisotropy" label="異方性" tool_tip="にじみを角度の軸に沿って引き伸ばし、アナモルフィック風の方向性のある流れを作ります"/>
+				<setting_row name="ca_offset_rx" label="赤のオフセットX" tool_tip="赤チャンネルの水平方向のずれ"/>
+				<setting_row name="ca_offset_ry" label="赤のオフセットY" tool_tip="赤チャンネルの垂直方向のずれ"/>
+				<setting_row name="ca_offset_bx" label="青のオフセットX" tool_tip="青チャンネルの水平方向のずれ。通常は赤のオフセットと逆方向です"/>
+				<setting_row name="ca_offset_by" label="青のオフセットY" tool_tip="青チャンネルの垂直方向のずれ"/>
+				<button name="sec_ca_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_distortion" title="歪み">
+			<panel name="sec_distortion">
+				<setting_row name="distortion_amount" label="量" tool_tip="レンズの歪み全体の強さ。0で無効です。曲がるのはワールドの表示だけで、名前タグ、輪郭、UIはまっすぐなままです。"/>
+				<setting_row name="distortion_k1" label="樽型／糸巻き型" tool_tip="負の値で直線が外側に膨らみ（樽型、広角レンズの見た目）、正の値で内側に曲がります（糸巻き型）"/>
+				<setting_row name="distortion_squeeze" label="アナモルフィックスクイーズ" tool_tip="水平方向のデスクイーズ。1.0は球面レンズ、2.0はアナモルフィックの映画に相当します"/>
+				<button name="sec_distortion_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_distortion_adv" title="歪み - 詳細">
+			<panel name="sec_distortion_adv">
+				<setting_row name="distortion_k2" label="二次の曲がり" tool_tip="隅に向かう曲がりの形を整えます。0以外の小さな値で、実際の広角レンズのように画面の端付近で曲がりが反転する陣笠型の歪みになります。"/>
+				<text name="distortion_fit_label" value="再スケール"/>
+				<combo_box name="distortion_fit_combo" tool_tip="曲げた画像の再スケール方法：「なし」では糸巻き型で隅が黒くなり、「フィット」は黒い部分がなくなるまで拡大し、「フィル」は画面全体を表示したまま隅を黒く縁取る場合があります">
+					<combo_box.item name="0" label="なし"/>
+					<combo_box.item name="1" label="フィット（黒なし）"/>
+					<combo_box.item name="2" label="フィル（全体を保持）"/>
+				</combo_box>
+				<button name="distortion_fit_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="distortion_center" label="中心" tool_tip="画面の中心からの光軸のずれ"/>
+				<setting_row name="distortion_tangential" label="接線方向" tool_tip="偏心の項p1とp2で、わずかに軸からずれて取り付けられたレンズ要素を再現します。現実的な値はごく小さなものです。"/>
+				<button name="sec_distortion_adv_reset" label="すべてリセット" tool_tip="歪みの詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_vignette" title="周辺減光">
+			<panel name="sec_vignette">
+				<setting_row name="vignette_amount" label="量" tool_tip="周辺減光の不透明度。0で無効です"/>
+				<setting_row name="vignette_radius" label="半径" tool_tip="画像の高さを単位とした周辺減光のサイズ。1.0で上下の端に届きます"/>
+				<setting_row name="vignette_feather" label="ぼかし" tool_tip="暗くなる曲線の形状：1未満では穏やかなもやが内側に広がり、1を超えると隅に暗さが集中します"/>
+				<button name="sec_vignette_reset" label="すべてリセット" tool_tip="このセクション（「詳細」を含む）をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_vignette_adv" title="周辺減光 - 詳細">
+			<panel name="sec_vignette_adv">
+				<setting_row name="vignette_soft" label="柔らかさ" tool_tip="周辺減光の境界の柔らかさ"/>
+				<setting_row name="vignette_shape" label="形状" tool_tip="0は円形、1は角丸の四角形"/>
+				<setting_row name="vignette_midpoint" label="中間点" tool_tip="3色のグラデーションにおける中間色の位置。0で無効（2色の周辺減光）"/>
+				<text name="vignette_color_label" value="端の色"/>
+				<color_swatch name="vignette_color" tool_tip="周辺減光の端の色"/>
+				<button name="vignette_color_rst" tool_tip="デフォルトにリセットします"/>
+				<text name="vignette_midcolor_label" value="中間色"/>
+				<color_swatch name="vignette_midcolor" tool_tip="中間点が0より大きいときに使うグラデーションの中間色"/>
+				<button name="vignette_midcolor_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="vignette_center" label="中心" tool_tip="周辺減光の中心のずれ（XとY。3つ目の値は使用しません）"/>
+				<check_box name="vignette_aspect" label="アスペクト比を補正" tool_tip="画面に合わせて引き伸ばさず、横長の画面でも周辺減光を円形に保ちます"/>
+				<button name="sec_vignette_adv_reset" label="すべてリセット" tool_tip="周辺減光の詳細設定をデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_grain" title="フィルム粒子">
+			<panel name="sec_grain">
+				<setting_row name="grain_amount" label="量" tool_tip="フィルム粒子の強さ。0で無効です"/>
+				<setting_row name="grain_size" label="サイズ" tool_tip="粒子の大きさ"/>
+				<text name="grain_style_label" value="スタイル"/>
+				<combo_box name="grain_style_combo" tool_tip="粒子の性質：モノクロの輝度、カラー（デジタル増感）、粗い（16㎜風）、フォトンショット（CCDセンサー）">
+					<combo_box.item name="0" label="モノクロ（輝度）"/>
+					<combo_box.item name="1" label="カラー（デジタル）"/>
+					<combo_box.item name="2" label="粗い（16㎜）"/>
+					<combo_box.item name="3" label="フォトンショット（CCD）"/>
+				</combo_box>
+				<button name="grain_style_rst" tool_tip="デフォルトにリセットします"/>
+				<setting_row name="grain_range" label="輝度の範囲" tool_tip="粒子が最も強く出る輝度の位置：0はシャドウのみ、0.5は中間調（古典的なフィルム）、1はハイライトのみ"/>
+				<text name="grain_tint_label" value="色"/>
+				<color_swatch name="grain_tint" tool_tip="粒子の色。白は無彩色、暖色はフィルム、寒色はビデオのノイズを思わせます"/>
+				<button name="grain_tint_rst" tool_tip="デフォルトにリセットします"/>
+				<check_box name="grain_animated" label="アニメーション" tool_tip="実際のフィルムのように、フレームごとに粒子をランダムにし直します"/>
+				<button name="sec_grain_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_sharp" title="シャープ">
+			<panel name="sec_sharp">
+				<setting_row name="sharp_cas" label="シャープネス（CAS）" tool_tip="コントラスト適応型シャープニングの強さ"/>
+				<button name="sec_sharp_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします"/>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

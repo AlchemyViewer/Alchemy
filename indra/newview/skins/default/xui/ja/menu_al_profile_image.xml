@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Profile Image">
+	<menu_item_call name="profile_image_upload" label="画像をアップロード"/>
+	<menu_item_call name="profile_image_change" label="画像を変更"/>
+	<menu_item_call name="profile_image_remove" label="画像を削除"/>
+</context_menu>

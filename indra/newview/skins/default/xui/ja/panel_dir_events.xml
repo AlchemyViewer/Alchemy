@@ -37,4 +37,5 @@
 	</radio_group>
 	<button name="back_btn" label="«" label_selected="«" tool_tip="１日戻る"/>
 	<button name="forward_btn" label="»" label_selected="»" tool_tip="１日進める"/>
+	<button name="Search" label="検索"/>
 </panel>

@@ -8,4 +8,10 @@
 	</text>
 	<button name="continue_btn" label="コンテンツを許可"/>
 	<button name="cancel_btn" label="キャンセル"/>
+	<floater.string name="location_rated_string" value="選択した場所のレーティングは[MATURITY]です。"/>
+	<floater.string name="update_maturity_string" value="現在のレーティング設定には[MATURITY]コンテンツが含まれていません。許可すると設定が更新されます。"/>
+	<floater.string name="allow_maturity_string" value="[MATURITY]コンテンツを許可"/>
+	<text name="learn_more_lbl">
+		レーティングについて[https://lindenlab.freshdesk.com/support/solutions/articles/31000135220-i-can-t-access-adult-land-and-content- 詳しく見る]。
+	</text>
 </floater>

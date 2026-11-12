@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="search" title="検索">
+	<floater.string name="not_found">
+		「[TEXT]」が見つかりません
+	</floater.string>
+	<floater.string name="no_results">
+		結果はありません
+	</floater.string>
+	<floater.string name="result_spillover">
+		[TOTAL]件以上の結果　[VISIBLE_BEGIN]～[VISIBLE_END]件を表示
+	</floater.string>
+	<floater.string name="result_count">
+		[TOTAL]件の結果
+	</floater.string>
+	<floater.string name="searching">
+		検索しています…
+	</floater.string>
+	<floater.string name="all_categories">
+		すべてのカテゴリ
+	</floater.string>
+	<floater.string name="search_banned">
+		コミュニティスタンダードに定められたコンテンツ制限により、検索語の一部が除外されました。
+	</floater.string>
+	<floater.string name="search_short">
+		検索語が短すぎるため、検索は実行されませんでした。
+	</floater.string>
+	<floater.string name="search_disabled">
+		このリージョンでは検索が無効になっています。
+	</floater.string>
+	<floater.string name="search_no_date_offset">
+		検索条件に日付のオフセットがありません。
+	</floater.string>
+	<floater.string name="search_no_catgory">
+		検索条件にカテゴリがありません。
+	</floater.string>
+	<floater.string name="search_no_query">
+		検索条件に検索語がありません。
+	</floater.string>
+	<tab_container name="search_tabs">
+		<panel name="panel_search_people" label="人物"/>
+		<panel name="panel_search_groups" label="グループ"/>
+		<panel name="panel_search_places" label="場所"/>
+		<panel name="panel_search_landsales" label="土地"/>
+		<panel name="panel_search_events" label="イベント"/>
+		<panel name="panel_search_classifieds" label="クラシファイド広告"/>
+	</tab_container>
+	<text name="results_status" value="[TOTAL]件の結果"/>
+	<button name="popout" tool_tip="結果を新しいウィンドウで開きます"/>
+</floater>

@@ -27,4 +27,5 @@
 	<menu_item_call name="Profile..." label="プロフィール"/>
 	<menu_item_call name="Debug..." label="テクスチャのデバッグ"/>
 	<menu_item_call name="Dump XML" label="ＸＭＬとしてダンプ"/>
+	<menu_item_call name="Sit stand" label="座る／立つ"/>
 </toggleable_menu>

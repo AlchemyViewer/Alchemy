@@ -29,6 +29,7 @@
 			</layout_panel>
 		</layout_stack>
 		<button name="ao_less" tool_tip="インターフェースを縮小表示にします。"/>
+		<check_box name="ao_enable" label="ＡＯを有効にする" tool_tip="アニメーションオーバーライダーを有効または無効にします"/>
 	</panel>
 	<panel name="ao_reload_cover">
 		<panel name="ao_reload_text_panel">
@@ -46,5 +47,6 @@
 		<button name="ao_previous_small" tool_tip="前のステートのアニメーションに切り替えます。"/>
 		<button name="ao_next_small" tool_tip="次のステートのアニメーションに切り替えます。"/>
 		<check_box name="ao_sit_override_small" label="座った時" tool_tip="座るアニメーションをオーバーライドする場合は、これをチェックします。"/>
+		<check_box name="ao_enable" label="AOを有効にする" tool_tip="アニメーションオーバーライダーを有効または無効にします"/>
 	</panel>
 </panel>

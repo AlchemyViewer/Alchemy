@@ -20,5 +20,6 @@
 		<panel label="アップロード" name="uploads"/>
 		<panel label="操作" name="controls"/>
 		<panel label="スキン" name="skins"/>
+		<panel name="interface" label="インターフェース"/>
 	</tab_container>
 </floater>

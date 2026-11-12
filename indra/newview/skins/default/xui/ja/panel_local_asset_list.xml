@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_local_asset">
+	<string name="rez_label">ワールドにRez</string>
+	<string name="apply_texture_label">選択中のものに適用</string>
+	<string name="apply_material_label">選択中のものに適用</string>
+	<string name="rez_tooltip">このメッシュの新しいコピーをワールドにRezします（クライアント側のプレビューで、何もアップロードされません）。</string>
+	<string name="apply_tooltip">選択中のオブジェクト（すべての面）、または「面を選択」で選んだ面にだけ適用します。</string>
+	<string name="col_name">名前</string>
+	<string name="col_status">状態</string>
+	<string name="target_self">自分のアバター</string>
+	<string name="target_selected">選択中のオブジェクト</string>
+	<string name="empty_hint_mesh">メッシュはまだありません。「追加…」をクリックして.dae、.gltf、.glbのモデルを読み込んでください。</string>
+	<string name="empty_hint_anim">アニメーションはまだありません。「追加…」をクリックして.bvhまたは.animファイルを読み込んでください。</string>
+	<string name="empty_hint_tex">テクスチャはまだありません。「追加…」をクリックして画像ファイルを読み込んでください。</string>
+	<string name="empty_hint_mat">マテリアルはまだありません。「追加…」をクリックして.gltfまたは.glbのマテリアルを読み込んでください。</string>
+	<scroll_list name="l_name_list">
+		<column name="unit_name" label="名前"/>
+	</scroll_list>
+	<button name="add_btn" label="追加…" tool_tip="ディスクからファイルを読み込んでローカルでプレビューします。何もアップロードされません。"/>
+	<button name="upload_btn" label="アップロード…" tool_tip="選択したファイルを、通常のアップロード（L$の費用の確認あり）でSecond Lifeにアップロードします。"/>
+	<button name="unload_btn" label="アンロード" tool_tip="このアセットをメモリから解放しますが、再読み込みできるよう淡色の項目として一覧に残します。メッシュの場合は、ワールド内のコピーもDerezします。"/>
+	<button name="remove_btn" label="削除" tool_tip="このファイルを完全に忘れ、一覧から削除します。"/>
+	<button name="spawn_btn" label="ワールドにRez"/>
+	<button name="select_btn" label="ワールドで選択" tool_tip="Rezしたコピーを選択し、ビルドを開いて編集します（カメラは移動しません）。"/>
+	<combo_box name="attach_point_combo" tool_tip="プレビューを装着するアタッチメントポイント。"/>
+	<button name="attach_btn" label="装着…" tool_tip="このメッシュのコピーを、選択したアタッチメントポイントでアバターに装着します。"/>
+	<check_box name="include_joints_check" label="ジョイントの位置" tool_tip="メッシュのジョイント位置の上書きをスキンに焼き込みます（それを必要とする体型用）。オフにするとアップロードのプレビューのデフォルトと同じになります。変更するとメッシュを再読み込みします。"/>
+	<combo_box name="anim_target_combo" tool_tip="自分のアバター、または選択中のアニメーションオブジェクトで再生します。"/>
+	<button name="play_btn" label="再生" tool_tip="選択したアニメーションを選択した対象で再生します。"/>
+	<button name="stop_btn" label="停止" tool_tip="選択した対象のアニメーションを停止します。"/>
+</panel>

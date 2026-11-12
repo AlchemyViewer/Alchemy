@@ -12,6 +12,8 @@
 			<item label="小" name="Small"/>
 			<item label="中" name="Medium"/>
 			<item label="大" name="Large"/>
+			<item name="Monospace" label="等幅"/>
+			<item name="Huge" label="特大"/>
 		</combo_box>
 		<check_box label="吹き出しチャット" name="bubble_text_chat"/>
 	</panel>
@@ -64,6 +66,7 @@
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow"/>
 			<item label="メッセージをポップアップ" name="PopUpMessage"/>
 			<item label="アクションなし" name="NoAction"/>
+			<item name="FlashToolBarButton" label="ツールバーのボタンを点滅"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_nearby_chat_im">
 		</check_box>
@@ -74,6 +77,7 @@
 			<item label="会話ウィンドウを開く" name="OpenConversationsWindow"/>
 			<item label="メッセージをポップアップ" name="PopUpMessage"/>
 			<item label="アクションなし" name="NoAction"/>
+			<item name="FlashToolBarButton" label="ツールバーのボタンを点滅"/>
 		</combo_box>
 		<check_box label="サウンド再生" name="play_sound_object_im"/>
 		<text name="notifications_alert">

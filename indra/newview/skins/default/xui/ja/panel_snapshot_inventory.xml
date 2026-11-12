@@ -11,6 +11,8 @@
 		<combo_box.item label="カスタム" name="Custom"/>
 		<combo_box.item name="Wide(1024x512)" label="ワイド（1024x512）"/>
 		<combo_box.item name="Full(2048x1024)" label="フルワイド（2048x1024）"/>
+		<combo_box.item name="Huge(1024x1024)" label="特大（1024x1024）"/>
+		<combo_box.item name="Full(2048x2048)" label="フル（2048x2048）"/>
 	</combo_box>
 	<spinner label="横幅✕高さ" name="inventory_snapshot_width"/>
 	<check_box label="縦横比の固定" name="inventory_keep_aspect_check"/>

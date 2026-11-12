@@ -30,4 +30,5 @@
 	</scroll_list>
 	<button name="prev_btn" tool_tip="前のページに戻ります。"/>
 	<button name="next_btn" tool_tip="次のページに進みます。"/>
+	<button name="Search" label="検索"/>
 </panel>

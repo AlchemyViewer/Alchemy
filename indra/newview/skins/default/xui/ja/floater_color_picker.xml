@@ -12,7 +12,7 @@
 				青：
 			</text>
 		</panel>
-		<panel name="LSL" label="LSL">
+		<panel name="LSL" label="ＬＳＬ">
 			<text name="r_val_text_float">
 				赤：
 			</text>

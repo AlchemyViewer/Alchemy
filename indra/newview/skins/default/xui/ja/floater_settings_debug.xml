@@ -14,4 +14,9 @@
 		</layout_panel>
 	</layout_stack>
 	<check_box label="変更された設定のみ表示" name="hide_default"/>
+	<floater.string name="SettingGroup">設定</floater.string>
+	<floater.string name="SettingChanged">変更済み</floater.string>
+	<floater.string name="SettingDefault">出荷時のまま</floater.string>
+	<floater.string name="SettingTip">[NAME]は[TYPE]です</floater.string>
+	<floater.string name="SettingRemoveTip">[NAME]を出荷時の状態に戻します</floater.string>
 </floater>

@@ -24,6 +24,8 @@
 		<menu_item_call label="全てのコントロールを隠す" name="Hide UI" shortcut="control|shift|U"/>
 		<menu_item_check label="ＨＵＤを表示" name="Show HUD Attachments" shortcut="alt|shift|H"/>
 		<menu_item_call label="[APP_NAME]の終了" name="Quit"/>
+		<menu_item_call name="Visited Places" label="訪れた場所…"/>
+		<menu_item_call name="Lightbox Settings" label="ライトボックス…"/>
 	</menu>
 	<menu label="アバター" name="Avatar">
 		<menu_item_call label="着用中…" name="NowWearing"/>
@@ -129,10 +131,13 @@
 			<menu_item_call label="自分の環境…" name="my_environs"/>
 			<menu_item_call label="環境の個人設定…" name="adjustment_tool"/>
 			<menu_item_check label="雲の動きを一時停止" name="pause_clouds"/>
+			<menu_item_check name="Switch to Shared after teleport" label="テレポート後に共有環境に切り替える"/>
 		</menu>
 		<menu_item_check name="Sound Explorer" label="サウンドエクスプローラー"/>
 		<menu_item_check name="Poser" label="ポーザー"/>
 		<menu_item_check name="toggle_sound" label="サウンドのミュート／ミュート解除"/>
+		<menu_item_check name="Scene Explorer" label="シーンエクスプローラー"/>
+		<menu_item_check name="Scopes" label="スコープ"/>
 	</menu>
 	<menu label="ビルド" name="BuildTools">
 		<menu_item_check label="ビルドツールを表示" name="Show Build Tools"/>
@@ -173,8 +178,9 @@
 			<menu_item_call label="スクリプトを実行停止にする" name="Set Scripts to Not Running"/>
 			<menu_item_call label="スクリプトを削除" name="Delete Scripts"/>
 			<menu_item_call name="Lua" label="スクリプトをSLuaとして再コンパイル"/>
-			<menu_item_call name="LSL on Luau" label="スクリプトをLSL（Luau）として再コンパイル"/>
+			<menu_item_call name="LSL on Luau" label="スクリプトをＬＳＬ（Luau）として再コンパイル"/>
 			<menu_item_check name="Script Editor Server" label="スクリプトエディターサーバー"/>
+			<menu_item_check name="Script Studio Build" label="Script Studio…"/>
 		</menu>
 		<menu label="経路探索" name="Pathfinding">
 			<menu_item_call label="リージョンのオブジェクト" name="pathfinding_linksets_menu_item"/>
@@ -211,6 +217,22 @@
 			<menu_item_call label="選択をグリッドに使用する" name="Use Selection for Grid"/>
 			<menu_item_call label="グリッドオプション…" name="Grid Options"/>
 			<menu_item_call label="デフォルトの権限設定…" name="Set default permissions"/>
+			<menu_item_check name="Show Selection Wireframe" label="選択範囲のワイヤーフレームを表示"/>
+			<menu name="Selection Outline Options" label="選択範囲の輪郭のオプション">
+				<menu_item_check name="Outline Whole Faces" label="面全体の輪郭を表示（アルファを無視）"/>
+				<menu_item_check name="Outline Thin" label="細い輪郭"/>
+				<menu_item_check name="Outline Normal" label="標準の輪郭"/>
+				<menu_item_check name="Outline Thick" label="太い輪郭"/>
+				<menu_item_check name="Outline Extra Thick" label="極太の輪郭"/>
+				<menu_item_check name="Outline Contrast Off" label="コントラスト：なし"/>
+				<menu_item_check name="Outline Contrast Shift" label="コントラスト：明るさに合わせる"/>
+				<menu_item_check name="Outline Contrast Rim" label="コントラスト：暗いまたは明るい縁"/>
+				<menu_item_check name="Wireframe Width 1" label="ワイヤーフレームの線：1 px"/>
+				<menu_item_check name="Wireframe Width 2" label="ワイヤーフレームの線：2 px"/>
+				<menu_item_check name="Wireframe Width 3" label="ワイヤーフレームの線：3 px"/>
+			</menu>
+			<menu_item_check name="RenderParcelSelection" label="区画の境界線を表示"/>
+			<menu_item_check name="RenderParcelSelectionToMaxHeight" label="最大建築高度まで境界を表示"/>
 		</menu>
 		<menu label="アップロード" name="Upload">
 			<menu_item_call label="画像（L$ [COST]）…" name="Upload Image"/>
@@ -222,6 +244,7 @@
 		</menu>
 		<menu_item_call label="取り消し" name="Undo"/>
 		<menu_item_call label="やり直し" name="Redo"/>
+		<menu_item_call name="LocalAssets" label="ローカルアセット…"/>
 	</menu>
 	<menu label="ヘルプ" name="Help">
 		<menu_item_call label="Second Lifeナレッジベース" name="Knowledge Base"/>
@@ -232,6 +255,7 @@
 		<menu_item_call label="嫌がらせの報告" name="Report Abuse"/>
 		<menu_item_call label="衝突・プッシュ＆打撃" name="Bumps, Pushes &amp;amp; Hits"/>
 		<menu_item_call label="[APP_NAME]について" name="About Second Life"/>
+		<menu_item_call name="Send Feedback" label="フィードバックを送信…"/>
 	</menu>
 	<menu label="ＲＬＶａ" name="RLVa Main">
 		<menu label="デバッグ" name="Debug">
@@ -334,6 +358,7 @@
 		<menu_item_check label="RestrainedLove API（ＲＬＶａ）を有効化" name="RLV API"/>
 		<menu_item_call label="デバッグ設定を表示" name="Debug Settings"/>
 		<menu_item_check label="開発メニューを表示" name="Debug Mode"/>
+		<menu_item_check name="Lock DoF Focus Point" label="被写界深度の焦点をロック"/>
 	</menu>
 	<menu label="開発" name="Develop">
 		<menu label="コンソール" name="Consoles">
@@ -379,6 +404,9 @@
 			<menu_item_call label="ビューアの接続遮断を実行する" name="Force Disconnect Viewer"/>
 			<menu_item_call label="メモリリークをシミュレートする" name="Memory Leaking Simulation"/>
 			<menu_item_call name="Force LLError Message And Crash" label="LLErrorとメッセージとクラッシュを実行する"/>
+			<menu_item_call name="Force Abort" label="強制アボート"/>
+			<menu_item_call name="Force Stack Overflow" label="強制スタックオーバーフロー"/>
+			<menu_item_call name="Force Terminate" label="強制終了"/>
 		</menu>
 		<menu label="ビデオ" name="Video">
 			<menu_item_call label="1080✕1920" name="1080x1920"/>
@@ -450,6 +478,13 @@
 			<menu_item_call label="キャッシュを直ちにクリア" name="Cache Clear"/>
 			<menu_item_check name="Render Avatar Cloth" label="アバターの衣服を描画"/>
 			<menu_item_check name="Collect UI Image Vertex Buffers" label="UI画像の頂点バッファを収集"/>
+			<menu name="Far Plane" label="ファークリップ面">
+				<menu_item_check name="Projection Overlay" label="投影オーバーレイ"/>
+				<menu_item_check name="Projection Automatic" label="投影：自動"/>
+				<menu_item_check name="Projection Finite" label="投影：有限（描画距離の２倍）"/>
+				<menu_item_check name="Projection Infinite" label="投影：無限（リバースＺ）"/>
+			</menu>
+			<menu_item_check name="Hover Glow Objects" label="ホバーしたオブジェクトを光らせる"/>
 		</menu>
 		<menu label="ネットワーク" name="Network">
 			<menu_item_check label="エージェントを一時停止する" name="AgentPause"/>
@@ -458,6 +493,9 @@
 			<menu_item_check label="速度補間オブジェクト" name="Velocity Interpolate Objects"/>
 			<menu_item_check label="速度補間オブジェクトへPing" name="Ping Interpolate Object Positions"/>
 			<menu_item_call label="パケットをドロップ" name="Drop a Packet"/>
+			<menu_item_call name="Message Log" label="メッセージログ…"/>
+			<menu_item_call name="Message Builder" label="メッセージビルダー…"/>
+			<menu_item_call name="Message Rewriter" label="メッセージリライター…"/>
 		</menu>
 		<menu label="キャッシュ" name="Cache">
 			<menu_item_call label="ディスクキャッシュをパージ" name="Purge Disk Cache"/>
@@ -569,6 +607,8 @@
 		<menu_item_call label="管理者ステータスの呼び出し" name="Request Admin Options"/>
 		<menu_item_call label="管理者ステータス解除" name="Leave Admin Options"/>
 		<menu_item_check label="管理者メニューを表示する" name="View Admin Options"/>
+		<menu_item_call name="LoadLocalMesh" label="ローカルメッシュを読み込む…"/>
+		<menu_item_call name="Send Test Feedback" label="テストフィードバックを送信…"/>
 	</menu>
 	<menu label="管理" name="Admin">
 		<menu label="オブジェクト" name="AdminObject">

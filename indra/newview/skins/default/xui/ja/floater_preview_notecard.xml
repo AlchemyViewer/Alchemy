@@ -15,4 +15,54 @@
 	<button label="編集…" label_selected="編集" name="Edit"/>
 	<button label="保存" label_selected="保存" name="Save"/>
 	<button label="削除" label_selected="削除" name="Delete"/>
+	<floater.string name="Loading">読み込んでいます…</floater.string>
+	<floater.string name="ReadOnlyNoModify">このノートカードは閲覧できますが、変更する権限がありません。</floater.string>
+	<floater.string name="ReadOnlyFailed">このノートカードを読み込めませんでした：[REASON]</floater.string>
+	<floater.string name="Saving">保存しています…</floater.string>
+	<floater.string name="Saved">保存しました。</floater.string>
+	<floater.string name="SaveFailed">保存されていません：[REASON]</floater.string>
+	<floater.string name="SavedElsewhere">ここに未保存の変更がある間に、[NAME]が[WHO]で保存されました。</floater.string>
+	<floater.string name="SavedByOther">別のエディター</floater.string>
+	<floater.string name="SavedByFile">ディスク上のファイル</floater.string>
+	<floater.string name="LinkedToFile">このノートカードはディスク上の[FILE]にリンクされています。ここで保存するとファイルに書き込まれ、ファイルの保存によって送信されます。</floater.string>
+	<floater.string name="Unlink">リンクを解除</floater.string>
+	<floater.string name="Unlinked">このノートカードはファイルとのリンクが解除されました。ここで保存するとインワールドに保存されます。</floater.string>
+	<floater.string name="SavedToFile">[FILE]に保存しました。ファイルから送信されます。</floater.string>
+	<floater.string name="FileNotWritten">[FILE]に書き込めませんでした</floater.string>
+	<floater.string name="LinkedCarries">保存されていません：このノートカードにはアイテムが含まれていますが、リンク先のファイル[FILE]にはアイテムを保持できません。アイテムごと保存するには、リンクを解除してください。</floater.string>
+	<floater.string name="TakeTheirs">相手の変更を採用</floater.string>
+	<floater.string name="KeepMine">自分の変更を残す</floater.string>
+	<floater.string name="Compare">比較</floater.string>
+	<floater.string name="BackToText">テキストに戻る</floater.string>
+	<floater.string name="CompareTheirs">向こうで保存された内容</floater.string>
+	<floater.string name="CompareMine">ここの内容</floater.string>
+	<floater.string name="KeptMine">あなたの変更は保持されています。保存すると、向こうで保存された内容が置き換えられます。</floater.string>
+	<floater.string name="Recovered">[WHEN]時点のこのノートカードの未保存の変更が保持されていました。</floater.string>
+	<floater.string name="Restore">復元</floater.string>
+	<floater.string name="Discard">破棄</floater.string>
+	<floater.string name="Restored">保持されていた変更を戻しました。「取り消し」で元に戻せます。</floater.string>
+	<floater.string name="RecoveryWriteFailed">ビューアが終了した場合に備えて未保存の変更を保持することができませんでした。</floater.string>
+	<floater.string name="HistoryNone">このノートカードの保存履歴はまだありません。今後の保存は30日間保持されます。</floater.string>
+	<floater.string name="HistoryTitle">このノートカードの保存履歴</floater.string>
+	<floater.string name="HistoryPlaceholder">日付や時刻を入力して保存を検索</floater.string>
+	<floater.string name="HistoryBytesA">1バイト</floater.string>
+	<floater.string name="HistoryBytesB">[COUNT]バイト</floater.string>
+	<floater.string name="HistoryLongerA">前回の保存より1バイト長い</floater.string>
+	<floater.string name="HistoryLongerB">前回の保存より[COUNT]バイト長い</floater.string>
+	<floater.string name="HistoryShorterA">前回の保存より1バイト短い</floater.string>
+	<floater.string name="HistoryShorterB">前回の保存より[COUNT]バイト短い</floater.string>
+	<floater.string name="HistorySameLength">前回の保存と同じ長さ</floater.string>
+	<floater.string name="HistoryCurrent">現在保存されている内容</floater.string>
+	<floater.string name="HistorySavedAt">[WHEN]に保存</floater.string>
+	<floater.string name="HistoryShown">[WHEN]の保存を、現在のノートカードと並べて表示しています。</floater.string>
+	<floater.string name="HistoryUnreadable">[WHEN]の保存を読み込めませんでした。</floater.string>
+	<floater.string name="HistoryRestored">[WHEN]の保存を戻しました。「取り消し」で元に戻せます。保存するまでは保存されません。</floater.string>
+	<floater.string name="RestoreSave">この保存を復元</floater.string>
+	<floater.string name="GoToLineTitle">指定行へ移動</floater.string>
+	<floater.string name="GoToLinePlaceholder">行、または 行:列</floater.string>
+	<floater.string name="GoToLineHint">移動先の行番号を入力してください（[FIRST]～[COUNT]）。</floater.string>
+	<floater.string name="GoToLineGo">[LINE]行目へ移動します。</floater.string>
+	<floater.string name="GoToLineGoColumn">[LINE]行目の[COL]列目へ移動します。</floater.string>
+	<floater.string name="GoToLineNone">[LINE]行目はありません。最終行は[COUNT]行目です。</floater.string>
+	<button name="History" label="履歴…" tool_tip="このノートカードを以前の保存と比較し、復元します"/>
 </floater>

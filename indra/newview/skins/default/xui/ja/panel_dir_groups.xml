@@ -9,4 +9,6 @@
 		<column name="name" label="名前"/>
 		<column name="members" label="メンバー"/>
 	</scroll_list>
+	<check_box name="incmature" label="Matureグループを含める"/>
+	<button name="Search" label="検索"/>
 </panel>
