@@ -286,20 +286,6 @@
 					-->
 				</panel>
 				<!-- ==== STEP 2: Analyze ==== -->
-				<panel name="physics analysis">
-					<text name="method_label">
-						ステップ２：分析
-					</text>
-					<text name="analysis_method_label">
-						方法：
-					</text>
-					<text name="quality_label">
-						品質：
-					</text>
-					<text name="smooth_method_label">
-						滑らかさ：
-					</text>
-				</panel>
 				<panel name="physics analysis vhacd">
 					<text name="method_label">
 						ステップ２：殻への変換（オプション）
@@ -387,9 +373,6 @@
 					[X]✕[Y]✕[Z]
 				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
-				<text name="pelvis_offset_label">
-					Ｚオフセット（アバターの上下調整）：
-				</text>
 			</panel>
 			<panel label="オーバーライド" name="rigging_panel" title="リグ">
 				<check_box label="スキンのウエイトを含める" name="upload_skin"/>

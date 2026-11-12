@@ -72,7 +72,6 @@
 		<menu_item_check label="ボイスチャット" name="Speak"/>
 		<menu_item_check label="会話ログ…" name="Conversation Log..."/>
 		<menu_item_check label="チャットアラート…" name="Chat Alerts"/>
-		<menu_item_check label="喋る" name="Speak"/>
 		<menu_item_check label="ジェスチャー…" name="Gestures"/>
 		<menu_item_check label="フレンド" name="My Friends"/>
 		<menu_item_check label="グループ" name="My Groups"/>
@@ -159,7 +158,7 @@
 		<menu label="オブジェクト" name="Object">
 			<menu_item_call label="購入" name="Menu Object Buy"/>
 			<menu_item_call label="取得" name="Menu Object Take"/>
-			<menu_item_call label="コピーを取得" name="Take Copy"/>
+			<menu_item_call label="複製を取る" name="Take Copy"/>
 			<menu_item_call label="パーティクルの編集" name="Menu Object Edit Particles"/>
 			<menu_item_call label="オブジェクトの中身に保存" name="Save Object Back to Object Contents"/>
 			<menu_item_call label="オブジェクトを返却" name="Return Object back to Owner"/>
@@ -186,11 +185,10 @@
 		<menu label="オプション" name="Options">
 			<menu_item_check label="権限の詳細を表示する" name="DebugPermissions"/>
 			<menu_item_check label="自分のオブジェクトだけを選択する" name="Select Only My Objects"/>
-			<menu_item_check label="コピー可能なオブジェクトだけを選択する" name="Select Only Copyable Objects"/>
+			<menu_item_check label="複製可能なオブジェクトだけを選択する" name="Select Only Copyable Objects"/>
 			<menu_item_check label="動的オブジェクトだけを選択する" name="Select Only Movable Objects"/>
 			<menu_item_check label="非表示のオブジェクトを選択する" name="Select Invisible Objects"/>
 			<menu_item_check label="反射プローブを選択する" name="Select Reflection Probes"/>
-			<menu_item_check label="プローブの更新" name="Probe Updates"/>
 			<menu_item_check label="範囲内を選択する" name="Select By Surrounding"/>
 			<menu_item_check label="選択のアウトラインを表示する" name="Show Selection Outlines"/>
 			<menu_item_check label="隠れた部分を表示" name="Show Hidden Selection"/>
@@ -280,7 +278,6 @@
 			<menu_item_check label="ビーコンを簡素化" name="Cheesy Beacon"/>
 			<menu_item_check label="パーティクルを非表示" name="Hide Particles"/>
 			<menu_item_check label="選択を非表示" name="Hide Selected"/>
-			<menu_item_check label="透明部分をハイライト" name="Highlight Transparent"/>
 			<menu_item_check label="マウスルックのときにクロスヘアーを表示" name="ShowCrosshairs"/>
 		</menu>
 		<menu label="マウスホバー時のツールチップ" name="Hover Tips">
@@ -332,9 +329,6 @@
 			<menu_item_check label="ジョイスティック・フライカム" name="Joystick Flycam"/>
 			<menu_item_call label="視界をリセット" name="Reset View"/>
 			<menu_item_call label="最後の発言者を見る" name="Look at Last Chatter"/>
-			<menu_item_call label="ズーム・イン" name="Zoom In"/>
-			<menu_item_call label="ズーム（デフォルト）" name="Zoom Default"/>
-			<menu_item_call label="ズーム・アウト" name="Zoom Out"/>
 		</menu>
 		<!--Shortcuts-->
 		<menu_item_check label="RestrainedLove API（ＲＬＶａ）を有効化" name="RLV API"/>
@@ -453,7 +447,6 @@
 			<menu_item_check label="フォント頂点バッファを収集する" name="Collect Font Vertex Buffers"/>
 			<menu_item_check label="シェーダーキャッシュを有効化" name="Enable Shader Cache"/>
 			<menu_item_call label="シェーダーキャッシュをクリア" name="Shader Cache Clear"/>
-			<menu_item_call label="地形を再構築" name="Rebuild Terrain"/>
 			<menu_item_call label="キャッシュを直ちにクリア" name="Cache Clear"/>
 			<menu_item_check name="Render Avatar Cloth" label="アバターの衣服を描画"/>
 			<menu_item_check name="Collect UI Image Vertex Buffers" label="UI画像の頂点バッファを収集"/>
@@ -579,7 +572,7 @@
 	</menu>
 	<menu label="管理" name="Admin">
 		<menu label="オブジェクト" name="AdminObject">
-			<menu_item_call label="コピーを取る" name="Admin Take Copy"/>
+			<menu_item_call label="複製を取る" name="Admin Take Copy"/>
 			<menu_item_call label="自分を所有者にする" name="Force Owner To Me"/>
 			<menu_item_call label="所有者権限の実行" name="Force Owner Permissive"/>
 			<menu_item_call label="削除" name="Delete"/>

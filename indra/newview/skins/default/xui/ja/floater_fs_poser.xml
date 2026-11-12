@@ -225,7 +225,6 @@
 						</panel>
 						<panel title="プリセット" name="hands_presets_panel">
 							<scroll_list name="hand_presets_scroll">
-								<scroll_list.columns label="プリセット名" name="name"/>
 								<scroll_list.columns name="load_file_name_column" label="プリセット名"/>
 								<scroll_list.columns name="load_file_date_column" label="日付"/>
 								<scroll_list.columns name="load_file_date_sort_column" label="日付"/>
@@ -245,7 +244,6 @@
 						</scroll_list>
 					</panel>
 					<panel title="モデル" name="avatarSelection_panel">
-						<avatar_list name="avatars_online"/>
 						<scroll_list tool_tip="アニメーション化するアバターまたはアニメッシュを選択します。" name="avatarSelection_scroll">
 							<scroll_list.columns label="ポーズをとる人を選択…" name="name"/>
 							<scroll_list.columns label="ＵＵＩＤ" name="uuid"/>
@@ -323,7 +321,6 @@
 			</panel>
 			<panel name="poses_loadSave">
 				<scroll_list tool_tip="アニメーション化する人物のポーズを読み込みます。" name="poses_scroll">
-					<scroll_list.columns label="ポーズ名" name="name"/>
 					<scroll_list.columns name="load_file_name_column" label="ポーズ名"/>
 					<scroll_list.columns name="load_file_date_column" label="日付"/>
 					<scroll_list.columns name="load_file_date_sort_column" label="日付"/>

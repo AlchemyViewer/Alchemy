@@ -430,9 +430,6 @@ Second Lifeのサポートまでお問い合わせください。
 	<string name="TooltipFlagNoEdit">
 		編集禁止
 	</string>
-	<string name="TooltipFlagNoEdit">
-		グループ作成
-	</string>
 	<string name="TooltipFlagNotSafe">
 		危険
 	</string>
@@ -641,7 +638,7 @@ Second Lifeのサポートまでお問い合わせください。
 添付できます。
 	</string>
 	<string name="TooltipTextureRestrictedDrop">
-		無制限のコピーおよび
+		無制限の複製および
 譲渡権限を持つテクスチャのみが
 許可されます。
 	</string>
@@ -1655,7 +1652,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		バージョンフォルダには、在庫フォルダが含まれなければなりません。
 	</string>
 	<string name="Marketplace Validation Error Mixed Stock">
-		エラー：在庫フォルダ内のすべてのアイテムは、コピー不可で同じ種類でなければなりません。
+		エラー：在庫フォルダ内のすべてのアイテムは、複製不可で同じ種類でなければなりません。
 	</string>
 	<string name="Marketplace Validation Error Subfolder In Stock">
 		エラー：在庫フォルダにサブフォルダを含めることはできません。
@@ -1676,7 +1673,7 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 		：警告：フォルダの中身が在庫フォルダに移されました。空のフォルダを削除します。
 	</string>
 	<string name="Marketplace Validation Error Stock Item">
-		：エラー：在庫フォルダには、コピー不可アイテムを含める必要があります。
+		：エラー：在庫フォルダには、複製不可アイテムを含める必要があります。
 	</string>
 	<string name="Marketplace Validation Warning Unwrapped Item">
 		：警告：バージョンフォルダには、アイテムが含まれていなければなりません。
@@ -1745,13 +1742,13 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	<string name="active" value="（アクティブ）"/>
 	<string name="no_transfer" value="（再販・譲渡不可）"/>
 	<string name="no_modify" value="（編集不可）"/>
-	<string name="no_copy" value="（コピー不可）"/>
+	<string name="no_copy" value="（複製不可）"/>
 	<string name="worn" value="（着用中）"/>
 	<string name="link" value="　リンク"/>
 	<string name="broken_link" value=" 　壊れたリンク"/>
 	<string name="no_transfer_lbl" value="　再販・譲渡不可"/>
 	<string name="no_modify_lbl" value="　編集不可"/>
-	<string name="no_copy_lbl" value="　コピー不可"/>
+	<string name="no_copy_lbl" value="　複製不可"/>
 	<string name="LoadingContents">
 		コンテンツを読み込んでいます…
 	</string>
@@ -1902,9 +1899,6 @@ https://support.secondlife.com よりSecond Lifeのサポートまでお問い�
 	</string>
 	<string name="InvFolder Materials">
 		マテリアル
-	</string>
-	<string name="InvFolder Settings">
-		自然環境の設定
 	</string>
 	<!-- are used for Friends and Friends/All folders in Inventory "Calling cards" folder. See EXT-694-->
 	<string name="InvFolder Friends">
@@ -5993,7 +5987,7 @@ OSのバージョン：[OS_VERSION]
 	<string name="PrivilegedLandAccessCaution">オブジェクト「&lt;nolink&gt;[OBJECTNAME]&lt;/nolink&gt;」は、あなたの土地への特権的なアクセスを要求しています。アクセスを許可すると、追加の警告なしにあなたの土地を売却される可能性があります。</string>
 	<string name="PrivilegedLandAccess">代理で土地を売却する</string>
 	<string name="Validator_ShouldBeNewLineOrASCIINoPipe">[NR]文字目の文字[CH]は、表示可能なASCII文字（パイプを除く）か改行である必要があります</string>
-	<string name="InventoryNoMaterial">インベントリ内にこのマテリアルの複製がありません。</string>
+	<string name="InventoryNoMaterial">インベントリ内にこのマテリアルのコピーがありません。</string>
 	<string name="MBFreezeDetected">
 		[APP_NAME]がフリーズしたようです。この問題が頻繁に発生する場合は、https://support.secondlife.com からサポートにお問い合わせください。
 	</string>

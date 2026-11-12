@@ -137,7 +137,7 @@
 		</text>
 		<check_box label="ビーコンを表示" name="show_beacon"/>
 		<button label="取る" name="take_objects"/>
-		<button label="コピーを取る" name="take_copy_objects"/>
+		<button label="複製を取る" name="take_copy_objects"/>
 		<button label="その場所にテレポート" name="teleport_me_to_object"/>
 		<button label="返却" name="return_objects"/>
 		<button label="削除" name="delete_objects"/>

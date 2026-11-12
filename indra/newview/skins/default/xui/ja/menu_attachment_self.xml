@@ -16,8 +16,6 @@
 	<menu_item_call label="ホバーする高さ…" name="Hover Height"/>
 	<menu_item_call label="シェイプ…" name="Edit Shape"/>
 	<menu_item_call label="アウトフィットパーツを編集…" name="Edit Outfit"/>
-	<menu_item_call label="オブジェクトのプロフィール" name="Object Profile"/>
-	<menu_item_call label="オブジェクトの調査" name="Object Inspect"/>
 	<context_menu label="脱ぐ" name="Take Off &gt;">
 		<context_menu label="衣装" name="Clothes &gt;">
 			<menu_item_call label="シャツ" name="Shirt"/>

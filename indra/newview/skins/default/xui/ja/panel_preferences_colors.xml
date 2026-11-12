@@ -10,23 +10,18 @@
 			<text name="nametag_font_colors">
 				名前タグの文字色：
 			</text>
-			<color_swatch name="user_nametag_color"/>
 			<text name="text_nametag_box1">
 				自分
 			</text>
-			<color_swatch name="agent_nametag_color"/>
 			<text name="text_nametag_box2">
 				他人
 			</text>
-			<color_swatch name="friends_nametag_color"/>
 			<text name="text_nametag_box3">
 				フレンド
 			</text>
-			<color_swatch name="linden_nametag_color"/>
 			<text name="text_nametag_box4">
 				リンデン
 			</text>
-			<color_swatch name="muted_nametag_color"/>
 			<text name="text_nametag_box5">
 				ミュート済み
 			</text>

@@ -3,7 +3,6 @@
 	<text name="contains_text">
 		&lt;nolink&gt;[NAME]&lt;/nolink&gt;に含まれるもの：
 	</text>
-	<scroll_list name="item_list"/>
 	<text name="buy_text">
 		[NAME] からL$ [AMOUNT]で購入しますか？
 	</text>
@@ -11,7 +10,7 @@
 	<button label="購入" label_selected="購入" name="buy_btn"/>
 	<check_box label="今すぐ着る" name="wear_check"/>
 	<text name="no_copy_text">
-		（コピー不可）
+		（複製不可）
 	</text>
 	<text name="no_modify_text">
 		（修正不可）

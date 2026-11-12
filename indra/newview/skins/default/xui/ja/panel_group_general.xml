@@ -16,7 +16,6 @@
 		<text name="prepend_founded_by">
 			創設者：
 		</text>
-		<name_box name="founder_name"/>
 		<text name="join_cost_text">
 			入会費はかかりません。
 		</text>

@@ -272,7 +272,6 @@
 			<button label="オブジェクトを返却する" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="タイプ" name="type"/>
-				<name_list.columns name="online_status"/>
 				<name_list.columns label="名前" name="name"/>
 				<name_list.columns label="数" name="count"/>
 				<name_list.columns label="最新" name="mostrecent"/>
@@ -411,7 +410,6 @@
 			<text name="MusicURL:">
 				音楽ＵＲＬ：
 			</text>
-			<combo_box name="music_url"/>
 			<text name="Sound:">
 				サウンド：
 			</text>

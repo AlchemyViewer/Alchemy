@@ -73,7 +73,6 @@
 			失敗しました
 		</text>
 	</panel>
-	<loading_indicator name="working_indicator"/>
 	<text name="working_lbl">
 		処理しています
 	</text>
