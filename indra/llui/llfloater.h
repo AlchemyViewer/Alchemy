@@ -658,6 +658,10 @@ public:
 
     void            hideAllFloaters();
     void            showHiddenFloaters();
+    // Leaves a floater hidden by hideAllFloaters() out of what
+    // showHiddenFloaters() shows again: called when it closes, and by an
+    // owner that has hidden it since
+    void            hiddenFloaterClosed(LLFloater* floater);
 
 
     LLFloater* getFrontmost() const;
@@ -677,8 +681,6 @@ public:
     void setToolbarRect(LLToolBarEnums::EToolBarLocation tb, const LLRect& toolbar_rect);
 
 private:
-    void hiddenFloaterClosed(LLFloater* floater);
-
     LLRect              mLastSnapRect;
     LLRect              mToolbarLeftRect;
     LLRect              mToolbarBottomRect;
