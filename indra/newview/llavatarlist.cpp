@@ -49,6 +49,10 @@
 #include "llviewercontrol.h"    // for gSavedSettings
 #include "lltooldraganddrop.h"
 #include "llworld.h"
+// [RLVa:KB]
+#include "rlvactions.h"
+#include "rlvcommon.h"
+// [/RLVa:KB]
 
 static LLDefaultChildRegistry::Register<LLAvatarList> r("avatar_list");
 
@@ -195,8 +199,15 @@ void LLAvatarList::setShowIcons(std::string param_name)
     mShowIcons = gSavedSettings.getBOOL(mIconParamName);
 }
 
-std::string LLAvatarList::getAvatarName(LLAvatarName av_name)
+std::string LLAvatarList::getAvatarName(const LLUUID& id, LLAvatarName av_name)
 {
+// [RLVa:KB]
+    // The name the item shows, so that the filter matches the anonym rather than the real name
+    if (mRlvCheckShowNames && !RlvActions::canShowName(RlvActions::SNC_DEFAULT, id))
+    {
+        return RlvStrings::getAnonym(av_name);
+    }
+// [/RLVa:KB]
     return mShowCompleteName? av_name.getCompleteName(false, mForceCompleteName) : av_name.getDisplayName();
 }
 
@@ -299,7 +310,7 @@ void LLAvatarList::refresh()
         LLAvatarName av_name;
         have_names &= LLAvatarNameCache::get(buddy_id, &av_name);
 
-        if (!have_filter || findInsensitive(getAvatarName(av_name), mNameFilter))
+        if (!have_filter || findInsensitive(getAvatarName(buddy_id, av_name), mNameFilter))
         {
             if (nadded >= ADD_LIMIT)
             {
@@ -310,7 +321,7 @@ void LLAvatarList::refresh()
             {
                 // *NOTE: If you change the UI to show a different string,
                 // be sure to change the filter code below.
-                std::string display_name = getAvatarName(av_name);
+                std::string display_name = getAvatarName(buddy_id, av_name);
                 addNewItem(buddy_id,
                     display_name.empty() ? waiting_str : display_name,
                     LLAvatarTracker::instance().isBuddyOnline(buddy_id));
@@ -339,7 +350,7 @@ void LLAvatarList::refresh()
             const LLUUID& buddy_id = it->asUUID();
             LLAvatarName av_name;
             have_names &= LLAvatarNameCache::get(buddy_id, &av_name);
-            if (!findInsensitive(getAvatarName(av_name), mNameFilter))
+            if (!findInsensitive(getAvatarName(buddy_id, av_name), mNameFilter))
             {
                 removeItemByUUID(buddy_id);
                 modified = true;
@@ -413,7 +424,7 @@ bool LLAvatarList::filterHasMatches()
         // If name has not been loaded yet we consider it as a match.
         // When the name will be loaded the filter will be applied again(in refresh()).
 
-        if (have_name && !findInsensitive(getAvatarName(av_name), mNameFilter))
+        if (have_name && !findInsensitive(getAvatarName(buddy_id, av_name), mNameFilter))
         {
             continue;
         }
