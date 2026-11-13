@@ -30,8 +30,10 @@
 
 #include "lluuid.h"
 
+#include <algorithm>
 #include <map>
 #include <string>
+#include <vector>
 
 namespace
 {
@@ -172,5 +174,66 @@ namespace
         CHECK(ALGroupMembers::merge(held.members, reply, true, role_members_complete) == 0);
         CHECK(held.members.size() == 2);
         CHECK(Member::sLive == 2);
+    }
+
+    // Asked for in pages, a full first page is only the start of the list: replacing the members held with it would
+    // drop every member past it.
+    TEST_CASE("algroupmembers: only a reply that is not paged or a first page with room to spare lists every member", "[algroupmembers]")
+    {
+        CHECK(ALGroupMembers::isWholeList(0, 0, 0));
+        CHECK(ALGroupMembers::isWholeList(0, 0, 500));
+        CHECK(ALGroupMembers::isWholeList(50, 0, 0));
+        CHECK(ALGroupMembers::isWholeList(50, 0, 49));
+        CHECK_FALSE(ALGroupMembers::isWholeList(50, 0, 50));
+        CHECK_FALSE(ALGroupMembers::isWholeList(50, 50, 10));
+    }
+
+    TEST_CASE("algroupmembers: a whole list tells which members held it no longer lists", "[algroupmembers]")
+    {
+        Held held;
+        bool role_members_complete = true;
+        const Members reply{ { STAYS, new Member("member") }, { JOINED, new Member("member") } };
+        std::vector<LLUUID> gone;
+
+        ALGroupMembers::merge(held.members, reply, true, role_members_complete, &gone);
+        CHECK(gone == std::vector<LLUUID>{ LEFT });
+
+        // a page adds to the members held, and none goes
+        const Members page{ { LEFT, new Member("member") } };
+        gone.clear();
+        ALGroupMembers::merge(held.members, page, false, role_members_complete, &gone);
+        CHECK(gone.empty());
+        CHECK(held.members.count(STAYS) == 1);
+    }
+
+    // A role's members as LLGroupRoleData keeps them.
+    struct RoleMembers
+    {
+        bool removeMember(const LLUUID& id)
+        {
+            const auto it = std::find(mIDs.begin(), mIDs.end(), id);
+            if (it == mIDs.end())
+            {
+                return false;
+            }
+            mIDs.erase(it);
+            return true;
+        }
+        std::vector<LLUUID> mIDs;
+    };
+
+    // The roles tab lists a role's members from the role, so a member who has left must go from there too.
+    TEST_CASE("algroupmembers: members gone leave every role", "[algroupmembers]")
+    {
+        const LLUUID EVERYONE;
+        RoleMembers everyone{ { STAYS, LEFT } };
+        RoleMembers officers{ { LEFT } };
+        std::map<LLUUID, RoleMembers*> roles{ { EVERYONE, &everyone }, { OFFICERS, &officers },
+                                              { JOINED, nullptr } };
+
+        ALGroupMembers::leaveRoles(roles, std::vector<LLUUID>{ LEFT });
+
+        CHECK(everyone.mIDs == std::vector<LLUUID>{ STAYS });
+        CHECK(officers.mIDs.empty());
     }
 }

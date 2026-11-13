@@ -2301,10 +2301,13 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
             donated_square_meters, member_powers, title, online_status, is_owner);
     }
 
-    // A reply from the first member is the whole list as it is now, so it replaces the members held; one from
-    // later in the list adds to them.
-    const size_t members_added = ALGroupMembers::merge(group_datap->mMembers, reply_members, page_start == 0,
-                                                       group_datap->mRoleMemberDataComplete);
+    // A reply that lists every member is the group as it is now, so it replaces the members held, and a member who
+    // has left leaves the roles too; a page of a longer list adds to them.
+    std::vector<LLUUID> members_gone;
+    const size_t members_added = ALGroupMembers::merge(group_datap->mMembers, reply_members,
+                                                       ALGroupMembers::isWholeList(page_size, page_start, members_loaded),
+                                                       group_datap->mRoleMemberDataComplete, &members_gone);
+    ALGroupMembers::leaveRoles(group_datap->mRoles, members_gone);
 
     U32 member_count = (U32)group_datap->mMembers.size();
 
