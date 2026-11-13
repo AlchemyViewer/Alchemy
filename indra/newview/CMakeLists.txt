@@ -1148,11 +1148,13 @@ if(AL_BUILD_VIEWER)
     alhoverglow.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
+    almaturitypreference.h
     almotionpredictor.h
     alobjectproperties.h
     alobjectroster.h
     alprobereach.h
     alregionretirement.h
+    alteleportprogress.h
     alagentlocationformat.h
     alcrashreporter.h
     alfeedback.h
@@ -2553,6 +2555,7 @@ if(AL_BUILD_TESTS)
       tests/algradehistory_test.cpp
       tests/algroupchanges_test.cpp
       tests/algroupmembers_test.cpp
+      tests/almaturitypreference_test.cpp
       tests/almotionpredictor_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
@@ -2606,6 +2609,7 @@ if(AL_BUILD_TESTS)
       tests/alscripttheme_test.cpp
       tests/alscripttypes_test.cpp
       tests/alscriptweightspane_test.cpp
+      tests/alteleportprogress_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altextureboost_test.cpp
       tests/altexturetable_test.cpp

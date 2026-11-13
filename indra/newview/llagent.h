@@ -28,6 +28,7 @@
 #define LL_LLAGENT_H
 
 #include "indra_constants.h"
+#include "almaturitypreference.h"
 #include "llevent.h"                // LLObservable base class
 #include "llagentdata.h"            // gAgentID, gAgentSessionID
 #include "llcharacter.h"
@@ -842,11 +843,8 @@ public:
 
 private:
     bool                            mIsDoSendMaturityPreferenceToServer;
-    unsigned int                    mMaturityPreferenceRequestId;
-    unsigned int                    mMaturityPreferenceResponseId;
-    unsigned int                    mMaturityPreferenceNumRetries;
-    U8                              mLastKnownRequestMaturity;
-    U8                              mLastKnownResponseMaturity;
+    // the preference as asked of the server and as it answered
+    ALMaturityPreference            mMaturityPreference;
     LLCore::HttpRequest::policy_t   mHttpPolicy;
 
     bool            isMaturityPreferenceSyncedWithServer() const;
@@ -855,6 +853,7 @@ private:
 
     void            handlePreferredMaturityResult(U8 pServerMaturity);
     void            handlePreferredMaturityError();
+    void            handleMaturityPreferenceOutcome(ALMaturityPreference::Outcome outcome);
     void            reportPreferredMaturitySuccess();
     void            reportPreferredMaturityError();
 
