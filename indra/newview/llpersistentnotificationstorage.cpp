@@ -32,6 +32,7 @@
 
 #include "llchannelmanager.h"
 #include "llnotificationstorage.h"
+#include "llnotificationtemplate.h"
 #include "llscreenchannel.h"
 #include "llscriptfloater.h"
 #include "llviewermessage.h"
@@ -125,6 +126,12 @@ void LLPersistentNotificationStorage::loadNotifications()
         ++notification_it)
     {
         LLSD notification_params = *notification_it;
+        // A notification saved while its template was persistent is not
+        // restored, and so not saved again, once the template no longer is.
+        if (!instance.getTemplate(notification_params["name"].asString())->mPersist)
+        {
+            continue;
+        }
         notifications_array.push_back(notification_params);
 
         ++processed_notifications;

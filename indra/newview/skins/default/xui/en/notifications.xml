@@ -13820,7 +13820,6 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
   <notification
    icon="notifytip.tga"
    name="AlwaysRunEnabled"
-   persist="true"
    log_to_chat="true"
    type="notifytip">
 Always Run enabled.
@@ -13828,7 +13827,6 @@ Always Run enabled.
   <notification
     icon="notifytip.tga"
     name="AlwaysRunDisabled"
-    persist="true"
     log_to_chat="true"
     type="notifytip">
 Always Run disabled.
