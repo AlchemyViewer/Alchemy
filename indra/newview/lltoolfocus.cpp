@@ -339,7 +339,7 @@ bool LLToolCamera::handleMouseUp(S32 x, S32 y, MASK mask)
 
 bool LLToolCamera::handleHover(S32 x, S32 y, MASK mask)
 {
-    if (gViewerWindow->getRightMouseDown())
+    if (mMouseSteering && gViewerWindow->getRightMouseDown())
     {
         agent_push_forward(KEYSTATE_LEVEL);
     }
