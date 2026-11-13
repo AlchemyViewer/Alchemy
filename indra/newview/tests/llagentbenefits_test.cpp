@@ -28,6 +28,9 @@
 
 #include "../llagentbenefits.h"
 
+#include <cstring>
+#include <new>
+
 namespace
 {
     // Every field init requires, as a login's account_level_benefits has them.
@@ -89,5 +92,16 @@ namespace
         CHECK_FALSE(read_without_limit.init(without_limit));
         CHECK(read_without_limit.hasRoomForGroup(100));
         CHECK(read_without_limit.hasRoomForGroup(100, true));
+    }
+
+    // Benefits never read set no price to create a group, as they set no limits, rather than whatever the memory
+    // they were made in held. They are made here in zeroed memory, where a price left unset reads as 0.
+    TEST_CASE("llagentbenefits: benefits never read set no group creation price", "[llagentbenefits]")
+    {
+        alignas(LLAgentBenefits) unsigned char storage[sizeof(LLAgentBenefits)];
+        std::memset(storage, 0, sizeof(storage));
+        const LLAgentBenefits* never_read = new (storage) LLAgentBenefits();
+        CHECK(never_read->getCreateGroupCost() == -1);
+        never_read->~LLAgentBenefits();
     }
 }

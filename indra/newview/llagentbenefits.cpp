@@ -32,6 +32,7 @@ LLAgentBenefits::LLAgentBenefits():
     m_animated_object_limit(-1),
     m_animation_upload_cost(-1),
     m_attachment_limit(-1),
+    m_create_group_cost(-1),
     m_group_membership_limit(-1),
     m_picks_limit(-1),
     m_sound_upload_cost(-1),
