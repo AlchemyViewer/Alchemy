@@ -68,6 +68,17 @@
             <key>Value</key>
             <real>2.0</real>
         </map>
+        <key>ALMuteGroupIMSound</key>
+        <map>
+            <key>Comment</key>
+            <string>Silence the new-conversation sound for conversations that originate from a group, ad-hoc conferences included. Direct conversations still play it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>ALProbeSHProjectionRes</key>
         <map>
             <key>Comment</key>
