@@ -74,14 +74,15 @@ enum EAnimRequest
     ANIM_REQUEST_STOP
 };
 
+// A field a message about the group leaves out reads as nothing: AgentGroupDataUpdate has no ListInProfile.
 struct LLGroupData
 {
     LLUUID mID;
     LLUUID mInsigniaID;
-    U64 mPowers;
-    bool mAcceptNotices;
-    bool mListInProfile;
-    S32 mContribution;
+    U64 mPowers = 0;
+    bool mAcceptNotices = false;
+    bool mListInProfile = false;
+    S32 mContribution = 0;
     std::string mName;
 };
 

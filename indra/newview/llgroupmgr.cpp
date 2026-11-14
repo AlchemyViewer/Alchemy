@@ -33,6 +33,9 @@
 
 #include "llgroupmgr.h"
 
+#include "algroupchanges.h"
+#include "algroupmembers.h"
+
 #include <vector>
 #include <algorithm>
 
@@ -1512,41 +1515,7 @@ void LLGroupMgr::addPendingPropertyRequest(const LLUUID& id)
 
 void LLGroupMgr::notifyObservers(LLGroupChange gc)
 {
-    for (group_map_t::iterator gi = mGroups.begin(); gi != mGroups.end(); ++gi)
-    {
-        LLUUID group_id = gi->first;
-        if (gi->second->mChanged)
-        {
-            // notify LLGroupMgrObserver
-            // Copy the map because observers may remove themselves on update
-            observer_multimap_t observers = mObservers;
-
-            // find all observers for this group id
-            observer_multimap_t::iterator oi = observers.lower_bound(group_id);
-            observer_multimap_t::iterator end = observers.upper_bound(group_id);
-            for (; oi != end; ++oi)
-            {
-                oi->second->changed(gc);
-            }
-            gi->second->mChanged = false;
-
-
-            // notify LLParticularGroupObserver
-            observer_map_t::iterator obs_it = mParticularObservers.find(group_id);
-            if(obs_it == mParticularObservers.end())
-                return;
-
-//          observer_set_t& obs = obs_it->second;
-// [RLVa:KB] - Checked: RLVa-2.2 (General bugfix)
-            // Iterate over a *copy* of the observer list
-            observer_set_t obs = obs_it->second;
-// [/RLVa:KB]
-            for (observer_set_t::iterator ob_it = obs.begin(); ob_it != obs.end(); ++ob_it)
-            {
-                (*ob_it)->changed(group_id, gc);
-            }
-        }
-    }
+    ALGroupChanges::notify(mGroups, mObservers, mParticularObservers, gc);
 }
 
 void LLGroupMgr::addGroup(LLGroupMgrGroupData* group_datap)
@@ -2280,6 +2249,8 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
     std::string default_title = titles.size() ? titles[0].asString() : LLStringUtil::null;
     U64 default_powers = llstrtou64(defaults["default_powers"].asString().c_str(), NULL, 16);
 
+    // The reply's members, laid over the group's once all are read.
+    LLGroupMgrGroupData::member_list_t reply_members;
     auto members_end = members.endMap();
     for (auto it = members.beginMap(); it != members_end; ++it)
     {
@@ -2326,27 +2297,17 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
             is_owner = true;
         }
 
-        LLGroupMemberData* data = new LLGroupMemberData(member_id,
+        reply_members[member_id] = new LLGroupMemberData(member_id,
             donated_square_meters, member_powers, title, online_status, is_owner);
-
-        if (group_datap->mRoleMemberDataComplete)
-        {
-            if (LLGroupMemberData* member_old = group_datap->mMembers[member_id])
-            {
-                auto role_end = member_old->roleEnd();
-                for (auto role_it = member_old->roleBegin(); role_it != role_end; ++role_it)
-                {
-                    data->addRole(role_it->first, role_it->second);
-                }
-            }
-            else
-            {
-                group_datap->mRoleMemberDataComplete = false;
-            }
-        }
-
-        group_datap->mMembers[member_id] = data;
     }
+
+    // A reply that lists every member is the group as it is now, so it replaces the members held, and a member who
+    // has left leaves the roles too; a page of a longer list adds to them.
+    std::vector<LLUUID> members_gone;
+    const size_t members_added = ALGroupMembers::merge(group_datap->mMembers, reply_members,
+                                                       ALGroupMembers::isWholeList(page_size, page_start, members_loaded),
+                                                       group_datap->mRoleMemberDataComplete, &members_gone);
+    ALGroupMembers::leaveRoles(group_datap->mRoles, members_gone);
 
     U32 member_count = (U32)group_datap->mMembers.size();
 
@@ -2371,7 +2332,7 @@ void LLGroupMgr::processCapGroupMembersResponse(const LLSD& response, const std:
         sendGroupTitlesRequest(group_id);
     }
 
-    if (page_size && members_loaded >= page_size && member_count > members_before)
+    if (page_size && members_loaded >= page_size && members_added > 0)
     {
         LLCoros::instance().launch("LLGroupMgr::groupMembersRequestCoro", [&]()
             {
