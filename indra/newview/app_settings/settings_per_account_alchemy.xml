@@ -86,7 +86,7 @@
             <key>Type</key>
             <string>S32</string>
             <key>Value</key>
-            <integer>0</integer>
+            <integer>1</integer>
         </map>
         <key>AlchemyReportIgnoredAdHocSession</key>
         <map>
@@ -96,6 +96,50 @@
             <integer>1</integer>
             <key>Type</key>
             <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKContactCalls</key>
+        <map>
+            <key>Comment</key>
+            <string>Who may voice call you: 0 everyone, 1 friends only, 2 nobody.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>SKContactGroupCalls</key>
+        <map>
+            <key>Comment</key>
+            <string>Who may start a group voice call with you: 0 everyone, 2 nobody.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKContactGroupChat</key>
+        <map>
+            <key>Comment</key>
+            <string>Who may open group chat with you: 0 everyone, 2 nobody (leaves group sessions as they start).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
+        <key>SKContactIMs</key>
+        <map>
+            <key>Comment</key>
+            <string>Who may instant message you: 0 everyone, 1 friends only.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>S32</string>
             <key>Value</key>
             <integer>0</integer>
         </map>

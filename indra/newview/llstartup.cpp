@@ -1239,6 +1239,15 @@ bool idle_startup()
         // Overwrite default user settings with user settings
         LLAppViewer::instance()->loadSettingsFromDirectory("Account");
 
+        // <SK:Nexii> Split the old friends-only switch into the per-channel contact filters
+        if (gSavedPerAccountSettings.getBOOL("VoiceCallsFriendsOnly"))
+        {
+            gSavedPerAccountSettings.setS32("SKContactIMs", 1);
+            gSavedPerAccountSettings.setS32("SKContactCalls", 1);
+            gSavedPerAccountSettings.setBOOL("VoiceCallsFriendsOnly", false);
+        }
+        // </SK:Nexii>
+
         // Convert 'LogInstantMessages' into 'KeepConversationLogTranscripts' for backward compatibility (CHUI-743).
         LLControlVariablePtr logInstantMessagesControl = gSavedPerAccountSettings.getControl("LogInstantMessages");
         if (logInstantMessagesControl.notNull())

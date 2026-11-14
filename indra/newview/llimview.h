@@ -338,6 +338,13 @@ private:
 
 };
 
+// <SK:Nexii> Per-channel contact filters
+enum class SKContact { IM, Call, Conference, GroupChat, GroupCall };
+
+// Whether from_id may reach the agent on a channel; Lindens and the agent always may.
+bool sk_contact_allowed(SKContact channel, const LLUUID& from_id, bool from_linden);
+// </SK:Nexii>
+
 class LLIMSessionObserver
 {
 public:
