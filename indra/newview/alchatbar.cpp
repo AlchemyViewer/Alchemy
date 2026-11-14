@@ -437,6 +437,11 @@ bool ALChatBar::shouldUseChatBar()
 // static
 void ALChatBar::startChat(const char* line)
 {
+    if (gKeyboard)
+    {
+        gKeyboard->resetMaskKeys();
+    }
+
     ALChatBar* bar = LLFloaterReg::getTypedInstance<ALChatBar>("chatbar");
     bar->setVisible(TRUE);
     bar->setFocus(TRUE);
