@@ -447,7 +447,7 @@ size_t LLAvatarList::filterMatchCount()
     {
         LLAvatarName av_name;
         LLAvatarNameCache::get(id, &av_name);
-        if (findInsensitive(getAvatarName(av_name), mNameFilter))
+        if (findInsensitive(getAvatarName(id, av_name), mNameFilter))
         {
             ++count;
         }
