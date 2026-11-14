@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="move_panel" label="移動">
+	<text name="mouse_lbl">
+		マウス：
+	</text>
+	<check_box name="first_person_avatar_visible" label="マウスルックで自分を表示する"/>
+	<check_box name="AlchemyRealisticMouselook" label="リアルなマウスルック" tool_tip="マウスルック中に、カメラをアバターの体の動きやアニメーションに追従させます"/>
+	<check_box name="disable_mouse_steering" label="マウスステアリングを無効にする" tool_tip="マウスステアリングでは、アバターをクリックしたときにカメラとアバターの位置がリセットされ、カメラの反対側を向きます。"/>
+	<check_box name="turn_toward_selected_objects" label="選択したオブジェクトの方を向く" tool_tip="カメラが離れている間に選択または右クリックしたオブジェクトの方へ、アバターを自動的に向かせます。チェックを外すとアバターは同じ方向を向いたままです。"/>
+	<text name=" Mouse Sensitivity">
+		マウスルックの感度：
+	</text>
+	<check_box name="invert_mouse" label="反転"/>
+	<text name="mouse_warp_lbl">
+		マウスワープ：
+	</text>
+	<combo_box name="mouse_warp_combo" tool_tip="Altズームやマウスルック中に、マウスを画面の中央にワープさせるかを設定します。">
+		<combo_box.item name="0" label="自動"/>
+		<combo_box.item name="1" label="オン"/>
+		<combo_box.item name="2" label="オフ"/>
+	</combo_box>
+	<text name="Combat Features">
+		ゲームプレイの機能：
+	</text>
+	<check_box name="alchemy_mlook_instructions" label="マウスルックの説明を表示する" tool_tip="マウスルックのオーバーレイに説明テキストを表示します。"/>
+	<check_box name="alchemy_mlook_position" label="マウスルックで位置と体力を表示する" tool_tip="マウスルックのオーバーレイに現在の位置と体力を表示します。"/>
+	<check_box name="alchemy_mlook_iff" label="照準の先のユーザーを表示する" tool_tip="マウスルックの照準の先にいるユーザーの名前と距離を表示します。"/>
+	<check_box name="alchemy_mlook_iff_markers" label="画面外のユーザーを矢印で表示する" tool_tip="現在見えていないユーザーの方向を画面の端に矢印で表示します。"/>
+	<text name="IFF Range">
+		マウスルックの範囲：
+	</text>
+</panel>

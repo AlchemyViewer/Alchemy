@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_block_avatar_rendering" label="アバターの描画">
+	<string name="av_never_render" value="しない"/>
+	<string name="av_always_render" value="常に"/>
+	<name_list name="exception_list">
+		<name_list.columns name="name" label="名前"/>
+		<name_list.columns name="setting" label="描画の設定"/>
+		<name_list.columns name="timestamp" label="追加日"/>
+	</name_list>
+	<panel name="bottom_panel">
+		<button name="rendering_exception_always_btn" label="常に描画" tool_tip="常に描画する住人を選択します"/>
+		<button name="rendering_exception_never_btn" label="描画しない" tool_tip="描画しない住人を選択します"/>
+		<button name="rendering_exception_trash_btn" label="削除" tool_tip="選択中の描画の例外を削除します"/>
+	</panel>
+</panel>

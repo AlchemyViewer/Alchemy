@@ -108,12 +108,6 @@
 	<text name="label glossiness">
 		光沢度
 	</text>
-	<combo_box name="combobox shininess">
-		<combo_box.item label="なし" name="None"/>
-		<combo_box.item label="低" name="Low"/>
-		<combo_box.item label="中" name="Medium"/>
-		<combo_box.item label="高" name="High"/>
-	</combo_box>
 	<text name="label environment">
 		自然環境
 	</text>
@@ -162,5 +156,14 @@
 	<spinner label="メートル毎の繰り返し" name="gltfRptctrl"/>
 	<!-- END PBR Material texture transform parameters -->
 	<check_box label="マテリアルを同期" name="checkbox_sync_settings" tool_tip="全てのマップの繰り返しを同期させます。"/>
-	<button label="揃える" name="button align textures" label_selected="現在のテクスチャレイヤーを揃える" tool_tip="現在のテクスチャレイヤーのオフセット値を基準に揃えます。"/>
+	<button name="btn_select_same_diff" label="全て検索" tool_tip="この面と同じ拡散反射（ディフューズ）マップを貼り付けた、すべての面を選択します。"/>
+	<button name="btn_select_same_norm" label="全て検索" tool_tip="この面と同じ法線（ノーマル）マップを貼り付けた、すべての面を選択します。"/>
+	<button name="btn_select_same_spec" label="全て検索" tool_tip="この面と同じ鏡面反射（スペキュラ）マップを貼り付けた、すべての面を選択します。"/>
+	<button name="copy_color_btn" tool_tip="色のパラメータをコピー"/>
+	<button name="paste_color_btn" tool_tip="色のパラメータをペースト"/>
+	<button name="pipette_color_btn" tool_tip="スポイトツールで色のパラメータをペースト"/>
+	<button name="copy_texture_btn" tool_tip="テクスチャのパラメータをコピー"/>
+	<button name="paste_texture_btn" tool_tip="テクスチャのパラメータをペースト"/>
+	<button name="pipette_texture_btn" tool_tip="スポイトツールでテクスチャのパラメータをペースト"/>
+	<button name="btn_select_same_pbr" label="全て検索" tool_tip="この面と同じPBRマテリアルのすべての面を選択します"/>
 </panel>

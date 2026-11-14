@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="asset_hex_editor" title="16進エディター">
+	<slider name="column_count" label="列数"/>
+	<button name="save_btn" label="保存"/>
+</floater>

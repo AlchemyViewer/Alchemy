@@ -26,4 +26,7 @@
 		無効
 	</text>
 	<button name="unmute_btn" label="ミュート解除"/>
+	<string name="device_not_loaded">
+		デバイスが読み込まれていません。
+	</string>
 </panel>

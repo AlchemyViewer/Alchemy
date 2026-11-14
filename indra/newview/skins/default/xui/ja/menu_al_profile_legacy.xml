@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_profile_legacy">
+	<menu_item_call name="webprofile" label="Webプロフィールを開く…"/>
+	<menu_item_call name="share" label="共有…"/>
+	<menu_item_call name="call" label="アバターにコール…"/>
+	<menu_item_call name="teleport" label="テレポートを送る…"/>
+	<menu_item_call name="request_teleport" label="テレポートをリクエスト…"/>
+	<menu_item_call name="map" label="マップに表示…"/>
+	<menu_item_call name="pay" label="支払う…"/>
+	<menu_item_call name="report_abuse" label="嫌がらせを報告…"/>
+	<menu_item_call name="Copy Name" label="名前をコピー"/>
+	<menu_item_call name="Copy SLurl" label="SLurlをコピー"/>
+	<menu_item_call name="Copy ID" label="UUIDをコピー"/>
+</toggleable_menu>

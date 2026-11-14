@@ -51,6 +51,9 @@
 				<text name="events_adult_label">
 					Adult
 				</text>
+				<text name="grid_coords_label">
+					グリッドマップの座標を表示
+				</text>
 			</panel>
 			<panel name="layout_panel_3">
 				<text name="find_on_map_label">

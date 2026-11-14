@@ -38,7 +38,32 @@
 	<button label="メッセージをリージョンに送信…" name="im_btn"/>
 	<button label="テレハブの管理…" name="manage_telehub_btn"/>
 	<button label="再起動のスケジュールを管理…"  name="manage_restart_btn"/>
-	<panel name="Combat">
+	<panel name="Combat" label="戦闘">
 		<check_box label="ダメージを許可" name="allow_damage_check"/>
+		<text name="access_text" label="死亡時">
+			死亡時：
+		</text>
+		<check_box name="combat_restrict_log" label="戦闘ログを制限"/>
+		<check_box name="combat_allow_damage_adjust" label="ダメージの調整を許可"/>
+		<check_box name="combat_restore_health" label="死亡時に体力を回復"/>
+		<combo_box name="combat_on_death">
+			<combo_box.item name="item0" label="ホームにテレポート"/>
+			<combo_box.item name="item1" label="区画の着地点"/>
+			<combo_box.item name="item2" label="リージョンのテレハブ"/>
+			<combo_box.item name="item3" label="何もしない"/>
+		</combo_box>
+		<spinner name="combat_dps_spin" label="ダメージの制限（DPS）："/>
+		<spinner name="combat_damage_limit" label="ダメージの上限："/>
+		<spinner name="combat_hps_spin" label="体力の回復（HPS）："/>
+		<spinner name="combat_invuln_spin" label="無敵時間（秒）："/>
 	</panel>
+	<text name="estate_id_lbl">
+		不動産ＩＤ：
+	</text>
+	<line_editor name="estate_id" initial_value="不明"/>
+	<text name="grid_position_lbl">
+		グリッドの位置：
+	</text>
+	<line_editor name="grid_position_x" default_text="なし"/>
+	<line_editor name="grid_position_y" default_text="なし"/>
 </panel>

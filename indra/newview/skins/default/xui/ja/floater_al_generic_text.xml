@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_generic_text" title="情報">
+	<button name="copy_btn" label="コピー"/>
+	<button name="close_btn" label="閉じる"/>
+</floater>

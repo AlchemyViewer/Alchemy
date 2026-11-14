@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="move_general_panel" label="移動">
+	<slider name="camera_fov" label="視野角"/>
+	<slider name="camera_offset_scale" label="距離"/>
+	<check_box name="clicking_avatar_keeps_camera" label="アバターをクリックしても回転させない" tool_tip="アバターや名前タグをクリックしたときに、アバターを回転させずにカメラを周回させられるようにします。"/>
+	<text name="heading2">
+		自動で位置を調整：
+	</text>
+	<check_box name="edit_camera_movement" label="ビルド／編集" tool_tip="編集モードの開始時と終了時に、カメラの位置を自動的に調整します"/>
+	<check_box name="appearance_camera_movement" label="容姿" tool_tip="編集モード中に、カメラの位置を自動的に調整します"/>
+	<text name="keyboard_lbl">
+		キーボード：
+	</text>
+	<check_box name="arrow_keys_move_avatar_check" label="矢印キーで常にアバターを移動する"/>
+	<check_box name="motion_reset_camera_check" label="移動するとカメラの位置をリセットする"/>
+	<check_box name="tap_tap_hold_to_run" label="2回押して長押しで走る"/>
+	<check_box name="automatic_fly" label="ジャンプまたはしゃがむキーを長押しして飛行を開始／停止する"/>
+	<check_box name="moon_walk" label="ムーンウォークを有効にする" tool_tip="後ろに歩くときに向きを変えないようにします。自分にだけ見えます"/>
+	<text name="numpad_control_lbl">
+		テンキー：
+	</text>
+	<combo_box name="numpad_control_combo">
+		<combo_box.item name="0" label="矢印キーと同じ動作"/>
+		<combo_box.item name="1" label="NumLockがオフのときに移動"/>
+		<combo_box.item name="2" label="常に移動（NumLockを無視）"/>
+	</combo_box>
+	<text name="single_click_action_lbl">
+		土地をシングルクリック：
+	</text>
+	<combo_box name="single_click_action_combo">
+		<combo_box.item name="0" label="何もしない"/>
+		<combo_box.item name="1" label="クリックした場所へ移動"/>
+	</combo_box>
+	<text name="double_click_action_lbl">
+		土地をダブルクリック：
+	</text>
+	<combo_box name="double_click_action_combo">
+		<combo_box.item name="0" label="何もしない"/>
+		<combo_box.item name="1" label="クリックした場所へ移動"/>
+		<combo_box.item name="2" label="クリックした場所へテレポート"/>
+	</combo_box>
+	<button name="joystick_setup_button" label="その他のデバイス"/>
+</panel>

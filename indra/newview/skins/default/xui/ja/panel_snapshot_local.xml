@@ -22,6 +22,8 @@
 		<combo_box.item label="PNG（可逆圧縮）" name="PNG"/>
 		<combo_box.item label="JPEG" name="JPEG"/>
 		<combo_box.item label="BMP（可逆圧縮）" name="BMP"/>
+		<combo_box.item name="WEBP" label="WebP（ロスレス）"/>
+		<combo_box.item name="AVIF_LOSSLESS" label="AVIF（ロスレス）"/>
 	</combo_box>
 	<slider label="品質：" name="image_quality_slider"/>
 	<button label="キャンセル" name="cancel_btn"/>

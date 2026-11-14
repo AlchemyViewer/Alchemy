@@ -17,4 +17,11 @@ Single instance - only have one at a time, recycle it each spawn
 		これは私のSecondLifeの説明であり、本当に素晴らしいと思います。しかし、どういうわけか、私の説明は非常に長くなっています。なぜなら、私はたくさん話すのが好きだからです。
 	</text>
 	<slider name="volume_slider" tool_tip="ボイス音量"/>
+	<button name="add_friend_btn" label="フレンドに追加"/>
+	<button name="im_btn" label="ＩＭ"/>
+	<button name="view_profile_btn" label="プロフィール"/>
+	<panel name="moderator_panel">
+		<button name="disable_voice" label="ボイスを無効化"/>
+		<button name="enable_voice" label="ボイスを有効化"/>
+	</panel>
 </floater>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Code editor context menu">
+	<menu_item_call name="quick_fix" label="クイックフィックス…"/>
+	<menu_item_call name="Suggestion 1" label="（不明）"/>
+	<menu_item_call name="Suggestion 2" label="（不明）"/>
+	<menu_item_call name="Suggestion 3" label="（不明）"/>
+	<menu_item_call name="Suggestion 4" label="（不明）"/>
+	<menu_item_call name="Suggestion 5" label="（不明）"/>
+	<menu_item_call name="Add to Dictionary" label="辞書に追加"/>
+	<menu_item_call name="Add to Ignore" label="無視リストに追加"/>
+	<menu_item_call name="go_to_definition" label="定義へ移動"/>
+	<menu_item_call name="find_references" label="参照を検索"/>
+	<menu_item_call name="rename" label="名前の変更…"/>
+	<menu_item_call name="undo" label="取り消し"/>
+	<menu_item_call name="redo" label="やり直し"/>
+	<menu_item_call name="cut" label="カット"/>
+	<menu_item_call name="copy" label="コピー"/>
+	<menu_item_call name="paste" label="ペースト"/>
+	<menu_item_call name="delete" label="削除"/>
+	<menu_item_call name="select_all" label="すべて選択"/>
+	<menu_item_call name="toggle_comment" label="コメントの切り替え"/>
+	<menu_item_call name="duplicate_line" label="行を複製"/>
+	<menu_item_call name="delete_line" label="行を削除"/>
+	<menu_item_call name="fold" label="折りたたむ"/>
+	<menu_item_call name="unfold" label="展開"/>
+	<menu_item_call name="fold_all" label="すべて折りたたむ"/>
+	<menu_item_call name="unfold_all" label="すべて展開"/>
+	<menu_item_call name="complete" label="補完"/>
+</context_menu>

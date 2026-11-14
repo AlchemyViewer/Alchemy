@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="scene_explorer_filters" title="シーンエクスプローラーのフィルター">
+	<text name="match_note">チェックしたすべてのフィルターに一致するオブジェクトのみを表示：</text>
+	<text name="label_type">種類</text>
+	<check_box name="check_type_prim" label="プリム" tool_tip="通常のプリムのみ表示します"/>
+	<check_box name="check_type_mesh" label="メッシュ" tool_tip="メッシュオブジェクトのみ表示します"/>
+	<check_box name="check_type_sculpt" label="スカルプト" tool_tip="スカルプトプリムのみ表示します"/>
+	<text name="label_features">機能</text>
+	<check_box name="check_scripted" label="スクリプト付き" tool_tip="スクリプトを含むオブジェクトのみ"/>
+	<check_box name="check_physics" label="物理" tool_tip="物理オブジェクトのみ"/>
+	<check_box name="check_phantom" label="ファントム" tool_tip="ファントムオブジェクト（衝突なし）のみ"/>
+	<check_box name="check_temporary" label="一時" tool_tip="Rez時に一時的なオブジェクトのみ"/>
+	<check_box name="check_flexible" label="フレキシブル" tool_tip="フレキシブルプリムのみ"/>
+	<check_box name="check_light" label="ライト" tool_tip="光を放つオブジェクトのみ"/>
+	<check_box name="check_spotlight" label="スポットライト" tool_tip="スポットライトの円錐を持つライトのみ"/>
+	<check_box name="check_projector" label="プロジェクター" tool_tip="投影テクスチャを持つライトのみ"/>
+	<check_box name="check_glow" label="グロー" tool_tip="いずれかの面にグローがあるオブジェクトのみ"/>
+	<check_box name="check_fullbright" label="フルブライト" tool_tip="フルブライトの面があるオブジェクトのみ"/>
+	<check_box name="check_media" label="メディア" tool_tip="面にメディアがあるオブジェクトのみ"/>
+	<check_box name="check_particles" label="パーティクル" tool_tip="パーティクルの発生源のみ"/>
+	<check_box name="check_probe" label="反射プローブ" tool_tip="反射プローブのボリュームのみ"/>
+	<check_box name="check_animated" label="アニメーションメッシュ" tool_tip="アニメーション（アニメッシュ）オブジェクトのみ"/>
+	<check_box name="check_pbr" label="PBRマテリアル" tool_tip="いずれかの面にPBRマテリアルがあるオブジェクトのみ"/>
+	<check_box name="check_alpha" label="透明" tool_tip="透明な面があるオブジェクトのみ"/>
+	<check_box name="check_attachment" label="アタッチメント" tool_tip="装着中のアタッチメントのみ"/>
+	<check_box name="check_for_sale" label="販売中" tool_tip="販売設定されているオブジェクトのみ"/>
+	<check_box name="check_payable" label="支払い可能（スクリプト）" tool_tip="支払いを受け付けるオブジェクトのみ"/>
+	<text name="label_scope">範囲</text>
+	<radio_group name="scope_radio" tool_tip="検索結果の空間的な範囲">
+		<radio_item name="scope_region" label="リージョン全体" tool_tip="リージョン内のすべて"/>
+		<radio_item name="scope_parcel" label="この区画" tool_tip="自分が立っている区画のオブジェクトのみ"/>
+		<radio_item name="scope_radius" label="半径内" tool_tip="自分から指定半径内のオブジェクトのみ"/>
+	</radio_group>
+	<slider name="radius_slider" tool_tip="自分を中心とした半径（メートル）"/>
+	<text name="label_heaviness">重さ</text>
+	<spinner name="min_li_spinner" label="最小ランドインパクト" tool_tip="ランドインパクトがこの値以上のリンクセットのみ表示します（0＝オフ）"/>
+	<spinner name="min_tris_spinner" label="最小三角形数" tool_tip="三角形がこの数以上のオブジェクトのみ表示します（0＝オフ）"/>
+	<button name="reset_btn" label="すべてのフィルターをリセット" tool_tip="エクスプローラーのクイックバーを含め、すべてのフィルターをクリアします"/>
+</floater>

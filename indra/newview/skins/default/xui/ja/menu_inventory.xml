@@ -29,8 +29,8 @@
 		<menu_item_call label="靴" name="Shoes"/>
 		<menu_item_call label="シャツ" name="Shirt"/>
 		<menu_item_call label="スカート" name="Skirt"/>
-		<menu_item_call label="下着（上半身）" name="Underpants"/>
-		<menu_item_call label="下着（下半身）" name="Undershirt"/>
+		<menu_item_call label="下着（下半身）" name="Underpants"/>
+		<menu_item_call label="下着（上半身）" name="Undershirt"/>
 	</menu>
 	<menu_item_call label="テレポート" name="Landmark Open"/>
 	<menu_item_call label="開く" name="Animation Open"/>
@@ -52,7 +52,6 @@
 	<menu_item_call label="メインパネルで表示" name="Show in Main Panel"/>
 	<menu_item_call label="開く" name="open_in_current_window"/>
 	<menu_item_call label="新しいウィンドウで開く" name="open_in_new_window"/>
-	<menu_item_call label="名前変更" name="Rename"/>
 	<menu_item_call label="カット" name="Cut"/>
 	<menu_item_call label="コピー" name="Copy"/>
 	<menu_item_call label="ペースト" name="Paste"/>
@@ -142,4 +141,8 @@
 	<menu_item_call label="マーケットプレイスの出品リストにコピー" name="Marketplace Copy"/>
 	<menu_item_call label="マーケットプレイスの出品リストに移動" name="Marketplace Move"/>
 	<menu_item_call label="－オプションなし－" name="--no options--" />
+	<menu_item_call name="Copy Inventory UUID" label="インベントリのUUIDをコピー"/>
+	<menu name="Extras Menu" label="その他">
+		<menu_item_call name="Edit Hex" label="16進数で編集"/>
+	</menu>
 </menu>

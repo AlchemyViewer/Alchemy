@@ -48,6 +48,7 @@
 		<combo_box label="画像レイヤー" name="layer_types">
 			<combo_box.item label="カラー" name="Colors"/>
 			<combo_box.item label="色深度" name="Depth"/>
+			<combo_box.item name="Depth24" label="色深度（２４ビット）"/>
 		</combo_box>
 		<check_box label="インターフェース" name="ui_check"/>
 		<check_box label="L$残高" name="balance_check"/>
@@ -61,6 +62,13 @@
 		<combo_box name="filters_combobox" tool_tip="画像フィルタ">
 			<combo_box.item label="フィルタなし" name="NoFilter"/>
 		</combo_box>
+		<check_box name="cutout_check" label="切り抜き" tool_tip="選択したアバターまたはオブジェクトだけを描画します。それ以外はピッカーの横の色で塗りつぶされます（アルファが0なら透明）。これがオンの間は「スナップショットをディスクに保存」も切り抜きになります。"/>
+		<button name="cutout_pick_btn" tool_tip="切り抜く対象を選択します：これをクリックしてから、アバターまたはオブジェクトをクリックしてください。装着物をクリックすると、それを身に着けている人が選択されます。Escでキャンセルします。"/>
+		<color_swatch name="cutout_fill_swatch" tool_tip="被写体以外を塗りつぶす色。アルファ0では透明になります。JPEG、BMP、ポストカードは透明に対応していないため、単色で塗りつぶされます。"/>
+		<text name="cutout_target_text">
+			何も選択されていません
+		</text>
+		<check_box name="cutout_seated_check" label="座っているアバターを含める" tool_tip="オブジェクトを切り抜くとき、その上に座っているアバターと、その装着物も含めます。"/>
 	</panel>
 	<panel name="succeeded_panel">
 		<text name="succeeded_lbl">
@@ -72,7 +80,6 @@
 			失敗しました
 		</text>
 	</panel>
-	<loading_indicator name="working_indicator"/>
 	<text name="working_lbl">
 		処理しています
 	</text>
@@ -88,4 +95,15 @@
 	<text name="360_label">
 		３６０度Ｓショットを撮影
 	</text>
+	<string name="cutout_nothing">何も選択されていません</string>
+	<string name="cutout_picking">アバターまたはオブジェクトをクリックしてください</string>
+	<string name="cutout_retrieving">取得しています…</string>
+	<string name="cutout_not_found">視界外</string>
+	<string name="cutout_not_drawn">視界外：[NAME]</string>
+	<string name="cutout_muted">完全には描画されていません：[NAME]</string>
+	<string name="cutout_mouselook">マウスルックでは描画されません：[NAME]</string>
+	<string name="cutout_rlv">視覚が制限されている間は利用できません</string>
+	<string name="cutout_fill_title">切り抜きの塗りつぶし</string>
+	<string name="cutout_full_picker">その他…</string>
+	<string name="cutout_full_picker_tooltip">数値入力やスポイトが使える詳細なカラーピッカー</string>
 </floater>

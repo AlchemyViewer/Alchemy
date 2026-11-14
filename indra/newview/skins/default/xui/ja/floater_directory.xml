@@ -1,3 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="directory" title="検索">
+	<tab_container name="Directory Tabs">
+		<panel name="panel_dir_people" label="人物"/>
+		<panel name="panel_dir_groups" label="グループ"/>
+		<panel name="panel_dir_places" label="場所"/>
+		<panel name="panel_dir_land" label="不動産販売"/>
+		<panel name="panel_dir_events" label="イベント"/>
+		<panel name="panel_dir_classified" label="クラシファイド"/>
+	</tab_container>
 </floater>

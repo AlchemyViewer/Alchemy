@@ -37,19 +37,30 @@
 			<slider label="最大距離" name="Max Distance"/>
 			<button label="ブロックリスト" name="block_list"/>
 			<text name="inventory_header">
-				Inventory:
+				インベントリ：
 			</text>
-			<check_box label="Automatically accept new inventory items" name="Auto_Accept_New_Inventory"/>
-			<check_box label="Automatically show newly accepted items in inventory" name="Show_In_Inventory"/>
-			<check_box label="Automatically view notecards, textures, landmarks after accepting" name="Show_New_Inventory"/>
+			<check_box label="新しくインベントリに送られて来たアイテムを自動的に受け取る" name="Auto_Accept_New_Inventory"/>
+			<check_box label="新しいアイテムを受け取った時に、自動的にインベントリフォルダを開いて表示する" name="Show_In_Inventory"/>
+			<check_box label="ノートカード、画像、ランドマークを受け取った時にすぐに表示する" name="Show_New_Inventory"/>
 			<text name="block_list_label">
 				（ブロックした人物やオブジェクト）
 			</text>
+			<check_box name="crash_reports_check" label="Alchemyの開発者にクラッシュレポートを送信する" tool_tip="レポートには、ビューアがクラッシュした場所、ログ、設定、アバター名が含まれ、Alchemyの開発者だけが閲覧できるSentryに送られます"/>
 		</panel>
 		<panel label="Discord" name="privacy_preferences_discord">
-			<check_box label="Discordとの統合を有効化" name="enable_discord"/>
+			<check_box label="Discordとの統合を有効化" name="enable_discord" tool_tip="Discordのフレンドには、グリッド、ビューア、オンライン時間が表示されます。名前と現在地は下での選択に従い、RLVで非表示になっている間は表示されません。変更するにはログインしてください。"/>
 			<check_box label="アバター名を表示" name="show_name"/>
-			<check_box label="場所を表示" name="show_location"/>
+			<check_box label="場所を表示" name="show_location" tool_tip="リージョン名と自分の位置（下のレーティング以下のリージョンのみ）。RLVで現在地が非表示の間は送信されません。"/>
+			<text name="discord_max_maturity_label">
+				表示するリージョンのレーティング：
+			</text>
+			<combo_box name="discord_max_maturity">
+				<combo_box.item name="discord_maturity_moderate" label="GeneralとModerate"/>
+				<combo_box.item name="discord_maturity_adult" label="General、Moderate、Adult"/>
+			</combo_box>
+			<text name="discord_note">
+				Discordアプリの起動が必要です。
+			</text>
 		</panel>
 	</tab_container>
 </panel>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_dir_groups" label="グループ">
+	<button name="prev_btn" tool_tip="前のページに戻ります。"/>
+	<button name="next_btn" tool_tip="次のページに進みます。"/>
+	<text name="find">
+		検索語句を入力：
+	</text>
+	<scroll_list name="results">
+		<column name="name" label="名前"/>
+		<column name="members" label="メンバー"/>
+	</scroll_list>
+	<check_box name="incmature" label="Matureグループを含める"/>
+	<button name="Search" label="検索"/>
+</panel>

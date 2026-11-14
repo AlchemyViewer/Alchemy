@@ -206,10 +206,10 @@
 			<!-- for log tab -->
 			<!-- LOD PANEL -->
 			<panel label="ＬｏＤ" name="lod_panel" title="詳細度">
-				<text name="source" value="ソース"/>
-				<text name="triangles" value="三角形数"/>
-				<text name="vertices" value="頂点数"/>
-				<text name="high_label" value="高"/>
+				<text name="source" value="ソース" initial_value="ソース"/>
+				<text name="triangles" value="三角形数" initial_value="三角形"/>
+				<text name="vertices" value="頂点数" initial_value="頂点"/>
+				<text name="high_label" value="高" initial_value="高"/>
 				<combo_box name="lod_source_high">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -221,7 +221,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="medium_label" value="中"/>
+				<text name="medium_label" value="中" initial_value="中"/>
 				<combo_box name="lod_source_medium">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -234,7 +234,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="low_label" value="低"/>
+				<text name="low_label" value="低" initial_value="低"/>
 				<combo_box name="lod_source_low">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -247,7 +247,7 @@
 					<item label="三角形の限度数" name="Triangle Limit"/>
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
-				<text name="lowest_label" value="最低"/>
+				<text name="lowest_label" value="最低" initial_value="最低"/>
 				<combo_box name="lod_source_lowest">
 					<item name="Load from file" label="ファイルから読み込む"/>
 					<item name="MeshOpt Auto" label="自動生成"/>
@@ -261,7 +261,7 @@
 					<item label="エラーのしきい値" name="Error Threshold"/>
 				</combo_box>
 				<check_box name="gen_normals" label="法線を生成"/>
-				<text name="crease_label" value="折り目の角度："/>
+				<text name="crease_label" value="折り目の角度：" initial_value="折り目の角度："/>
 			</panel>
 			<!-- PHYSYCS PANEL -->
 			<panel label="物理効果" name="physics_panel">
@@ -286,20 +286,6 @@
 					-->
 				</panel>
 				<!-- ==== STEP 2: Analyze ==== -->
-				<panel name="physics analysis">
-					<text name="method_label">
-						ステップ２：分析
-					</text>
-					<text name="analysis_method_label">
-						方法：
-					</text>
-					<text name="quality_label">
-						品質：
-					</text>
-					<text name="smooth_method_label">
-						滑らかさ：
-					</text>
-				</panel>
 				<panel name="physics analysis vhacd">
 					<text name="method_label">
 						ステップ２：殻への変換（オプション）
@@ -361,6 +347,18 @@
 					<button label="キャンセル" name="decompose_cancel"/>
 					<button label="分析" name="Decompose"/>
 					<check_box label="穴を閉じる" name="Close Holes (Slow)"/>
+					<text name="method_label">
+						ステップ２：殻への変換（オプション）
+					</text>
+					<text name="analysis_method_label">
+						方法：
+					</text>
+					<text name="quality_label">
+						品質：
+					</text>
+					<text name="smooth_method_label">
+						滑らかさ：
+					</text>
 				</panel>
 			</panel>
 			<!-- MODIFIERS PANEL -->
@@ -375,9 +373,6 @@
 					[X]✕[Y]✕[Z]
 				</text>
 				<check_box label="テクスチャを含む" name="upload_textures"/>
-				<text name="pelvis_offset_label">
-					Ｚオフセット（アバターの上下調整）：
-				</text>
 			</panel>
 			<panel label="オーバーライド" name="rigging_panel" title="リグ">
 				<check_box label="スキンのウエイトを含める" name="upload_skin"/>

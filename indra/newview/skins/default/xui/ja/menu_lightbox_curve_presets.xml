@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_lightbox_curve_presets">
+	<menu_item_call name="linear" label="リニア"/>
+	<menu_item_call name="soft_s" label="ソフトS字"/>
+	<menu_item_call name="strong_s" label="ストロングS字"/>
+	<menu_item_call name="fade" label="フェード"/>
+	<menu_item_call name="matte" label="マット"/>
+</toggleable_menu>

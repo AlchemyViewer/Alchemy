@@ -10,23 +10,18 @@
 			<text name="nametag_font_colors">
 				名前タグの文字色：
 			</text>
-			<color_swatch name="user_nametag_color"/>
 			<text name="text_nametag_box1">
 				自分
 			</text>
-			<color_swatch name="agent_nametag_color"/>
 			<text name="text_nametag_box2">
 				他人
 			</text>
-			<color_swatch name="friends_nametag_color"/>
 			<text name="text_nametag_box3">
 				フレンド
 			</text>
-			<color_swatch name="linden_nametag_color"/>
 			<text name="text_nametag_box4">
 				リンデン
 			</text>
-			<color_swatch name="muted_nametag_color"/>
 			<text name="text_nametag_box5">
 				ミュート済み
 			</text>
@@ -93,6 +88,18 @@
 			<text name="lindens_text">
 				リンデン
 			</text>
+			<text name="irc_colors_label">
+				IRC風のチャットの色：
+			</text>
+			<check_box name="irc_chat_colors_enabled" label="他の発言者ごとに固有の色を付ける" tool_tip="近くのチャットと会話で、他の人の発言をその人専用の変わらない色で表示します。自分のメッセージ、Linden、システム、オブジェクト、所有者への発言のメッセージは上で設定した色のままです。"/>
+			<check_box name="irc_chat_colors_name_tags" label="名前タグもその色に合わせる" tool_tip="他の人の名前タグを、チャットでのその人の名前の色で表示します。ミュートした人とLindenは名前タグの色を維持します。"/>
+			<slider name="irc_agent_saturation" label="彩度"/>
+			<slider name="irc_agent_lightness" label="明度"/>
+			<slider name="irc_name_lightness" label="名前の明度"/>
+			<text name="irc_preview_label">
+				コンパクトなチャットのプレビュー：
+			</text>
+			<text_editor name="irc_chat_preview" tool_tip="上の色と設定を使った、コンパクトなスタイルでのチャットの見た目です。"/>
 		</panel>
 	</tab_container>
 </panel>

@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <mimetypes name="default">
-	<defaultlabel>
-		（不明）
-	</defaultlabel>
-	<defaultwidget>
-		なし
-	</defaultwidget>
 	<widgetset name="web">
 		<label name="web_label">
 			Webコンテンツ
@@ -226,6 +220,21 @@
 	<mimetype name="video/x-msvideo">
 		<label name="video/x-msvideo_label">
 			ムービー（AVI）
+		</label>
+	</mimetype>
+	<mimetype name="application/octet-stream">
+		<label name="application/octet-stream_label">
+			ストリーム
+		</label>
+	</mimetype>
+	<mimetype name="video/x-flv">
+		<label name="video/x-flv_label">
+			ムービー（flv）
+		</label>
+	</mimetype>
+	<mimetype name="video/octet-stream">
+		<label name="video/octet-stream_label">
+			ムービー
 		</label>
 	</mimetype>
 </mimetypes>

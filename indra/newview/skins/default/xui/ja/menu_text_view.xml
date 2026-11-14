@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Text view context menu">
+	<menu_item_call name="Suggestion 1" label="（不明）"/>
+	<menu_item_call name="Suggestion 2" label="（不明）"/>
+	<menu_item_call name="Suggestion 3" label="（不明）"/>
+	<menu_item_call name="Suggestion 4" label="（不明）"/>
+	<menu_item_call name="Suggestion 5" label="（不明）"/>
+	<menu_item_call name="Add to Dictionary" label="辞書に追加"/>
+	<menu_item_call name="Add to Ignore" label="無視リストに追加"/>
+	<menu_item_call name="undo" label="取り消し"/>
+	<menu_item_call name="redo" label="やり直し"/>
+	<menu_item_call name="cut" label="カット"/>
+	<menu_item_call name="copy" label="コピー"/>
+	<menu_item_call name="paste" label="ペースト"/>
+	<menu_item_call name="delete" label="削除"/>
+	<menu_item_call name="select_all" label="すべて選択"/>
+</context_menu>

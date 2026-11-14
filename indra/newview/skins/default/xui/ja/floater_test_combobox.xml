@@ -1,40 +1,31 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <floater name="floater_test_combobox">
-	<text>
-		現実的な使い道（ログイン場所）：
-	</text>
 	<combo_box name="start_location_combo">
 		<combo_box.item label="最後に訪れた場所" name="MyLastLocation"/>
 		<combo_box.item label="自分の家" name="MyHome"/>
 		<combo_box.item label="＜リージョン名を入力＞" name="Typeregionname"/>
 	</combo_box>
-	<text>
-		最小のコンボボックス：
-	</text>
 	<combo_box name="minimal_combo">
 		<combo_box.item label="最初" name="item1"/>
 		<combo_box.item label="２つ目" name="item2"/>
 	</combo_box>
-	<text>
-		テキスト入力を許可：
-	</text>
 	<combo_box name="text_entry_combo">
 		<combo_box.item label="最初の項目" name="item1"/>
 		<combo_box.item label="２つ目の項目" name="item2"/>
 	</combo_box>
-	<text>
-		テキスト入力を許可。デフォルトは２つ目の項目：
-	</text>
 	<combo_box name="text_entry_combo2">
 		<combo_box.item label="最初の項目" name="item1"/>
 		<combo_box.item label="２つ目の項目" name="item2"/>
 	</combo_box>
-	<text>
-		２文字まで入力可能：
-	</text>
-	<combo_box name="state_combo">
-		<combo_box.item label="CA" name="item1"/>
-		<combo_box.item label="NY" name="item2"/>
-		<combo_box.item label="TX" name="item3"/>
+	<combo_box name="multi_column_combo">
+		<combo_item name="combo_item1">
+			<column name="longtext" label="全文一致"/>
+		</combo_item>
+		<combo_item name="combo_item2">
+			<column name="longtext" label="部分文字列に一致"/>
+		</combo_item>
+		<combo_item name="combo_item3">
+			<column name="longtext" label="正規表現に一致"/>
+		</combo_item>
 	</combo_box>
 </floater>

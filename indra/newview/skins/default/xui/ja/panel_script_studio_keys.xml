@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="keys_panel">
+	<panel.string name="NoKeys">（なし）</panel.string>
+	<panel.string name="PresetChosen">キー割り当てを[NAME]に合わせました。</panel.string>
+	<panel.string name="PresetChosenOwn">キー割り当てを[NAME]に合わせました。自分で変更したものはその上に引き続き適用されます。「すべてリセット」で削除できます。</panel.string>
+	<panel.string name="Changed">変更済み</panel.string>
+	<panel.string name="KeyTaken">[KEYS]は[WHAT]に割り当てられ、[WHOSE]からは削除されました。</panel.string>
+	<panel.string name="CaptureTitle">[WHAT]のキー</panel.string>
+	<panel.string name="CapturePrompt">キーを押してください。Enterで設定、Escでキャンセルします。</panel.string>
+	<panel.string name="CapturePromptTwo">キーを1つ、または2つ続けて押してください（Ctrl+Kの後にSなど）。Enterで設定、Escでキャンセルします。</panel.string>
+	<panel.string name="CaptureNothing">キーを待っています…</panel.string>
+	<panel.string name="CaptureSet">設定</panel.string>
+	<panel.string name="CaptureCancel">キャンセル</panel.string>
+	<panel.string name="CaptureTakes">すでに[WHOSE]で使われており、そちらからは削除されます。</panel.string>
+	<panel.string name="CaptureShadows">ビューアのメニューでは[KEYS]を[ITEM]に使っています。Script Studioではこのコマンドが優先されます。</panel.string>
+	<panel.string name="cmd_move_left">左へ移動</panel.string>
+	<panel.string name="cmd_move_right">右へ移動</panel.string>
+	<panel.string name="cmd_move_up">上へ移動</panel.string>
+	<panel.string name="cmd_move_down">下へ移動</panel.string>
+	<panel.string name="cmd_move_word_left">1単語左へ移動</panel.string>
+	<panel.string name="cmd_move_word_right">1単語右へ移動</panel.string>
+	<panel.string name="cmd_move_line_start">行頭へ移動</panel.string>
+	<panel.string name="cmd_move_line_end">行末へ移動</panel.string>
+	<panel.string name="cmd_move_doc_start">先頭へ移動</panel.string>
+	<panel.string name="cmd_move_doc_end">末尾へ移動</panel.string>
+	<panel.string name="cmd_move_page_up">1ページ上へ移動</panel.string>
+	<panel.string name="cmd_move_page_down">1ページ下へ移動</panel.string>
+	<panel.string name="cmd_select_left">左へ選択</panel.string>
+	<panel.string name="cmd_select_right">右へ選択</panel.string>
+	<panel.string name="cmd_select_up">上へ選択</panel.string>
+	<panel.string name="cmd_select_down">下へ選択</panel.string>
+	<panel.string name="cmd_select_word_left">1単語左へ選択</panel.string>
+	<panel.string name="cmd_select_word_right">1単語右へ選択</panel.string>
+	<panel.string name="cmd_select_line_start">行頭まで選択</panel.string>
+	<panel.string name="cmd_select_line_end">行末まで選択</panel.string>
+	<panel.string name="cmd_select_doc_start">先頭まで選択</panel.string>
+	<panel.string name="cmd_select_doc_end">末尾まで選択</panel.string>
+	<panel.string name="cmd_select_page_up">1ページ上へ選択</panel.string>
+	<panel.string name="cmd_select_page_down">1ページ下へ選択</panel.string>
+	<panel.string name="cmd_select_all">すべて選択</panel.string>
+	<panel.string name="cmd_delete_left">左を削除</panel.string>
+	<panel.string name="cmd_delete_right">右を削除</panel.string>
+	<panel.string name="cmd_delete_word_left">1単語左を削除</panel.string>
+	<panel.string name="cmd_delete_word_right">1単語右を削除</panel.string>
+	<panel.string name="cmd_delete_to_line_start">行頭まで削除</panel.string>
+	<panel.string name="cmd_delete_to_line_end">行末まで削除</panel.string>
+	<panel.string name="cmd_new_line">改行</panel.string>
+	<panel.string name="cmd_indent">インデント</panel.string>
+	<panel.string name="cmd_unindent">インデント解除</panel.string>
+	<panel.string name="cmd_undo">取り消し</panel.string>
+	<panel.string name="cmd_redo">やり直し</panel.string>
+	<panel.string name="cmd_cut">カット</panel.string>
+	<panel.string name="cmd_copy">コピー</panel.string>
+	<panel.string name="cmd_paste">ペースト</panel.string>
+	<panel.string name="cmd_delete">削除</panel.string>
+	<panel.string name="cmd_toggle_comment">コメントの切り替え</panel.string>
+	<panel.string name="cmd_duplicate_line">行を複製</panel.string>
+	<panel.string name="cmd_move_line_up">行を上に移動</panel.string>
+	<panel.string name="cmd_move_line_down">行を下に移動</panel.string>
+	<panel.string name="cmd_delete_line">行を削除</panel.string>
+	<panel.string name="cmd_fold">折りたたむ</panel.string>
+	<panel.string name="cmd_unfold">展開</panel.string>
+	<panel.string name="cmd_fold_all">すべて折りたたむ</panel.string>
+	<panel.string name="cmd_unfold_all">すべて展開</panel.string>
+	<panel.string name="cmd_complete">補完</panel.string>
+	<panel.string name="cmd_signature_help">パラメーター情報</panel.string>
+	<panel.string name="cmd_go_to_definition">定義へ移動</panel.string>
+	<panel.string name="cmd_find_references">参照を検索</panel.string>
+	<panel.string name="cmd_rename">シンボルの名前を変更</panel.string>
+	<panel.string name="cmd_find">検索</panel.string>
+	<panel.string name="cmd_replace">置換</panel.string>
+	<panel.string name="cmd_find_next">次を検索</panel.string>
+	<panel.string name="cmd_find_previous">前を検索</panel.string>
+	<panel.string name="cmd_quick_fix">クイックフィックス</panel.string>
+	<panel.string name="cmd_next_misspelling">次のスペルミス</panel.string>
+	<panel.string name="cmd_join_lines">行を結合</panel.string>
+	<panel.string name="cmd_previous_change">前の編集位置</panel.string>
+	<panel.string name="cmd_next_change">次の編集位置</panel.string>
+	<panel.string name="cmd_next_function">次の関数</panel.string>
+	<panel.string name="cmd_previous_function">前の関数</panel.string>
+	<panel.string name="cmd_select_function">関数を選択</panel.string>
+	<panel.string name="cmd_go_to_bracket">対応する括弧へ移動</panel.string>
+	<panel.string name="cmd_insert_line_below">下に行を挿入</panel.string>
+	<panel.string name="cmd_insert_line_above">上に行を挿入</panel.string>
+	<panel.string name="cmd_select_line">行を選択</panel.string>
+	<panel.string name="cmd_move_subword_left">単語の一部分左へ移動</panel.string>
+	<panel.string name="cmd_move_subword_right">単語の一部分右へ移動</panel.string>
+	<panel.string name="cmd_select_subword_left">単語の一部分左へ選択</panel.string>
+	<panel.string name="cmd_select_subword_right">単語の一部分右へ選択</panel.string>
+	<panel.string name="cmd_expand_selection">選択範囲を拡大</panel.string>
+	<panel.string name="cmd_shrink_selection">選択範囲を縮小</panel.string>
+	<panel.string name="cmd_select_next_occurrence">次の出現箇所を選択</panel.string>
+	<panel.string name="cmd_change_all_occurrences">すべての出現箇所を変更</panel.string>
+	<panel.string name="cmd_add_caret_above">上にキャレットを追加</panel.string>
+	<panel.string name="cmd_add_caret_below">下にキャレットを追加</panel.string>
+	<panel.string name="cmd_column_select_left">矩形選択を左に広げる</panel.string>
+	<panel.string name="cmd_column_select_right">矩形選択を右に広げる</panel.string>
+	<panel.string name="cmd_column_select_up">矩形選択を上に広げる</panel.string>
+	<panel.string name="cmd_column_select_down">矩形選択を下に広げる</panel.string>
+	<panel.string name="cmd_previous_misspelling">前のスペルミス</panel.string>
+	<text name="preset_label">
+		キー割り当て：
+	</text>
+	<combo_box name="preset" tool_tip="他のエディターの標準のキー割り当てを使います。自分で変更したキーはその上に引き続き適用されます。"/>
+	<line_editor name="filter" label="コマンドまたはキーで絞り込む" tool_tip="名前またはキーにこのテキストを含むコマンドのみを表示します"/>
+	<scroll_list name="keys" tool_tip="エディターとメニューのコマンドとそのキー。ダブルクリックで新しいキーを設定します">
+		<scroll_list.columns name="command" label="コマンド"/>
+		<scroll_list.columns name="keys" label="キー"/>
+	</scroll_list>
+	<button name="change" label="変更…" tool_tip="選択したコマンドのキーを置き換えます。新しいキーを使っている他のコマンドからはそのキーが削除されます"/>
+	<button name="add" label="追加…" tool_tip="現在のキーを残したまま、選択したコマンドに別のキーを追加します"/>
+	<button name="clear" label="クリア" tool_tip="選択したコマンドからすべてのキーを削除します"/>
+	<button name="restore" label="リセット" tool_tip="選択したコマンドのキーを、選択中のキー割り当ての状態に戻します"/>
+	<button name="restore_all" label="すべてリセット" tool_tip="すべてのコマンドのキーを、選択中のキー割り当ての状態に戻し、自分の変更を削除します"/>
+</panel>

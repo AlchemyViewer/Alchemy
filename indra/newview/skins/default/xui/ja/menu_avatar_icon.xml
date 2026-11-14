@@ -22,4 +22,11 @@
 		<menu_item_call label="この参加者のミュートを解除する" name="ModerateVoiceUnMuteSelected"/>
 	</context_menu>
 	<menu_item_call label="メンバーをバン" name="BanMember"/>
+	<context_menu name="Utilities" label="操作">
+		<menu_item_call name="Copy Full Name" label="フルネームをコピー"/>
+		<menu_item_call name="Copy Display Name" label="表示名をコピー"/>
+		<menu_item_call name="Copy Username" label="エージェント名をコピー"/>
+		<menu_item_call name="Copy SLurl" label="SLurlをコピー"/>
+		<menu_item_call name="Copy ID" label="UUIDをコピー"/>
+	</context_menu>
 </toggleable_menu>

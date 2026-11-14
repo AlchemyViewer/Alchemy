@@ -19,13 +19,13 @@
 		[CPU_TIME]㎲
 	</floater.string>
 	<floater.string name="character_owner_loading">
-		[Loading]
+		［読み込んでいます…］
 	</floater.string>
 	<floater.string name="character_owner_unknown">
-		[Unknown]
+		［不明］
 	</floater.string>
 	<floater.string name="character_owner_group">
-		[group]
+		［グループ］
 	</floater.string>
 	<panel name="pathfinding_chars_main">
 		<scroll_list name="objects_scroll_list">
@@ -49,7 +49,7 @@
 		<check_box label="ビーコンを表示" name="show_beacon"/>
 		<check_box label="物理効果カプセルを表示" name="show_physics_capsule"/>
 		<button label="取る" name="take_objects"/>
-		<button label="コピーを取る" name="take_copy_objects"/>
+		<button label="複製を取る" name="take_copy_objects"/>
 		<button label="その場所にテレポート" name="teleport_me_to_object" tool_tip="１つのキャラクターが選択された場合にのみ有効です。"/>
 		<button label="返却" name="return_objects"/>
 		<button label="削除" name="delete_objects"/>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Scopes Pane Menu">
+	<menu_item_check name="mode_rgb" label="ヒストグラム：RGB"/>
+	<menu_item_check name="mode_luma" label="ヒストグラム：輝度"/>
+	<menu_item_check name="mode_red" label="ヒストグラム：赤"/>
+	<menu_item_check name="mode_green" label="ヒストグラム：緑"/>
+	<menu_item_check name="mode_blue" label="ヒストグラム：青"/>
+	<menu_item_check name="mode_wave_luma" label="波形：輝度"/>
+	<menu_item_check name="mode_wave_rgb" label="波形：RGB"/>
+	<menu_item_check name="mode_parade" label="パレード：R G B"/>
+	<menu_item_check name="mode_vector" label="ベクトルスコープ"/>
+</context_menu>

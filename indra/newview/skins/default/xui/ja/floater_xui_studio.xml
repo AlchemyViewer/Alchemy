@@ -1,0 +1,614 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="xui_studio">
+	<floater.string name="ExternalEditorNotSet">エディターがありません：ExternalEditor設定またはLL_XUI_EDITOR環境変数を、ファイルを%s、行を%Lとして設定してください。</floater.string>
+	<floater.string name="NoFile">ファイルを選択してください。</floater.string>
+	<floater.string name="CaptureNoSnapshot">ウィンドウのスナップショットを取得できませんでした。</floater.string>
+	<floater.string name="CaptureNoPreview">何もプレビューしていません。</floater.string>
+	<floater.string name="CaptureOffScreen">プレビューが画面外にあります。</floater.string>
+	<floater.string name="CaptureWriteFailed">[PATH]に書き込めませんでした</floater.string>
+	<floater.string name="CaptureWritten">[WIDTH]×[HEIGHT]を[PATH]にキャプチャしました</floater.string>
+	<floater.string name="GalleryBuilt">ギャラリー：[SKIN]/[LANG]のウィジェット[COUNT]個</floater.string>
+	<floater.string name="EditorOpened">[PATH]:[LINE]を開きました</floater.string>
+	<floater.string name="NotBuilt">この種類のファイルはカタログ化と検索のみ行い、構築はしません。</floater.string>
+	<floater.string name="ViewerWidget">[TAG]はビューアのウィジェットです：シェルでの構築ではコンストラクターが実行されません。カタログ化と検索のみ行います。</floater.string>
+	<floater.string name="TemplateAlone">[TAG]はテンプレートだけからは構築できません：テンプレートが提供しないモデル、親、子が必要です。</floater.string>
+	<floater.string name="Built">ビュー[VIEWS]個、[MS] ms、検出結果[DIAG]件、[SKIN]/[LANG]</floater.string>
+	<floater.string name="BuiltReal">ビュー[VIEWS]個、[MS] ms、検出結果[DIAG]件、[SKIN]/[LANG]。登録済みのフローターのため、ハンドルはありません</floater.string>
+	<floater.string name="BuildFailed">[FILE]を構築できませんでした：検出結果を参照してください。</floater.string>
+	<floater.string name="Reloaded">ディスク上の変更を受けて再読み込みしました。</floater.string>
+	<floater.string name="NoResults">一致するものはありません。</floater.string>
+	<floater.string name="CanvasTabTip">[LAYER]の[FILE]</floater.string>
+	<floater.string name="CanvasTabDirtyTip">[LAYER]の[FILE]（未保存の編集あり）</floater.string>
+	<floater.string name="CanvasTabPreviewTip">[SKIN]/[LANG]の[FILE]（表示中、固定されていません）：次に選んだファイルに置き換わります</floater.string>
+	<floater.string name="CanvasTabWaiting">待機中</floater.string>
+	<floater.string name="CanvasDropInto">[NAME]の中へ</floater.string>
+	<floater.string name="CanvasRoomFrom">[NAME]から</floater.string>
+	<floater.string name="CanvasTabWaitingTip">[FILE]が選択され、固定の解除を待っています。ここを押すと固定を解除します</floater.string>
+	<floater.string name="CanvasHeld">キャンバスは[FILE]に固定されています。固定を解除すると[PENDING]が構築されます。</floater.string>
+	<floater.string name="CanvasPinnedHere">キャンバスは[FILE]（カタログで選択中のファイル）に固定されています。</floater.string>
+	<floater.string name="EditTarget">移動は[LAYER]の[FILE]に書き込まれます</floater.string>
+	<floater.string name="EditNoTarget">移動するには要素を選択してください。</floater.string>
+	<floater.string name="EditNoSelection">何も選択されていません。</floater.string>
+	<floater.string name="EditWrote">[LAYER]の[FILE]に[ATTRS]を書き込みました</floater.string>
+	<floater.string name="EditAligned">[LAYER]の[FILE]で[COUNT]個を整列しました</floater.string>
+	<floater.string name="AlignNeedsTwo">複数の要素を選択してください：キャンバスでShift+Ctrl+クリックするか、アウトラインでShiftを押しながら選択します。ハンドルが付いている要素に他の要素が揃えられます。</floater.string>
+	<floater.string name="AlignNothingToDo">移動するものはありません：選択したものはすでに揃っているか、スタックによって配置されています。</floater.string>
+	<floater.string name="EditTookOut">[LAYER]の[FILE]から[ATTRS]を削除しました。それ以前に有効だった値が再び有効になります</floater.string>
+	<floater.string name="EditWroteNotMoved">[LAYER]の[FILE]に[ATTRS]を書き込みました。プレビュー自体の枠はファイルではなくここで配置されます</floater.string>
+	<floater.string name="EditRootMoved">キャンバス上のプレビューを移動しました。ここでの位置はファイルに含まれないため、何も書き込んでいません。</floater.string>
+	<floater.string name="EditRootMove">プレビュー自体の枠はファイルではなくここで配置されます：サイズは編集できますが、位置は編集できません。</floater.string>
+	<floater.string name="EditUndone">[FILE]を元の状態に戻しました。</floater.string>
+	<floater.string name="EditRedone">[FILE]に同じ操作を再度行いました。</floater.string>
+	<floater.string name="EditUndoneWhat">取り消し：[WHAT]</floater.string>
+	<floater.string name="EditRedoneWhat">やり直し：[WHAT]</floater.string>
+	<floater.string name="StepWroteField">[WHERE]の[WHAT]</floater.string>
+	<floater.string name="StepTookFieldOut">[WHERE]から[WHAT]を削除</floater.string>
+	<floater.string name="StepWroteText">[WHERE]のテキスト</floater.string>
+	<floater.string name="StepRenamed">[WHERE]の名前付け</floater.string>
+	<floater.string name="StepAddedElement">[WHERE]に追加したもの</floater.string>
+	<floater.string name="EditRemoved">[LAYER]の[FILE]から[WHERE]を削除しました</floater.string>
+	<floater.string name="EditMoved">[LAYER]の[FILE]で[WHERE]を移動しました</floater.string>
+	<floater.string name="EditDuplicated">[LAYER]の[FILE]で[WHERE]をコピーしました</floater.string>
+	<floater.string name="StepMovedElement">[WHERE]の移動</floater.string>
+	<floater.string name="StepRemovedElement">[WHERE]の削除</floater.string>
+	<floater.string name="EditSaved">[FILE]を書き込みました。</floater.string>
+	<floater.string name="EditSavedAll">[COUNT]個のファイルを書き込みました。</floater.string>
+	<floater.string name="EditSavedSomeAll">[COUNT]個のファイルを書き込んで停止しました：[ERROR]</floater.string>
+	<floater.string name="EditSavedAndRepaired">[FILE]を書き込み、[MOVES]個の翻訳を新しい配置場所に移動しました。</floater.string>
+	<floater.string name="RenameStrands">この要素の翻訳[COUNT]個が適用されなくなります。「保存して翻訳を修復」で移動します。</floater.string>
+	<floater.string name="FixTakeOut">[ATTR]を削除</floater.string>
+	<floater.string name="FixSpell">[NAME]と綴る</floater.string>
+	<floater.string name="FixMoveInside">[DX], [DY]移動</floater.string>
+	<floater.string name="FixWidenBy">[DX]広げる</floater.string>
+	<floater.string name="FixApplied">[FILE]の検出結果[COUNT]件を修正しました。それぞれ個別に取り消せる編集です。</floater.string>
+	<floater.string name="FixNone">ここには修正を提示するものがありません。</floater.string>
+	<floater.string name="FixGone">それはもうここには書かれていません。</floater.string>
+	<floater.string name="FixOtherFile">その検出結果は[FILE]に関するものです。修正するにはそのファイルを開いてください。</floater.string>
+	<floater.string name="FixDidTakeOut">[FILE]（[LAYER]）の[WHERE]から[ATTR]を削除しました</floater.string>
+	<floater.string name="FixDidSpell">[FILE]（[LAYER]）の[WHERE]の[ATTR]を[NAME]にしました</floater.string>
+	<floater.string name="FixDidMove">[FILE]（[LAYER]）で[WHERE]を親の内側に移動しました</floater.string>
+	<floater.string name="FixDidWiden">[FILE]（[LAYER]）で[WHERE]を[DX]広げました</floater.string>
+	<floater.string name="StepSpeltFieldAgain">[WHERE]の[WHAT]</floater.string>
+	<floater.string name="StepManySteps">[STEPS]個の編集</floater.string>
+	<floater.string name="StepManyFiles">[FILES]個のファイルにわたる[STEPS]個の編集</floater.string>
+	<floater.string name="HistoryWentTo">ファイルを[COUNT]個目の編集の時点に戻しました。</floater.string>
+	<floater.string name="DropBefore">[WHERE]の前に[WHAT]</floater.string>
+	<floater.string name="DropInto">[WHERE]の中に[WHAT]</floater.string>
+	<floater.string name="DropAfter">[WHERE]の後に[WHAT]</floater.string>
+	<floater.string name="MenuUndo">取り消し</floater.string>
+	<floater.string name="MenuUndoWhat">取り消し：[WHAT]</floater.string>
+	<floater.string name="MenuRedo">やり直し</floater.string>
+	<floater.string name="MenuRedoWhat">やり直し：[WHAT]</floater.string>
+	<floater.string name="FindingsAll">チェックした[FILES]個のファイルの検出結果[HELD]件中[SHOWN]件</floater.string>
+	<floater.string name="FindingsSome">[TOTAL]件中[SHOWN]件を表示。チェックした[FILES]個のファイルの検出結果[HELD]件</floater.string>
+	<floater.string name="FindingsEveryRule">すべてのルール</floater.string>
+	<floater.string name="DocumentClosed">[FILE]を解放しました。</floater.string>
+	<floater.string name="OverrideField">[ATTR]（各レイヤーでの値）。書き込むと、有効な値が選択したレイヤーに入ります。</floater.string>
+	<floater.string name="OverrideNoField">フィールドが選択されていません：「属性」の行の横にある余白のマークをクリックしてください。</floater.string>
+	<floater.string name="OverrideNoLayer">書き込み先のレイヤーを選択してください。</floater.string>
+	<floater.string name="OverrideNothingInForce">そのフィールドを書き込んでいるレイヤーがないため、上書きする値がありません。</floater.string>
+	<floater.string name="GutterTitle">レイヤーごとの[ATTR]</floater.string>
+	<floater.string name="GutterLayer">レイヤー</floater.string>
+	<floater.string name="GutterSays">値</floater.string>
+	<floater.string name="GutterWriteHere">ここに書き込む</floater.string>
+	<floater.string name="GutterListTip">このファイルのすべてのレイヤーと、それぞれの[ATTR]の値。点はマージで採用されるレイヤーを示します。レイヤーを選んで「ここに書き込む」を押すと、有効な値をそのレイヤーに入れます。</floater.string>
+	<floater.string name="GutterForceTip">点は値が有効になっているレイヤーを示します</floater.string>
+	<floater.string name="GutterLayerTip">レイヤーが属するスキンと言語（マージされる順）</floater.string>
+	<floater.string name="GutterSaysTip">このレイヤーが[ATTR]に書き込んでいる値（書き込んでいない場合は空）</floater.string>
+	<floater.string name="GutterLineTip">そのレイヤーで要素が始まる行</floater.string>
+	<floater.string name="GutterWriteHereTip">有効な[ATTR]の値を選択したレイヤーに書き込み、そのレイヤーが最終的な値を決めるようにします</floater.string>
+	<floater.string name="FindCountTip">語句が見つかった箇所の数と、そのファイル数</floater.string>
+	<floater.string name="FindQueryTip">検索する語句。Enterで検索を実行し、見つかった場所をファイルごとに一覧表示します。</floater.string>
+	<floater.string name="CrumbRootTip">ファイルのルート：押すと選択します</floater.string>
+	<floater.string name="CrumbTip">押すと[NAME]を選択します</floater.string>
+	<floater.string name="CrumbSiblingsTip">押すと[NAME]を選択します。矢印で隣にある他の要素[COUNT]個を選べます</floater.string>
+	<floater.string name="BreadcrumbCodeBuilt">コードで構築</floater.string>
+	<floater.string name="QuickOpenTitle">クイックオープン</floater.string>
+	<floater.string name="QuickOpenPlaceholder">ファイル名の一部</floater.string>
+	<floater.string name="PaletteTakesText">テキストを取る</floater.string>
+	<floater.string name="GroupContainers">コンテナ</floater.string>
+	<floater.string name="GroupControls">コントロール</floater.string>
+	<floater.string name="GroupLists">リスト</floater.string>
+	<floater.string name="GroupText">テキスト</floater.string>
+	<floater.string name="GroupChrome">装飾</floater.string>
+	<floater.string name="PaletteTakesChildren">子の種類[COUNT]個</floater.string>
+	<floater.string name="FindWord">検索</floater.string>
+	<floater.string name="FindIn">対象</floater.string>
+	<floater.string name="FindAny">すべて</floater.string>
+	<floater.string name="FindTag">タグ</floater.string>
+	<floater.string name="FindAttribute">属性名</floater.string>
+	<floater.string name="FindValue">属性値</floater.string>
+	<floater.string name="FindName">要素名</floater.string>
+	<floater.string name="FindText">タグ間のテキスト</floater.string>
+	<floater.string name="FindContaining">を含む</floater.string>
+	<floater.string name="FindMatching">に一致</floater.string>
+	<floater.string name="FindStarting">で始まる</floater.string>
+	<floater.string name="FindEnding">で終わる</floater.string>
+	<floater.string name="FindEverywhere">すべてのスキン</floater.string>
+	<floater.string name="FindThisSkin">[SKIN]スキン</floater.string>
+	<floater.string name="FindThisFile">このファイル</floater.string>
+	<floater.string name="FindPlaceholder">検索する内容</floater.string>
+	<floater.string name="FindFieldTip">ファイルのどの部分で語句を検索するか</floater.string>
+	<floater.string name="FindHowTip">語句をファイルの内容とどのように比較するか</floater.string>
+	<floater.string name="FindScopeTip">どのレイヤーを検索するか</floater.string>
+	<floater.string name="FindResults">[FILES]個のファイルで[COUNT]件</floater.string>
+	<floater.string name="FindSomeResults">[FILES]個のファイルで[COUNT]件、最初の[SHOWN]件</floater.string>
+	<floater.string name="LintStarted">すべてLint：[TOTAL]個のファイル…</floater.string>
+	<floater.string name="LintStepped">すべてLint：[TOTAL]個中[DONE]個のファイル、検出結果[FOUND]件…</floater.string>
+	<floater.string name="LintStopped">すべてLint：停止しました。</floater.string>
+	<floater.string name="LintFinished">すべてLint：[FILES]個のファイルで検出結果[FOUND]件。レポートは[PATH]です</floater.string>
+	<floater.string name="TranslateImpactNone">これによって適用されなくなる翻訳はありません。</floater.string>
+	<floater.string name="TranslateImpact">このまま書き込むと、[COUNT]個の翻訳が適用されなくなります：[LANGS]。「保存して翻訳を修復」で移動します。</floater.string>
+	<floater.string name="EditReverted">[FILE]を再読み込みしました。加えた変更は失われました。</floater.string>
+	<floater.string name="EditNothingToSave">何も変更されていません。</floater.string>
+	<floater.string name="EditChangedOnDisk">[FILE]がディスク上で変更されましたが、ここには書き込まれていない変更があります。こちらを残すには保存し、向こうを採用するには元に戻してください。</floater.string>
+	<floater.string name="TranslateCounts">翻訳済み[TRANSLATED]、移動後に適用[RESCUED]、未翻訳[MISSING]、適用先なし[NOTAPPLIED]、古い[PLACEHOLDERS]、禁止[FORBIDDEN]</floater.string>
+	<floater.string name="TranslateNoFile">ファイルと言語を選択してください。</floater.string>
+	<floater.string name="TranslateWrote">[FILE]に[FIELD]を書き込みました</floater.string>
+	<floater.string name="TranslateRemoved">[FILE]から[FIELD]を削除しました</floater.string>
+	<floater.string name="TranslateNothingToRemove">この言語はこの行に何も書き込んでいません。</floater.string>
+	<floater.string name="TranslateTheText">テキスト</floater.string>
+	<floater.string name="TranslateRepaired">[FILE]で[MOVES]個の値を正しい場所に移動しました</floater.string>
+	<floater.string name="TranslateRepairedAll">[LANG]の[FILES]個のファイルにわたり、[COUNT]個の値を正しい場所に移動しました</floater.string>
+	<floater.string name="TranslateRemovedOrphans">[LANG]の[FILES]個のファイルから、[COUNT]個の孤立した値を削除しました</floater.string>
+	<floater.string name="TranslateNothingToRepair">[FILE]には、ベースが移動したパスに書かれているものはありません。</floater.string>
+	<floater.string name="TranslateSameLanguage">翻訳先として、ベース以外の言語を選択してください。</floater.string>
+	<floater.string name="TranslateRoots">[LANG]の[FILES]個のファイルにベースのルート名を付けました。[LEFT]個は別のものの翻訳としてそのままにしました</floater.string>
+	<floater.string name="CensusStarted">すべての言語のオーバーレイの動作を集計しています…</floater.string>
+	<floater.string name="CensusProgress">[TOTAL]個中[DONE]個のファイルを集計しました</floater.string>
+	<floater.string name="CensusDone">届く値[COVERED]個、適用先なし[NOTHING]個。表を[FILE]に書き込みました</floater.string>
+	<floater.string name="NotificationPosted">[NAME]をチャンネルに送信しました。どこに届いたかは「チャンネル」タブで確認できます。</floater.string>
+	<floater.string name="NotificationAnswered">[NAME]に[BUTTON]で応答しました。</floater.string>
+	<floater.string name="AttributeUnknown">そのようなパラメーターはありません</floater.string>
+	<floater.string name="SchemaWritten">[SUMMARY]。[FILE]に書き込みました</floater.string>
+	<floater.string name="SchemaFailed">[FILE]に書き込めませんでした</floater.string>
+	<floater.string name="EditCut">[WHAT]を切り取りました。移動先を選択して「ここに移動」を選んでください。</floater.string>
+	<floater.string name="EditNothingCut">何も切り取られていないか、切り取ったものはすでにここにあります。</floater.string>
+	<floater.string name="EditNoSibling">その方向には隣接する要素がありません。</floater.string>
+	<floater.string name="EditReparented">[WHAT]は[INTO]の中に移り、移動先に合わせて位置が書き込まれました。</floater.string>
+	<floater.string name="EditStackAxis">レイアウトスタックはパネルを自動で配置します：スタックの方向に沿って端をドラッグすると、スタックが読む1つの寸法を変更できます。</floater.string>
+	<floater.string name="EditWroteStack">[LAYER]の[FILE]に[ATTRS]を書き込みました。[SIBLING]が場所を譲ります</floater.string>
+	<floater.string name="AttributeWhatCodeBuilt">[NAME]   コードで構築   [CLASS]</floater.string>
+	<floater.string name="AttributeWhatNone">何も選択されていません</floater.string>
+	<floater.string name="AttributeNothingSelected">何も選択されていません</floater.string>
+	<floater.string name="AttributeNothingSelectedHow">アウトラインで要素を選ぶか、キャンバスで要素をCtrl+クリックしてください。</floater.string>
+	<floater.string name="AttributeNothingWritten">この要素は何も書き込んでいません</floater.string>
+	<floater.string name="AttributeNothingWrittenHow">すべての値は他の場所（ウィジェット自体のデフォルトや、下のレイヤー）から有効になっています。</floater.string>
+	<floater.string name="AttributeShowEvery">すべてのフィールドを表示</floater.string>
+	<floater.string name="AttributeNoMatch">その名前のフィールドはありません</floater.string>
+	<floater.string name="AttributeNoMatchHow">フィルターは、ファイルに書かれる名前（ドットを含む）に一致します。残りを表示するにはクリアしてください。</floater.string>
+	<floater.string name="PaneNavigator">XUI Studio：ナビゲーター</floater.string>
+	<floater.string name="PaneBottom">XUI Studio：検出結果と表</floater.string>
+	<floater.string name="PaneInspectors">XUI Studio：インスペクター</floater.string>
+	<floater.string name="AttributeTipSource">[SOURCE]に書かれています。</floater.string>
+	<floater.string name="AttributeTipUnwritten">ここでは誰も書き込んでいません。表示されているのは有効な値で、変更すると初めて書き込まれます。</floater.string>
+	<floater.string name="AttributeTipIgnored">[NAME]はすべてのウィジェットで読み込まれた後に破棄されます。ファイルに書くことはできますが、何にも使われません。</floater.string>
+	<floater.string name="AttributeTipUnknown">[NAME]はここに書かれていますが、どこでも宣言されていません。名前の誤字か、ウィジェットが対応しなくなったかのどちらかです。</floater.string>
+	<floater.string name="AttributeTipDeprecated">[NAME]は動作しますが、新しく書くべきではありません。</floater.string>
+	<floater.string name="AttributeTipDeprecatedFor">[NAME]は動作しますが、新しく書くべきではありません：代わりに[INSTEAD]を使ってください。</floater.string>
+	<floater.string name="AttributeTipRemove">このファイルから[NAME]を再び削除し、それ以前に有効だった値を有効にします。</floater.string>
+	<floater.string name="ImageChoicesTextures">テクスチャ</floater.string>
+	<floater.string name="FollowsTipLeft">この要素の左端と親の左端との間隔を保ち、親が広がっても要素がその場にとどまるようにします。クリックで保持／解除します。</floater.string>
+	<floater.string name="FollowsTipBottom">この要素の下端と親の下端との間隔を保ち、親が高くなっても要素がその場にとどまるようにします。クリックで保持／解除します。</floater.string>
+	<floater.string name="FollowsTipRight">この要素の右端と親の右端との間隔を保ち、親が広がると要素がその端と一緒に動くようにします。クリックで保持／解除します。</floater.string>
+	<floater.string name="FollowsTipTop">この要素の上端と親の上端との間隔を保ち、親が高くなると要素がその端と一緒に動くようにします。クリックで保持／解除します。</floater.string>
+	<floater.string name="FollowsTipAcross">左右の両端を同時に保持します。幅が調整されることになり、要素は親に合わせて横方向に伸縮します。クリックで両方を保持／解除します。</floater.string>
+	<floater.string name="FollowsTipDown">上下の両端を同時に保持します。高さが調整されることになり、要素は親に合わせて縦方向に伸縮します。クリックで両方を保持／解除します。</floater.string>
+	<floater.string name="EditNoNestedFile">この要素は独自のファイルを指定していません。</floater.string>
+	<floater.string name="EditNestedMissing">[FILE]がここで指定されていますが、カタログにありません。</floater.string>
+	<floater.string name="SourceEdited">ソースを編集しました：[FILE]</floater.string>
+	<floater.string name="SourceEditedBroken">[FILE]はまだ解析できません（[LINE]行目：[MESSAGE]）。解析できるようになるまで、最後に解析できたテキストが有効です</floater.string>
+	<floater.string name="Yes">はい</floater.string>
+	<floater.string name="No">いいえ</floater.string>
+	<floater.string name="LayoutSize">サイズ</floater.string>
+	<floater.string name="LayoutRectValue">左 [LEFT]  上 [TOP]  右 [RIGHT]  下 [BOTTOM]  （[WIDTH] x [HEIGHT]）</floater.string>
+	<floater.string name="LayoutLeftTop">左／上（親の左上から）</floater.string>
+	<floater.string name="LayoutRightBottom">右／下（親の左上から）</floater.string>
+	<floater.string name="LayoutGap">親の右／下までの間隔</floater.string>
+	<floater.string name="LayoutParent">親</floater.string>
+	<floater.string name="LayoutRect">矩形（親の空間、左下原点）</floater.string>
+	<floater.string name="LayoutRectScreen">矩形（画面）</floater.string>
+	<floater.string name="LayoutBoundingRect">境界矩形</floater.string>
+	<floater.string name="LayoutFollows">追従</floater.string>
+	<floater.string name="LayoutAuthored">記述値</floater.string>
+	<floater.string name="LayoutAuthoredNone">（なし：ウィジェットのデフォルト）</floater.string>
+	<floater.string name="LayoutLayout">レイアウト</floater.string>
+	<floater.string name="LayoutDefault">（デフォルト）</floater.string>
+	<floater.string name="LayoutFollowsAuthored">追従（記述値）</floater.string>
+	<floater.string name="LayoutNone">（なし）</floater.string>
+	<floater.string name="LayoutRelativeTo">基準</floater.string>
+	<floater.string name="LayoutRelativeToParent">（前にウィジェットがないため、親）</floater.string>
+	<floater.string name="LayoutUnnamed">名前なし</floater.string>
+	<floater.string name="LayoutResizable">サイズ変更可能</floater.string>
+	<floater.string name="LayoutMinSize">最小サイズ</floater.string>
+	<floater.string name="BindingCommitRegistry">コミットレジストリ</floater.string>
+	<floater.string name="BindingEnableRegistry">有効化レジストリ</floater.string>
+	<floater.string name="BindingFloaterOwn">フローター自身</floater.string>
+	<floater.string name="BindingNowhere">どこにも登録されていない</floater.string>
+	<floater.string name="BindingNotGlobal">グローバルではない</floater.string>
+	<floater.string name="BindingConfig">設定</floater.string>
+	<floater.string name="BindingAccount">アカウント</floater.string>
+	<floater.string name="BindingNoControl">そのようなコントロールはない</floater.string>
+	<floater.string name="BindingInCatalog">カタログ内</floater.string>
+	<floater.string name="BindingNoFile">そのようなファイルはない</floater.string>
+	<floater.string name="StateVisible">表示</floater.string>
+	<floater.string name="StateInVisibleChain">表示チェーン内</floater.string>
+	<floater.string name="StateEnabled">有効</floater.string>
+	<floater.string name="StateMouseOver">マウスオーバー</floater.string>
+	<floater.string name="StateFocus">フォーカス</floater.string>
+	<floater.string name="StateValue">値</floater.string>
+	<floater.string name="StateText">テキスト</floater.string>
+	<floater.string name="StateTruncated">切り詰め</floater.string>
+	<floater.string name="StateTooltip">ツールチップ</floater.string>
+	<floater.string name="StateName">名前</floater.string>
+	<floater.string name="StateClass">クラス</floater.string>
+	<floater.string name="SectionIdentity">識別</floater.string>
+	<floater.string name="SectionGeometry">位置とサイズ</floater.string>
+	<floater.string name="SectionAppearance">外観</floater.string>
+	<floater.string name="SectionBehaviour">動作</floater.string>
+	<floater.string name="SectionOther">その他</floater.string>
+	<floater.string name="SectionIgnored">読み込まれて破棄</floater.string>
+	<floater.string name="SectionUnknown">宣言なし</floater.string>
+	<floater.string name="GalleryTitle">ウィジェットギャラリー [[SKIN]/[LANG]]</floater.string>
+	<floater.string name="CaptionFiles">XUIファイル</floater.string>
+	<floater.string name="CaptionFilesMatching">「[FILTER]」に一致するXUIファイル</floater.string>
+	<floater.string name="CaptionSearch">[SKIN]/[LANG]の[FIELD]で「[QUERY]」を検索</floater.string>
+	<floater.string name="CaptionNoFile">ファイルなし</floater.string>
+	<floater.string name="CaptionFindings">[WHERE]の検出結果</floater.string>
+	<floater.string name="CaptionRows">行</floater.string>
+	<floater.string name="CaptionLayout">レイアウト</floater.string>
+	<floater.string name="CaptionBindings">バインディング</floater.string>
+	<floater.string name="CaptionState">状態</floater.string>
+	<floater.string name="CaptionSelectionFindings">検出結果</floater.string>
+	<floater.string name="CaptionOf">[PATH]の[WHAT]</floater.string>
+	<floater.string name="CaptionIn">[WHERE]内の[WHAT]</floater.string>
+	<floater.string name="OverlayNoBase">翻訳するベースファイルがありません</floater.string>
+	<floater.string name="OverlayNoDirectory">ベースファイルがどのディレクトリにもありません</floater.string>
+	<floater.string name="OverlayNoLanguageDirectory">ベースファイルがどの言語ディレクトリにもありません</floater.string>
+	<floater.string name="OverlayMkdirFailed">[DIR]を作成できませんでした</floater.string>
+	<floater.string name="TranslateStateTranslated">翻訳済み</floater.string>
+	<floater.string name="TranslateStateMissing">未翻訳</floater.string>
+	<floater.string name="TranslateStatePlaceholders">プレースホルダーが異なる</floater.string>
+	<floater.string name="TranslateStateRescued">ベースが移動した場所に適用</floater.string>
+	<floater.string name="TranslateStateNotApplied">適用先なし</floater.string>
+	<floater.string name="TranslateStateMoved">適用先なし：移動</floater.string>
+	<floater.string name="TranslateStateAbsent">適用先なし：存在しない</floater.string>
+	<floater.string name="TranslateStateUnnamed">適用先なし：名前なし</floater.string>
+	<floater.string name="TranslateStateAmbiguous">適用先なし：曖昧</floater.string>
+	<floater.string name="TranslateStateNoSuchField">適用先なし：そのようなフィールドはない</floater.string>
+	<floater.string name="FindingsHere">ここ</floater.string>
+	<menu_bar name="studio_menu">
+		<menu name="file" label="ファイル">
+			<menu_item_call name="quick_open" label="クイックオープン…"/>
+			<menu_item_call name="save" label="保存"/>
+			<menu_item_call name="save_all" label="すべて保存"/>
+			<menu_item_call name="save_repair" label="保存して翻訳を修復"/>
+			<menu_item_call name="revert" label="元に戻す"/>
+			<menu_item_call name="undo" label="取り消し"/>
+			<menu_item_call name="redo" label="やり直し"/>
+			<menu_item_call name="reload" label="カタログを再読み込み"/>
+			<menu_item_call name="edit" label="外部エディターで開く"/>
+			<menu_item_call name="open_nested" label="この要素が指定するファイルを開く"/>
+			<menu_item_call name="capture" label="プレビューをキャプチャ…"/>
+		</menu>
+		<menu name="view" label="表示">
+			<menu_item_call name="show" label="プレビューを表示"/>
+			<menu_item_call name="hide" label="プレビューを隠す"/>
+			<menu_item_check name="hover" label="ホバー時に強調表示"/>
+			<menu_item_check name="pane_navigator" label="ナビゲーター"/>
+			<menu_item_check name="pane_inspectors" label="インスペクター"/>
+			<menu_item_check name="pane_bottom" label="検出結果と表"/>
+			<menu_item_check name="out_navigator" label="ナビゲーターを独立したウィンドウで表示"/>
+			<menu_item_check name="out_inspectors" label="インスペクターを独立したウィンドウで表示"/>
+			<menu_item_check name="out_bottom" label="検出結果と表を独立したウィンドウで表示"/>
+			<menu_item_check name="float_preview" label="プレビューを独立したウィンドウで表示"/>
+			<menu_item_check name="real_floater" label="登録済みのフローターを構築"/>
+			<menu_item_check name="code_built" label="コードで構築された行"/>
+		</menu>
+		<menu name="tools" label="ツール">
+			<menu_item_call name="library" label="ライブラリ"/>
+			<menu_item_call name="gallery" label="ウィジェットギャラリー"/>
+			<menu_item_call name="lint_all" label="すべてのファイルをLint"/>
+			<menu_item_call name="census" label="オーバーレイの集計"/>
+			<menu_item_call name="schema" label="スキーマをエクスポート"/>
+			<menu_item_call name="colors" label="色の設定"/>
+			<menu_item_call name="impact" label="翻訳への影響"/>
+			<menu_item_call name="repair_roots" label="ルートを修復"/>
+			<menu_item_call name="repair_all" label="言語を修復"/>
+			<menu_item_call name="remove_orphans" label="孤立した値を削除"/>
+		</menu>
+	</menu_bar>
+	<text name="skin_label">スキン</text>
+	<combo_box name="skin_combo" tool_tip="プレビューを構築するスキン。スキン独自のファイルはデフォルトのファイルに重ねられるため、キャンバスに表示されるのはそのスキンのユーザーが見るものです。"/>
+	<text name="language_label">言語</text>
+	<combo_box name="language_combo" tool_tip="プレビューを構築する言語。言語のファイルはベースのファイルに重ねられるため、キャンバスに表示されるのはその言語の利用者が見るものです。"/>
+	<button name="library_btn" label="ライブラリ" tool_tip="ファイルに書けるすべてのタグと、それぞれについてスキーマが把握していること、そして確認用に構築した見本（Ctrl+Shift+L）"/>
+	<button name="edit_btn" label="編集" tool_tip="選択した要素のファイルを、その行で外部エディターで開きます"/>
+	<button name="fold_navigator" label="ナビゲーター" tool_tip="左側のファイル、アウトライン、検索、ライブラリのペイン（Ctrl+0）"/>
+	<button name="fold_bottom" label="表" tool_tip="キャンバスの下の帯：検出結果、翻訳、通知、チャンネル（Ctrl+Shift+B）"/>
+	<button name="fold_inspectors" label="インスペクター" tool_tip="右側の、選択した要素のインスペクター（Ctrl+Alt+0）"/>
+	<layout_stack name="main_stack">
+		<layout_panel name="navigator_panel">
+			<tab_container name="navigator_tabs">
+				<panel name="files_mode" label="ファイル" tool_tip="ファイル：スキン内のすべてのXUIファイルと、選択したスキンと言語が独自に持つファイル">
+					<layout_stack name="files_stack">
+						<layout_panel name="file_list_area">
+							<pane_list name="file_list" tool_tip="各スキンが持つすべてのXUIファイルと、どれがそれぞれのコピーを持っているか。選択するとキャンバスに構築します。">
+								<pane_list.columns name="kind" label="種類"/>
+								<pane_list.columns name="name" label="ファイル"/>
+								<pane_list.columns name="lang" tool_tip="選択した言語にファイルがある"/>
+								<pane_list.columns name="skin" tool_tip="選択したスキンにファイルがある"/>
+							</pane_list>
+						</layout_panel>
+						<layout_panel name="catalog_filter_row">
+							<filter_editor name="catalog_filter" label="ファイルを絞り込む" tool_tip="名前にこれを含むファイルに一覧を絞り込みます"/>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+				<panel name="outline_mode" label="アウトライン" tool_tip="アウトライン：プレビュー中のファイルのツリーと、そのフィルター、並べ替えボタン">
+					<layout_stack name="tree_stack">
+						<layout_panel name="breadcrumb_row">
+							<jump_bar name="breadcrumb" tool_tip="ファイルのルートから選択した要素までの位置。各段階を押すと選択し、矢印を押すと隣にある要素を代わりに選べます。"/>
+						</layout_panel>
+						<layout_panel name="edit_target_row">
+							<text name="edit_target" tool_tip="プレビュー内の要素をCtrl+クリックで選択、Ctrl+ドラッグで移動します。中央のハンドルで移動、角と辺でサイズ変更、矢印キーで1ピクセル（Shiftで10ピクセル）移動します。通常のクリックはウィジェット自体を操作します">移動するには要素を選択してください。</text>
+						</layout_panel>
+						<layout_panel name="tree_buttons_row">
+							<button name="tree_up" label="上へ" tool_tip="要素を上の要素の前に移動します（Ctrl+上）"/>
+							<button name="tree_down" label="下へ" tool_tip="要素を下の要素の後に移動します（Ctrl+下）"/>
+							<button name="tree_in" label="中へ" tool_tip="上の要素の子にします（Ctrl+右）"/>
+							<button name="tree_out" label="外へ" tool_tip="親の兄弟にします（Ctrl+左）"/>
+						</layout_panel>
+						<layout_panel name="tree_filter_row">
+							<filter_editor name="tree_filter" label="名前またはタグで絞り込む" tool_tip="名前、タグ、値にこれを含む要素にアウトラインを絞り込みます"/>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+				<panel name="find_mode" label="検索" tool_tip="検索：すべてのファイルとすべてのレイヤーにわたる検索">
+					<layout_stack name="find_stack">
+						<layout_panel name="find_row">
+							<scope_bar name="scope_bar" tool_tip="文として表した検索：何を探すか、語句がどう一致すべきか、語句、どのレイヤーを検索するか。Enterで実行し、語句を変えると再実行します。"/>
+						</layout_panel>
+						<layout_panel name="find_results_area">
+							<pane_list name="find_results" tool_tip="語句が見つかった場所をファイルごとにまとめて表示します。行を選ぶと、そのファイルを開いて該当する要素を選択します。">
+								<pane_list.columns name="file" label="ファイル"/>
+								<pane_list.columns name="line" label="行"/>
+								<pane_list.columns name="layer" label="レイヤー"/>
+								<pane_list.columns name="snippet" label="一致"/>
+							</pane_list>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+				<panel name="documents_mode" label="ドキュメント" tool_tip="ドキュメント：このツールで開いているすべてのファイルと、そのうちディスクに反映されていない作業があるもの">
+					<layout_stack name="documents_stack">
+						<layout_panel name="documents_area">
+							<pane_list name="documents" tool_tip="ダブルクリックで表示します。点はディスクに反映されていない作業があることを示します">
+								<pane_list.columns name="dirty" tool_tip="点は未保存を示します"/>
+								<pane_list.columns name="file" label="ファイル"/>
+								<pane_list.columns name="layer" label="レイヤー"/>
+								<pane_list.columns name="steps" label="ステップ" tool_tip="戻せる編集の数"/>
+							</pane_list>
+						</layout_panel>
+						<layout_panel name="documents_foot">
+							<button name="document_save" label="保存" tool_tip="これを書き込みます"/>
+							<button name="document_revert" label="元に戻す" tool_tip="ディスクから読み込み直し、作業内容を破棄します"/>
+							<button name="document_close" label="閉じる" tool_tip="解放します。作業中のドキュメントは、先に保存するか元に戻す必要があります"/>
+							<button name="document_save_all" label="すべて保存" tool_tip="作業中のものをすべて書き込みます"/>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+				<panel name="palette_mode" label="ライブラリ" tool_tip="ライブラリ：選択した要素に含められるタグ">
+					<layout_stack name="palette_stack">
+						<layout_panel name="palette_area">
+							<button name="palette_cells" label="グリッド" tool_tip="ウィジェットを1行に1つずつではなく、名前付きのセルとして縦横に並べて表示します"/>
+							<specimen_list name="palette" tool_tip="選択した要素に含められるタグを、それぞれが構築するウィジェットとして表示します"/>
+						</layout_panel>
+						<layout_panel name="palette_detail">
+							<text name="palette_note" tool_tip="選択したタグの用途（xui_notes.xmlの説明文）。誰も説明を書いていないタグの場合は何も表示されません"/>
+							<pane_list name="palette_attributes" tool_tip="選択したタグが受け取るものと、すでに持っているもの：持っている値と同じものとして書かれた属性は、ウィジェット自体が示す以上のことを何も示しません">
+								<pane_list.columns name="attribute" label="属性"/>
+								<pane_list.columns name="type" label="型"/>
+								<pane_list.columns name="carries" label="保持値"/>
+							</pane_list>
+						</layout_panel>
+						<layout_panel name="palette_foot">
+							<button name="palette_insert" label="挿入" tool_tip="選択した要素の下に、名前と配置だけを指定してこれを1つ追加します"/>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+			</tab_container>
+		</layout_panel>
+		<layout_panel name="canvas_panel">
+			<layout_stack name="centre_stack">
+				<layout_panel name="canvas_head">
+					<button name="canvas_shown" label="表示" tool_tip="プレビューを隠して、その分の領域を情報の表示に使います。キャンバス上のものは構築されたままです"/>
+					<button name="canvas_pinned" label="固定" tool_tip="カタログを読む間、キャンバスをこのファイルに固定します。その間に選択したファイルは、固定を解除したときに表示されます"/>
+					<tab_strip name="canvas_tabs" tool_tip="このツールが保持するファイル（1つにつき1タブ）。表示中のタブがキャンバス上のファイルで、別の表示のタブは閲覧中なだけです"/>
+				</layout_panel>
+				<layout_panel name="canvas_region">
+					<layout_stack name="canvas_region_stack">
+						<layout_panel name="canvas_foot">
+							<button name="show_btn" label="表示" tool_tip="選択したファイルを再構築します"/>
+							<button name="hide_btn" label="隠す" tool_tip="キャンバス上のものを取り除きます"/>
+							<button name="reload_btn" label="再読み込み" tool_tip="カタログとファイルをディスクから再読み込みします"/>
+							<spinner name="canvas_zoom" tool_tip="プレビューを実寸の何パーセントで描画するか。中の数値はファイル自体の値のままです。キャンバス上でCtrl+ホイールでも同じ刻みで変わります。"/>
+							<button name="canvas_rulers" label="ルーラー" tool_tip="キャンバスの上と左に、ファイル自体の座標で目盛りを表示します"/>
+							<button name="canvas_snap" label="スナップ" tool_tip="ドラッグ時に、ポインター位置ではなくグリッドに合わせます"/>
+							<combo_box name="canvas_grid" tool_tip="グリッドの間隔と、スナップ時のドラッグの移動量"/>
+							<menu_button name="canvas_backdrop" tool_tip="プレビューの背景：なし、半透明のウィンドウが下にあるものにどう影響するかを示す模様、透明部分を示すチェッカーボード、ウィンドウの色、明るいグレー"/>
+							<check_box name="secondary_check" label="2つ目" tool_tip="ファイルを別の言語でもう一度構築し、1つ目の隣のキャンバスに表示して選択を共有します"/>
+							<combo_box name="language_combo_2" tool_tip="1つ目の隣にある2つ目のキャンバスを構築する言語。どちらも同じファイルで、選択は共有されます。"/>
+							<button name="align_left" tool_tip="選択中の他の要素を、ハンドルが付いている要素の左端に揃えます"/>
+							<button name="align_centre" tool_tip="選択中の他の要素を、ハンドルが付いている要素の横方向の中央に揃えます"/>
+							<button name="align_right" tool_tip="選択中の他の要素を、ハンドルが付いている要素の右端に揃えます"/>
+							<button name="align_top" tool_tip="選択中の他の要素を、ハンドルが付いている要素の上端に揃えます"/>
+							<button name="align_middle" tool_tip="選択中の他の要素を、ハンドルが付いている要素の縦方向の中央に揃えます"/>
+							<button name="align_bottom" tool_tip="選択中の他の要素を、ハンドルが付いている要素の下端に揃えます"/>
+						</layout_panel>
+					</layout_stack>
+				</layout_panel>
+				<layout_panel name="bottom_panel">
+					<tab_container name="bottom_tabs">
+						<panel name="findings_mode" label="検出結果" tool_tip="パーサー、ファクトリー、レイヤーのマージ、ルールがこのファイルで見つけたもの">
+							<layout_stack name="findings_stack">
+								<layout_panel name="findings_head">
+									<combo_box name="finding_scope" tool_tip="このファイル、または「すべてLint」でチェックしたすべてのファイル">
+										<combo_box.item name="file" label="このファイル"/>
+										<combo_box.item name="all" label="すべてのファイル"/>
+									</combo_box>
+									<combo_box name="finding_rule" tool_tip="1つのルールの検出結果のみ。何かを見つけた各ルールが件数とともに表示されます"/>
+									<combo_box name="finding_severity" tool_tip="表示する最も軽い重要度：エラーのみ、警告とエラー、または注記まですべて">
+										<combo_box.item name="everything" label="すべて"/>
+										<combo_box.item name="loud" label="エラーと警告"/>
+										<combo_box.item name="errors" label="エラーのみ"/>
+									</combo_box>
+									<check_box name="finding_fixable" label="修正可能" tool_tip="このツールが修正を提示するもののみ"/>
+									<filter_editor name="finding_filter" label="フィルター" tool_tip="メッセージ内の語、問題のある名前、要素、ファイル"/>
+								</layout_panel>
+								<layout_panel name="findings_list_panel">
+									<pane_list name="findings" tool_tip="パーサー、ファクトリー、レイヤーのマージ、ルールが見つけたもの。ダブルクリックで要素を選択します">
+										<pane_list.columns name="severity" tool_tip="重要度：エラーは要素が動作しないこと、警告はファイルの記述どおりに動作しない可能性が高いことを示し、注記は確認する価値があるものの意図的な場合も多いものです"/>
+										<pane_list.columns name="rule" label="ルール"/>
+										<pane_list.columns name="line" label="行"/>
+										<pane_list.columns name="where" label="場所"/>
+										<pane_list.columns name="message" label="内容"/>
+										<pane_list.columns name="fix" label="修正" tool_tip="このツールが把握している場合に、それに対して行う処理"/>
+									</pane_list>
+								</layout_panel>
+								<layout_panel name="findings_foot">
+									<button name="finding_fix" label="修正" tool_tip="「修正」列の内容を、取り消し可能な1回の編集として実行します"/>
+									<button name="finding_fix_all" label="すべて修正" tool_tip="このファイルで修正を提示するすべての検出結果を、それぞれ個別の編集として実行します"/>
+									<text name="finding_count" tool_tip="一覧に表示している検出結果の数と全体の数、および「すべてLint」で読み込んだファイルの数"/>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+						<panel name="translation_mode" label="翻訳" tool_tip="選択した言語について、翻訳者が書くフィールドごとに1行">
+							<layout_stack name="translation_stack">
+								<layout_panel name="translate_head">
+									<text name="translate_label">言語</text>
+									<combo_box name="translate_language" tool_tip="この表の対象言語（キャンバス上の2つ目の表示に使われます）"/>
+									<button name="translate_repair_file" label="ファイルを修復" tool_tip="このファイルが、ベースが移動したパスに書いているすべての値を移動します。それ以外は何も変更しません"/>
+									<button name="translate_repair_all" label="言語を修復" tool_tip="この言語のすべてのファイルに対して同じ処理を行います"/>
+									<button name="translate_repair_roots" label="ルートを修復" tool_tip="この言語のファイルのうち、別のルート名を持つものや持たないものに、ベースのルート名を付け直します：ルートはファイル全体を照合するためのものです"/>
+									<button name="translate_remove_orphans" label="孤立した値を削除" tool_tip="この言語のすべてのファイルから、ベースにもう存在しないものに対して書かれた値（なくなった名前の要素、名前のない要素、ベースの要素が持たない属性）を削除します。ベースが移動したものは「ファイルを修復」に、複数のパスにあるものは手動での対応に残します。"/>
+									<text name="translate_counts" tool_tip="状態ごとの行数：翻訳済み、言語に未翻訳、ベースが移動したパスに書かれている、翻訳済みだがプレースホルダーが異なる、翻訳しないよう指定されている"/>
+								</layout_panel>
+								<layout_panel name="translate_table">
+									<pane_list name="translate_list" tool_tip="翻訳者が書くフィールドごとに1行。ダブルクリックで要素を選択します">
+										<pane_list.columns name="path" label="場所"/>
+										<pane_list.columns name="field" label="フィールド"/>
+										<pane_list.columns name="english" label="英語"/>
+										<pane_list.columns name="translation" label="翻訳"/>
+										<pane_list.columns name="state" label="状態" tool_tip="この言語がこの値を持っているか、欠けているか、ベースが移動したパスに書いているか"/>
+										<pane_list.columns name="fits" label="収まり" tool_tip="2つ目の表示で、翻訳がウィジェットに収まるかどうか"/>
+									</pane_list>
+								</layout_panel>
+								<layout_panel name="translate_write_row">
+									<text_editor name="translate_value" label="翻訳するには上の行を選択してください" tool_tip="選択した行の翻訳。翻訳は複数行にできるため、Enterで改行し、隣のボタンで書き込みます。"/>
+									<button name="translate_write" label="書き込む" tool_tip="ベースが与える祖先の下の、マージが見つけられる場所に書き込みます"/>
+									<button name="translate_remove" label="削除" tool_tip="この行に対する言語の値をファイルから削除します：属性、またはテキストだけを持っていた要素。ベースにないものを指す値をファイルから取り除く方法です。"/>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+						<panel name="notifications_mode" label="通知" tool_tip="notifications.xmlが宣言するすべてのテンプレートと、それぞれが生成するパネル">
+							<layout_stack name="notifications_stack">
+								<layout_panel name="notifications_area">
+									<pane_list name="notifications" tool_tip="notifications.xmlが宣言するすべてのテンプレート。選択すると、それが生成するパネルを構築します">
+										<pane_list.columns name="name" label="名前"/>
+										<pane_list.columns name="type" label="種類"/>
+										<pane_list.columns name="buttons" label="ボタン"/>
+										<pane_list.columns name="message" label="メッセージ"/>
+									</pane_list>
+								</layout_panel>
+								<layout_panel name="notification_foot">
+									<filter_editor name="notification_filter" label="フィルター" tool_tip="名前にこれを含むテンプレートに一覧を絞り込みます"/>
+									<button name="notification_post" label="送信" tool_tip="選択した通知を、ビューアと同様にチャンネルを通じて実際に送信します"/>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+						<panel name="history_mode" label="履歴" tool_tip="このツールで開いているファイルに対して行ったすべての操作と、現在位置の印">
+							<history_list name="history" tool_tip="開いているファイルに対して行ったすべての操作（新しい順）と、現在位置の印。ステップをクリックすると対象の要素を表示し、ダブルクリックするとその直後の状態にファイルを戻します。"/>
+						</panel>
+						<panel name="channels_mode" label="チャンネル" tool_tip="送信されたものを通知システムがどう処理したか">
+							<layout_stack name="channels_stack">
+								<layout_panel name="channel_head">
+									<text name="channel_label">応答</text>
+									<combo_box name="channel_response" tool_tip="選択した通知のフォームが宣言するボタン"/>
+									<button name="channel_respond" label="応答" tool_tip="ユーザーと同じように通知に応答します（実際の応答になります）"/>
+									<button name="channel_clear" label="クリア" tool_tip="一覧を空にします。すでにチャンネルを通過したものはそのままです"/>
+								</layout_panel>
+								<layout_panel name="channels_area">
+									<pane_list name="channels" tool_tip="このフローターを開いてから、すべてのチャンネルを通過したすべての通知（チャンネルが処理した順）">
+										<pane_list.columns name="channel" label="チャンネル"/>
+										<pane_list.columns name="name" label="通知"/>
+										<pane_list.columns name="time" label="時刻"/>
+										<pane_list.columns name="message" label="メッセージ"/>
+									</pane_list>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+					</tab_container>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="inspector_panel">
+			<tab_container name="inspector_tabs">
+				<panel name="attributes_tab" label="属性" tool_tip="属性：タグが受け付けるすべてのフィールドと、有効な値、それを書いた場所">
+					<text name="attributes_what" tool_tip="選択した要素：名前、ファイルに書かれたタグ、ビューアが構築したクラス">何も選択されていません</text>
+					<filter_editor name="attributes_filter" label="フィールドを絞り込む" tool_tip="名前にこれを含むフィールドに行を絞り込みます"/>
+					<check_box name="attributes_authored" label="ファイルに書かれたもののみ" tool_tip="作成者が扱う短い一覧：このファイルが実際に書いているフィールド"/>
+					<check_box name="attributes_nested" label="入れ子のフィールド" tool_tip="フィールドが持つブロックの末端（font.nameやbg_alpha_color.alphaなど）。ファイルが書いている入れ子のフィールドは常に表示されます。"/>
+				</panel>
+				<panel name="layout_tab" label="レイアウト" tool_tip="レイアウト：要素が最終的にどこに配置されたか、どの数値でそれが決まったか">
+					<pane_list name="layout" tool_tip="この要素の位置を決めるもの：自身の数値、ファイルが書く数値、親がそれらをどう扱うか。">
+						<pane_list.columns name="property" label="プロパティ"/>
+						<pane_list.columns name="value" label="値"/>
+					</pane_list>
+				</panel>
+				<panel name="source_tab" label="ソース" tool_tip="ソース：各レイヤーが書く要素を順に表示">
+					<layout_stack name="source_stack">
+						<layout_panel name="source_head">
+							<text name="source_layers" tool_tip="このファイルのすべてのレイヤーと、各レイヤーで選択した要素が始まる行（マージされる順）。レイヤーが持たない場合はダッシュ"/>
+							<button name="jump_btn" label="エディターで開く" tool_tip="この要素の行で、ファイルを外部エディターで開きます"/>
+						</layout_panel>
+						<layout_panel name="source_layers_panel">
+							<pane_list name="source_layer_list" tool_tip="このファイルのすべてのレイヤー：それぞれが選択したフィールドについて示す値と、マージで採用されるもの">
+								<pane_list.columns name="force" tool_tip="点は有効なものを示します"/>
+								<pane_list.columns name="layer" label="レイヤー"/>
+								<pane_list.columns name="value" label="値"/>
+								<pane_list.columns name="line" label="行"/>
+							</pane_list>
+						</layout_panel>
+						<layout_panel name="source_override">
+							<button name="write_override" label="ここに書き込む" tool_tip="有効な値を選択したレイヤーに書き込み、そのレイヤーが他を上書きするようにします"/>
+							<text name="override_field" tool_tip="下の一覧の対象フィールドで、「ここに書き込む」が書き込む内容：有効な値を、そこで選択したレイヤーに書き込みます"/>
+						</layout_panel>
+						<layout_panel name="source_text_panel">
+							<code_editor name="source_text" tool_tip="レイヤーのファイルの現在の内容（編集可能）：入力が止まるとドキュメントに反映され、ツリーとプレビューが追従します。スキーマがタグ、属性、値を補完し、このファイルの検出結果が示されます"/>
+						</layout_panel>
+					</layout_stack>
+				</panel>
+				<panel name="bindings_tab" label="バインディング" tool_tip="バインディング：ファイルが指定するコールバックと、それに応答するものがあるかどうか">
+					<pane_list name="bindings" tool_tip="ファイルが指定するコールバックと、各名前に応答するものが登録されているかどうか。">
+						<pane_list.columns name="kind" label="種類"/>
+						<pane_list.columns name="name" label="名前"/>
+						<pane_list.columns name="status" label="状態"/>
+					</pane_list>
+				</panel>
+				<panel name="state_tab" label="状態" tool_tip="状態：構築したウィジェットが現在示している自身の情報">
+					<pane_list name="state" tool_tip="構築したウィジェットが現在示している自身の情報（このタブの表示中は再取得されます）。">
+						<pane_list.columns name="property" label="プロパティ"/>
+						<pane_list.columns name="value" label="値"/>
+					</pane_list>
+				</panel>
+				<panel name="findings_tab" label="検出結果" tool_tip="検出結果：パーサー、マージ、ルールがこの要素について示したもの">
+					<pane_list name="selection_findings" tool_tip="選択した要素とその下にあるすべての検出結果">
+						<pane_list.columns name="rule" label="ルール"/>
+						<pane_list.columns name="where" label="場所"/>
+						<pane_list.columns name="message" label="内容"/>
+					</pane_list>
+				</panel>
+			</tab_container>
+		</layout_panel>
+	</layout_stack>
+</floater>

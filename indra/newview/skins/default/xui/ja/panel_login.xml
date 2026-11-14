@@ -20,11 +20,18 @@
 				パスワードヘルプ
 			</text>
 							<button label="ログイン" name="connect_btn"/>
+							<button name="sign_btn" label="アカウント作成"/>
 						</layout_panel>
 						<layout_panel name="grid_panel">
 							<combo_box label="グリッドを選択" name="server_combo"/>
+							<text name="grid_text">
+								グリッド
+							</text>
 						</layout_panel>
 					</layout_stack>
+					<text name="location_text">
+						開始位置
+					</text>
 				</layout_panel>
 			</layout_stack>
 		</layout_panel>

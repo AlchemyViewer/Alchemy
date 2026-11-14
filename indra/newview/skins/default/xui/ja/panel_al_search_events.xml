@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_search_events">
+	<text name="search_title" value="検索語を入力："/>
+	<radio_group name="events_search_mode">
+		<radio_item name="current" label="進行中および今後のイベント"/>
+		<radio_item name="date" label="日付で指定"/>
+	</radio_group>
+	<search_editor name="search_bar" label="検索" tool_tip="検索語を入力してください"/>
+	<combo_box name="events_category">
+		<combo_box.item name="any" label="すべてのカテゴリ"/>
+		<combo_box.item name="discussion" label="討論"/>
+		<combo_box.item name="sports" label="スポーツ"/>
+		<combo_box.item name="music" label="ライブミュージック"/>
+		<combo_box.item name="commercial" label="商用"/>
+		<combo_box.item name="nightlife" label="ナイトライフ／エンターテイメント"/>
+		<combo_box.item name="games" label="ゲーム／コンテスト"/>
+		<combo_box.item name="pageants" label="ページェント"/>
+		<combo_box.item name="education" label="教育"/>
+		<combo_box.item name="arts" label="芸術と文化"/>
+		<combo_box.item name="charity" label="チャリティー／サポートグループ"/>
+		<combo_box.item name="misc" label="その他"/>
+	</combo_box>
+</panel>

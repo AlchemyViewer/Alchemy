@@ -6,4 +6,5 @@
 	<text name="grid_opacity_label" tool_tip="グリッドの不透明度">
 		不透明度：
 	</text>
+	<spinner name="RotationStep" label="角度（度）" tool_tip="回転ツールによるすべての回転は、この単位の倍数に制限されます。［デフォルト：1.0］"/>
 </floater>

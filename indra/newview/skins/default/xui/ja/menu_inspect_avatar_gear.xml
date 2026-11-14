@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="Gear Menu">
+	<menu_item_call name="view_profile" label="プロフィールの表示"/>
+	<menu_item_call name="im" label="ＩＭ"/>
+	<menu_item_call name="teleport" label="テレポート"/>
+	<menu_item_call name="request_teleport" label="テレポートのリクエスト"/>
+	<menu_item_call name="call" label="ボイスコール"/>
+	<menu_item_call name="add_friend" label="フレンド登録"/>
+	<menu_item_call name="invite_to_group" label="グループに招待"/>
+	<context_menu name="manage_menu" label="管理">
+		<menu_item_call name="block" label="ブロック"/>
+		<menu_item_call name="unblock" label="ブロック解除"/>
+		<menu_item_call name="report" label="嫌がらせの報告"/>
+		<menu_item_call name="freeze" label="フリーズ"/>
+		<menu_item_call name="eject" label="追放"/>
+		<menu_item_call name="csr" label="ＣＳＲ"/>
+		<menu_item_call name="debug" label="テクスチャのデバッグ"/>
+		<menu_item_call name="Dump XML" label="ＸＭＬとしてダンプ"/>
+		<menu_item_call name="teleporthome" label="ホームにテレポート"/>
+		<menu_item_call name="estatekick" label="不動産からキック"/>
+		<menu_item_call name="estateban" label="不動産から追放"/>
+		<menu_item_call name="godfreeze" label="ゴッドフリーズ"/>
+		<menu_item_call name="godkick" label="ゴッドキック"/>
+	</context_menu>
+	<menu_item_call name="zoom_in" label="ズームイン"/>
+	<menu_item_call name="find_on_map" label="マップ"/>
+	<menu_item_call name="share" label="共有"/>
+	<menu_item_call name="pay" label="支払う"/>
+	<menu_item_call name="chat_history" label="チャット履歴を表示…"/>
+	<menu_item_call name="remove_friend" label="フレンドを解除"/>
+	<menu_item_call name="teleport_to" label="テレポート"/>
+	<context_menu name="utils_menu" label="コピー">
+		<menu_item_call name="copy_full_name" label="フルネームをコピー"/>
+		<menu_item_call name="copy_display_name" label="表示名をコピー"/>
+		<menu_item_call name="copy_username" label="エージェント名をコピー"/>
+		<menu_item_call name="copy_slurl" label="SLurlをコピー"/>
+		<menu_item_call name="copy_uuid" label="UUIDをコピー"/>
+	</context_menu>
+</toggleable_menu>

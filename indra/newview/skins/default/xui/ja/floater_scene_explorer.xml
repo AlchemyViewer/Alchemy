@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="scene_explorer" title="シーンエクスプローラー">
+	<floater.string name="no_matches">一致するオブジェクトはありません</floater.string>
+	<combo_box name="search_type_combo" tool_tip="検索対象">
+		<combo_box.item name="name" label="名前"/>
+		<combo_box.item name="description" label="説明"/>
+		<combo_box.item name="owner" label="所有者"/>
+		<combo_box.item name="all" label="すべて"/>
+	</combo_box>
+	<menu_button name="visibility_btn" tool_tip="ツリーに表示する項目を選択します"/>
+	<filter_editor name="filter_input" label="検索テキストを入力" tool_tip="「検索対象」で選んだ項目でツリーを絞り込みます"/>
+	<menu_button name="view_btn" tool_tip="表示／並べ替えのオプション"/>
+	<combo_box name="owner_combo" tool_tip="所有者で絞り込みます">
+		<combo_box.item name="any" label="すべての所有者"/>
+		<combo_box.item name="mine" label="自分が所有"/>
+		<combo_box.item name="group" label="グループ所有"/>
+		<combo_box.item name="others" label="他人が所有"/>
+		<combo_box.item name="specific" label="選択した所有者"/>
+	</combo_box>
+	<check_box name="flag_scripted" label="スクリプト付き" tool_tip="スクリプトを含むオブジェクトのみ（すべての条件は「フィルター」ウィンドウにあります）"/>
+	<check_box name="flag_light" label="ライト" tool_tip="光を放つオブジェクトのみ"/>
+	<check_box name="flag_particles" label="パーティクル" tool_tip="パーティクルの発生源のみ"/>
+	<check_box name="limit_radius_check" label="範囲内" tool_tip="自分から指定半径内のオブジェクトのみ（「フィルター」ウィンドウでは区画単位の範囲も指定できます）"/>
+	<slider name="radius_slider" tool_tip="自分を中心とした半径（メートル）"/>
+	<layout_stack name="main_stack">
+		<layout_panel name="detail_host_layout">
+			<button name="details_btn" label="詳細" tool_tip="選択した行の詳細を表示します"/>
+			<layout_stack name="detail_stack">
+				<layout_panel name="detail_rows_layout">
+					<scroll_container name="detail_scroll">
+						<panel name="detail_content">
+							<panel name="detail_panel_object">
+								<text name="label_owner">所有者</text>
+								<text name="label_creator">制作者</text>
+								<text name="label_perms">権限</text>
+								<check_box name="check_modify" label="修正" tool_tip="所有者がこのオブジェクトを修正できるかどうか（表示のみ）"/>
+								<check_box name="check_copy" label="複製" tool_tip="所有者がこのオブジェクトを複製できるかどうか（表示のみ）"/>
+								<check_box name="check_transfer" label="譲渡" tool_tip="所有者がこのオブジェクトを譲渡できるかどうか（表示のみ）"/>
+								<text name="label_pos">位置</text>
+								<text name="label_size">サイズ</text>
+								<text name="label_geom">ジオメトリ</text>
+								<text name="label_costs">コスト</text>
+								<text name="label_render">描画</text>
+								<text name="label_phys">物理</text>
+								<text name="label_stream">ストリーミング</text>
+								<text name="label_flags">フラグ</text>
+								<check_box name="check_scripted" label="スクリプト付き" tool_tip="スクリプトを含む（表示のみ）"/>
+								<check_box name="check_light" label="ライト" tool_tip="光を放つ（表示のみ）"/>
+								<check_box name="check_physics" label="物理" tool_tip="物理オブジェクト（表示のみ）"/>
+								<check_box name="check_phantom" label="ファントム" tool_tip="衝突なし（表示のみ）"/>
+								<check_box name="check_temp" label="一時" tool_tip="Rez時に一時的－自動削除（表示のみ）"/>
+							</panel>
+							<panel name="detail_panel_avatar">
+								<text name="label_av_distance">距離</text>
+								<text name="label_av_complexity">複雑度</text>
+								<text name="label_av_attachments">アタッチメント</text>
+							</panel>
+						</panel>
+					</scroll_container>
+				</layout_panel>
+				<layout_panel name="detail_faces_layout">
+					<scroll_list name="detail_faces" tool_tip="選択したオブジェクトの面ごとのマテリアルとテクスチャ（アセットIDはフル権限のアセットのみ表示）">
+						<scroll_list.columns name="material" label="マテリアル／テクスチャ"/>
+						<scroll_list.columns name="alpha" label="アルファ"/>
+						<scroll_list.columns name="glow" label="グロー"/>
+					</scroll_list>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+	</layout_stack>
+	<menu_button name="gear_btn" tool_tip="選択した行の操作"/>
+	<button name="focus_btn" label="注目" tool_tip="選択した行にカメラをズームします"/>
+	<button name="edit_btn" label="編集" tool_tip="選択したオブジェクトをビルドツールで開きます"/>
+	<button name="inspect_btn" label="調査" tool_tip="選択したオブジェクトを「調査」ウィンドウで開きます"/>
+	<button name="beacon_btn" label="ビーコン" tool_tip="この行の位置に追跡ビーコンを設定します。もう一度使うと解除します"/>
+	<button name="teleport_btn" tool_tip="選択した行の位置にテレポートします"/>
+</floater>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="avatar_firstlife_tab" label="ファーストライフ">
+	<panel name="avatar_info_top">
+		<profile_image name="fl_profile_pic" tool_tip="クリックして写真を選択します"/>
+	</panel>
+</panel>

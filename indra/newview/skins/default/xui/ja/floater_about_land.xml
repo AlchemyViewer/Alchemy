@@ -138,6 +138,9 @@
 			<button label="入場許可を購入" name="Buy Pass..." tool_tip="この土地への一時的なアクセスを許可します。"/>
 			<button label="土地の放棄" name="Abandon Land..."/>
 			<button label="土地を取り戻す" name="Reclaim Land..."/>
+			<panel.string name="time_stamp_template_ampm">
+				[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）　[ampm,datetime,slt][hour12,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]
+			</panel.string>
 		</panel>
 		<panel label="約款" name="land_covenant_panel">
 			<panel.string name="can_resell">
@@ -269,7 +272,6 @@
 			<button label="オブジェクトを返却する" name="Return objects..."/>
 			<name_list name="owner list">
 				<name_list.columns label="タイプ" name="type"/>
-				<name_list.columns name="online_status"/>
 				<name_list.columns label="名前" name="name"/>
 				<name_list.columns label="数" name="count"/>
 				<name_list.columns label="最新" name="mostrecent"/>
@@ -408,7 +410,6 @@
 			<text name="MusicURL:">
 				音楽ＵＲＬ：
 			</text>
-			<combo_box name="music_url"/>
 			<text name="Sound:">
 				サウンド：
 			</text>
@@ -460,7 +461,7 @@
 					<button label="削除" label_selected="削除" name="remove_allowed"/>
 				</layout_panel>
 				<layout_panel name="Banned_layout_panel">
-					<text label="Ban" name="BanCheck">
+					<text label="バン" name="BanCheck">
 						バンした人物（全[MAX]人中[COUNT]人）
 					</text>
 					<name_list name="BannedList" tool_tip="（全[MAX]人中[COUNT]人）">

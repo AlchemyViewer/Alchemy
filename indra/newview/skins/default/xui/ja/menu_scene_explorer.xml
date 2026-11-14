@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_scene_explorer">
+	<menu_item_call name="touch" label="触る"/>
+	<menu_item_call name="sit" label="ここに座る"/>
+	<menu_item_call name="open" label="開く"/>
+	<menu_item_call name="buy" label="購入"/>
+	<menu_item_call name="pay" label="支払う…"/>
+	<menu_item_call name="take_copy" label="複製を取る"/>
+	<menu_item_call name="av_profile" label="プロフィールを表示"/>
+	<menu_item_call name="av_im" label="ＩＭを送る…"/>
+	<menu_item_call name="av_offer_tp" label="テレポートを送る"/>
+	<menu_item_call name="av_request_tp" label="テレポートをリクエスト"/>
+	<menu_item_call name="focus" label="カメラを注目"/>
+	<menu_item_call name="av_zoom" label="ズームイン"/>
+	<menu_item_call name="edit" label="編集…"/>
+	<menu_item_call name="inspect" label="調査…"/>
+	<menu_item_call name="teleport" label="テレポート"/>
+	<menu_item_call name="av_teleport" label="テレポート"/>
+	<menu_item_call name="show_map" label="マップに表示"/>
+	<menu_item_call name="beacon" label="ビーコン" tool_tip="この行の位置に追跡ビーコンを設定します。もう一度使うと解除します"/>
+	<menu name="copy_menu" label="コピー">
+		<menu_item_call name="copy_name" label="名前"/>
+		<menu_item_call name="copy_pos" label="位置"/>
+	</menu>
+	<menu_item_call name="filter_by_owner" label="この所有者で絞り込む" tool_tip="同じ所有者のオブジェクトのみ表示します"/>
+	<menu_item_call name="return" label="所有者に返却"/>
+	<menu_item_call name="freeze" label="フリーズ"/>
+	<menu_item_call name="eject" label="追放"/>
+	<menu_item_call name="estate_home" label="ホームにテレポート"/>
+	<menu_item_call name="estate_kick" label="不動産からキック"/>
+	<menu_item_call name="estate_ban" label="不動産から追放"/>
+	<menu_item_call name="block_object" label="ブロック"/>
+	<menu_item_call name="block_owner" label="所有者をブロック"/>
+	<menu_item_call name="av_block" label="ブロック／ブロック解除"/>
+	<menu_item_call name="report" label="嫌がらせを報告…"/>
+	<menu_item_call name="av_report" label="嫌がらせを報告…"/>
+	<menu_item_call name="derender_temp" label="非表示"/>
+	<menu_item_call name="derender_perm" label="恒久的に非表示"/>
+	<menu_item_call name="restore_derendered" label="復元"/>
+	<menu_item_call name="refresh" label="更新"/>
+	<menu_item_call name="copy_results" label="結果をクリップボードにコピー" tool_tip="絞り込んだ一覧をCSV（名前、所有者、LI、三角形、距離、UUID）としてコピーします"/>
+</toggleable_menu>

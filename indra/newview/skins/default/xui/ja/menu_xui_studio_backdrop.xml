@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_xui_studio_backdrop">
+	<menu_item_check name="backdrop_none" label="プレビューの背景なし"/>
+	<menu_item_check name="backdrop_pattern" label="模様" tool_tip="半透明のウィンドウが下にあるものをどう見せるかを確認するための、色の帯、円、テキスト"/>
+	<menu_item_check name="backdrop_checker" label="チェッカーボード" tool_tip="透明な部分を示します"/>
+	<menu_item_check name="backdrop_window" label="ウィンドウの色" tool_tip="ウィンドウ内のパネルから見たウィンドウの色"/>
+	<menu_item_check name="backdrop_light" label="明るいグレー" tool_tip="暗い装飾を引き立てる明るい背景"/>
+</toggleable_menu>

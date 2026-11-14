@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Script studio tab menu">
+	<menu_item_call name="keep" label="開いたままにする"/>
+	<menu_item_call name="close" label="閉じる"/>
+	<menu_item_call name="close_others" label="他を閉じる"/>
+	<menu_item_call name="close_saved" label="保存済みを閉じる"/>
+	<menu_item_call name="close_all" label="すべて閉じる"/>
+	<menu_item_call name="pop_out" label="新しいウィンドウに移動"/>
+	<menu_item_call name="reveal" label="エクスプローラーで表示"/>
+	<menu_item_call name="copy_name" label="名前をコピー"/>
+</context_menu>

@@ -33,6 +33,10 @@
 				星の輝度：
 			</text>
 			<check_box label="ビーコンを表示" name="sunbeacon"/>
+			<text name="bloom_label">
+				ブルーム：
+			</text>
+			<texture_picker name="bloom_image" tool_tip="太陽のブルーム：このテクスチャが太陽の円盤の周りに描くハローで、円盤の4倍の大きさです。描画するのはAlchemyだけで、Lightboxの「空の効果」で「太陽のブルーム」がオンの場合に限ります。他のビューアは空と一緒にテクスチャを保持しますが、何も描画しません。"/>
 		</layout_panel>
 		<layout_panel name="moon_layout">
 			<text name="moon_label">

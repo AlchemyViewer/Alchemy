@@ -47,9 +47,6 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			<panel.string name="cant_delete_role">
 				「全員（Everyone）」と「所有者（Owner）」の役割は削除することができません。
 			</panel.string>
-			<panel.string name="donation_area">
-				[AREA]㎡
-			</panel.string>
 			<filter_editor label="役割でフィルタ" name="filter_input"/>
 			<scroll_list name="role_list">
 				<scroll_list.columns label="役割" name="name"/>
@@ -116,6 +113,9 @@ Ctrlキーを押しながら、メンバー名をクリックすることで複�
 			許可された能力
 		</text>
 		<scroll_list name="role_allowed_actions" tool_tip="各能力の詳細は、能力のタブをご覧ください。"/>
+		<text name="members_not_loaded">
+			メンバーが読み込まれていません
+		</text>
 	</panel>
 	<panel name="roles_header">
 		<text_editor name="role_action_description">

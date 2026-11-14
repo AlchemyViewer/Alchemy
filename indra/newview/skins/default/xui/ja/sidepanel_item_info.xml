@@ -70,12 +70,12 @@
 				あなたができること：
 			</text>
 			<check_box label="修正" name="CheckOwnerModify"/>
-			<check_box label="コピー" name="CheckOwnerCopy"/>
+			<check_box label="複製" name="CheckOwnerCopy"/>
 			<check_box label="再販・譲渡" name="CheckOwnerTransfer"/>
 			<text name="AnyoneLabel">
 				全員：
 			</text>
-			<check_box label="コピー" name="CheckEveryoneCopy" tool_tip="オブジェクトのコピーは誰でも受け取ることができます。オブジェクトとそのオブジェクトの中身はすべて、コピーまたは譲渡できるように設定する必要があります。"/>
+			<check_box label="複製" name="CheckEveryoneCopy" tool_tip="誰でもこのオブジェクトの複製を受け取ることができます。オブジェクトとその中身はすべて、複製と譲渡が可能に設定されている必要があります。"/>
 			<text name="GroupLabel">
 				グループ：
 			</text>
@@ -84,11 +84,11 @@
 				次の所有者：
 			</text>
 			<check_box label="編集" name="CheckNextOwnerModify" tool_tip="次の所有者は、アイテム名などのプロパティを編集したり、サイズ変更ができるようになります。"/>
-			<check_box label="コピー" name="CheckNextOwnerCopy" tool_tip="次の所有者は、このオブジェクトを無制限にコピーできるようになります。コピーには制作者の情報が含まれ、コピー元のアイテムと違って許可などに関して制約があります。"/>
+			<check_box label="複製" name="CheckNextOwnerCopy" tool_tip="次の所有者は、このオブジェクトを無制限に複製できます。複製には制作者の情報が保持され、複製元のアイテムより緩い権限になることはありません。"/>
 			<check_box label="再販・譲渡" name="CheckNextOwnerTransfer" tool_tip="次の所有者は、このオブジェクトを他の人に譲渡したり、再販することができるようになります。"/>
-			<check_box label="販売対象とする" name="CheckPurchase" tool_tip="このオブジェクトやオブジェクトの中身を購入できるようにするか、指定価格でインワールドにコピーできるようになります。"/>
-			<combo_box name="ComboBoxSaleType" tool_tip="購入者がコピー、コピーの中身、またはアイテム自体を受け取るのか選択してください。">
-				<combo_box.item label="コピー" name="Copy"/>
+			<check_box label="販売対象とする" name="CheckPurchase" tool_tip="このオブジェクト、その中身、またはその複製を、指定価格でインワールドで購入できるようにします。"/>
+			<combo_box name="ComboBoxSaleType" tool_tip="購入者が受け取るのが、複製、中身の複製、アイテム自体のいずれかを選択してください。">
+				<combo_box.item label="複製" name="Copy"/>
 				<combo_box.item label="中身" name="Contents"/>
 				<combo_box.item label="オリジナル" name="Original"/>
 			</combo_box>
@@ -112,4 +112,7 @@
 			</text>
 		</layout_panel>
 	</layout_stack>
+	<panel.string name="acquiredDateAMPM">
+		[year,datetime,slt]年[mth,datetime,slt]月[day,datetime,slt]日（[wkday,datetime,slt]）[ampm,datetime,slt][hour12,datetime,slt]：[min,datetime,slt]：[second,datetime,slt]
+	</panel.string>
 </panel>

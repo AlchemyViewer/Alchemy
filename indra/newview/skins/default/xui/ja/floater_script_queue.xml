@@ -25,4 +25,7 @@
 		以下のインベントリを読み込んでいます：[OBJECT_NAME]
 	</floater.string>
 	<button label="閉じる" label_selected="閉じる" name="close"/>
+	<floater.string name="SkippingIncompatibleScript">
+		スクリプト「[SCRIPT_NAME]」をスキップしています（[TARGET]に再コンパイルできません）
+	</floater.string>
 </floater>

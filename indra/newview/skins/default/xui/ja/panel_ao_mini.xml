@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="ao_mini">
+	<button name="ao_wrench" tool_tip="AOのメイン操作画面を開きます"/>
+	<button name="ao_prev" tool_tip="前のステートのアニメーションに切り替えます。"/>
+	<button name="ao_next" tool_tip="次のステートのアニメーションに切り替えます。"/>
+</panel>

@@ -11,4 +11,5 @@
 	</text>
 	<button label="削除" name="delete"/>
 	<button label="キャンセル" name="cancel"/>
+	<string name="title_looks">ルックを削除</string>
 </floater>
