@@ -279,6 +279,13 @@ void LLModelPreview::updateDimentionsAndOffsets()
 
     mDetailsSignal((F32)(mPreviewScale[0] * scale), (F32)(mPreviewScale[1] * scale), (F32)(mPreviewScale[2] * scale));
 
+    // <SK:Nexii> Mesh uploader pivot: metres follow the model's size
+    if (LLFloaterModelPreview::sInstance && LLFloaterModelPreview::sInstance->mModelPreview == this)
+    {
+        LLFloaterModelPreview::sInstance->updatePivotControls();
+    }
+    // </SK:Nexii>
+
     updateStatusMessages();
 }
 
@@ -287,6 +294,26 @@ void LLModelPreview::rebuildUploadData()
     assert_main_thread();
 
     mDefaultPhysicsShapeP = NULL;
+    // <SK:Nexii> Mesh uploader LODs by name: physics set to use a LOD is that LOD as it stands now, however
+    // it changed since (a new high file, the file's own LODs, generation, a LOD file of its own)
+    if (mPhysicsSearchLOD >= LLModel::LOD_IMPOSTOR && mPhysicsSearchLOD <= LLModel::LOD_HIGH
+        && mLODFile[LLModel::LOD_PHYSICS].empty() && !mLODFromHighFile[LLModel::LOD_PHYSICS]
+        && mModel[LLModel::LOD_PHYSICS] != mModel[mPhysicsSearchLOD])
+    {
+        mModel[LLModel::LOD_PHYSICS] = mModel[mPhysicsSearchLOD];
+        mScene[LLModel::LOD_PHYSICS] = mScene[mPhysicsSearchLOD];
+        mVertexBuffer[LLModel::LOD_PHYSICS].clear();
+    }
+    // </SK:Nexii>
+    // <SK:Nexii> Mesh uploader LODs by name: physics from the high file names its default shape as a physics file does
+    if (mLODFromHighFile[LLModel::LOD_PHYSICS])
+    {
+        LLMatrix4 ignored_transform;
+        LLModel* default_shape = nullptr;
+        FindModel(mScene[LLModel::LOD_PHYSICS], DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS), default_shape, ignored_transform);
+        mDefaultPhysicsShapeP = default_shape;
+    }
+    // </SK:Nexii>
     mUploadData.clear();
     mTextureSet.clear();
 
@@ -297,6 +324,7 @@ void LLModelPreview::rebuildUploadData()
     LLSpinCtrl* scale_spinner = mFMP->getChild<LLSpinCtrl>("import_scale");
 
     F32 scale = (F32)scale_spinner->getValue().asReal();
+    mPivotScale = scale; // <SK:Nexii> Mesh uploader pivot: the scale the transforms below carry
 
     LLMatrix4 scale_mat;
     scale_mat.initScale(LLVector3(scale, scale, scale));
@@ -885,6 +913,7 @@ void LLModelPreview::setPhysicsFromLOD(S32 lod)
     if (lod >= 0 && lod <= 3)
     {
         mPhysicsSearchLOD = lod;
+        mLODFromHighFile[LLModel::LOD_PHYSICS] = false; // <SK:Nexii> Mesh uploader LODs by name
         mModel[LLModel::LOD_PHYSICS] = mModel[lod];
         mScene[LLModel::LOD_PHYSICS] = mScene[lod];
         mLODFile[LLModel::LOD_PHYSICS].clear();
@@ -1007,6 +1036,7 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     if (loaded_lod == -1)
     { //populate all LoDs from model loader scene
         mSimplifiers.clear();
+        std::fill(std::begin(mLODFromHighFile), std::end(mLODFromHighFile), false); // <SK:Nexii> Mesh uploader LODs by name
         mBaseModel.clear();
         mBaseScene.clear();
 
@@ -1113,6 +1143,16 @@ void LLModelPreview::loadModelCallback(S32 loaded_lod)
     { //only replace given LoD
         mModel[loaded_lod] = mModelLoader->mModelList;
         mScene[loaded_lod] = mModelLoader->mScene;
+        // <SK:Nexii> Mesh uploader LODs by name: a file of its own replaces what the high file gave
+        if (loaded_lod != LLModel::LOD_HIGH)
+        {
+            mLODFromHighFile[loaded_lod] = false;
+        }
+        else
+        {
+            splitSuffixedModels(mModelLoader->mFilename);
+        }
+        // </SK:Nexii>
 
         // Duplicate the model if it is an internal bounding box model
         if (loaded_lod == LLModel::LOD_PHYSICS &&
@@ -1839,6 +1879,341 @@ void LLModelPreview::genMeshOptimizerLODs(S32 which_lod, S32 meshopt_mode, U32 d
         << ", failures: " << meshes_fail_count << LL_ENDL;
 }
 
+// <SK:Nexii> Mesh uploader pivot
+void LLModelPreview::setPivotMode(EPivotMode mode)
+{
+    if (mode == PIVOT_CUSTOM && mPivotMode != PIVOT_CUSTOM && isSingleModel())
+    {
+        mCustomPivot = getWantedPivot(mUploadData[0].mModel);
+    }
+    mPivotMode = mode;
+}
+
+// static
+LLVector3 LLModelPreview::getFileOriginPivot(const LLModel* model)
+{
+    if (!model)
+    {
+        return LLVector3::zero;
+    }
+    // The loader centred the model on its box; the file's origin is where it moved the centre from.
+    LLVector3 size, centre;
+    model->getNormalizedScaleTranslation(size, centre);
+    LLVector3 pivot;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        pivot.mV[i] = size.mV[i] > 0.f ? -2.f * centre.mV[i] / size.mV[i] : 0.f;
+        // An origin outside the box is a scene's, from a file that placed its vertices in the scene: centre it.
+        if (fabsf(pivot.mV[i]) > 1.001f)
+        {
+            return LLVector3::zero;
+        }
+        pivot.mV[i] = llclamp(pivot.mV[i], -1.f, 1.f);
+    }
+    return pivot;
+}
+
+LLVector3 LLModelPreview::getWantedPivot(const LLModel* model) const
+{
+    switch (mPivotMode)
+    {
+    case PIVOT_FILE:
+        return getFileOriginPivot(model);
+    case PIVOT_CUSTOM:
+        return isSingleModel() ? mCustomPivot : LLVector3::zero;
+    default:
+        return LLVector3::zero;
+    }
+}
+
+// <SK:Nexii> Mesh uploader LODs by name
+void LLModelPreview::splitSuffixedModels(const std::string& filename)
+{
+    bool was_from_file[LLModel::NUM_LODS];
+    std::copy(std::begin(mLODFromHighFile), std::end(mLODFromHighFile), was_from_file);
+    for (bool& from_file : mLODFromHighFile)
+    {
+        from_file = false;
+    }
+    // A submodel is named after its root with a letter added, after any suffix: NAME_LOD2b.
+    auto core_of = [](const LLModel* model) -> std::string
+    {
+        return model->mSubmodelID > 0 && !model->mLabel.empty() ? model->mLabel.substr(0, model->mLabel.size() - 1) : model->mLabel;
+    };
+    auto letter_of = [](const LLModel* model) -> std::string
+    {
+        return model->mSubmodelID > 0 && !model->mLabel.empty() ? model->mLabel.substr(model->mLabel.size() - 1) : std::string();
+    };
+    auto suffix_lod = [](const std::string& label) -> S32
+    {
+        for (S32 lod : { (S32)LLModel::LOD_IMPOSTOR, (S32)LLModel::LOD_LOW, (S32)LLModel::LOD_MEDIUM, (S32)LLModel::LOD_PHYSICS })
+        {
+            const std::string suffix = getLodSuffix(lod);
+            if (label.size() > suffix.size() && label.compare(label.size() - suffix.size(), suffix.size(), suffix) == 0)
+            {
+                return lod;
+            }
+        }
+        return -1;
+    };
+
+    const bool legacy = gSavedSettings.getBOOL("ImporterLegacyMatching");
+    // Only a suffixed model whose base the file also has is a LOD; any other is a model of its own.
+    std::set<std::string> bases;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        if (model && !model->mSubmodelID && suffix_lod(model->mLabel) < 0)
+        {
+            bases.insert(model->mLabel);
+        }
+    }
+    auto lod_of = [&](const LLModel* model) -> S32
+    {
+        if (!model)
+        {
+            return -1;
+        }
+        const std::string core = core_of(model);
+        if (legacy)
+        {
+            return -1;
+        }
+        // The shape for parts with no _PHYS of their own goes to physics whether or not a part shares its name.
+        if (core == DEFAULT_PHYSICS_MESH_NAME + getLodSuffix(LLModel::LOD_PHYSICS))
+        {
+            return LLModel::LOD_PHYSICS;
+        }
+        const S32 lod = suffix_lod(core);
+        return lod >= 0 && bases.count(stripSuffix(core)) ? lod : -1;
+    };
+
+    // LODs an earlier file filled and this one does not are generated again.
+    LLFloaterModelPreview* fmp = LLFloaterModelPreview::sInstance;
+    auto release = [&](S32 lod)
+    {
+        mModel[lod].clear();
+        mScene[lod].clear();
+        mLODFile[lod].clear();
+        mVertexBuffer[lod].clear();
+        if (fmp && lod != LLModel::LOD_PHYSICS)
+        {
+            // Only a LOD still set to come from the file goes back to generation; another source stays.
+            LLComboBox* lod_combo = fmp->findChild<LLComboBox>("lod_source_" + lod_name[lod]);
+            if (!lod_combo || lod_combo->getCurrentIndex() == LOD_FROM_FILE)
+            {
+                fmp->mLODMode[lod] = MESH_OPTIMIZER_AUTO;
+                if (lod_combo)
+                {
+                    lod_combo->setCurrentByIndex(MESH_OPTIMIZER_AUTO);
+                }
+            }
+            fmp->childSetValue("lod_file_" + lod_name[lod], "");
+        }
+        else if (fmp)
+        {
+            // Physics the high file no longer supplies is no longer from a file: back to none, as a reset leaves it.
+            fmp->childSetValue("physics_file", "");
+            fmp->childSetValue("physics_lod_combo", "none");
+        }
+    };
+
+    // A suffixed model with no base is named as the loader always named it, without its suffix. Models
+    // are found first, so every instance of one shared model takes the new name, not only the first.
+    std::set<LLModel*> leftovers;
+    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
+    {
+        for (LLModelInstance& instance : scene_pair.second)
+        {
+            LLModel* model = instance.mModel;
+            if (model && suffix_lod(core_of(model)) >= 0 && lod_of(model) < 0)
+            {
+                leftovers.insert(model);
+            }
+        }
+    }
+    for (LLModel* model : leftovers)
+    {
+        model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
+    }
+    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
+    {
+        for (LLModelInstance& instance : scene_pair.second)
+        {
+            if (leftovers.count(instance.mModel))
+            {
+                instance.mLabel = instance.mModel->mLabel; // a submodel keeps its letter, so it isn't taken for its root
+            }
+        }
+    }
+
+    // Each model's LOD is settled once, before any is renamed.
+    std::map<const LLModel*, S32> moved;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = lod_of(model);
+        if (lod >= 0)
+        {
+            moved[model.get()] = lod;
+        }
+    }
+    auto moved_to = [&](const LLModel* model) -> S32
+    {
+        auto it = moved.find(model);
+        return it != moved.end() ? it->second : -1;
+    };
+
+    bool split[LLModel::NUM_LODS] = {};
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = moved_to(model);
+        if (lod >= 0 && !split[lod])
+        {
+            split[lod] = true;
+            mModel[lod].clear();
+            mScene[lod].clear();
+        }
+    }
+    LLModelLoader::model_list kept;
+    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    {
+        const S32 lod = moved_to(model);
+        if (lod < 0)
+        {
+            kept.push_back(model);
+        }
+        else
+        {
+            // Named as a separate LOD file would name it, so the matching finds a submodel too.
+            model->mLabel = stripSuffix(core_of(model)) + letter_of(model) + getLodSuffix(lod);
+            mModel[lod].push_back(model);
+        }
+    }
+    for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
+    {
+        if (was_from_file[lod] && !split[lod])
+        {
+            release(lod);
+            if (lod != LLModel::LOD_PHYSICS)
+            {
+                updateLodControls(lod);
+            }
+        }
+    }
+    if (kept.size() == mModel[LLModel::LOD_HIGH].size())
+    {
+        return;
+    }
+    mModel[LLModel::LOD_HIGH] = kept;
+
+    for (auto scene_it = mScene[LLModel::LOD_HIGH].begin(); scene_it != mScene[LLModel::LOD_HIGH].end();)
+    {
+        LLModelLoader::model_instance_list& list = scene_it->second;
+        for (auto it = list.begin(); it != list.end();)
+        {
+            const S32 lod = moved_to(it->mModel);
+            if (lod < 0)
+            {
+                ++it;
+                continue;
+            }
+            mScene[lod][scene_it->first].push_back(*it);
+            it = list.erase(it);
+        }
+        scene_it = list.empty() ? mScene[LLModel::LOD_HIGH].erase(scene_it) : std::next(scene_it);
+    }
+
+    if (split[LLModel::LOD_PHYSICS])
+    {
+        // As an explicit physics file does: the parts with no _PHYS are logged, and may use a default shape.
+        mPhysicsSearchLOD = LLModel::LOD_PHYSICS;
+        mWarnOfUnmatchedPhyicsMeshes = true;
+    }
+
+    for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
+    {
+        if (!split[lod])
+        {
+            continue;
+        }
+        // A LOD needs every model and submodel, each by its own name: a partial set is dropped and the LOD generated.
+        auto complete = [&]()
+        {
+            if (mModel[lod].size() != kept.size())
+            {
+                return false;
+            }
+            std::set<std::string> names;
+            for (const LLPointer<LLModel>& model : mModel[lod])
+            {
+                names.insert(model->mLabel);
+            }
+            return std::all_of(kept.begin(), kept.end(), [&](const LLPointer<LLModel>& model)
+                               { return names.count(model->mLabel + getLodSuffix(lod)) > 0; });
+        };
+        if (lod != LLModel::LOD_PHYSICS && !complete())
+        {
+            release(lod);
+            updateLodControls(lod);
+            std::ostringstream out;
+            out << "Only some models have a " << getLodSuffix(lod) << " model in the file; generating that LOD instead";
+            LLFloaterModelPreview::addStringToLog(out, true);
+            continue;
+        }
+        mLODFromHighFile[lod] = true;
+        mLODFile[lod] = filename;
+        mVertexBuffer[lod].clear();
+        if (fmp)
+        {
+            fmp->setCtrlLoadFromFile(lod);
+            if (lod == LLModel::LOD_PHYSICS)
+            {
+                fmp->childSetValue("physics_file", filename);
+            }
+            else
+            {
+                fmp->mLODMode[lod] = LOD_FROM_FILE;
+                fmp->childSetValue("lod_file_" + lod_name[lod], filename);
+                updateLodControls(lod);
+            }
+        }
+        std::ostringstream out;
+        out << "Took " << mModel[lod].size() << " model(s) named " << getLodSuffix(lod) << " from the file for that slot";
+        LLFloaterModelPreview::addStringToLog(out, false);
+    }
+}
+// </SK:Nexii>
+
+bool LLModelPreview::uploadsRigged(const LLModelInstance& instance) const
+{
+    // The upload takes its skin from the High model, which may carry weights its base does not.
+    if (!mFMP || !mFMP->childGetValue("upload_skin").asBoolean())
+    {
+        return false;
+    }
+    const LLModel* high = instance.mLOD[LLModel::LOD_HIGH];
+    return (instance.mModel && !instance.mModel->mSkinWeights.empty()) || (high && !high->mSkinWeights.empty());
+}
+
+bool LLModelPreview::isSingleModel() const
+{
+    // A model with more than eight materials uploads as a root and its submodels, sharing one transform.
+    return std::count_if(mUploadData.begin(), mUploadData.end(),
+                         [](const LLModelInstance& instance) { return instance.mModel && !instance.mModel->mSubmodelID; }) == 1;
+}
+
+
+LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets() const
+{
+    LLMeshUploadThread::position_offsets_t offsets;
+    for (const LLModelInstance& instance : mUploadData)
+    {
+        // Rigged mesh is placed by its skeleton and keeps the default position domain, whatever the pivot.
+        offsets[instance.mModel.get()] = uploadsRigged(instance) ? LLVector3::zero : getUploadPivot(instance.mModel) * -0.5f;
+    }
+    return offsets;
+}
+// </SK:Nexii>
+
 void LLModelPreview::updateStatusMessages()
 {
     // bit mask values for physics errors. used to prevent overwrite of single line status
@@ -2181,6 +2556,77 @@ void LLModelPreview::updateStatusMessages()
             }
         }
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls where the pivot puts them but fits
+    // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
+    {
+        // Each part is judged on its own, so one rigged or unanalyzed part holds only itself at the centre.
+        bool any_rigged = false;
+        bool any_unanalyzed = false;
+        bool pivot_without_physics = false; // a pivoted part that collides with a default hull centred on itself
+        mPivotHeld.clear();
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            const LLModel* model = instance.mModel;
+            if (!model)
+            {
+                continue;
+            }
+            // Skin weights left out of the upload make a static mesh, which can take a pivot.
+            const bool rigged = uploadsRigged(instance);
+            // The hulls uploaded are the physics model's, or the base model's without one.
+            const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
+            bool instance_physics = false;
+            bool unanalyzed = false;
+            if (physics && physics->getNumVolumeFaces() > 0)
+            {
+                instance_physics = true;
+                unanalyzed = physics->mPhysics.mHull.empty();
+            }
+            else if (!physics && !model->mPhysics.mHull.empty())
+            {
+                instance_physics = true;
+            }
+            if (rigged || unanalyzed)
+            {
+                mPivotHeld.insert(model);
+            }
+            any_rigged |= rigged;
+            any_unanalyzed |= unanalyzed && !rigged;
+            pivot_without_physics |= !rigged && !instance_physics && !getWantedPivot(model).isExactlyZero();
+        }
+
+        // Some instance must be free of the hold: several instances of one held model are all held.
+        mUploadPivotAllowed = std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
+                                          { return instance.mModel && !mPivotHeld.count(instance.mModel); });
+        // Every reason that applies is shown, since each concerns different parts.
+        std::string pivot_status;
+        auto add_status = [&](const char* name)
+        {
+            pivot_status += (pivot_status.empty() ? "" : " ") + mFMP->getString(name);
+        };
+        if (any_rigged)
+        {
+            add_status("pivot_status_rigged");
+        }
+        if (any_unanalyzed)
+        {
+            add_status("pivot_status_analyze");
+        }
+        if (pivot_without_physics)
+        {
+            add_status("pivot_status_no_physics");
+        }
+
+        const bool custom = mFMP->childGetValue("pivot_mode").asString() == "custom";
+        for (const char* axis : { "pivot_x", "pivot_y", "pivot_z" })
+        {
+            mFMP->childSetEnabled(axis, mUploadPivotAllowed && custom);
+        }
+        mFMP->childSetEnabled("pivot_mode", mUploadPivotAllowed);
+        mFMP->childSetValue("pivot_status", pivot_status);
+    }
+    // </SK:Nexii>
 
     if (!mModelNoErrors || mHasDegenerate)
     {
@@ -2699,7 +3145,10 @@ void LLModelPreview::update()
         for (S32 lod = LLModel::LOD_HIGH; lod >= 0; --lod)
         {
             // adding all lods into query for generation
-            mLodsQuery.push_back(lod);
+            if (!mLODFromHighFile[lod]) // <SK:Nexii> Mesh uploader LODs by name: the file gave this one
+            {
+                mLodsQuery.push_back(lod);
+            }
         }
 
         if (subscribe_for_generation)
@@ -3640,6 +4089,82 @@ bool LLModelPreview::render()
             }
         }
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the object's origin, drawn through the model
+    if (mViewOption["show_origin"] && !mViewOption["show_skin_weight"]) // rigged mesh is drawn on the avatar
+    {
+        LLGLSLShader* shader = LLGLSLShader::sCurBoundShaderPtr;
+        gUIProgram.bind(); // takes the vertex colours, which gDebugProgram replaces with one uniform
+        gGL.getTextureSlot(0)->unbind();
+        LLGLDepthTest gls_depth(GL_FALSE);
+        LLGLDisable no_cull(GL_CULL_FACE);
+        gGL.setLineWidth(2.f);
+
+        for (const LLModelInstance& instance : mUploadData)
+        {
+            const LLMatrix4& mat = instance.mTransform;
+            const LLVector3 origin = (getUploadPivot(instance.mModel) * 0.5f) * mat;
+
+            LLVector3 axes[3];
+            F32 reach = 0.f;
+            for (S32 i = 0; i < 3; ++i)
+            {
+                axes[i].set(mat.mMatrix[i][0], mat.mMatrix[i][1], mat.mMatrix[i][2]);
+                reach = llmax(reach, axes[i].normalize());
+            }
+            reach *= 0.6f;
+
+            // Arrows as the translate gizmo draws them: a shaft and a solid cone per axis.
+            static const LLColor4 colors[3] = { LLColor4::red, LLColor4::green, LLColor4::blue };
+            const F32 head_length = reach * 0.2f;
+            const F32 head_radius = reach * 0.06f;
+            constexpr S32 HEAD_SEGMENTS = 12;
+
+            gGL.begin(LLRender::LINES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                gGL.color4fv(colors[i].mV);
+                gGL.vertex3fv(origin.mV);
+                gGL.vertex3fv((origin + axes[i] * (reach - head_length)).mV);
+            }
+            gGL.end();
+
+            gGL.begin(LLRender::TRIANGLES);
+            for (S32 i = 0; i < 3; ++i)
+            {
+                const LLVector3 tip = origin + axes[i] * reach;
+                const LLVector3 base = origin + axes[i] * (reach - head_length);
+                const LLVector3 u = axes[(i + 1) % 3] * head_radius;
+                const LLVector3 v = axes[(i + 2) % 3] * head_radius;
+                for (S32 s = 0; s < HEAD_SEGMENTS; ++s)
+                {
+                    const F32 a0 = F_TWO_PI * s / HEAD_SEGMENTS;
+                    const F32 a1 = F_TWO_PI * (s + 1) / HEAD_SEGMENTS;
+                    const LLVector3 r0 = base + u * cosf(a0) + v * sinf(a0);
+                    const LLVector3 r1 = base + u * cosf(a1) + v * sinf(a1);
+                    // Shade the side by its angle so the cone reads as solid.
+                    const F32 shade = 0.65f + 0.35f * cosf(a0);
+                    gGL.color4f(colors[i].mV[VRED] * shade, colors[i].mV[VGREEN] * shade, colors[i].mV[VBLUE] * shade, 1.f);
+                    gGL.vertex3fv(tip.mV);
+                    gGL.vertex3fv(r0.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.color4f(colors[i].mV[VRED] * 0.5f, colors[i].mV[VGREEN] * 0.5f, colors[i].mV[VBLUE] * 0.5f, 1.f);
+                    gGL.vertex3fv(base.mV);
+                    gGL.vertex3fv(r1.mV);
+                    gGL.vertex3fv(r0.mV);
+                }
+            }
+            gGL.end();
+        }
+        gGL.flush();
+        gGL.setLineWidth(1.f);
+
+        if (shader)
+        {
+            shader->bind();
+        }
+    }
+    // </SK:Nexii>
 
     gObjectPreviewProgram.unbind();
 

@@ -27,6 +27,9 @@
 #include "lllocalmesh.h"
 
 #include <algorithm>     // std::sort (stable rez-order listing of spawned copies)
+#include <array>
+#include <set>
+#include <string_view>
 #include <unordered_map> // mSpawnedCopies: instance id -> copy (O(1) per-copy lookup/erase)
 #include <unordered_set> // dedup avatars when rebuilding overrides across copies
 
@@ -53,6 +56,7 @@
 #include "lllocalgltfmaterials.h" // import a glTF mesh's materials as mesh-owned local materials
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
+#include "llmodelpreview.h"      // LLModelPreview::getFileOriginPivot, the uploader's origin rule
 #include "llnotificationsutil.h" // warn when a loaded mesh has no UVs
 #include "llscrolllistctrl.h"
 #include "llselectmgr.h"    // deselect before re-parenting onto the avatar
@@ -516,6 +520,141 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         importGLTFMaterials(gltf_mat_by_name, new_owned_materials);
     }
 
+    // A model named NAME_LOD0-2 or NAME_PHYS beside a NAME is one of NAME's
+    // lower LODs or its physics shape, as the uploader reads the file, not a
+    // part of its own. A submodel's letter follows the suffix: NAME_LOD2b.
+    static const std::array<std::string_view, 4> lod_suffixes{ "_LOD0", "_LOD1", "_LOD2", "_PHYS" };
+    auto core_label = [](const LLModel* mdl) -> std::string_view
+    {
+        std::string_view label(mdl->mLabel);
+        return mdl->mSubmodelID > 0 && !label.empty() ? label.substr(0, label.size() - 1) : label;
+    };
+    auto base_of = [&](std::string_view label) -> std::string_view
+    {
+        for (std::string_view suffix : lod_suffixes)
+        {
+            if (label.size() > suffix.size() && label.substr(label.size() - suffix.size()) == suffix)
+            {
+                return label.substr(0, label.size() - suffix.size());
+            }
+        }
+        return {};
+    };
+    std::set<std::string, std::less<>> bases;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            const LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (mdl && !mdl->mSubmodelID && base_of(mdl->mLabel).empty())
+            {
+                bases.emplace(mdl->mLabel);
+            }
+        }
+    }
+    // Each part's own LOD and physics models, by the part's label (NAME, or NAMEb for a submodel):
+    // slots 0-2 are LOD0-2, slot 3 the physics shape.
+    std::map<std::string, std::array<LLModel*, 4>, std::less<>> lods_of;
+    // How many models (root and submodels) each part has at High, and at each of its own LOD slots:
+    // a LOD split differently from High would leave faces out, so it isn't served.
+    std::map<std::string, S32, std::less<>> high_count;
+    std::map<std::string, std::array<S32, 4>, std::less<>> lod_count;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (!mdl || mdl->getNumVolumeFaces() <= 0)
+            {
+                continue;
+            }
+            const std::string_view core = core_label(mdl);
+            const std::string_view base = base_of(core);
+            if (base.empty() || bases.find(base) == bases.end())
+            {
+                if (base.empty())
+                {
+                    ++high_count[std::string(core)];
+                }
+                continue;
+            }
+            const std::string_view suffix = core.substr(base.size());
+            const size_t slot = suffix == "_PHYS" ? 3 : (size_t)(suffix.back() - '0');
+            std::string key(base);
+            if (mdl->mSubmodelID > 0)
+            {
+                key += mdl->mLabel.back();
+            }
+            lods_of[key][slot] = mdl; // value-initialised to nulls on first use
+            ++lod_count[std::string(base)][slot];
+        }
+    }
+    // A static part stands on the origin its file gives, as the uploader's From file pivot places it:
+    // its geometry moves by the offset that brings that origin to the prim's, and the part moves back.
+    auto shift_face = [](LLVolumeFace& face, const LLVector4a& offset)
+    {
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            face.mPositions[v].add(offset);
+        }
+        if (face.mExtents)
+        {
+            face.mExtents[0].add(offset);
+            face.mExtents[1].add(offset);
+        }
+        if (face.mCenter)
+        {
+            face.mCenter->add(offset);
+        }
+    };
+
+    // A LOD or physics model's faces as a volume the repository can serve, built as the part's own is.
+    auto make_volume = [&](LLModel* mdl, const LLVector4a& offset) -> LLPointer<LLVolume>
+    {
+        std::vector<LLVolumeFace> lod_faces;
+        lod_faces.reserve(mdl->getNumVolumeFaces());
+        const LLModel::JointWeightCache lod_weights(*mdl);
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            LLVolumeFace face = mdl->getVolumeFace(fi);
+            if (unit_rigged)
+            {
+                populateFaceWeights(face, *mdl, lod_weights);
+            }
+            shift_face(face, offset);
+            lod_faces.push_back(face);
+        }
+        LLVolumeParams lod_params;
+        lod_params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        LLPointer<LLVolume> volume = new LLVolume(lod_params, 1.f);
+        volume->copyFacesFrom(lod_faces);
+        volume->cacheOptimize(true);
+        volume->setMeshAssetLoaded(true);
+        return volume;
+    };
+    // A physics model as the triangle list the physics display draws, as a downloaded physics mesh is.
+    auto make_physics = [](const LLModel* mdl, const LLVector3& offset) -> std::shared_ptr<LLModel::Decomposition>
+    {
+        auto decomp = std::make_shared<LLModel::Decomposition>();
+        std::vector<LLVector3>& pos = decomp->mPhysicsShapeMesh.mPositions;
+        std::vector<LLVector3>& norm = decomp->mPhysicsShapeMesh.mNormals;
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            const LLVolumeFace& face = mdl->getVolumeFace(fi);
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                const U16 idx = face.mIndices[i];
+                if (idx < face.mNumVertices)
+                {
+                    pos.emplace_back(LLVector3(face.mPositions[idx].getF32ptr()) + offset);
+                    // A Collada model without normals has none; the physics display draws positions alone.
+                    norm.emplace_back(face.mNormals ? LLVector3(face.mNormals[idx].getF32ptr()) : LLVector3::z_axis);
+                }
+            }
+        }
+        return decomp->mPhysicsShapeMesh.mPositions.empty() ? nullptr : decomp;
+    };
+
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
         for (LLModelInstance& instance : iter->second)
@@ -525,6 +664,15 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             {
                 continue;
             }
+            const std::string_view base = base_of(core_label(mdl));
+            if (!base.empty() && bases.find(base) != bases.end())
+            {
+                continue;
+            }
+            // Rigged parts are placed by their skeleton, so only a static part takes its file's origin.
+            const LLVector3 pivot_offset = unit_rigged ? LLVector3::zero : LLModelPreview::getFileOriginPivot(mdl) * -0.5f;
+            LLVector4a pivot_offset4;
+            pivot_offset4.load3(pivot_offset.mV);
 
             std::vector<LLVolumeFace> faces;
             faces.reserve(mdl->getNumVolumeFaces());
@@ -534,6 +682,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
             {
                 LLVolumeFace face = mdl->getVolumeFace(fi); // deep copy
+                shift_face(face, pivot_offset4);
                 // Keep the loader's model-local geometry for both rigged and static
                 // units; the instance transform is applied as the object transform
                 // below (mirroring the upload), so geometry/normals/tangents stay in
@@ -640,7 +789,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 decomposeInstanceMatrix(instance.mTransform, pos, rot, scl);
                 part.mScale    = scl;
                 part.mRotation = rot;
-                part.mOffset   = pos; // scene-space; spawn uses per-part differences
+                part.mOffset   = (-pivot_offset) * instance.mTransform; // scene-space at the pivot; spawn uses per-part differences
             }
 
             LLVolumeParams vparams;
@@ -655,6 +804,32 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
             }
             part.mVolume->setMeshAssetLoaded(true);
+
+            auto own = lods_of.find(mdl->mLabel);
+            if (own != lods_of.end())
+            {
+                const std::string_view own_base = core_label(mdl);
+                const auto high_it = high_count.find(own_base);
+                const auto lod_it = lod_count.find(own_base);
+                for (S32 lod = LLModel::LOD_IMPOSTOR; lod < LLModel::LOD_HIGH; ++lod)
+                {
+                    LLModel* lod_mdl = own->second[lod];
+                    // Served only where it can stand in for High: split the same way, with its
+                    // materials in the same order (faces take High's materials by index), and
+                    // skinned where High is, or it would draw unskinned at that distance.
+                    if (lod_mdl
+                        && high_it != high_count.end() && lod_it != lod_count.end() && lod_it->second[lod] == high_it->second
+                        && lod_mdl->mMaterialList == mdl->mMaterialList
+                        && (!unit_rigged || !lod_mdl->mSkinWeights.empty()))
+                    {
+                        part.mLODVolumes[lod] = make_volume(lod_mdl, pivot_offset4);
+                    }
+                }
+                if (LLModel* physics_mdl = own->second[3])
+                {
+                    part.mPhysics = make_physics(physics_mdl, pivot_offset);
+                }
+            }
 
             if (!mdl->mSkinInfo.mJointNames.empty())
             {
@@ -1115,10 +1290,24 @@ bool LLLocalMeshMgr::isLocal(const LLUUID& world_id) const
     return findPart(world_id) != nullptr;
 }
 
-LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id) const
+LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id, S32 lod) const
 {
     const LLLocalMeshPart* part = findPart(world_id);
-    return part ? part->mVolume.get() : nullptr;
+    if (!part)
+    {
+        return nullptr;
+    }
+    if (lod >= LLModel::LOD_IMPOSTOR && lod < LLModel::LOD_HIGH && part->mLODVolumes[lod].notNull())
+    {
+        return part->mLODVolumes[lod].get();
+    }
+    return part->mVolume.get();
+}
+
+LLModel::Decomposition* LLLocalMeshMgr::getDecompositionForWorldID(const LLUUID& world_id) const
+{
+    const LLLocalMeshPart* part = findPart(world_id);
+    return part ? part->mPhysics.get() : nullptr;
 }
 
 const LLMeshSkinInfo* LLLocalMeshMgr::getSkinInfoForWorldID(const LLUUID& world_id) const

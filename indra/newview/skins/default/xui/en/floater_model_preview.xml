@@ -35,6 +35,9 @@
   <string name="mesh_status_invalid_material_list">LOD materials are not a subset of reference model.</string>
   <string name="phys_status_vertex_limit_exceeded">Some physical hulls exceed vertex limitations.</string>
   <string name="phys_status_degenerate_triangles">The physics mesh is too dense or contains degenerate triangles. Use Analyze/Simplify to resolve.</string>
+  <string name="pivot_status_rigged">A pivot is for unrigged mesh; rigged mesh is placed by its skeleton.</string>
+  <string name="pivot_status_analyze">Analyze the physics to set a pivot: unanalyzed physics stays centred on the object.</string>
+  <string name="pivot_status_no_physics">No physics shape is defined, so the object collides with its default hull, centred on itself. Fine for a phantom piece or physics type None.</string>
   <string name="layer_all">All</string> <!-- Text to display in physics layer combo box for "all layers" -->
   <string name="decomposing">Analyzing...</string>
   <string name="simplifying">Simplifying...</string>
@@ -1365,6 +1368,119 @@
              label_text.text_color="White"
              left="20"
              top_pad="20"/>
+           <!-- <SK:Nexii> Mesh uploader pivot -->
+           <text
+             follows="top|left"
+             height="16"
+             left="20"
+             name="pivot_label"
+             text_color="White"
+             top_pad="20"
+             width="50"
+             tool_tip="Where the object's origin, and so its rotation, sits within its bounding box: in percent, -100 and 100 are its faces and 0 its centre; in metres, the distance from its centre.">
+             Pivot:
+           </text>
+           <radio_group
+             layout="topleft"
+             follows="top|left"
+             height="52"
+             left_pad="0"
+             name="pivot_mode"
+             top_delta="0"
+             width="90">
+             <radio_item
+               layout="topleft"
+               height="16"
+               label="From file"
+               left="0"
+               name="pivot_mode_file"
+               tool_tip="Each model's origin as the file gives it, such as its object origin in Blender. A model whose origin lies outside its box stays centred."
+               top="0"
+               value="file"
+               width="90"/>
+             <radio_item
+               layout="topleft"
+               height="16"
+               label="Centre"
+               left="0"
+               name="pivot_mode_centre"
+               tool_tip="The centre of the bounding box, as uploads place it without a pivot."
+               top_pad="2"
+               value="centre"
+               width="80"/>
+             <radio_item
+               layout="topleft"
+               height="16"
+               label="Custom"
+               left="0"
+               name="pivot_mode_custom"
+               tool_tip="Set the pivot below, starting from the one last shown. For a single model only."
+               top_pad="2"
+               value="custom"
+               width="80"/>
+           </radio_group>
+           <spinner
+             decimal_digits="1"
+             follows="top|left"
+             height="20"
+             increment="50"
+             label="X"
+             label_width="12"
+             left_pad="10"
+             max_val="100"
+             min_val="-100"
+             name="pivot_x"
+             top_delta="-2"
+             value="0"
+             width="80"/>
+           <spinner
+             decimal_digits="1"
+             follows="top|left"
+             height="20"
+             increment="50"
+             label="Y"
+             label_width="12"
+             left_pad="10"
+             max_val="100"
+             min_val="-100"
+             name="pivot_y"
+             top_delta="0"
+             value="0"
+             width="80"/>
+           <spinner
+             decimal_digits="1"
+             follows="top|left"
+             height="20"
+             increment="50"
+             label="Z"
+             label_width="12"
+             left_pad="10"
+             max_val="100"
+             min_val="-100"
+             name="pivot_z"
+             top_delta="0"
+             value="0"
+             width="80"/>
+           <combo_box
+             follows="top|left"
+             height="20"
+             left_pad="10"
+             name="pivot_units"
+             top_delta="0"
+             width="50">
+             <combo_item name="percent" value="percent" label="%"/>
+             <combo_item name="metres" value="metres" label="m"/>
+           </combo_box>
+           <text
+             follows="top|left"
+             height="90"
+             left="170"
+             name="pivot_status"
+             text_color="Yellow"
+             top_pad="6"
+             width="440"
+             word_wrap="true"/>
+           <!-- </SK:Nexii> -->
      </panel>
       <panel
        label="Overrides"
@@ -1854,10 +1970,10 @@ Analysed:
    name="preview_panel"
    top_pad="4"
    width="325"
-   height="408"/>
+   height="340"/>
   <panel
     follows="right|bottom"
-    height="140"
+    height="208"
     layout="topleft"
     name="right_panel"
     top_pad="5"
@@ -1922,8 +2038,6 @@ Analysed:
       follows="top|left"
       label="Joint position overrides"
       label_text.text_color="White"
-      word_wrap="down"
-      width="130"
       layout="topleft"
       name="show_joint_overrides"
       top_pad="10">
@@ -1934,8 +2048,18 @@ Analysed:
       label_text.text_color="White"
       layout="topleft"
       name="show_joint_positions"
-      top_pad="21">
+      top_pad="10">
     </check_box>
+    <!-- <SK:Nexii> Mesh uploader pivot -->
+    <check_box
+      follows="top|left"
+      label="Origin"
+      label_text.text_color="White"
+      layout="topleft"
+      name="show_origin"
+      top_pad="10">
+    </check_box>
+    <!-- </SK:Nexii> -->
     <text
       follows="top|left"
       layout="topleft"
