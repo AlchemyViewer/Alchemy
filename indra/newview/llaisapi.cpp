@@ -28,6 +28,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llaisapi.h"
 
+#include "alinventorysync.h"
 #include "llagent.h"
 #include "llappviewer.h"
 #include "llcallbacklist.h"
@@ -897,7 +898,11 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                         << " since folder no longer exists at server. Descendent count: server == " << cat->getDescendentCount()
                         << ", viewer == " << cat->getViewerDescendentCount()
                         << LL_ENDL;
-                    gInventory.fetchDescendentsOf(cat->getParentUUID());
+                    // The folder it was in is out of step, and is fetched when next asked for.
+                    if (LLViewerInventoryCategory* parent = gInventory.getCategory(cat->getParentUUID()))
+                    {
+                        ALInventorySync::markOutOfStep(*parent);
+                    }
                     // Note: don't delete folder here - contained items will be deparented (or deleted)
                     // and since we are clearly out of sync we can't be sure we won't get rid of something we need.
                     // For example folder could have been moved or renamed with items intact, let it fetch first.
@@ -910,10 +915,15 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
                 {
                     LL_WARNS("Inventory") << "Purge failed for '" << item->getName()
                         << "' since item no longer exists at server." << LL_ENDL;
-                    gInventory.fetchDescendentsOf(item->getParentUUID());
+                    const LLUUID parent_id = item->getParentUUID();
                     // since item not on the server and exists at viewer, so it needs an update at the least,
                     // so delete it, in worst case item will be refetched with new params.
                     gInventory.onObjectDeletedFromServer(targetId);
+                    // The folder it was in is out of step, and is fetched when next asked for.
+                    if (LLViewerInventoryCategory* parent = gInventory.getCategory(parent_id))
+                    {
+                        ALInventorySync::markOutOfStep(*parent);
+                    }
                 }
             }
         }
@@ -1097,6 +1107,7 @@ void AISUpdate::clearParseResults()
     mItemsUpdated.clear();
     mCategoriesCreated.clear();
     mCategoriesUpdated.clear();
+    mChildrenUnlisted.clear();
     mObjectsDeletedIds.clear();
     mItemIds.clear();
     mCategoryIds.clear();
@@ -1395,15 +1406,25 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     }
     else
     {
-        if (category_map.has("agent_id"))
+        // A folder the reply names no owner of is its parent's: one made
+        // earlier in this reply, or one the model holds. Else it is the
+        // agent's, whose inventory every request but a library fetch is of,
+        // and a library fetch's folders are under the one it asked for.
+        const auto parent_owner = [this](const LLUUID& parent_id) -> std::optional<LLUUID>
         {
-            new_cat = new LLViewerInventoryCategory(category_map["agent_id"].asUUID());
-        }
-        else
-        {
-            LL_DEBUGS() << "No owner provided, folder might be assigned wrong owner" << LL_ENDL;
-            new_cat = new LLViewerInventoryCategory(LLUUID::null);
-        }
+            const deferred_category_map_t::const_iterator made = mCategoriesCreated.find(parent_id);
+            if (made != mCategoriesCreated.end())
+            {
+                return made->second->getOwnerID();
+            }
+            if (const LLViewerInventoryCategory* parent = gInventory.getCategory(parent_id))
+            {
+                return parent->getOwnerID();
+            }
+            return std::nullopt;
+        };
+        new_cat = new LLViewerInventoryCategory(
+            ALInventorySync::newFolderOwner(category_map, parent_owner, gAgent.getID()));
     }
     bool rv = new_cat->unpackMessage(category_map);
     // *NOTE: unpackMessage does not unpack version or descendent count.
@@ -1443,6 +1464,8 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
                             << " for category " << category_id << LL_ENDL;
                     }
 
+                    // What the folder holds that the listing leaves out.
+                    parseUnlisted(category_id, new_cat->getPreferredType(), category_map["_embedded"], version);
                     new_cat->setVersion(version);
                 }
             }
@@ -1503,21 +1526,63 @@ void AISUpdate::parseCategory(const LLSD& category_map, S32 depth)
     }
 }
 
+static bool is_outfit_folder(LLFolderType::EType type)
+{
+    return type == LLFolderType::FT_CURRENT_OUTFIT || type == LLFolderType::FT_OUTFIT;
+}
+
 void AISUpdate::parseDescendentCount(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded)
 {
     // We can only determine true descendent count if this contains all descendent types.
-    if (embedded.has("categories") &&
-        embedded.has("links") &&
-        embedded.has("items"))
+    const std::optional<ALInventorySync::Listing> listing =
+        ALInventorySync::embeddedListing(embedded, is_outfit_folder(type), mFetch);
+    if (listing == ALInventorySync::Listing::Whole)
     {
         mCatDescendentsKnown[category_id] = embedded["categories"].size();
         mCatDescendentsKnown[category_id] += embedded["links"].size();
         mCatDescendentsKnown[category_id] += embedded["items"].size();
     }
-    else if (mFetch && embedded.has("links") && (type == LLFolderType::FT_CURRENT_OUTFIT || type == LLFolderType::FT_OUTFIT))
+    else if (listing == ALInventorySync::Listing::LinksOnly)
     {
         // COF and outfits contain links only
         mCatDescendentsKnown[category_id] = embedded["links"].size();
+    }
+}
+
+void AISUpdate::parseUnlisted(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded, S32 version)
+{
+    const LLViewerInventoryCategory* held = gInventory.getCategory(category_id);
+    const std::optional<ALInventorySync::Listing> listing =
+        ALInventorySync::embeddedListing(embedded, is_outfit_folder(type), mFetch);
+    if (!held || !listing)
+    {
+        return;
+    }
+
+    LLInventoryModel::cat_array_t* categories = nullptr;
+    LLInventoryModel::item_array_t* items = nullptr;
+    gInventory.getDirectDescendentsOf(category_id, categories, items);
+    std::vector<ALInventorySync::Child> children;
+    if (categories)
+    {
+        for (const LLPointer<LLViewerInventoryCategory>& category : *categories)
+        {
+            children.push_back({ category->getUUID(), false });
+        }
+    }
+    if (items)
+    {
+        for (const LLPointer<LLViewerInventoryItem>& item : *items)
+        {
+            children.push_back({ item->getUUID(), item->getIsLinkType() });
+        }
+    }
+
+    for (const LLUUID& child_id : ALInventorySync::unlisted(children, *listing,
+                                                            ALInventorySync::embeddedIds(embedded, *listing),
+                                                            version, held->getVersion()))
+    {
+        mChildrenUnlisted.emplace_back(child_id, category_id);
     }
 }
 
@@ -1781,6 +1846,19 @@ void AISUpdate::doUpdate()
         gInventory.updateItem(new_item);
     }
 
+    // REMOVE WHAT FETCHED FOLDERS NO LONGER LIST
+    for (const auto& [child_id, folder_id] : mChildrenUnlisted)
+    {
+        // Unless it has moved since, by this update or another.
+        const LLInventoryObject* child = gInventory.getObject(child_id);
+        if (child && child->getParentUUID() == folder_id)
+        {
+            LL_DEBUGS("Inventory") << "removed " << child_id << ", which fetched folder " << folder_id
+                                   << " no longer lists" << LL_ENDL;
+            gInventory.onObjectDeletedFromServer(child_id, false, false, false);
+        }
+    }
+
     // DELETE OBJECTS
     for (uuid_list_t::const_iterator del_it = mObjectsDeletedIds.begin();
          del_it != mObjectsDeletedIds.end(); ++del_it)
@@ -1823,15 +1901,13 @@ void AISUpdate::doUpdate()
                 else
                 {
                     // We do not account for update if version is UNKNOWN, so we shouldn't riase version
-                    // either or viewer will get stuck on descendants count -1, try to refetch folder instead
-                    //
-                    // Todo: proper backoff?
+                    // either or viewer will get stuck on descendants count -1. The viewer's version is
+                    // known here, so forget it, and the folder is fetched when next asked for.
 
                     LL_WARNS() << "Possible version mismatch for category " << cat->getName()
                         << ", viewer version " << cat->getVersion()
-                        << " AIS version " << version << " !!!Rerequesting category!!!" << LL_ENDL;
-                    const S32 LONG_EXPIRY = 360;
-                    cat->fetch(LONG_EXPIRY);
+                        << " AIS version " << version << " !!!Forgetting local version!!!" << LL_ENDL;
+                    ALInventorySync::markOutOfStep(*cat);
                 }
             }
         }

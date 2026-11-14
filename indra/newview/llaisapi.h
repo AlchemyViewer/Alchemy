@@ -123,6 +123,7 @@ public:
     void parseItem(const LLSD& link_map);
     void parseCategory(const LLSD& link_map, S32 depth);
     void parseDescendentCount(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded);
+    void parseUnlisted(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded, S32 version);
     void parseEmbedded(const LLSD& embedded, S32 depth);
     void parseEmbeddedLinks(const LLSD& links, S32 depth);
     void parseEmbeddedItems(const LLSD& items);
@@ -154,6 +155,10 @@ private:
     typedef std::map<LLUUID,LLPointer<LLViewerInventoryCategory> > deferred_category_map_t;
     deferred_category_map_t mCategoriesCreated;
     deferred_category_map_t mCategoriesUpdated;
+
+    // What a fetched folder held that the fetch's listing of it left out:
+    // each child's id and the folder's.
+    std::vector<std::pair<LLUUID, LLUUID>> mChildrenUnlisted;
 
     // These keep track of uuid's mentioned in meta values.
     // Useful for filtering out which content we are interested in.
