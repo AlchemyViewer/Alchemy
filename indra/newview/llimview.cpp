@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 
 #include "llimview.h"
+#include "alagentlistupdates.h"
 #include "alchattimestamp.h"
 
 #include "llavatarnamecache.h"  // IDEVO
@@ -3884,60 +3885,13 @@ void LLIMMgr::addPendingAgentListUpdates(
     const LLUUID& session_id,
     const LLSD& updates)
 {
-    LLSD::map_const_iterator iter;
-
     if ( !mPendingAgentListUpdates.has(session_id.asString()) )
     {
         //this is a new agent list update for this session
         mPendingAgentListUpdates[session_id.asString()] = LLSD::emptyMap();
     }
 
-    if (
-        updates.has("agent_updates") &&
-        updates["agent_updates"].isMap() &&
-        updates.has("updates") &&
-        updates["updates"].isMap() )
-    {
-        //new school update
-        LLSD update_types = LLSD::emptyArray();
-        LLSD::array_iterator array_iter;
-
-        update_types.append("agent_updates");
-        update_types.append("updates");
-
-        for (
-            array_iter = update_types.beginArray();
-            array_iter != update_types.endArray();
-            ++array_iter)
-        {
-            //we only want to include the last update for a given agent
-            for (
-                iter = updates[array_iter->asString()].beginMap();
-                iter != updates[array_iter->asString()].endMap();
-                ++iter)
-            {
-                mPendingAgentListUpdates[session_id.asString()][array_iter->asString()][iter->first] =
-                    iter->second;
-            }
-        }
-    }
-    else if (
-        updates.has("updates") &&
-        updates["updates"].isMap() )
-    {
-        //old school update where the SD contained just mappings
-        //of agent_id -> "LEAVE"/"ENTER"
-
-        //only want to keep last update for each agent
-        for (
-            iter = updates["updates"].beginMap();
-            iter != updates["updates"].endMap();
-            ++iter)
-        {
-            mPendingAgentListUpdates[session_id.asString()]["updates"][iter->first] =
-                iter->second;
-        }
-    }
+    ALAgentListUpdates::hold(mPendingAgentListUpdates[session_id.asString()], updates);
 }
 
 void LLIMMgr::clearPendingAgentListUpdates(const LLUUID& session_id)

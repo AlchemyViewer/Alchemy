@@ -1153,6 +1153,7 @@ if(AL_BUILD_VIEWER)
     alobjectroster.h
     alprobereach.h
     alregionretirement.h
+    alagentlistupdates.h
     alteleportprogress.h
     alagentlocationformat.h
     alcrashreporter.h
@@ -2542,6 +2543,7 @@ if(AL_BUILD_TESTS)
     newview_tests
     PROJECT ${test_project}
     SOURCES
+      tests/alagentlistupdates_test.cpp
       tests/alagentlocationformat_test.cpp
       tests/alapplinks_test.cpp
       tests/albakeproxies_test.cpp
