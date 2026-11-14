@@ -101,6 +101,9 @@ public:
     // Return true if filter has at least one match.
     bool filterHasMatches();
 
+    // Return how many ids the filter matches: the rows refresh() builds, built yet or not.
+    size_t filterMatchCount();
+
 // [RLVa:KB] - Checked: RLVa-1.2.0
     void setRlvCheckShowNames(bool fRlvCheckShowNames) { mRlvCheckShowNames = fRlvCheckShowNames; }
     // We need this to be public since we call it from RlvUIEnabler::onToggleShowNames()

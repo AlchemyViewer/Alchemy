@@ -784,7 +784,7 @@ void LLPanelPeople::updateFriendAccordionTitles()
     if (mOnlineFriendList)
     {
         LLStringUtil::format_map_t args_online;
-        args_online["[COUNT]"] = std::to_string(mOnlineFriendList->size());
+        args_online["[COUNT]"] = std::to_string(mOnlineFriendList->filterMatchCount());
         std::string online_title = getString("online_friends_count", args_online);
 
         mFriendsOnlineTab->setTitle(online_title);
@@ -793,7 +793,7 @@ void LLPanelPeople::updateFriendAccordionTitles()
     if (mAllFriendList)
     {
         LLStringUtil::format_map_t args_all;
-        args_all["[COUNT]"] = std::to_string(mAllFriendList->size());
+        args_all["[COUNT]"] = std::to_string(mAllFriendList->filterMatchCount());
         std::string all_title = getString("all_friends_count", args_all);
 
         mFriendsAllTab->setTitle(all_title);

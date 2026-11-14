@@ -434,6 +434,27 @@ bool LLAvatarList::filterHasMatches()
     return false;
 }
 
+size_t LLAvatarList::filterMatchCount()
+{
+    if (mNameFilter.empty())
+    {
+        return getIDs().size();
+    }
+
+    // Matched as refresh() matches the ids it adds, so a name not loaded yet is no match.
+    size_t count = 0;
+    for (const LLUUID& id : getIDs())
+    {
+        LLAvatarName av_name;
+        LLAvatarNameCache::get(id, &av_name);
+        if (findInsensitive(getAvatarName(av_name), mNameFilter))
+        {
+            ++count;
+        }
+    }
+    return count;
+}
+
 boost::signals2::connection LLAvatarList::setRefreshCompleteCallback(const commit_signal_t::slot_type& cb)
 {
     return mRefreshCompleteSignal.connect(cb);
