@@ -2707,6 +2707,32 @@
             <key>Value</key>
             <real>0.25</real>
         </map>
+        <key>AlchemyExposureIncidentStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>How far automatic exposure meters the light falling on surfaces (incident metering) instead of the light they reflect (reflective metering). 0 is reflective, which exposes a white wall in dim light as middle grey; 1 is incident, so white stays white and a grey card stays grey. The incident light is estimated by dividing the reflected light by the G-buffer's albedo. 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
+        <key>AlchemyExposureIncidentTuning</key>
+        <map>
+            <key>Comment</key>
+            <string>Tuning for incident metering (AlchemyExposureIncidentStrength), for debugging. x: the albedo floor, below which a surface is read as reflecting this much so that a black one is not the brightest light in the frame (0.1). y, z: between these a patch's mean albedo earns its share of the exposure, none below y and all of it above z, so that near black surfaces say nothing about the light (0.02, 0.12).</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Vector3</string>
+            <key>Value</key>
+            <array>
+                <real>0.1</real>
+                <real>0.02</real>
+                <real>0.12</real>
+            </array>
+        </map>
         <key>AlchemyScopeLayout</key>
         <map>
             <key>Comment</key>
