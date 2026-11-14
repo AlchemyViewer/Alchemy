@@ -765,10 +765,6 @@ bool tryFinishAudio(const LLUUID &decode_id, LLPointer<LLVorbisDecodeState> deco
         if (adp->isPinned() && !adp->getBuffer())
         {
             adp->load();
-            if (adp->getBuffer())
-            {
-                adp->getBuffer()->setPinned(true);
-            }
         }
     }
 

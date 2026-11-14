@@ -723,10 +723,6 @@ bool LLAudioEngine::preloadSound(const LLUUID &uuid, bool pin_buffer)
     if (adp->hasDecodedData() && !adp->getBuffer())
     {
         adp->load();
-        if (adp->getBuffer() && pin_buffer)
-        {
-            adp->getBuffer()->setPinned(true);
-        }
         return true;
     }
 
