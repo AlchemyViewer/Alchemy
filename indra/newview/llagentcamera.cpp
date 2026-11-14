@@ -57,6 +57,7 @@
 // [RLVa:KB] - Checked: 2010-05-10 (RLVa-1.2.0g)
 #include "rlvactions.h"
 #include "rlvhandler.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 // [/RLVa:KB]
 
 using namespace LLAvatarAppearanceDefines;
@@ -1430,8 +1431,10 @@ void LLAgentCamera::updateCamera()
         // linear interpolation
         F32 fraction_of_animation = time / mAnimationDuration;
 
-        bool isfirstPerson = mCameraMode == CAMERA_MODE_MOUSELOOK;
-        bool wasfirstPerson = mLastCameraMode == CAMERA_MODE_MOUSELOOK;
+        // <SK:Nexii> Over-the-shoulder view: first person is mouselook without the shoulder view
+        bool isfirstPerson = mCameraMode == CAMERA_MODE_MOUSELOOK && !SKOTSCamera::isShoulder();
+        bool wasfirstPerson = SKOTSCamera::animationFromFirstPerson();
+        // </SK:Nexii>
         F32 fraction_animation_to_skip;
 
         if (mAnimationCameraStartGlobal == camera_target_global)
@@ -1455,8 +1458,19 @@ void LLAgentCamera::updateCamera()
 
             // ...adjust position for animation
             F32 smooth_fraction_of_animation = llsmoothstep(0.0f, 1.0f, fraction_of_animation);
-            camera_pos_global = lerp(mAnimationCameraStartGlobal, camera_target_global, smooth_fraction_of_animation);
-            mFocusGlobal = lerp(mAnimationFocusStartGlobal, focus_target_global, smooth_fraction_of_animation);
+            // <SK:Nexii> Over-the-shoulder view: in mouselook the transition follows the avatar
+            LLVector3d camera_start_global = mAnimationCameraStartGlobal;
+            LLVector3d focus_start_global = mAnimationFocusStartGlobal;
+            if (mCameraMode == CAMERA_MODE_MOUSELOOK && isAgentAvatarValid())
+            {
+                const LLVector3d root_global = gAgent.getPosGlobalFromAgent(getAvatarRootPosition());
+                const LLQuaternion rot = gAgent.getFrameAgent().getQuaternion();
+                camera_start_global = SKOTSCamera::followAvatar(camera_start_global, root_global, rot);
+                focus_start_global = SKOTSCamera::followAvatar(focus_start_global, root_global, rot);
+            }
+            camera_pos_global = lerp(camera_start_global, camera_target_global, smooth_fraction_of_animation);
+            mFocusGlobal = lerp(focus_start_global, focus_target_global, smooth_fraction_of_animation);
+            // </SK:Nexii>
         }
         else
         {
@@ -1535,6 +1549,7 @@ void LLAgentCamera::updateCamera()
 
     // Try to move the camera
 
+    SKOTSCamera::onCameraUpdated(mCameraMode == CAMERA_MODE_MOUSELOOK && !SKOTSCamera::isShoulder()); // <SK:Nexii> Over-the-shoulder view
     if (!LLViewerCamera::getInstance()->updateCameraLocation(position_agent, mCameraUpVector, focus_agent))
         return;
 
@@ -1558,7 +1573,8 @@ void LLAgentCamera::updateCamera()
     }
     gAgent.setLastPositionGlobal(global_pos);
 
-    if (LLVOAvatar::sVisibleInFirstPerson && isAgentAvatarValid() && !gAgentAvatarp->isSitting() && cameraMouselook())
+    if (LLVOAvatar::sVisibleInFirstPerson && isAgentAvatarValid() && !gAgentAvatarp->isSitting() && cameraMouselook()
+        && !SKOTSCamera::isShoulder()) // <SK:Nexii> Over-the-shoulder view keeps the camera off the head
     {
         LLVector3 head_pos = gAgentAvatarp->mHeadp->getWorldPosition() +
             LLVector3(0.08f, 0.f, 0.05f) * gAgentAvatarp->mHeadp->getWorldRotation() +
@@ -1710,6 +1726,14 @@ LLVector3d LLAgentCamera::calcFocusPositionTargetGlobal()
                 agent_rot *= ((LLViewerObject*)(gAgentAvatarp->getParent()))->getRenderRotation();
             }
         }
+        // <SK:Nexii> Over-the-shoulder view
+        if (SKOTSCamera::isShoulder() && isAgentAvatarValid())
+        {
+            const LLVector3* sit_offset = mSitCameraEnabled && gAgentAvatarp->isSitting() ? &mSitCameraPos : nullptr;
+            mFocusTargetGlobal = gAgent.getPosGlobalFromAgent(SKOTSCamera::focusPositionAgent(getAvatarRootPosition(), agent_rot, sit_offset));
+            return mFocusTargetGlobal;
+        }
+        // </SK:Nexii>
         at_axis = at_axis * agent_rot;
         mFocusTargetGlobal = calcCameraPositionTargetGlobal() + at_axis;
         return mFocusTargetGlobal;
@@ -1885,6 +1909,19 @@ LLVector3d LLAgentCamera::calcCameraPositionTargetGlobal(bool *hit_limit)
             LL_WARNS() << "Null avatar drawable!" << LL_ENDL;
             return LLVector3d::zero;
         }
+
+        // <SK:Nexii> Over-the-shoulder view
+        if (SKOTSCamera::isShoulder())
+        {
+            LLQuaternion aim_rot = gAgent.getFrameAgent().getQuaternion();
+            if (gAgentAvatarp->getParent() && !((LLViewerObject*)gAgentAvatarp->getRoot())->flagCameraDecoupled())
+            {
+                aim_rot *= ((LLViewerObject*)gAgentAvatarp->getParent())->getRenderRotation();
+            }
+            const LLVector3* sit_offset = mSitCameraEnabled && gAgentAvatarp->isSitting() ? &mSitCameraPos : nullptr;
+            return gAgent.getPosGlobalFromAgent(SKOTSCamera::cameraPositionAgent(getAvatarRootPosition(), aim_rot, sit_offset));
+        }
+        // </SK:Nexii>
 
         head_offset.clearVec();
         F32 fixup;
@@ -2431,6 +2468,7 @@ void LLAgentCamera::changeCameraToMouselook(bool animate)
 
         updateLastCamera();
         mCameraMode = CAMERA_MODE_MOUSELOOK;
+        SKOTSCamera::onEnterMouselook(); // <SK:Nexii> Over-the-shoulder view
         AOEngine::getInstance()->inMouselook(true);
         gAgent.setControlFlags(AGENT_CONTROL_MOUSELOOK);
 
@@ -2567,7 +2605,7 @@ void LLAgentCamera::changeCameraToThirdPerson(bool animate)
         }
 
         mCameraLag.clearVec();
-        if (mCameraMode == CAMERA_MODE_MOUSELOOK)
+        if (mCameraMode == CAMERA_MODE_MOUSELOOK && !SKOTSCamera::isShoulder()) // <SK:Nexii> Over-the-shoulder view glides back out
         {
             mCurrentCameraDistance = MIN_CAMERA_DISTANCE;
             mTargetCameraDistance = MIN_CAMERA_DISTANCE;
@@ -2749,6 +2787,12 @@ void LLAgentCamera::startCameraAnimation()
 {
     mAnimationCameraStartGlobal = getCameraPositionGlobal();
     mAnimationFocusStartGlobal = mFocusGlobal;
+    // <SK:Nexii> Over-the-shoulder view
+    if (isAgentAvatarValid())
+    {
+        SKOTSCamera::onAnimationStart(gAgent.getPosGlobalFromAgent(getAvatarRootPosition()), gAgent.getFrameAgent().getQuaternion());
+    }
+    // </SK:Nexii>
     setAnimationDuration(gSavedSettings.getF32("ZoomTime"));
     mAnimationTimer.reset();
     mCameraAnimating = true;
