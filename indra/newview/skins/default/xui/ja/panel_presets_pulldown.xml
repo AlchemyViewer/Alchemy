@@ -4,4 +4,30 @@
 		グラフィックのプリセット
 	</text>
 	<button name="open_prefs_btn" label="グラフィック初期設定" tool_tip="グラフィック設定を呼び出します。"/>
+	<text name="QualitySpeed">
+		品質と速さ：
+	</text>
+	<text name="ShadersPrefText">
+		低
+	</text>
+	<text name="ShadersPrefText2">
+		中
+	</text>
+	<text name="ShadersPrefText3">
+		高
+	</text>
+	<text name="ShadersPrefText4">
+		最高
+	</text>
+	<text name="draw_distance_label" value="描画距離："/>
+	<text name="lod_label" value="オブジェクトのLoD："/>
+	<text name="max_particles_label" value="パーティクル："/>
+	<text name="max_avatars_label" value="アバター："/>
+	<text name="complexity_label" value="複雑度："/>
+	<text name="lights_label" value="ローカル光源："/>
+	<text name="light_intensity_label" value="光の強さ："/>
+	<text name="res_scale_label" value="解像度スケール："/>
+	<button name="open_lightbox_btn" tool_tip="ライトボックスを開きます：露光とカラーグレーディング、レンズ効果、描画品質、空"/>
+	<slider_bar name="res_scale_slider_bar" tool_tip="（デフォルト：1.0）[DANGEROUS] 内部のレンダリング解像度の倍率。"/>
+	<spinner name="res_scale_spinner" tool_tip="（デフォルト：1.0）[DANGEROUS] 内部のレンダリング解像度の倍率。"/>
 </panel>

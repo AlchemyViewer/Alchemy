@@ -1,0 +1,1314 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="script_studio">
+	<floater.string name="Untitled">スクリプト</floater.string>
+	<floater.string name="Loading">読み込んでいます…</floater.string>
+	<floater.string name="Loaded">[NAME]を読み込みました。</floater.string>
+	<floater.string name="LoadedReadOnly">[NAME]を読み取り専用で読み込みました。</floater.string>
+	<floater.string name="Saving">[NAME]を保存しています…</floater.string>
+	<floater.string name="Compiled">[NAME]をコンパイルしました。</floater.string>
+	<floater.string name="CompileFailedA">[NAME]はコンパイルされませんでした：問題が1件あります。</floater.string>
+	<floater.string name="CompileFailedB">[NAME]はコンパイルされませんでした：問題が[COUNT]件あります。</floater.string>
+	<floater.string name="SaveFailed">[NAME]を保存できませんでした：[ERROR]</floater.string>
+	<floater.string name="SaveExperienceUnknown">[NAME]を保存できませんでした：リージョンがスクリプトの体験を報告しなかったため、このまま保存すると体験が解除されます。エディター下部のバーの右端にある「体験」欄で体験か「体験なし」を選択してから、もう一度保存してください。</floater.string>
+	<floater.string name="SavedToFile">[PATH]に保存しました</floater.string>
+	<floater.string name="FileReloaded">[NAME]がディスク上で変更されたため、再読み込みしました。</floater.string>
+	<floater.string name="Reverted">[NAME]をディスク上のバージョンに戻しました。</floater.string>
+	<floater.string name="FileChangedOutside">編集中に[NAME]がディスク上で変更されました。保存するとファイルが上書きされます。</floater.string>
+	<floater.string name="SaveToFileFailed">[PATH]に書き込めませんでした</floater.string>
+	<floater.string name="LoadFromFileFailed">[FILE]を読み込めませんでした</floater.string>
+	<floater.string name="FileTooLarge">[FILE]は大きすぎるため、ここでは開けません。</floater.string>
+	<floater.string name="RevertOutOfReach">[NAME]を元に戻せません：元のソースが存在しないか、アクセスできません。</floater.string>
+	<floater.string name="RevertFailed">[NAME]を元に戻せませんでした（タブは変更されていません）：[ERROR]</floater.string>
+	<floater.string name="NoProblems">問題はありません。</floater.string>
+	<floater.string name="NoScriptOpenHeadline">スクリプトが開かれていません</floater.string>
+	<floater.string name="NoScriptOpenSentence">自分のスクリプトを名前で開くか、エクスプローラーで選択するか、新しいスクリプトを作成してください。</floater.string>
+	<floater.string name="NoScriptOpenGoTo">スクリプトへ移動（[KEYS]）</floater.string>
+	<floater.string name="NoScriptOpenGoToNoKeys">スクリプトへ移動…</floater.string>
+	<floater.string name="NoScriptOpenNew">新規スクリプト…</floater.string>
+	<floater.string name="NoScriptOpenFile">コンピューター上のファイルを開く…</floater.string>
+	<floater.string name="NoReferences">まだ表示するものはありません。名前の上にキャレットを置いて「参照を検索」を選択してください。</floater.string>
+	<floater.string name="NoOutline">このスクリプトにはまだアウトラインに表示するものがありません。</floater.string>
+	<floater.string name="NoOutlineYet">まだ読み込み中です。</floater.string>
+	<floater.string name="NoOutlineNotecard">ノートカードは、JSONとして読み込んだ場合にアウトラインが表示されます。</floater.string>
+	<floater.string name="NoOutlineJson">このノートカードにはまだアウトラインに表示するものがありません。</floater.string>
+	<floater.string name="NotecardItemsUnread">このノートカードにはアイテムが埋め込まれているため、スクリプトから読み取れません。llGetNotecardLineはすべての行でEOFを返します。</floater.string>
+	<floater.string name="NotecardReadFromObject">スクリプトは自分のオブジェクトにあるノートカードを読み取ります。[NAME]へ移動するには、このスクリプトをオブジェクトから開いてください。</floater.string>
+	<floater.string name="NotecardNotFoundHere">このスクリプトのオブジェクトには[NAME]という名前のノートカードはありません。</floater.string>
+	<floater.string name="NotecardReadersNeedObject">スクリプトは、[NAME]が入っているオブジェクトからのみそれを読み取ります。</floater.string>
+	<floater.string name="NotecardReadByNone">このオブジェクトには[NAME]を読み取るスクリプトはありません。</floater.string>
+	<floater.string name="NotecardLineCut">この行は[SIZE]バイトですが、スクリプトが読み取れるのは最初の[BYTES]バイトだけです。</floater.string>
+	<floater.string name="NoExplorerSelection">何も選択されていません。ワールドでオブジェクトを選択すると、その中身が表示されます。</floater.string>
+	<floater.string name="ExplorerNoMatch">名前にそのテキストを含む項目はありません。</floater.string>
+	<floater.string name="NoOutput">まだ出力はありません。コンパイル、実行、プリプロセッサーからのメッセージがここに表示されます。</floater.string>
+	<floater.string name="PaneExplorer">エクスプローラー</floater.string>
+	<floater.string name="PaneBottom">問題、参照、出力、検索、メモリ</floater.string>
+	<floater.string name="NoReference">キャレット位置に調べられるものがありません。</floater.string>
+	<floater.string name="NoWikiPage">[NAME]はこのスクリプト内で定義されているため、Wikiにページはありません。</floater.string>
+	<floater.string name="ReferenceTitle">リファレンス</floater.string>
+	<floater.string name="ReferencePlaceholder">関数、イベント、定数の名前</floater.string>
+	<floater.string name="SnippetDetail">スニペット</floater.string>
+	<floater.string name="Deprecated">非推奨</floater.string>
+	<floater.string name="InsertTitle">挿入</floater.string>
+	<floater.string name="InsertSnippetPlaceholder">スニペットの名前</floater.string>
+	<floater.string name="InsertFunctionPlaceholder">関数の名前</floater.string>
+	<floater.string name="InsertEventPlaceholder">イベントの名前</floater.string>
+	<floater.string name="InsertConstantPlaceholder">定数の名前</floater.string>
+	<floater.string name="Formatted">[NAME]を整形しました。</floater.string>
+	<floater.string name="FormattedSelection">[NAME]の選択範囲を整形しました。</floater.string>
+	<floater.string name="FormattedAlready">[NAME]はすでに整形されています。</floater.string>
+	<floater.string name="FormatFailed">[NAME]を整形できませんでした：整形後に行数を保てませんでした。</floater.string>
+	<floater.string name="SearchFind">検索</floater.string>
+	<floater.string name="SearchPlaceholder">語句</floater.string>
+	<floater.string name="SearchQueryTip">検索する内容。Enterキーで検索します</floater.string>
+	<floater.string name="SearchAs">条件</floater.string>
+	<floater.string name="SearchHowTip">テキストをどこでも一致させるか、単語単位で一致させるか、正規表現で一致させるかを選びます</floater.string>
+	<floater.string name="SearchText">テキスト</floater.string>
+	<floater.string name="SearchWord">単語単位</floater.string>
+	<floater.string name="SearchPattern">パターン</floater.string>
+	<floater.string name="SearchCaseTip">大文字と小文字を区別するかどうか</floater.string>
+	<floater.string name="SearchAnyCase">大文字小文字を区別しない</floater.string>
+	<floater.string name="SearchThisCase">大文字小文字を区別する</floater.string>
+	<floater.string name="SearchIn">対象</floater.string>
+	<floater.string name="SearchScopeTip">開いているスクリプトとノートカード、このオブジェクト、エクスプローラーのオブジェクト、インベントリのいずれかを検索します</floater.string>
+	<floater.string name="SearchOpen">開いているスクリプト</floater.string>
+	<floater.string name="SearchThisObject">このオブジェクト</floater.string>
+	<floater.string name="SearchListed">一覧のすべてのオブジェクト</floater.string>
+	<floater.string name="SearchInventory">自分のインベントリ</floater.string>
+	<floater.string name="SearchInventoryWhere">インベントリ</floater.string>
+	<floater.string name="SearchAlone">そのものだけ</floater.string>
+	<floater.string name="SearchWithIncludes">インクルード先も含める</floater.string>
+	<floater.string name="RunningTip">スクリプトをオブジェクト内で実行するかどうか。保存してもこの設定は保持されます</floater.string>
+	<floater.string name="RunningAsking">スクリプトが実行中かどうかをリージョンに問い合わせています。今保存すると、応答を待ってその状態を保持します</floater.string>
+	<floater.string name="RunningPublic">パブリックオブジェクトではスクリプトを実行できません：このオブジェクトはパブリックで、所有者がいません</floater.string>
+	<floater.string name="RunningStarting">[NAME]を開始しています…</floater.string>
+	<floater.string name="RunningStopping">[NAME]を停止しています…</floater.string>
+	<floater.string name="RunningStarted">[NAME]は実行中です。</floater.string>
+	<floater.string name="RunningStopped">[NAME]は停止しています。</floater.string>
+	<floater.string name="RunningNotStarted">[NAME]は開始されませんでした：リージョンはまだ停止中だと報告しています。</floater.string>
+	<floater.string name="RunningNotStopped">[NAME]は停止されませんでした：リージョンはまだ実行中だと報告しています。</floater.string>
+	<floater.string name="ResetSent">[NAME]をリセットしました：状態がクリアされ、state_entryが再度実行されます。</floater.string>
+	<floater.string name="SearchIncludesTip">#includeやrequireで取り込まれたファイルも検索します。「すべて置換」ではそれらは変更されません。</floater.string>
+	<floater.string name="SearchIncluded">インクルード</floater.string>
+	<floater.string name="SearchCountTip">見つかった一致の数と、そのファイル数</floater.string>
+	<floater.string name="SearchCounting">[FILES]で[HITS]、取得しています…</floater.string>
+	<floater.string name="SearchCount">[FILES]で[HITS]</floater.string>
+	<floater.string name="SearchPassedOver">[SAID]、ただし[MISSED]</floater.string>
+	<floater.string name="SearchBoth">[FIRST]と[SECOND]</floater.string>
+	<floater.string name="SearchUnlistedA">1個のプリムが中身を一覧表示しませんでした</floater.string>
+	<floater.string name="SearchUnlistedB">[COUNT]個のプリムが中身を一覧表示しませんでした</floater.string>
+	<floater.string name="SearchUnreadA">1個のスクリプトを読み込めませんでした</floater.string>
+	<floater.string name="SearchUnreadB">[COUNT]個のスクリプトを読み込めませんでした</floater.string>
+	<floater.string name="SearchCountCapped">[FILES]で[HITS]、最初の[SHOWN]件を表示</floater.string>
+	<floater.string name="MatchesA">1件の一致</floater.string>
+	<floater.string name="MatchesB">[COUNT]件の一致</floater.string>
+	<floater.string name="FilesA">1個のファイル</floater.string>
+	<floater.string name="FilesB">[COUNT]個のファイル</floater.string>
+	<floater.string name="PlacesA">1箇所</floater.string>
+	<floater.string name="PlacesB">[COUNT]箇所</floater.string>
+	<floater.string name="FixesA">1件の修正</floater.string>
+	<floater.string name="FixesB">[COUNT]件の修正</floater.string>
+	<floater.string name="FixesMadeA">1件修正しました。</floater.string>
+	<floater.string name="FixesMadeB">[COUNT]件修正しました。</floater.string>
+	<floater.string name="FixNone">修正するものはありません。</floater.string>
+	<floater.string name="FixNoneSafe">確認なしで安全に適用できる修正はありません。</floater.string>
+	<floater.string name="FixesLeftA">1件の修正は、スクリプトの動作を変えたり意図を推測したりする可能性があるため、「問題」から手動で適用するよう残してあります。</floater.string>
+	<floater.string name="FixesLeftB">[COUNT]件の修正は、スクリプトの動作を変えたり意図を推測したりする可能性があるため、「問題」から手動で適用するよう残してあります。</floater.string>
+	<floater.string name="FixChecking">[NAME]の修正を確認しています…</floater.string>
+	<floater.string name="FilterFixable">修正可能</floater.string>
+	<floater.string name="FilterFixableCount">修正可能（[COUNT]）</floater.string>
+	<floater.string name="AliasTaken">SLuaのエイリアス@[NAME]は、現在別のフォルダーを指しています。スクリプトを再チェックすると別の修正が提示されます。</floater.string>
+	<floater.string name="FixStale">チェック後にスクリプトが変更されました。次のチェック後に修正が再度提示されます。</floater.string>
+	<floater.string name="ProblemFixTip">修正：[TITLE]</floater.string>
+	<floater.string name="ScriptsA">1個のスクリプト</floater.string>
+	<floater.string name="ScriptsB">[COUNT]個のスクリプト</floater.string>
+	<floater.string name="ScriptsNotecardsA">1個のスクリプトまたはノートカード</floater.string>
+	<floater.string name="ScriptsNotecardsB">[COUNT]個のスクリプトとノートカード</floater.string>
+	<floater.string name="SearchReplaced">[SCRIPTS]で[PLACES]を置換しました</floater.string>
+	<floater.string name="SearchReplacedOpened">[SCRIPTS]を未保存の変更付きで開きました</floater.string>
+	<floater.string name="SearchReplacedLeft">[SCRIPTS]をスキップしました（検索後に変更されたため）</floater.string>
+	<floater.string name="SearchReplaceNothing">置換するものはありません。</floater.string>
+	<floater.string name="SearchNoObject">オブジェクトが選択されていません</floater.string>
+	<floater.string name="SearchNoObjectTip">オブジェクトからスクリプトを開くか、エクスプローラーでオブジェクトを選択すると、その中身を検索できます</floater.string>
+	<floater.string name="SearchObjectTip">[OBJECT]：[FILES]で[HITS]</floater.string>
+	<floater.string name="OutputCopiedA">1行コピーしました。</floater.string>
+	<floater.string name="OutputCopiedB">[COUNT]行コピーしました。</floater.string>
+	<floater.string name="OutputNothingToCopy">コピーできる表示内容がありません。</floater.string>
+	<floater.string name="SearchNone">見つかりませんでした</floater.string>
+	<floater.string name="SearchBadPattern">パターンが正しくありません</floater.string>
+	<floater.string name="PaneInspector">インスペクター</floater.string>
+	<floater.string name="KindObject">オブジェクト</floater.string>
+	<floater.string name="KindLinkset">リンクセット</floater.string>
+	<floater.string name="KindPrim">プリム</floater.string>
+	<floater.string name="KindAway">視界外</floater.string>
+	<floater.string name="RunningYes">実行中</floater.string>
+	<floater.string name="RunningNo">停止中</floater.string>
+	<floater.string name="ObjectUnnamed">（名前なし）</floater.string>
+	<floater.string name="ExplorerEmptyPrims">空のプリム[COUNT]個</floater.string>
+	<floater.string name="StateUnknown">読み込んでいます…</floater.string>
+	<floater.string name="TransferGoing">インベントリ経由で[NAME]にアイテムを移動しています…</floater.string>
+	<floater.string name="TransferDoneA">インベントリ経由で[NAME]に1個のアイテムを移動しました。途中で作られたコピーは「ごみ箱」＞「オブジェクト間の受け渡し」にあります。</floater.string>
+	<floater.string name="TransferDoneB">インベントリ経由で[NAME]に[COUNT]個のアイテムを移動しました。途中で作られたコピーは「ごみ箱」＞「オブジェクト間の受け渡し」にあります。</floater.string>
+	<floater.string name="TransferNone">[NAME]には何も移動されませんでした。</floater.string>
+	<floater.string name="TransferFailed">[NAME]にアイテムを移動できませんでした：[ERROR]。</floater.string>
+	<floater.string name="TransferRefused">移動できませんでした：[REFUSED]。</floater.string>
+	<floater.string name="TransferLost">届きませんでした：[LOST]。「ごみ箱」＞「オブジェクト間の受け渡し」を確認してください。</floater.string>
+	<floater.string name="TransferStranded">届きましたが[NAME]に受け入れられませんでした：[STRANDED]。「ごみ箱」＞「オブジェクト間の受け渡し」を確認してください。</floater.string>
+	<floater.string name="DropNotYours">[NAME]の中身を変更することはできません。</floater.string>
+	<floater.string name="DropFromNotecard">ノートカード内のアイテムはオブジェクトに入れられません。</floater.string>
+	<floater.string name="DropNotTransferable">このアイテムは[NAME]に渡せません。</floater.string>
+	<floater.string name="DropRefused">[NAME]はこれを受け入れられません。</floater.string>
+	<floater.string name="ExperienceNone">体験なし</floater.string>
+	<floater.string name="ExperienceLoading">読み込んでいます…</floater.string>
+	<floater.string name="ExperienceAsking">体験：読み込んでいます…</floater.string>
+	<floater.string name="ExperienceUnknown">体験：不明</floater.string>
+	<floater.string name="ExperienceSetOnSave">[NAME]は保存後に[EXPERIENCE]を使用します。</floater.string>
+	<floater.string name="ExperienceClearedOnSave">[NAME]は保存後に体験を使用しなくなります。</floater.string>
+	<floater.string name="NewKindScript">スクリプト</floater.string>
+	<floater.string name="NewKindLua">SLuaスクリプト</floater.string>
+	<floater.string name="NewKindNotecard">ノートカード</floater.string>
+	<floater.string name="NewScriptName">新規スクリプト</floater.string>
+	<floater.string name="TemplatesTitle">新規スクリプト</floater.string>
+	<floater.string name="TemplatesPlaceholder">ひな形を選択…</floater.string>
+	<floater.string name="TemplateOwn">自分のテンプレート</floater.string>
+	<floater.string name="TemplateOwnDetail">Script Studio設定の「テンプレート」タブから</floater.string>
+	<floater.string name="TemplateGrid">グリッドのデフォルト</floater.string>
+	<floater.string name="TemplateGridDetail">他の場所で作成する新規スクリプトと同じ</floater.string>
+	<floater.string name="NewNotecardName">新規ノート</floater.string>
+	<floater.string name="CreateFailed">[NAME]を作成できませんでした：[ERROR]</floater.string>
+	<floater.string name="Recompiling">[NAME]を再コンパイルしています…</floater.string>
+	<floater.string name="SavedNotecard">[NAME]を保存しました。</floater.string>
+	<floater.string name="Preflight">保存前に[NAME]をチェックしています…</floater.string>
+	<floater.string name="PreflightErrorsA">チェッカーが[NAME]に1件のエラーを見つけました。それでもコンパイルするには、もう一度保存してください。</floater.string>
+	<floater.string name="PreflightErrorsB">チェッカーが[NAME]に[COUNT]件のエラーを見つけました。それでもコンパイルするには、もう一度保存してください。</floater.string>
+	<floater.string name="SentWithErrorsA">チェッカーが見つけたエラー1件を含んだまま[NAME]をリージョンに送信しました。最終的な結果はリージョンのコンパイル結果です。</floater.string>
+	<floater.string name="SentWithErrorsB">チェッカーが見つけたエラー[COUNT]件を含んだまま[NAME]をリージョンに送信しました。最終的な結果はリージョンのコンパイル結果です。</floater.string>
+	<floater.string name="HoverExpected">ここで期待される型：[TYPE]</floater.string>
+	<floater.string name="InspectDeclared">[LINE]行目で宣言されています。</floater.string>
+	<floater.string name="InspectDeclaredTip">宣言へ移動します</floater.string>
+	<floater.string name="InspectDeclaredIn">[FILE]の[LINE]行目で宣言されています。</floater.string>
+	<floater.string name="InspectProblem">問題：[MESSAGE]</floater.string>
+	<floater.string name="NothingKnown">ここには[NAME]についての情報はありません。</floater.string>
+	<floater.string name="NoProblemsHere">[NAME]には問題はありません。</floater.string>
+	<floater.string name="NothingKnownBroken">「問題」にある構文エラーを修正するまで、[NAME]についての情報はありません。</floater.string>
+	<floater.string name="NoDefinition">[NAME]はこのスクリプトで定義されていません。</floater.string>
+	<floater.string name="IncludeNotFoundHere">[NAME]が見つかりません：プリプロセッサーの実行で見つかっておらず、インクルードフォルダーにもありません。</floater.string>
+	<floater.string name="ModuleNotFoundHere">モジュール[NAME]が見つかりません：プリプロセッサーの実行で見つかっておらず、インクルードフォルダーにもありません。</floater.string>
+	<floater.string name="ReferencesFoundA">[NAME]は1箇所にあります。</floater.string>
+	<floater.string name="ReferencesFoundB">[NAME]は[COUNT]箇所にあります。</floater.string>
+	<floater.string name="LookingAcrossA">オブジェクト内の他のスクリプト1個で[NAME]を探しています…</floater.string>
+	<floater.string name="LookingAcrossB">オブジェクト内の他のスクリプト[COUNT]個で[NAME]を探しています…</floater.string>
+	<floater.string name="ReferencesUnlistedA">一覧にない箇所があと1つあります</floater.string>
+	<floater.string name="ReferencesUnlistedB">一覧にない箇所があと[COUNT]箇所あります</floater.string>
+	<floater.string name="ReferencesFoundAcrossA">[FILES]個のスクリプトで[NAME]が1箇所見つかりました。</floater.string>
+	<floater.string name="ReferencesFoundAcrossB">[FILES]個のスクリプトで[NAME]が[COUNT]箇所見つかりました。</floater.string>
+	<floater.string name="LevelError">エラー</floater.string>
+	<floater.string name="LevelWarning">警告</floater.string>
+	<floater.string name="LevelNote">注記</floater.string>
+	<floater.string name="NotRenamable">[NAME]はここでは名前を変更できません。</floater.string>
+	<floater.string name="RenameBadName">有効な名前ではありません：「[NAME]」</floater.string>
+	<floater.string name="DeleteItemAsk">オブジェクトから「[NAME]」を削除しますか？　この操作は元に戻せません。</floater.string>
+	<floater.string name="DeleteItemsAsk">[COUNT]個のアイテムをそれぞれのオブジェクトから削除しますか？　この操作は元に戻せません。</floater.string>
+	<floater.string name="RenameStale">名前の変更前にスクリプトが変更されました。もう一度お試しください。</floater.string>
+	<floater.string name="RenamedHere">[PLACES]を[NAME]に名前変更しました</floater.string>
+	<floater.string name="RenamedIn">[SCRIPTS]で[PLACES]を[NAME]に名前変更しました</floater.string>
+	<floater.string name="RenamedOpened">[SCRIPTS]を未保存の変更付きで開きました</floater.string>
+	<floater.string name="RenamedLeft">[SCRIPTS]をスキップしました：最後に読み込んだ後に変更されたか、編集できません</floater.string>
+	<floater.string name="RenameMissedA">[NAME]では、1箇所が変更されていたため名前変更されませんでした。</floater.string>
+	<floater.string name="RenameMissedB">[NAME]では、[COUNT]箇所が変更されていたため名前変更されませんでした。</floater.string>
+	<floater.string name="ReplaceMissedA">[NAME]では、1件の一致が検索後に変更されていたため置換されませんでした。</floater.string>
+	<floater.string name="ReplaceMissedB">[NAME]では、[COUNT]件の一致が検索後に変更されていたため置換されませんでした。</floater.string>
+	<floater.string name="RenameReserved">[NAME]は予約語のため、名前として使用できません。</floater.string>
+	<floater.string name="RenameClash">[NEW]に名前変更します。[NEW]はすでに[SCRIPT]で使われているため、衝突する可能性があります。</floater.string>
+	<floater.string name="RenameUnreached">[NAMES]をインクルードしている他のオブジェクト内のスクリプトは変更されません。</floater.string>
+	<floater.string name="LookupUnlistedA">オブジェクト内の１個のプリムが中身を一覧表示しなかったため、そのスクリプトは検索されませんでした。</floater.string>
+	<floater.string name="LookupUnlistedB">オブジェクト内の[COUNT]個のプリムが中身を一覧表示しなかったため、それらのスクリプトは検索されませんでした。</floater.string>
+	<floater.string name="LookupUnreadA">[NAMES]を読み込めなかったため、検索されませんでした。</floater.string>
+	<floater.string name="LookupUnreadB">[COUNT]個のスクリプトを読み込めなかったため、検索されませんでした：[NAMES]</floater.string>
+	<floater.string name="RenamePreviewHint">Shift+Enterを押すと、各変更を事前にプレビューできます。</floater.string>
+	<floater.string name="CaretPosition">[LINE]行、[COL]列</floater.string>
+	<floater.string name="SelectedLinesA">1行選択</floater.string>
+	<floater.string name="SelectedLinesB">[COUNT]行選択</floater.string>
+	<floater.string name="SelectedCharsA">1文字選択</floater.string>
+	<floater.string name="SelectedCharsB">[COUNT]文字選択</floater.string>
+	<floater.string name="ProblemErrorsA">エラー1件</floater.string>
+	<floater.string name="ProblemErrorsB">エラー[COUNT]件</floater.string>
+	<floater.string name="ProblemWarningsA">警告1件</floater.string>
+	<floater.string name="ProblemWarningsB">警告[COUNT]件</floater.string>
+	<floater.string name="MigrationLeftA">ＬＳＬからの残り１件</floater.string>
+	<floater.string name="MigrationLeftB">ＬＳＬからの残り[COUNT]件</floater.string>
+	<floater.string name="CrumbRootTip">[NAME]：クリックで先頭に移動します。矢印でスクリプトの宣言を一覧表示します</floater.string>
+	<floater.string name="CrumbTip">[NAME]へ移動します。矢印でこの階層の他の項目を一覧表示します</floater.string>
+	<floater.string name="GoToSymbolTitle">シンボルへ移動</floater.string>
+	<floater.string name="AllTabsTitle">すべてのタブ</floater.string>
+	<floater.string name="QuickOpenTitle">移動</floater.string>
+	<floater.string name="QuickOpenPlaceholder">スクリプト名、または「&gt;」とコマンドを入力：format、fold、vim、preprocess…</floater.string>
+	<floater.string name="QuickOpenRecent">最近開いたもの</floater.string>
+	<floater.string name="AllTabsPlaceholder">スクリプトまたはノートカードの名前を入力</floater.string>
+	<floater.string name="TabUnsaved">未保存</floater.string>
+	<floater.string name="GoToSymbolPlaceholder">シンボル名を入力</floater.string>
+	<floater.string name="GoToLineTitle">指定行へ移動</floater.string>
+	<floater.string name="VimHistoryTitle">[KIND]の履歴</floater.string>
+	<floater.string name="VimHistoryPlaceholder">入力して行を検索。Enterで実行、Shift+Enterで編集用に開きます</floater.string>
+	<floater.string name="VimNoAlternate">E23: 代替ファイルがありません</floater.string>
+	<floater.string name="VimNoSuchTab">E86: バッファ [NUMBER] はありません</floater.string>
+	<floater.string name="VimTabsMatch">E93: [NAME] に複数該当しました</floater.string>
+	<floater.string name="VimNoTabMatch">E94: [NAME] に該当するバッファはありません</floater.string>
+	<floater.string name="VimBadArgument">E474: 無効な引数です</floater.string>
+	<floater.string name="VimArgumentRequired">E471: 引数が必要です</floater.string>
+	<floater.string name="VimNotSaved">E37: 最後の変更が保存されていません（! を追加で上書き）</floater.string>
+	<floater.string name="VimNoFile">E484: ファイル [FILE] を開けません</floater.string>
+	<floater.string name="VimrcNotTaken">[WHENCE]：次のvimrcの行は無視されました</floater.string>
+	<floater.string name="VimrcNotMade">[FILE]にvimrcを作成できませんでした。</floater.string>
+	<floater.string name="VimNoFileName">E32: ファイル名がありません</floater.string>
+	<floater.string name="VimCannotChange">E21: 'modifiable' がオフなので、変更できません</floater.string>
+	<floater.string name="VimFileExists">E13: ファイルが存在します（! を追加で上書き）</floater.string>
+	<floater.string name="VimCannotWrite">E212: 書込み用にファイルを開けません: [FILE]</floater.string>
+	<floater.string name="VimWritten">[QUOTED] [LINES]L, [BYTES]B 書込み</floater.string>
+	<floater.string name="VimNoErrors">E42: エラーはありません</floater.string>
+	<floater.string name="VimNotInPath">E447: path には "[NAME]" というファイルがありません</floater.string>
+	<floater.string name="VimSuggestTitle">「[WORD]」の変更先</floater.string>
+	<floater.string name="VimSuggestPlaceholder">入力して絞り込み。Enterで選択したスペルを使います</floater.string>
+	<floater.string name="VimFileInfo">[QUOTED] [STATE][LINES] 行 --[PERCENT]%--</floater.string>
+	<floater.string name="GoToLinePlaceholder">行、または 行:列</floater.string>
+	<floater.string name="GoToLineHint">移動先の行番号を入力してください（[FIRST]～[COUNT]）。</floater.string>
+	<floater.string name="GoToLineGo">[LINE]行目へ移動します。</floater.string>
+	<floater.string name="GoToLineGoColumn">[LINE]行目の[COL]列目へ移動します。</floater.string>
+	<floater.string name="GoToLineNone">[LINE]行目はありません。最終行は[COUNT]行目です。</floater.string>
+	<floater.string name="RenameTitle">名前の変更</floater.string>
+	<floater.string name="RenamePlaceholder">新しい名前</floater.string>
+	<floater.string name="RenameHint">[NAME]の新しい名前を入力してください。</floater.string>
+	<floater.string name="RenameSame">名前はすでに[NAME]です。</floater.string>
+	<floater.string name="RenameToA">[NAME]の1箇所を[NEW]に名前変更します。</floater.string>
+	<floater.string name="RenameToB">[NAME]の[COUNT]箇所を[NEW]に名前変更します。</floater.string>
+	<floater.string name="RenameToAcross">[FILES]個のスクリプトで[NAME]の[COUNT]箇所を[NEW]に名前変更します。開いていないスクリプトは、変更が未保存の状態で開かれます。</floater.string>
+	<floater.string name="KindKeyword">キーワード</floater.string>
+	<floater.string name="KindVariable">変数</floater.string>
+	<floater.string name="KindParameter">パラメーター</floater.string>
+	<floater.string name="KindFunction">関数</floater.string>
+	<floater.string name="KindField">フィールド</floater.string>
+	<floater.string name="KindType">型</floater.string>
+	<floater.string name="KindConstant">定数</floater.string>
+	<floater.string name="KindEvent">イベント</floater.string>
+	<floater.string name="KindState">ステート</floater.string>
+	<floater.string name="KindLabel">ラベル</floater.string>
+	<floater.string name="KindModule">モジュール</floater.string>
+	<floater.string name="KindOwnerSay">所有者</floater.string>
+	<floater.string name="KindError">エラー</floater.string>
+	<floater.string name="KindSaid">発言</floater.string>
+	<floater.string name="KindSaidTo">あなたへの発言</floater.string>
+	<floater.string name="OriginRuntime">実行時</floater.string>
+	<floater.string name="OriginAny">すべての発生元</floater.string>
+	<floater.string name="ProblemsAllHiddenA">唯一の問題がフィルターで非表示になっています。</floater.string>
+	<floater.string name="ProblemsAllHiddenB">[COUNT]件の問題がすべてフィルターで非表示になっています。</floater.string>
+	<floater.string name="ProblemsUnlistedA">一覧にないものがあと1件</floater.string>
+	<floater.string name="ProblemsUnlistedB">一覧にないものがあと[COUNT]件</floater.string>
+	<floater.string name="ProblemsHiddenA">フィルターで非表示のものがあと1件</floater.string>
+	<floater.string name="ProblemsHiddenB">フィルターで非表示のものがあと[COUNT]件</floater.string>
+	<floater.string name="ProblemsCopiedA">問題を1件コピーしました。</floater.string>
+	<floater.string name="ProblemsCopiedB">問題を[COUNT]件コピーしました。</floater.string>
+	<floater.string name="ProblemNotesA">注記1件</floater.string>
+	<floater.string name="ProblemNotesB">注記[COUNT]件</floater.string>
+	<floater.string name="ProblemsIncludedBy">[FILE]（[NAME]がインクルード）</floater.string>
+	<floater.string name="ProblemsChecked">[OBJECT]内の[NAME]（開いていません）</floater.string>
+	<floater.string name="CheckNoObject">オブジェクト内のすべてのスクリプトをチェックするには、そのスクリプトのどれかを開くか、エクスプローラーでオブジェクトを選択してください。</floater.string>
+	<floater.string name="CheckingObject">[OBJECT]内のすべてのスクリプトをチェックしています…</floater.string>
+	<floater.string name="CheckObjectAway">[OBJECT]内のスクリプトをチェックできませんでした：オブジェクトが範囲外か、もう存在しません。</floater.string>
+	<floater.string name="CheckedObjectA">[OBJECT]内の1個のスクリプトをチェックしました</floater.string>
+	<floater.string name="CheckedObjectB">[OBJECT]内の[COUNT]個のスクリプトをチェックしました</floater.string>
+	<floater.string name="CheckedClean">問題なし</floater.string>
+	<floater.string name="CheckedOpenA">1個のスクリプトはタブで開かれているため、そこでチェックされます。</floater.string>
+	<floater.string name="CheckedOpenB">[COUNT]個のスクリプトはタブで開かれているため、そこでチェックされます。</floater.string>
+	<floater.string name="NoProblemsOpen">開いているスクリプトに問題はありません。</floater.string>
+	<floater.string name="NoProblemsIn">[NAME]に問題はありません。</floater.string>
+	<floater.string name="RepeatedTimes">（[COUNT]回）</floater.string>
+	<floater.string name="FilterErrors">エラー</floater.string>
+	<floater.string name="FilterErrorsCount">エラー（[COUNT]）</floater.string>
+	<floater.string name="FilterWarnings">警告</floater.string>
+	<floater.string name="FilterWarningsCount">警告（[COUNT]）</floater.string>
+	<floater.string name="FilterNotes">注記</floater.string>
+	<floater.string name="FilterNotesCount">注記（[COUNT]）</floater.string>
+	<floater.string name="RestoredTab">前回のタブを1個開き直しました。</floater.string>
+	<floater.string name="RestoredTabs">前回のタブを[COUNT]個開き直しました。</floater.string>
+	<floater.string name="TabProblems">問題</floater.string>
+	<floater.string name="TabProblemsCount">問題（[COUNT]）</floater.string>
+	<floater.string name="TabReferences">参照</floater.string>
+	<floater.string name="TabReferencesCount">参照（[COUNT]）</floater.string>
+	<floater.string name="TabOutput">出力</floater.string>
+	<floater.string name="TabOutputUnread">出力 •</floater.string>
+	<floater.string name="TrailerLineTip">指定行へ移動（[KEYS]）</floater.string>
+	<floater.string name="TrailerLineTipNoKeys">指定行へ移動</floater.string>
+	<floater.string name="TrailerProblemsTip">問題を表示（[KEYS]）</floater.string>
+	<floater.string name="TrailerChecking">チェック中…</floater.string>
+	<floater.string name="TrailerCheckingTip">最新の変更をチェックしています。表示中の問題は前回のチェック結果です。</floater.string>
+	<floater.string name="TrailerProblemsTipNoKeys">問題を表示</floater.string>
+	<floater.string name="TrailerMigrationTip">ＬＳＬから対応が必要な残りを表示します：コンバーターの注記、ＬＳＬ特有の書き方、llcompatの呼び出し</floater.string>
+	<floater.string name="TrailerSource">ソース</floater.string>
+	<floater.string name="TrailerExpanded">プリプロセス済み</floater.string>
+	<floater.string name="TrailerSourceTip">ソースを表示中。クリックすると、サーバーがコンパイルするコードである「プリプロセス済み」表示に切り替えます（[KEYS]）</floater.string>
+	<floater.string name="TrailerSourceTipNoKeys">ソースを表示中。クリックすると、サーバーがコンパイルするコードである「プリプロセス済み」表示に切り替えます</floater.string>
+	<floater.string name="TrailerExpandedTip">サーバーがコンパイルするプリプロセス済みのコードを表示中（読み取り専用）。クリックするとソースに切り替えます（[KEYS]）</floater.string>
+	<floater.string name="TrailerExpandedTipNoKeys">サーバーがコンパイルするプリプロセス済みのコードを表示中（読み取り専用）。クリックするとソースに切り替えます</floater.string>
+	<floater.string name="TrailerPreprocessedDirectives">保存時にプリプロセスされます：サーバーが他の方法ではコンパイルできないディレクティブを含んでいるためです。</floater.string>
+	<floater.string name="TrailerPreprocessedSetting">保存時にプリプロセスされます：「ビルド」＞「保存時にプリプロセス」がオンです。</floater.string>
+	<floater.string name="TrailerNotPreprocessed">保存時にプリプロセスしない</floater.string>
+	<floater.string name="TrailerNotPreprocessedTip">保存すると、このスクリプトはプリプロセッサーの外枠なしで書かれたとおりに送信されます：ディレクティブがなく、「ビルド」＞「保存時にプリプロセス」がオフのためです。「プリプロセス済み」表示は、プリプロセッサーが生成する内容を示すもので、実際に送信される内容ではありません。</floater.string>
+	<floater.string name="ReferenceDeclaration">宣言</floater.string>
+	<floater.string name="ReferenceDeclarationTip">[NAME]が宣言されている場所</floater.string>
+	<floater.string name="OutlineNoMatch">入力した内容に一致するシンボル名はありません。</floater.string>
+	<floater.string name="OutputAllObjects">すべてのオブジェクト</floater.string>
+	<floater.string name="OutputOpenScripts">ここで開いているスクリプト</floater.string>
+	<floater.string name="OutputMyObjects">自分のオブジェクト</floater.string>
+	<floater.string name="OutputStudioShow">[NAME]を表示</floater.string>
+	<floater.string name="OutputOpen">[NAME]を開く</floater.string>
+	<floater.string name="OutputOpenAtLine">[NAME]を[LINE]行目で開く</floater.string>
+	<floater.string name="OutputAtLine">（[LINE]行目）</floater.string>
+	<floater.string name="TabInventoryTip">インベントリ内のスクリプト</floater.string>
+	<floater.string name="TabObjectTip">オブジェクトの中身にあるスクリプト</floater.string>
+	<floater.string name="TabNotecardTip">ノートカード（プレーンテキスト）</floater.string>
+	<floater.string name="TabReadOnlyTip">読み取り専用：閲覧はできますが変更はできません</floater.string>
+	<floater.string name="TrailerReadOnly">読み取り専用</floater.string>
+	<floater.string name="ReadAsSLua">[NAME]はSLuaとして扱われるようになり、保存時にSLuaとしてコンパイルされます</floater.string>
+	<floater.string name="ReadAsLSL">[NAME]はＬＳＬとして扱われるようになり、保存時にＬＳＬとしてコンパイルされます</floater.string>
+	<floater.string name="ScriptItemDropName">名前を挿入：[TEXT]。Shiftを押しているとキーを挿入します</floater.string>
+	<floater.string name="ScriptItemDropKey">キーを挿入：[TEXT]</floater.string>
+	<floater.string name="ScriptItemDropNoKey">キーを挿入できません：アイテムがフル権限ではありません。Shiftを離すと名前を挿入します</floater.string>
+	<floater.string name="ScriptItemDropReadOnly">このスクリプトは読み取り専用です</floater.string>
+	<floater.string name="TrailerIndentSpaces">スペース：[WIDTH]</floater.string>
+	<floater.string name="TrailerIndentTabs">タブ幅：[WIDTH]</floater.string>
+	<floater.string name="TrailerIndentTipText">このスクリプトの行から検出したインデントです。クリックで変更または変換します</floater.string>
+	<floater.string name="TrailerIndentTipDefaults">初期設定のデフォルトのインデントです（スクリプトからは検出されませんでした）。クリックで変更または変換します</floater.string>
+	<floater.string name="TrailerIndentTipChosen">このスクリプト用に設定したインデントです。クリックで変更または変換します</floater.string>
+	<floater.string name="IndentReadAgain">スクリプトからインデントを検出</floater.string>
+	<floater.string name="IndentToDefault">デフォルトのインデントを使用</floater.string>
+	<floater.string name="TrailerReadOnlyTip">このスクリプトは閲覧できますが、変更はできません</floater.string>
+	<floater.string name="OriginPreprocessor">プリプロセッサー</floater.string>
+	<floater.string name="OriginOptimizer">オプティマイザー</floater.string>
+	<floater.string name="Preprocessing">[NAME]をプリプロセスしています…</floater.string>
+	<floater.string name="Preprocessed">[NAME]をプリプロセスしました。</floater.string>
+	<floater.string name="PreprocessedPendingA">[NAME]をプリプロセスしました。1個のインクルードを取得できませんでした：[FILES]</floater.string>
+	<floater.string name="PreprocessedPendingB">[NAME]をプリプロセスしました。[COUNT]個のインクルードを取得できませんでした：[FILES]</floater.string>
+	<floater.string name="PreprocessMissingDiskRoute">インクルードはディスク上のフォルダーからのみ読み込まれ、オブジェクトやインベントリからは読み込まれません。「ビルド」＞「ディスクからインクルード」をオンにし、「ビルド」＞「インクルードフォルダーを追加…」でフォルダーを追加してください。</floater.string>
+	<floater.string name="SavingWithoutA">1個のインクルードなしで[NAME]を保存しています：[FILES]。その内容はアップロードに含まれません。</floater.string>
+	<floater.string name="SavingWithoutB">[COUNT]個のインクルードなしで[NAME]を保存しています：[FILES]。それらの内容はアップロードに含まれません。</floater.string>
+	<floater.string name="SavingWithErrorsA">作業内容を失わないよう、プリプロセッサーのエラー1件を含んだまま[NAME]を保存しています。詳細は「問題」を参照してください。</floater.string>
+	<floater.string name="SavingWithErrorsB">作業内容を失わないよう、プリプロセッサーのエラー[COUNT]件を含んだまま[NAME]を保存しています。詳細は「問題」を参照してください。</floater.string>
+	<floater.string name="SaveAnyway">それでも保存</floater.string>
+	<floater.string name="RecoveryWriteFailed">[NAME]のクラッシュ復旧用コピーを保存できませんでした：復旧フォルダーに書き込めません。</floater.string>
+	<floater.string name="RecoveryReadFailed">[NAME]のクラッシュ復旧用コピーを読み込めませんでした：復旧フォルダー内のファイルが見つからないか、破損しています。</floater.string>
+	<floater.string name="KeepFailed">すべての未保存の変更を次回用に保持できなかったため、ビューアは終了しませんでした。開いているタブを保存またはエクスポートするか、もう一度終了して「保存しない」を選択してください。</floater.string>
+	<floater.string name="OfflineKeptA">切断されました：未保存のスクリプトまたはノートカード1個をこのコンピューターに保持し、次回のログイン時に復元を提案します。</floater.string>
+	<floater.string name="OfflineKeptB">切断されました：未保存のスクリプトとノートカード[COUNT]個をこのコンピューターに保持し、次回のログイン時に復元を提案します。</floater.string>
+	<floater.string name="OrphanAwayKept">[NAME]を含むオブジェクトが視界外です。未保存の変更は保持されています。</floater.string>
+	<floater.string name="OrphanRemovedKept">[NAME]は削除されました。タブは開いたままで、未保存の変更はこのコンピューターに保持されています。</floater.string>
+	<floater.string name="OrphanBack">[NAME]を再び保存できるようになりました。</floater.string>
+	<floater.string name="OrphanLockedKept">[NAME]を修正できなくなりました。未保存の変更はタブにあります。コピーを保存するか、エクスポートしてください。</floater.string>
+	<floater.string name="ItemRemovedClosed">[NAME]はオブジェクトから削除されました。タブに未保存の変更がなかったため、閉じました。</floater.string>
+	<floater.string name="NoticeRecoverable">以前のセッション（[WHEN]）の未保存の変更が見つかりました。</floater.string>
+	<floater.string name="NoticeRecoverableStale">以前のセッション（[WHEN]）の未保存の変更が見つかりました。最後の保存より前に行われたものです。</floater.string>
+	<floater.string name="NoticeAway">これを含むオブジェクトが視界外です（削除された、返却された、または範囲外）。戻ってくるまで保存は待機します。このタブのテキストは保持されます。</floater.string>
+	<floater.string name="NoticeRemoved">これはもうオブジェクト内にありません。このタブのテキストは保持されます。恒久的に残すにはコピーを保存してください。</floater.string>
+	<floater.string name="NoticeRemovedInventory">これはもうインベントリ内にありません。このタブのテキストは保持されます。恒久的に残すにはコピーを保存してください。</floater.string>
+	<floater.string name="NoticeOffline">切断されました：何も保存できません。このタブのテキストはこのコンピューターに保持され、次回のログイン時に復元を提案します。</floater.string>
+	<floater.string name="NoticeTrashed">これはごみ箱にあります。ごみ箱を空にするまでは保存できます。</floater.string>
+	<floater.string name="NoticeFileGone">[FILE]はもうディスク上に存在しません。保存すると再作成されます。</floater.string>
+	<floater.string name="NoticeLocked">これを修正できなくなりました。このタブのテキストは保持されます。恒久的に残すにはコピーを保存してください。</floater.string>
+	<floater.string name="NoticeUnloaded">これを読み込めませんでした（[ERROR]）。このタブのテキストは保持されます。再試行するか、恒久的に残すにはコピーを保存してください。</floater.string>
+	<floater.string name="NoticeRestore">復元する</floater.string>
+	<floater.string name="NoticeRestoreTip">未保存の変更を1回の取り消し操作として復元します</floater.string>
+	<floater.string name="NoticeRestoreSave">この保存を復元</floater.string>
+	<floater.string name="NoticeRestoreSaveTip">この保存を1回の取り消し操作としてタブに入れます。保存するまでは保存されません</floater.string>
+	<floater.string name="NoticeDiscard">破棄</floater.string>
+	<floater.string name="NoticeCompiledDiffers">このスクリプトに保存されているプリプロセス済みのコードがソースと一致しません：直接編集されたか、インクルードが変更されました。保存すると置き換えられます。</floater.string>
+	<floater.string name="NoticeKeepSource">ソースを維持</floater.string>
+	<floater.string name="NoticeTakeCompiled">プリプロセス済みのコードを使用</floater.string>
+	<floater.string name="NoticeCompare">比較</floater.string>
+	<floater.string name="NoticeCompareTip">両方のテキストを変更箇所を示して並べて表示します。Escキーで比較を閉じます</floater.string>
+	<floater.string name="NoticeMerge">マージ</floater.string>
+	<floater.string name="NoticeMergeTip">もう一方のバージョンだけが変更した部分を取り込み、比較画面で競合を1つずつ解決します。「取り消し」でマージを元に戻せます</floater.string>
+	<floater.string name="CompareNow">現在のこのタブ</floater.string>
+	<floater.string name="CompareUnsaved">[TITLE]（未保存）</floater.string>
+	<floater.string name="FixAllAfter">[FIXES]の適用後</floater.string>
+	<floater.string name="ConvertName">[NAME]（SLua）</floater.string>
+	<floater.string name="ConvertLSLTitle">[NAME]（ＬＳＬ）</floater.string>
+	<floater.string name="ConvertExpandedTitle">[NAME]（プリプロセッサーが生成したＬＳＬ）</floater.string>
+	<floater.string name="ConvertSLuaTitle">SLuaで記述</floater.string>
+	<floater.string name="ConvertNotesA">注記1箇所</floater.string>
+	<floater.string name="ConvertNotesB">注記[COUNT]箇所</floater.string>
+	<floater.string name="Converted">[NAME]をSLuaとして、ＬＳＬの隣の新しいスクリプト[NEW]（未保存）に書き出しました：「-- LSL:」コメント付きの[NOTES]。ＬＳＬスクリプトは元のままです。書き出し方法：初期設定の「ＬＳＬからSLua」。</floater.string>
+	<floater.string name="ConvertedExpanded">[NAME]をプリプロセッサーが生成した内容からSLuaとして、その隣の新しいスクリプト[NEW]（未保存）に書き出しました：「-- LSL:」コメント付きの[NOTES]。ＬＳＬスクリプトは元のままです。</floater.string>
+	<floater.string name="ConvertFailed">[NAME]をSLuaとして書き出せませんでした：[LINE]行目、[ERROR]。</floater.string>
+	<floater.string name="RenameAfter">[NAME]に名前変更しました</floater.string>
+	<floater.string name="RenameChangesNotHere">[SCRIPT]はここで開かれていないか、検索後に変更されています。該当箇所は「参照」に一覧表示されています。</floater.string>
+	<floater.string name="FixAllPreviewed">[NAME]の[FIXES]をテキストの隣に表示しています。「適用」を押すと、1回の取り消し操作として適用されます。</floater.string>
+	<floater.string name="FixAllNotPreviewed">適用待ちのプレビューはありません。修正を表示するには、もう一度修正を要求してください。</floater.string>
+	<floater.string name="FixAllNotMade">修正は適用されませんでした：テキストに適用できませんでした。</floater.string>
+	<floater.string name="FixAllChangedSince">プレビュー後にテキストが変更されたため、修正は適用されませんでした。現在のテキストに対する修正を表示するには、もう一度「すべて修正」を使用してください。</floater.string>
+	<floater.string name="ActionApplyFixes">適用</floater.string>
+	<floater.string name="ActionApplyFixesTip">[NAME]でプレビューした修正を、1回の取り消し操作として適用します</floater.string>
+	<floater.string name="NoticeApplyFixes">修正を適用</floater.string>
+	<floater.string name="NoticeApplyFixesTip">表示された修正を、1回の取り消し操作として適用します</floater.string>
+	<floater.string name="MigrationDone">[NAME]にはＬＳＬからの残りはありません。</floater.string>
+	<floater.string name="MigrationDoneStrict">[NAME]にはＬＳＬからの残りはありません。--!strictにすると、Luauが推論できるすべての型がチェックされます。</floater.string>
+	<floater.string name="ActionMakeStrict">--!strictにする</floater.string>
+	<floater.string name="ActionMakeStrictTip">[NAME]の先頭に--!strictを追加します</floater.string>
+	<floater.string name="NoticeMakeStrict">--!strictにする</floater.string>
+	<floater.string name="NoticeMakeStrictTip">スクリプトの先頭に--!strictを追加します</floater.string>
+	<floater.string name="HistoryNone">[NAME]の保存履歴はまだありません。今後の保存は30日間保持されます。</floater.string>
+	<floater.string name="HistoryTitle">[NAME]の保存履歴</floater.string>
+	<floater.string name="HistoryPlaceholder">日付や時刻を入力して保存を検索</floater.string>
+	<floater.string name="HistoryBytesA">1バイト</floater.string>
+	<floater.string name="HistoryBytesB">[COUNT]バイト</floater.string>
+	<floater.string name="HistoryLongerA">前回の保存より1バイト長い</floater.string>
+	<floater.string name="HistoryLongerB">前回の保存より[COUNT]バイト長い</floater.string>
+	<floater.string name="HistoryShorterA">前回の保存より1バイト短い</floater.string>
+	<floater.string name="HistoryShorterB">前回の保存より[COUNT]バイト短い</floater.string>
+	<floater.string name="HistorySameLength">前回の保存と同じ長さ</floater.string>
+	<floater.string name="HistoryCurrent">現在保存されている内容</floater.string>
+	<floater.string name="HistorySavedAt">[WHEN]に保存</floater.string>
+	<floater.string name="HistoryUnreadable">[WHEN]の[NAME]の保存を読み込めませんでした。</floater.string>
+	<floater.string name="HistoryRestored">[WHEN]の[NAME]の保存を戻しました。「取り消し」で元に戻せます。保存するまでは保存されません。</floater.string>
+	<floater.string name="NoticeHistory">[WHEN]の保存を、このタブと並べて表示しています。</floater.string>
+	<floater.string name="CompareNotLoaded">比較用に[NAME]を読み込めませんでした：[ERROR]</floater.string>
+	<floater.string name="ExplorerCompareTitle">[NAME]と比較する対象</floater.string>
+	<floater.string name="ExplorerComparePlaceholder">名前を入力してスクリプトまたはノートカードを検索</floater.string>
+	<floater.string name="ExplorerNothingToCompare">エクスプローラーには[NAME]と比較できる似た項目がありません。先にもう一方のオブジェクトを固定するか選択してください。</floater.string>
+	<floater.string name="CompareSaved">最後に保存した内容</floater.string>
+	<floater.string name="CompareAsset">保存済みのアセット（他のビューアで開いたときの内容）</floater.string>
+	<floater.string name="CompareWithTitle">[NAME]と比較する対象</floater.string>
+	<floater.string name="PeekNoChange">スクリプトの保存後、キャレットのある行は変更されていません。</floater.string>
+	<floater.string name="NoChangeAfter">この行より後の保存以降、変更はありません。</floater.string>
+	<floater.string name="NoChangeBefore">この行より前の保存以降、変更はありません。</floater.string>
+	<floater.string name="ComparePreprocessed">プリプロセス済み（保存時に送信される内容）</floater.string>
+	<floater.string name="SelectionLine">[NAME]、[FIRST]行目</floater.string>
+	<floater.string name="SelectionLines">[NAME]、[FIRST]～[LAST]行目</floater.string>
+	<floater.string name="SelectionHeld">比較用に[TITLE]を保持しています。ここか別のタブで他の部分を選択してから、「表示」＞「保持した選択範囲と比較」を選んでください。</floater.string>
+	<floater.string name="CompareWithPlaceholder">入力してタブ、ファイル、オブジェクト内のスクリプトを検索</floater.string>
+	<floater.string name="CompareWithSavedDetail">最後に保存したときのこのタブのテキスト</floater.string>
+	<floater.string name="CompareWithSavedThereDetail">他の場所から上書き保存された内容</floater.string>
+	<floater.string name="CompareWithTab">開いているタブ</floater.string>
+	<floater.string name="CompareWithTabUnsaved">開いているタブ（未保存）</floater.string>
+	<floater.string name="CompareClipboard">クリップボード</floater.string>
+	<floater.string name="CompareWithLinesA">1行</floater.string>
+	<floater.string name="CompareWithLinesB">[COUNT]行</floater.string>
+	<floater.string name="CompareWithClipboardEmpty">クリップボードに比較できるテキストがありません。</floater.string>
+	<floater.string name="CompareTabClosed">[NAME]は開かれていないため比較できません。</floater.string>
+	<floater.string name="CompareSavedThereGone">他の場所で保存されたバージョンはもう存在しないため、比較できません。</floater.string>
+	<floater.string name="CompareTabSnapshot">[NAME]（その時点の内容）</floater.string>
+	<floater.string name="CompareWithFile">ディスク上のファイル…</floater.string>
+	<floater.string name="CompareWithFileDetail">比較するファイルを選択します</floater.string>
+	<floater.string name="CompareWithHistory">ローカル履歴…</floater.string>
+	<floater.string name="CompareWithSavesA">保存1件を保持</floater.string>
+	<floater.string name="CompareWithSavesB">保存[COUNT]件を保持</floater.string>
+	<floater.string name="CompareNothingSaved">比較できる保存済みのテキストがありません：最後の保存より前まで取り消してから変更を加えたためです。</floater.string>
+	<floater.string name="CompareKept">未保存の変更、[WHEN]</floater.string>
+	<floater.string name="CompareCompiled">プリプロセス済みのコード（保存時の内容）</floater.string>
+	<floater.string name="CompareMade">現在のソースからプリプロセスした内容</floater.string>
+	<floater.string name="NoticeKeepSourceTip">ソースを維持します。次回の保存時に、ソースからプリプロセス済みのコードを再構築します</floater.string>
+	<floater.string name="NoticeTakeCompiledTip">ソースをプリプロセス済みのコードで置き換えます（1回の取り消し操作）</floater.string>
+	<floater.string name="NoticeDiscardTip">未保存の変更を破棄します。「ファイル」＞「未保存の変更を復旧」で1週間は保持されます</floater.string>
+	<floater.string name="NoticeCopy">コピーを保存</floater.string>
+	<floater.string name="NoticeCopyTip">このタブのテキストを新しいインベントリアイテムとして保存し、このタブを閉じます</floater.string>
+	<floater.string name="NoticeExport">エクスポート…</floater.string>
+	<floater.string name="NoticeExportTip">このタブのテキストをこのコンピューター上のファイルに保存します</floater.string>
+	<floater.string name="NoticeSaveAgain">もう一度保存</floater.string>
+	<floater.string name="NoticeSaveAgainTip">元の場所にファイルをもう一度保存します</floater.string>
+	<floater.string name="NoticeTryAgain">再試行</floater.string>
+	<floater.string name="NoticeTryAgainTip">スクリプトを再読み込みしてから、このタブのテキストを上書きで戻します</floater.string>
+	<floater.string name="NoticeSaveAnyway">それでも保存</floater.string>
+	<floater.string name="NoticeSaveAnywayTip">保存を妨げた原因を無視して、このタブのテキストを保存します</floater.string>
+	<floater.string name="NoticeRetrySave">再試行</floater.string>
+	<floater.string name="NoticeRetrySaveTip">もう一度保存します</floater.string>
+	<floater.string name="NoticeReload">再読み込み</floater.string>
+	<floater.string name="NoticeReloadTip">保存済みのバージョンを再読み込みします。変更内容は「ファイル」＞「未保存の変更を復旧」に残ります</floater.string>
+	<floater.string name="NoticeTakeExternal">外部エディターの内容を採用</floater.string>
+	<floater.string name="NoticeTakeExternalTip">外部エディターのバージョンを使用して保存します。「取り消し」で変更内容を復元できます</floater.string>
+	<floater.string name="NoticeKeepHere">このバージョンを維持</floater.string>
+	<floater.string name="NoticeKeepHereTip">外部エディターの保存を無視します。次回の保存でそのファイルを上書きします</floater.string>
+	<floater.string name="NoticeTakeSaved">相手の変更を採用</floater.string>
+	<floater.string name="NoticeTakeSavedTip">他の場所で保存されたバージョンを使用します。「取り消し」で変更内容を復元できます</floater.string>
+	<floater.string name="NoticeKeepSaved">自分の変更を残す</floater.string>
+	<floater.string name="NoticeKeepSavedTip">変更内容を維持します。保存すると、他の場所で保存されたバージョンを置き換えます</floater.string>
+	<floater.string name="SaveBlockedAway">オブジェクトが視界外にある間は[NAME]を保存できません。コピーを保存するか、エクスポートしてください。</floater.string>
+	<floater.string name="SaveBlockedRemoved">[NAME]は削除されたため保存できません。コピーを保存するか、エクスポートしてください。</floater.string>
+	<floater.string name="SaveBlockedOffline">切断されました：[NAME]を保存できません。次回のログインまで保持されます。</floater.string>
+	<floater.string name="SaveBlockedLocked">[NAME]を修正できなくなりました。コピーを保存するか、エクスポートしてください。</floater.string>
+	<floater.string name="SaveBlockedUnloaded">[NAME]を読み込めませんでした。今保存すると、まだ見ていないテキストを上書きする可能性があります。再試行するか、コピーを保存してください。</floater.string>
+	<floater.string name="SaveWaitsForLoad">先に[NAME]を読み込んでから、このタブのテキストを上書きで戻します。読み込みが完了したら、もう一度保存してください。</floater.string>
+	<floater.string name="PopOutWhileSaving">[NAME]は保存中です。保存が完了してから移動してください。</floater.string>
+	<floater.string name="MoveToWindow">[WINDOW]に移動</floater.string>
+	<floater.string name="CopyingTo">[NAME]のコピーをインベントリに保存しています…</floater.string>
+	<floater.string name="CopiedTo">[NAME]のコピーをインベントリに保存しました。元のタブは閉じました。</floater.string>
+	<floater.string name="CopiedToKeptOpen">[NAME]のコピーをインベントリに保存しました。コピーの保存中に変更されたため、元のタブは開いたままです。</floater.string>
+	<floater.string name="RecoverTitle">未保存の変更</floater.string>
+	<floater.string name="RecoverPlaceholder">Enterで選択した項目を変更付きで開き、Shift+Enterで破棄します</floater.string>
+	<floater.string name="RecoverUnsaved">ビューアが停止したときに未保存だったもの</floater.string>
+	<floater.string name="RecoverKept">次回用に保持</floater.string>
+	<floater.string name="RecoverDiscarded">破棄済み</floater.string>
+	<floater.string name="RecoverNone">以前のセッションの未保存の変更はなく、最近破棄したものもありません。</floater.string>
+	<floater.string name="RecoveryReopenedA">前回保持したスクリプト1個を、未保存の変更付きで開き直しました。</floater.string>
+	<floater.string name="RecoveryReopenedB">前回保持したスクリプト[COUNT]個を、未保存の変更付きで開き直しました。</floater.string>
+	<floater.string name="RecoveryRestored">[NAME]の未保存の変更を復元しました。「取り消し」で削除できます。</floater.string>
+	<floater.string name="CompiledTaken">[NAME]はプリプロセス済みのコードをソースとして使用するようになりました。「取り消し」で元に戻せます。</floater.string>
+	<floater.string name="RecoveryStale">これらの変更の後に[NAME]が保存されています：変更を保存するとそのバージョンが置き換えられ、「保存した状態に戻す」で元に戻せます。</floater.string>
+	<floater.string name="RecoveryDiscarded">[NAME]の未保存の変更を破棄しました。「ファイル」＞「未保存の変更を復旧」で1週間は保持されます。</floater.string>
+	<floater.string name="RecoveryGone">[NAME]の破棄した変更を完全に削除しました。</floater.string>
+	<floater.string name="ActionRetry">再試行</floater.string>
+	<floater.string name="ActionRetryTip">[NAME]をもう一度保存します</floater.string>
+	<floater.string name="ActionCopy">コピーをインベントリに保存</floater.string>
+	<floater.string name="ActionCopyTip">[NAME]のテキストを新しいアイテムとしてインベントリに保存します</floater.string>
+	<floater.string name="ExternalConflict">[NAME]は外部エディターで保存されましたが、このタブにはそのコピーにない変更があります。何も置き換えていません。どちらかを選択してください：</floater.string>
+	<floater.string name="ExternalKept">[NAME]はこのタブのバージョンを維持しました。外部エディターの保存は無視され、次回の保存でそのファイルを上書きします。</floater.string>
+	<floater.string name="ActionTakeExternal">外部エディターの内容を採用</floater.string>
+	<floater.string name="ActionTakeExternalTip">外部エディターの[NAME]のバージョンを使用して保存します。「取り消し」で変更内容を復元できます</floater.string>
+	<floater.string name="ActionKeepHere">このバージョンを維持</floater.string>
+	<floater.string name="ActionKeepHereTip">外部エディターによる[NAME]の保存を無視します。次回の保存でそのファイルを上書きします</floater.string>
+	<floater.string name="ActionTakeSaved">相手の変更を採用</floater.string>
+	<floater.string name="ActionTakeSavedTip">他の場所で保存された[NAME]のバージョンを使用します。「取り消し」で変更内容を復元できます</floater.string>
+	<floater.string name="ActionKeepSaved">自分の変更を残す</floater.string>
+	<floater.string name="ActionKeepSavedTip">変更内容を維持します。[NAME]を保存すると、他の場所で保存されたバージョンを置き換えます</floater.string>
+	<floater.string name="ActionCompareSaved">比較</floater.string>
+	<floater.string name="ActionCompareSavedTip">他の場所で保存されたバージョンとこのタブを比較します</floater.string>
+	<floater.string name="ActionMergeSaved">マージ</floater.string>
+	<floater.string name="ActionMergeSavedTip">他の場所で保存されたバージョンだけが変更した部分を[NAME]に取り込み、比較画面で競合を1つずつ解決します</floater.string>
+	<floater.string name="SavedElsewhereConflict">このタブに未保存の変更がある間に、[NAME]が[WHO]で保存されました。</floater.string>
+	<floater.string name="SavedElsewhereKept">[NAME]の変更内容を維持しました。保存すると、他の場所で保存されたバージョンを置き換えます。</floater.string>
+	<floater.string name="LinkCompletion">リンク[LINK]</floater.string>
+	<floater.string name="KindAwayIn">最後に確認した場所：[REGION]</floater.string>
+	<floater.string name="KeysCopiedA">[KEYS]をコピーしました</floater.string>
+	<floater.string name="KeysCopiedB">[COUNT]個のキーを1行に1つずつコピーしました</floater.string>
+	<floater.string name="NoModifyMark">修正不可</floater.string>
+	<floater.string name="NoCopyMark">複製不可</floater.string>
+	<floater.string name="ScriptInObject">[OBJECT]内の[NAME]</floater.string>
+	<floater.string name="RecompilingMany">再コンパイルしています…</floater.string>
+	<floater.string name="RecompileNothing">再コンパイルするスクリプトがありません。</floater.string>
+	<floater.string name="RecompiledA">1個のスクリプトを再コンパイルしました（[TARGET]）</floater.string>
+	<floater.string name="RecompiledB">[COUNT]個のスクリプトを再コンパイルしました（[TARGET]）</floater.string>
+	<floater.string name="RecompiledAsTheyAre">ターゲットを変更せずに</floater.string>
+	<floater.string name="RecompiledForMono">ＬＳＬ（Mono）向けに</floater.string>
+	<floater.string name="RecompiledForLegacy">ＬＳＬ（LSO）向けに</floater.string>
+	<floater.string name="RecompiledForLuau">ＬＳＬ（Luau）向けに</floater.string>
+	<floater.string name="RecompiledCompiledA">1個コンパイル済み</floater.string>
+	<floater.string name="RecompiledCompiledB">[COUNT]個コンパイル済み</floater.string>
+	<floater.string name="RecompiledFailedA">1個失敗（「問題」を参照）</floater.string>
+	<floater.string name="RecompiledFailedB">[COUNT]個失敗（「問題」を参照）</floater.string>
+	<floater.string name="RecompiledNotSentA">1個送信できませんでした</floater.string>
+	<floater.string name="RecompiledNotSentB">[COUNT]個送信できませんでした</floater.string>
+	<floater.string name="RecompiledSkippedA">1個スキップ（保存中）</floater.string>
+	<floater.string name="RecompiledSkippedB">[COUNT]個スキップ（保存中）</floater.string>
+	<floater.string name="RecompileSkippedSaving">[NAME]は再コンパイルされませんでした：保存中のため、再コンパイルすると上書きされる可能性があります。</floater.string>
+	<floater.string name="RecompileUnsaved">[NAME]には未保存の変更があります。再コンパイルでは、それらを含まないサーバー上の保存済みバージョンを使用します。</floater.string>
+	<floater.string name="SavedByEditor">別のエディター</floater.string>
+	<floater.string name="SavedByQueue">再コンパイル</floater.string>
+	<floater.string name="SavedByFile">ディスク上のファイル</floater.string>
+	<floater.string name="MasterNotSLuaFile">[FILE]はSLuaファイルではありませんが、[NAME]はSLuaです。</floater.string>
+	<floater.string name="MasterNotLSLFile">[FILE]はＬＳＬファイルではありませんが、[NAME]はＬＳＬです。</floater.string>
+	<floater.string name="MasterNotNotecardFile">[FILE]はノートカード用のファイルではありません：ノートカードは.txt、.notecard、.jsonファイルにリンクされます。</floater.string>
+	<floater.string name="MasterNotecardCarries">[NAME]にはアイテムが含まれており、ディスク上のファイルにはそれを保持できないため、ファイルにリンクできません。</floater.string>
+	<floater.string name="MasterLinked">[NAME]は[FILE]にリンクされています：ファイルを保存するたびに送信されます。</floater.string>
+	<floater.string name="MasterLinkedBridge">VS Codeも[NAME]を保持しています：最後に保存した側の内容が反映されます。</floater.string>
+	<floater.string name="MasterLinkDiffers">現在は内容が異なります：次回の保存でファイルが送信され、[NAME]の内容は履歴に残ります。</floater.string>
+	<floater.string name="MasterUnlinked">[NAME]は[FILE]とのリンクが解除されました。</floater.string>
+	<floater.string name="MasterSaveFileFirst">送信する前に[NAME]を保存してください：アップロードされるのはディスク上のファイルです。</floater.string>
+	<floater.string name="MasterSendingA">[NAME]をスクリプトに送信しています。</floater.string>
+	<floater.string name="MasterSendingB">[NAME]を[COUNT]個のスクリプトに送信しています。</floater.string>
+	<floater.string name="MasterOpened">[NAME]は[FILE]にリンクされています：代わりにそのファイルを開きました。</floater.string>
+	<floater.string name="MasterHinted">[NAME]は[FILE]を自分のファイルとして指定しています。</floater.string>
+	<floater.string name="MasterHintUnsaved">[NAME]を指定のファイル[FILE]にリンクする前に、保存するか元に戻してください：ここで入力した内容はスクリプトにもファイルにも含まれていません。</floater.string>
+	<floater.string name="MasterSent">[FILE]から[NAME]を保存しました。</floater.string>
+	<floater.string name="MasterNotCompiled">[NAME]は[FILE]からアップロードされましたが、コンパイルされませんでした。</floater.string>
+	<floater.string name="MasterKeptTheirs">インワールドで保持していた（ファイルとは異なる）内容は履歴にあります。</floater.string>
+	<floater.string name="MasterSendFailed">[FILE]は[NAME]に送信されませんでした：[WHY]。</floater.string>
+	<floater.string name="MasterSkipped">[NAME]はすでに[FILE]の内容を保持しています。</floater.string>
+	<floater.string name="MasterHeld">[FILE]を最後に送信した後に[NAME]がインワールドで変更されたため、送信されませんでした。</floater.string>
+	<floater.string name="MasterDiffering">[NAME]は[WHO]によってインワールドで変更されました：もう[FILE]の内容ではありません。</floater.string>
+	<floater.string name="MasterSuspended">[NAME]の[FILE]へのリンクは保留中です：[WHY]。</floater.string>
+	<floater.string name="MasterOrphaned">[NAME]は元の場所からなくなりました。戻ってきた場合に備え、[FILE]へのリンクはしばらく保持されます。</floater.string>
+	<floater.string name="MasterPending">[FILE]は[NAME]に送信されませんでした：[WHY]。手動での送信を待っています。</floater.string>
+	<floater.string name="MasterRelinked">[NAME]は再び[FILE]にリンクされました。</floater.string>
+	<floater.string name="MasterNotWritten">[FILE]に書き込めなかったため、[NAME]はリンクされていません。入力した内容はここに残っています。</floater.string>
+	<floater.string name="MasterGaveWay">[NAME]は[FILE]にリンクされました：タブはファイルのタブに切り替わり、以後はそこで変更します。</floater.string>
+	<floater.string name="MasterLinkedUnsaved">[NAME]は[FILE]にリンクされましたが、ここで入力した内容はファイルに含まれていません：残すにはファイルにコピーするか、「リンクを解除」してここから保存してください。</floater.string>
+	<floater.string name="MasterLinkedClean">[NAME]は[FILE]にリンクされ、ここに未保存の内容は残っていません：ファイルに切り替えてそこで変更するか、「リンクを解除」してここから保存してください。</floater.string>
+	<floater.string name="MasterEditedOutside">[NAME]は[FILE]にリンクされています：代わりにそのファイルを外部エディターで開きました。</floater.string>
+	<floater.string name="MasterTargetChosen">[NAME]の次回の保存では、[TARGET]向けにコンパイルしたスクリプトを送信します。</floater.string>
+	<floater.string name="MasterExperienceChosen">[NAME]の次回の保存から、スクリプトは[EXPERIENCE]で実行されます。</floater.string>
+	<floater.string name="MasterExperienceCleared">[NAME]の次回の保存から、スクリプトは体験なしで実行されます。</floater.string>
+	<floater.string name="MasterNotRead">[NAME]と比較するために[FILE]を読み込めませんでした。</floater.string>
+	<floater.string name="MasterWorldNotRead">インワールドの[NAME]を読み込めませんでした：[WHY]</floater.string>
+	<floater.string name="MasterTookWorld">[FILE]にインワールドの[NAME]の内容を入れました（未保存）。「取り消し」で元に戻せます。</floater.string>
+	<floater.string name="MasterTookSame">[FILE]はすでにインワールドの[NAME]と同じ内容です。</floater.string>
+	<floater.string name="LinkHeadListing">[OBJECTS]の中身を問い合わせています…</floater.string>
+	<floater.string name="LinkHeadReading">[OBJECTS]のスクリプトを読み込んでいます：[COUNT]個中[DONE]個…</floater.string>
+	<floater.string name="LinkHeadMatchingA">1個のスクリプトのファイルをディスク上で探しています…</floater.string>
+	<floater.string name="LinkHeadMatchingB">[COUNT]個のスクリプトのファイルをディスク上で探しています…</floater.string>
+	<floater.string name="LinkHeadNone">[OBJECTS]にリンクできるスクリプトは残っていません</floater.string>
+	<floater.string name="LinkHeadFoundA">[OBJECTS]のスクリプト1個</floater.string>
+	<floater.string name="LinkHeadFoundB">[OBJECTS]のスクリプト[COUNT]個</floater.string>
+	<floater.string name="LinkHeadAlreadyA">1個はリンク済み</floater.string>
+	<floater.string name="LinkHeadAlreadyB">[COUNT]個はリンク済み</floater.string>
+	<floater.string name="LinkHeadUnreadA">1個は読み取れません</floater.string>
+	<floater.string name="LinkHeadUnreadB">[COUNT]個は読み取れません</floater.string>
+	<floater.string name="LinkHeadUnlistedA">1個のプリムが中身を報告しませんでした</floater.string>
+	<floater.string name="LinkHeadUnlistedB">[COUNT]個のプリムが中身を報告しませんでした</floater.string>
+	<floater.string name="LinkHeadChecking">インワールドと異なるものを確認中</floater.string>
+	<floater.string name="LinkFileNone">見つかりません：ファイルを選択してください</floater.string>
+	<floater.string name="LinkFileChooseA">ファイルを選択…</floater.string>
+	<floater.string name="LinkFileChooseB">[COUNT]個のファイルから選択…</floater.string>
+	<floater.string name="LinkHowHint">@file指定</floater.string>
+	<floater.string name="LinkHowNamed">スクリプトが指定</floater.string>
+	<floater.string name="LinkHowRecord">以前のリンク</floater.string>
+	<floater.string name="LinkHowOwnRecord">自身のリンク</floater.string>
+	<floater.string name="LinkHowName">名前</floater.string>
+	<floater.string name="LinkHowPicked">選択</floater.string>
+	<floater.string name="LinkWorldAsking">確認中…</floater.string>
+	<floater.string name="LinkWorldSame">同じ</floater.string>
+	<floater.string name="LinkWorldDiffers">異なる</floater.string>
+	<floater.string name="LinkWorldUnknown">判別不可</floater.string>
+	<floater.string name="LinkTipHint">[HINT]を自分のファイルとして指定しています。</floater.string>
+	<floater.string name="LinkTipHintWhy">[HINT]を自分のファイルとして指定していますが、使用されていません：[WHY]。</floater.string>
+	<floater.string name="LinkTipNamed">スクリプトはこのファイルを指定していますが、名前が[NAME]ではありません：リンクする前に、意図したファイルか確認してください。</floater.string>
+	<floater.string name="LinkTipRecord">[NAME]という名前のスクリプトが、取得される前にこのファイルにリンクされていました。再度Rezされたものかもしれません。</floater.string>
+	<floater.string name="LinkTipOwnRecord">[NAME]はこのファイルにリンクされていましたが、スクリプトがまだここにあるにもかかわらずリンクは失われたものとして保持されていました：リンクするとリンクが復元されます。</floater.string>
+	<floater.string name="LinkTipChoicesA">該当する可能性のあるファイルが1個あります：選択してください。</floater.string>
+	<floater.string name="LinkTipChoicesB">該当する可能性のあるファイルが[COUNT]個あります：1つ選択してください。</floater.string>
+	<floater.string name="LinkTipRecordsA">該当する可能性のある以前のリンクが1件あります：選択してください。</floater.string>
+	<floater.string name="LinkTipRecordsB">[NAME]という名前のスクリプトの以前のリンク[COUNT]件は、それぞれ別のファイルでした：1つ選択してください。</floater.string>
+	<floater.string name="LinkTipUnknown">インワールドのスクリプトの内容と同じかどうか判別できません：インワールドのテキストを読み込めませんでした。</floater.string>
+	<floater.string name="LinkTipUnknownWhy">インワールドのスクリプトの内容と同じかどうか判別できません：[WHY]。</floater.string>
+	<floater.string name="LinkTipNotOwned">自分のオブジェクトではないため、チェックされていません：リンクするにはチェックを入れてください。</floater.string>
+	<floater.string name="LinkTipMissed">[FILE]は正常に展開できない（インクルードが見つからないなど）ため、ここからは送信されません。ファイルを保存すれば同様に送信されます。</floater.string>
+	<floater.string name="LinkChooseTitle">[NAME]のファイル</floater.string>
+	<floater.string name="LinkChoosePlaceholder">入力してファイルを検索</floater.string>
+	<floater.string name="LinkChoosePick">別のファイル…</floater.string>
+	<floater.string name="LinkChoosePickDetail">ディスク上の任意のファイルを選択します</floater.string>
+	<floater.string name="LinkedOne">[NAME]を[FILE]に</floater.string>
+	<floater.string name="LinkedScriptsA">[LIST]をリンクしました。</floater.string>
+	<floater.string name="LinkedScriptsB">[COUNT]個のスクリプトをそれぞれのファイルにリンクしました：[LIST]。</floater.string>
+	<floater.string name="LinkedSendingA">異なる1個を送信しています。</floater.string>
+	<floater.string name="LinkedSendingB">異なる[COUNT]個を送信しています。</floater.string>
+	<floater.string name="LinkedUnexpandedA">異なる1個は、ファイルを正常に展開できないため送信されませんでした：ファイルを保存すると送信されます。</floater.string>
+	<floater.string name="LinkedUnexpandedB">異なる[COUNT]個は、ファイルを正常に展開できないため送信されませんでした：それぞれのファイルを保存すると送信されます。</floater.string>
+	<floater.string name="ExplorerSendingFromFilesA">1個のスクリプトをファイルから送信しています。</floater.string>
+	<floater.string name="ExplorerSendingFromFilesB">[COUNT]個のスクリプトをそれぞれのファイルから送信しています。</floater.string>
+	<floater.string name="ExplorerSendUnsavedA">1個は送信されませんでした：そのファイルにはタブ内に未保存の変更があります。</floater.string>
+	<floater.string name="ExplorerSendUnsavedB">[COUNT]個は送信されませんでした：それらのファイルにはタブ内に未保存の変更があります。</floater.string>
+	<floater.string name="LinkBadgeLinked">リンク済み</floater.string>
+	<floater.string name="LinkBadgeLinkedTip">[FILE]にリンク済み：ファイルを保存すると送信されます。</floater.string>
+	<floater.string name="LinkBadgeUnsent">ファイル未送信</floater.string>
+	<floater.string name="LinkBadgeUnsentTip">[FILE]にリンク済みですが、まだ送信されていません：「ファイルから送信」で送信します。</floater.string>
+	<floater.string name="LinkBadgeNewer">ファイル変更あり</floater.string>
+	<floater.string name="LinkBadgeNewerTip">[FILE]にリンク済みで、最後の送信後に変更されています：「ファイルから送信」で送信します。</floater.string>
+	<floater.string name="LinkBadgePending">送信待ち</floater.string>
+	<floater.string name="LinkBadgePendingTip">[FILE]にリンク済み。最後の送信は行われず、「ファイルから送信」を待っています。</floater.string>
+	<floater.string name="LinkBadgeDiffering">インワールドで変更あり</floater.string>
+	<floater.string name="LinkBadgeDifferingTip">[FILE]にリンク済みで、最後の送信後にインワールドで変更されています：「ファイルから送信」は保留されます。ファイルを保存すると送信され、元の内容は履歴に残ります。</floater.string>
+	<floater.string name="LinkBadgeSuspended">ファイルなし</floater.string>
+	<floater.string name="LinkBadgeSuspendedTip">[FILE]にリンク済みですが、ファイルが見つかりません：再び見つかるまで何も送信されません。</floater.string>
+	<floater.string name="TabMastersDetailA">リンク済み</floater.string>
+	<floater.string name="TabMastersDetailB">[COUNT]個にリンク</floater.string>
+	<floater.string name="TabMastersTipA">インワールドのスクリプト1個のマスターです：保存すると送信されます。</floater.string>
+	<floater.string name="TabMastersTipB">インワールドのスクリプト[COUNT]個のマスターです：保存するとそれらに送信されます。</floater.string>
+	<floater.string name="CompareMasterFile">ファイル</floater.string>
+	<floater.string name="CompareMasterWorld">インワールドの[NAME]</floater.string>
+	<floater.string name="CompareMasterOnDisk">ディスク上の[FILE]</floater.string>
+	<floater.string name="NoticeMasterLink">リンク</floater.string>
+	<floater.string name="NoticeMasterLinkTip">このスクリプトを、指定されているファイルにリンクします。以後はファイルを通じて変更します</floater.string>
+	<floater.string name="NoticeMasterSend">ファイルを送信</floater.string>
+	<floater.string name="NoticeMasterSendTip">ディスク上のファイルを今すぐスクリプトに送信します。スクリプトの内容は履歴に残ります</floater.string>
+	<floater.string name="NoticeMasterTakeWorld">ファイルを更新</floater.string>
+	<floater.string name="NoticeMasterTakeWorldTip">インワールドのスクリプトの内容をファイルのタブに入れます（1回の取り消し操作）。保存するとファイルに書き込まれます</floater.string>
+	<floater.string name="NoticeMasterUnlink">リンクを解除</floater.string>
+	<floater.string name="NoticeMasterUnlinkTip">スクリプトとこのファイルのリンクを解除します。どちらも変更されません</floater.string>
+	<floater.string name="NoticeMasterGiveWay">ファイルに切り替え</floater.string>
+	<floater.string name="NoticeMasterGiveWayTip">このタブを閉じて代わりにファイルのタブを開きます。以後はそこでスクリプトを変更します</floater.string>
+	<floater.string name="NoticeMasterCompareFile">ファイルと比較</floater.string>
+	<floater.string name="NoticeMasterCompareFileTip">ディスク上のファイルを、ここで入力した内容と並べて変更箇所を示して表示します</floater.string>
+	<floater.string name="NoticeMasterOpenFile">ファイルを開く</floater.string>
+	<floater.string name="NoticeMasterOpenFileTip">このタブを残したままファイルを別のタブで開き、ここで入力した内容をコピーできるようにします</floater.string>
+	<floater.string name="NoticeMasterFind">ファイルを探す…</floater.string>
+	<floater.string name="NoticeMasterFindTip">リンクを維持したまま、ファイルの現在の場所を選択します</floater.string>
+	<floater.string name="ActionMasterLink">リンク</floater.string>
+	<floater.string name="ActionMasterLinkTip">[NAME]を指定されているファイルにリンクします</floater.string>
+	<floater.string name="ActionMasterSend">ファイルを送信</floater.string>
+	<floater.string name="ActionMasterSendTip">ディスク上のファイルを今すぐスクリプトに送信します</floater.string>
+	<floater.string name="ActionMasterTakeWorld">ファイルを更新</floater.string>
+	<floater.string name="ActionMasterTakeWorldTip">インワールドのスクリプトの内容を[NAME]のタブに入れます</floater.string>
+	<floater.string name="ActionMasterCompare">比較</floater.string>
+	<floater.string name="ActionMasterCompareTip">[NAME]をインワールドのスクリプトの内容と比較します</floater.string>
+	<floater.string name="ActionMasterGiveWay">ファイルに切り替え</floater.string>
+	<floater.string name="ActionMasterGiveWayTip">[NAME]のタブを閉じて、代わりにそのファイルのタブを開きます</floater.string>
+	<floater.string name="ActionMasterCompareFile">ファイルと比較</floater.string>
+	<floater.string name="ActionMasterCompareFileTip">[NAME]で入力した内容をディスク上のファイルと比較します</floater.string>
+	<floater.string name="ActionMasterOpenFile">ファイルを開く</floater.string>
+	<floater.string name="ActionMasterOpenFileTip">タブを残したまま、[NAME]のリンク先のファイルを開きます</floater.string>
+	<floater.string name="ActionMasterUnlink">リンクを解除</floater.string>
+	<floater.string name="ActionMasterUnlinkTip">スクリプトと[NAME]のリンクを解除します</floater.string>
+	<floater.string name="ActionMasterFind">ファイルを探す</floater.string>
+	<floater.string name="ActionMasterFindTip">リンクを維持したまま、ファイルの現在の場所を選択します</floater.string>
+	<floater.string name="CompareSavedThere">他の場所で保存</floater.string>
+	<floater.string name="SaveAskingWorld">[NAME]が他の場所で保存されたかどうかを確認しています…</floater.string>
+	<floater.string name="SaveWorldMoved">ここで開いた後に、[NAME]が他の場所（共同所有者や別のビューア）で保存されました。保存するとそのバージョンが置き換えられます。</floater.string>
+	<floater.string name="ActionReloadWorld">再読み込み</floater.string>
+	<floater.string name="ActionReloadWorldTip">保存済みの[NAME]を再読み込みします。未保存の変更は「ファイル」＞「未保存の変更を復旧」に保持されます</floater.string>
+	<floater.string name="ActionCompareWorld">比較</floater.string>
+	<floater.string name="ActionCompareWorldTip">保存済みの[NAME]をこのタブのテキストと比較します</floater.string>
+	<floater.string name="ActionMergeWorld">マージ</floater.string>
+	<floater.string name="ActionMergeWorldTip">保存済みの[NAME]だけが変更した部分をこのタブに取り込み、比較画面で競合を1つずつ解決します</floater.string>
+	<floater.string name="MergeConflictsA">もう一方のバージョンだけが変更した部分を[NAME]にマージしました。比較画面で解決が必要な競合が1件残っています。マージを確定するには保存してください。</floater.string>
+	<floater.string name="MergeConflictsB">もう一方のバージョンだけが変更した部分を[NAME]にマージしました。比較画面で解決が必要な競合が[COUNT]件残っています。マージを確定するには保存してください。</floater.string>
+	<floater.string name="MergeTakenBack">[NAME]へのマージを取り消しました。もう一方のバージョンに戻りました。</floater.string>
+	<floater.string name="CompareLoading">比較用に[NAME]を読み込んでいます…</floater.string>
+	<floater.string name="NoticeShowCompare">比較を表示</floater.string>
+	<floater.string name="NoticeShowCompareTip">マージの比較画面を表示します。各競合が示され、そこで解決できます</floater.string>
+	<floater.string name="ActionShowCompare">比較を表示</floater.string>
+	<floater.string name="ActionShowCompareTip">[NAME]の比較画面を表示します。各競合が示され、そこで解決できます</floater.string>
+	<floater.string name="MergeClean">もう一方のバージョンだけが変更した部分を[NAME]にマージしました。競合はありません。マージを確定するには保存してください。</floater.string>
+	<floater.string name="MergeNoBase">両方の変更前の[NAME]の内容が分からないため、2つをそのまま比較します：必要な変更をそれぞれ取り込んでください。</floater.string>
+	<floater.string name="MergeReadOnly">[NAME]はここでは変更できないため、2つをそのまま比較します。</floater.string>
+	<floater.string name="CompareWorld">現在保存されている内容</floater.string>
+	<floater.string name="ActionExport">ファイルにエクスポート</floater.string>
+	<floater.string name="ActionExportTip">[NAME]のコピーをこのコンピューター上のファイルに保存します</floater.string>
+	<floater.string name="SaveAnywayTip">警告を無視して、[NAME]を現在の状態で保存します</floater.string>
+	<floater.string name="ExternalWriteFailed">[FILE]に書き込めませんでした。</floater.string>
+	<floater.string name="ExternalOpened">[NAME]は外部エディターで開かれています。そこで保存すると、Script Studioでも保存されます。</floater.string>
+	<floater.string name="ExternalOpenedVSCode">[NAME]はVS Codeで開かれています。そこで保存すると、Script Studioでも保存されます。</floater.string>
+	<floater.string name="IncludeGone">[FILE]はもう存在しません。</floater.string>
+	<floater.string name="FileOpenElsewhere">[FILE]は別のタブで開かれています。</floater.string>
+	<floater.string name="NoRecentFiles">最近使ったファイルはありません</floater.string>
+	<floater.string name="PreprocHintSwitch">（[WORD]はFirestormの拡張機能です：「ビルド」＞「保存時にプリプロセス」と「ビルド」＞「Firestorm」＞「switch文」をオンにしてください）</floater.string>
+	<floater.string name="RequireNotPreprocessed">require("[NAME]")は書かれたとおりに保存されますが、グリッドはrequireをサポートしていません：モジュールを取り込むには「ビルド」＞「保存時にプリプロセス」をオンにしてください</floater.string>
+	<floater.string name="PreprocHintExtensions">（[WORD]は拡張機能です：「ビルド」＞「保存時にプリプロセス」と「ビルド」＞「拡張機能」をオンにしてください）</floater.string>
+	<floater.string name="PreprocHintConst">（[WORD]は定数を宣言し、他のグローバル変数から計算したグローバル変数を使えるようにします：「ビルド」＞「保存時にプリプロセス」をオンにしてください）</floater.string>
+	<floater.string name="PreprocHintDirective">（#で始まる行はプリプロセッサー用です：「ビルド」＞「保存時にプリプロセス」をオンにしてください）</floater.string>
+	<floater.string name="PreprocHintInline">（[WORD]は関数を呼び出し箇所ごとにインライン展開するよう指定します：「ビルド」＞「保存時にプリプロセス」をオンにしてください）</floater.string>
+	<floater.string name="ClearRecentFiles">メニューをクリア</floater.string>
+	<floater.string name="OriginCompiler">コンパイラー</floater.string>
+	<floater.string name="CompilerAsSaved">（前回の保存時点）</floater.string>
+	<floater.string name="UpdatingDefinitions">リージョンに言語定義を再度要求しています。届き次第、すべてのスクリプトを再チェックします。</floater.string>
+	<floater.string name="OriginParser">パーサー</floater.string>
+	<floater.string name="OriginTypes">型</floater.string>
+	<floater.string name="OriginMigration">ＬＳＬから</floater.string>
+	<floater.string name="OriginDefinitions">定義</floater.string>
+	<floater.string name="InGeneratedCode">プリプロセッサーが生成</floater.string>
+	<floater.string name="NoGeneratedView">それはプリプロセッサーが生成したコード内にあります。スクリプトをプリプロセスした後、「プリプロセス済み」表示で確認できます。</floater.string>
+	<floater.string name="MenuUndo">取り消し</floater.string>
+	<floater.string name="MenuUndoWhat">取り消し：[WHAT]</floater.string>
+	<floater.string name="MenuRedo">やり直し</floater.string>
+	<floater.string name="MenuRedoWhat">やり直し：[WHAT]</floater.string>
+	<floater.string name="TextSize">文字サイズ [POINTS] pt</floater.string>
+	<floater.string name="ChordWaiting">[KEYS]が押されました：次のキーを待っています…</floater.string>
+	<floater.string name="ChordNone">[KEYS]はコマンドではありません。</floater.string>
+	<floater.string name="PaletteOn">オン</floater.string>
+	<floater.string name="PaletteOff">オフ</floater.string>
+	<floater.string name="UndoWhatRename">名前の変更</floater.string>
+	<floater.string name="UndoWhatFix">修正</floater.string>
+	<floater.string name="TrailerWeight">[TARGET] [LIMIT]㎅中 [SIZE,number,1]㎅使用</floater.string>
+	<floater.string name="TrailerWeightEstimate">[TARGET] [LIMIT]㎅中 約[SIZE,number,1]㎅使用</floater.string>
+	<floater.string name="TrailerWeightTip">[TARGET]でのコードサイズ：[MAX]バイト中[BYTES]バイト。実行中に使用するメモリは含みません。</floater.string>
+	<floater.string name="TrailerWeightEstimateTip">[TARGET]での推定コードサイズ：[MAX]バイト中[BYTES]バイト。実行中に使用するメモリは含みません。</floater.string>
+	<floater.string name="TrailerWeightBeforeTip">保存時に実行されるプリプロセッサーのオプティマイザーを適用する前の計測値です。保存されるスクリプトはこれより小さくなる場合があります。</floater.string>
+	<floater.string name="TrailerWeightSentTip">プリプロセッサー適用後、保存される状態で計測しています。</floater.string>
+	<floater.string name="OriginWeight">メモリ</floater.string>
+	<floater.string name="WeightOver">スクリプトのコードは約[SIZE,number,1]㎅で、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅を超えています。</floater.string>
+	<floater.string name="WeightOverEstimate">スクリプトのコードは約[SIZE,number,1]㎅で、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅を超える可能性が高いです。</floater.string>
+	<floater.string name="WeightNear">スクリプトのコードは、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅のうち[SIZE,number,1]㎅を使用しており、実行中のリスト、文字列、スタック用に[LEFT,number,1]㎅が残ります。</floater.string>
+	<floater.string name="WeightNearEstimate">スクリプトのコードは、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅のうち約[SIZE,number,1]㎅を使用しており、実行中のリスト、文字列、スタック用に約[LEFT,number,1]㎅が残ります。</floater.string>
+	<floater.string name="WeightOverBefore">オプティマイザー適用前のスクリプトのコードは[SIZE,number,1]㎅で、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅を超えています。オプティマイザーの実行後には収まる可能性があります。</floater.string>
+	<floater.string name="TrailerSize">[LIMIT]㎅中 [SIZE]㎅</floater.string>
+	<floater.string name="TrailerSizeTip">保存サイズ：[MAX]バイト中[BYTES]バイト（プリプロセス済みのコードを含み、最適化と圧縮の前）。</floater.string>
+	<floater.string name="TrailerSizeOverTip">保存サイズ：[BYTES]バイト。上限[MAX]を[OVER]超えています。小さくするまで保存できません。</floater.string>
+	<floater.string name="TrailerNotecardSizeTip">ノートカードのテキスト：ノートカードに保持できる[MAX]バイト中[BYTES]バイト。</floater.string>
+	<floater.string name="TrailerNotecardSizeOverTip">ノートカードのテキスト：[BYTES]バイト。上限[MAX]を[OVER]超えています。小さくするまで保存できません。</floater.string>
+	<floater.string name="WeightsNoScript">スクリプトが開かれていません。</floater.string>
+	<floater.string name="WeightsNoTarget">[NAME]には計測する独自のコードがありません：ノートカードか、他からインクルードされるだけのスクリプトです。</floater.string>
+	<floater.string name="WeightsNotYet">[NAME]のメモリ使用量は、チェック後に表示されます。</floater.string>
+	<floater.string name="WeightsHead">[TARGET]での[NAME]：[LIMIT]㎅中[SIZE,number,1]㎅使用（[SHARE]）。</floater.string>
+	<floater.string name="WeightsHeadEstimate">[TARGET]での[NAME]：[LIMIT]㎅中約[SIZE,number,1]㎅使用（[SHARE]）。</floater.string>
+	<floater.string name="WeightsHeadFailed">[NAME]は[TARGET]向けにコンパイルできません：[ERROR]</floater.string>
+	<floater.string name="WeightsHeadError">現在、[ERROR]。</floater.string>
+	<floater.string name="WeightsHeadNoLines">行ごとの計測は行われません：[TARGET]のコンパイラーは行情報を記録しません。</floater.string>
+	<floater.string name="WeightsHeadBefore">保存時に実行されるプリプロセッサーのオプティマイザー適用前の計測値です。</floater.string>
+	<floater.string name="WeightsHeadSent">プリプロセッサーのオプティマイザー適用前の計測値です。保存時は[SENT,number,1]㎅です。</floater.string>
+	<floater.string name="WeightsHeadTip">コードサイズのみで、スクリプトが実行中に作成するリストや文字列は含みません。</floater.string>
+	<floater.string name="WeightsHeadRegion">リージョン内で、このオブジェクトはすべてのスクリプト用に[RESERVED,number,0]㎅を確保しています（[WHEN]時点）。</floater.string>
+	<floater.string name="WeightsHeadRegionUrls">リージョン内で、このオブジェクトはすべてのスクリプト用に[RESERVED,number,0]㎅と[URLS]個のURLを確保しています（[WHEN]時点）。</floater.string>
+	<floater.string name="WeightsHeadRegionTip">リージョンは、オブジェクト内のすべてのスクリプトのメモリを、実際の使用量ではなく各上限値（llSetMemoryLimitで下げない限りMonoは64㎅）で数えます。</floater.string>
+	<floater.string name="ExplorerReserved">[RESERVED,number,0]㎅確保</floater.string>
+	<floater.string name="ExplorerTime">1フレームあたり[TIME] ms</floater.string>
+	<floater.string name="WeightsHeadRegionTime">このスクリプトは1フレームあたりリージョンの時間を[TIME] ms使用しています（[WHEN]時点）。</floater.string>
+	<floater.string name="WeightsHeadRegionTimeTip">この時間は、不動産マネージャーに「トップスクリプト」一覧で示されるのと同じ、オブジェクトの全スクリプトに対するリージョン自身の平均値です。</floater.string>
+	<floater.string name="WeightsTargetTip">[TARGET]：メモリ[MAX]バイト中、コード[BYTES]バイト。</floater.string>
+	<floater.string name="WeightsTargetEstimateTip">[TARGET]：メモリ[MAX]バイト中、コード約[BYTES]バイト（コンパイル済みコードからの推定）。</floater.string>
+	<floater.string name="WeightsTargetFailedTip">[TARGET]向けにコンパイルできません：[ERROR]</floater.string>
+	<floater.string name="WeightsTargetErrorTip">現在、[ERROR]。</floater.string>
+	<floater.string name="WeightsTargetOwnTip">スクリプトのコンパイル先のターゲット。</floater.string>
+	<floater.string name="WeightsKilobytesEstimate">約[SIZE,number,1]㎅</floater.string>
+	<floater.string name="WeightsNew">新規</floater.string>
+	<floater.string name="WeightsPartRegisters">レジスタ</floater.string>
+	<floater.string name="WeightsPartAssembly">アセンブリ</floater.string>
+	<floater.string name="WeightsPartGlobals">グローバル変数</floater.string>
+	<floater.string name="WeightsPartScript">トップレベルのコード</floater.string>
+	<floater.string name="WeightsPartStrings">文字列</floater.string>
+	<floater.string name="WeightsPartUnnamed">無名関数</floater.string>
+	<floater.string name="WeightsPartHandler">[STATE]の[EVENT]</floater.string>
+	<floater.string name="WeightsKindFunction">関数</floater.string>
+	<floater.string name="WeightsKindHandler">イベント</floater.string>
+	<floater.string name="WeightsKindState">ステート</floater.string>
+	<floater.string name="WeightsKindGlobal">グローバル</floater.string>
+	<floater.string name="WeightsKindConstant">定数</floater.string>
+	<floater.string name="WeightsKindFrame">オーバーヘッド</floater.string>
+	<floater.string name="WeightsStateTip">ステートのハンドラーテーブル。各ハンドラーは個別に表示されます。</floater.string>
+	<floater.string name="WeightsFrameTip">このターゲットのすべてのスクリプトに共通する固定のオーバーヘッド。</floater.string>
+	<floater.string name="WeightsStringName">名前</floater.string>
+	<floater.string name="WeightsStringTip">文字列テーブル内の[BYTES]バイト（長さを含む）。[USES]個の命令で使用され、そのうち[LOADS]個は値として読み込まれます。</floater.string>
+	<floater.string name="WeightsStringNameTip">関数の名前（行情報が保持します）：文字列テーブル内の[BYTES]バイト（長さを含む）。</floater.string>
+	<floater.string name="WeightsSharedStart">共通の先頭：[COUNT]個の文字列の[START]</floater.string>
+	<floater.string name="WeightsSharedStartTip">[COUNT]個の文字列がこの[LENGTH]バイトで始まっています。先頭を1回だけ保持し、読み込むたびに結合すれば、バイトコードは約[SAVED]バイト小さくなります。Luauはコンパイル時に定数文字列（再代入されないローカル変数を含む）を結合するため、先頭は別にしておく必要があります：local start; start = [START]。結合するたびに、スクリプトの実行中に文字列も構築されます。</floater.string>
+	<floater.string name="WeightsSharedStartStrings">該当する文字列：[STRINGS]</floater.string>
+	<floater.string name="WeightsSharedStartMore">[STRINGS]、ほか[COUNT]個</floater.string>
+	<floater.string name="WeightsStringShares">先頭の[START]を他の[COUNT]個の文字列と共有しており、1回だけ保持できます。</floater.string>
+	<floater.string name="KeptStartOnce">[COUNT]箇所の共通の先頭を[NAME]として1回だけ保持しました。</floater.string>
+	<floater.string name="KeepStartFailed">共通の先頭を1回だけ保持できませんでした：[ERROR]</floater.string>
+	<floater.string name="WeightNote">[BYTES]バイト</floater.string>
+	<floater.string name="WeightNoteEstimate">約[BYTES]バイト</floater.string>
+	<floater.string name="WeightNoteTip">[NAME]：[TARGET]でのコード[BYTES]バイト、メモリ[LIMIT]㎅の[SHARE]。</floater.string>
+	<floater.string name="WeightNoteEstimateTip">[NAME]：[TARGET]でのコード約[BYTES]バイト、メモリ[LIMIT]㎅の[SHARE]。</floater.string>
+	<floater.string name="WeightHeatTip">[LINE]行目：[TARGET]でのコード[BYTES]バイト、メモリ[LIMIT]㎅の[SHARE]。</floater.string>
+	<floater.string name="WeightHeatEstimateTip">[LINE]行目：[TARGET]でのコード約[BYTES]バイト、メモリ[LIMIT]㎅の[SHARE]。</floater.string>
+	<floater.string name="OptimizerNoteLighter">（[TARGET]でコードを[BYTES]バイト削減）</floater.string>
+	<floater.string name="OptimizerNoteHeavier">（[TARGET]でコードが[BYTES]バイト増加）</floater.string>
+	<floater.string name="OptimizerNoteSame">（[TARGET]でのコード削減なし）</floater.string>
+	<floater.string name="TrailerOptimized">[TARGET] [LIMIT]㎅中 [BEFORE,number,1] → [AFTER,number,1]㎅使用</floater.string>
+	<floater.string name="TrailerOptimizedEstimate">[TARGET] [LIMIT]㎅中 約[BEFORE,number,1] → 約[AFTER,number,1]㎅使用</floater.string>
+	<floater.string name="TrailerOptimizedTip">最適化前後の[TARGET]でのコードサイズ：[MAX]バイト中[BYTESBEFORE] → [BYTESAFTER]バイト。</floater.string>
+	<floater.string name="TrailerOptimizedEstimateTip">最適化前後の[TARGET]での推定コードサイズ：[MAX]バイト中[BYTESBEFORE] → [BYTESAFTER]バイト。</floater.string>
+	<floater.string name="FixLighter">[TARGET]でコードが[BYTES]バイト減少</floater.string>
+	<floater.string name="FixLighterEstimate">[TARGET]でコードが約[BYTES]バイト減少</floater.string>
+	<floater.string name="FixHeavier">[TARGET]でコードが[BYTES]バイト増加</floater.string>
+	<floater.string name="FixHeavierEstimate">[TARGET]でコードが約[BYTES]バイト増加</floater.string>
+	<floater.string name="SaveOverWeight">[NAME]を保存しましたが、コードは約[SIZE,number,1]㎅で、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅を超えています。コンパイルや実行ができない可能性があります。</floater.string>
+	<floater.string name="SaveOverWeightEstimate">[NAME]を保存しましたが、コードは推定[SIZE,number,1]㎅で、[TARGET]でスクリプトが使えるメモリ[LIMIT]㎅を超える可能性が高いです。実行できない可能性があります。</floater.string>
+	<floater.string name="SaveTooLarge">[NAME]は保存されませんでした：[SIZE]バイトで、上限[LIMIT]を[OVER]バイト超えています。</floater.string>
+	<floater.string name="SaveTooLargePlain">収めるには、一部を別のスクリプトか、スクリプトが読み込むノートカードに移してください。</floater.string>
+	<floater.string name="SaveTooLargeCompress">プリプロセス済みのスクリプトは、ソースとプリプロセス済みのコードの両方を保存します。プリプロセス済みのコードを縮小するには、「ビルド」＞「Firestorm」＞「プリプロセス済みのコードを圧縮」をオンにしてください。</floater.string>
+	<floater.string name="SaveTooLargeWrapped">プリプロセス済みのスクリプトは、ソースと、インクルードを含むプリプロセス済みのコードの両方を保存します。収めるには、インクルードを減らすか、一部を別のスクリプトに移してください。</floater.string>
+	<floater.string name="UndoWhatRefactor">リファクタリング</floater.string>
+	<floater.string name="UndoWhatFormat">整形</floater.string>
+	<floater.string name="UndoWhatReplace">すべて置換</floater.string>
+	<floater.string name="RecentScripts">スクリプト</floater.string>
+	<floater.string name="RecentFiles">ファイル</floater.string>
+	<floater.string name="NewScriptLSL">ＬＳＬスクリプト</floater.string>
+	<floater.string name="NewScriptLua">SLuaスクリプト</floater.string>
+	<menu_bar name="studio_menu">
+		<menu name="file" label="ファイル">
+			<menu_item_call name="new_script" label="新規スクリプト…"/>
+			<menu_item_call name="new_lua_script" label="新規SLuaスクリプト…"/>
+			<menu_item_call name="open_file" label="ファイルを開く…"/>
+			<menu name="open_recent" label="最近使ったファイルを開く"/>
+			<menu_item_call name="local_history" label="ローカル履歴…"/>
+			<menu_item_call name="recover" label="未保存の変更を復旧…"/>
+			<menu_item_call name="save" label="保存"/>
+			<menu_item_call name="save_all" label="すべて保存"/>
+			<menu_item_call name="save_as" label="名前を付けてファイルに保存…"/>
+			<menu_item_call name="revert" label="保存した状態に戻す"/>
+			<menu name="file_transfer_menu" label="インポートとエクスポート">
+				<menu_item_call name="insert_file" label="ファイルを挿入…"/>
+				<menu_item_call name="load_file" label="ファイルからテキストを置き換え…"/>
+				<menu_item_call name="save_file" label="ファイルにエクスポート…"/>
+			</menu>
+			<menu_item_call name="external_editor" label="外部エディターで編集"/>
+			<menu_item_call name="link_file" label="ディスク上のファイルにリンク…"/>
+			<menu_item_call name="send_file" label="ファイルをスクリプトに送信"/>
+			<menu_item_call name="unlink_file" label="ファイルとスクリプトのリンクを解除"/>
+			<menu_item_call name="pop_out" label="新しいウィンドウに移動"/>
+			<menu_item_call name="close" label="スクリプトを閉じる"/>
+			<menu_item_call name="close_others" label="他を閉じる"/>
+			<menu_item_call name="close_saved" label="保存済みを閉じる"/>
+			<menu_item_call name="close_all" label="すべて閉じる"/>
+			<menu_item_call name="preferences" label="初期設定…"/>
+		</menu>
+		<menu name="edit" label="編集">
+			<menu_item_call name="undo" label="取り消し"/>
+			<menu_item_call name="redo" label="やり直し"/>
+			<menu_item_call name="cut" label="カット"/>
+			<menu_item_call name="copy" label="コピー"/>
+			<menu_item_call name="paste" label="ペースト"/>
+			<menu_item_call name="find" label="検索…"/>
+			<menu_item_call name="replace" label="置換…"/>
+			<menu_item_call name="find_next" label="次を検索"/>
+			<menu_item_call name="find_previous" label="前を検索"/>
+			<menu_item_call name="find_in_files" label="ファイル内を検索…"/>
+			<menu_item_call name="toggle_comment" label="コメントの切り替え"/>
+			<menu name="lines_menu" label="行">
+				<menu_item_call name="insert_line_below" label="下に行を挿入"/>
+				<menu_item_call name="insert_line_above" label="上に行を挿入"/>
+				<menu_item_call name="duplicate_line" label="行を複製"/>
+				<menu_item_call name="delete_line" label="行を削除"/>
+				<menu_item_call name="join_lines" label="行を結合"/>
+				<menu_item_call name="move_line_up" label="行を上に移動"/>
+				<menu_item_call name="move_line_down" label="行を下に移動"/>
+			</menu>
+		</menu>
+		<menu name="selection" label="選択">
+			<menu_item_call name="select_all" label="すべて選択"/>
+			<menu_item_call name="select_line" label="行を選択"/>
+			<menu_item_call name="select_function" label="関数を選択"/>
+			<menu_item_call name="expand_selection" label="選択範囲を拡大"/>
+			<menu_item_call name="shrink_selection" label="選択範囲を縮小"/>
+			<menu_item_call name="select_next_occurrence" label="次の出現箇所を選択"/>
+			<menu_item_call name="change_all_occurrences" label="すべての出現箇所を変更"/>
+			<menu_item_call name="add_caret_above" label="上にキャレットを追加"/>
+			<menu_item_call name="add_caret_below" label="下にキャレットを追加"/>
+		</menu>
+		<menu name="code" label="コード">
+			<menu_item_call name="complete" label="補完"/>
+			<menu_item_call name="signature_help" label="パラメーター情報"/>
+			<menu name="insert" label="挿入">
+				<menu_item_call name="insert_snippet" label="スニペット…"/>
+				<menu_item_call name="insert_function" label="関数…"/>
+				<menu_item_call name="insert_event" label="イベントハンドラー…"/>
+				<menu_item_call name="insert_constant" label="定数…"/>
+			</menu>
+			<menu_item_call name="rename" label="シンボルの名前を変更…"/>
+			<menu_item_call name="quick_fix" label="クイックフィックス…"/>
+			<menu_item_call name="fix_all" label="すべての問題を修正"/>
+			<menu_item_call name="fix_migration" label="ＬＳＬからの残りを修正"/>
+			<menu_item_call name="format" label="ドキュメントを整形"/>
+			<menu_item_call name="format_selection" label="選択範囲を整形"/>
+			<menu name="indentation_menu" label="インデント">
+				<menu_item_call name="indent_spaces" label="スペースに変換"/>
+				<menu_item_call name="indent_tabs" label="タブに変換"/>
+			</menu>
+			<menu_item_call name="convert_slua" label="SLuaに変換…"/>
+		</menu>
+		<menu name="go" label="移動">
+			<menu_item_call name="back" label="戻る"/>
+			<menu_item_call name="forward" label="進む"/>
+			<menu_item_call name="previous_change" label="前の編集位置"/>
+			<menu_item_call name="next_change" label="次の編集位置"/>
+			<menu_item_call name="quick_open" label="スクリプトへ移動…"/>
+			<menu_item_call name="go_to_symbol" label="シンボルへ移動…"/>
+			<menu_item_call name="go_to_line" label="指定行へ移動…"/>
+			<menu_item_call name="go_to_definition" label="定義へ移動"/>
+			<menu_item_call name="find_references" label="参照を検索"/>
+			<menu_item_call name="go_to_bracket" label="対応する括弧"/>
+			<menu_item_call name="next_function" label="次の関数"/>
+			<menu_item_call name="previous_function" label="前の関数"/>
+			<menu_item_call name="next_problem" label="次の問題"/>
+			<menu_item_call name="previous_problem" label="前の問題"/>
+			<menu_item_call name="next_difference" label="次の変更"/>
+			<menu_item_call name="previous_difference" label="前の変更"/>
+			<menu_item_call name="next_migration" label="ＬＳＬからの次の残り"/>
+			<menu_item_call name="previous_migration" label="ＬＳＬからの前の残り"/>
+			<menu_item_call name="next_misspelling" label="次のスペルミス"/>
+			<menu_item_call name="previous_misspelling" label="前のスペルミス"/>
+			<menu name="tabs_menu" label="タブ">
+				<menu_item_call name="next_tab" label="次のタブ"/>
+				<menu_item_call name="previous_tab" label="前のタブ"/>
+				<menu_item_call name="last_tab" label="最後に使用したタブ"/>
+				<menu_item_call name="all_tabs" label="すべてのタブ…"/>
+				<menu_item_call name="move_tab_left" label="タブを左に移動"/>
+				<menu_item_call name="move_tab_right" label="タブを右に移動"/>
+				<menu_item_call name="focus_tabs" label="タブへ移動"/>
+			</menu>
+			<menu_item_call name="next_pane" label="次のペイン"/>
+			<menu_item_call name="previous_pane" label="前のペイン"/>
+		</menu>
+		<menu name="view" label="表示">
+			<menu_item_call name="command_palette" label="コマンドパレット…"/>
+			<menu name="panes_menu" label="ペイン">
+				<menu_item_check name="explorer" label="エクスプローラー"/>
+				<menu_item_check name="problems" label="問題"/>
+				<menu_item_check name="references" label="参照"/>
+				<menu_item_check name="output" label="出力"/>
+				<menu_item_check name="search" label="検索"/>
+				<menu_item_check name="weights" label="メモリ"/>
+				<menu_item_check name="inspector" label="インスペクター"/>
+			</menu>
+			<menu_item_check name="expanded" label="プリプロセス済み表示"/>
+			<menu_item_check name="compare_saved" label="保存済みと比較"/>
+			<menu_item_call name="compare_asset" label="保存済みアセットと比較"/>
+			<menu_item_check name="peek_change" label="変更をのぞき見"/>
+			<menu_item_call name="compare_with" label="比較対象を選択…"/>
+			<menu_item_call name="compare_preprocessed" label="プリプロセス済みと比較"/>
+			<menu_item_call name="compare_hold_selection" label="比較用に選択"/>
+			<menu_item_call name="compare_selections" label="保持した選択範囲と比較"/>
+			<menu_item_check name="compare_shown" label="比較を表示"/>
+			<menu_item_call name="compare_take_back" label="変更を戻す"/>
+			<menu_item_check name="compare_inline" label="インラインで比較"/>
+			<menu name="comparison_view_menu" label="比較">
+				<menu_item_call name="compare_settle_theirs" label="相手側で解決"/>
+				<menu_item_call name="compare_settle_mine" label="自分側で解決"/>
+				<menu_item_call name="compare_settle_both" label="両方で解決"/>
+				<menu_item_check name="compare_fold" label="変更のない行を折りたたむ"/>
+				<menu_item_check name="compare_swap" label="左右を入れ替え"/>
+				<menu_item_call name="compare_older" label="古い保存"/>
+				<menu_item_call name="compare_newer" label="新しい保存"/>
+				<menu_item_check name="compare_minimal" label="変更を最小にする"/>
+				<menu_item_check name="compare_structural" label="構造で比較"/>
+				<menu_item_call name="compare_copy_change" label="この変更をコピー"/>
+				<menu_item_call name="compare_copy_diff" label="unified diff形式でコピー"/>
+				<menu_item_check name="compare_ignore_whitespace" label="空白を無視"/>
+				<menu_item_check name="compare_ignore_trailing" label="行末の空白を無視"/>
+				<menu_item_check name="compare_ignore_blank_lines" label="空行を無視"/>
+				<menu_item_check name="compare_ignore_comments" label="コメントを無視"/>
+			</menu>
+			<menu_item_check name="word_wrap" label="折り返し"/>
+			<menu name="editor_view_menu" label="エディター">
+				<menu_item_check name="line_numbers" label="行番号"/>
+				<menu_item_check name="relative_numbers" label="相対行番号"/>
+				<menu_item_check name="notecard_from_zero" label="ノートカードの行を0から数える"/>
+				<menu_item_check name="indent_guides" label="インデントガイド"/>
+				<menu name="whitespace_menu" label="空白文字">
+					<menu_item_check name="blanks_none" label="なし"/>
+					<menu_item_check name="blanks_selection" label="選択範囲内"/>
+					<menu_item_check name="blanks_trailing" label="行末のみ"/>
+					<menu_item_check name="blanks_all" label="すべて"/>
+				</menu>
+				<menu_item_check name="rainbow_brackets" label="レインボー括弧"/>
+				<menu_item_check name="sticky_headers" label="固定ヘッダー"/>
+				<menu_item_check name="semantic_colors" label="セマンティックカラー"/>
+				<menu_item_check name="spell_check" label="スペルチェック"/>
+				<menu name="scrollbar_menu" label="スクロールバー">
+					<menu_item_check name="scroll_bar" label="バー"/>
+					<menu_item_check name="scroll_map" label="マップ"/>
+					<menu_item_check name="map_narrow" label="狭いマップ"/>
+					<menu_item_check name="map_medium" label="中程度のマップ"/>
+					<menu_item_check name="map_wide" label="広いマップ"/>
+					<menu_item_check name="map_preview" label="マウス位置をプレビュー"/>
+					<menu_item_check name="map_left" label="マップを左側に表示"/>
+				</menu>
+			</menu>
+			<menu name="hints_menu" label="ヒント">
+				<menu_item_check name="inlay_parameters" label="パラメーター名のヒント"/>
+				<menu_item_check name="inlay_types" label="型のヒント"/>
+				<menu_item_check name="weight_notes" label="宣言の後にバイト数を表示"/>
+				<menu_item_check name="weight_heat" label="余白にメモリのヒートマップを表示"/>
+			</menu>
+			<menu name="folding_menu" label="折りたたみ">
+				<menu_item_call name="fold" label="折りたたむ"/>
+				<menu_item_call name="unfold" label="展開"/>
+				<menu_item_call name="fold_all" label="すべて折りたたむ"/>
+				<menu_item_call name="unfold_all" label="すべて展開"/>
+			</menu>
+			<menu_item_check name="vim_mode" label="Vimモード"/>
+			<menu_item_call name="zoom_in" label="拡大"/>
+			<menu_item_call name="zoom_out" label="縮小"/>
+			<menu_item_call name="zoom_reset" label="実際のサイズ"/>
+		</menu>
+		<menu name="build" label="ビルド">
+			<menu_item_call name="preprocess" label="今すぐプリプロセス"/>
+			<menu_item_call name="save_plain" label="プリプロセスせずに保存"/>
+			<menu_item_call name="check_object" label="このオブジェクトのすべてのスクリプトをチェック"/>
+			<menu_item_check name="running" label="実行中"/>
+			<menu_item_call name="reset_script" label="スクリプトをリセット"/>
+			<menu_item_call name="choose_target" label="コンパイルターゲット…"/>
+			<menu_item_call name="choose_experience" label="体験…"/>
+			<menu_item_check name="preflight" label="エラー時に保存を保留"/>
+			<menu_item_check name="fix_on_save" label="保存時に安全な修正を適用"/>
+			<menu_item_check name="format_on_save" label="保存時に整形"/>
+			<menu_item_check name="trim_on_save" label="保存時に行末の空白を削除"/>
+			<menu name="preprocessor_menu" label="プリプロセッサー">
+				<menu_item_check name="preproc_enabled" label="保存時にプリプロセス"/>
+				<menu_item_check name="preproc_disk" label="ディスクからインクルード"/>
+				<menu_item_call name="preproc_folder" label="インクルードフォルダーを追加…"/>
+				<menu_item_check name="preproc_line_comments" label="行の出どころを記録"/>
+				<menu name="preproc_firestorm_menu">
+					<menu_item_check name="preproc_switch" label="switch文"/>
+					<menu_item_check name="preproc_lazy" label="遅延リスト"/>
+					<menu_item_check name="preproc_compress" label="プリプロセス済みのコードを圧縮"/>
+				</menu>
+				<menu name="preproc_extensions_menu" label="拡張機能">
+					<menu_item_check name="preproc_extensions" label="break、continue、&amp;= |= ^=、inline"/>
+				</menu>
+			</menu>
+			<menu name="preproc_optimizer_menu" label="オプティマイザー">
+				<menu_item_check name="preproc_optimize" label="最適化"/>
+				<menu_item_check name="preproc_shrink" label="名前を短縮"/>
+				<menu_item_check name="preproc_addstrings" label="文字列を結合"/>
+				<menu_item_check name="preproc_inline" label="一度だけ呼ばれる関数をインライン展開"/>
+			</menu>
+			<menu_item_call name="update_definitions" label="言語定義を更新"/>
+		</menu>
+		<menu name="help" label="ヘルプ">
+			<menu_item_call name="reference" label="キャレット位置の語のリファレンス"/>
+			<menu_item_call name="browse_reference" label="リファレンスを参照…"/>
+			<menu_item_call name="wiki" label="Wikiで開く"/>
+		</menu>
+	</menu_bar>
+	<button name="save_btn" tool_tip="スクリプトを保存してコンパイルします [KEYS]。ノートカードは保存のみ行います"/>
+	<button name="save_all_btn" tool_tip="未保存の変更があるすべてのスクリプトを保存します [KEYS]"/>
+	<button name="undo_btn" tool_tip="最後の変更を取り消します [KEYS]"/>
+	<button name="redo_btn" tool_tip="最後に取り消した変更をやり直します [KEYS]"/>
+	<button name="find_btn" tool_tip="このスクリプト内を検索 [KEYS]、スクリプト全体を検索 [KEYS2]"/>
+	<button name="format_btn" tool_tip="スクリプトのインデントとスペースを整形します [KEYS]"/>
+	<button name="expanded_btn" tool_tip="プリプロセス済みのコード（読み取り専用）またはソースを表示します [KEYS]。「ビルド」＞「保存時にプリプロセス」が必要です。"/>
+	<button name="fold_explorer" label="エクスプローラ" tool_tip="エクスプローラ（オブジェクトとそのスクリプト）の表示を切り替えます [KEYS]"/>
+	<button name="fold_bottom" label="パネル" tool_tip="問題 [KEYS]、参照 [KEYS2]、出力 [KEYS3]、検索 [KEYS4] の表示を切り替えます。"/>
+	<button name="fold_inspector" label="インスペクタ" tool_tip="インスペクタ（アウトラインとキャレット位置のシンボル）の表示を切り替えます [KEYS]"/>
+	<layout_stack name="main_stack">
+		<layout_panel name="explorer_panel">
+			<panel name="explorer_pane">
+				<filter_editor name="explorer_filter" label="フィルタ" tool_tip="名前にこのテキストを含むオブジェクト、プリム、スクリプト、ノートカードのみを表示します。"/>
+				<panel name="explorer_tree" tool_tip="Enterまたはダブルクリックで開く、F2で名前の変更、Deleteで削除、右クリックでその他の操作。"/>
+				<button name="explorer_open" label="開く" tool_tip="選択したスクリプトとノートカードを開きます"/>
+				<button name="explorer_start" label="開始" tool_tip="選択したスクリプトと、選択したオブジェクトやプリム内のすべてのスクリプトを開始します。"/>
+				<button name="explorer_stop" label="停止" tool_tip="選択したスクリプトと、選択したオブジェクトやプリム内のすべてのスクリプトを停止します。"/>
+				<button name="explorer_reset" label="リセット" tool_tip="選択したスクリプトと、選択したオブジェクトやプリム内のすべてのスクリプトをリセットします。"/>
+				<button name="explorer_refresh" tool_tip="更新：オブジェクトの中身をリージョンに再度問い合わせます"/>
+			</panel>
+		</layout_panel>
+		<layout_panel name="centre">
+			<layout_stack name="centre_stack">
+				<layout_panel name="editor_column">
+					<layout_stack name="editor_stack">
+						<layout_panel name="editor_head">
+							<tab_strip name="tabs" tool_tip="開いているスクリプトごとに1つのタブ。「タブへ移動」の後：矢印キーで選択、Shift+矢印キーでタブを移動、Deleteで閉じる"/>
+						</layout_panel>
+						<layout_panel name="editor_notice">
+							<panel name="notice">
+								<button name="notice_close" tool_tip="新しい通知が来るまでこの通知を隠します"/>
+							</panel>
+						</layout_panel>
+						<layout_panel name="editor_crumbs">
+							<panel name="crumbs">
+								<jump_bar name="breadcrumb" tool_tip="キャレット位置。各部分をクリックするとそこへ移動し、矢印をクリックすると同じ階層の他のシンボルを選べます。"/>
+							</panel>
+							<combo_box name="experience" tool_tip="スクリプトが体験関数で使用する体験。保存時に設定されます。"/>
+							<button name="experience_profile" tool_tip="スクリプトの体験のプロフィールを開きます"/>
+							<button name="reset_btn" label="リセット" tool_tip="オブジェクト内のスクリプトをリセットします：状態をクリアしてstate_entryを再度実行します。"/>
+							<check_box name="running" label="実行中" tool_tip="オンにすると、スクリプトはオブジェクト内で実行されます。保存してもこの設定は保持されます。"/>
+							<combo_box name="compile_target" tool_tip="保存時にスクリプトをコンパイルする形式。もう一方の言語のターゲットを選ぶと、言語も変わります。"/>
+							<combo_box name="notecard_grammar" tool_tip="色分けとアウトラインのために、ノートカードを何として読むか。開いたときにテキストから推測されます。">
+								<combo_box.item name="notecard_grammar_text" label="プレーンテキスト"/>
+								<combo_box.item name="notecard_grammar_config" label="設定"/>
+							</combo_box>
+						</layout_panel>
+					</layout_stack>
+				</layout_panel>
+				<layout_panel name="bottom_panel">
+					<tab_container name="bottom_tabs">
+						<panel name="problems_tab" label="問題">
+							<layout_stack name="problems_stack">
+								<layout_panel name="problems_filter_panel">
+									<check_box name="problems_errors" label="エラー" tool_tip="エラーを表示：スクリプトのコンパイルや実行を妨げる問題"/>
+									<check_box name="problems_warnings" label="警告" tool_tip="警告を表示：意図どおりに動作しない可能性が高いコード"/>
+									<check_box name="problems_notes" label="注記" tool_tip="オプティマイザーの変更やLintの提案などの注記を表示します。"/>
+									<check_box name="problems_fixable" label="修正可能" tool_tip="修正のある問題のみ表示します：右クリックメニュー、電球アイコン、またはクイックフィックス [KEYS] を使用してください。"/>
+									<combo_box name="problems_scope" tool_tip="アクティブなタブ、開いているすべてのスクリプト、または最後にチェックしたオブジェクトのスクリプトの問題を、スクリプトごとにまとめて表示します。">
+										<combo_box.item name="problems_scope_this" label="このスクリプト"/>
+										<combo_box.item name="problems_scope_all" label="開いているすべてのスクリプト"/>
+										<combo_box.item name="problems_scope_object" label="チェックしたオブジェクト"/>
+									</combo_box>
+									<combo_box name="problems_origin" tool_tip="コンパイラー、チェッカー、実行中のスクリプトなど、1つの発生元からの問題のみを表示します。"/>
+									<filter_editor name="problems_filter" label="フィルター" tool_tip="このテキストを含む問題のみを表示します。"/>
+								</layout_panel>
+								<layout_panel name="problems_list_panel">
+									<pane_list name="problems" tool_tip="コンパイラーとチェッカーからの問題。Enterまたはダブルクリックでその場所へ移動し、Escで戻ります。">
+										<pane_list.columns name="message" label="メッセージ"/>
+										<pane_list.columns name="source" label="発生元"/>
+										<pane_list.columns name="line" label="行"/>
+									</pane_list>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+						<panel name="references_tab" label="参照">
+							<pane_list name="references" tool_tip="最後に調べた名前の、そのオブジェクトのスクリプト内での出現箇所。ダブルクリックでその場所へ移動します。">
+								<pane_list.columns name="where" label="スクリプト"/>
+								<pane_list.columns name="line" label="行"/>
+								<pane_list.columns name="text" label="テキスト"/>
+							</pane_list>
+							<button name="references_changes" label="変更を表示" tool_tip="選択した出現箇所のスクリプトの現在の内容と、チェックした名前変更を適用した場合の内容を比較します。"/>
+							<button name="references_rename" label="名前の変更" tool_tip="チェックした出現箇所のみ名前を変更します。"/>
+							<button name="references_cancel" label="キャンセル" tool_tip="名前の変更をキャンセルし、出現箇所の一覧に戻ります。"/>
+						</panel>
+						<panel name="output_tab" label="出力">
+							<combo_box name="output_filter" tool_tip="すべてのオブジェクト、開いているスクリプト、自分のオブジェクト、または1つのオブジェクトからのメッセージを表示します。"/>
+							<combo_box name="output_kind" tool_tip="表示する内容：エラー、所有者へのメッセージ、デバッグチャンネル、チャット、ＩＭ、保存などのStudioの操作">
+								<combo_box.item name="output_kind_all" label="すべて"/>
+								<combo_box.item name="output_kind_error" label="エラー"/>
+								<combo_box.item name="output_kind_owner" label="所有者への発言"/>
+								<combo_box.item name="output_kind_debug" label="デバッグチャンネル"/>
+								<combo_box.item name="output_kind_said" label="発言"/>
+								<combo_box.item name="output_kind_im" label="ＩＭ"/>
+							</combo_box>
+							<filter_editor name="output_find" label="フィルター" tool_tip="このテキストを含むメッセージ、またはこのテキストを含む名前からのメッセージのみを表示します"/>
+							<button name="output_clear" label="クリア" tool_tip="これまでのメッセージをクリアします。フィルターはそのままです"/>
+							<button name="output_copy" label="すべてコピー" tool_tip="ペインに表示されている内容をフィルター適用後の状態でクリップボードにコピーします"/>
+						</panel>
+						<panel name="search_tab" label="検索">
+							<scope_bar name="search_bar" tool_tip="検索する内容、一致方法、検索場所。Enterで検索を実行し、変更するたびに再検索します。"/>
+							<button name="search_replace" label="すべて置換" tool_tip="確認後、すべての一致を置換します。開いていないスクリプトは開かれ、変更は未保存になります。"/>
+							<line_editor name="search_replacement" label="置換後の文字列" tool_tip="置換後のテキスト。Enterまたは「すべて置換」で、置換前に確認します"/>
+							<pane_list name="search_results" tool_tip="一致した箇所。開いているスクリプトの変更に合わせて更新されます。Enterまたはダブルクリックでその場所へ移動します。">
+								<pane_list.columns name="where" label="場所"/>
+								<pane_list.columns name="line" label="行"/>
+								<pane_list.columns name="text" label="テキスト"/>
+							</pane_list>
+						</panel>
+						<panel name="weights_tab" label="メモリ">
+							<layout_stack name="weights_stack">
+								<layout_panel name="weights_targets_panel">
+									<pane_list name="weights_targets" tool_tip="各コンパイルターゲットでのコードサイズと、そのターゲットのメモリに占める割合。選択すると内訳を表示します。">
+										<pane_list.columns name="target" label="ターゲット"/>
+										<pane_list.columns name="code" label="コード"/>
+										<pane_list.columns name="share" label="割合"/>
+										<pane_list.columns name="change" label="保存後の変化"/>
+									</pane_list>
+								</layout_panel>
+								<layout_panel name="weights_parts_panel">
+									<pane_list name="weights_parts" tool_tip="選択したターゲットで各部分が使用するメモリと、保存後の変化。ダブルクリックでその場所へ移動します。">
+										<pane_list.columns name="part" label="部分"/>
+										<pane_list.columns name="kind" label="種類"/>
+										<pane_list.columns name="bytes" label="バイト"/>
+										<pane_list.columns name="share" label="割合"/>
+										<pane_list.columns name="change" label="保存後の変化"/>
+										<pane_list.columns name="line" label="行"/>
+									</pane_list>
+								</layout_panel>
+								<layout_panel name="weights_strings_panel">
+									<pane_list name="weights_strings" tool_tip="コンパイル済みスクリプトが1回だけ保持する各文字列と、そのバイト数、使用する命令の数。斜体の行は複数の文字列が共有する先頭で、1回だけ保持できます。ダブルクリックでその場所へ移動します。">
+										<pane_list.columns name="string" label="文字列"/>
+										<pane_list.columns name="bytes" label="バイト"/>
+										<pane_list.columns name="uses" label="使用数"/>
+										<pane_list.columns name="change" label="保存後の変化"/>
+										<pane_list.columns name="line" label="行"/>
+									</pane_list>
+									<button name="weights_keep_start" label="先頭を1回だけ保持" tool_tip="選択した共通の先頭をスクリプト内の専用のローカル変数に1回だけ書き、各文字列に結合し直します。SLuaのみ。1回の取り消し操作で元に戻せます。"/>
+								</layout_panel>
+							</layout_stack>
+						</panel>
+						<panel name="link_tab" label="ファイルにリンク"/>
+					</tab_container>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="inspector_panel">
+			<layout_stack name="inspector_stack">
+				<layout_panel name="outline_panel">
+					<panel name="outline_pane">
+						<text name="outline_head">
+							アウトライン
+						</text>
+						<combo_box name="outline_sort" tool_tip="シンボルをスクリプト内の順序、名前、種類で並べ替えます">
+							<combo_box.item name="outline_sort_order" label="順序"/>
+							<combo_box.item name="outline_sort_name" label="名前"/>
+							<combo_box.item name="outline_sort_kind" label="種類"/>
+						</combo_box>
+						<filter_editor name="outline_filter" label="フィルター" tool_tip="名前にこのテキストを含むシンボルのみを表示します"/>
+						<pane_list name="outline" tool_tip="スクリプト内のシンボル。キャレット位置のものが選択されます。左右キーで折りたたみ、ダブルクリックでその場所へ移動します。">
+							<pane_list.columns name="symbol" label="シンボル"/>
+						</pane_list>
+					</panel>
+				</layout_panel>
+				<layout_panel name="symbol_panel">
+					<panel name="inspector_pane">
+						<text name="symbol_head">
+							キャレット位置
+						</text>
+					</panel>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+	</layout_stack>
+</floater>

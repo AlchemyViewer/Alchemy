@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_lightbox_sky">
+	<accordion name="sky_accordion">
+		<accordion_tab name="atab_sec_daycycle" title="デイサイクル">
+			<panel name="sec_daycycle">
+				<text name="daycycle_note" value="グレーディング中は、リージョンの設定より優先して空を固定します。" tool_tip="止める時計はありません：ビューアは毎フレーム、時刻からサイクル上の位置を計算しています。固定すると、サイクルが今作っている空と水を固定のローカル環境として設定し、それによって動きが止まります。オンの間は、区画やリージョンの自然環境より優先されます。"/>
+				<check_box name="day_freeze" label="空を固定" tool_tip="デイサイクルの１点で空と水面を固定します。チェックを外すと、以前の自然環境に戻ります。リージョンのデフォルトに戻るのではなく、本当に元に戻す操作です。"/>
+				<slider name="day_time" label="位置" tool_tip="サイクル全体に対する割合で示した、固定する位置。時計ではありません：ビューアにはサイクル上の位置を時刻に対応させる仕組みがなく、リージョンはキーフレームを好きな場所に置けます。空が動いている間はそれに追従するので、「固定」にチェックを入れると見ていた瞬間で止まります。"/>
+				<button name="day_sunrise" label="日の出" tool_tip="このリージョンのサイクルで太陽が昇りながら地平線を横切る位置にジャンプして固定します。"/>
+				<button name="day_noon" label="正午" tool_tip="このリージョンのサイクルで太陽が最も高くなる位置にジャンプして固定します。"/>
+				<button name="day_sunset" label="日没" tool_tip="このリージョンのサイクルで太陽が沈みながら地平線を横切る位置にジャンプして固定します。"/>
+				<button name="day_midnight" label="真夜中" tool_tip="このリージョンのサイクルで太陽が最も低くなる位置にジャンプして固定します。"/>
+				<check_box name="day_pause_clouds" label="雲を一時停止" tool_tip="雲はデイサイクルとは別のタイマーで流れるため、空を固定してもこれをオンにするまでは天気が動き続けます。「ワールド」＞「自然環境」＞「雲を一時停止」と同じスイッチです。"/>
+				<button name="day_restore_environment" label="共有環境を使用" tool_tip="ローカル環境を完全に破棄し、区画またはリージョンの自然環境に戻ります。「固定」のチェックを外す場合と異なり、以前に設定した個人用の空には戻りません。"/>
+			</panel>
+		</accordion_tab>
+		<accordion_tab name="atab_sec_skyfx" title="空の効果">
+			<panel name="sec_skyfx">
+				<setting_row name="aurora_intensity" label="オーロラの強度" tool_tip="手続き的に生成するオーロラ（クライアント側でのみ描画）。０で完全にオフ（デフォルト）、１ではっきりした表示、2で鮮やかな表示になります。夜のみで、星と同じ明るさの条件で表示され、散乱した月光で発光がかき消されるため、月が明るくなるにつれて薄れます。ＨＤＲＩの空はドームを置き換えるため、描画先がなくなります。"/>
+				<text name="star_count_label" value="星"/>
+				<combo_box name="star_count_combo" tool_tip="夜空を構成する星の数。変更すると星空を再生成して頂点バッファを再構築するため、一瞬カクつきます。明るい星、中くらいの星、暗い星の比率はどの段階でも同じです。">
+					<combo_box.item name="0" label="なし"/>
+					<combo_box.item name="40000" label="まばら"/>
+					<combo_box.item name="155000" label="標準"/>
+					<combo_box.item name="350000" label="密集"/>
+					<combo_box.item name="700000" label="最大"/>
+				</combo_box>
+				<button name="star_count_rst" tool_tip="デフォルトにリセットします。"/>
+				<check_box name="meteors_enable" label="流星" tool_tip="手続き的に生成する流星の軌跡（クライアント側でのみ描画）。横切る星と同じ夜の条件で表示されます。"/>
+				<setting_row name="meteor_max_count" label="流星の最大数" tool_tip="空に同時に現れる軌跡の数。上限は64で、空の合成がその数まで保持します。"/>
+				<setting_row name="meteor_spawn_interval" label="流星の間隔" tool_tip="軌跡と軌跡の間の平均秒数で、高いほどまれになります。固定の間隔ではなく平均です：レンダラーは毎フレーム出現を抽選するため、アニメーションではなく天候のように見えます。"/>
+				<check_box name="sun_bloom_enable" label="太陽のブルーム" tool_tip="空のブルームテクスチャが太陽の円盤の周りに描くハロー（クライアント側でのみ描画）。空のブルームテクスチャは空の編集画面の「太陽と月」タブで設定します。オフにすると描画もダウンロードもされません。切り替えると空のシェーダーを再構築するため、一瞬カクつきます。"/>
+				<button name="sec_skyfx_reset" label="すべてリセット" tool_tip="このセクションをデフォルトにリセットします。"/>
+			</panel>
+		</accordion_tab>
+	</accordion>
+</panel>

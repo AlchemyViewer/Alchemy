@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="avatar_secondlife_tab">
+	<layout_stack name="avatar_secondlife_stack">
+		<layout_panel name="avatar_info_top">
+			<profile_image name="sl_profile_pic" tool_tip="クリックして写真を選択します"/>
+			<text name="rezday_label">
+				誕生日：
+			</text>
+			<icon name="cake" tool_tip="Rez日おめでとう"/>
+			<text name="online">
+				オンライン
+			</text>
+			<text name="rezday">
+				（不明）
+			</text>
+			<text name="partner_label">
+				パートナー：
+			</text>
+		</layout_panel>
+		<layout_panel name="avatar_desc">
+			<line_editor name="www_edit" tool_tip="Webサイトのリンク"/>
+		</layout_panel>
+		<layout_panel name="avatar_perm">
+			<text name="permissions_label">
+				このアバターに次のことを許可：
+			</text>
+			<check_box name="allow_show_online" label="オンライン状態の確認"/>
+			<check_box name="allow_mapping" label="ワールドマップでの位置の確認"/>
+			<check_box name="allow_object_perms" label="オブジェクトの編集、削除、取得"/>
+		</layout_panel>
+		<layout_panel name="avatar_in_search">
+			<check_box name="allow_publish" label="検索に表示"/>
+		</layout_panel>
+	</layout_stack>
+</panel>

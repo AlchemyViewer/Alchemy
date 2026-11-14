@@ -1,11 +1,5 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <mimetypes name="default">
-	<defaultlabel>
-		（不明）
-	</defaultlabel>
-	<defaultwidget>
-		なし
-	</defaultwidget>
 	<widgetset name="web">
 		<label name="web_label">
 			Webコンテンツ

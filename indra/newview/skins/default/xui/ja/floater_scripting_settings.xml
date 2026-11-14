@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_scripting_settings" title="スクリプト開発の設定">
+	<check_box name="show_script_errors" label="スクリプトエラーの表示先："/>
+	<radio_group name="show_location">
+		<radio_item name="0" label="近くのチャット"/>
+		<radio_item name="1" label="別ウィンドウ"/>
+	</radio_group>
+	<text name="tip">
+		外部スクリプトエディター：
+	</text>
+	<button name="browse_btn" label="参照…"/>
+	<check_box name="tight_integration" label="VS Codeとの密な連携"/>
+	<check_box name="websocket_sync_enable" label="WebSocket同期を有効にする"/>
+	<text name="websocket_tip">
+		WebSocketの待ち受けポート：
+	</text>
+	<check_box name="websocket_forward_debug" label="スクリプトのエラーとデバッグ出力をWebSocketクライアントに転送する"/>
+	<button name="close_btn" label="閉じる"/>
+</floater>

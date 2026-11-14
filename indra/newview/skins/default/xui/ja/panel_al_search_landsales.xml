@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_search_landsales">
+	<text name="search_title" value="検索語を入力："/>
+	<check_box name="price_check" label="価格　＞"/>
+	<check_box name="area_check" label="面積　＞"/>
+	<combo_box name="land_type">
+		<combo_box.item name="All" label="すべてのカテゴリ"/>
+		<combo_box.item name="Auction" label="オークション"/>
+		<combo_box.item name="Mainland" label="メインランドの販売"/>
+		<combo_box.item name="Estate" label="エステートの販売"/>
+	</combo_box>
+	<combo_box name="land_sort">
+		<combo_box.item name="Name_item" label="名前で並べ替え"/>
+		<combo_box.item name="Price_item" label="価格で並べ替え"/>
+		<combo_box.item name="PPM_item" label="平方メートルあたりの価格で並べ替え"/>
+		<combo_box.item name="Area_item" label="面積で並べ替え"/>
+	</combo_box>
+	<check_box name="ascending" label="昇順"/>
+</panel>

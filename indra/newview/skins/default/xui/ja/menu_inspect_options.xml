@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_group_plus">
+	<menu_item_check name="description" label="説明"/>
+	<menu_item_check name="owner_name" label="所有者名"/>
+	<menu_item_check name="creator_name" label="制作者名"/>
+	<menu_item_check name="facecount" label="面数"/>
+	<menu_item_check name="vertexcount" label="頂点数"/>
+	<menu_item_check name="trianglecount" label="三角形の数"/>
+	<menu_item_check name="creation_date" label="作成日"/>
+	<menu_item_check name="land_impact" label="ランドインパクト"/>
+	<menu_item_check name="rendercost" label="描画コスト（ARC）"/>
+	<menu_item_check name="physicscost" label="物理コスト"/>
+	<menu_item_check name="streamingcost" label="ストリーミングコスト"/>
+	<menu_item_check name="primcount" label="プリム数"/>
+	<menu_item_check name="distance" label="距離"/>
+	<menu_item_check name="scripts" label="スクリプト"/>
+	<menu_item_check name="lightglow" label="ライト／グロー"/>
+	<menu_item_check name="media" label="メディア"/>
+	<menu_item_check name="alphapbr" label="アルファ／PBR"/>
+</toggleable_menu>

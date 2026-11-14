@@ -7,7 +7,7 @@
 		輝度：
 	</string>
 	<string name="hdr_tooltip">
-		リアルで明るい空やダイナミックな露出などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値は周辺光源とＨＤＲの混合となります。
+		リアルで明るい空やダイナミックな露光などの光源効果の強さを指定します。1.0がデフォルトで、0はオフとなり、0～1の間の値は周辺光源とＨＤＲの混合となります。
 	</string>
 	<layout_stack name="outer_stack">
 		<!-- If I put in a timeline it would go here -->

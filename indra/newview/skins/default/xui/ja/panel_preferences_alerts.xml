@@ -13,4 +13,6 @@
 	<text name="dont_show_label">
 		表示しないメッセージ：
 	</text>
+	<check_box name="music_stream_title" label="音楽ストリームのタイトルが変わったとき"/>
+	<check_box name="music_stream_title_checkbox_chat" label="近くのチャットに表示"/>
 </panel>

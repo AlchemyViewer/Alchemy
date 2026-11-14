@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_lightbox_settings">
+	<floater.string name="find_placeholder">
+		設定やセクションを検索
+	</floater.string>
+	<floater.string name="history_reset_section">
+		[SECTION]をリセット
+	</floater.string>
+	<floater.string name="history_reset_setting">
+		[SETTING]をリセット
+	</floater.string>
+	<floater.string name="history_look">
+		ルック：[NAME]
+	</floater.string>
+	<floater.string name="history_revert">
+		[NAME]に戻す
+	</floater.string>
+	<floater.string name="history_white_balance">
+		ホワイトバランスの選択
+	</floater.string>
+	<floater.string name="history_settings">
+		[COUNT]個の設定
+	</floater.string>
+	<floater.string name="history_start">
+		履歴の開始
+	</floater.string>
+	<floater.string name="history_empty_headline">
+		取り消せる操作はまだありません
+	</floater.string>
+	<floater.string name="history_empty_sentence">
+		グレーディングの変更は、行うたびにここに一覧表示されます。ダブルクリックすると、その時点に戻ります。
+	</floater.string>
+	<floater.string name="color_full_picker">
+		詳細なピッカー…
+	</floater.string>
+	<floater.string name="color_full_picker_tooltip">
+		ビューアのカラーピッカーを開きます。数値入力やスポイトが使え、ここで選んだ色から始まります
+	</floater.string>
+	<floater.string name="pane_title">
+		Lightbox：[TAB]
+	</floater.string>
+	<floater.string name="pane_take_out_tooltip">
+		[TAB]タブを独立したウィンドウに取り出します
+	</floater.string>
+	<floater.string name="pane_put_back_tooltip">
+		[TAB]タブをLightboxに戻します
+	</floater.string>
+	<floater.string name="pane_away_headline">
+		[TAB]は独立したウィンドウに表示されています
+	</floater.string>
+	<floater.string name="pane_away_sentence">
+		そのウィンドウは使いやすい場所に移動できます。ウィンドウを閉じるか、下のボタンを押すと、タブはここに戻ります。
+	</floater.string>
+	<floater.string name="pane_put_back">
+		元に戻す
+	</floater.string>
+	<panel name="lightbox_topbar">
+		<combo_box name="looks_combo" tool_tip="保存したルック（「ルック」タブと「レンズ」タブの見た目の設定をまとめたもの）を適用します。名前の後の「*」は、そのルックを適用してから設定が変更されたことを示します。"/>
+		<button name="look_save" tool_tip="保存：現在のルックを今の設定で上書きします"/>
+		<button name="look_saveas" tool_tip="名前を付けて保存：現在の設定を新しいルックとして保存します"/>
+		<button name="look_delete" tool_tip="保存したルックを削除します"/>
+		<button name="look_revert" tool_tip="元に戻す：変更を破棄し、最後に適用したルックを再適用します"/>
+		<button name="look_undo" tool_tip="最後のグレーディングの変更を取り消します（Ctrl+Z）。コントロールを1回ドラッグすると1ステップです。"/>
+		<button name="look_redo" tool_tip="取り消した変更をやり直します（Ctrl+YまたはCtrl+Shift+Z）"/>
+		<button name="look_history" tool_tip="履歴：Lightboxを開いてからのすべてのグレーディングの変更を名前付きで表示します。ダブルクリックすると、その時点まで戻るか進みます。"/>
+		<button name="open_scopes" tool_tip="スコープ：グレーディング中のフレームを計測します。ヒストグラム、波形、パレード、ベクトルスコープを最大4つ同時に表示できます。もう一度クリックすると閉じます。"/>
+		<button name="lightbox_find" tool_tip="設定やセクションを名前で検索して移動します（Ctrl+F）"/>
+	</panel>
+	<tab_container name="lightbox_tabs">
+		<panel name="tab_look" label="ルック" tool_tip="露光とトーンマッピング、カラーグレーディング、3D LUT、トーンカーブ。このタブの数字は、比較のためにオフにしているグレーディングのセクション数です。"/>
+		<panel name="tab_lens" label="レンズ" tool_tip="カメラとフィルムの効果：被写界深度とボケ、レンズの収差、ブルーム／グローとクロスフィルター、レンズフレア、レンズの汚れ、色収差、歪み、周辺減光、粒子、シャープネス。"/>
+		<panel name="tab_scene" label="シーン" tool_tip="描画品質：アンチエイリアス、反射、ミラー、影とアンビエントオクルージョン、パフォーマンス、プレビュー補助。"/>
+		<panel name="tab_sky" label="空" tool_tip="ワールドの自然環境を自分用に変更するデイサイクルと、自分の画面にだけ描画される空の効果。"/>
+		<button name="lightbox_pop_out" tool_tip="このタブを独立したウィンドウに取り出します"/>
+	</tab_container>
+</floater>
