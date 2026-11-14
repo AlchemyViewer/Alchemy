@@ -42,6 +42,7 @@
 #include "llcommunicationchannel.h"
 #include "llfloaterreg.h"
 #include "llhudicon.h"
+#include "alfloaterfontreset.h"
 #include "llmeshrepository.h"
 #include "llnotificationhandler.h"
 #include "llpanellogin.h"
@@ -3222,6 +3223,17 @@ bool LLViewerWindow::handleKey(KEY key, MASK mask)
     if (LLSetKeyBindDialog::recordKey(key, mask, true))
     {
         LL_DEBUGS() << "Key handled by LLSetKeyBindDialog" << LL_ENDL;
+        return true;
+    }
+
+    // Ctrl/Cmd+Alt+Shift+F opens the font-reset dialog. Key recording
+    // takes priority above, and recordKey() can decline a key while
+    // still recording (mask-only or filtered combos), so check
+    // isRecording() explicitly to keep this dialog out of recording.
+    if (!LLSetKeyBindDialog::isRecording()
+        && (key == 'f' || key == 'F') && (mask & MASK_CONTROL) && (mask & MASK_ALT) && (mask & MASK_SHIFT))
+    {
+        ALFloaterFontReset::showConfirm();
         return true;
     }
 
@@ -6707,6 +6719,9 @@ void LLViewerWindow::initFonts(F32 zoom_factor)
     // the first font load so the renderer sees the right glyph types from
     // the start.
     LLFontGL::sForceMonochromeEmoji = gSavedSettings.getBOOL("AlchemyForceMonochromeEmoji");
+    // Same seeding for --resetfonts: createFont must already know to
+    // search the user font directory last on the first font load.
+    LLFontGL::sResetFontsOnStartup = gSavedSettings.getBOOL("AlchemyResetFontsOnStartup");
 
     LLFontGL::initClass( gSavedSettings.getF32("FontScreenDPI"),
                                 mDisplayScale.mV[VX] * zoom_factor,

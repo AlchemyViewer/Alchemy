@@ -2946,6 +2946,38 @@
             <key>Value</key>
             <map />
         </map>
+        <key>AlchemyImportedFonts</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                User-imported font families. Array of maps, one per imported family:
+                { name (canonical internal key), label (display name), category
+                (proportional|monospace|emoji), files: [ { file (leaf in the
+                per-user fonts dir), style (NORMAL|BOLD|ITALIC|"BOLD|ITALIC") } ] }.
+                Source of truth for the generated fonts/imported_fonts.xml overlay.
+            </string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>LLSD</string>
+            <key>Value</key>
+            <array />
+        </map>
+        <key>AlchemyResetFontsOnStartup</key>
+        <map>
+            <key>Comment</key>
+            <string>
+                Set by the --resetfonts command-line option. When true at startup the
+                viewer clears all AlchemyUIFontOverrides before fonts load, restoring the
+                built-in fonts. Not persisted; it is a one-shot recovery action.
+            </string>
+            <key>Persist</key>
+            <integer>0</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyVOCacheEvictionMode</key>
         <map>
             <key>Comment</key>

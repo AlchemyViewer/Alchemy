@@ -462,6 +462,83 @@ S32 LLFontFreetype::getNumFaces(const std::string& filename)
     return num_faces;
 }
 
+LLFontFreetype::FaceInfo LLFontFreetype::probeFaceInfo(const std::string& filename)
+{
+    FaceInfo info;
+
+    auto contents = LLFile::getContents(filename);
+    if (contents.empty())
+        return info;
+
+    FT_Open_Args openArgs;
+    memset(&openArgs, 0, sizeof(openArgs));
+    openArgs.memory_base = reinterpret_cast<const FT_Byte*>(contents.data());
+    openArgs.memory_size = static_cast<FT_Long>(contents.size());
+    openArgs.flags = FT_OPEN_MEMORY;
+
+    FT_Face probe = nullptr;
+    if (FT_Open_Face(gFTLibrary, &openArgs, 0, &probe) != 0)
+        return info;
+
+    info.family = probe->family_name ? probe->family_name : "";
+
+    info.bold   = (probe->style_flags & FT_STYLE_FLAG_BOLD) != 0;
+    info.italic = (probe->style_flags & FT_STYLE_FLAG_ITALIC) != 0;
+    if (!info.bold || !info.italic)
+    {
+        std::string style = probe->style_name ? probe->style_name : "";
+        LLStringUtil::toLower(style);
+        if (style.find("bold") != std::string::npos)
+            info.bold = true;
+        if (style.find("italic") != std::string::npos || style.find("oblique") != std::string::npos)
+            info.italic = true;
+    }
+
+    info.fixed_width = (probe->face_flags & FT_FACE_FLAG_FIXED_WIDTH) != 0;
+    info.has_color   = FT_HAS_COLOR(probe);
+    info.valid       = !info.family.empty();
+
+    if (info.valid && !FT_IS_SCALABLE(probe))
+    {
+        // Bitmap-only faces (including sbix, which FreeType reports as
+        // non-scalable) cannot be scaled by the viewer: ALFontFace::load
+        // sizes a face with FT_Set_Char_Size, which for such faces only
+        // succeeds when a strike's ppem exactly matches the requested
+        // size. A family name alone therefore does not make the font
+        // usable -- reject it unless at least one strike matches a size
+        // the viewer actually requests, instead of importing a font
+        // that then fails to load. Scalable faces (including scalable
+        // faces that also carry sbits) are unaffected.
+        // The required point sizes are the global <font_size> table in
+        // fonts.xml (SmallLSL, Small, Medium, Monospace, HugeLSL, Huge),
+        // tested at the viewer's current DPI -- the same size
+        // ALFontFace::load will request on the reload that follows
+        // import.
+        static const F32 kRequiredPointSizes[] = { 7.f, 9.f, 10.f, 11.f, 12.f, 16.f };
+        const F32 horz_dpi = LLFontGL::sHorizDPI > 0.f ? LLFontGL::sHorizDPI : 96.f;
+        const F32 vert_dpi = LLFontGL::sVertDPI > 0.f ? LLFontGL::sVertDPI : 96.f;
+
+        bool has_usable_strike = probe->num_fixed_sizes > 0 && probe->available_sizes != nullptr;
+        if (has_usable_strike)
+        {
+            has_usable_strike = false;
+            for (F32 point_size : kRequiredPointSizes)
+            {
+                if (FT_Set_Char_Size(probe, 0, static_cast<FT_F26Dot6>(point_size * 64.f),
+                                     (U32)horz_dpi, (U32)vert_dpi) == 0)
+                {
+                    has_usable_strike = true;
+                    break;
+                }
+            }
+        }
+        info.valid = has_usable_strike;
+    }
+
+    FT_Done_Face(probe);
+    return info;
+}
+
 void LLFontFreetype::addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font,
                                      const char_functor_t& functor) const
 {

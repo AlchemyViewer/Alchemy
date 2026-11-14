@@ -218,6 +218,10 @@ public:
     void setRecommendedSettings();
     void resetAutotuneSettings();
 
+public:
+    // Refresh the font dropdowns in the open Preferences floater.
+    static void scheduleFontDropdownRefresh();
+
 private:
 
     void onDeleteTranscripts();
@@ -253,6 +257,19 @@ private:
     // being overridden. Empty input erases the override; otherwise writes
     // the raw filename.
     void onUIFontFileEntered(LLUICtrl* ctrl, const LLSD& userdata);
+
+    // Rebuild the imported-font list control from the saved setting.
+    void refreshImportedFontList();
+    // Open the file picker for importing font files.
+    void onImportFont();
+    // Handle the picker result: validate, copy, and register imported fonts.
+    void onImportFontCallback(const std::vector<std::string>& filenames);
+    // Prompt to remove the selected imported font family.
+    void onRemoveImportedFont();
+    // Handle the remove confirmation: delete files and refresh the list.
+    void callbackRemoveImportedFont(const LLSD& notification, const LLSD& response);
+    // Show the reset-fonts confirmation dialog.
+    void onResetFonts();
 
     static std::string sSkin;
     notifications_map mNotificationOptions;

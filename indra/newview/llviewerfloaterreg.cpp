@@ -42,6 +42,7 @@
 #include "alfloaterexploresounds.h"
 #include "alfloaterfeedback.h"
 #include "alfloaterfeedbackpreview.h"
+#include "alfloaterfontreset.h"
 #include "alfloatergenerictext.h"
 #include "alfloatergroupprofile.h"
 #include "alfloaterlightbox.h"
@@ -589,6 +590,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("delete_queue", "floater_script_queue.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterDeleteQueue>);
     LLFloaterReg::add("feedback", "floater_al_feedback.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterFeedback>);
     LLFloaterReg::add("feedback_preview", "floater_al_feedback_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterFeedbackPreview>);
+    LLFloaterReg::add("font_reset", "floater_al_font_reset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterFontReset>);
     LLFloaterReg::add("generic_text", "floater_al_generic_text.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGenericText>);
     LLFloaterReg::add("group_profile", "floater_al_group_profile.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterGroupProfile>);
     LLFloaterReg::add("legacy_profile", "floater_al_profile_legacy.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterProfileLegacy>);
