@@ -1000,6 +1000,7 @@ if(AL_BUILD_VIEWER)
     rlvinventory.cpp
     rlvlocks.cpp
     rlvui.cpp
+    skcombatlockout.cpp
   )
 
   set(
@@ -1887,6 +1888,7 @@ if(AL_BUILD_VIEWER)
     rlvlocks.h
     rlvmodifiers.h
     rlvui.h
+    skcombatlockout.h
     roles_constants.h
   )
 

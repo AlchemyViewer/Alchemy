@@ -2922,11 +2922,14 @@ void LLPipeline::resetFrameStats()
     LLRender::sDrawCalls    = 0;
     LLRender::sDrawElements = 0;
 
-    if (mOldRenderDebugMask != mRenderDebugMask)
+    // <SK:Nexii> The mask as readers see it, so text left by a view the combat render lockout hides is cleared
+    const U64 debug_mask = mRenderDebugMask & ~SKCombatLockout::debugMask();
+    if (mOldRenderDebugMask != debug_mask)
     {
         gObjectList.clearDebugText();
-        mOldRenderDebugMask = mRenderDebugMask;
+        mOldRenderDebugMask = debug_mask;
     }
+    // </SK:Nexii>
 }
 
 //external functions for asynchronous updating
@@ -4802,7 +4805,8 @@ void LLPipeline::postSort(LLCamera &camera)
     }
 
     // only render if the flag is set. The flag is only set if we are in edit mode or the toggle is set in the menus
-    if (LLFloaterReg::instanceVisible("beacons") && !sShadowRender && !gCubeSnapshot)
+    // <SK:Nexii/> Combat render lockout: beacons are unoccluded lines over every scripted object and sound source
+    if (LLFloaterReg::instanceVisible("beacons") && !sShadowRender && !gCubeSnapshot && !SKCombatLockout::active())
     {
         if (sRenderScriptedTouchBeacons)
         {
@@ -7410,29 +7414,31 @@ void LLPipeline::toggleRenderType(U32 type)
     }
 }
 
+// <SK:Nexii> The UI goes through the combat render lockout, which holds the user's intent for a geometry type it has forced on.
 //static
 void LLPipeline::toggleRenderTypeControl(U32 type)
 {
-    gPipeline.toggleRenderType(type);
+    SKCombatLockout::toggleRenderType(type);
 }
 
 //static
 bool LLPipeline::hasRenderTypeControl(U32 type)
 {
-    return gPipeline.hasRenderType(type);
+    return SKCombatLockout::hasRenderType(type);
 }
 
 // Allows UI items labeled "Hide foo" instead of "Show foo"
 //static
 bool LLPipeline::toggleRenderTypeControlNegated(S32 type)
 {
-    return !gPipeline.hasRenderType(type);
+    return !SKCombatLockout::hasRenderType(type);
 }
+// </SK:Nexii>
 
 //static
 void LLPipeline::toggleRenderDebug(U64 bit)
 {
-    if (gPipeline.hasRenderDebugMask(bit))
+    if (gPipeline.mRenderDebugMask & bit) // <SK:Nexii/> raw mask, so a toggle made under the combat render lockout lands on the user's state
     {
         LL_INFOS() << "Toggling render debug mask " << std::hex << bit << " off" << std::dec << LL_ENDL;
     }
@@ -7447,7 +7453,7 @@ void LLPipeline::toggleRenderDebug(U64 bit)
 //static
 bool LLPipeline::toggleRenderDebugControl(U64 bit)
 {
-    return gPipeline.hasRenderDebugMask(bit);
+    return bool(gPipeline.mRenderDebugMask & bit); // <SK:Nexii/> raw mask, the user's state under the combat render lockout
 }
 
 //static
