@@ -41,6 +41,8 @@ class LLXfer;
 #include "llassetstorage.h"
 #include "lldir.h"
 #include <deque>
+#include <optional>
+#include <string_view>
 #include "llthrottle.h"
 
 class LLHostStatus
@@ -180,6 +182,13 @@ class LLXferManager
     */
     virtual void expectFileForRequest(const std::string& filename);
     virtual bool validateFileForRequest(const std::string& filename);
+
+    /**
+        The cache file a request from no folder names by the legacy "data/"
+        prefix: the name without the prefix, or nothing where the name does
+        not begin with it.
+    */
+    static std::optional<std::string_view> legacyCacheName(std::string_view filename);
 
     /**
         Same idea but for VFiles, kept separate to avoid namespace overlap

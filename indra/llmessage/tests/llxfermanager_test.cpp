@@ -39,10 +39,14 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <cctype>
+#include <clocale>
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace
@@ -71,6 +75,34 @@ namespace
             INFO("local file name '" << local << "'");
             CHECK_NOTHROW(LLXfer_File(local, true, -1));
         }
+    }
+
+    TEST_CASE("LLXferManager: a requested name shorter than the legacy cache prefix names no cache file", "[LLXferManager]")
+    {
+        // Each name is read out of a buffer that goes on with the prefix, so
+        // a comparison that runs past a name's end finds the prefix there.
+        const std::string_view buffer = "data/held.tmp";
+        for (size_t length = 0; length < std::string_view("data/").size(); ++length)
+        {
+            const std::string_view name = buffer.substr(0, length);
+            INFO("requested name '" << name << "'");
+            CHECK_FALSE(LLXferManager::legacyCacheName(name).has_value());
+        }
+    }
+
+    TEST_CASE("LLXferManager: a requested name under the legacy cache prefix names the cache file after it", "[LLXferManager]")
+    {
+        const std::optional<std::string_view> held = LLXferManager::legacyCacheName("data/held.tmp");
+        REQUIRE(held.has_value());
+        CHECK(*held == "held.tmp");
+
+        const std::optional<std::string_view> bare = LLXferManager::legacyCacheName("data/");
+        REQUIRE(bare.has_value());
+        CHECK(bare->empty());
+
+        CHECK_FALSE(LLXferManager::legacyCacheName("held.tmp").has_value());
+        CHECK_FALSE(LLXferManager::legacyCacheName("Data/held.tmp").has_value());
+        CHECK_FALSE(LLXferManager::legacyCacheName("/data/held.tmp").has_value());
     }
 
     // The xfer messages, as the template the viewer reads has them.
@@ -335,15 +367,42 @@ namespace
         LLXfer* find(U64 id) { return mManager.findXferByID(id, mManager.mReceiveList); }
 
         // The simulator sends SendXferPacket with these bytes, and the viewer
-        // reads it. `packet` is its number, and the unreliable packet that
-        // carries it is numbered in the order they go.
+        // reads it. `packet` is its number.
         bool deliver(U64 id, U32 packet, const std::vector<U8>& data)
         {
-            std::vector<U8> bytes = { 0, 0, 0, 0, (U8)++mPacketsSent, 0, 18 };
-            appendLittleEndian(bytes, id);
-            appendLittleEndian(bytes, packet);
-            appendLittleEndian(bytes, (U16)data.size());
-            bytes.insert(bytes.end(), data.begin(), data.end());
+            std::vector<U8> message = { 18 };
+            appendLittleEndian(message, id);
+            appendLittleEndian(message, packet);
+            appendLittleEndian(message, (U16)data.size());
+            message.insert(message.end(), data.begin(), data.end());
+            return send(message);
+        }
+
+        // The simulator sends RequestXfer for a file of the viewer's named
+        // `filename` in `path`, and the viewer reads it.
+        bool askFor(U64 id, const std::string& filename, ELLPath path)
+        {
+            std::vector<U8> message = { 0xFF, 0xFF, 0x00, 156 };
+            appendLittleEndian(message, id);
+            message.push_back((U8)(filename.size() + 1));
+            message.insert(message.end(), filename.begin(), filename.end());
+            message.push_back(0);
+            message.push_back((U8)path);
+            message.push_back(0); // DeleteOnCompletion
+            message.push_back(0); // UseBigPackets
+            message.insert(message.end(), UUID_BYTES, 0); // VFileID
+            appendLittleEndian(message, (S16)0); // VFileType
+            return send(message);
+        }
+
+    private:
+        // The simulator sends a message, its number and body, in an
+        // unreliable packet numbered in the order they go, and the viewer
+        // reads it.
+        bool send(const std::vector<U8>& message)
+        {
+            std::vector<U8> bytes = { 0, 0, 0, 0, (U8)++mPacketsSent, 0 };
+            bytes.insert(bytes.end(), message.begin(), message.end());
             if (!mSimulator.send(bytes, LLHost("127.0.0.1", mSystem.getListenPort())))
             {
                 return false;
@@ -362,7 +421,6 @@ namespace
             return mSystem.mPacketsIn == wanted;
         }
 
-    private:
         XferTemplateFile mTemplate;
         LLMessageSystem mSystem;
         LLMessageSystem* mPriorSystem;
@@ -371,6 +429,80 @@ namespace
         LLXferManager mManager;
         U32 mPacketsSent = 0;
     };
+
+    // The C library's character classes set to a locale with a letter past
+    // ASCII, where the system has one, and put back as this ends: Windows's
+    // Japanese code page, whose half-width katakana are single bytes, or a
+    // Latin-1 locale.
+    class LettersPastAscii
+    {
+    public:
+        LettersPastAscii()
+        {
+            const char* prior = std::setlocale(LC_CTYPE, nullptr);
+            mPrior = prior ? prior : "C";
+            const std::pair<const char*, unsigned char> locales[] = {
+                { "Japanese_Japan.932", 0xB1 }, // ｱ
+                { "en_US.ISO-8859-1", 0xE9 },   // é
+                { "en_US.ISO8859-1", 0xE9 },
+                { "en_US.iso88591", 0xE9 },
+                { "de_DE.ISO-8859-1", 0xE9 },
+            };
+            for (const auto& [name, letter] : locales)
+            {
+                if (std::setlocale(LC_CTYPE, name) && std::isalpha(letter))
+                {
+                    mName = name;
+                    mLetter = (char)letter;
+                    return;
+                }
+            }
+            std::setlocale(LC_CTYPE, mPrior.c_str());
+        }
+
+        ~LettersPastAscii()
+        {
+            std::setlocale(LC_CTYPE, mPrior.c_str());
+        }
+
+        LettersPastAscii(const LettersPastAscii&) = delete;
+        LettersPastAscii& operator=(const LettersPastAscii&) = delete;
+
+        // The locale set, or nothing where the system has none of them.
+        const std::string& name() const { return mName; }
+        // A byte past ASCII that is one of its letters.
+        char letter() const { return mLetter; }
+
+    private:
+        std::string mPrior;
+        std::string mName;
+        char mLetter = (char)0xE9;
+    };
+
+    TEST_CASE("LLXferManager: a requested cache file name with a byte past ASCII is refused", "[LLXferManager]")
+    {
+        // The names the cache serves hold ASCII alone, whatever the locale
+        // takes for a letter.
+        const LettersPastAscii letters;
+        INFO("locale '" << letters.name() << "'");
+
+        XferSession session;
+        REQUIRE(session.isReady());
+
+        constexpr U64 REFUSED = 0x0123456789ABCE01ull;
+        REQUIRE(session.askFor(REFUSED, std::string("llxfermanager_test_") + letters.letter() + ".tmp", LL_PATH_CACHE));
+        CHECK(session.simulator().receive(0.1f).empty());
+        CHECK(session.manager().mSendList.empty());
+
+        // A name of ASCII alone is taken, and the file, which isn't there,
+        // given up.
+        constexpr U64 TAKEN = 0x0123456789ABCE02ull;
+        REQUIRE(session.askFor(TAKEN, "llxfermanager_test_absent.tmp", LL_PATH_CACHE));
+        const std::vector<U8> answer = session.simulator().receive(1.f);
+        REQUIRE(isAbortXfer(answer));
+        CHECK(readLittleEndian<U64>(answer, 10) == TAKEN);
+        CHECK(readLittleEndian<S32>(answer, 18) == LL_ERR_FILE_NOT_FOUND);
+    }
 
     TEST_CASE("LLXferManager: a first packet too short to hold the file's size gives the file up", "[LLXferManager]")
     {
