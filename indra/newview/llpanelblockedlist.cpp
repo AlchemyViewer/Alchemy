@@ -163,7 +163,7 @@ void LLPanelBlockedList::unblockItem()
     LLBlockedListItem* item = mBlockedList->getBlockedItem();
     if (item)
     {
-        LLMute mute(item->getUUID(), item->getName());
+        LLMute mute(item->getUUID(), item->getName(), item->getType());
         LLMuteList::instance().remove(mute);
     }
 }

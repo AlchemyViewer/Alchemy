@@ -32,6 +32,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include "alfriendbacklog.h"
 #include "lluserrelations.h"
 #include "lluuid.h"
 #include "v3dmath.h"
@@ -110,8 +111,9 @@ public:
     // add or remove agents from buddy list. Each method takes a set
     // of buddies and returns how many were actually added or removed.
     typedef std::map<LLUUID, LLRelationship*> buddy_map_t;
-    typedef std::queue<std::pair<LLUUID, bool>> buddy_status_queue_t;
 
+    // Applies the login's friends list, which may be empty, and then what the circuit said meanwhile about the
+    // friends it names.
     S32 addBuddyList(const buddy_map_t& buddies);
     //S32 removeBuddyList(const buddy_list_t& exes);
     void copyBuddyList(buddy_map_t& buddies) const;
@@ -169,7 +171,13 @@ public:
     // buddy list in the functor or bad things will happen.
     void applyFunctor(LLRelationshipFunctor& f);
 
+    // friend_id is a friend now: the server answered the agent's acceptance of their offer, or they accepted the
+    // agent's.
     static void formFriendship(const LLUUID& friend_id);
+    // The agent accepted friend_id's offer: what the circuit says of them is held until the server answers, with
+    // formFriendship or friendshipRefused.
+    void expectFriendship(const LLUUID& friend_id);
+    void friendshipRefused(const LLUUID& friend_id);
 
 protected:
     void deleteTrackingData();
@@ -187,6 +195,13 @@ protected:
     void processNotify(LLMessageSystem* msg, bool online);
     void processChange(LLMessageSystem* msg);
 
+    // Makes id a friend, with the rights a new friendship starts with, unless they are one. Says whether they were
+    // made one.
+    bool befriend(const LLUUID& id);
+    // Applies a notice held until its resident's place in the friends list was known: makes them a friend, for a
+    // friendship formed, or else applies it if they are one.
+    void applyHeldNotice(const ALFriendBacklog::Notice& notice);
+
 protected:
     static LLAvatarTracker sInstance;
     LLTrackingData* mTrackingData;
@@ -196,7 +211,9 @@ protected:
     //LLInventoryObserver* mInventoryObserver;
 
     buddy_map_t mBuddyInfo;
-    buddy_status_queue_t mBuddyStatusQueue;
+    // what the circuit said of residents not in mBuddyInfo, and the friendships formed, before the login's list was
+    // applied
+    ALFriendBacklog mBacklog;
 
     typedef std::set<LLUUID> changed_buddy_t;
     changed_buddy_t mChangedBuddyIDs;

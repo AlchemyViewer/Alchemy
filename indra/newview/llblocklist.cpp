@@ -356,7 +356,7 @@ void LLBlockList::onCustomAction(const LLSD& userdata)
 
     if ("unblock_item" == command_name)
     {
-        LLMute mute(item->getUUID(), item->getName());
+        LLMute mute(item->getUUID(), item->getName(), item->getType());
         LLMuteList::getInstance()->remove(mute);
     }
     else if ("profile_item" == command_name)

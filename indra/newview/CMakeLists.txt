@@ -1148,6 +1148,7 @@ if(AL_BUILD_VIEWER)
     allightboxdirectory.h
     almaturitypreference.h
     almotionpredictor.h
+    almutelookup.h
     alobjectproperties.h
     alobjectroster.h
     alprobereach.h
@@ -1157,6 +1158,7 @@ if(AL_BUILD_VIEWER)
     alcrashreporter.h
     alfeedback.h
     alfeedbackoutbox.h
+    alfriendbacklog.h
     alpanelaomini.h
     alparceliconstrip.h
     alpanelaopulldown.h
@@ -2550,9 +2552,11 @@ if(AL_BUILD_TESTS)
       tests/aldaycyclelandmarks_test.cpp
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
+      tests/alfriendbacklog_test.cpp
       tests/algradehistory_test.cpp
       tests/almaturitypreference_test.cpp
       tests/almotionpredictor_test.cpp
+      tests/almutelookup_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
       tests/alprobereach_test.cpp

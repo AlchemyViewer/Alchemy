@@ -271,19 +271,12 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
         }
     }
 
-    // It's possible that the buddy list getting propagated from the inventory may have happened after we actually got the buddy list.
-    // Any buddies that we got prior will reside in a special queue that we must process and update statuses accordingly with.
-    // Do that here.
-    // -Geenz 2025-03-12
-    while (!mBuddyStatusQueue.empty())
+    // The circuit is listened to before the login's list is applied, so notices about friends may have come
+    // first; they apply now to those the list names. From here on a notice about anyone else is about someone who
+    // is not a friend.
+    for (const ALFriendBacklog::Notice& notice : mBacklog.applyList())
     {
-        auto buddyStatus = mBuddyStatusQueue.front();
-        mBuddyStatusQueue.pop();
-
-        if (mBuddyInfo.find(buddyStatus.first) != mBuddyInfo.end())
-        {
-            setBuddyOnline(buddyStatus.first, buddyStatus.second);
-        }
+        applyHeldNotice(notice);
     }
 
     // do not notify observers here - list can be large so let it be done on idle.
@@ -291,6 +284,60 @@ S32 LLAvatarTracker::addBuddyList(const LLAvatarTracker::buddy_map_t& buds)
     return new_buddy_count;
 }
 
+
+bool LLAvatarTracker::befriend(const LLUUID& id)
+{
+    if (get_ptr_in_map(mBuddyInfo, id))
+    {
+        return false;
+    }
+    //The default for relationship establishment is to have both parties
+    //visible online to each other.
+    mBuddyInfo[id] = new LLRelationship(LLRelationship::GRANT_ONLINE_STATUS, LLRelationship::GRANT_ONLINE_STATUS, false);
+    addChangedMask(LLFriendObserver::ADD, id);
+    return true;
+}
+
+void LLAvatarTracker::applyHeldNotice(const ALFriendBacklog::Notice& notice)
+{
+    if (notice.mKind == ALFriendBacklog::Kind::FORMED)
+    {
+        befriend(notice.mID);
+        return;
+    }
+
+    LLRelationship* buddy = get_ptr_in_map(mBuddyInfo, notice.mID);
+    if (!buddy)
+    {
+        // not a friend after all
+        return;
+    }
+
+    switch (notice.mKind)
+    {
+    case ALFriendBacklog::Kind::ONLINE:
+    case ALFriendBacklog::Kind::OFFLINE:
+        setBuddyOnline(notice.mID, notice.mKind == ALFriendBacklog::Kind::ONLINE);
+        break;
+    case ALFriendBacklog::Kind::TERMINATED:
+        mBuddyInfo.erase(notice.mID);
+        addChangedMask(LLFriendObserver::REMOVE, notice.mID);
+        delete buddy;
+        break;
+    case ALFriendBacklog::Kind::RIGHTS_TO:
+        buddy->setRightsTo(notice.mRights);
+        addChangedMask(LLFriendObserver::POWERS, notice.mID);
+        break;
+    case ALFriendBacklog::Kind::RIGHTS_FROM:
+        buddy->setRightsFrom(notice.mRights);
+        LLViewerObject::markObjectsForUpdate(notice.mID);
+        addChangedMask(LLFriendObserver::POWERS, notice.mID);
+        break;
+    case ALFriendBacklog::Kind::FORMED:
+        // applied above
+        break;
+    }
+}
 
 void LLAvatarTracker::copyBuddyList(buddy_map_t& buddies) const
 {
@@ -345,12 +392,10 @@ void LLAvatarTracker::setBuddyOnline(const LLUUID& id, bool is_online)
         addChangedMask(LLFriendObserver::ONLINE, id);
         LL_DEBUGS() << "Set buddy " << id << (is_online ? " Online" : " Offline") << LL_ENDL;
     }
-    else
+    else if (!mBacklog.hold({ id, is_online ? ALFriendBacklog::Kind::ONLINE : ALFriendBacklog::Kind::OFFLINE }))
     {
         LL_WARNS() << "!! No buddy info found for " << id
                 << ", setting to " << (is_online ? "Online" : "Offline") << LL_ENDL;
-        LL_WARNS() << "Did we receive a buddy status update before the buddy info?" << LL_ENDL;
-        mBuddyStatusQueue.push(std::make_pair(id, is_online));
     }
 }
 
@@ -663,11 +708,19 @@ void LLAvatarTracker::processChange(LLMessageSystem* msg)
                 buddy_it->second->setRightsTo(new_rights);
                 mChangedBuddyIDs.insert(agent_related);
             }
+            else
+            {
+                mBacklog.hold({ agent_related, ALFriendBacklog::Kind::RIGHTS_TO, new_rights });
+            }
         }
         else
         {
             auto buddy_it = mBuddyInfo.find(agent_id);
-            if(mBuddyInfo.find(agent_id) != mBuddyInfo.end())
+            if (buddy_it == mBuddyInfo.end())
+            {
+                mBacklog.hold({ agent_id, ALFriendBacklog::Kind::RIGHTS_FROM, new_rights });
+            }
+            else
             {
                 S32 change = buddy_it->second->getRightsGrantedFrom() ^ new_rights;
                 if (change && !gAgent.isDoNotDisturb())
@@ -728,11 +781,14 @@ void LLAvatarTracker::processNotify(LLMessageSystem* msg, bool online)
             {
                 setBuddyOnline(agent_id,online);
             }
+            else if (mBacklog.hold({ agent_id, online ? ALFriendBacklog::Kind::ONLINE : ALFriendBacklog::Kind::OFFLINE }))
+            {
+                LL_DEBUGS() << "Holding an online notification for " << agent_id << ", who is "
+                    << (online ? "ONLINE" : "OFFLINE") << ", until the friends list is applied" << LL_ENDL;
+            }
             else
             {
-                LL_DEBUGS() << "Received online notification for unknown buddy: "
-                    << agent_id << " is " << (online ? "ONLINE" : "OFFLINE") << " Adding buddy to buddy queue." << LL_ENDL;
-                mBuddyStatusQueue.push(std::make_pair(agent_id, online));
+                LL_DEBUGS() << "Received online notification for " << agent_id << ", who is not a friend" << LL_ENDL;
             }
 
             if(!online && tracking_id == agent_id)
@@ -801,18 +857,38 @@ void LLAvatarTracker::formFriendship(const LLUUID& id)
 {
     if(id.notNull())
     {
-        LLRelationship* buddy_info = get_ptr_in_map(instance().mBuddyInfo, id);
-        if(!buddy_info)
+        LLAvatarTracker& at = LLAvatarTracker::instance();
+        // The login's list, yet to be applied, may name them already, with their rights: the friendship is applied
+        // over it with the rest of what was held.
+        if (at.mBacklog.formed(id))
         {
-            LLAvatarTracker& at = LLAvatarTracker::instance();
-            //The default for relationship establishment is to have both parties
-            //visible online to each other.
-            buddy_info = new LLRelationship(LLRelationship::GRANT_ONLINE_STATUS,LLRelationship::GRANT_ONLINE_STATUS, false);
-            at.mBuddyInfo[id] = buddy_info;
-            at.addChangedMask(LLFriendObserver::ADD, id);
+            return;
+        }
+        bool changed = at.befriend(id);
+        // What the circuit said of them while the acceptance was unanswered applies now.
+        for (const ALFriendBacklog::Notice& notice : at.mBacklog.answered(id))
+        {
+            at.applyHeldNotice(notice);
+            changed = true;
+        }
+        if (changed)
+        {
             at.notifyObservers();
         }
     }
+}
+
+void LLAvatarTracker::expectFriendship(const LLUUID& id)
+{
+    if (id.notNull())
+    {
+        mBacklog.expect(id);
+    }
+}
+
+void LLAvatarTracker::friendshipRefused(const LLUUID& id)
+{
+    mBacklog.answered(id);
 }
 
 void LLAvatarTracker::processTerminateFriendship(LLMessageSystem* msg, void**)
@@ -823,7 +899,11 @@ void LLAvatarTracker::processTerminateFriendship(LLMessageSystem* msg, void**)
     {
         LLAvatarTracker& at = LLAvatarTracker::instance();
         LLRelationship* buddy = get_ptr_in_map(at.mBuddyInfo, id);
-        if(!buddy) return;
+        if(!buddy)
+        {
+            at.mBacklog.hold({ id, ALFriendBacklog::Kind::TERMINATED });
+            return;
+        }
         at.mBuddyInfo.erase(id);
         at.addChangedMask(LLFriendObserver::REMOVE, id);
         delete buddy;
