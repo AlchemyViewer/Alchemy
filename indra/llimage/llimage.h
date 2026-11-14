@@ -277,6 +277,9 @@ using LLImageDataLockPair = LLImageBase::DataLockPair<false, false>;
 // Raw representation of an image (used for textures, and other uncompressed formats
 class LLImageRaw : public LLImageBase
 {
+    // Hands the image the buffer its resize made, by setDataAndSize.
+    friend class ALImageJ2CRS;
+
 protected:
     /*virtual*/ ~LLImageRaw();
 

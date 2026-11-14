@@ -160,13 +160,35 @@ option(AL_ENABLE_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" ON)
 
 # Proprietary Libraries
 option(AL_ENABLE_PROPRIETARY "Build with support for non-free libraries" OFF)
-cmake_dependent_option(
-  AL_USE_KDU
-  "Enable support for the Kakadu JPEG2000 decoding library"
-  OFF
-  "AL_ENABLE_PROPRIETARY"
-  OFF
-)
+
+# The JPEG 2000 codec, one of two, and the only one a tree installs, builds
+# or tests. A proprietary build's is pnj2k, the Rust codec (see
+# cmake/Pnj2k.cmake), and an open-source build's is OpenJPEG, unless the
+# other is asked for, which holds that one off. PNJ2K_SOURCE_DIR names a
+# checkout of pnj2k to build in place of the revision rust/pnj2k_libc pins.
+if(AL_ENABLE_PROPRIETARY)
+  option(AL_USE_OPENJPEG "Decode and encode JPEG 2000 with OpenJPEG" OFF)
+  cmake_dependent_option(
+    AL_USE_PNJ2K
+    "Decode and encode JPEG 2000 with pnj2k, the Rust codec"
+    ON
+    "NOT AL_USE_OPENJPEG"
+    OFF
+  )
+else()
+  option(AL_USE_PNJ2K "Decode and encode JPEG 2000 with pnj2k, the Rust codec" OFF)
+  cmake_dependent_option(
+    AL_USE_OPENJPEG
+    "Decode and encode JPEG 2000 with OpenJPEG"
+    ON
+    "NOT AL_USE_PNJ2K"
+    OFF
+  )
+endif()
+if(NOT (AL_USE_PNJ2K OR AL_USE_OPENJPEG))
+  message(FATAL_ERROR "No JPEG 2000 codec is on: turn on AL_USE_PNJ2K or AL_USE_OPENJPEG")
+endif()
+set(PNJ2K_SOURCE_DIR "" CACHE PATH "A checkout of pnj2k to build in place of the pinned revision")
 
 # The Discord Social SDK comes from AlchemyViewer's private vcpkg registry;
 # see cmake/Discord.cmake. It is built for Windows and macOS, x64 and arm64,
@@ -369,10 +391,6 @@ if(AL_BUILD_TESTS)
   list(APPEND VCPKG_MANIFEST_FEATURES "tests")
 endif()
 
-if(AL_USE_KDU)
-  list(APPEND VCPKG_MANIFEST_FEATURES "kdu")
-endif()
-
 if(AL_USE_DISCORD)
   list(APPEND VCPKG_MANIFEST_FEATURES "discord")
 endif()
@@ -408,6 +426,14 @@ endif()
 
 if(AL_USE_VELOPACK)
   list(APPEND VCPKG_MANIFEST_FEATURES "velopack")
+endif()
+
+if(AL_USE_PNJ2K)
+  list(APPEND VCPKG_MANIFEST_FEATURES "pnj2k")
+endif()
+
+if(AL_USE_OPENJPEG)
+  list(APPEND VCPKG_MANIFEST_FEATURES "openjpeg")
 endif()
 
 if(AL_USE_SENTRY)
@@ -540,8 +566,8 @@ set(
   Harfbuzz
   Hunspell
   ICU
-  LLKDU
   NDOF
+  Pnj2k
   SDL3
   Sentry
   Tracy
@@ -593,8 +619,12 @@ add_subdirectory(llcharacter)
 add_subdirectory(llcommon)
 add_subdirectory(llcorehttp)
 add_subdirectory(llimage)
-add_subdirectory(llkdu)
-add_subdirectory(llimagej2coj)
+if(AL_USE_OPENJPEG)
+  add_subdirectory(llimagej2coj)
+endif()
+if(AL_USE_PNJ2K)
+  add_subdirectory(llimagej2crs)
+endif()
 add_subdirectory(llinventory)
 add_subdirectory(llmath)
 add_subdirectory(llmessage)

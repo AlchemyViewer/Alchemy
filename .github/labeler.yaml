@@ -38,10 +38,6 @@ llinventory:
 - changed-files:
   - any-glob-to-any-file: indra/llinventory/**
 
-llkdu:
-- changed-files:
-  - any-glob-to-any-file: indra/llkdu/**
-
 llmath:
 - changed-files:
   - any-glob-to-any-file: indra/llmath/**
