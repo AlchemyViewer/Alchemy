@@ -32,7 +32,6 @@
 	<button label="透明" label_selected="透明" name="Transparent"/>
 	<button label="ブランク" label_selected="ブランク" name="Blank"/>
 	<button label="なし" label_selected="なし" name="None"/>
-	<button name="Pipette"/>
 	<text name="preview_disabled" value="プレビュー無効"/>
 	<filter_editor label="テクスチャをフィルタ" name="inventory search editor"/>
 	<line_editor name="uuid_editor" label="テクスチャのＵＵＩＤを入力"/>

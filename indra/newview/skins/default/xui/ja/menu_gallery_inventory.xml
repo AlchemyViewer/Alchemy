@@ -104,4 +104,5 @@
 	<menu_item_call label="マーケットプレイスの出品リストにコピー" name="Marketplace Copy"/>
 	<menu_item_call label="マーケットプレイスの出品リストに移動" name="Marketplace Move"/>
 	<menu_item_call label="－オプション無し－" name="--no options--"/>
+	<menu_item_call name="Copy Inventory UUID" label="インベントリのUUIDをコピー"/>
 </context_menu>

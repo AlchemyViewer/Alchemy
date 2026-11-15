@@ -10,7 +10,7 @@
 		５ボタン
 	</panel.string>
     <tab_container name="sound_prefs_tab_container">
-    <panel name="general_sound_panel">
+    <panel name="general_sound_panel" label="一般">
 	<slider label="全体のボリューム" name="System Volume"/>
 	<check_box  name="mute_when_minimized" label="最小化時にミュート"/>
 	<slider label="ボタン" name="UI Volume"/>
@@ -53,8 +53,49 @@
 		<item label="アバターの位置" name="avatar_position"/>
 		<item label="カメラの位置" name="camera_position"/>
 	</combo_box>
+	<text name="audio_output_device_label">
+		出力デバイス：
+	</text>
+	<combo_box name="audio_output_device_combo" tool_tip="特定のオーディオ出力デバイスを選択します。すぐに適用され（オーディオの再起動中は一瞬無音になります）、次回の起動用にも保存されます。"/>
+	<text name="audio_reverb_label">
+		リバーブのプリセット：
+	</text>
+	<combo_box name="audio_reverb_combo" tool_tip="使用中のオーディオバックエンドが適用するI3DL2リバーブのプリセット。すぐに適用されます。">
+		<item name="reverb_default" label="デフォルト"/>
+		<item name="reverb_generic" label="一般"/>
+		<item name="reverb_paddedcell" label="防音室"/>
+		<item name="reverb_room" label="部屋"/>
+		<item name="reverb_bathroom" label="浴室"/>
+		<item name="reverb_livingroom" label="リビングルーム"/>
+		<item name="reverb_stoneroom" label="石造りの部屋"/>
+		<item name="reverb_auditorium" label="講堂"/>
+		<item name="reverb_concerthall" label="コンサートホール"/>
+		<item name="reverb_cave" label="洞窟"/>
+		<item name="reverb_arena" label="アリーナ"/>
+		<item name="reverb_hangar" label="格納庫"/>
+		<item name="reverb_carpetedhallway" label="絨毯敷きの廊下"/>
+		<item name="reverb_hallway" label="廊下"/>
+		<item name="reverb_stonecorridor" label="石造りの通路"/>
+		<item name="reverb_alley" label="路地"/>
+		<item name="reverb_forest" label="森"/>
+		<item name="reverb_city" label="都市"/>
+		<item name="reverb_mountains" label="山"/>
+		<item name="reverb_quarry" label="採石場"/>
+		<item name="reverb_plain" label="平原（屋外）"/>
+		<item name="reverb_parkinglot" label="駐車場"/>
+		<item name="reverb_sewerpipe" label="下水管"/>
+		<item name="reverb_underwater" label="水中"/>
+		<item name="reverb_smallroom" label="小部屋"/>
+	</combo_box>
+	<slider name="audio_reverb_send_slider" label="リバーブの量" tool_tip="リバーブのサブミックスをマスターにどれだけ戻すか。0でリバーブのセンドを無効にします。使用中のバックエンドごとのセンド量のキーに紐付いています（同じ値が3つの異なるDSPを動かすため、FAudio／OpenAL／FMODはそれぞれ独自の値を保持します）。すぐに適用されます。"/>
+	<check_box name="collision_audio_play_btn" label="衝突時にサウンドを再生する" tool_tip="オブジェクトが衝突したときのSLのデフォルトのサウンド"/>
+	<check_box name="al_typing_sounds_btn" label="入力中のサウンドを再生する" tool_tip="アバターが入力中のときにサウンドを鳴らすかどうか"/>
+	<check_box name="al_teleport_sounds_btn" label="テレポートのサウンドを再生する" tool_tip="テレポート時に「シュッ」という音を鳴らすかどうか"/>
+	<text name="media_section">
+		メディア：
+	</text>
 	</panel>
-	<panel name="voice_sound_panel">
+	<panel name="voice_sound_panel" label="ボイス">
 	<text name="noise_suppression_label">
 		マイクのノイズ抑制：
 	</text>
@@ -80,4 +121,7 @@
 	<button label="入出力機器の設定" name="device_settings_btn"/>
 	</panel>
 	</tab_container>
+	<panel.string name="audio_output_system_default">
+		システムのデフォルト
+	</panel.string>
 </panel>

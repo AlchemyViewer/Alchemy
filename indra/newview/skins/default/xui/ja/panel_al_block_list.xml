@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_block_list" label="ブロックリスト">
+	<scroll_list name="block_list" tool_tip="現在ブロックしている住人／オブジェクトの一覧です。">
+		<scroll_list.columns name="item_name" label="名前"/>
+		<scroll_list.columns name="item_type" label="ブロックの種類"/>
+		<scroll_list.columns name="item_text" label="文" tool_tip="テキスト"/>
+		<scroll_list.columns name="item_voice" label="声" tool_tip="ボイス"/>
+		<scroll_list.columns name="item_particles" label="粒" tool_tip="パーティクル"/>
+		<scroll_list.columns name="item_sounds" label="音" tool_tip="オブジェクトのサウンド"/>
+	</scroll_list>
+	<panel name="bottom_panel">
+		<button name="block_resident_btn" label="住人をブロック" tool_tip="ブロックする住人を選択します"/>
+		<button name="block_object_btn" label="オブジェクトをブロック" tool_tip="名前でブロックするオブジェクトを選択します"/>
+		<button name="block_trash_btn" label="ブロック解除" tool_tip="選択した項目をブロックリストから削除します"/>
+	</panel>
+</panel>

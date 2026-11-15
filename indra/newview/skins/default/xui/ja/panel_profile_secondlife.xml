@@ -37,11 +37,9 @@
 			<text name="friend_text" value="あなたはフレンドです。"/>
 		</layout_panel>
 		<layout_panel name="online_layout">
-			<icon name="online_icon"/>
 			<text name="online_text" value="オンライン"/>
 		</layout_panel>
 		<layout_panel name="offline_layout">
-			<icon name="offline_icon"/>
 			<text name="offline_text" value="オフライン"/>
 		</layout_panel>
 		<layout_panel name="account_layout">

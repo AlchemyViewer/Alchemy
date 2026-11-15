@@ -11,4 +11,8 @@
 		全[LIMIT]件中、[COUNT]件のエントリがブロックされています。
 	</text>
 	<block_list name="blocked" tool_tip="現在ブロックされている住人とオブジェクト一覧です。"/>
+	<string name="no_blocked" value="ブロックされた住民やオブジェクトはありません。"/>
+	<string name="no_filtered_blocked" value="検索条件に一致するブロックされた住民やオブジェクトはありません。"/>
+	<string name="loading_blocked" value="ブロックされた住民とオブジェクトを読み込んでいます…"/>
+	<string name="failed_blocked" value="ブロックリストは現在使用できません。"/>
 </panel>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="quick_settings">
+	<text name="draw_distance_label" value="描画距離："/>
+	<text name="lod_label" value="詳細度："/>
+	<text name="max_particles_label" value="最大パーティクル数："/>
+	<text name="max_avatars_label" value="最大アバター数："/>
+	<text name="max_bandwith_label" value="最大帯域幅："/>
+	<text name="hover_height_label" value="浮遊の高さ："/>
+</panel>

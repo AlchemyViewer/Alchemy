@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_local_spawned">
+	<string name="empty_hint">ワールドにはまだコピーがありません。「メッシュ」タブからメッシュをRezしてください。</string>
+	<scroll_list name="spawned_list">
+		<column name="unit_name" label="名前"/>
+		<column name="status" label="状態"/>
+	</scroll_list>
+	<button name="select_btn" label="ワールドで選択" tool_tip="このコピーを選択し、ビルドのフローターを開いて編集します（カメラは移動しません）。"/>
+	<button name="focus_btn" label="カメラを注目" tool_tip="このコピーにカメラを向けます。"/>
+	<button name="derez_btn" tool_tip="選択したコピーをワールドから削除します。"/>
+	<button name="derez_all_btn" label="すべてDerez" tool_tip="Rezしたすべてのコピーをワールドから削除します。"/>
+</panel>
