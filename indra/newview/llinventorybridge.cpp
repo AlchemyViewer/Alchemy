@@ -2392,7 +2392,9 @@ bool LLItemBridge::isItemCopyable(bool can_copy_as_link) const
     // Can't copy worn objects.
     // Worn objects are tied to their inworld conterparts
     // Copy of modified worn object will return object with obsolete asset and inventory
-    if (get_is_item_worn(mUUID))
+    // Alchemy - Allow copy of worn object, if user is powerful wizard
+    static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+    if (get_is_item_worn(mUUID) && !sPowerfulWizard)
     {
         return false;
     }
