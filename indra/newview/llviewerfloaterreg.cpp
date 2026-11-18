@@ -36,6 +36,7 @@
 #include "alchatbar.h"
 // [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
 #include "alfloaterblocked.h"
+#include "alfloaterbulkrename.h"
 // [/SL:KB]
 #include "alfloaterdirectory.h"
 #include "alfloaterevent.h"
@@ -240,6 +241,7 @@ public:
             || nav_type == NAV_TYPE_EXTERNAL)
         {
             const std::list<std::string> blacklist_clicked = {
+                "bulk_rename",
                 "camera_presets",
                 "delete_pref_preset",
                 "feedback", // A link must not say what a report is about.
@@ -272,6 +274,7 @@ public:
                 "appearance",
                 "associate_listing",
                 "avatar_picker",
+                "bulk_rename",
                 "camera",
                 "camera_presets",
                 "change_item_thumbnail",
@@ -451,6 +454,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("lagmeter", "floater_lagmeter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLagMeter>);
     LLFloaterReg::add("land_holdings", "floater_land_holdings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLandHoldings>);
     LLFloaterReg::add("linkreplace", "floater_linkreplace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLinkReplace>);
+    LLFloaterReg::add("bulk_rename", "floater_al_bulk_rename.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBulkRename>);
     LLFloaterReg::add("load_pref_preset", "floater_load_pref_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLoadPrefPreset>);
 
     LLFloaterReg::add("mem_leaking", "floater_mem_leaking.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMemLeak>);
