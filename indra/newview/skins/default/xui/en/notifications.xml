@@ -2083,6 +2083,29 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's c
 
   <notification
    icon="alertmodal.tga"
+   name="BulkRenameConfirm"
+   type="alertmodal">
+You are about to rename [COUNT] items. Continue?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Rename"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="BulkRenameTooMany"
+   type="alertmodal">
+You cannot rename more than [MAX] items at once. You selected [COUNT].
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioFixAll"
    type="alertmodal">
 Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step, or preview them first.[LEFT]

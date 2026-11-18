@@ -29,6 +29,7 @@
 // library
 #include "llbutton.h"
 #include "llcombobox.h"
+#include "llfloaterreg.h"
 #include "lllineeditor.h"
 #include "llpanel.h"
 #include "llsdutil.h"
@@ -38,9 +39,32 @@
 // newview
 #include "llinventoryfunctions.h"
 #include "llinventorymodel.h"
+#include "llnotificationsutil.h"
 #include "llpreview.h"
 #include "llviewerinventory.h"
+#include "llviewercontrol.h"
 #include "llviewerobjectlist.h"
+
+namespace
+{
+constexpr size_t CONFIRM_RENAME_ABOVE = 15;
+}
+
+// static
+void ALFloaterBulkRename::show(const LLSD& key)
+{
+    static LLCachedControl<U32> max_items(gSavedSettings, "AlchemyBulkRenameMaxItems", 100);
+    const size_t count = key["ids"].size();
+    if (count > max_items())
+    {
+        LLSD args;
+        args["MAX"]   = static_cast<LLSD::Integer>(max_items());
+        args["COUNT"] = static_cast<LLSD::Integer>(count);
+        LLNotificationsUtil::add("BulkRenameTooMany", args);
+        return;
+    }
+    LLFloaterReg::showInstance("bulk_rename", key);
+}
 
 ALFloaterBulkRename::ALFloaterBulkRename(const LLSD& key)
 :   LLFloater(key)
@@ -256,6 +280,26 @@ void ALFloaterBulkRename::onClickOK()
         }
     }
 
+    if (renames.size() > CONFIRM_RENAME_ABOVE)
+    {
+        LLSD args;
+        args["COUNT"] = static_cast<LLSD::Integer>(renames.size());
+        const LLHandle<LLFloater> handle = getHandle();
+        LLNotificationsUtil::add("BulkRenameConfirm", args, LLSD(),
+                                 [handle, renames](const LLSD& notification, const LLSD& response) {
+                                     ALFloaterBulkRename* floater = ALViewType::as<ALFloaterBulkRename>(handle.get());
+                                     if (floater && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+                                     {
+                                         floater->applyRenames(renames);
+                                     }
+                                 });
+        return;
+    }
+    applyRenames(renames);
+}
+
+void ALFloaterBulkRename::applyRenames(const std::vector<std::pair<LLUUID, std::string>>& renames)
+{
     if (mTaskID.notNull())
     {
         if (LLViewerObject* object = gObjectList.findObject(mTaskID))
