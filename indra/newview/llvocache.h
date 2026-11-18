@@ -314,16 +314,24 @@ public:
         bool mHoldsCamera    = false; // its box holds the camera, so no query will ask it (doOcclusion)
         bool mAnswerAwaited  = false; // a query is out, or one was asked this frame
         bool mOccluded       = false; // its last answer found it hidden
+        bool mRetestDue      = false; // no query is out and its last is a period old (isOcclusionRetestDue)
     };
     struct GroupCullAction
     {
         bool mAsk     = false; // ask an occlusion query (addOccluders)
         bool mVisible = false; // add it to the region's visible groups, whose cached objects are then made
     };
-    // A group is asked when it is new to the view (not seen at the last front cull) and on its needsUpdate() frame. It
+    // A group is asked when it is new to the view (not seen at the last front cull), on its needsUpdate() frame, and
+    // while it is hidden and due a retest: a retest the query pool refused, its target held, leaves a group seen and
+    // still hidden, and while the camera rests half the groups' needsUpdate() frames never fall on a front cull. It
     // is added, and its objects made, where it was seen at the last front cull too, is not hidden and awaits no answer,
     // and at once where its box holds the camera. The last front cull counts only within a period of this one.
     static GroupCullAction cullGroup(const GroupCullFacts& facts);
+
+    // Whether the front cull passes over a group its last answer found hidden, on a frame that is not its needsUpdate()
+    // frame: until its retest is due, unless its box holds the camera, which can step into a box a query found hidden
+    // from outside.
+    static bool culledAsHidden(bool retest_due, bool holds_camera) { return !retest_due && !holds_camera; }
 
 private:
     void selectBackObjects(LLCamera &camera, F32 projection_area_cutoff, bool use_occlusion); //select objects behind camera.

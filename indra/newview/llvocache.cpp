@@ -959,8 +959,10 @@ public:
 
             // An occluded group is asked again on its needsUpdate() frame. While the camera rests, this cull runs only
             // on frames that never fall on half the groups' (cull), so one whose last query is a period old is let
-            // through all the same, or it would stay hidden after whatever hid it had gone.
-            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED) && !group->isOcclusionRetestDue())
+            // through all the same, or it would stay hidden after whatever hid it had gone. So is one whose box holds the
+            // camera, which processGroup makes at once (culledAsHidden).
+            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED) &&
+                LLVOCachePartition::culledAsHidden(group->isOcclusionRetestDue(), group->holdsCamera(mCamera, &mShift)))
             {
                 return true;
             }
@@ -1030,6 +1032,7 @@ public:
         facts.mAnswerAwaited  = group->isOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING |
                                                         LLOcclusionCullingGroup::ACTIVE_OCCLUSION);
         facts.mOccluded       = group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+        facts.mRetestDue      = group->isOcclusionRetestDue();
         const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
 
         if (action.mAsk)
@@ -1242,7 +1245,7 @@ LLVOCachePartition::GroupCullAction LLVOCachePartition::cullGroup(const GroupCul
                       && facts.mCurrentFrame - facts.mLastFrontCull <= (S32)facts.mPeriod;
 
     GroupCullAction action;
-    action.mAsk     = facts.mNeedsUpdate || !seen;
+    action.mAsk     = facts.mNeedsUpdate || !seen || (facts.mOccluded && facts.mRetestDue);
     action.mVisible = facts.mHoldsCamera || (seen && !facts.mAnswerAwaited && !facts.mOccluded);
     return action;
 }
