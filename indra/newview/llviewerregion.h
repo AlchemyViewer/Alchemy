@@ -563,6 +563,8 @@ public:
     static U32  sObjectsCreated;
     // The objects a frame makes whatever they take, so that the caches empty however slowly each is made.
     static constexpr U32 MIN_OBJECTS_CREATED = 8;
+    // And those each region with objects waiting to be made makes, past the frame's.
+    static constexpr U32 MIN_REGION_OBJECTS_CREATED = 1;
     // How near the camera a visible group of the cache's must come, in metres past its bounds, for updateVisibleEntries
     // to walk it every frame; the farther ones take turns in the time the update has.
     static constexpr F32 WALK_NEAR_RADIUS = 64.f;

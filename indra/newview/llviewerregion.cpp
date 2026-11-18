@@ -1708,21 +1708,24 @@ void LLViewerRegion::createVisibleObjects()
     // And for no more than AlchemyObjectCreationTime a frame, every region's together, a few at the least: a fast
     // camera that brings a crowd of cached objects into view would otherwise make the count's worth in one frame, and
     // build them all in the next. Not while the login or teleport screen lifts the count (-2); the count turned off
-    // (-1) leaves the time.
+    // (-1) leaves the time. Each region makes one at the least, past the frame's few: the agent's region updates first,
+    // and the others in an order that is the same frame after frame while every one is updated (LLWorld::updateRegions),
+    // so one could spend the time every frame, and a region that made nothing was taken for a quiet one, its cull slowed
+    // to every few frames with its objects still waiting (LLVOCachePartition::cull).
     const bool timed = throttle > -2 && sObjectCreationSeconds > 0.f;
     LLTimer    creation_timer;
-    bool has_new_obj = false;
+    U32  created = 0;
     for (LLVOCacheEntry* vo_entry : waiting)
     {
         if(vo_entry->getState() < LLVOCacheEntry::WAITING)
         {
-            if (timed && sObjectsCreated >= MIN_OBJECTS_CREATED
+            if (timed && created >= MIN_REGION_OBJECTS_CREATED && sObjectsCreated >= MIN_OBJECTS_CREATED
                 && sObjectCreationSpent + creation_timer.getElapsedTimeF32() >= sObjectCreationSeconds)
             {
                 break;
             }
             addNewObject(vo_entry);
-            has_new_obj = true;
+            ++created;
             ++sObjectsCreated;
             if(throttle > 0 && --throttle == 0)
             {
@@ -1732,7 +1735,7 @@ void LLViewerRegion::createVisibleObjects()
     }
     sObjectCreationSpent += creation_timer.getElapsedTimeF32();
 
-    mImpl->mVOCachePartition->setCullHistory(has_new_obj);
+    mImpl->mVOCachePartition->setCullHistory(created > 0);
 
     return;
 }
