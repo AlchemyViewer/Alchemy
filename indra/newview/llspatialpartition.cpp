@@ -319,7 +319,7 @@ bool LLSpatialGroup::addObject(LLDrawable *drawablep)
     {
         drawablep->setGroup(this);
         setState(static_cast<U32>(OBJECT_DIRTY) | static_cast<U32>(GEOM_DIRTY));
-        setOcclusionState(LLSpatialGroup::DISCARD_QUERY, LLSpatialGroup::STATE_MODE_ALL_CAMERAS);
+        discardAllQueries();
         gPipeline.markRebuild(this);
         if (drawablep->isSpatialBridge())
         {
@@ -920,7 +920,7 @@ LLSpatialGroup *LLSpatialPartition::put(LLDrawable *drawablep, bool was_visible)
 
     if (group && was_visible && group->isOcclusionState(LLSpatialGroup::QUERY_PENDING))
     {
-        group->setOcclusionState(LLSpatialGroup::DISCARD_QUERY, LLSpatialGroup::STATE_MODE_ALL_CAMERAS);
+        group->discardAllQueries();
     }
 
     return group;

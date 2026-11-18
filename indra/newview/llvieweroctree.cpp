@@ -913,10 +913,6 @@ void LLOcclusionCullingGroup::setOcclusionState(U32 state, S32 mode /* = STATE_M
             add(sNumObjectsOccluded, 1);
         }
         mOcclusionState[LLViewerCamera::sCurCameraID] |= state;
-        if (state & DISCARD_QUERY)
-        {
-            mOcclusionQuery[LLViewerCamera::sCurCameraID] = {};
-        }
         break;
 
     case STATE_MODE_DIFF:
@@ -939,17 +935,35 @@ void LLOcclusionCullingGroup::setOcclusionState(U32 state, S32 mode /* = STATE_M
         for (U32 i = 0; i < LLViewerCamera::NUM_CAMERAS; i++)
         {
             mOcclusionState[i] |= state;
-
-            if (state & DISCARD_QUERY)
-            {
-                mOcclusionQuery[i] = {};
-            }
         }
         break;
 
     default:
         break;
     }
+}
+
+// A query is out exactly while QUERY_PENDING is set, so that nothing waits on the flag for an answer no query will give:
+// the object cache's cull holds a group's objects back while its query is pending (LLVOCacheOctreeCull::processGroup),
+// and a group whose box holds the camera is asked nothing until the camera leaves it (doOcclusion).
+void LLOcclusionCullingGroup::endQuery(U32 camera)
+{
+    mOcclusionQuery[camera] = {};
+    mOcclusionState[camera] &= ~QUERY_PENDING;
+}
+
+void LLOcclusionCullingGroup::discardAllQueries()
+{
+    for (U32 i = 0; i < LLViewerCamera::NUM_CAMERAS; i++)
+    {
+        endQuery(i);
+    }
+}
+
+bool LLOcclusionCullingGroup::queryStateAgrees() const
+{
+    const U32 camera = LLViewerCamera::sCurCameraID;
+    return ((mOcclusionState[camera] & QUERY_PENDING) != 0) == mOcclusionQuery[camera].isValid();
 }
 
 class LLSpatialClearOcclusionState : public OctreeTraveler
@@ -1004,9 +1018,9 @@ public:
     void visit(const OctreeNode* branch) override
     {
         LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)branch->getListener(0);
-        if (group && group->isOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING))
+        if (group)
         {
-            group->setOcclusionState(LLOcclusionCullingGroup::DISCARD_QUERY);
+            group->discardQuery();
         }
     }
 };
@@ -1119,60 +1133,47 @@ bool LLOcclusionCullingGroup::checkOcclusion()
 
     LL_PROFILE_ZONE_SCOPED_CATEGORY_OCTREE;
     const U32 camera = LLViewerCamera::sCurCameraID;
-    if (mOcclusionIssued[camera] < sOcclusionForgotten[camera]
-        && isOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY))
+    llassert(queryStateAgrees());
+    if (mOcclusionIssued[camera] < sOcclusionForgotten[camera] && isOcclusionState(OCCLUDED | QUERY_PENDING))
     {   // what this camera found before forgetOcclusion() is let go: seen, and nothing out
-        mOcclusionQuery[camera] = {};
-        clearOcclusionState(OCCLUDED | QUERY_PENDING | DISCARD_QUERY);
+        endQuery(camera);
+        clearOcclusionState(OCCLUDED);
         return false;
     }
 
     LLOcclusionCullingGroup* parent = (LLOcclusionCullingGroup*)getParent();
     if (parent && parent->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
     {   //if the parent has been marked as occluded, the child is implicitly occluded
-        clearOcclusionState(QUERY_PENDING | DISCARD_QUERY);
+        endQuery(camera);
         return false;
     }
 
-    ALQueryTicket& query = mOcclusionQuery[LLViewerCamera::sCurCameraID];
-    if (query.isValid() && isOcclusionState(QUERY_PENDING))
+    if (isOcclusionState(QUERY_PENDING))
     {
-        if (isOcclusionState(DISCARD_QUERY))
-        {   // drop the query unread
-            query = {};
-            // mark non-occluded
-            discardStaleQueriesBelow();
-            clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
-            clearOcclusionState(QUERY_PENDING | DISCARD_QUERY);
-        }
-        else
+        // Pending until the pool has read the frame it was issued in, its age (AlchemyRenderQueryResultAge) frames on
+        // at the soonest, and the group issues no other meanwhile (doOcclusion): one query in flight a group and camera,
+        // however dense the scene. The pool waits for a frame only once the GPU is ALQueryPool::FRAMES frames behind,
+        // which bounds how old the state kept here is.
+        U64 passed = 0;
+        ALQueryPool::Status status;
         {
-            // Pending until the pool has read the frame it was issued in, its age (AlchemyRenderQueryResultAge) frames
-            // on at the soonest, and the group issues no other meanwhile (doOcclusion): one query in flight a group and
-            // camera, however dense the scene. The pool waits for a frame only once the GPU is ALQueryPool::FRAMES
-            // frames behind, which bounds how old the state kept here is.
-            U64 passed = 0;
-            ALQueryPool::Status status;
-            {
-                LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query result");
-                status = gGL.queries().result(query, passed);
-            }
+            LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("co - query result");
+            status = gGL.queries().result(mOcclusionQuery[camera], passed);
+        }
 
-            if (status != ALQueryPool::Status::Pending)
+        if (status != ALQueryPool::Status::Pending)
+        {
+            endQuery(camera);
+            if (status == ALQueryPool::Status::Ready && passed == 0)
             {
-                query = {};
-                if (status == ALQueryPool::Status::Ready && passed == 0)
-                {
-                    setOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
-                }
-                else
-                {   // seen, or expired unread: erring toward visible, as the cull does
-                    discardStaleQueriesBelow();
-                    clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
-                }
-                clearOcclusionState(QUERY_PENDING);
-                return status == ALQueryPool::Status::Ready && passed > 0;
+                setOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
             }
+            else
+            {   // seen, or expired unread: erring toward visible, as the cull does
+                discardStaleQueriesBelow();
+                clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
+            }
+            return status == ALQueryPool::Status::Ready && passed > 0;
         }
     }
     else if (mSpatialPartition->isOcclusionEnabled() && isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
@@ -1211,10 +1212,11 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
             beside_map = camera->AABBInFrustumNoFarClip(bounds[0], radius) != 2;
         }
 
+        llassert(queryStateAgrees());
         if (beside_map || earlyFail(camera, bounds))
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - early fail");
-            setOcclusionState(LLOcclusionCullingGroup::DISCARD_QUERY);
+            discardQuery();
             assert_states_valid(this);
             discardStaleQueriesBelow();
             clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
@@ -1222,18 +1224,17 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
         }
         else
         {
-            if (!isOcclusionState(QUERY_PENDING) || isOcclusionState(DISCARD_QUERY))
+            if (!isOcclusionState(QUERY_PENDING))
             {
-                { //no query pending, or previous query to be discarded
+                { //no query out
                     LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - render");
 
                     ALQueryScope query(gGL.queries(), queryKind());
-                    mOcclusionQuery[LLViewerCamera::sCurCameraID] = query.ticket();
                     if (!query.ticket().isValid())
-                    {   // the pool refused it, its target held: nothing is pending, and the group keeps its state
-                        clearOcclusionState(QUERY_PENDING | DISCARD_QUERY);
+                    {   // the pool refused it, its target held: nothing is out, and the group keeps its state
                         return;
                     }
+                    mOcclusionQuery[LLViewerCamera::sCurCameraID] = query.ticket();
 
                     add(sOcclusionQueries, 1);
 
@@ -1269,7 +1270,6 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
                 {
                     LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - set state");
                     setOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING);
-                    clearOcclusionState(LLOcclusionCullingGroup::DISCARD_QUERY);
                 }
             }
         }
