@@ -235,7 +235,7 @@ void ALFloaterBulkRename::updatePreview()
     mFormatPositionPanel->setVisible(current.mode == ALBulkRename::Mode::Format &&
                                     current.format_kind != ALBulkRename::FormatKind::Custom);
     mFormatDatePanel->setVisible(current.mode == ALBulkRename::Mode::Format &&
-                                ( 
+                                (
                                     current.format_kind == ALBulkRename::FormatKind::CurrentDate
                                     ||
                                     current.format_kind == ALBulkRename::FormatKind::AcquiredDate
