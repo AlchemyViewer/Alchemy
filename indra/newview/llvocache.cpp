@@ -884,6 +884,7 @@ LLVOCachePartition::LLVOCachePartition(LLViewerRegion* regionp)
         mCulledTime[i] = 0;
     }
     mCullHistory = -1;
+    mLastFrontCull = 0;
 
     new LLVOCacheGroup(mOctree, this);
 }
@@ -920,13 +921,16 @@ class LLVOCacheOctreeCull : public LLViewerOctreeCull
 {
 public:
     LLVOCacheOctreeCull(LLCamera* camera, LLViewerRegion* regionp,
-        const LLVector3& shift, bool use_object_cache_occlusion, F32 pixel_threshold, LLVOCachePartition* part)
+        const LLVector3& shift, bool use_object_cache_occlusion, F32 pixel_threshold, LLVOCachePartition* part,
+        U32 last_front_cull)
         : LLViewerOctreeCull(camera),
           mRegionp(regionp),
           mPartition(part),
-          mPixelThreshold(pixel_threshold)
+          mPixelThreshold(pixel_threshold),
+          mLastFrontCull(last_front_cull)
     {
         mLocalShift = shift;
+        mShift.load3(shift.mV);
         mNearFirst = false; // the groups it finds go into a set (LLViewerRegion::addVisibleGroup)
         mUseObjectCacheOcclusion = use_object_cache_occlusion;
         mNearRadius = LLVOCacheEntry::sNearRadius;
@@ -938,19 +942,19 @@ public:
             base_group->getOctreeNode()->getParent()) //never occlusion cull the root node
         {
             LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)base_group;
+
+            // A query that has come back finding the group in view makes it seen now, on its needsUpdate() frame as
+            // on any other, so that an answer is never left waiting for the next cull: while the camera rests this cull
+            // runs only every few frames (cull).
+            if (group->checkOcclusion())
+            {
+                group->setVisible();
+            }
+
             if(group->needsUpdate())
             {
                 //needs to issue new occlusion culling check, perform view culling check first.
                 return false;
-            }
-
-            // A query that has just come back finding the group in view makes it seen now. processGroup would
-            // otherwise take a group not seen in the last two frames for one new to the view, and query it again
-            // instead of adding it: while the camera rests this cull runs only every few frames (cull), so each
-            // answer would come back too late to count, and the group's objects would never be created.
-            if (group->checkOcclusion())
-            {
-                group->setVisible();
             }
 
             // An occluded group is asked again on its needsUpdate() frame. While the camera rests, this cull runs only
@@ -1016,25 +1020,26 @@ public:
         }
 
         LLOcclusionCullingGroup* group = (LLOcclusionCullingGroup*)base_group;
-        if(group->needsUpdate() || !group->isRecentlyVisible())//needs to issue new occlusion culling check.
+        LLVOCachePartition::GroupCullFacts facts;
+        facts.mCurrentFrame   = LLViewerOctreeEntryData::getCurrentFrame();
+        facts.mLastFrontCull  = (S32)mLastFrontCull;
+        facts.mGroupSeenFrame = group->getVisible(LLViewerCamera::CAMERA_WORLD);
+        facts.mPeriod         = mPartition->mLODPeriod;
+        facts.mNeedsUpdate    = group->needsUpdate();
+        facts.mHoldsCamera    = group->holdsCamera(mCamera, &mShift);
+        facts.mAnswerAwaited  = group->isOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING |
+                                                        LLOcclusionCullingGroup::ACTIVE_OCCLUSION);
+        facts.mOccluded       = group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+        const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+
+        if (action.mAsk)
         {
             mPartition->addOccluders(group);
-            group->setVisible();
-            return ; //wait for occlusion culling result
         }
-
-        if(group->isOcclusionState(LLOcclusionCullingGroup::QUERY_PENDING) ||
-            group->isOcclusionState(LLOcclusionCullingGroup::ACTIVE_OCCLUSION))
+        group->setVisible();
+        if (action.mVisible)
         {
-            //keep waiting
-            group->setVisible();
-        }
-        else
-        {
-            if(mRegionp->addVisibleGroup(base_group))
-            {
-                base_group->setVisible();
-            }
+            mRegionp->addVisibleGroup(base_group);
         }
     }
 
@@ -1042,8 +1047,10 @@ private:
     LLVOCachePartition* mPartition;
     LLViewerRegion*     mRegionp;
     LLVector3           mLocalShift; //shift vector from agent space to local region space.
+    LLVector4a          mShift;      //the same, for the group's bounds
     F32                 mPixelThreshold;
     F32                 mNearRadius;
+    U32                 mLastFrontCull;
     bool                mUseObjectCacheOcclusion;
 };
 
@@ -1179,15 +1186,7 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
 
     if(!mCullHistory && LLViewerRegion::isViewerCameraStatic())
     {
-        U32 seed = llmax(mLODPeriod >> 1, (U32)4);
-        if(LLViewerCamera::sCurCameraID == LLViewerCamera::CAMERA_WORLD)
-        {
-            if(!(LLViewerOctreeEntryData::getCurrentFrame() % seed))
-            {
-                mIdleHash = (mIdleHash + 1) % seed;
-            }
-        }
-        if(LLViewerOctreeEntryData::getCurrentFrame() % seed != mIdleHash)
+        if(!quietFrontCullDue(LLViewerOctreeEntryData::getCurrentFrame(), mLODPeriod, mIdleHash))
         {
             mFrontCull = false;
 
@@ -1208,8 +1207,9 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
 
     mFrontCull = true;
     LLVOCacheOctreeCull culler(&camera, mRegionp, region_agent, do_occlusion && use_object_cache_occlusion,
-        LLVOCacheEntry::getSquaredPixelThreshold(mFrontCull), this);
+        LLVOCacheEntry::getSquaredPixelThreshold(mFrontCull), this, mLastFrontCull);
     culler.traverse(mOctree);
+    mLastFrontCull = LLViewerOctreeEntryData::getCurrentFrame();
 
     if(!sNeedsOcclusionCheck)
     {
@@ -1218,6 +1218,34 @@ S32 LLVOCachePartition::cull(LLCamera &camera, bool do_occlusion)
     return 1;
 }
 #endif // LL_TEST
+
+//static
+bool LLVOCachePartition::quietFrontCullDue(U32 frame, U32 period, U32& idle_hash)
+{
+    const U32 block = llmax(period >> 1, (U32)4);
+    if (!(frame % block))
+    {
+        idle_hash = (idle_hash + 1) % block;
+    }
+    return frame % block == idle_hash;
+}
+
+// Seen at the partition's last front cull, rather than within the last two frames: the same while the camera moves and
+// the cull runs every frame, but while it rests the culls fall nine frames apart (quietFrontCullDue), and a group then
+// went back to be asked at each one instead of being made. One whose box holds the camera, which no query asks
+// (doOcclusion), is made at once, and a group's needsUpdate() frame asks it again without holding back the objects of one
+// already seen.
+//static
+LLVOCachePartition::GroupCullAction LLVOCachePartition::cullGroup(const GroupCullFacts& facts)
+{
+    const bool seen = facts.mLastFrontCull > 0 && facts.mGroupSeenFrame >= facts.mLastFrontCull
+                      && facts.mCurrentFrame - facts.mLastFrontCull <= (S32)facts.mPeriod;
+
+    GroupCullAction action;
+    action.mAsk     = facts.mNeedsUpdate || !seen;
+    action.mVisible = facts.mHoldsCamera || (seen && !facts.mAnswerAwaited && !facts.mOccluded);
+    return action;
+}
 
 void LLVOCachePartition::setCullHistory(bool has_new_object)
 {

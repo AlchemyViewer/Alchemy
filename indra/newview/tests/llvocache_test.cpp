@@ -1099,4 +1099,247 @@ namespace
             REQUIRE(LLVOCacheEntry::staysInMemory(facts));
         }
     }
+
+    // A cache group as the object cache's front cull sees it, played through
+    // the partition's own cadence and decision with occlusion on: what earlyFail
+    // and doOcclusion do around them is modelled here, with every query answered
+    // RESULT_AGE frames after it was asked.
+    struct CacheGroupModel
+    {
+        static constexpr U32 PERIOD     = 16; // LLVOCachePartition's mLODPeriod
+        static constexpr S32 RESULT_AGE = 3;  // AlchemyRenderQueryResultAge's default
+
+        U32  mHash        = 0;     // the frame of the period it is asked again on
+        bool mHoldsCamera = false; // its box holds the camera, so a query of it fails early
+        bool mHidden      = false; // what a query of it answers
+
+        S32  mSeen     = 0;  // the group's last frame in view
+        S32  mAnswerAt = -1; // the frame its query's answer is read from, -1 with none out
+        S32  mAsked    = 0;  // the frame it was last asked
+        bool mOccluded = false;
+        S32  mMadeAt   = -1; // the first front cull that added it, -1 for none
+
+        // One front cull at `frame`, `last_front_cull` the one before it.
+        void cull(S32 frame, S32 last_front_cull)
+        {
+            const bool needs_update = (U32)frame % PERIOD == mHash;
+
+            // earlyFail reads an answer come back, then culls a hidden group
+            // that is not due to be asked again
+            if (mAnswerAt >= 0 && frame >= mAnswerAt)
+            {
+                mAnswerAt = -1;
+                mOccluded = mHidden;
+                if (!mHidden)
+                {
+                    mSeen = frame;
+                }
+            }
+            const bool retest_due = mAnswerAt < 0 && frame - mAsked >= (S32)PERIOD;
+            if (!needs_update && mOccluded && !retest_due)
+            {
+                return;
+            }
+
+            LLVOCachePartition::GroupCullFacts facts;
+            facts.mCurrentFrame   = frame;
+            facts.mLastFrontCull  = last_front_cull;
+            facts.mGroupSeenFrame = mSeen;
+            facts.mPeriod         = PERIOD;
+            facts.mNeedsUpdate    = needs_update;
+            facts.mHoldsCamera    = mHoldsCamera;
+            facts.mAnswerAwaited  = mAnswerAt >= 0;
+            facts.mOccluded       = mOccluded;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+
+            if (action.mAsk)
+            {   // doOcclusion, later in the frame
+                if (mHoldsCamera)
+                {
+                    mAnswerAt = -1;
+                    mOccluded = false;
+                }
+                else if (mAnswerAt < 0)
+                {
+                    mAnswerAt = frame + RESULT_AGE;
+                    mAsked    = frame;
+                }
+            }
+            mSeen = frame;
+            if (action.mVisible && mMadeAt < 0)
+            {
+                mMadeAt = frame;
+            }
+        }
+    };
+
+    // The front culls of a quiet partition under a resting camera, from `first`
+    // for `frames` frames.
+    std::vector<S32> quiet_front_culls(U32 first, U32 frames, U32 idle_hash)
+    {
+        std::vector<S32> culls;
+        for (U32 frame = first; frame < first + frames; ++frame)
+        {
+            if (LLVOCachePartition::quietFrontCullDue(frame, CacheGroupModel::PERIOD, idle_hash))
+            {
+                culls.push_back((S32)frame);
+            }
+        }
+        return culls;
+    }
+
+    TEST_CASE("LLVOCachePartition: a quiet partition culls one frame in nine, two together as its hash wraps", "[LLVOCache]")
+    {
+        const std::vector<S32> culls = quiet_front_culls(6400, 128, 0);
+        REQUIRE(culls.size() == 16u);
+        size_t together = 0;
+        for (size_t i = 1; i < culls.size(); ++i)
+        {
+            const S32 gap = culls[i] - culls[i - 1];
+            CAPTURE(culls[i]);
+            UNSCOPED_INFO("the culls fall a block and a frame apart, or together");
+            CHECK((gap == 9 || gap == 1));
+            together += gap == 1;
+        }
+        UNSCOPED_INFO("and together once in each cycle of the hash, 64 frames");
+        CHECK(together == 2u);
+    }
+
+    TEST_CASE("LLVOCachePartition: a cache group in view is made while the camera rests, whatever its hash", "[LLVOCache]")
+    {
+        // A resting camera over a group new to the view, for each frame of the
+        // period the group can be asked again on and each phase of the cadence:
+        // a group whose box holds the camera, which no query asks, and one
+        // outside it that its query finds in view. Seen only within the last two
+        // frames, each was asked again at every cull, nine frames apart, and made
+        // only at the culls a frame apart as the hash wraps: the one holding the
+        // camera waited for those, and never came in where its needsUpdate()
+        // frame fell on the second of them.
+        for (U32 phase = 0; phase < 64; ++phase)
+        {
+            const std::vector<S32> culls = quiet_front_culls(6400 + phase, 128, 0);
+            for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+            {
+                for (bool holds_camera : { true, false })
+                {
+                    CAPTURE(phase, hash, holds_camera);
+                    CacheGroupModel group;
+                    group.mHash        = hash;
+                    group.mHoldsCamera = holds_camera;
+
+                    S32 last = culls.front() - 9; // the cull before, which left the group out of view
+                    for (S32 frame : culls)
+                    {
+                        group.cull(frame, last);
+                        last = frame;
+                    }
+
+                    REQUIRE(group.mMadeAt >= 0);
+                    if (holds_camera)
+                    {
+                        UNSCOPED_INFO("a group whose box holds the camera is made at the first cull that sees it");
+                        CHECK(group.mMadeAt == culls[0]);
+                    }
+                    else
+                    {
+                        UNSCOPED_INFO("a group outside it is made at the first cull its answer is back by");
+                        CHECK(group.mMadeAt <= culls[0] + 10);
+                    }
+                }
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: a moving camera makes a cache group once its answer is read, as before", "[LLVOCache]")
+    {
+        for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+        {
+            CAPTURE(hash);
+            CacheGroupModel group;
+            group.mHash = hash;
+            for (S32 frame = 6401; frame < 6401 + 64; ++frame) // a front cull every frame
+            {
+                group.cull(frame, frame - 1);
+            }
+            UNSCOPED_INFO("asked at the first cull and made as its answer is read");
+            CHECK(group.mMadeAt == 6401 + CacheGroupModel::RESULT_AGE);
+        }
+
+        CacheGroupModel hidden;
+        hidden.mHidden = true;
+        for (S32 frame = 6401; frame < 6401 + 256; ++frame)
+        {
+            hidden.cull(frame, frame - 1);
+        }
+        UNSCOPED_INFO("a group its queries find hidden is never made");
+        CHECK(hidden.mMadeAt < 0);
+    }
+
+    TEST_CASE("LLVOCachePartition: cullGroup asks a group new to the view and makes one seen at the last cull", "[LLVOCache]")
+    {
+        auto seen_last_cull = []()
+        {
+            LLVOCachePartition::GroupCullFacts facts;
+            facts.mCurrentFrame   = 6409;
+            facts.mLastFrontCull  = 6400;
+            facts.mGroupSeenFrame = 6400;
+            facts.mPeriod         = 16;
+            return facts;
+        };
+
+        {
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(seen_last_cull());
+            UNSCOPED_INFO("a group seen at the last cull, nine frames back, is made and not asked");
+            CHECK(action.mVisible);
+            CHECK_FALSE(action.mAsk);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mNeedsUpdate = true;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("its needsUpdate() frame asks it again and still makes it");
+            CHECK(action.mAsk);
+            CHECK(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mAnswerAwaited = true;
+            UNSCOPED_INFO("an answer awaited holds it back");
+            CHECK_FALSE(LLVOCachePartition::cullGroup(facts).mVisible);
+            facts.mHoldsCamera = true;
+            UNSCOPED_INFO("unless its box holds the camera");
+            CHECK(LLVOCachePartition::cullGroup(facts).mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mOccluded = true;
+            UNSCOPED_INFO("a group found hidden is not made");
+            CHECK_FALSE(LLVOCachePartition::cullGroup(facts).mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mGroupSeenFrame = 6399;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("a group not seen at the last cull is new to the view: asked, not made");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mCurrentFrame = facts.mLastFrontCull + 17;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("a last cull more than a period back counts for nothing");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mLastFrontCull  = 0;
+            facts.mGroupSeenFrame = 0;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("nor does the want of one before the first cull");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+    }
 }

@@ -1122,6 +1122,16 @@ bool LLOcclusionCullingGroup::earlyFail(LLCamera* camera, const LLVector4a* boun
     return true;
 }
 
+bool LLOcclusionCullingGroup::holdsCamera(LLCamera* camera, const LLVector4a* shift)
+{
+    LLVector4a bounds[2] = { mBounds[0], mBounds[1] };
+    if (shift)
+    {
+        bounds[0].add(*shift);
+    }
+    return earlyFail(camera, bounds);
+}
+
 U32 LLOcclusionCullingGroup::getLastOcclusionIssuedTime()
 {
     return mOcclusionIssued[LLViewerCamera::sCurCameraID];

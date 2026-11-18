@@ -304,6 +304,9 @@ public:
     void discardAllQueries();
     /// Reads back the last occlusion query, if any has come back. True where one has and found the group in view.
     bool checkOcclusion();
+    /// Whether the camera stands in the group's box, widened as a query's is, `shift` taking the box to the camera's
+    /// space: such a group is asked nothing, and taken as seen (doOcclusion).
+    bool holdsCamera(LLCamera* camera, const LLVector4a* shift = NULL);
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
     bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
     U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}
