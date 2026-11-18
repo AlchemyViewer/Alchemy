@@ -67,6 +67,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewermessage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
+#include "alfloaterbulkrename.h"
 #include "alscriptstudio.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -1382,7 +1383,7 @@ void LLPanelObjectInventory::doToSelected(const LLSD& userdata)
                     ids.append(view_model->getUUID());
                 }
             }
-            LLFloaterReg::showInstance("bulk_rename", LLSD().with("ids", ids).with("task_id", mTaskUUID));
+            ALFloaterBulkRename::show(LLSD().with("ids", ids).with("task_id", mTaskUUID));
         }
         else
         {

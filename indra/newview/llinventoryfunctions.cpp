@@ -34,6 +34,7 @@
 #include "llagent.h"
 #include "llagentwearables.h"
 #include "llcallingcard.h"
+#include "alfloaterbulkrename.h"
 #include "llfloaterreg.h"
 #include "llinventorydefines.h"
 #include "llsdserialize.h"
@@ -3552,7 +3553,7 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
                 ids.append(view_model->getUUID());
             }
         }
-        LLFloaterReg::showInstance("bulk_rename", LLSD().with("ids", ids));
+        ALFloaterBulkRename::show(LLSD().with("ids", ids));
         return;
     }
 

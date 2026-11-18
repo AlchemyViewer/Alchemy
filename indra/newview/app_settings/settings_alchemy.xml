@@ -1448,6 +1448,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyBulkRenameMaxItems</key>
+        <map>
+            <key>Comment</key>
+            <string>The most inventory items Bulk Rename takes at once. Choosing Bulk Rename with more selected says so instead of opening.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>100</integer>
+        </map>
         <key>AlchemyCameraFloaterExpanded</key>
         <map>
             <key>Comment</key>

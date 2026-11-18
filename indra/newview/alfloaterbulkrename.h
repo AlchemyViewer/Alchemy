@@ -41,6 +41,9 @@ class ALFloaterBulkRename final : public LLFloater
 public:
     AL_VIEW_TYPE(ALFloaterBulkRename, LLFloater);
 
+    // Opens the floater for key["ids"], or says why not when there are too many.
+    static void show(const LLSD& key);
+
     ALFloaterBulkRename(const LLSD& key);
     bool postBuild() override;
     void onOpen(const LLSD& key) override;
@@ -55,6 +58,7 @@ private:
     static std::string newName(const ALBulkRename& rule, const LLInventoryObject* obj, int index, int total);
     void               updatePreview();
     void               onClickOK();
+    void               applyRenames(const std::vector<std::pair<LLUUID, std::string>>& renames);
 
     uuid_vec_t mIDs;
     LLUUID     mTaskID; // Set when the items live in an object's contents.
