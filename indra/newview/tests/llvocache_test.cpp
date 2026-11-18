@@ -915,7 +915,7 @@ namespace
         CHECK(killed.empty());
     }
 
-    TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once, then waits for a change", "[LLVOCache]")
+    TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once and then waits for a change", "[LLVOCache]")
     {
         constexpr U32 CRC = 0x1234u;
         LLPointer<LLVOCacheEntry> entry = vocacheTest::makeEntry(7, CRC, 16);
