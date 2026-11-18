@@ -915,6 +915,45 @@ namespace
         CHECK(killed.empty());
     }
 
+    TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once, then waits for a change", "[LLVOCache]")
+    {
+        constexpr U32 CRC = 0x1234u;
+        LLPointer<LLVOCacheEntry> entry = vocacheTest::makeEntry(7, CRC, 16);
+        CHECK_FALSE(entry->isRefused(CRC));
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("the first refusal sets the entry's CRC apart from the one the region sends it under");
+        CHECK(entry->getCRC() != CRC);
+        CHECK_FALSE(entry->isRefused(CRC));
+
+        std::vector<U8> body(32, 0xCD);
+        LLDataPackerBinaryBuffer sent(body.data(), (S32)body.size());
+        entry->updateEntry(CRC, sent);
+        UNSCOPED_INFO("so the region's update replaces the bytes refused");
+        CHECK(entry->getCRC() == CRC);
+        REQUIRE(entry->getDP());
+        CHECK(entry->getDP()->getBufferSize() == 32);
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("a refusal of the bytes the region sent leaves the entry refused at their CRC");
+        CHECK(entry->getCRC() == CRC);
+        CHECK(entry->isRefused(CRC));
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("and so does another");
+        CHECK(entry->getCRC() == CRC);
+        CHECK(entry->isRefused(CRC));
+
+        entry->updateEntry(CRC + 1, sent);
+        UNSCOPED_INFO("an object changed starts over");
+        CHECK_FALSE(entry->isRefused(CRC));
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+        entry->refuseUpdate();
+        CHECK(entry->getCRC() != CRC + 1);
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

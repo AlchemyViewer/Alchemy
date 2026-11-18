@@ -160,6 +160,14 @@ public:
     void setValid(bool valid = true) {mValid = valid;}
     bool isValid() const {return mValid;}
 
+    // The update made from the entry's bytes was refused, cut short (LLViewerObject::processUpdateMessage), and the
+    // object asked for whole again. The first refusal at a CRC sets the entry's CRC apart from the region's, so that
+    // the update the region sends replaces the bytes rather than being taken for them; a second, of the bytes the
+    // region sent, leaves the entry refused at that CRC (isRefused) until its object changes, rather than asked for
+    // and refused again for as long as it is in view.
+    void refuseUpdate();
+    bool isRefused(U32 crc) const { return mRefusals > 1 && crc == mRefusedCRC; }
+
     void setUpdateFlags(U32 flags) {mUpdateFlags = flags;}
     U32  getUpdateFlags() const    {return mUpdateFlags;}
 
@@ -241,6 +249,8 @@ protected:
     U32                         mUpdateFlags; //receive from sim
     S32                         mHitCount;
     S32                         mCRCChangeCount;    // in memory only, for dumpCache
+    U32                         mRefusedCRC = 0;    // the CRC refuseUpdate last refused at, in memory only
+    U8                          mRefusals   = 0;    // and how often, to 2
     mutable LLDataPackerBinaryBuffer    mDP;
     U8                          *mBuffer;
 

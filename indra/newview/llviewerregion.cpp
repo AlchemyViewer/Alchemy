@@ -1268,6 +1268,25 @@ void LLViewerRegion::killCacheEntry(U32 local_id)
     }
 }
 
+// Held at WAITING, the entry would wait for an object that is gone; valid under the CRC it was cached with, the region's
+// update for it would be taken for the bytes refused (cacheFullUpdate), and the object made in neither this session nor
+// the next. Its children stay with it, for the object the region's update makes to load.
+void LLViewerRegion::refuseCachedUpdate(LLVOCacheEntry* entry)
+{
+    if (mDead || !entry)
+    {
+        return;
+    }
+
+    mImpl->mVisibleEntries.erase(entry);
+    mImpl->mWaitingSet.erase(entry);
+    removeFromVOCacheTree(entry);
+    entry->setState(LLVOCacheEntry::INACTIVE);
+    entry->setValid(false);
+    entry->refuseUpdate();
+    mCacheDirty = true;
+}
+
 U32 LLViewerRegion::getNumOfActiveCachedObjects() const
 {
     return static_cast<U32>(mImpl->mActiveSet.size());
@@ -2983,6 +3002,11 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 
     LLVOCacheEntry* entry = getCacheEntry(local_id, false);
 
+    if (entry && entry->isRefused(crc))
+    {   // the region sent bytes already refused, and asked for again: they wait for the object to change
+        return CACHE_UPDATE_DUPE;
+    }
+
     if (entry)
     {
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
@@ -3138,6 +3162,12 @@ bool LLViewerRegion::probeCache(U32 local_id, U32 crc, U32 flags, U8 &cache_miss
     }
 
     LLVOCacheEntry* entry = getCacheEntry(local_id, false);
+
+    if (entry && entry->isRefused(crc))
+    {   // nothing to ask for: what the region would send has been refused
+        cache_miss_type = CACHE_MISS_TYPE_NONE;
+        return true;
+    }
 
     if (entry)
     {
