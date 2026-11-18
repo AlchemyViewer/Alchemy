@@ -1128,7 +1128,8 @@ namespace
             const bool needs_update = (U32)frame % PERIOD == mHash;
 
             // earlyFail reads an answer come back, then culls a hidden group
-            // that is not due to be asked again and does not hold the camera
+            // that is not due to be asked again and does not hold the camera,
+            // and takes one it lets through for hidden no longer
             if (mAnswerAt >= 0 && frame >= mAnswerAt)
             {
                 mAnswerAt = -1;
@@ -1139,9 +1140,14 @@ namespace
                 }
             }
             const bool retest_due = mAnswerAt < 0 && frame - mAsked >= (S32)PERIOD;
-            if (!needs_update && mOccluded && LLVOCachePartition::culledAsHidden(retest_due, mHoldsCamera))
+            const bool hidden_retest = mOccluded && retest_due;
+            if (!needs_update && mOccluded)
             {
-                return;
+                if (LLVOCachePartition::culledAsHidden(retest_due, mHoldsCamera))
+                {
+                    return;
+                }
+                mOccluded = false;
             }
 
             LLVOCachePartition::GroupCullFacts facts;
@@ -1166,7 +1172,7 @@ namespace
                 else if (mAnswerAt < 0)
                 {
                     mLastAsk = frame;
-                    if (mRefuseRetest && mOccluded && retest_due && mRefusedAt < 0)
+                    if (mRefuseRetest && hidden_retest && mRefusedAt < 0)
                     {   // nothing is out, and the group keeps its state
                         mRefusedAt = frame;
                     }
@@ -1347,13 +1353,13 @@ namespace
         }
     }
 
-    TEST_CASE("LLVOCachePartition: a hidden cache group whose retest the query pool refuses is asked at the next cull", "[LLVOCache]")
+    TEST_CASE("LLVOCachePartition: a hidden cache group whose retest the query pool refuses is made at the next cull", "[LLVOCache]")
     {
         // The pool refuses a query while its target is held, by the shader
-        // profiler: the group keeps its state, hidden and due its retest, and
-        // the cull that asked it saw it. Asked again then only on its
-        // needsUpdate() frame, it stayed hidden while the camera rested wherever
-        // that frame never falls on a front cull, half the hashes.
+        // profiler: nothing is out, and the group earlyFail let through for its
+        // retest is hidden no longer, so the next cull makes it, as an answer
+        // that expired counts for one in view, rather than wait for an answer
+        // that is not coming.
         for (U32 phase = 0; phase < 64; ++phase)
         {
             const std::vector<S32> culls = quiet_front_culls(6400 + phase, 256, 0);
@@ -1375,13 +1381,50 @@ namespace
                     if (refused && after_refusal < 0)
                     {
                         after_refusal = frame;
-                        UNSCOPED_INFO("the cull after the refusal asks it again");
-                        CHECK(group.mLastAsk == frame);
+                        UNSCOPED_INFO("the cull after the refusal makes it");
+                        CHECK(group.mMadeAt == frame);
                     }
                 }
                 REQUIRE(after_refusal >= 0);
-                UNSCOPED_INFO("and it is still never made");
-                CHECK(group.mMadeAt < 0);
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: a hidden cache group taken for hidden no longer at its retest is still not made", "[LLVOCache]")
+    {
+        // earlyFail clears a hidden group's OCCLUDED as it lets it through to
+        // be asked again, so that a group it never asks does not hide the
+        // answers below it. Until its answer is back the group is not seen at
+        // the last cull, so it is asked, and not made, whichever cadence the
+        // cull keeps and wherever its needsUpdate() frame falls.
+        for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+        {
+            CAPTURE(hash);
+            CacheGroupModel moving;
+            moving.mHash   = hash;
+            moving.mHidden = true;
+            for (S32 frame = 6401; frame < 6401 + 256; ++frame)
+            {
+                moving.cull(frame, frame - 1);
+            }
+            UNSCOPED_INFO("under a moving camera");
+            CHECK(moving.mMadeAt < 0);
+
+            for (U32 phase = 0; phase < 64; ++phase)
+            {
+                CAPTURE(phase);
+                const std::vector<S32> culls = quiet_front_culls(6400 + phase, 256, 0);
+                CacheGroupModel resting;
+                resting.mHash   = hash;
+                resting.mHidden = true;
+                S32 last = culls.front() - 9;
+                for (S32 frame : culls)
+                {
+                    resting.cull(frame, last);
+                    last = frame;
+                }
+                UNSCOPED_INFO("under a resting one");
+                CHECK(resting.mMadeAt < 0);
             }
         }
     }

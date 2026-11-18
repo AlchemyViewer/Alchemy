@@ -961,10 +961,17 @@ public:
             // on frames that never fall on half the groups' (cull), so one whose last query is a period old is let
             // through all the same, or it would stay hidden after whatever hid it had gone. So is one whose box holds the
             // camera, which processGroup makes at once (culledAsHidden).
-            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED) &&
-                LLVOCachePartition::culledAsHidden(group->isOcclusionRetestDue(), group->holdsCamera(mCamera, &mShift)))
+            if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
             {
-                return true;
+                if (LLVOCachePartition::culledAsHidden(group->isOcclusionRetestDue(), group->holdsCamera(mCamera, &mShift)))
+                {
+                    return true;
+                }
+                // And it is no longer taken for hidden until its next answer. A group this cull never asks, with no
+                // objects of its own or none large enough to make, keeps the OCCLUDED a hidden group above it gave it,
+                // and checkOcclusion drops the answers of the groups whose parent is occluded: those below it would be
+                // asked, period after period, and never seen.
+                group->clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
             }
         }
 

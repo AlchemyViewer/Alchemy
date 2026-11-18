@@ -1186,12 +1186,6 @@ bool LLOcclusionCullingGroup::checkOcclusion()
             return status == ALQueryPool::Status::Ready && passed > 0;
         }
     }
-    else if (mSpatialPartition->isOcclusionEnabled() && isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
-    {   //check occlusion has been issued for occluded node that has not had a query issued
-        assert_states_valid(this);
-        //clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
-        assert_states_valid(this);
-    }
     return false;
 }
 
