@@ -352,6 +352,20 @@ void LLVOCacheEntry::setParentID(U32 id)
     }
 }
 
+LLVOCacheEntry::EChildPlace LLVOCacheEntry::takeParent(U32 parent_id, const LLVOCacheEntry* parent, bool parent_made)
+{
+    setParentID(parent_id);
+    if (!parent_id)
+    {
+        return EChildPlace::ROOT;
+    }
+    if (parent)
+    {
+        return parent->getState() != INACTIVE ? EChildPlace::MADE : EChildPlace::WITH_PARENT;
+    }
+    return parent_made ? EChildPlace::MADE : EChildPlace::ORPHAN;
+}
+
 void LLVOCacheEntry::removeAllChildren()
 {
     if(mChildrenList.empty())

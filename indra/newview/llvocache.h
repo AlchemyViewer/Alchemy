@@ -147,6 +147,27 @@ public:
     U32  getParentID() const {return mParentID;}
     bool isChild() const {return mParentID > 0;}
 
+    // Where an entry goes once a full update or a probe has decoded it.
+    enum class EChildPlace
+    {
+        // Not a child: its data names no parent.
+        ROOT,
+        // Queued to be made, its parent made.
+        MADE,
+        // On its parent's entry, to be made as its parent is.
+        WITH_PARENT,
+        // Among the region's orphans, until its parent comes.
+        ORPHAN
+    };
+    // This entry takes parent_id, which its data names, 0 for none, as its
+    // parent, the caller having taken it off the entry of the one it named
+    // before, and says where it goes. parent is the parent's valid entry, null
+    // where it has none, and parent_made, where it has none, whether an object
+    // is made under the parent's local ID. A child goes where it would whether
+    // or not it named the parent before: one an update or a probe makes valid
+    // again names the parent it named, and may be waiting nowhere.
+    EChildPlace takeParent(U32 parent_id, const LLVOCacheEntry* parent, bool parent_made);
+
     void addChild(LLVOCacheEntry* entry);
     void removeChild(LLVOCacheEntry* entry);
     void removeAllChildren();

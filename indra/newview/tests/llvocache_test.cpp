@@ -977,6 +977,29 @@ namespace
         CHECK_FALSE(entry->isRefused(entry->getCRC()));
     }
 
+    TEST_CASE("LLVOCacheEntry: a child whose parent has no valid entry waits among the orphans unless its parent is made", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+        constexpr U32 OTHER_PARENT = 11;
+
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 1, 16);
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("decoded again naming the same parent, as an entry an update or a probe makes valid again is");
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->takeParent(PARENT, nullptr, true) == EChildPlace::MADE);
+
+        UNSCOPED_INFO("naming another parent, which is made");
+        CHECK(child->takeParent(OTHER_PARENT, nullptr, true) == EChildPlace::MADE);
+        CHECK(child->getParentID() == OTHER_PARENT);
+
+        UNSCOPED_INFO("and naming none");
+        CHECK(child->takeParent(0, nullptr, false) == EChildPlace::ROOT);
+        CHECK_FALSE(child->isChild());
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

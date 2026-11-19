@@ -2904,7 +2904,6 @@ void LLViewerRegion::decodeBoundingInfo(LLVOCacheEntry* entry)
     U32 parent_id = entry->getDP() ? LLViewerObject::extractSpatialExtents(entry->getDP(), pos, scale, rot) : entry->getParentID();
 
     U32 old_parent_id = entry->getParentID();
-    bool same_old_parent = false;
     if(parent_id != old_parent_id) //parent changed.
     {
         if(old_parent_id > 0) //has an old parent, disconnect it
@@ -2920,61 +2919,39 @@ void LLViewerRegion::decodeBoundingInfo(LLVOCacheEntry* entry)
                 }
             }
         }
-        entry->setParentID(parent_id);
-    }
-    else
-    {
-        same_old_parent = true;
     }
 
-    if(parent_id > 0) //has a new parent
+    //the new parent, where it has a valid entry in the cache
+    LLVOCacheEntry* parent = parent_id > 0 ? getCacheEntry(parent_id) : NULL;
+    switch(entry->takeParent(parent_id, parent, isNonCacheableObjectCreated(parent_id)))
     {
-        //1, find the parent in cache
-        LLVOCacheEntry* parent = getCacheEntry(parent_id);
-
-        //2, parent is not in the cache, put into the orphan list.
-        if(!parent)
-        {
-            if(!same_old_parent)
-            {
-                //check if parent is non-cacheable and already created
-                if(isNonCacheableObjectCreated(parent_id))
-                {
-                    //parent is visible, so is the child.
-                    addVisibleChildCacheEntry(NULL, entry);
-                }
-                else
-                {
-                    entry->setBoundingInfo(pos, scale);
-                    mOrphanMap[parent_id].push_back(entry->getLocalID());
-                }
-            }
-            else
-            {
-                entry->setBoundingInfo(pos, scale);
-            }
-        }
-        else //parent in cache.
-        {
-            if(!parent->isState(LLVOCacheEntry::INACTIVE))
-            {
-                //parent is visible, so is the child.
-                addVisibleChildCacheEntry(parent, entry);
-            }
-            else
-            {
-                entry->setBoundingInfo(pos, scale);
-                parent->addChild(entry);
-
-                if(parent->getGroup()) //re-insert parent to vo-cache tree because its bounding info changed.
-                {
-                    removeFromVOCacheTree(parent);
-                    addToVOCacheTree(parent);
-                }
-            }
-        }
-
+    case LLVOCacheEntry::EChildPlace::ROOT:
+        break;
+    case LLVOCacheEntry::EChildPlace::MADE:
+        //parent is visible, so is the child.
+        addVisibleChildCacheEntry(parent, entry);
         return;
+    case LLVOCacheEntry::EChildPlace::WITH_PARENT:
+        entry->setBoundingInfo(pos, scale);
+        parent->addChild(entry);
+
+        if(parent->getGroup()) //re-insert parent to vo-cache tree because its bounding info changed.
+        {
+            removeFromVOCacheTree(parent);
+            addToVOCacheTree(parent);
+        }
+        return;
+    case LLVOCacheEntry::EChildPlace::ORPHAN:
+    {
+        entry->setBoundingInfo(pos, scale);
+        //one naming the parent it named before may be waiting already
+        std::vector<U32>& orphans = mOrphanMap[parent_id];
+        if(std::find(orphans.begin(), orphans.end(), entry->getLocalID()) == orphans.end())
+        {
+            orphans.push_back(entry->getLocalID());
+        }
+        return;
+    }
     }
 
     //
