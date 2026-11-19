@@ -2226,7 +2226,12 @@ namespace
     // Everything else keeps its root order. Spaces, symbols, currency signs
     // and punctuation beyond ASCII come before ASCII space, as they do in
     // those viewers; letters sort as root collation has them, an accented
-    // letter beside the letter it decorates.
+    // letter beside the letter it decorates. '≮', '≠' and '≯' are '<', '='
+    // and '>' with a slash laid over them, which root collation sorts beside
+    // those marks; they keep their root place among the symbols, between '×'
+    // and '¬', rather than follow the marks past the digits. The Greek question
+    // mark (U+037E) and varia (U+1FEF) are ';' and '`' by canonical
+    // equivalence, and sort as those marks.
     //
     // The first run is anchored at the end of the punctuation group rather
     // than just before '0': numeric collation gives a run of digits primaries
@@ -2239,7 +2244,8 @@ namespace
         u"&[before 1]a"
         u" < ':' < ';' < '<' < '=' < '>' < '?' < '@' < '[' < '\\' < ']' < '^' < '_' < '`'"
         u"&z"
-        u" < '{' < '|' < '}' < '~'";
+        u" < '{' < '|' < '}' < '~'"
+        u"&× < ≮ < ≠ < ≯";
 
     // Built once; each thread clones it.
     const UCollator* ascii_order_collator()

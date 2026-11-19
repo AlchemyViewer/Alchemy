@@ -773,6 +773,33 @@ namespace
         CHECK(LLStringUtil::compareDict(std::string("a\xE2\x98\x85"), std::string("a b")) < 0);
     }
 
+    TEST_CASE("LLString: compareDict keeps the slashed comparison signs among the symbols", "[LLString]")
+    {
+        const std::string times("\xC3\x97" "x");
+        const std::string not_sign("\xC2\xAC" "x");
+        // '≮', '≠' and '≯', precomposed and as the mark followed by U+0338.
+        const std::string slashed[][2] = {
+            { "\xE2\x89\xAE" "x", "<\xCC\xB8" "x" },
+            { "\xE2\x89\xA0" "x", "=\xCC\xB8" "x" },
+            { "\xE2\x89\xAF" "x", ">\xCC\xB8" "x" },
+        };
+        for (const auto& [precomposed, decomposed] : slashed)
+        {
+            INFO("[" << precomposed << "]");
+            CHECK(LLStringUtil::compareStrings(precomposed, decomposed) == 0);
+            for (const std::string& sign : { precomposed, decomposed })
+            {
+                CHECK(LLStringUtil::compareDict(times, sign) < 0);
+                CHECK(LLStringUtil::compareDict(sign, not_sign) < 0);
+                CHECK(LLStringUtil::compareDict(sign, std::string(" x")) < 0);
+                CHECK(LLStringUtil::compareDict(sign, std::string("0x")) < 0);
+            }
+        }
+        // The marks themselves stay between the digits and the letters.
+        CHECK(LLStringUtil::compareDict(std::string("0x"), std::string("<x")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("=x"), std::string("ax")) < 0);
+    }
+
     TEST_CASE("LLString: copy copies no more than the destination size", "[LLString]")
     {
         char str1[] = "First String...";
