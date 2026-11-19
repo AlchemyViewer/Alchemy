@@ -14085,13 +14085,14 @@ void LLPipeline::generateSunShadow(LLCamera& camera)
 
             // Casters nearer the light than every receiver are drawn clamped onto the near plane (drawShadow's depth
             // clamp), and a receiver's compare reference moves toward lit by the constant bias (twice RenderShadowBias,
-            // directionalShadow) and at most half a texel of its capped slope on each axis (SHADOW_RPDB_MAXBIAS 0.01,
-            // filterShadowGather). A receiver that close to the near plane read lit against all of them: the topmost
-            // surface in view lost the shadow of anything above the view, a roof out of frame, until the view took the
-            // roof in and the near plane rose past it. Each fit keeps twice that reach of its depth range, in normalized
-            // depth, clear between the near plane and the receivers nearest the light: the ortho fit by moving its near
-            // plane out, the perspective fit by narrowing its depth scale (fz), which clears the same share at every
-            // distance from its origin. At most a quarter of the range, however large a bias is asked for.
+            // directionalShadow) and by what its filter adds, the fixed kernels' push along its normal or PCSS's slope
+            // (shadowMapPosition), room for which is kept here at 0.01 of the range. A receiver that close to the near
+            // plane read lit against all of them: the topmost surface in view lost the shadow of anything above the
+            // view, a roof out of frame, until the view took the roof in and the near plane rose past it. Each fit keeps
+            // twice that reach of its depth range, in normalized depth, clear between the near plane and the receivers
+            // nearest the light: the ortho fit by moving its near plane out, the perspective fit by narrowing its depth
+            // scale (fz), which clears the same share at every distance from its origin. At most a quarter of the range,
+            // however large a bias is asked for.
             const F32 near_free = llmin(2.f * (2.f * fabsf(RenderShadowBias) + 0.01f), 0.25f);
             const F32 near_z = max.mV[2] + (max.mV[2] - min.mV[2]) * near_free / (1.f - near_free);
 
