@@ -29,6 +29,7 @@
 #include "llviewerparcelmgr.h"
 
 // Library includes
+#include "alparcelupdate.h"
 #include "llaudioengine.h"
 #include "indra_constants.h"
 #include "llcachename.h"
@@ -1710,22 +1711,19 @@ void LLViewerParcelMgr::processParcelProperties(LLMessageSystem *msg, void **use
     // Actually extract the data.
     if (parcel)
     {
-        // store region_id in the parcel so we can find it again later
         LLViewerRegion* parcel_region = LLWorld::getInstance()->getRegion(msg->getSender());
+        const LLUUID parcel_region_id = parcel_region ? parcel_region->getRegionID() : LLUUID::null;
+
+        // Decided before the parcel takes its region below, since the parcel
+        // being written may be the agent parcel itself.
+        const LLViewerRegion* agent_region = gAgent.getRegion();
+        agent_parcel_update = ALParcelUpdate::updatesAgentParcel(local_id, parcel_region_id, *parcel_mgr.mAgentParcel,
+                                                                 agent_region ? agent_region->getRegionID() : LLUUID::null);
+
+        // store region_id in the parcel so we can find it again later
         if (parcel_region)
         {
-            parcel->setRegionID(parcel_region->getRegionID());
-        }
-
-        if (local_id == parcel_mgr.mAgentParcel->getLocalID())
-        {
-            // Parcels in different regions can have same ids.
-            LLViewerRegion* agent_region = gAgent.getRegion();
-            if (parcel_region && agent_region && parcel_region->getRegionID() == agent_region->getRegionID())
-            {
-                // we got an updated version of agent parcel
-                agent_parcel_update = true;
-            }
+            parcel->setRegionID(parcel_region_id);
         }
 
         S32 cur_parcel_environment_version = parcel->getParcelEnvironmentVersion();
