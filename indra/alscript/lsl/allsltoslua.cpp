@@ -3250,7 +3250,7 @@ namespace
     // --- rule lists as tables -----------------------------------------------------------
 
     // What a rule's value is to the key SLua's table names it by: as the
-    // definitions' ParticleParams, MediaParams and HttpRequestParams type
+    // definitions' ParticleParams, PrimMediaParams and HttpRequestParams type
     // it, and as the grid's serializer makes LSL's list of it again.
     enum class Takes : U8
     {

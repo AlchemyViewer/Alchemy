@@ -3289,7 +3289,7 @@ namespace
         require_checks_clean(r);
     }
 
-    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a media rule list as MediaParams with booleans and whitelist pieces", "[ALLSLToSLua]")
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a media rule list as PrimMediaParams with booleans and whitelist pieces", "[ALLSLToSLua]")
     {
         const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
                                                         "    integer on = llGetLinkNumber();\n"
@@ -3470,7 +3470,7 @@ namespace
             while (std::getline(in, text))
             {
                 type = text.find("ParticleSystem(") != std::string::npos      ? "ParticleParams"
-                       : text.find("ll.SetLinkMedia(") != std::string::npos   ? "MediaParams"
+                       : text.find("ll.SetLinkMedia(") != std::string::npos   ? "PrimMediaParams"
                        : text.find("ll.HTTPRequest(") != std::string::npos    ? "HttpRequestParams"
                                                                               : type;
                 const size_t equals = text.find(" = ");
@@ -3484,7 +3484,7 @@ namespace
         llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
         std::stringstream defs;
         defs << in.rdbuf();
-        for (const char* type : { "ParticleParams", "MediaParams", "HttpRequestParams" })
+        for (const char* type : { "ParticleParams", "PrimMediaParams", "HttpRequestParams" })
         {
             const std::string text  = defs.str();
             const size_t      begin = text.find(std::string("export type ") + type + " = {");
