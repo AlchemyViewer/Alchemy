@@ -296,6 +296,43 @@ public:
 
     bool isFrontCull() const {return mFrontCull;}
 
+    // Whether the front cull runs on `frame` while the partition is quiet and the camera rests. Each block of
+    // max(period / 2, 4) frames runs it on the one frame `idle_hash` picks, and moves `idle_hash` on at its first frame,
+    // so the culls fall one more than a block apart, and two fall together once the hash wraps.
+    static bool quietFrontCullDue(U32 frame, U32 period, U32& idle_hash);
+
+    // What the front cull knows of a group in view whose objects are large enough to make, with occlusion on. The
+    // frames are the octree's counter: the group was last in view to the world camera at mGroupSeenFrame, and the
+    // partition's front cull before this one ran at mLastFrontCull, 0 for none.
+    struct GroupCullFacts
+    {
+        S32  mCurrentFrame   = 0;
+        S32  mLastFrontCull  = 0;
+        S32  mGroupSeenFrame = 0;
+        U32  mPeriod         = 0;     // the partition's update period, mLODPeriod
+        bool mNeedsUpdate    = false; // the group's frame to be asked again (LLOcclusionCullingGroup::needsUpdate)
+        bool mHoldsCamera    = false; // its box holds the camera, so no query will ask it (doOcclusion)
+        bool mAnswerAwaited  = false; // a query is out, or one was asked this frame
+        bool mOccluded       = false; // its last answer found it hidden
+        bool mRetestDue      = false; // no query is out and its last is a period old (isOcclusionRetestDue)
+    };
+    struct GroupCullAction
+    {
+        bool mAsk     = false; // ask an occlusion query (addOccluders)
+        bool mVisible = false; // add it to the region's visible groups, whose cached objects are then made
+    };
+    // A group is asked when it is new to the view (not seen at the last front cull), on its needsUpdate() frame, and
+    // while it is hidden and due a retest: a retest the query pool refused, its target held, leaves a group seen and
+    // still hidden, and while the camera rests half the groups' needsUpdate() frames never fall on a front cull. It
+    // is added, and its objects made, where it was seen at the last front cull too, is not hidden and awaits no answer,
+    // and at once where its box holds the camera. The last front cull counts only within a period of this one.
+    static GroupCullAction cullGroup(const GroupCullFacts& facts);
+
+    // Whether the front cull passes over a group its last answer found hidden, on a frame that is not its needsUpdate()
+    // frame: until its retest is due, unless its box holds the camera, which can step into a box a query found hidden
+    // from outside.
+    static bool culledAsHidden(bool retest_due, bool holds_camera) { return !retest_due && !holds_camera; }
+
 private:
     void selectBackObjects(LLCamera &camera, F32 projection_area_cutoff, bool use_occlusion); //select objects behind camera.
 
@@ -310,6 +347,7 @@ private:
 
     S32   mBackSlectionEnabled; //enable to select back objects if > 0.
     U32   mIdleHash;
+    U32   mLastFrontCull; // the frame of the last front cull, 0 before the first
 };
 
 //
