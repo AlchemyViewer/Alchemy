@@ -1199,12 +1199,14 @@ void LLViewerRegion::dirtyAllPatches()
 //physically delete the cache entry
 void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
 {
-    if(!entry || !entry->isValid())
+    // An entry refused, invalid until the region sends its object again, is killed all the same: it holds its
+    // children, which an object given the local ID later would load.
+    if(!entry || !entry->isKillable())
     {
         return;
     }
 
-    if(for_rendering && !entry->isState(LLVOCacheEntry::ACTIVE))
+    if(for_rendering && entry->isValid() && !entry->isState(LLVOCacheEntry::ACTIVE))
     {
         addNewObject(entry); //force to add to rendering pipeline
     }
@@ -1255,6 +1257,7 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
     entry->setState(LLVOCacheEntry::INACTIVE);
     entry->removeOctreeEntry();
     entry->setValid(false);
+    entry->forgetRefusal();
 
 }
 
@@ -1270,7 +1273,8 @@ void LLViewerRegion::killCacheEntry(U32 local_id)
 
 // Held at WAITING, the entry would wait for an object that is gone; valid under the CRC it was cached with, the region's
 // update for it would be taken for the bytes refused (cacheFullUpdate), and the object made in neither this session nor
-// the next. Its children stay with it, for the object the region's update makes to load.
+// the next. Its children stay with it, for the object the region's update makes to load, through the entry made valid
+// again (LLDrawable::init) or through findOrphans while it is not; a kill takes them with it (killCacheEntry).
 void LLViewerRegion::refuseCachedUpdate(LLVOCacheEntry* entry)
 {
     if (mDead || !entry)
@@ -2797,7 +2801,8 @@ void LLViewerRegion::setSimulatorFeatures(const LLSD& sim_features)
     LLAppViewer::instance()->postToMainCoro(work);
 }
 
-//this is called when the parent is not cacheable.
+//this is called when an object is made from the region's update rather than its cache entry: the parent is not
+//cacheable, or its entry's update was refused.
 //move all orphan children out of cache and insert to rendering octree.
 void LLViewerRegion::findOrphans(U32 parent_id)
 {
@@ -2812,6 +2817,19 @@ void LLViewerRegion::findOrphans(U32 parent_id)
         }
         children->clear();
         mOrphanMap.erase(parent_id);
+    }
+
+    // And those a refused entry holds (refuseCachedUpdate). An object made from its entry takes the entry, which loads
+    // them (LLDrawable::init), but only a valid one: this object was made from the region's update, and the entry stays
+    // invalid until the region sends its bytes again, or for good where it sent them refused twice.
+    LLVOCacheEntry* refused = getCacheEntry(parent_id, false);
+    if (refused && !refused->isValid() && refused->wasRefused())
+    {
+        while (LLVOCacheEntry* child = refused->getChild())
+        {
+            //parent is visible, so is the child.
+            addVisibleChildCacheEntry(NULL, child);
+        }
     }
 }
 

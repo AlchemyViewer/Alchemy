@@ -913,6 +913,15 @@ namespace
         killed.clear();
         CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
         CHECK(killed.empty());
+
+        constexpr U32 REFUSED = 5;
+        entries[REFUSED] = vocacheTest::makeEntry(REFUSED, 5, 16);
+        entries[REFUSED]->refuseUpdate();
+        entries[REFUSED]->setValid(false);
+        UNSCOPED_INFO("an entry invalid for a refused update holds its children, and is killed with them");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(REFUSED, entries, overrides, kill_entry));
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[REFUSED].get());
     }
 
     TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once and then waits for a change", "[LLVOCache]")
@@ -920,11 +929,17 @@ namespace
         constexpr U32 CRC = 0x1234u;
         LLPointer<LLVOCacheEntry> entry = vocacheTest::makeEntry(7, CRC, 16);
         CHECK_FALSE(entry->isRefused(CRC));
+        CHECK_FALSE(entry->wasRefused());
 
         entry->refuseUpdate();
         UNSCOPED_INFO("the first refusal sets the entry's CRC apart from the one the region sends it under");
         CHECK(entry->getCRC() != CRC);
         CHECK_FALSE(entry->isRefused(CRC));
+        CHECK(entry->wasRefused());
+        entry->setValid(false);
+        UNSCOPED_INFO("and a kill still reaches the entry, invalid until the region sends its object again");
+        CHECK(entry->isKillable());
+        entry->setValid();
 
         std::vector<U8> body(32, 0xCD);
         LLDataPackerBinaryBuffer sent(body.data(), (S32)body.size());
@@ -952,6 +967,14 @@ namespace
         entry->refuseUpdate();
         CHECK(entry->getCRC() != CRC + 1);
         CHECK_FALSE(entry->isRefused(CRC + 1));
+
+        entry->refuseUpdate();
+        entry->setValid(false);
+        entry->forgetRefusal();
+        UNSCOPED_INFO("a kill lets the refusal go, and the entry with it");
+        CHECK_FALSE(entry->wasRefused());
+        CHECK_FALSE(entry->isKillable());
+        CHECK_FALSE(entry->isRefused(entry->getCRC()));
     }
 
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")

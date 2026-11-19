@@ -279,7 +279,7 @@ bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, voc
                                  const std::function<void(LLVOCacheEntry*)>& kill_entry)
 {
     const auto iter = entries.find(local_id);
-    if (iter != entries.end() && iter->second->isValid())
+    if (iter != entries.end() && iter->second->isKillable())
     {
         kill_entry(iter->second);
     }
