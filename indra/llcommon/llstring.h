@@ -186,9 +186,10 @@ public:
     // so the two never disagree on what belongs in a cluster.
     static bool isEmojiClusterExtender(llwchar a);
 
-    // Sort order. Root-locale Unicode collation on both forms, so a list comes
-    // out the same on every platform and an accented letter sorts beside the
-    // letter it decorates rather than past the end of the alphabet.
+    // Sort order. Root-locale Unicode collation, so a list comes out the same
+    // on every platform and an accented letter sorts beside the letter it
+    // decorates rather than past the end of the alphabet, with ASCII's
+    // punctuation and symbols in ASCII order around the digits and letters.
     static S32  collate(const char* a, const char* b);
 
     static void setupDatetimeInfo(bool pacific_daylight_time);
@@ -457,9 +458,12 @@ public:
 
     // Sort order for lists people read: Unicode collation with digit runs
     // compared as numbers, so item2 comes before item10 and an accented letter
-    // sorts beside the letter it decorates. Case is a tertiary difference, so
-    // "abc" and "ABC" differ but sort next to each other, lowercase first.
-    // Root locale, so a list looks the same to everyone.
+    // sorts beside the letter it decorates. ASCII's punctuation and symbols
+    // keep ASCII order around the digits and letters, so "!a" < "-a" < "1a" <
+    // ":a" < "[a" < "a" < "~a", the order inventory names are written for.
+    // Case is a tertiary difference, so "abc" and "ABC" differ but sort next
+    // to each other, uppercase first. Root locale, so a list looks the same to
+    // everyone.
     static S32      compareDict(string_view_type a, string_view_type b);
 
     // The same, with case ignored entirely. Accents still separate.

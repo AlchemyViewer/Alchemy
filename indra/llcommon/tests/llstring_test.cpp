@@ -33,6 +33,7 @@
 #include "StringVec.h"
 #include <catch2/catch_test_macros.hpp>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -608,6 +609,195 @@ namespace
         // ... and case-insensitive still keeps accents apart.
         UNSCOPED_INFO("caseless keeps accents");
         CHECK(LLStringUtil::compareDictInsensitive(std::string("ab"), std::string("\xC3\xA4" "b")) < 0);
+    }
+
+    // The dictionary order Second Life's viewers sort an inventory by, for
+    // ASCII: letters folded to lowercase, uppercase first where nothing else
+    // differs, a run of digits ranked by its length and then its digits, and
+    // every other character by its byte.
+    S32 viewer_dict_order(const std::string& astr, const std::string& bstr, bool caseless)
+    {
+        const auto is_upper = [](char c) { return c >= 'A' && c <= 'Z'; };
+        const auto is_digit = [](char c) { return c >= '0' && c <= '9'; };
+        const auto lower = [](char c) { return (char)(c - 'A' + 'a'); };
+
+        const char* a = astr.c_str();
+        const char* b = bstr.c_str();
+        S32 bias = 0;
+        S32 run = 0;
+        char ca = *(a++);
+        char cb = *(b++);
+        while (ca && cb)
+        {
+            if (!caseless && bias == 0)
+            {
+                if (is_upper(ca)) { ca = lower(ca); --bias; }
+                if (is_upper(cb)) { cb = lower(cb); ++bias; }
+            }
+            else
+            {
+                if (is_upper(ca)) { ca = lower(ca); }
+                if (is_upper(cb)) { cb = lower(cb); }
+            }
+            if (is_digit(ca))
+            {
+                if (run-- > 0)
+                {
+                    if (cb != ca) break;
+                }
+                else
+                {
+                    if (!is_digit(cb)) break;
+                    S32 ai = 0;
+                    S32 bi = 0;
+                    while (is_digit(a[ai])) ++ai;
+                    while (is_digit(b[bi])) ++bi;
+                    if (ai < bi) { ca = 0; break; }
+                    if (bi < ai) { cb = 0; break; }
+                    if (ca != cb) break;
+                    run = ai;
+                }
+            }
+            else if (ca != cb)
+            {
+                break;
+            }
+            ca = *(a++);
+            cb = *(b++);
+        }
+        return (ca == cb) ? bias : (S32)ca - (S32)cb;
+    }
+
+    S32 sign_of(S32 v)
+    {
+        return (v > 0) - (v < 0);
+    }
+
+    // Every printable ASCII character alone and before a letter, and every
+    // pair drawn from a mix of marks, digits and both cases.
+    std::vector<std::string> ascii_names()
+    {
+        std::vector<std::string> names;
+        for (char c = ' '; c <= '~'; ++c)
+        {
+            names.emplace_back(1, c);
+            names.push_back(std::string(1, c) + "x");
+        }
+        constexpr std::string_view mix = " !#'-.019:@[\\_`aAbzZ{|~";
+        for (char first : mix)
+        {
+            for (char second : mix)
+            {
+                names.push_back(std::string{ first, second });
+            }
+        }
+
+        // A run of digits that starts with zero is the one place the orders
+        // part on purpose: the reference ranks "01" after "1" by its length,
+        // collation beside it by its value.
+        std::erase_if(names, [](const std::string& s)
+        {
+            for (size_t i = 0; i + 1 < s.size(); ++i)
+            {
+                const bool starts_run = (i == 0 || !LLStringOps::isDigit(s[i - 1]));
+                if (starts_run && s[i] == '0' && LLStringOps::isDigit(s[i + 1]))
+                    return true;
+            }
+            return false;
+        });
+        return names;
+    }
+
+    TEST_CASE("LLString: compareDict puts ASCII marks in the order inventory names are written for", "[LLString]")
+    {
+        // The order a folder's leading mark places it by.
+        CHECK(LLStringUtil::compareDict(std::string("!Favorites"), std::string("-Outfits")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("-Outfits"), std::string(":: Brand ::")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("!Favorites"), std::string(":: Brand ::")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("*Brand*"), std::string("1 Box")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("10 Box"), std::string("[Brand] Hat")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("[Brand] Hat"), std::string("Apple")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("_Archive"), std::string("apple")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("Zebra"), std::string("~Old")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("zebra"), std::string("{Box}")) < 0);
+        CHECK(LLStringUtil::compareDictInsensitive(std::string("!b"), std::string("-a")) < 0);
+        CHECK(LLStringUtil::compareInsensitive(std::string("!b"), std::string("-a")) < 0);
+        CHECK(LLStringUtil::compareStrings(std::string("!b"), std::string("-a")) < 0);
+    }
+
+    TEST_CASE("LLString: compareDict agrees with the viewers' dictionary order on ASCII", "[LLString]")
+    {
+        const std::vector<std::string> names = ascii_names();
+        for (bool caseless : { false, true })
+        {
+            size_t disagreements = 0;
+            std::string first_lhs;
+            std::string first_rhs;
+            for (const std::string& lhs : names)
+            {
+                for (const std::string& rhs : names)
+                {
+                    const S32 said = caseless ? LLStringUtil::compareDictInsensitive(lhs, rhs)
+                                              : LLStringUtil::compareDict(lhs, rhs);
+                    if (sign_of(said) != sign_of(viewer_dict_order(lhs, rhs, caseless)))
+                    {
+                        if (0 == disagreements++)
+                        {
+                            first_lhs = lhs;
+                            first_rhs = rhs;
+                        }
+                    }
+                }
+            }
+            INFO("caseless " << caseless << ", first at [" << first_lhs << "] against [" << first_rhs << "]");
+            CHECK(disagreements == 0);
+        }
+    }
+
+    TEST_CASE("LLString: compareDict puts marks beyond ASCII before ASCII space", "[LLString]")
+    {
+        const std::string black_star("\xE2\x98\x85" "x");
+        const std::string heart("\xE2\x9D\xA4" "x");
+        const std::string bullet("\xE2\x80\xA2" "x");
+        const std::string corner_bracket("\xE3\x80\x8C" "x");
+        const std::string euro("\xE2\x82\xAC" "x");
+        const std::string no_break_space("\xC2\xA0" "x");
+        for (const std::string& mark : { black_star, heart, bullet, corner_bracket, euro, no_break_space })
+        {
+            INFO("[" << mark << "]");
+            CHECK(LLStringUtil::compareDict(mark, std::string(" x")) < 0);
+            CHECK(LLStringUtil::compareDict(mark, std::string("!x")) < 0);
+            CHECK(LLStringUtil::compareDict(mark, std::string("0x")) < 0);
+        }
+        // Within a name too: the star sorts before the space.
+        CHECK(LLStringUtil::compareDict(std::string("a\xE2\x98\x85"), std::string("a b")) < 0);
+    }
+
+    TEST_CASE("LLString: compareDict keeps the slashed comparison signs among the symbols", "[LLString]")
+    {
+        const std::string times("\xC3\x97" "x");
+        const std::string not_sign("\xC2\xAC" "x");
+        // '≮', '≠' and '≯', precomposed and as the mark followed by U+0338.
+        const std::string slashed[][2] = {
+            { "\xE2\x89\xAE" "x", "<\xCC\xB8" "x" },
+            { "\xE2\x89\xA0" "x", "=\xCC\xB8" "x" },
+            { "\xE2\x89\xAF" "x", ">\xCC\xB8" "x" },
+        };
+        for (const auto& [precomposed, decomposed] : slashed)
+        {
+            INFO("[" << precomposed << "]");
+            CHECK(LLStringUtil::compareStrings(precomposed, decomposed) == 0);
+            for (const std::string& sign : { precomposed, decomposed })
+            {
+                CHECK(LLStringUtil::compareDict(times, sign) < 0);
+                CHECK(LLStringUtil::compareDict(sign, not_sign) < 0);
+                CHECK(LLStringUtil::compareDict(sign, std::string(" x")) < 0);
+                CHECK(LLStringUtil::compareDict(sign, std::string("0x")) < 0);
+            }
+        }
+        // The marks themselves stay between the digits and the letters.
+        CHECK(LLStringUtil::compareDict(std::string("0x"), std::string("<x")) < 0);
+        CHECK(LLStringUtil::compareDict(std::string("=x"), std::string("ax")) < 0);
     }
 
     TEST_CASE("LLString: copy copies no more than the destination size", "[LLString]")
