@@ -307,6 +307,10 @@ public:
     /// Whether the camera stands in the group's box, widened as a query's is, `shift` taking the box to the camera's
     /// space: such a group is asked nothing, and taken as seen (doOcclusion).
     bool holdsCamera(LLCamera* camera, const LLVector4a* shift = NULL);
+    /// Takes the group for seen with the groups below it, as doOcclusion takes a box it asks nothing of: drops its query
+    /// and the stale ones below, and clears OCCLUDED here and below, which the walks below stop doing at a group no
+    /// longer hidden.
+    void takeForSeen();
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
     bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
     U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}

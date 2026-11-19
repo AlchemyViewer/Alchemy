@@ -963,15 +963,25 @@ public:
             // camera, which processGroup makes at once (culledAsHidden).
             if (group->isOcclusionState(LLOcclusionCullingGroup::OCCLUDED))
             {
-                if (LLVOCachePartition::culledAsHidden(group->isOcclusionRetestDue(), group->holdsCamera(mCamera, &mShift)))
+                const bool holds_camera = group->holdsCamera(mCamera, &mShift);
+                if (LLVOCachePartition::culledAsHidden(group->isOcclusionRetestDue(), holds_camera))
                 {
                     return true;
                 }
-                // And it is no longer taken for hidden until its next answer. A group this cull never asks, with no
-                // objects of its own or none large enough to make, keeps the OCCLUDED a hidden group above it gave it,
-                // and checkOcclusion drops the answers of the groups whose parent is occluded: those below it would be
-                // asked, period after period, and never seen.
-                group->clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+                if (holds_camera)
+                {   // With the groups below it, as doOcclusion would take it later in the frame: their answers, and
+                    // its, were asked from outside, and once this group is no longer hidden doOcclusion's walk below
+                    // it stops at once.
+                    group->takeForSeen();
+                }
+                else
+                {
+                    // And it is no longer taken for hidden until its next answer. A group this cull never asks, with
+                    // no objects of its own or none large enough to make, keeps the OCCLUDED a hidden group above it
+                    // gave it, and checkOcclusion drops the answers of the groups whose parent is occluded: those below
+                    // it would be asked, period after period, and never seen. They keep their own answers.
+                    group->clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED);
+                }
             }
         }
 

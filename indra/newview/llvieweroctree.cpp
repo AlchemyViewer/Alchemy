@@ -1189,6 +1189,15 @@ bool LLOcclusionCullingGroup::checkOcclusion()
     return false;
 }
 
+void LLOcclusionCullingGroup::takeForSeen()
+{
+    discardQuery();
+    assert_states_valid(this);
+    discardStaleQueriesBelow(); // before OCCLUDED goes, which it reads
+    clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
+    assert_states_valid(this);
+}
+
 void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* shift)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_OCTREE;
@@ -1220,11 +1229,7 @@ void LLOcclusionCullingGroup::doOcclusion(LLCamera* camera, const LLVector4a* sh
         if (beside_map || earlyFail(camera, bounds))
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_OCTREE("doOcclusion - early fail");
-            discardQuery();
-            assert_states_valid(this);
-            discardStaleQueriesBelow();
-            clearOcclusionState(LLOcclusionCullingGroup::OCCLUDED, LLOcclusionCullingGroup::STATE_MODE_DIFF);
-            assert_states_valid(this);
+            takeForSeen();
         }
         else
         {
