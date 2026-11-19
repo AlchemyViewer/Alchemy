@@ -644,7 +644,7 @@ namespace
     constexpr F32 SPHERE_FIT_CLEAR = 0.028f;
 
     // RenderShadowBias and RenderShadowOffset as the viewer ships them, the bias's size.
-    constexpr F32 STOCK_SHADOW_BIAS   = 0.002f;
+    constexpr F32 STOCK_SHADOW_BIAS   = 0.0005f;
     constexpr F32 STOCK_SHADOW_OFFSET = 0.01f;
 
     const char* kSphereMapV =
