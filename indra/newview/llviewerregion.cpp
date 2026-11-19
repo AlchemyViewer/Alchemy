@@ -1724,9 +1724,14 @@ void LLViewerRegion::createVisibleObjects()
             {
                 break;
             }
-            addNewObject(vo_entry);
-            ++created;
-            ++sObjectsCreated;
+            // Only an object made counts toward either: an entry that makes none, its object in two regions at once
+            // (addNewObject), is tried again next frame, and would stand for the region's one, and some of the frame's
+            // few, every frame. The setting's count goes on counting tries, the work it bounds.
+            if (addNewObject(vo_entry))
+            {
+                ++created;
+                ++sObjectsCreated;
+            }
             if(throttle > 0 && --throttle == 0)
             {
                 break;
