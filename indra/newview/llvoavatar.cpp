@@ -39,6 +39,7 @@
 
 #include "alavatargroups.h"
 #include "albakeproxies.h"
+#include "alobjectupdate.h"
 #include "alrenderisolation.h"
 #include "aoengine.h"
 #include "llagent.h" //  Get state values from here
@@ -8121,7 +8122,24 @@ bool LLVOAvatar::setParent(LLViewerObject* parent)
     if (parent == NULL)
     {
         getOffObject();
+
+        // getOffObject puts the drawable where the avatar was drawn, in the
+        // agent's frame. Its own position and rotation are still against the
+        // seat, and are read against the region once the seat lets it go.
+        std::optional<ALObjectUpdate::Place> drawn;
+        if (mDrawable.notNull())
+        {
+            drawn = ALObjectUpdate::Place{ mDrawable->mXform.getPosition(), mDrawable->mXform.getRotation() };
+        }
+        const LLVector3 region_origin = mRegionp ? mRegionp->getOriginAgent() : LLVector3::zero;
+        const ALObjectUpdate::Place stand = ALObjectUpdate::placeOnStanding(*this, drawn, region_origin);
+
         ret = LLViewerObject::setParent(parent);
+        if (ret && mRegionp)
+        {
+            setPositionRegion(stand.mPosition);
+            setRotation(stand.mRotation);
+        }
         if (isSelf())
         {
             gAgentCamera.resetCamera();

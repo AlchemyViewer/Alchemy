@@ -188,4 +188,97 @@ namespace
         UNSCOPED_INFO("however slowly");
         CHECK_FALSE(ALObjectUpdate::resetsSpin(LLVector3(0.f, 1e-6f, 0.f), false));
     }
+
+    bool samePosition(const LLVector3& a, const LLVector3& b)
+    {
+        return dist_vec(a, b) < 1e-4f;
+    }
+
+    // q and -q are the same rotation.
+    bool sameRotation(const LLQuaternion& a, const LLQuaternion& b)
+    {
+        return llabs(dot(a, b)) > 1.f - 1e-6f;
+    }
+
+    // A quarter turn about z takes x to y.
+    const LLQuaternion QUARTER_TURN_Z(F_PI_BY_TWO, LLVector3::z_axis);
+    const LLQuaternion QUARTER_TURN_X(F_PI_BY_TWO, LLVector3::x_axis);
+    const LLVector3 REGION_ORIGIN(256.f, -512.f, 0.f);
+
+    // A seat at (100, 50, 20) in its region, a quarter turn about z, and an
+    // avatar on it 1 m along the seat's x and 0.5 m up, which puts it at
+    // (100, 51, 20.5) in the region.
+    struct Seated
+    {
+        LLXform mSeat;
+        LLXform mAvatar;
+
+        Seated()
+        {
+            mSeat.setPosition(LLVector3(100.f, 50.f, 20.f));
+            mSeat.setRotation(QUARTER_TURN_Z);
+            mAvatar.setPosition(LLVector3(1.f, 0.f, 0.5f));
+            REQUIRE(mAvatar.setParent(&mSeat));
+        }
+    };
+
+    TEST_CASE("ALObjectUpdate: an avatar stands where it was drawn against its region", "[ALObjectUpdate]")
+    {
+        const Seated seated;
+        const ALObjectUpdate::Place drawn{ REGION_ORIGIN + LLVector3(100.f, 51.f, 20.5f), QUARTER_TURN_Z };
+
+        const ALObjectUpdate::Place stand = ALObjectUpdate::placeOnStanding(seated.mAvatar, drawn, REGION_ORIGIN);
+        CAPTURE(stand.mPosition);
+        CHECK(samePosition(stand.mPosition, LLVector3(100.f, 51.f, 20.5f)));
+        CHECK(sameRotation(stand.mRotation, QUARTER_TURN_Z));
+    }
+
+    TEST_CASE("ALObjectUpdate: where an avatar was drawn wins over where it sat", "[ALObjectUpdate]")
+    {
+        // Drawn short of its seat, as when the drawable is still easing
+        // toward it, and turned the other way.
+        const Seated seated;
+        const ALObjectUpdate::Place drawn{ REGION_ORIGIN + LLVector3(99.5f, 51.f, 20.f), ~QUARTER_TURN_Z };
+
+        const ALObjectUpdate::Place stand = ALObjectUpdate::placeOnStanding(seated.mAvatar, drawn, REGION_ORIGIN);
+        CAPTURE(stand.mPosition);
+        CHECK(samePosition(stand.mPosition, LLVector3(99.5f, 51.f, 20.f)));
+        CHECK(sameRotation(stand.mRotation, ~QUARTER_TURN_Z));
+    }
+
+    TEST_CASE("ALObjectUpdate: an avatar not drawn stands where its place against the seat puts it", "[ALObjectUpdate]")
+    {
+        Seated seated;
+        seated.mAvatar.setRotation(QUARTER_TURN_X);
+
+        const ALObjectUpdate::Place stand = ALObjectUpdate::placeOnStanding(seated.mAvatar, std::nullopt, REGION_ORIGIN);
+        CAPTURE(stand.mPosition);
+        CHECK(samePosition(stand.mPosition, LLVector3(100.f, 51.f, 20.5f)));
+        UNSCOPED_INFO("its own turn first and then the seat's");
+        CHECK(sameRotation(stand.mRotation, QUARTER_TURN_X * QUARTER_TURN_Z));
+    }
+
+    TEST_CASE("ALObjectUpdate: an avatar not drawn on a seat that is a child stands where the linkset puts it", "[ALObjectUpdate]")
+    {
+        // The root at (10, 20, 30), a quarter turn about z; the seat 2 m along
+        // the root's x, a quarter turn about x against it; the avatar 1 m along
+        // the seat's y. The seat's turn takes that y to z, and the root's leaves
+        // z alone: (10, 22, 30) and 1 m up. Taken the other way round, the root's
+        // turn first, the avatar would be at (9, 22, 30).
+        LLXform root;
+        LLXform seat;
+        LLXform avatar;
+        root.setPosition(LLVector3(10.f, 20.f, 30.f));
+        root.setRotation(QUARTER_TURN_Z);
+        seat.setPosition(LLVector3(2.f, 0.f, 0.f));
+        seat.setRotation(QUARTER_TURN_X);
+        avatar.setPosition(LLVector3(0.f, 1.f, 0.f));
+        REQUIRE(seat.setParent(&root));
+        REQUIRE(avatar.setParent(&seat));
+
+        const ALObjectUpdate::Place stand = ALObjectUpdate::placeOnStanding(avatar, std::nullopt, REGION_ORIGIN);
+        CAPTURE(stand.mPosition);
+        CHECK(samePosition(stand.mPosition, LLVector3(10.f, 22.f, 31.f)));
+        CHECK(sameRotation(stand.mRotation, QUARTER_TURN_X * QUARTER_TURN_Z));
+    }
 }
