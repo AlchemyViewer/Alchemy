@@ -86,13 +86,13 @@ std::string ALBulkRename::applyFormat(const std::string& name, int index, int to
             {
                 return name;
             }
-            addition = replaceAll(text, "$n", name);
-            addition = replaceAll(addition, "$i", std::to_string(counter_start + index));
+            addition = replaceAll(text, "$i", std::to_string(counter_start + index));
             addition = replaceAll(addition, "$c", paddedCounter(index, total));
             addition = replaceAll(addition, "$a", formatTime(when, "%Y-%m-%d"));
             addition = replaceAll(addition, "$t", formatTime(when, "%H:%M:%S"));
-
-            return formatTime(std::time(nullptr), addition);
+            addition = formatTime(std::time(nullptr), addition);
+            // $n replaced last to prevent text in previous name being treated as tokens for replacement
+            return replaceAll(addition, "$n", name);
         }
         default:
             LL_WARNS("ALBulkRename") << "Unknown format kind: " << static_cast<int>(format_kind) << LL_ENDL;

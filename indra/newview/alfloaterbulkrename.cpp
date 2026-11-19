@@ -184,15 +184,14 @@ ALBulkRename ALFloaterBulkRename::rule() const
         rule.position = mFormatPositionCombo->getValue().asString() == "before" ? ALBulkRename::Position::Before
                                                                                 : ALBulkRename::Position::After;
         rule.text     = mFormatText->getText();
+        rule.counter_start = mCounterStart->getValue().asInteger();
         if (mFormatKindCombo->getValue().asString() == "count")
         {
             rule.format_kind   = ALBulkRename::FormatKind::Count;
-            rule.counter_start = mCounterStart->getValue().asInteger();
         }
         else if (mFormatKindCombo->getValue().asString() == "index")
         {
             rule.format_kind   = ALBulkRename::FormatKind::Index;
-            rule.counter_start = mCounterStart->getValue().asInteger();
         }
         else if (mFormatKindCombo->getValue().asString() == "date_current")
         {
