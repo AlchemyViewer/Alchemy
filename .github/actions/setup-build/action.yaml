@@ -162,9 +162,10 @@ runs:
     # After the MSVC environment, so nothing it puts on the path comes ahead
     # of these. Linux builds with the CMake floor, so the floor is a floor;
     # the Visual Studio 2026 generator needs a newer one. Both are pinned:
-    # vcpkg builds the ports with this CMake and hashes its version into
-    # every package ABI, so a CMake release on PyPI would otherwise miss the
-    # whole binary cache until a protected build filled it again. llsd is
+    # vcpkg builds the ports with the first CMake on the path no older than
+    # the one its own pin names, and hashes its version into every package
+    # ABI, so a CMake release on PyPI would otherwise miss the whole binary
+    # cache until a protected build filled it again. llsd is
     # for the tests that spawn a Python peer, PyYAML for lsl-definitions'
     # generator, which LL's LSL compiler needs for its tests, and sentry-cli
     # uploads the debug files.
@@ -178,6 +179,15 @@ runs:
           llsd==1.2.4
           PyYAML==6.0.3
           sentry-cli==3.8.0
+
+    # The Linux floor is older than the CMake vcpkg's pin names, so vcpkg
+    # passes it over for the image's, and every CMake the image moves to
+    # misses the whole binary cache as a PyPI release would. On Linux vcpkg
+    # takes the CMake and Ninja its own pin names.
+    - name: vcpkg's own tools
+      if: runner.os == 'Linux'
+      shell: bash
+      run: echo "VCPKG_FORCE_DOWNLOADED_BINARIES=1" >> "$GITHUB_ENV"
 
     - name: Bootstrap vcpkg Windows
       if: runner.os == 'Windows'
