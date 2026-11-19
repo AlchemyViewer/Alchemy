@@ -361,7 +361,7 @@ LLVOCacheEntry::EChildPlace LLVOCacheEntry::takeParent(U32 parent_id, const LLVO
     }
     if (parent)
     {
-        return parent->getState() != INACTIVE ? EChildPlace::MADE : EChildPlace::WITH_PARENT;
+        return parent->getState() == ACTIVE ? EChildPlace::MADE : EChildPlace::WITH_PARENT;
     }
     return parent_made ? EChildPlace::MADE : EChildPlace::ORPHAN;
 }

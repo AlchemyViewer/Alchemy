@@ -1000,6 +1000,29 @@ namespace
         CHECK_FALSE(child->isChild());
     }
 
+    TEST_CASE("LLVOCacheEntry: a child waits on its parent's entry until the parent is made from it", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+
+        LLPointer<LLVOCacheEntry> parent = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("queued to be made");
+        parent->setState(LLVOCacheEntry::IN_QUEUE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("its object asked for, its drawable not yet made");
+        parent->setState(LLVOCacheEntry::WAITING);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+        CHECK(child->takeParent(PARENT, parent, true) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("and made");
+        parent->setState(LLVOCacheEntry::ACTIVE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::MADE);
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

@@ -152,9 +152,12 @@ public:
     {
         // Not a child: its data names no parent.
         ROOT,
-        // Queued to be made, its parent made.
+        // Queued to be made, its parent made: from its entry, where it has a
+        // valid one, and the parent's drawable made (ACTIVE).
         MADE,
-        // On its parent's entry, to be made as its parent is.
+        // On its parent's entry, which is not made yet, though it may be
+        // queued or waiting for its drawable, to be made as the parent's
+        // drawable is (LLDrawable::init).
         WITH_PARENT,
         // Among the region's orphans, until its parent comes.
         ORPHAN
