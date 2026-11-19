@@ -2167,6 +2167,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
     }
 
     objectp->mLocalID = local_id;
+    regionp->addToCreatedList(local_id);
     mUUIDObjectMap[uuid] = objectp;
     mPresenceSignal(uuid, true);
     setUUIDAndLocal(uuid,

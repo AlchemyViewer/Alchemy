@@ -977,6 +977,89 @@ namespace
         CHECK_FALSE(entry->isRefused(entry->getCRC()));
     }
 
+    TEST_CASE("LLVOCacheEntry: a child whose parent has no valid entry waits among the orphans unless its parent is made", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+        constexpr U32 OTHER_PARENT = 11;
+
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 1, 16);
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("decoded again naming the same parent, as an entry an update or a probe makes valid again is");
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->takeParent(PARENT, nullptr, true) == EChildPlace::MADE);
+
+        UNSCOPED_INFO("naming another parent, which is made");
+        CHECK(child->takeParent(OTHER_PARENT, nullptr, true) == EChildPlace::MADE);
+        CHECK(child->getParentID() == OTHER_PARENT);
+
+        UNSCOPED_INFO("and naming none");
+        CHECK(child->takeParent(0, nullptr, false) == EChildPlace::ROOT);
+        CHECK_FALSE(child->isChild());
+    }
+
+    TEST_CASE("LLVOCacheEntry: a child waits on its parent's entry until the parent is made from it", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+
+        LLPointer<LLVOCacheEntry> parent = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("queued to be made");
+        parent->setState(LLVOCacheEntry::IN_QUEUE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("its object asked for, its drawable not yet made");
+        parent->setState(LLVOCacheEntry::WAITING);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+        CHECK(child->takeParent(PARENT, parent, true) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("and made");
+        parent->setState(LLVOCacheEntry::ACTIVE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::MADE);
+    }
+
+    TEST_CASE("LLVOCacheEntry: a child leaves its parent's entry where it holds its children, valid or refused", "[LLVOCache]")
+    {
+        constexpr U32 PARENT = 10;
+        constexpr U32 NO_ENTRY = 11;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[PARENT] = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLVOCacheEntry* const parent = entries[PARENT].get();
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a parent refused, invalid until the region sends its object again, holds its children");
+        parent->refuseUpdate();
+        parent->setValid(false);
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a killed one holds none, and the child goes on naming it");
+        parent->forgetRefusal();
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("nor does a parent with no entry");
+        child->setParentID(NO_ENTRY);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == NO_ENTRY);
+
+        UNSCOPED_INFO("and a root has no parent to leave");
+        child->setParentID(0);
+        CHECK(child->leaveParent(entries) == nullptr);
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

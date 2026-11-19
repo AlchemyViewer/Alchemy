@@ -24,6 +24,8 @@
 
 #pragma once
 
+#include "llmath.h"
+#include "llquaternion.h"
 #include "lluuid.h"
 #include "llvolume.h"
 #include "v3math.h"
@@ -34,6 +36,13 @@ class LLXform;
 
 struct ALObjectUpdate
 {
+    // A position and a rotation in a frame.
+    struct Place
+    {
+        LLVector3    mPosition;
+        LLQuaternion mRotation;
+    };
+
     // Whether an update of this type makes an object: a volume, an avatar,
     // grass or a legacy tree. The types under LL_PCODE_APP are the viewer's
     // own surface patches and particle groups, which it makes itself.
@@ -72,6 +81,21 @@ struct ALObjectUpdate
     // stays, which is none.
     static std::optional<LLVector3> positionOnCrossing(const LLVector3& position, const LLVector3& old_origin,
                                                        const LLVector3& new_origin, bool is_root);
+
+    // Whether a full update starts over the spin an object's angular velocity
+    // has turned it through: the update says it spins no longer, its angular
+    // velocity exactly zero. A stale update hands its motion back to what a
+    // newer one reported, and leaves the spin to go on from there.
+    static bool resetsSpin(const LLVector3& angular_velocity, bool stale);
+
+    // Where an avatar stands, against its region, as its seat lets it go.
+    // Until then its own position and rotation are against the seat, and once
+    // it is a root they are read against its region. It stands where it was
+    // drawn: drawn, in the agent's frame, whose axes are the region's, its
+    // position less region_origin, the region's origin in that frame. With
+    // nothing drawn, it stands where its place against the seat puts it in the
+    // seat's region.
+    static Place placeOnStanding(const LLXform& avatar, const std::optional<Place>& drawn, const LLVector3& region_origin);
 
     // Whether a region handshake ends the object cache a region holds: it has
     // loaded one, under loaded_id, and the handshake names another. A handshake

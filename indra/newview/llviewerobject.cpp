@@ -1459,7 +1459,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     setAcceleration(motion.mAcceleration);
                     new_rot = motion.mRotation;
                     new_angv = motion.mAngularVelocity;
-                    if (new_angv.isExactlyZero())
+                    if (ALObjectUpdate::resetsSpin(new_angv, stale_update))
                     {
                         // reset rotation time
                         resetRot();

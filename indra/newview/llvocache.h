@@ -147,6 +147,30 @@ public:
     U32  getParentID() const {return mParentID;}
     bool isChild() const {return mParentID > 0;}
 
+    // Where an entry goes once a full update or a probe has decoded it.
+    enum class EChildPlace
+    {
+        // Not a child: its data names no parent.
+        ROOT,
+        // Queued to be made, its parent made: from its entry, where it has a
+        // valid one, and the parent's drawable made (ACTIVE).
+        MADE,
+        // On its parent's entry, which is not made yet, though it may be
+        // queued or waiting for its drawable, to be made as the parent's
+        // drawable is (LLDrawable::init).
+        WITH_PARENT,
+        // Among the region's orphans, until its parent comes.
+        ORPHAN
+    };
+    // This entry takes parent_id, which its data names, 0 for none, as its
+    // parent, the caller having taken it off the entry of the one it named
+    // before, and says where it goes. parent is the parent's valid entry, null
+    // where it has none, and parent_made, where it has none, whether an object
+    // is made under the parent's local ID. A child goes where it would whether
+    // or not it named the parent before: one an update or a probe makes valid
+    // again names the parent it named, and may be waiting nowhere.
+    EChildPlace takeParent(U32 parent_id, const LLVOCacheEntry* parent, bool parent_made);
+
     void addChild(LLVOCacheEntry* entry);
     void removeChild(LLVOCacheEntry* entry);
     void removeAllChildren();
@@ -242,6 +266,12 @@ public:
     // would take them. True where it took any overrides.
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
+
+    // Takes this entry off the entry of the parent it names in `entries`, where that entry holds its children: a
+    // valid one, or one invalid for a refused update (wasRefused), which keeps them for the object the region's update
+    // makes. Returns that entry, null where there is none, this entry then naming its parent still: a killed entry
+    // holds no children.
+    LLVOCacheEntry* leaveParent(const vocache_entry_map_t& entries);
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
