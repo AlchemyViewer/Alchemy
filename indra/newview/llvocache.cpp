@@ -286,6 +286,22 @@ bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, voc
     return overrides.erase(local_id) > 0;
 }
 
+LLVOCacheEntry* LLVOCacheEntry::leaveParent(const vocache_entry_map_t& entries)
+{
+    if (!mParentID)
+    {
+        return NULL;
+    }
+    const auto iter = entries.find(mParentID);
+    if (iter == entries.end() || !(iter->second->isValid() || iter->second->wasRefused()))
+    {
+        return NULL;
+    }
+    LLVOCacheEntry* parent = iter->second.get();
+    parent->removeChild(this);
+    return parent;
+}
+
 // static
 void LLVOCacheEntry::releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
                                 const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep)

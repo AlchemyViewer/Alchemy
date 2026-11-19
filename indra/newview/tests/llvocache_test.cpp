@@ -1023,6 +1023,43 @@ namespace
         CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::MADE);
     }
 
+    TEST_CASE("LLVOCacheEntry: a child leaves its parent's entry where it holds its children, valid or refused", "[LLVOCache]")
+    {
+        constexpr U32 PARENT = 10;
+        constexpr U32 NO_ENTRY = 11;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[PARENT] = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLVOCacheEntry* const parent = entries[PARENT].get();
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a parent refused, invalid until the region sends its object again, holds its children");
+        parent->refuseUpdate();
+        parent->setValid(false);
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a killed one holds none, and the child goes on naming it");
+        parent->forgetRefusal();
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("nor does a parent with no entry");
+        child->setParentID(NO_ENTRY);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == NO_ENTRY);
+
+        UNSCOPED_INFO("and a root has no parent to leave");
+        child->setParentID(0);
+        CHECK(child->leaveParent(entries) == nullptr);
+    }
+
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_entry_map_t entries = vocacheTest::makeEntries(6);

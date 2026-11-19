@@ -1230,14 +1230,10 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
     //remove from the forced visible list
     mImpl->mVisibleEntries.erase(entry);
 
-    //disconnect from parent if it is a child
+    //disconnect from parent if it is a child, a refused parent's entry among those that hold children
     if(entry->getParentID() > 0)
     {
-        LLVOCacheEntry* parent = getCacheEntry(entry->getParentID());
-        if(parent)
-        {
-            parent->removeChild(entry);
-        }
+        entry->leaveParent(mImpl->mCacheMap);
     }
     else if(entry->getNumOfChildren() > 0)//remove children from cache if has any
     {
@@ -2906,17 +2902,13 @@ void LLViewerRegion::decodeBoundingInfo(LLVOCacheEntry* entry)
     U32 old_parent_id = entry->getParentID();
     if(parent_id != old_parent_id) //parent changed.
     {
-        if(old_parent_id > 0) //has an old parent, disconnect it
+        if(old_parent_id > 0) //has an old parent, disconnect it, a refused one as a valid one
         {
-            LLVOCacheEntry* old_parent = getCacheEntry(old_parent_id);
-            if(old_parent)
+            LLVOCacheEntry* old_parent = entry->leaveParent(mImpl->mCacheMap);
+            if(old_parent && !old_parent->isState(LLVOCacheEntry::INACTIVE))
             {
-                old_parent->removeChild(entry);
-                if(!old_parent->isState(LLVOCacheEntry::INACTIVE))
-                {
-                    mImpl->mVisibleEntries.erase(entry);
-                    entry->setState(LLVOCacheEntry::INACTIVE);
-                }
+                mImpl->mVisibleEntries.erase(entry);
+                entry->setState(LLVOCacheEntry::INACTIVE);
             }
         }
     }

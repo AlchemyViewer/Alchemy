@@ -267,6 +267,12 @@ public:
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
 
+    // Takes this entry off the entry of the parent it names in `entries`, where that entry holds its children: a
+    // valid one, or one invalid for a refused update (wasRefused), which keeps them for the object the region's update
+    // makes. Returns that entry, null where there is none, this entry then naming its parent still: a killed entry
+    // holds no children.
+    LLVOCacheEntry* leaveParent(const vocache_entry_map_t& entries);
+
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
     vocache_entry_set_t::const_iterator getChildrenBegin() const { return mChildrenList.begin(); }
     vocache_entry_set_t::const_iterator getChildrenEnd() const { return mChildrenList.end(); }
