@@ -2014,6 +2014,7 @@ void LLModelPreview::splitSuffixedModels(const std::string& filename)
             // Physics the high file no longer supplies is no longer from a file: back to none, as a reset leaves it.
             fmp->childSetValue("physics_file", "");
             fmp->childSetValue("physics_lod_combo", "none");
+            mWarnOfUnmatchedPhyicsMeshes = false;
         }
     };
 
