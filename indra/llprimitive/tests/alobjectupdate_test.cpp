@@ -168,4 +168,24 @@ namespace
         UNSCOPED_INFO("the first handshake, before a cache has been loaded for any");
         CHECK_FALSE(ALObjectUpdate::handshakeEndsCache(false, LLUUID::null, CACHE_ID));
     }
+
+    TEST_CASE("ALObjectUpdate: a full update that stops the spin starts it over", "[ALObjectUpdate]")
+    {
+        CHECK(ALObjectUpdate::resetsSpin(LLVector3::zero, false));
+    }
+
+    TEST_CASE("ALObjectUpdate: a stale full update leaves the spin as it was", "[ALObjectUpdate]")
+    {
+        // Overtaken by an update that has the object spinning: what the stale
+        // one says of the spin is as old as the rest of its motion.
+        CHECK_FALSE(ALObjectUpdate::resetsSpin(LLVector3::zero, true));
+        CHECK_FALSE(ALObjectUpdate::resetsSpin(LLVector3(0.f, 0.f, 1.f), true));
+    }
+
+    TEST_CASE("ALObjectUpdate: a full update that spins leaves the spin to go on", "[ALObjectUpdate]")
+    {
+        CHECK_FALSE(ALObjectUpdate::resetsSpin(LLVector3(0.f, 0.f, 1.f), false));
+        UNSCOPED_INFO("however slowly");
+        CHECK_FALSE(ALObjectUpdate::resetsSpin(LLVector3(0.f, 1e-6f, 0.f), false));
+    }
 }

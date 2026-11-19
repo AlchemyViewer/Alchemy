@@ -84,6 +84,12 @@ std::optional<LLVector3> ALObjectUpdate::positionOnCrossing(const LLVector3& pos
 }
 
 // static
+bool ALObjectUpdate::resetsSpin(const LLVector3& angular_velocity, bool stale)
+{
+    return !stale && angular_velocity.isExactlyZero();
+}
+
+// static
 bool ALObjectUpdate::handshakeEndsCache(bool cache_loaded, const LLUUID& loaded_id, const LLUUID& handshake_id)
 {
     return cache_loaded && loaded_id != handshake_id;

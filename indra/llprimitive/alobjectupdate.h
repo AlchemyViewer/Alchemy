@@ -73,6 +73,12 @@ struct ALObjectUpdate
     static std::optional<LLVector3> positionOnCrossing(const LLVector3& position, const LLVector3& old_origin,
                                                        const LLVector3& new_origin, bool is_root);
 
+    // Whether a full update starts over the spin an object's angular velocity
+    // has turned it through: the update says it spins no longer, its angular
+    // velocity exactly zero. A stale update hands its motion back to what a
+    // newer one reported, and leaves the spin to go on from there.
+    static bool resetsSpin(const LLVector3& angular_velocity, bool stale);
+
     // Whether a region handshake ends the object cache a region holds: it has
     // loaded one, under loaded_id, and the handshake names another. A handshake
     // may come again on the same circuit, for a change to the region's settings.
