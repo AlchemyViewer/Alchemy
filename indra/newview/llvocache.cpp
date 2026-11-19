@@ -279,7 +279,7 @@ bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, voc
                                  const std::function<void(LLVOCacheEntry*)>& kill_entry)
 {
     const auto iter = entries.find(local_id);
-    if (iter != entries.end() && iter->second->isValid())
+    if (iter != entries.end() && iter->second->isKillable())
     {
         kill_entry(iter->second);
     }
@@ -318,6 +318,10 @@ void LLVOCacheEntry::updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp)
         mCRC = crc;
         mCRCChangeCount++;
     }
+    if (crc != mRefusedCRC)
+    {
+        mRefusals = 0;
+    }
 
     mDP.freeBuffer();
 
@@ -325,6 +329,18 @@ void LLVOCacheEntry::updateEntry(U32 crc, LLDataPackerBinaryBuffer &dp)
     mBuffer = new U8[dp.getBufferSize()];
     mDP.assignBuffer(mBuffer, dp.getBufferSize());
     mDP = dp;
+}
+
+void LLVOCacheEntry::refuseUpdate()
+{
+    if (mRefusals > 0 && mCRC == mRefusedCRC)
+    {   // the bytes the region sent in place of the entry's were refused too
+        mRefusals = 2;
+        return;
+    }
+    mRefusedCRC = mCRC;
+    mRefusals   = 1;
+    mCRC        = ~mCRC;
 }
 
 void LLVOCacheEntry::setParentID(U32 id)

@@ -448,20 +448,15 @@ U32 LLVOVolume::processUpdateMessage(LLMessageSystem *mesgsys,
             const ALCompressedVolume::ECut cut = volume.unpack(*dp, value);
             if (cut != ALCompressedVolume::ECut::NONE)
             {
+                // The region's object cache is not flushed for it. An update
+                // made from a cached object takes that object's entry alone
+                // out of the cache once it is refused
+                // (LLViewerRegion::refuseCachedUpdate), and a flush let go of
+                // every object the region had cached, those not yet made
+                // among them, which the region does not send again.
                 if (cut != ALCompressedVolume::ECut::TEXTURE_ANIM)
                 {
-                    // An update that ends before the end of its texture
-                    // entry is bogus data, which flushes the region's cache
-                    // once the update is done with: the flush lets go of the
-                    // region's cached objects, and the update may be read
-                    // from one of them.
                     dp->dumpBufferToLog();
-                    LL_WARNS() << "Flushing cache files" << LL_ENDL;
-
-                    if(LLVOCache::instanceExists() && getRegion())
-                    {
-                        LLVOCache::getInstance()->requestRemoval(getRegion()->getHandle());
-                    }
                 }
                 LL_WARNS("UpdateFail") << (cut == ALCompressedVolume::ECut::VOLUME_PARAMS ? "Volume parameters"
                                            : cut == ALCompressedVolume::ECut::TEXTURE_ENTRY ? "Texture entry"

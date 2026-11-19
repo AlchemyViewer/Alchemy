@@ -258,6 +258,9 @@ public:
     void addActiveCacheEntry(LLVOCacheEntry* entry);
     void removeActiveCacheEntry(LLVOCacheEntry* entry, LLDrawable* drawablep);
     void killCacheEntry(U32 local_id); //physically delete the cache entry
+    // The update made from `entry` was refused and its object killed (LLViewerObject::processUpdateMessage): the entry
+    // leaves the cache's tree and every list of what to make, invalid until the region sends the object again.
+    void refuseCachedUpdate(LLVOCacheEntry* entry);
 
     // Like idleUpdate, but forces everything to complete regardless of
     // how long it takes.

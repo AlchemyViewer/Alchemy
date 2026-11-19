@@ -160,6 +160,21 @@ public:
     void setValid(bool valid = true) {mValid = valid;}
     bool isValid() const {return mValid;}
 
+    // The update made from the entry's bytes was refused, cut short (LLViewerObject::processUpdateMessage), and the
+    // object asked for whole again. The first refusal at a CRC sets the entry's CRC apart from the region's, so that
+    // the update the region sends replaces the bytes rather than being taken for them; a second, of the bytes the
+    // region sent, leaves the entry refused at that CRC (isRefused) until its object changes, rather than asked for
+    // and refused again for as long as it is in view.
+    void refuseUpdate();
+    bool isRefused(U32 crc) const { return mRefusals > 1 && crc == mRefusedCRC; }
+    // Whether an update made from the entry was refused since it was last killed. Refused and not yet sent again, the
+    // entry is invalid, and holds its children for the object the region's update makes (LLViewerRegion::findOrphans).
+    bool wasRefused() const { return mRefusals > 0; }
+    // Whether a kill of the entry's local ID reaches it: a valid entry, or one invalid only for a refused update.
+    bool isKillable() const { return mValid || wasRefused(); }
+    // A kill lets the refused update go with the object it was of.
+    void forgetRefusal() { mRefusals = 0; }
+
     void setUpdateFlags(U32 flags) {mUpdateFlags = flags;}
     U32  getUpdateFlags() const    {return mUpdateFlags;}
 
@@ -222,9 +237,9 @@ public:
     static void releaseAll(vocache_entry_map_t& entries, std::initializer_list<vocache_entry_set_t*> sets,
                            const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep);
 
-    // What a kill of local_id takes from a region's cache: its entry, through `kill_entry`, where it has a valid one,
-    // and its glTF overrides whether or not it has, since an object given the local ID later would take them. True
-    // where it took any overrides.
+    // What a kill of local_id takes from a region's cache: its entry, through `kill_entry`, where it has one a kill
+    // reaches (isKillable), and its glTF overrides whether or not it has, since an object given the local ID later
+    // would take them. True where it took any overrides.
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
 
@@ -241,6 +256,8 @@ protected:
     U32                         mUpdateFlags; //receive from sim
     S32                         mHitCount;
     S32                         mCRCChangeCount;    // in memory only, for dumpCache
+    U32                         mRefusedCRC = 0;    // the CRC refuseUpdate last refused at, in memory only
+    U8                          mRefusals   = 0;    // and how often, to 2
     mutable LLDataPackerBinaryBuffer    mDP;
     U8                          *mBuffer;
 
