@@ -508,7 +508,6 @@ void LLFloaterModelPreview::onClickCalculateBtn()
     clearLogTab();
     addStringToLog("Calculating model data.", false);
     mModelPreview->rebuildUploadData();
-    mModelPreview->updateStatusMessages(); // <SK:Nexii> Mesh uploader pivot: whether a pivot is allowed follows the rebuilt data
 
     bool upload_skinweights = childGetValue("upload_skin").asBoolean();
     bool upload_joint_positions = childGetValue("upload_joints").asBoolean();
@@ -1851,7 +1850,6 @@ void LLFloaterModelPreview::onUpload(void* user_data)
     mp->mUploadBtn->setEnabled(false);
 
     mp->mModelPreview->rebuildUploadData();
-    mp->mModelPreview->updateStatusMessages(); // <SK:Nexii> Mesh uploader pivot: whether a pivot is allowed follows the rebuilt data
 
     bool upload_skinweights = mp->childGetValue("upload_skin").asBoolean();
     bool upload_joint_positions = mp->childGetValue("upload_joints").asBoolean();

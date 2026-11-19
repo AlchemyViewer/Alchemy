@@ -660,6 +660,7 @@ void LLModelPreview::rebuildUploadData()
         scale_spinner->setValue(max_import_scale);
     }
 
+    updatePivotHold(); // <SK:Nexii> Mesh uploader pivot: the offsets an upload takes follow the data just built
 }
 
 void LLModelPreview::saveUploadData(bool save_skinweights, bool save_joint_positions, bool lock_scale_if_joint_position)
@@ -2213,6 +2214,51 @@ LLMeshUploadThread::position_offsets_t LLModelPreview::getUploadPositionOffsets(
     }
     return offsets;
 }
+
+void LLModelPreview::updatePivotHold()
+{
+    // The sim keeps analyzed hulls where the pivot puts them but fits any other physics shape to the box,
+    // so a pivot needs analyzed physics or none at all. Each part is judged on its own, so one rigged or
+    // unanalyzed part holds only itself at the centre.
+    mPivotAnyRigged = false;
+    mPivotAnyUnanalyzed = false;
+    mPivotWithoutPhysics = false;
+    mPivotHeld.clear();
+    for (const LLModelInstance& instance : mUploadData)
+    {
+        const LLModel* model = instance.mModel;
+        if (!model)
+        {
+            continue;
+        }
+        // Skin weights left out of the upload make a static mesh, which can take a pivot.
+        const bool rigged = uploadsRigged(instance);
+        // The hulls uploaded are the physics model's, or the base model's without one.
+        const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
+        bool instance_physics = false;
+        bool unanalyzed = false;
+        if (physics && physics->getNumVolumeFaces() > 0)
+        {
+            instance_physics = true;
+            unanalyzed = physics->mPhysics.mHull.empty();
+        }
+        else if (!physics && !model->mPhysics.mHull.empty())
+        {
+            instance_physics = true;
+        }
+        if (rigged || unanalyzed)
+        {
+            mPivotHeld.insert(model);
+        }
+        mPivotAnyRigged |= rigged;
+        mPivotAnyUnanalyzed |= unanalyzed && !rigged;
+        mPivotWithoutPhysics |= !rigged && !instance_physics && !getWantedPivot(model).isExactlyZero();
+    }
+
+    // Some instance must be free of the hold: several instances of one held model are all held.
+    mUploadPivotAllowed = std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
+                                      { return instance.mModel && !mPivotHeld.count(instance.mModel); });
+}
 // </SK:Nexii>
 
 void LLModelPreview::updateStatusMessages()
@@ -2558,63 +2604,25 @@ void LLModelPreview::updateStatusMessages()
         }
     }
 
-    // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls where the pivot puts them but fits
-    // any other physics shape to the box, so a pivot needs analyzed physics or none at all.
+    // <SK:Nexii> Mesh uploader pivot: the hold is settled again here too, since the skin option and
+    // an analysis change it without rebuilding the upload data.
     {
-        // Each part is judged on its own, so one rigged or unanalyzed part holds only itself at the centre.
-        bool any_rigged = false;
-        bool any_unanalyzed = false;
-        bool pivot_without_physics = false; // a pivoted part that collides with a default hull centred on itself
-        mPivotHeld.clear();
-        for (const LLModelInstance& instance : mUploadData)
-        {
-            const LLModel* model = instance.mModel;
-            if (!model)
-            {
-                continue;
-            }
-            // Skin weights left out of the upload make a static mesh, which can take a pivot.
-            const bool rigged = uploadsRigged(instance);
-            // The hulls uploaded are the physics model's, or the base model's without one.
-            const LLModel* physics = instance.mLOD[LLModel::LOD_PHYSICS];
-            bool instance_physics = false;
-            bool unanalyzed = false;
-            if (physics && physics->getNumVolumeFaces() > 0)
-            {
-                instance_physics = true;
-                unanalyzed = physics->mPhysics.mHull.empty();
-            }
-            else if (!physics && !model->mPhysics.mHull.empty())
-            {
-                instance_physics = true;
-            }
-            if (rigged || unanalyzed)
-            {
-                mPivotHeld.insert(model);
-            }
-            any_rigged |= rigged;
-            any_unanalyzed |= unanalyzed && !rigged;
-            pivot_without_physics |= !rigged && !instance_physics && !getWantedPivot(model).isExactlyZero();
-        }
-
-        // Some instance must be free of the hold: several instances of one held model are all held.
-        mUploadPivotAllowed = std::any_of(mUploadData.begin(), mUploadData.end(), [this](const LLModelInstance& instance)
-                                          { return instance.mModel && !mPivotHeld.count(instance.mModel); });
+        updatePivotHold();
         // Every reason that applies is shown, since each concerns different parts.
         std::string pivot_status;
         auto add_status = [&](const char* name)
         {
             pivot_status += (pivot_status.empty() ? "" : " ") + mFMP->getString(name);
         };
-        if (any_rigged)
+        if (mPivotAnyRigged)
         {
             add_status("pivot_status_rigged");
         }
-        if (any_unanalyzed)
+        if (mPivotAnyUnanalyzed)
         {
             add_status("pivot_status_analyze");
         }
-        if (pivot_without_physics)
+        if (mPivotWithoutPhysics)
         {
             add_status("pivot_status_no_physics");
         }
