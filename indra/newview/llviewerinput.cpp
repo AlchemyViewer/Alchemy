@@ -45,6 +45,7 @@
 #include "llviewercontrol.h"
 #include "llviewerwindow.h"
 #include "llvoavatarself.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 #include "llfloatercamera.h"
 #include "llinitparam.h"
 #include "llselectmgr.h"
@@ -911,6 +912,22 @@ bool toggle_sit(EKeystate s)
     return true;
 }
 
+// <SK:Nexii> Over-the-shoulder view
+bool ots_toggle_view(EKeystate s)
+{
+    if (KEYSTATE_DOWN != s) return true;
+    SKOTSCamera::toggleView();
+    return true;
+}
+
+bool ots_swap_shoulder(EKeystate s)
+{
+    if (KEYSTATE_DOWN != s) return true;
+    SKOTSCamera::swapShoulder();
+    return true;
+}
+// </SK:Nexii>
+
 bool toggle_pause_media(EKeystate s) // analogue of play/pause button in top bar
 {
     if (KEYSTATE_DOWN != s) return true;
@@ -1097,6 +1114,8 @@ REGISTER_KEYBOARD_ACTION("run_right", run_right);
 REGISTER_KEYBOARD_ACTION("toggle_run", toggle_run);
 REGISTER_KEYBOARD_ACTION("toggle_down", agent_toggle_down);
 REGISTER_KEYBOARD_ACTION("toggle_sit", toggle_sit);
+REGISTER_KEYBOARD_ACTION("ots_toggle_view", ots_toggle_view); // <SK:Nexii> Over-the-shoulder view
+REGISTER_KEYBOARD_ACTION("ots_swap_shoulder", ots_swap_shoulder); // <SK:Nexii> Over-the-shoulder view
 REGISTER_KEYBOARD_ACTION("toggle_pause_media", toggle_pause_media);
 REGISTER_KEYBOARD_ACTION("toggle_enable_media", toggle_enable_media);
 REGISTER_KEYBOARD_ACTION("teleport_to", teleport_to);

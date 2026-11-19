@@ -136,6 +136,7 @@
 #include "llviewerstatsrecorder.h"
 #include "llvlcomposition.h"
 #include "llvoavatarself.h"
+#include "skotscamera.h" // <SK:Nexii> Over-the-shoulder view
 #include "llworld.h"
 #include "llworldmap.h"
 #include "pipeline.h"
@@ -4889,7 +4890,9 @@ class LLViewMouselook : public view_listener_t
     {
         if (!gAgentCamera.cameraMouselook())
         {
+            SKOTSCamera::requestShoulder(); // <SK:Nexii> Over-the-shoulder view: the mouselook key opens it, scrolling in does not
             gAgentCamera.changeCameraToMouselook();
+            SKOTSCamera::cancelRequest(); // <SK:Nexii> Over-the-shoulder view: a refused mouselook leaves no request behind
         }
         else
         {
