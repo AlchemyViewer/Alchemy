@@ -189,6 +189,8 @@ public:
     bool isSingleModel() const;
     // Whether this instance uploads skinned, from its base or its High model: such mesh takes no pivot.
     bool uploadsRigged(const LLModelInstance& instance) const;
+    // Which parts are held at the centre, settled from the upload data rather than by a UI refresh.
+    void updatePivotHold();
     // </SK:Nexii>
 
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
@@ -295,6 +297,9 @@ protected:
     LLVector3   mCustomPivot;
     bool        mUploadPivotAllowed{true};   // some part may take a pivot
     std::set<const LLModel*> mPivotHeld; // parts held at the centre: rigged, or with physics not yet analyzed
+    bool        mPivotAnyRigged{false};
+    bool        mPivotAnyUnanalyzed{false};
+    bool        mPivotWithoutPhysics{false}; // a pivoted part that collides with a default hull centred on itself
     F32         mPivotScale{1.f};        // the import scale the upload data was last built with
     // </SK:Nexii>
 
