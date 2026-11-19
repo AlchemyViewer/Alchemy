@@ -230,7 +230,7 @@ public:
     LLVOCacheEntry::vocache_entry_set_t   mVisibleEntries; //must-be-created visible entries wait for objects creation.
     std::vector<LLVOCacheEntry*>          mWaitingList; //transient list of the visible entries waiting for object creation, sorted by createVisibleObjects()
     const LLViewerOctreeGroup*            mLastWalkedGroup = nullptr; // where updateVisibleEntries' walk of the visible groups stopped, compared only
-    std::set<U32>                          mNonCacheableCreatedList; //list of local ids of all non-cacheable objects
+    std::set<U32>                          mNonCacheableCreatedList; //list of local ids of all objects made in this region, from the cache or not
     LLVOCacheEntry::vocache_gltf_overrides_map_t mGLTFOverridesLLSD; // for materials
 
     // time?
