@@ -901,6 +901,11 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
             }
         }
 
+        if ((flags & ITEM_IN_MULTI_SELECTION) && !is_inbox && !single_folder_root)
+        {
+            items.push_back(std::string("Bulk Rename"));
+        }
+
         if (obj->getIsLinkType())
         {
             items.push_back(std::string("Find Original"));
@@ -923,7 +928,7 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                 items.push_back(std::string("Find Links"));
             }
 
-            if (!is_inbox && !single_folder_root)
+            if (!is_inbox && !single_folder_root && (flags & ITEM_IN_MULTI_SELECTION) == 0)
             {
                 items.push_back(std::string("Rename"));
                 if (!isItemRenameable() || ((flags & FIRST_SELECTED_ITEM) == 0))
@@ -2243,36 +2248,7 @@ time_t LLItemBridge::getCreationDate() const
 // virtual
 bool LLItemBridge::isItemRenameable() const
 {
-    if (LLViewerInventoryItem* item = getItem())
-    {
-        // (For now) Don't allow calling card rename since that may confuse users as to
-        // what the calling card points to.
-        if (item->getInventoryType() == LLInventoryType::IT_CALLINGCARD)
-        {
-            return false;
-        }
-
-        if (!item->isFinished()) // EXT-8662
-        {
-            return false;
-        }
-
-        if (isInboxFolder())
-        {
-            return false;
-        }
-
-// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
-        if ( (rlv_handler_t::isEnabled()) && (!RlvFolderLocks::instance().canRenameItem(mUUID)) )
-        {
-            return false;
-        }
-// [/RLVa:KB]
-
-        return item->getPermissions().allowModifyBy(gAgent.getID());
-    }
-
-    return false;
+    return get_is_item_renameable(getInventoryModel(), mUUID);
 }
 
 // virtual
@@ -4716,7 +4692,14 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
             if (cat->getPreferredType() == LLFolderType::FT_OUTFIT)
             {
                 // Want some but not all of the items from getClipboardEntries for outfits.
-                items.push_back(std::string("Rename"));
+                if (flags & ITEM_IN_MULTI_SELECTION)
+                {
+                    items.push_back(std::string("Bulk Rename"));
+                }
+                else
+                {
+                    items.push_back(std::string("Rename"));
+                }
                 items.push_back(std::string("thumbnail"));
 
                 addInventoryFavoritesMenuOptions(items);
@@ -4744,7 +4727,14 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
                         items.push_back(std::string("New Outfit"));
                         items.push_back(std::string("New Outfit Folder"));
                     }
-                    items.push_back(std::string("Rename"));
+                    if (flags & ITEM_IN_MULTI_SELECTION)
+                    {
+                        items.push_back(std::string("Bulk Rename"));
+                    }
+                    else
+                    {
+                        items.push_back(std::string("Rename"));
+                    }
                     items.push_back(std::string("thumbnail"));
 
                     addInventoryFavoritesMenuOptions(items);

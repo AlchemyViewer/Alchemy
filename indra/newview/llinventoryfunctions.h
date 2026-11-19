@@ -62,6 +62,12 @@ bool get_is_category_removable(const LLInventoryModel* model, const LLUUID& id);
 bool get_is_category_and_children_removable(LLInventoryModel* model, const LLUUID& folder_id, bool check_worn);
 
 bool get_is_category_renameable(const LLInventoryModel* model, const LLUUID& id);
+bool get_is_item_renameable(const LLInventoryModel* model, const LLUUID& id);
+
+class LLViewerObject;
+// An item inside an object's contents, with the object's own permission checks.
+bool get_is_task_item_renameable(LLViewerObject* object, const LLUUID& item_id);
+void rename_task_item(LLViewerObject* object, const LLUUID& item_id, const std::string& new_name);
 
 void show_item_profile(const LLUUID& item_uuid);
 void show_task_item_profile(const LLUUID& item_uuid, const LLUUID& object_id);

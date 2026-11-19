@@ -137,6 +137,7 @@ if(AL_BUILD_VIEWER)
     alavataractions.cpp
     alavatargroups.cpp
     albakeproxies.cpp
+    albulkrename.cpp
     alchatautocomplete.cpp
     alchatbar.cpp
     alchatcommand.cpp
@@ -153,6 +154,7 @@ if(AL_BUILD_VIEWER)
     aldroptarget.cpp
     alfarplaneoverlay.cpp
     alfloaterblocked.cpp
+    alfloaterbulkrename.cpp
     alfloaterdirectory.cpp
     alfloaterevent.cpp
     alfloaterexploresounds.cpp
@@ -1012,6 +1014,7 @@ if(AL_BUILD_VIEWER)
     alavataractions.h
     alavatargroups.h
     albakeproxies.h
+    albulkrename.h
     alchatautocomplete.h
     alchatbar.h
     alchatcommand.h
@@ -1027,6 +1030,7 @@ if(AL_BUILD_VIEWER)
     aldroptarget.h
     alfarplaneoverlay.h
     alfloaterblocked.h
+    alfloaterbulkrename.h
     alfloaterdirectory.h
     alfloaterevent.h
     alfloaterexploresounds.h
@@ -2549,6 +2553,7 @@ if(AL_BUILD_TESTS)
       tests/alagentlocationformat_test.cpp
       tests/alapplinks_test.cpp
       tests/albakeproxies_test.cpp
+      tests/albulkrename_test.cpp
       tests/alchattimestamp_test.cpp
       tests/alcolorwheelmodel_test.cpp
       tests/alcrashreporter_test.cpp
@@ -2636,6 +2641,7 @@ if(AL_BUILD_TESTS)
       alagentlocationformat.cpp
       alapplinks.cpp
       albakeproxies.cpp
+      albulkrename.cpp
       alchattimestamp.cpp
       alcolorwheelmodel.cpp
       alcrashreporter.cpp
