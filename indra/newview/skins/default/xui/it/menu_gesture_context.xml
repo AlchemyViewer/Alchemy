@@ -9,6 +9,6 @@
 	<menu_item_call name="copy_uuid" label="Copia UUID"/>
 	<menu_item_call name="play" label="Play"/>
 	<menu_item_call name="activate" label="Attiva"/>
-	<menu_item_call name="save_to_outfit" label="Salva vestiario"/>
+	<menu_item_call name="save_to_outfit" label="Aggiungi al vestiario"/>
 	<menu_item_call name="delete" label="Cancella"/>
 </context_menu>

@@ -9,6 +9,6 @@
 	<menu_item_call name="copy_uuid" label="UUID kopieren"/>
 	<menu_item_call name="play" label="Abspielen"/>
 	<menu_item_call name="activate" label="Aktivieren"/>
-	<menu_item_call name="save_to_outfit" label="Aktuelles Outfit speichern"/>
+	<menu_item_call name="save_to_outfit" label="Zum aktuellen Outfit hinzufügen"/>
 	<menu_item_call name="delete" label="Löschen"/>
 </context_menu>
