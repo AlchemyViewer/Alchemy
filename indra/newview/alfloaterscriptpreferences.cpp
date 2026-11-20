@@ -95,7 +95,7 @@ namespace
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
         "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",   "ALScriptConvertKeepComments",
-        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",
+        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",  "ALScriptConvertCommentCode",
     };
 
     // What each preset of Convert to SLua sets: SLua's own ways, or as
@@ -262,7 +262,8 @@ bool ALFloaterScriptPreferences::postBuild()
         mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshIncludeOrder(); }));
     }
     for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptUploadHeader", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
-                                 "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines" })
+                                 "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines",
+                                 "ALScriptConvertKeepComments" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
@@ -404,6 +405,8 @@ void ALFloaterScriptPreferences::refreshEnabled()
     {
         getChildView(name)->setEnabled(hover);
     }
+    // Comments' code is written only where the comments are.
+    getChildView("convert_comment_code")->setEnabled(gSavedSettings.getBOOL("ALScriptConvertKeepComments"));
     // What the settings hold, where something other than these fields
     // changed them: the menu adding a folder, a Cancel.
     refreshIncludeFolder();

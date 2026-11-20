@@ -843,6 +843,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptConvertCommentCode</key>
+        <map>
+            <key>Comment</key>
+            <string>With ALScriptConvertKeepComments, Convert to SLua writes the code a comment switched off as SLua, still commented, where it stood: each comment that, uncommented where it stands, parses and changes nothing else the script is written as. One that does not stays as the LSL had it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioAutoClose</key>
         <map>
             <key>Comment</key>

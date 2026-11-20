@@ -1804,6 +1804,17 @@ end</floater.string>
              tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, after it where it was after it on its line, or at the end of what held it; rules of stars or slashes as dashes, and //* ... //*/ as ---[[ ... --]]. Off: the SLua has none of them."
              top_pad="4"
              width="700" />
+            <check_box
+             control_name="ALScriptConvertCommentCode"
+             follows="left|top"
+             height="20"
+             label="Their code as SLua, still commented"
+             layout="topleft"
+             left="32"
+             name="convert_comment_code"
+             tool_tip="//llOwnerSay((string)n); as --print(tostring(n)), where it stood: each comment that, uncommented, parses and changes nothing else the script is written as, with the script's names, types and detected table. A block stays a block, and /* ... //*/ is --[[ ... --]], which one dash turns on. A comment that does not convert cleanly stays as the LSL had it. Off: every comment as the LSL had it."
+             top_pad="4"
+             width="680" />
         </panel>
         <panel
          class="al_panel_script_keymap"
