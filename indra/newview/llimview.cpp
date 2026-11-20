@@ -122,6 +122,15 @@ const LLUUID LLOutgoingCallDialog::OCD_KEY = LLUUID("7CF78E11-0CFE-498D-ADB9-141
 //
 LLIMMgr* gIMMgr = NULL;
 
+// Alchemy setting ALMuteGroupIMSound: silence the new-conversation sound for
+// conversations that originate from a group, ad-hoc conferences included. Direct
+// conversations are unaffected.
+static bool group_im_sound_muted()
+{
+    static LLCachedControl<bool> mute_group_im_sound(gSavedSettings, "ALMuteGroupIMSound", false);
+    return mute_group_im_sound;
+}
+
 
 bool LLSessionTimeoutTimer::tick()
 {
@@ -269,7 +278,8 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
     else if (session->isAdHocSessionType())
     {
         user_preferences = gSavedSettings.getString("NotificationConferenceIMOptions");
-        if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundConferenceIM")) && !play_snd_mention)
+        if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundConferenceIM")) && !play_snd_mention
+                && !group_im_sound_muted())
         {
             make_ui_sound("UISndNewIncomingIMSession");
         }
@@ -277,7 +287,8 @@ void notify_of_message(const LLSD& msg, bool is_dnd_msg)
     else if(session->isGroupSessionType())
     {
         user_preferences = gSavedSettings.getString("NotificationGroupChatOptions");
-        if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundGroupChatIM")) && !play_snd_mention)
+        if (!gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundGroupChatIM")) && !play_snd_mention
+                && !group_im_sound_muted())
         {
             make_ui_sound("UISndNewIncomingIMSession");
         }
@@ -3459,7 +3470,9 @@ void LLIMMgr::addMessage(
             }
 
             //Play sound for new conversations
-            if (!skip_message && !gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundNewConversation")))
+            bool from_group = is_group_chat || session->isAdHocSessionType();
+            if (!skip_message && !gAgent.isDoNotDisturb() && (gSavedSettings.getBOOL("PlaySoundNewConversation"))
+                    && !(group_im_sound_muted() && from_group))
             {
                 static LLCachedControl<bool> play_snd_mention_pref(gSavedSettings, "PlaySoundChatMention", false);
                 if (!play_snd_mention_pref || !LLUrlRegistry::getInstance()->containsAgentMention(msg))
