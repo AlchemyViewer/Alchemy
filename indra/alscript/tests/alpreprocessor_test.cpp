@@ -2193,6 +2193,9 @@ namespace
         UNSCOPED_INFO("a local is its own from the next statement on its line too");
         CHECK(counted("local require = function(name) return name end; print(require(\"./lib\"))\n").empty());
         CHECK(counted("local require = wrap(require(\"./lib\")); require(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("what it is set to goes on over the lines it goes on over");
+        CHECK(counted("local require = false or\n    require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
+        CHECK(counted("local require = f\n    .. require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
         UNSCOPED_INFO("and not inside a function it is set to, over several lines");
         CHECK(counted("local require = function(n)\n    return require(\"./inner\")\nend\nrequire(\"./a\")\n") == Names{ "./inner" });
         UNSCOPED_INFO("the global kept by its name is the global");

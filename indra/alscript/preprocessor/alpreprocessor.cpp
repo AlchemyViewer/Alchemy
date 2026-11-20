@@ -4613,17 +4613,30 @@ namespace
     };
 
     // Where a `local` statement's values end, from the word after its `=`:
-    // the first `;`, or the first word on a later line, outside brackets
-    // and blocks -- the next statement's, from which what it declares is in
+    // the first `;`, or the first word on a later line that starts a new
+    // statement rather than going on with the value -- the line before
+    // ending on a value, not an operator, and this one not beginning with
+    // an operator, an index, a call or a field -- outside brackets and
+    // blocks: the next statement's, from which what it declares is in
     // scope. `isExpression` tells an `if` that closes no block.
     template <typename IsExpression>
     size_t statementEnd(const std::vector<ScopeWord>& words, size_t from, IsExpression isExpression)
     {
+        // What leaves a value to come after it.
+        constexpr std::string_view OPEN_AFTER[] = { "=", ",", "and", "or", "not", "..", "+", "-", "*", "/", "//", "%", "^", "#",
+                                                    "==", "~=", "<", ">", "<=", ">=", "return", "local", "in", "::", "->" };
+        // What goes on with the value before it.
+        constexpr std::string_view GOES_ON[] = { "and", "or", "..", "+", "-", "*", "/", "//", "%", "^", "==", "~=",
+                                                 "<", ">", "<=", ">=", ".", ":", "(", "[", "{", "::" };
+        const auto among = [](std::string_view t, const auto& list) { return std::find(std::begin(list), std::end(list), t) != std::end(list); };
+        const auto quoted = [](const ScopeWord& w) { return !w.ident && !w.text.empty() && (w.text.front() == '"' || w.text.front() == '\'' || w.text.front() == '['); };
         S32 depth = 0;
         for (size_t k = from; k < words.size(); ++k)
         {
             const std::string_view t = words[k].text;
-            if (depth == 0 && k > from && (t == ";" || words[k].line > words[k - 1].line))
+            const bool newLine = k > from && words[k].line > words[k - 1].line && !among(words[k - 1].text, OPEN_AFTER) && !among(t, GOES_ON) &&
+                                 !quoted(words[k]);
+            if (depth == 0 && k > from && (t == ";" || newLine))
             {
                 return k;
             }
