@@ -3979,7 +3979,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     mRedoButton->setEnabled(doc && doc->undoText()->canRedo());
     mFindButton->setEnabled(doc != nullptr);
     mFormatButton->setEnabled(have && doc->modifiable && !doc->notecard && doc->shownView() == Doc::View::Source);
-    mExpandedButton->setEnabled(doc && doc->expandedEditor != nullptr);
+    mExpandedButton->setEnabled(doc && (doc->expandedEditor != nullptr || expandsOnAsking(*doc)));
     mExpandedButton->setToggleState(doc && doc->shownView() == Doc::View::Expanded);
     mRunning->setVisible(task);
     mResetButton->setVisible(task);
@@ -5060,11 +5060,21 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     };
     for (std::unique_ptr<Doc>& each : mDocs)
     {
-        if (each.get() != &doc && each->file.empty() && preprocessed(*each) && reads(*each))
+        if (each.get() == &doc || !reads(*each))
+        {
+            continue;
+        }
+        if (each->file.empty() && preprocessed(*each))
         {
             each->expanded.valid = false;
             mSaving.preprocess(*each);
             scheduleAnalysis(*each);
+        }
+        else if (!each->file.empty() && each->expandedEditor)
+        {
+            // A file's Preprocessed View, made on asking (expandsOnAsking):
+            // made again, so that it shows what the file saved now makes.
+            mSaving.preprocess(*each);
         }
     }
     fillTabs();
