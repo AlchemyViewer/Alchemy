@@ -80,6 +80,34 @@ namespace
         return out;
     }
 
+    // What a note over a line of the SLua begins with.
+    constexpr std::string_view NOTE = "-- LSL:";
+
+    // The comment after the code on a line of SLua, past its strings: from
+    // its --, or nothing.
+    std::string_view trailingComment(std::string_view line)
+    {
+        char quote = 0;
+        for (size_t i = 0; i < line.size(); ++i)
+        {
+            const char c = line[i];
+            if (quote)
+            {
+                i += c == '\\' ? 1 : 0;
+                quote = c == quote ? 0 : quote;
+            }
+            else if (c == '"' || c == '\'' || c == '`')
+            {
+                quote = c;
+            }
+            else if (c == '-' && i + 1 < line.size() && line[i + 1] == '-')
+            {
+                return line.substr(i);
+            }
+        }
+        return {};
+    }
+
     std::string_view leadingBlanks(std::string_view text)
     {
         return text.substr(0, std::min(text.find_first_not_of(" \t"), text.size()));
@@ -109,9 +137,14 @@ namespace
         ALLSLToSLua::Result run(ALLSLCommentCode::Report* report);
 
     private:
-        // The script converted with the units uncommented, each one's verdict;
-        // where it does not parse or resolve, what the parser said.
-        std::vector<Verdict> trial(const std::vector<Unit>& units, std::vector<ALLSLToSLua::Pass::Error>* refused = nullptr);
+        // The script converted with the units uncommented, and the stretches
+        // `blanked` blanked, each unit's verdict; where it does not parse or
+        // resolve, what the parser gave back.
+        typedef std::vector<std::pair<size_t, size_t>> Stretches;
+        std::vector<Verdict> trial(const std::vector<Unit>& units, ALLSLToSLua::Pass* refused = nullptr, const Stretches& blanked = {});
+        // A unit tried alone; where its only error is a declaration of its
+        // declaring again what the script declares, tried again in its stead.
+        Verdict alone(const Unit& unit);
         // The units tried at once: those that hold what the parser refuses,
         // and those with no code of their own, taken out until the rest
         // parse and each converts, then all taken; where one changes another
@@ -156,11 +189,18 @@ namespace
         return Pos{ static_cast<S32>(index), static_cast<S32>(byte - mLineStarts[index - 1]) + 1 };
     }
 
-    std::vector<Verdict> Trials::trial(const std::vector<Unit>& units, std::vector<ALLSLToSLua::Pass::Error>* refused)
+    std::vector<Verdict> Trials::trial(const std::vector<Unit>& units, ALLSLToSLua::Pass* refused, const Stretches& blanked)
     {
         LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("comment code: a trial");
         std::vector<Verdict> out(units.size());
         std::string          source(mLsl);
+        for (const auto& [begin, end] : blanked)
+        {
+            for (size_t i = begin; i < end && i < source.size(); ++i)
+            {
+                source[i] = source[i] == '\n' || source[i] == '\r' ? source[i] : ' ';
+            }
+        }
         ALLSLToSLua::Pass    pass;
         pass.inner = mInner;
         for (const Unit& u : units)
@@ -184,7 +224,7 @@ namespace
         {
             if (refused)
             {
-                *refused = std::move(pass.errors);
+                *refused = std::move(pass);
             }
             return out;
         }
@@ -266,10 +306,47 @@ namespace
                 rest.push_back(std::move(line));
             }
         }
-        std::vector<std::string> base;
-        for (std::string_view each : mBaseLines)
+        // Less what was blanked: each one's lines, the notes over them, and
+        // its code less any comment after it on its last line, which was not
+        // blanked.
+        std::vector<bool>        gone(mBaseLines.size(), false);
+        std::vector<std::string> kept(mBaseLines.size());
+        for (const auto& [begin, end] : blanked)
         {
-            std::string line(each);
+            const Pos  starts = at(begin);
+            const auto span   = std::find_if(mBase.spans.begin(), mBase.spans.end(), [&starts](const ALLSLToSLua::Span& each) {
+                return each.lslFirst + 1 == starts.line && each.lslColumn + 1 == starts.column;
+            });
+            if (span == mBase.spans.end())
+            {
+                for (Verdict& v : out)
+                {
+                    v.outcome = v.outcome == Outcome::Converted ? Outcome::Changes : v.outcome;
+                }
+                return out;
+            }
+            for (S32 l = span->sluaFirst; l <= span->sluaLast && l < static_cast<S32>(gone.size()); ++l)
+            {
+                gone[static_cast<size_t>(l)] = true;
+            }
+            for (S32 l = span->sluaFirst - 1; l >= 0; --l)
+            {
+                const std::string_view line = mBaseLines[static_cast<size_t>(l)];
+                if (line.substr(std::min(line.find_first_not_of(' '), line.size())).substr(0, NOTE.size()) != NOTE)
+                {
+                    break;
+                }
+                gone[static_cast<size_t>(l)] = true;
+            }
+            if (span->sluaLast >= 0 && span->sluaLast < static_cast<S32>(kept.size()))
+            {
+                kept[static_cast<size_t>(span->sluaLast)] = std::string(trailingComment(mBaseLines[static_cast<size_t>(span->sluaLast)]));
+            }
+        }
+        std::vector<std::string> base;
+        for (size_t l = 0; l < mBaseLines.size(); ++l)
+        {
+            std::string line = gone[l] ? kept[l] : std::string(mBaseLines[l]);
             for (const Unit& u : units)
             {
                 for (size_t k = u.first; k <= u.last; ++k)
@@ -296,6 +373,37 @@ namespace
             }
         }
         return out;
+    }
+
+    Verdict Trials::alone(const Unit& unit)
+    {
+        ALLSLToSLua::Pass refused;
+        Verdict           v = trial({ unit }, &refused).front();
+        if (v.outcome != Outcome::Refused || refused.twice.empty() || mConversions > ALLSLCommentCode::MAX_TRIALS)
+        {
+            return v;
+        }
+        // Each declaration twice, one of them the unit's and the other not:
+        // that other blanked, so that the unit's declares in its stead.
+        Stretches  live;
+        const auto inside = [&unit](size_t begin, size_t end) { return begin >= unit.begin && end <= unit.end; };
+        const auto apart  = [&unit](size_t begin, size_t end) { return end <= unit.begin || begin >= unit.end; };
+        for (const ALLSLToSLua::Pass::Twice& twice : refused.twice)
+        {
+            if (inside(twice.begin, twice.end) && apart(twice.firstBegin, twice.firstEnd))
+            {
+                live.emplace_back(twice.firstBegin, twice.firstEnd);
+            }
+            else if (inside(twice.firstBegin, twice.firstEnd) && apart(twice.begin, twice.end))
+            {
+                live.emplace_back(twice.begin, twice.end);
+            }
+            else
+            {
+                return v;
+            }
+        }
+        return trial({ unit }, nullptr, live).front();
     }
 
     std::string Trials::written(const Unit& unit, std::vector<std::string> code) const
@@ -415,8 +523,9 @@ namespace
     {
         while (group.size() > 1 && mConversions <= ALLSLCommentCode::MAX_TRIALS)
         {
-            std::vector<ALLSLToSLua::Pass::Error> errors;
-            const std::vector<Verdict>            verdicts = trial(group, &errors);
+            ALLSLToSLua::Pass          refusal;
+            const std::vector<Verdict> verdicts = trial(group, &refusal);
+            const auto&                errors   = refusal.errors;
             if (!errors.empty())
             {
                 // Each place the parser refused, in the unit it is in, or the
@@ -573,7 +682,7 @@ namespace
                 }
                 else if (mConversions <= ALLSLCommentCode::MAX_TRIALS)
                 {
-                    v = trial({ u }).front();
+                    v = alone(u);
                 }
                 if (v.outcome == Outcome::Converted)
                 {

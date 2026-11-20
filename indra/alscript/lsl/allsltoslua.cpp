@@ -8778,6 +8778,86 @@ end
     }
 }
 
+namespace
+{
+    // Each declaration declared again in its scope -- a global variable or a
+    // function beside an earlier one of its kind and name, a local beside one
+    // in its block -- with that earlier one, by the bytes each spans.
+    void declaredTwice(LSLScript* script, std::string_view source, std::vector<ALLSLToSLua::Pass::Twice>& out)
+    {
+        std::vector<size_t> starts{ 0 };
+        for (size_t i = 0; i < source.size(); ++i)
+        {
+            if (source[i] == '\n')
+            {
+                starts.push_back(i + 1);
+            }
+        }
+        const auto byte = [&](int line, int column) {
+            const size_t at = static_cast<size_t>(std::clamp(line, 1, static_cast<int>(starts.size()))) - 1;
+            return std::min(starts[at] + static_cast<size_t>(std::max(column, 1)) - 1, source.size());
+        };
+        // From its first byte to one past its last, and the ; that ends it.
+        const auto bytes = [&](LSLASTNode* node) {
+            const auto*  loc   = node->getLoc();
+            const size_t   begin = byte(loc->first_line, loc->first_column);
+            size_t         end   = std::max(begin, byte(loc->last_line, loc->last_column));
+            size_t         after = end;
+            while (after < source.size() && (source[after] == ' ' || source[after] == '\t'))
+            {
+                ++after;
+            }
+            if (after < source.size() && source[after] == ';')
+            {
+                end = after + 1;
+            }
+            return std::make_pair(begin, end);
+        };
+        struct Seen
+        {
+            LSLASTNode*      scope;
+            int              kind;
+            std::string_view name;
+            LSLASTNode*      node;
+        };
+        std::vector<Seen> seen;
+        walk(script, [&](LSLASTNode* node) {
+            int            kind = 0;
+            LSLIdentifier* id   = nullptr;
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                id = static_cast<LSLGlobalVariable*>(node)->getIdentifier();
+            }
+            else if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                kind = 1;
+                id   = static_cast<LSLGlobalFunction*>(node)->getIdentifier();
+            }
+            else if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_DECLARATION)
+            {
+                kind = 2;
+                id   = static_cast<LSLDeclaration*>(node)->getIdentifier();
+            }
+            if (!id || !id->getName() || !node->getLoc())
+            {
+                return;
+            }
+            const std::string_view name = id->getName();
+            for (const Seen& s : seen)
+            {
+                if (s.scope == node->getParent() && s.kind == kind && s.name == name)
+                {
+                    const auto [begin, end]           = bytes(node);
+                    const auto [first_begin, first_end] = bytes(s.node);
+                    out.push_back({ begin, end, first_begin, first_end });
+                    break;
+                }
+            }
+            seen.push_back({ node->getParent(), kind, name, node });
+        });
+    }
+}
+
 // static
 const char* ALLSLToSLua::lintOf(std::string_view note)
 {
@@ -8967,6 +9047,11 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
                 p.message  = message->getMessage();
                 pass.errors.push_back({ p.line, p.column, static_cast<S32>(message->getError()) });
                 result.problems.push_back(std::move(p));
+            }
+            if (script && !pass.errors.empty() &&
+                std::all_of(pass.errors.begin(), pass.errors.end(), [](const Pass::Error& e) { return e.code == E_DUPLICATE_DECLARATION; }))
+            {
+                declaredTwice(script, lsl, pass.twice);
             }
             return;
         }

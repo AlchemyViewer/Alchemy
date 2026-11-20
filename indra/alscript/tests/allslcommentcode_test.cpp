@@ -165,7 +165,7 @@ namespace
     {
         const std::string lsl = "integer gCount = 0;\n"
                                 "integer DEBUG = FALSE;\n"
-                                "// integer DEBUG = TRUE;\n"         // declared again
+                                "// integer DEBUG = \"yes\";\n"      // declared again, as what it cannot be
                                 "default {\n"
                                 "    state_entry() {\n"
                                 "        // Say hello (to all).\n"   // prose
@@ -201,6 +201,44 @@ namespace
         CHECK(report.tried[3].outcome == ALLSLCommentCode::Outcome::Refused);
         CHECK(report.tried[4].unit.line == 15);
         CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::NoStatement);
+    }
+
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a second version of a declaration tried in the live one's stead",
+                     "[ALLSLCommentCode]")
+    {
+        const std::string lsl = "integer DEBUG = FALSE; // set TRUE to debug\n"
+                                "// integer DEBUG = TRUE;\n"
+                                "string NAME = \"door\";\n"
+                                "//string NAME = \"gate\";\n"
+                                "integer SPEED = 1;\n"
+                                "// float SPEED = 2.0;\n"                          // another type: other lines change
+                                "integer twice(integer x) { return x * 2; }\n"
+                                "//integer twice(integer x) { return x + x; }\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        integer count = 0;\n"
+                                "        //integer count = 10;\n"
+                                "        if (DEBUG) llOwnerSay(NAME);\n"
+                                "        llSay(0, (string)twice(count) + (string)SPEED);\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLCommentCode::Report  report;
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the live one as it was, what was after it kept");
+        CHECK(has(r, "\nlocal DEBUG = false -- set TRUE to debug\n-- local DEBUG = true\nlocal NAME = \"door\"\n--local NAME = \"gate\"\n"));
+        UNSCOPED_INFO("a function, and a local");
+        CHECK(has(r, "\n--local function twice(x)\n--    return x + x\n--end\n"));
+        CHECK(has(r, "\nlocal count = 0\n--local count = 10\n"));
+        UNSCOPED_INFO("of another type, left");
+        CHECK(has(r, "\n-- float SPEED = 2.0;\n"));
+        CHECK(r.commentsConverted == 4);
+        CHECK(r.commentsLeft == 1);
+        REQUIRE(report.tried.size() == 5);
+        CHECK(report.tried[2].outcome == ALLSLCommentCode::Outcome::Changes);
+        require_checks_clean(r.text);
+        require_checks_clean(switchedOn(r.text, "-- local DEBUG = true", 1));
+        require_checks_clean(switchedOn(r.text, "--local function twice", 3));
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a unit's lines: several for one; left where it would change another line",

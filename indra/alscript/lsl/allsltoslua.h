@@ -207,6 +207,17 @@ public:
             S32 code   = 0;
         };
         std::vector<Error> errors;
+        // Given back where every error is a name declared again in its scope
+        // (Tailslide's E_DUPLICATE_DECLARATION): each such declaration, and
+        // the one before it, by the bytes each spans, its ; with it.
+        struct Twice
+        {
+            size_t begin      = 0;
+            size_t end        = 0;
+            size_t firstBegin = 0;
+            size_t firstEnd   = 0;
+        };
+        std::vector<Twice> twice;
     };
     static Result convert(std::string_view lsl, const Options& options, Pass& pass);
 
