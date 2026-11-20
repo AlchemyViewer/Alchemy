@@ -326,6 +326,17 @@ namespace
             }
             return out;
         };
+        if (unit.shape == Unit::Shape::Trailing)
+        {
+            // After the code on its line, as the LSL had it: a line of code.
+            const auto spoken = std::count_if(code.begin(), code.end(), [](const std::string& line) { return !line.empty(); });
+            if (spoken != 1)
+            {
+                return {};
+            }
+            const auto line = std::find_if(code.begin(), code.end(), [](const std::string& each) { return !each.empty(); });
+            return "--" + std::string(leadingBlanks(ALLSLComments::body(mLsl, mComments[unit.first]))) + *line;
+        }
         if (unit.shape == Unit::Shape::Lines)
         {
             // Each a line comment, after the blanks the LSL had after its
@@ -501,14 +512,7 @@ namespace
     {
         ALLSLToSLua::Pass plain;
         mComments                     = ALLSLComments::scan(mLsl);
-        std::vector<Unit> candidates;
-        for (const Unit& u : ALLSLComments::units(mLsl, mComments))
-        {
-            if (u.shape != Unit::Shape::Trailing)
-            {
-                candidates.push_back(u);
-            }
-        }
+        const std::vector<Unit> candidates = ALLSLComments::units(mLsl, mComments);
         mToggle                       = ALLSLComments::freeByte(mLsl);
         const std::vector<char> marks = ALLSLComments::freeBytes(mLsl, 2, mToggle);
         if (candidates.empty() || marks.size() < 2)

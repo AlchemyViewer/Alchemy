@@ -319,6 +319,46 @@ namespace
         CHECK(r.commentsLeft == 1);
     }
 
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a comment after code: a line of code after it; else as it was",
+                     "[ALLSLCommentCode]")
+    {
+        const std::string lsl = "integer gCount = 0;\n"
+                                "integer x = 0; // x = 1;\n"                                      // no statement here
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        llSay(0, \"a\"); // llSay(0, \"b\");\n"
+                                "        if (gCount) llSay(0, \"c\"); //llOwnerSay(\"d\");\n"
+                                "        if (gCount > 1) { // llSay(0, \"e\");\n"                 // in the block it opens
+                                "            llSay(0, \"f\");\n"
+                                "        }\n"
+                                "        integer i; // for (i = 0; i < 3; ++i) llSay(0, (string)i);\n"  // lines of code
+                                "        llSay(0, \"h\"); // see llSay(0, \"x\"); above\n"             // words
+                                "        list l = [\"a\", \"c\"]; llSay(0, (string)l); // x = 2;\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLCommentCode::Report  report;
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CAPTURE(r.text);
+        CHECK(has(r, "\nlocal x = 0 -- x = 1;\n"));
+        CHECK(has(r, "\nll.Say(0, \"a\") -- ll.Say(0, \"b\")\n"));
+        UNSCOPED_INFO("after an if on its line, its spacing kept");
+        CHECK(has(r, "\nif gCount ~= 0 then ll.Say(0, \"c\") end --print(\"d\")\n"));
+        UNSCOPED_INFO("after the line that opens the block");
+        CHECK(has(r, "\nif gCount > 1 then -- ll.Say(0, \"e\")\n    ll.Say(0, \"f\")\nend\n"));
+        UNSCOPED_INFO("more than a line after code, and words, as the LSL had them");
+        CHECK(has(r, "\nlocal i = 0 -- for (i = 0; i < 3; ++i) llSay(0, (string)i);\n"));
+        CHECK(has(r, "\nll.Say(0, \"h\") -- see llSay(0, \"x\"); above\n"));
+        UNSCOPED_INFO("after the last of two statements on a line");
+        CHECK(has(r, "\nll.Say(0, table.concat(l)) -- x = 2\n"));
+        CHECK(r.commentsConverted == 4);
+        CHECK(r.commentsLeft == 3);
+        REQUIRE(report.tried.size() == 7);
+        CHECK(report.tried[0].outcome == ALLSLCommentCode::Outcome::Refused);
+        CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::Unplaced);
+        CHECK(report.tried[5].outcome == ALLSLCommentCode::Outcome::Refused);
+        require_checks_clean(r.text);
+    }
+
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: every unit at once where each converts; past what the trials allow, left",
                      "[ALLSLCommentCode]")
     {
