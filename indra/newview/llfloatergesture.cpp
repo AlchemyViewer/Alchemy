@@ -299,6 +299,11 @@ void LLFloaterGesture::onFilterEdit(const std::string& filter)
         return;
 
     mFilter = std::move(normalized);
+
+    // As in the inventory, "clap+fast" matches gestures holding every term, in any order.
+    mFilterTerms = LLStringUtil::getTokens(mFilter, "+");
+    std::erase(mFilterTerms, std::string());
+
     refreshAll();
     mGestureList->setScrollPos(0);
 }
@@ -382,7 +387,7 @@ void LLFloaterGesture::buildGestureList()
     // since we do re-build whenever something gets dirty
     mGestureList->selectMultiple(selected_items);
     mGestureList->setScrollPos(scroll_pos);
-    mGestureList->setCommentText(getString(mFilter.empty() ? "no_gestures" : "no_matching_gestures"));
+    mGestureList->setCommentText(getString(mFilterTerms.empty() ? "no_gestures" : "no_matching_gestures"));
 }
 
 void LLFloaterGesture::addGesture(const LLUUID& item_id, LLMultiGesture* gesture, LLCtrlListInterface* list)
@@ -394,12 +399,21 @@ void LLFloaterGesture::addGesture(const LLUUID& item_id, LLMultiGesture* gesture
     const bool has_key = gesture && gesture->mKey != KEY_NONE;
     const std::string shortcut = has_key ? LLKeyboard::stringFromAccelerator(gesture->mMask, gesture->mKey) : "---";
 
-    if (!mFilter.empty()
-        && utf8str_tolower(item_name).find(mFilter) == std::string::npos
-        && utf8str_tolower(trigger).find(mFilter) == std::string::npos
-        && (!has_key || utf8str_tolower(shortcut).find(mFilter) == std::string::npos))
+    if (!mFilterTerms.empty())
     {
-        return;
+        const std::string name_lower = utf8str_tolower(item_name);
+        const std::string trigger_lower = utf8str_tolower(trigger);
+        const std::string shortcut_lower = has_key ? utf8str_tolower(shortcut) : std::string();
+
+        const bool matches = std::all_of(mFilterTerms.begin(), mFilterTerms.end(), [&](const std::string& term)
+        {
+            return name_lower.find(term) != std::string::npos
+                || trigger_lower.find(term) != std::string::npos
+                || shortcut_lower.find(term) != std::string::npos;
+        });
+
+        if (!matches)
+            return;
     }
 
     const bool playing = gesture && gesture->mPlaying;

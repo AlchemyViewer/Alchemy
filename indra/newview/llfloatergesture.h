@@ -112,6 +112,7 @@ private:
     LLUUID mGestureFolderID;
     LLScrollListCtrl* mGestureList = nullptr;
     std::string mFilter;
+    std::vector<std::string> mFilterTerms;
     LLFrameTimer mLastUsedRefreshTimer;
     ALMenuSlot mContextMenu;
 
