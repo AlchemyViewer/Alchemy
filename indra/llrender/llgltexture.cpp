@@ -143,8 +143,6 @@ void LLGLTexture::generateGLTexture()
 
 LLImageGL* LLGLTexture::getGLTexture() const
 {
-    llassert(mGLTexturep.notNull()) ;
-
     return mGLTexturep ;
 }
 

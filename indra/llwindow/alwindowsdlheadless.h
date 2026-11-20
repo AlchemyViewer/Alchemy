@@ -58,7 +58,7 @@ public:
     void close() override;
 
     void swapBuffers() override;
-    void* getPlatformWindow() override { return mWindow; }
+    void* getPlatformWindow() const override { return mWindow; }
 
     // Worker-thread contexts, through the same platform path LLWindowSDL uses.
     void* createSharedContext() override;

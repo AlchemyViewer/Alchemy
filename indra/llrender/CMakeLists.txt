@@ -177,6 +177,7 @@ if(AL_BUILD_TESTS)
       tests/llfontfreetype_test.cpp
       tests/llfontregistry_test.cpp
       tests/llglfloor_test.cpp
+      tests/llgltexture_test.cpp
       tests/llrendermatrix_test.cpp
       tests/lluitransform_test.cpp
     LIBRARIES llrender ll::icu

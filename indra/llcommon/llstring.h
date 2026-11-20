@@ -42,6 +42,7 @@
 //#include <locale>
 #include <iomanip>
 #include <algorithm>
+#include <functional>
 #include <vector>
 #include <map>
 #include "llformat.h"
@@ -479,6 +480,65 @@ public:
 
     // Copies src into dst at a given offset.
     static void     copyInto(string_type& dst, string_view_type src, size_type offset);
+
+    // Join non-empty strings from values using value itself and delimiter
+    template<class C>
+    static std::string join(const C& values, T delimiter = ',')
+    {
+        std::string result;
+        for (const std::string& value : values)
+        {
+            if (!value.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += value;
+            }
+        }
+        return result;
+    }
+
+    // Join non-empty strings from values using stringify(value) and delimiter
+    template<class C, class V>
+    static std::string join(const C& values, std::function<std::string(const V&)> stringify, T delimiter = ',')
+    {
+        std::string result;
+        for (const V& value : values)
+        {
+            std::string string = stringify(value);
+            if (!string.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += string;
+            }
+        }
+        return result;
+    }
+
+    // Join non-empty strings from values using stringify(index, value) and delimiter
+    template<class C, class V>
+    static std::string join(const C& values, std::function<std::string(size_t index, const V&)> stringify, T delimiter = ',')
+    {
+        std::string result;
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            std::string string = stringify(i, values[i]);
+            if (!string.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += string;
+            }
+        }
+        return result;
+    }
 
 
 #ifdef _DEBUG

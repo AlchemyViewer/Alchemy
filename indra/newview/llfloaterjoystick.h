@@ -42,7 +42,6 @@ public:
 
     virtual bool postBuild() override;
     virtual void refresh() override;
-    virtual void apply();   // Apply the changed values.
     virtual void cancel();  // Cancel the changed values.
     virtual void draw() override;
     static  void setSNDefaults();

@@ -34,6 +34,7 @@
 
 #include "llavatarnamecache.h"
 #include "llcachename.h"
+#include "llgamecontrol.h"
 #include "llkeyboard.h"
 #include "llscrolllistctrl.h" // for LLUrlEntryKeybinding file parsing
 #include "lltrans.h"
@@ -1748,9 +1749,144 @@ void LLUrlEntryKeybinding::initLocalization()
     initLocalizationFromFile("control_table_contents_camera.xml");
     initLocalizationFromFile("control_table_contents_editing.xml");
     initLocalizationFromFile("control_table_contents_media.xml");
+    initLocalizationFromFile("control_table_contents_game_control.xml");
 }
 
 void LLUrlEntryKeybinding::initLocalizationFromFile(const std::string& filename)
+{
+    LLXMLNodePtr xmlNode;
+    LLScrollListCtrl::Contents contents;
+    if (!LLUICtrlFactory::getLayeredXMLNode(filename, xmlNode))
+    {
+        LL_WARNS() << "Failed to load " << filename << LL_ENDL;
+        return;
+    }
+    LLXUIParser parser;
+    parser.readXUI(xmlNode, contents, filename);
+
+    if (!contents.validateBlock())
+    {
+        LL_WARNS() << "Failed to validate " << filename << LL_ENDL;
+        return;
+    }
+
+    for (LLInitParam::ParamIterator<LLScrollListItem::Params>::const_iterator row_it = contents.rows.begin();
+         row_it != contents.rows.end();
+         ++row_it)
+    {
+        std::string control = row_it->value.getValue().asString();
+        if (!control.empty() && control != "menu_separator")
+        {
+            mLocalizations[control] =
+                LLLocalizationData(
+                                   row_it->columns.begin()->value.getValue().asString(),
+                                   row_it->columns.begin()->tool_tip.getValue()
+                );
+        }
+    }
+}
+
+
+//
+// LLUrlEntryGameController Displays currently assigned game control binding
+//
+LLUrlEntryGameController::LLUrlEntryGameController()
+    : LLUrlEntryBase()
+    , pKeyHandler(NULL)
+    , pControllerHandler(NULL)
+{
+    mPattern = ALRegex(APP_HEADER_REGEX "/gamecontroller/[\\w+-]+(\\?mode=\\w+)?$", ALRegex::ICASE);
+    mMenuName = "menu_url_experience.xml";
+
+    initLocalization();
+}
+
+std::string LLUrlEntryGameController::getLabel(const std::string& url, const LLUrlLabelCallback& cb)
+{
+    std::string control = getControlName(url);
+
+    std::string keybind = "";
+    if (pControllerHandler && pControllerHandler->hasHandlingDevice())
+    {
+        keybind = pControllerHandler->getBindingAsString(control);
+        LL_DEBUGS() << "Game Control Translate:" << control << " = " << keybind << LL_ENDL;
+        if(!keybind.empty())
+        {
+            std::map<std::string, LLLocalizationData>::iterator iter = mLocalizations.find(keybind);
+            if(iter != mLocalizations.end()) {
+                keybind = iter->second.mLocalization;
+            }
+            // Debug text change for testing
+            keybind = keybind + " (Game Control)";
+            return keybind;
+        }
+    }
+    // Fallback to key binding if game control binding is not found
+    if (pKeyHandler && keybind.empty())
+    {
+        LLStringUtil::toLower(control);
+        keybind = pKeyHandler->getKeyBindingAsString(getMode(url), "game_control_" + control);
+        LL_DEBUGS() << "Key Binding Translate:" << control << " = " << keybind << LL_ENDL;
+        if(!keybind.empty())
+        {
+            // Debug text change for testing
+            keybind = keybind + " (Key Binding)";
+            return keybind;
+        }
+    }
+
+    return "Unbound Control: " + control;
+}
+
+std::string LLUrlEntryGameController::getTooltip(const std::string& url) const
+{
+    std::string control = getControlName(url);
+
+    std::map<std::string, LLLocalizationData>::const_iterator iter = mLocalizations.find(control);
+    if (iter != mLocalizations.end())
+    {
+        return iter->second.mTooltip;
+    }
+    return url;
+}
+
+std::string LLUrlEntryGameController::getControlName(const std::string& url) const
+{
+    std::string search = "/gamecontroller/";
+    size_t pos_start = url.find(search);
+    if (pos_start == std::string::npos)
+    {
+        return std::string();
+    }
+    pos_start += search.size();
+
+    size_t pos_end = url.find("?mode=");
+    if (pos_end == std::string::npos)
+    {
+        pos_end = url.size();
+    }
+    return url.substr(pos_start, pos_end - pos_start);
+}
+
+std::string LLUrlEntryGameController::getMode(const std::string& url) const
+{
+    std::string search = "?mode=";
+    size_t pos_start = url.find(search);
+    if (pos_start == std::string::npos)
+    {
+        return std::string();
+    }
+    pos_start += search.size();
+    return url.substr(pos_start, url.size() - pos_start);
+}
+
+void LLUrlEntryGameController::initLocalization()
+{
+    initLocalizationFromFile("control_table_contents_game_control.xml");
+    // TODO : Need to add localization for other game control bindings specifically axes
+}
+
+void LLUrlEntryGameController::initLocalizationFromFile(const std::string& filename)
 {
     LLXMLNodePtr xmlNode;
     LLScrollListCtrl::Contents contents;

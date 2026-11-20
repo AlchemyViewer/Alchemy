@@ -27,16 +27,17 @@
 #ifndef LL_LLTOOLFOCUS_H
 #define LL_LLTOOLFOCUS_H
 
+#include "llkeyboard.h"
 #include "lltool.h"
 
 class LLPickInfo;
 
 class LLToolCamera
-:   public LLTool, public LLSingleton<LLToolCamera>
+:   public LLTool, public LLSimpleton<LLToolCamera>
 {
-    LLSINGLETON(LLToolCamera);
-    virtual ~LLToolCamera();
 public:
+    LLToolCamera();
+    virtual ~LLToolCamera();
 
     virtual bool    handleMouseDown(S32 x, S32 y, MASK mask) override;
     virtual bool    handleMouseUp(S32 x, S32 y, MASK mask) override;
@@ -74,6 +75,7 @@ protected:
     S32     mMouseUpX;  // needed for releaseMouse()
     S32     mMouseUpY;
     MASK    mMouseUpMask;
+    LLKeyPressState mKeyState;
 };
 
 

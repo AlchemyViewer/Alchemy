@@ -54,6 +54,7 @@ LLWindowHeadless::LLWindowHeadless(LLWindowCallbacks* callbacks, const std::stri
     delete gKeyboard;
     gKeyboard = new LLKeyboardHeadless();
     gKeyboard->setCallbacks(callbacks);
+    mFullscreen = false;
 }
 
 

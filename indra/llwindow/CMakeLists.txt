@@ -6,6 +6,8 @@ set(
   llwindow_BASE_SOURCES
   alwindowsdlheadless.cpp
   llcursortypes.cpp
+  llgamecontrol.cpp
+  llgamecontroltranslator.cpp
   llkeyboard.cpp
   llkeyboardheadless.cpp
   llmousehandler.cpp
@@ -19,6 +21,8 @@ set(
   llwindow_BASE_HEADERS
   alwindowsdlheadless.h
   llcursortypes.h
+  llgamecontrol.h
+  llgamecontroltranslator.h
   llkeyboard.h
   llkeyboardheadless.h
   llmousehandler.h
