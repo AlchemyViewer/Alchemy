@@ -239,9 +239,11 @@ void LLPanelContents::getState(LLViewerObject *objectp )
 
     // Explore in IDE: to an external editor over the bridge when that is
     // on, else to Script Studio, and named for which; either way a single
-    // editable root object.
+    // editable root object. Its unpressed label only: pressed, published to
+    // the editor, it says "Stop Exploring" (label_selected), which setLabel
+    // would write over.
     const bool ide = LLScriptEditorWSServer::isEnabled();
-    mPublishButton->setLabel(getString(ide ? "ide_label" : "studio_label"));
+    mPublishButton->setLabelUnselected(getString(ide ? "ide_label" : "studio_label"));
     mPublishButton->setToolTip(getString(ide ? "ide_tooltip" : "studio_tooltip"));
     mPublishButton->setEnabled(new_button_enabled);
 
