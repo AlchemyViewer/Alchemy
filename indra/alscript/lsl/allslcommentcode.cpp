@@ -109,6 +109,18 @@ namespace
         return {};
     }
 
+    // What of a line of SLua two conversions are compared by: a note, or its
+    // code, less any comment, squeezed; nothing for a comment's line.
+    std::string compared(std::string_view line)
+    {
+        std::string out = squeezed(line);
+        if (out.rfind(NOTE, 0) == 0)
+        {
+            return out;
+        }
+        return squeezed(line.substr(0, line.size() - trailingComment(line).size()));
+    }
+
     std::string_view leadingBlanks(std::string_view text)
     {
         return text.substr(0, std::min(text.find_first_not_of(" \t"), text.size()));
@@ -333,21 +345,21 @@ namespace
             v.text    = written(u, std::move(code));
             v.outcome = v.text.empty() ? Outcome::Unplaced : Outcome::Converted;
         }
-        // Every other line as the script without them writes it.
+        // Every other line's code and notes as the script without them writes
+        // them. Where its comments go is not compared: a comment over code
+        // uncommented may be given to that code rather than to what holds it,
+        // and the comments are written where the plain conversion has them.
         std::vector<std::string> rest;
         for (size_t l = 0; l < lines.size(); ++l)
         {
-            std::string line = squeezed(lines[l]);
+            std::string line = compared(lines[l]);
             if (!mine[l] && !line.empty())
             {
                 rest.push_back(std::move(line));
             }
         }
-        // Less what was blanked: each one's lines, the notes over them, and
-        // its code less any comment after it on its last line, which was not
-        // blanked.
-        std::vector<bool>        gone(mBaseLines.size(), false);
-        std::vector<std::string> kept(mBaseLines.size());
+        // Less what was blanked: each one's lines, and the notes over them.
+        std::vector<bool> gone(mBaseLines.size(), false);
         for (const auto& [begin, end] : blanked)
         {
             const Pos  starts = at(begin);
@@ -366,46 +378,15 @@ namespace
             {
                 gone[static_cast<size_t>(l)] = true;
             }
-            for (S32 l = span->sluaFirst - 1; l >= 0; --l)
+            for (S32 l = span->sluaFirst - 1; l >= 0 && compared(mBaseLines[static_cast<size_t>(l)]).rfind(NOTE, 0) == 0; --l)
             {
-                const std::string_view line = mBaseLines[static_cast<size_t>(l)];
-                if (line.substr(std::min(line.find_first_not_of(' '), line.size())).substr(0, NOTE.size()) != NOTE)
-                {
-                    break;
-                }
                 gone[static_cast<size_t>(l)] = true;
-            }
-            if (span->sluaLast >= 0 && span->sluaLast < static_cast<S32>(kept.size()))
-            {
-                kept[static_cast<size_t>(span->sluaLast)] = std::string(trailingComment(mBaseLines[static_cast<size_t>(span->sluaLast)]));
             }
         }
         std::vector<std::string> base;
         for (size_t l = 0; l < mBaseLines.size(); ++l)
         {
-            std::string line = gone[l] ? kept[l] : std::string(mBaseLines[l]);
-            // Less the sentinels of the comments tried, each with the space
-            // before it.
-            for (size_t at = line.find(mSentinel); at != std::string::npos;)
-            {
-                const size_t close = line.find(mSentinel, at + 1);
-                if (close == std::string::npos || at < 2 || line.compare(at - 2, 2, "--") != 0)
-                {
-                    break;
-                }
-                const size_t k = static_cast<size_t>(std::strtoul(line.substr(at + 1, close - at - 1).c_str(), nullptr, 10));
-                if (k < owner.size() && owner[k] >= 0)
-                {
-                    const size_t from = at >= 3 && line[at - 3] == ' ' ? at - 3 : at - 2;
-                    line.erase(from, close + 1 - from);
-                    at = line.find(mSentinel, from);
-                }
-                else
-                {
-                    at = line.find(mSentinel, close + 1);
-                }
-            }
-            line = squeezed(line);
+            std::string line = gone[l] ? std::string() : compared(mBaseLines[l]);
             if (!line.empty())
             {
                 base.push_back(std::move(line));

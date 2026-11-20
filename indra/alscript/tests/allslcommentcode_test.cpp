@@ -203,6 +203,27 @@ namespace
         CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::NoStatement);
     }
 
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: where the comments go is not compared, only code and notes",
+                     "[ALLSLCommentCode]")
+    {
+        // Uncommented, the handlers are what the words over them are given
+        // to, rather than the end of the state: written elsewhere, which the
+        // plain conversion's layout does not follow.
+        const std::string lsl = "default {\n"
+                                "    state_entry() { llSay(0, \"a\"); }\n"
+                                "    touch_start(integer n) { llSay(0, \"b\"); }\n"
+                                "    // these are new\n"
+                                "    // timer() { llSay(0, \"c\"); }\n"
+                                "    // on_rez(integer p) { llSay(0, \"d\"); }\n"
+                                "}\n";
+        const ALLSLToSLua::Result r = converted(lsl);
+        CAPTURE(r.text);
+        CHECK(has(r, "\n-- these are new\n-- LLEvents:on(\"timer\", function()\n--     ll.Say(0, \"c\")\n-- end)\n--\n"
+                     "-- LLEvents:on(\"on_rez\", function(p)\n--     ll.Say(0, \"d\")\n-- end)\n"));
+        CHECK(r.commentsConverted == 1);
+        CHECK(r.text.substr(0, r.text.find("-- these are new")) == plain(lsl).text.substr(0, plain(lsl).text.find("-- these are new")));
+    }
+
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a second version of a declaration tried in the live one's stead",
                      "[ALLSLCommentCode]")
     {
