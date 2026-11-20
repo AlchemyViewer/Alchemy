@@ -199,6 +199,12 @@ bool ALLSLComments::mayBeCode(std::string_view text)
 }
 
 // static
+bool ALLSLComments::endsCode(std::string_view text)
+{
+    return text.find_first_of(";}") != std::string_view::npos;
+}
+
+// static
 std::vector<ALLSLComments::Unit> ALLSLComments::units(std::string_view source, const std::vector<Comment>& comments)
 {
     std::vector<Unit> out;
@@ -223,6 +229,7 @@ std::vector<ALLSLComments::Unit> ALLSLComments::units(std::string_view source, c
             {
                 // Those under it, each alone on the next line.
                 bool code = mayBeCode(body(source, c));
+                bool ends = endsCode(body(source, c));
                 while (unit.last + 1 < comments.size())
                 {
                     const Comment& next = comments[unit.last + 1];
@@ -232,9 +239,10 @@ std::vector<ALLSLComments::Unit> ALLSLComments::units(std::string_view source, c
                     }
                     ++unit.last;
                     code |= mayBeCode(body(source, next));
+                    ends |= endsCode(body(source, next));
                 }
                 k = unit.last;
-                if (!code)
+                if (!code || !ends)
                 {
                     continue;
                 }
@@ -246,7 +254,7 @@ std::vector<ALLSLComments::Unit> ALLSLComments::units(std::string_view source, c
             }
             // After code: not after another comment on its line, which is
             // no statement's.
-            if ((k > 0 && comments[k - 1].endLine == c.line) || !mayBeCode(body(source, c)))
+            if ((k > 0 && comments[k - 1].endLine == c.line) || !endsCode(body(source, c)))
             {
                 continue;
             }
@@ -257,7 +265,7 @@ std::vector<ALLSLComments::Unit> ALLSLComments::units(std::string_view source, c
         const std::string_view text  = body(source, c);
         const size_t           first = text.find_first_not_of(" \t\r\n");
         if (!c.closed || !c.alone || first == std::string_view::npos || text[first] == '*' || text[first] == '/' ||
-            text.find("/*") != std::string_view::npos || !stringsClosed(text) || !mayBeCode(text))
+            text.find("/*") != std::string_view::npos || !stringsClosed(text) || !endsCode(text))
         {
             continue;
         }
@@ -282,9 +290,16 @@ std::vector<ALLSLComments::Unit> ALLSLComments::runOf(const Unit& run, std::stri
             continue;
         }
         size_t last = k;
+        bool   ends = endsCode(body(source, comments[k]));
         while (!lines && last < run.last && mayBeCode(body(source, comments[last + 1])))
         {
             ++last;
+            ends |= endsCode(body(source, comments[last]));
+        }
+        if (!ends)
+        {
+            k = last;
+            continue;
         }
         Unit unit    = run;
         unit.first   = k;

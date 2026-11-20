@@ -8965,6 +8965,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
                 p.line     = zeroBased(message->getLoc()->first_line);
                 p.column   = zeroBased(message->getLoc()->first_column);
                 p.message  = message->getMessage();
+                pass.errors.push_back({ p.line, p.column, static_cast<S32>(message->getError()) });
                 result.problems.push_back(std::move(p));
             }
             return;

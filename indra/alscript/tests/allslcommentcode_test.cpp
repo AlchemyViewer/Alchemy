@@ -173,7 +173,7 @@ namespace
                                 "        llSay(0, \"a\");\n"
                                 "        //nope();\n"                // undeclared
                                 "        llSay(0, \"b\");\n"
-                                "        //if (gCount > 0) {\n"      // a brace across two
+                                "        //if (gCount > 0) {\n"      // a brace across two: this ends no code
                                 "        llSay(0, \"c\");\n"
                                 "        //}\n"
                                 "        llSay(0, \"d\");\n"
@@ -187,20 +187,20 @@ namespace
         UNSCOPED_INFO("the plain conversion, byte for byte");
         CHECK(r.text == plain(lsl).text);
         CHECK(r.commentsConverted == 0);
-        CHECK(r.commentsLeft == 7);
-        REQUIRE(report.tried.size() == 7);
-        UNSCOPED_INFO("what was tried, a run line by line once whole it was not, and why each was left");
+        CHECK(r.commentsLeft == 5);
+        REQUIRE(report.tried.size() == 5);
+        UNSCOPED_INFO("what was tried -- a run line by line once whole it was not, and nothing that ends no code -- and why each was left");
         CHECK(report.tried[0].unit.line == 3);
         CHECK(report.tried[0].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[1].unit.line == 6);
-        CHECK(report.tried[1].unit.endLine == 6);
+        CHECK(report.tried[1].unit.line == 7);
+        CHECK(report.tried[1].unit.endLine == 7);
         CHECK(report.tried[1].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[2].unit.line == 7);
+        CHECK(report.tried[2].unit.line == 9);
         CHECK(report.tried[2].outcome == ALLSLCommentCode::Outcome::Refused);
+        CHECK(report.tried[3].unit.line == 13);
         CHECK(report.tried[3].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[5].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[6].outcome == ALLSLCommentCode::Outcome::NoStatement);
+        CHECK(report.tried[4].unit.line == 15);
+        CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::NoStatement);
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a unit's lines: several for one; left where it would change another line",
@@ -317,6 +317,53 @@ namespace
         CHECK(has(r, "\n\n--if gOwner.istruthy then\n--    ll.Say(0, \"a\")\n--else\n--    ll.Say(0, \"b\")\n--end\n"));
         CHECK(r.commentsConverted == 3);
         CHECK(r.commentsLeft == 1);
+    }
+
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: every unit at once where each converts; past what the trials allow, left",
+                     "[ALLSLCommentCode]")
+    {
+        UNSCOPED_INFO("debug lines and words with a ; between live code: one trial for all");
+        std::string lsl = "default {\n    state_entry() {\n";
+        for (int n = 0; n < 10; ++n)
+        {
+            lsl += "        //llOwnerSay(\"step " + std::to_string(n) + "\");\n"
+                   "        // then step " + std::to_string(n) + "; done\n"
+                   "        llSay(0, \"" + std::to_string(n) + "\");\n";
+        }
+        lsl += "    }\n}\n";
+        ALLSLCommentCode::Report  report;
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CHECK(r.commentsConverted == 10);
+        CHECK(r.commentsLeft == 10);
+        UNSCOPED_INFO("the comments as sentinels; the runs at once, refused; their lines at once, then less the words; the last");
+        CHECK(report.conversions == 5);
+
+        UNSCOPED_INFO("each changing another line, tried apart until the trials run out");
+        std::string many;
+        for (int n = 0; n < 80; ++n)
+        {
+            many += "key k" + std::to_string(n) + ";\n";
+        }
+        many += "default {\n    state_entry() {\n";
+        for (int n = 0; n < 80; ++n)
+        {
+            many += "        k" + std::to_string(n) + " = llGetOwner();\n"
+                    "        //k" + std::to_string(n) + " = \"text\";\n"
+                    "        llOwnerSay((string)k" + std::to_string(n) + ");\n";
+        }
+        many += "    }\n}\n";
+        ALLSLCommentCode::Report  capped;
+        const ALLSLToSLua::Result c = converted(many, &capped);
+        CHECK(c.text == plain(many).text);
+        CHECK(c.commentsConverted == 0);
+        CHECK(c.commentsLeft == 80);
+        CHECK(capped.conversions <= ALLSLCommentCode::MAX_TRIALS + 2);
+        size_t past = 0;
+        for (const ALLSLCommentCode::Tried& each : capped.tried)
+        {
+            past += each.outcome == ALLSLCommentCode::Outcome::Capped ? 1 : 0;
+        }
+        CHECK(past > 0);
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: nothing noted of commented code; the live code's notes said still",

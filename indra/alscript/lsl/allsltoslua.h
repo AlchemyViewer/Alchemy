@@ -198,6 +198,15 @@ public:
         // stretch's index, and `inner` again.
         std::vector<std::pair<size_t, size_t>> tried;
         char                                   inner = 0;
+        // Given back where the parser refused the LSL: each error, where it
+        // is, from nought, and Tailslide's code for it.
+        struct Error
+        {
+            S32 line   = 0;
+            S32 column = 0;
+            S32 code   = 0;
+        };
+        std::vector<Error> errors;
     };
     static Result convert(std::string_view lsl, const Options& options, Pass& pass);
 

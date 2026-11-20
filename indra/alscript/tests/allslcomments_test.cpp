@@ -144,6 +144,11 @@ namespace
         CHECK(unitsOf("integer a; /* f(); */\n/* g(); */ integer b;\n").empty());
         UNSCOPED_INFO("after another comment on its line");
         CHECK(unitsOf("/* a */ // f();\n").empty());
+        UNSCOPED_INFO("nothing that ends code: a header in prose, a block's first line");
+        CHECK(unitsOf("// flash(prim, on) - finds a prim named so\n").empty());
+        CHECK(unitsOf("//if (x) {\n").empty());
+        CHECK(unitsOf("integer a; // see b()\n").empty());
+        CHECK(unitsOf("/* f(x) does it */\n").empty());
         UNSCOPED_INFO("a run of words is not tried, one with any code is, whole");
         CHECK(unitsOf("// one\n// two\n").empty());
         const std::vector<Unit> mixed = unitsOf("// old way:\n// f();\n// else\n");
@@ -154,7 +159,7 @@ namespace
 
     TEST_CASE("ALLSLComments: a run split at its lines of words; or each line of code alone", "[ALLSLComments]")
     {
-        const std::string          lsl     = "// old way:\n// f();\n// g();\n// then\n// h();\n";
+        const std::string          lsl     = "// old way:\n// f();\n// g();\n// then\n// h();\n// if (x) {\n// so\n// if (y) {\n";
         const std::vector<Comment> found   = ALLSLComments::scan(lsl);
         const std::vector<Unit>    units   = ALLSLComments::units(lsl, found);
         REQUIRE(units.size() == 1);
@@ -164,8 +169,9 @@ namespace
         CHECK(groups[0].last == 2);
         CHECK(groups[0].line == 2);
         CHECK(groups[0].endLine == 3);
+        UNSCOPED_INFO("a line that ends no code with one that does; and not alone");
         CHECK(groups[1].first == 4);
-        CHECK(groups[1].last == 4);
+        CHECK(groups[1].last == 5);
         const std::vector<Unit> lines = ALLSLComments::runOf(units[0], lsl, found, true);
         REQUIRE(lines.size() == 3);
         CHECK(lines[0].first == 1);

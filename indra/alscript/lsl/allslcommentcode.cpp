@@ -28,6 +28,8 @@
 
 #include "llprofiler.h"
 
+#include <tailslide/logger.hh>
+
 #include <algorithm>
 #include <string>
 
@@ -107,11 +109,19 @@ namespace
         ALLSLToSLua::Result run(ALLSLCommentCode::Report* report);
 
     private:
-        // The script converted with the units uncommented, each one's verdict.
-        std::vector<Verdict> trial(const std::vector<Unit>& units);
-        // A unit tried, and where it is not code, its pieces; what is taken,
-        // and how many are left.
-        void settle(const Unit& unit, std::vector<std::pair<Unit, std::string>>& taken, S32& left, ALLSLCommentCode::Report* report);
+        // The script converted with the units uncommented, each one's verdict;
+        // where it does not parse or resolve, what the parser said.
+        std::vector<Verdict> trial(const std::vector<Unit>& units, std::vector<ALLSLToSLua::Pass::Error>* refused = nullptr);
+        // The units tried at once: those that hold what the parser refuses,
+        // and those with no code of their own, taken out until the rest
+        // parse and each converts, then all taken; where one changes another
+        // line, each half tried so. What is not taken is tried alone, but
+        // for those the parser refused inside, which alone it would too.
+        void together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, std::vector<size_t>& refused,
+                      ALLSLCommentCode::Report* report);
+        // A run that is not code whole in pieces: split at its lines of words,
+        // or where it has none, a line at a time. Nothing for another unit.
+        std::vector<Unit> pieces(const Unit& unit) const;
         // The SLua a unit's code is written as where it stood, from the
         // trial's lines that are its own, commented as the unit was; nothing
         // where it cannot stand there.
@@ -146,8 +156,9 @@ namespace
         return Pos{ static_cast<S32>(index), static_cast<S32>(byte - mLineStarts[index - 1]) + 1 };
     }
 
-    std::vector<Verdict> Trials::trial(const std::vector<Unit>& units)
+    std::vector<Verdict> Trials::trial(const std::vector<Unit>& units, std::vector<ALLSLToSLua::Pass::Error>* refused)
     {
+        LL_PROFILE_ZONE_NAMED_CATEGORY_SCRIPTDEV("comment code: a trial");
         std::vector<Verdict> out(units.size());
         std::string          source(mLsl);
         ALLSLToSLua::Pass    pass;
@@ -171,6 +182,10 @@ namespace
         const ALLSLToSLua::Result r = ALLSLToSLua::convert(source, mOptions, pass);
         if (!r.converted)
         {
+            if (refused)
+            {
+                *refused = std::move(pass.errors);
+            }
             return out;
         }
         const std::vector<std::string_view> lines = linesOf(r.text);
@@ -384,44 +399,102 @@ namespace
         return joined(out);
     }
 
-    void Trials::settle(const Unit& unit, std::vector<std::pair<Unit, std::string>>& taken, S32& left, ALLSLCommentCode::Report* report)
+    void Trials::together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, std::vector<size_t>& refused,
+                          ALLSLCommentCode::Report* report)
     {
-        Verdict v;
-        v.outcome = Outcome::Capped;
-        if (mConversions <= ALLSLCommentCode::MAX_TRIALS)
+        while (group.size() > 1 && mConversions <= ALLSLCommentCode::MAX_TRIALS)
         {
-            v = trial({ unit }).front();
-        }
-        if (v.outcome == Outcome::Converted)
-        {
-            taken.emplace_back(unit, std::move(v.text));
-            if (report)
+            std::vector<ALLSLToSLua::Pass::Error> errors;
+            const std::vector<Verdict>            verdicts = trial(group, &errors);
+            if (!errors.empty())
             {
-                report->tried.push_back({ unit, v.outcome });
+                // Each place the parser refused, in the unit it is in, or the
+                // nearest before it: only what is tried next follows from it,
+                // since whatever is taken is taken from a trial that parsed.
+                // One refused inside, but for a name declared again, which
+                // another declaration may be (CC10), alone would be too: its
+                // code does not parse, or names what nothing declares.
+                std::vector<bool> out(group.size(), false);
+                for (const ALLSLToSLua::Pass::Error& error : errors)
+                {
+                    const Pos at    = { error.line + 1, error.column + 1 };
+                    size_t    which = 0;
+                    for (size_t i = 0; i < group.size(); ++i)
+                    {
+                        if (!(at < Pos{ group[i].line, group[i].column }))
+                        {
+                            which = i;
+                        }
+                    }
+                    out[which] = true;
+                    const bool inside = !(at < Pos{ group[which].line, group[which].column }) && at < this->at(group[which].end);
+                    if (inside && error.code != Tailslide::E_DUPLICATE_DECLARATION &&
+                        std::find(refused.begin(), refused.end(), group[which].first) == refused.end())
+                    {
+                        refused.push_back(group[which].first);
+                    }
+                }
+                std::vector<Unit> rest;
+                for (size_t i = 0; i < group.size(); ++i)
+                {
+                    if (!out[i])
+                    {
+                        rest.push_back(group[i]);
+                    }
+                }
+                group = std::move(rest);
+                continue;
+            }
+            // Where one changed another line, which one cannot be told: each
+            // half tried apart. Where none did, those with no code of their
+            // own are taken out, and the rest tried again.
+            if (std::any_of(verdicts.begin(), verdicts.end(), [](const Verdict& v) { return v.outcome == Outcome::Changes; }))
+            {
+                const auto half = group.begin() + static_cast<std::ptrdiff_t>(group.size() / 2);
+                together(std::vector<Unit>(group.begin(), half), taken, refused, report);
+                together(std::vector<Unit>(half, group.end()), taken, refused, report);
+                return;
+            }
+            if (!std::all_of(verdicts.begin(), verdicts.end(), [](const Verdict& v) { return v.outcome == Outcome::Converted; }))
+            {
+                std::vector<Unit> rest;
+                for (size_t i = 0; i < group.size(); ++i)
+                {
+                    if (verdicts[i].outcome == Outcome::Converted)
+                    {
+                        rest.push_back(group[i]);
+                    }
+                }
+                group = std::move(rest);
+                continue;
+            }
+            // Every one converts: all taken.
+            for (size_t i = 0; i < group.size(); ++i)
+            {
+                taken.emplace_back(group[i], verdicts[i].text);
+                if (report)
+                {
+                    report->tried.push_back({ group[i], Outcome::Converted });
+                }
             }
             return;
         }
-        // A run that is not code whole: split at its lines of words, each
-        // stretch between them tried whole; one of them that is not, a line
-        // at a time.
-        if (v.outcome != Outcome::Capped && unit.shape == Unit::Shape::Lines && unit.first < unit.last)
+    }
+
+    std::vector<Unit> Trials::pieces(const Unit& unit) const
+    {
+        if (unit.shape != Unit::Shape::Lines || unit.first == unit.last)
         {
-            std::vector<Unit> pieces = ALLSLComments::runOf(unit, mLsl, mComments, false);
-            if (pieces.size() == 1 && pieces.front().first == unit.first && pieces.front().last == unit.last)
-            {
-                pieces = ALLSLComments::runOf(unit, mLsl, mComments, true);
-            }
-            for (const Unit& piece : pieces)
-            {
-                settle(piece, taken, left, report);
-            }
-            return;
+            return {};
         }
-        ++left;
-        if (report)
+        // Split at its lines of words, each stretch between them whole; or
+        // where there are none, a line at a time.
+        std::vector<Unit> out = ALLSLComments::runOf(unit, mLsl, mComments, false);
+        if (out.size() == 1 && out.front().first == unit.first && out.front().last == unit.last)
         {
-            report->tried.push_back({ unit, v.outcome });
+            out = ALLSLComments::runOf(unit, mLsl, mComments, true);
         }
+        return out;
     }
 
     ALLSLToSLua::Result Trials::run(ALLSLCommentCode::Report* report)
@@ -469,11 +542,57 @@ namespace
         }
         mBaseLines = linesOf(mBase.text);
 
+        // In rounds: the units tried together, what was not taken tried
+        // alone, and the pieces of the runs that are not code whole the next
+        // round's units.
         std::vector<std::pair<Unit, std::string>> taken;
-        S32                                       left = 0;
-        for (const Unit& u : candidates)
+        S32                                       left  = 0;
+        std::vector<Unit>                         round = candidates;
+        while (!round.empty())
         {
-            settle(u, taken, left, report);
+            std::vector<size_t> refused;
+            const size_t        before = taken.size();
+            together(round, taken, refused, report);
+            std::vector<Unit> next;
+            for (const Unit& u : round)
+            {
+                if (std::any_of(taken.begin() + static_cast<std::ptrdiff_t>(before), taken.end(),
+                                [&u](const auto& t) { return t.first.first == u.first; }))
+                {
+                    continue;
+                }
+                Verdict v;
+                v.outcome = Outcome::Capped;
+                if (std::find(refused.begin(), refused.end(), u.first) != refused.end())
+                {
+                    v.outcome = Outcome::Refused;
+                }
+                else if (mConversions <= ALLSLCommentCode::MAX_TRIALS)
+                {
+                    v = trial({ u }).front();
+                }
+                if (v.outcome == Outcome::Converted)
+                {
+                    taken.emplace_back(u, std::move(v.text));
+                    if (report)
+                    {
+                        report->tried.push_back({ u, v.outcome });
+                    }
+                    continue;
+                }
+                const std::vector<Unit> split = v.outcome == Outcome::Capped ? std::vector<Unit>() : pieces(u);
+                if (!split.empty())
+                {
+                    next.insert(next.end(), split.begin(), split.end());
+                    continue;
+                }
+                ++left;
+                if (report)
+                {
+                    report->tried.push_back({ u, v.outcome });
+                }
+            }
+            round = std::move(next);
         }
 
         ALLSLToSLua::Pass last;
@@ -492,6 +611,8 @@ namespace
         if (report)
         {
             report->conversions = mConversions;
+            std::sort(report->tried.begin(), report->tried.end(),
+                      [](const ALLSLCommentCode::Tried& a, const ALLSLCommentCode::Tried& b) { return a.unit.begin < b.unit.begin; });
         }
         return r;
     }

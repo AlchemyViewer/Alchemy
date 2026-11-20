@@ -102,11 +102,13 @@ public:
     // and each line comment after code. Not a toggle's markers, a rule (a
     // comment beginning with a slash or a star), a comment whose code would
     // run past it once uncommented (an unclosed block, a string not closed
-    // on its line, a /* or */ inside), nor one that cannot be code
-    // (mayBeCode). A run is one unit; runOf splits it.
+    // on its line, a /* or */ inside), nor one that cannot be code: with no
+    // line that may be (mayBeCode), or nothing that ends code (endsCode). A
+    // run is one unit; runOf splits it.
     static std::vector<Unit> units(std::string_view source, const std::vector<Comment>& comments);
     // A run split at its lines that cannot be code, each stretch between
-    // them a unit; or each of its lines that may be, one a unit.
+    // them a unit; or each of its lines that may be, one a unit. Each that
+    // ends code.
     static std::vector<Unit> runOf(const Unit& run, std::string_view source, const std::vector<Comment>& comments, bool lines);
 
     // What a comment holds, past its markers: a line comment's text after
@@ -115,6 +117,9 @@ public:
     // Whether text may be LSL code: it has a ;, a brace or a bracket a call
     // opens. Words alone are prose.
     static bool mayBeCode(std::string_view text);
+    // Whether text may be whole LSL code: every statement, declaration,
+    // function, handler and state ends with a ; or a }.
+    static bool endsCode(std::string_view text);
     // The source with the unit's markers blanked to spaces, so that what
     // they held is code where it stands, every line and column where it was.
     static std::string uncommented(std::string_view source, const std::vector<Comment>& comments, const Unit& unit);
