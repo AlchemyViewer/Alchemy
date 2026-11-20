@@ -1509,6 +1509,20 @@ void ALFloaterScriptStudio::askLinkUnsaved(const Doc& doc, const std::string& pa
     });
 }
 
+void ALFloaterScriptStudio::askTakeWorldUnsaved(const Doc& doc, const std::string& name, std::function<void()> yes)
+{
+    LLSD question;
+    question["NAME"]                 = name;
+    question["FILE"]                 = doc.file;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioTakeWorldUnsaved", question, LLSD(), [handle, yes](const LLSD& notification, const LLSD& response) {
+        if (handle.get() && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+        {
+            yes();
+        }
+    });
+}
+
 void ALFloaterScriptStudio::editMasterFile(const std::string& path, bool lua)
 {
     // Its tab, here or in the window that has it, given to the editor from

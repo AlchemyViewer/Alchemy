@@ -95,6 +95,10 @@ public:
         // A tab with unsaved changes about to be linked to a file, asked what
         // becomes of them, the file named.
         virtual void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(Unsaved answer)> answered) = 0;
+        // A file's tab with unsaved changes about to take what a script it
+        // masters holds in-world, written to the file (Update File): asked
+        // first, the script named.
+        virtual void askTakeWorldUnsaved(const Doc& doc, const std::string& name, std::function<void()> yes) = 0;
         // A file's tab opened, or brought forward, and given to the editor
         // outside the viewer where it is on disk, as Edit Externally on it is.
         virtual void editMasterFile(const std::string& path, bool lua) = 0;
@@ -136,6 +140,11 @@ public:
         // masters sent as its save sends it.
         virtual void send(const ALScriptRef& ref, ALMasterPlan::Send kind) = 0;
         virtual void wrote(const std::string& path)                         = 0;
+        // The file written with what `from` holds in-world (Update File):
+        // that script left as it is, in step with the file, and the file's
+        // other scripts, and those including it, sent as any write of it
+        // sends them.
+        virtual void tookWorld(const std::string& path, const ALScriptRef& from) = 0;
         // What came of each send, or of the world heard changing under a
         // link; the links changing; and what was said with no window to
         // hear it, given once.
@@ -234,9 +243,12 @@ private:
     // and its master on disk beside what was typed in the item's.
     void compareWithWorld(Doc& doc, const ALScriptRef& ref);
     void compareWithFile(Doc& doc, const ALScriptRef& ref);
-    // The world's text of a script put in its master's tab, as one step to
-    // undo, for a save of the file to write.
+    // The world's text of a script written to its master on disk and put in
+    // the master's tab, as one step to undo, nothing sent to the script;
+    // a tab with unsaved changes asked about first (Update File).
     void takeWorld(Doc& doc, const ALScriptRef& ref);
+    // What the world holds written to the file and put in its tab.
+    void writeWorld(Doc& tab, const ALScriptRef& ref, const std::string& theirs, const std::string& name);
     // The world's text of a script, out of its envelope, given to `then`
     // with the master's tab where both are still there; a read that failed
     // said on the tab.

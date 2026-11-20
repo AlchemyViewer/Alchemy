@@ -291,6 +291,36 @@ void ALScriptDiskMasters::wrote(const std::string& path)
     mFanOut->changed({ file }, { file });
 }
 
+void ALScriptDiskMasters::tookWorld(const std::string& path, const ALScriptRef& from)
+{
+    ALMasterIndex* index = links();
+    if (!index)
+    {
+        return;
+    }
+    const std::string file = canonical(path);
+    if (mWatch)
+    {
+        mWatch->seen(file);
+    }
+    if (std::optional<ALMasterLink> link = index->linkOf(from.object, from.item); link && link->master == file)
+    {
+        // The file as the world has it: the link starts from it, as from a
+        // send of it, so that nothing marks the file as changed since.
+        link->stamp = ALFileStamp::of(file).time;
+        link->state = ALMasterLink::State::Active;
+        index->link(std::move(*link));
+    }
+    for (const ALMasterLink& one : mastering(file))
+    {
+        if (one.object != from.object || one.item != from.item)
+        {
+            send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Direct);
+        }
+    }
+    mFanOut->changed({ file }, { file });
+}
+
 void ALScriptDiskMasters::released(const std::vector<std::string>& masters, const std::vector<std::string>& includes)
 {
     // Saved outside, the burst over: a master's scripts sent as its save,

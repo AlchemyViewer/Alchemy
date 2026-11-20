@@ -43,6 +43,7 @@ public:
     void                                             unlink(const ALScriptRef& ref) override;
     void                                             send(const ALScriptRef& ref, ALMasterPlan::Send kind) override;
     void                                             wrote(const std::string& path) override;
+    void                                             tookWorld(const std::string& path, const ALScriptRef& from) override;
     boost::signals2::connection                      onOutcome(std::function<void(const Outcome& outcome)> heard) override;
     boost::signals2::connection                      onChanged(std::function<void()> changed) override;
     std::vector<Outcome>                             takeUnheard() override;

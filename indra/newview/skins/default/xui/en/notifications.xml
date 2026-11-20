@@ -2213,6 +2213,18 @@ Stop [COUNT] scripts? They stay stopped until you start them again.
 
   <notification
    icon="alertmodal.tga"
+   name="ScriptStudioTakeWorldUnsaved"
+   type="alertmodal">
+[FILE] has changes that are not saved. Update File writes what &quot;[NAME]&quot; holds in-world to the file, replacing everything in it. Undo in the file's tab brings your changes back, unsaved.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Update File"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="DeleteNotecard"
    type="alertmodal">
    <unique/>
