@@ -909,6 +909,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>ALScriptDefinitionsFolder</key>
+        <map>
+            <key>Comment</key>
+            <string>A folder of language definitions for Script Studio, newer than the region's: each file in it -- secondlife.d.luau, secondlife.docs.json, builtins.txt, lsl_keywords.xml, lua_keywords.xml -- is read in place of the region's of the same name, for the editor's checks, hovers, completions and colours. The region compiles with its own whatever this says. Empty: the region's alone.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
+        </map>
         <key>ALScriptStudioVimClipboard</key>
         <map>
             <key>Comment</key>

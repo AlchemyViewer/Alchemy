@@ -168,6 +168,8 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("add_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onAddIncludeFolder(); });
     getChild<LLButton>("remove_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemoveIncludeFolder(); });
     getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
+    getChild<LLButton>("definitions_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseDefinitions(); });
+    getChild<LLButton>("definitions_clear")->setCommitCallback([](LLUICtrl*, const LLSD&) { gSavedSettings.setString("ALScriptDefinitionsFolder", std::string()); });
     mVimrcNotecard = getChild<LLLineEditor>("vimrc_notecard");
     getChild<LLButton>("vimrc_edit")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALScriptStudio::openVimrc(); });
     getChild<LLButton>("vimrc_clear")->setCommitCallback(
@@ -1004,6 +1006,20 @@ void ALFloaterScriptPreferences::onBrowseExternalEditor()
             gSavedSettings.setString("ExternalEditor", "\"" + files.front() + "\" \"%s\"");
         },
         LLFilePicker::FFLOAD_EXE, false);
+}
+
+void ALFloaterScriptPreferences::onBrowseDefinitions()
+{
+    const std::string now = gSavedSettings.getString("ALScriptDefinitionsFolder");
+    (new LLDirPickerThread(
+         [](const std::vector<std::string>& folders, std::string) {
+             if (!folders.empty())
+             {
+                 gSavedSettings.setString("ALScriptDefinitionsFolder", folders.front());
+             }
+         },
+         now))
+        ->getFile();
 }
 
 void ALFloaterScriptPreferences::refreshTemplates()

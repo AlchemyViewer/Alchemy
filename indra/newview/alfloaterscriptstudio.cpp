@@ -170,7 +170,7 @@ namespace
         {
             return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
         }
-        std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getSyntaxID().asString(); }
+        std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getDefinitionsVersion(); }
         // The region's, where it delivered them, as the keywords are; else
         // those shipped.
         std::string definitionsYaml() override { return LLSyntaxDefCache::instance().loadCacheFile("lsl_definitions.yaml"); }
