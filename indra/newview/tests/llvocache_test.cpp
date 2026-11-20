@@ -808,6 +808,23 @@ namespace
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
     }
 
+    TEST_CASE("LLVOCacheEntry: an entry killed for an update keeps its object's overrides and one killed as gone takes them", "[LLVOCache]")
+    {
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1].mLocalId = 1;
+
+        UNSCOPED_INFO("the object stays in the world, made from the region's update");
+        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/true, overrides));
+        CHECK(overrides.count(1) == 1u);
+
+        UNSCOPED_INFO("the object is gone");
+        CHECK(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
+        CHECK(overrides.empty());
+
+        UNSCOPED_INFO("a local ID with none has none to take");
+        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
+    }
+
     // Removing a region's entry lets go of its objects in memory, and an
     // object update that finds the cache bogus is read from one of them.
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: a removal asked for waits for the removals asked for to be carried out", "[LLVOCache]")

@@ -286,6 +286,12 @@ bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, voc
     return overrides.erase(local_id) > 0;
 }
 
+// static
+bool LLVOCacheEntry::killEntryOverrides(U32 local_id, bool object_stays, vocache_gltf_overrides_map_t& overrides)
+{
+    return !object_stays && overrides.erase(local_id) > 0;
+}
+
 LLVOCacheEntry* LLVOCacheEntry::leaveParent(const vocache_entry_map_t& entries)
 {
     if (!mParentID)

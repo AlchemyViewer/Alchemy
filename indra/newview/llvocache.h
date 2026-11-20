@@ -267,6 +267,11 @@ public:
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
 
+    // What a kill of an entry takes of its object's glTF overrides: none where the object stays in the world, its entry
+    // killed so that it is made from the region's update, since the region sends them only with the object's full
+    // update; all where the object is gone. True where it took any.
+    static bool killEntryOverrides(U32 local_id, bool object_stays, vocache_gltf_overrides_map_t& overrides);
+
     // Takes this entry off the entry of the parent it names in `entries`, where that entry holds its children: a
     // valid one, or one invalid for a refused update (wasRefused), which keeps them for the object the region's update
     // makes. Returns that entry, null where there is none, this entry then naming its parent still: a killed entry

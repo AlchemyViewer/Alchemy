@@ -1244,10 +1244,18 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
             child = entry->getChild();
         }
     }
-    // Kill the assocaited overrides
-    if (mImpl->mGLTFOverridesLLSD.erase(entry->getLocalID()))
+    // An entry killed for rendering is the cached copy of an object that stays in the world, made from the region's
+    // update: it keeps the object's overrides, which the region sends only with the object's full update and which a
+    // face whose material is still fetching has yet to take. An entry killed because its object is gone takes them.
+    const U32 local_id = entry->getLocalID();
+    if (LLVOCacheEntry::killEntryOverrides(local_id, /*object_stays=*/for_rendering, mImpl->mGLTFOverridesLLSD))
     {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " go with its entry" << LL_ENDL;
         mGLTFOverridesDirty = true;
+    }
+    else if (for_rendering && mImpl->mGLTFOverridesLLSD.count(local_id))
+    {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " kept as its entry leaves for an update" << LL_ENDL;
     }
     //will remove it from the object cache, real deletion
     entry->setState(LLVOCacheEntry::INACTIVE);
