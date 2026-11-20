@@ -5440,7 +5440,11 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         {
             as_made = tokens;
         }
-        gathered.gather(tokens, std::string());
+        // A script with a require of its own calls that, not modules.
+        if (!bindsRequire(source))
+        {
+            gathered.gather(tokens, std::string());
+        }
         gathered.noteUnread();
         if (options.apart && !gathered.apart().empty())
         {
@@ -5854,11 +5858,70 @@ std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view tex
 }
 
 // static
+namespace
+{
+    // Whether the tokens bind `require` (ALPreprocessor::bindsRequire).
+    bool bindsRequireIn(const std::vector<ALPreprocessor::Token>& tokens)
+    {
+        typedef ALPreprocessor::Token::Kind Kind;
+        std::vector<const ALPreprocessor::Token*> code;
+        code.reserve(tokens.size());
+        for (const ALPreprocessor::Token& token : tokens)
+        {
+            if (token.kind != Kind::Space && token.kind != Kind::Newline && token.kind != Kind::Comment)
+            {
+                code.push_back(&token);
+            }
+        }
+        const auto is = [&code](size_t i, Kind kind, std::string_view word) {
+            return i < code.size() && code[i]->kind == kind && code[i]->text == word;
+        };
+        for (size_t i = 0; i < code.size(); ++i)
+        {
+            if (!is(i, Kind::Ident, "require") || (i > 0 && (is(i - 1, Kind::Punct, ".") || is(i - 1, Kind::Punct, ":"))))
+            {
+                continue;
+            }
+            // `function require`, `local function require`, `local require`,
+            // and `require = ...` where it stands alone as what is assigned.
+            if (i > 0 && (is(i - 1, Kind::Ident, "function") || is(i - 1, Kind::Ident, "local")))
+            {
+                return true;
+            }
+            if (is(i + 1, Kind::Punct, "="))
+            {
+                return true;
+            }
+            // `local a, b, require`: back over the names and commas to `local`.
+            size_t at = i;
+            while (at >= 2 && is(at - 1, Kind::Punct, ",") && code[at - 2]->kind == Kind::Ident)
+            {
+                at -= 2;
+            }
+            if (at != i && at > 0 && is(at - 1, Kind::Ident, "local"))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+}
+
+// static
+bool ALPreprocessor::bindsRequire(std::string_view text)
+{
+    return bindsRequireIn(tokenize(text, true));
+}
+
 std::vector<ALPreprocessor::Required> ALPreprocessor::requiresIn(std::string_view text)
 {
     // The shape Requires::gather takes: the word, `(`, a quoted string and
     // `)`, blanks and comments between them, and no `.` or `:` before it.
     const std::vector<Token> tokens = tokenize(text, true);
+    if (bindsRequireIn(tokens))
+    {
+        return {};
+    }
     const auto blank = [&tokens](size_t i) {
         const Token::Kind kind = tokens[i].kind;
         return kind == Token::Kind::Space || kind == Token::Kind::Newline || kind == Token::Kind::Comment;

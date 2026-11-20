@@ -2154,6 +2154,23 @@ namespace
         CHECK(P::wanted("local m = t.require(\"./lib\")\n", true, false) == P::Wanted::No);
         CHECK(P::wanted("-- require(\"./lib\")\n", true, false) == P::Wanted::No);
         CHECK(P::wanted("default { state_entry() { require(\"lib\"); } }\n", false, false) == P::Wanted::No);
+        {
+            INFO("a script binding require itself calls its own: no reason, and nothing counted");
+            for (const char* own : { "local function require(name) return name end\nprint(require(\"./lib\"))\n",
+                                     "local require = function(n) return n end\nprint(require(\"./lib\"))\n",
+                                     "local a, require = 1, print\nrequire(\"./lib\")\n",
+                                     "function require(n) return n end\nrequire(\"./lib\")\n",
+                                     "require = print\nrequire(\"./lib\")\n" })
+            {
+                CAPTURE(own);
+                CHECK(P::bindsRequire(own));
+                CHECK(P::requiresIn(own).empty());
+                CHECK(P::wanted(own, true, false) == P::Wanted::No);
+            }
+            UNSCOPED_INFO("a field named require, or a comparison, binds nothing");
+            CHECK_FALSE(P::bindsRequire("local t = {}\nt.require = 1\nlocal m = require(\"./lib\")\n"));
+            CHECK_FALSE(P::bindsRequire("if require == nil then end\nlocal m = require(\"./lib\")\n"));
+        }
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require only the old search found is said with a fix each way", "[alpreprocessor]")
@@ -2203,6 +2220,29 @@ namespace
         CHECK(r.problems[1].key == std::string("PreprocModuleNotFound"));
         UNSCOPED_INFO("with no fix");
         REQUIRE(r.problems[1].fixes.empty());
+    }
+
+    // QK4's review: a script with its own require calls that, and a run leaves its calls be.
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a script's own require is left as its calls", "[alpreprocessor]")
+    {
+        ALPreprocessor::Options o = options(true);
+        S32                     asked = 0;
+        o.resolve                 = [&asked](const ALPreprocessor::Ask&, ALPreprocessor::Include& out) {
+            ++asked;
+            out.text = "return 1\n";
+            out.name = "lib.luau";
+            out.path = "disk:/proj/lib.luau";
+            return ALPreprocessor::Found::Yes;
+        };
+        const ALPreprocessor::Result own = ALPreprocessor::run("local function require(name) return name end\nprint(require(\"./lib\"))\n", o);
+        UNSCOPED_INFO("nothing resolved or gathered: " << own.text);
+        CHECK(asked == 0);
+        CHECK(own.text.find("require(\"./lib\")") != std::string::npos);
+        CHECK(own.text.find("dangerouslyexecuterequiredmodule") == std::string::npos);
+        const ALPreprocessor::Result modules = ALPreprocessor::run("print(require(\"./lib\"))\n", o);
+        UNSCOPED_INFO("the global's still gathered: " << modules.text);
+        CHECK(asked == 1);
+        CHECK(modules.text.find("require(1)") != std::string::npos);
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require of a file beside a same-named folder init warns naming both", "[alpreprocessor]")
