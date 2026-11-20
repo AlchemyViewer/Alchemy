@@ -76,6 +76,11 @@ public:
     // like. `requested` is a target somebody asked for, which an LSL script
     // asked to run on Luau turns into the LSL-on-Luau target.
     static ALScriptLanguage resolve(const LLInventoryItem* item, std::string_view content, const std::string& requested = std::string());
+    // The target a script of the language compiles for, said by the region
+    // to compile for `said`: SLua runs on Luau alone, so a script that did
+    // not compile, said to run on no VM -- which reads as LSO -- or said
+    // to run on another, compiles for Luau still. LSL's is the region's.
+    static std::string targetFor(bool lua, const std::string& said) { return lua ? std::string("luau") : said; }
     // No `default` state anywhere means Lua: the same guess the legacy
     // editor made.
     static bool looksLikeLua(std::string_view content);

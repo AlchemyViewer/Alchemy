@@ -8107,9 +8107,12 @@ void ALFloaterScriptStudio::heardRunning(Doc& doc, const ALScriptRunningState& s
 {
     // What it compiles for, as the region knows it, but for one picked
     // here and not saved yet, which is what the next save sends; for a
-    // file standing in, of the file's language only.
+    // file standing in, of the file's language only. SLua compiles only for
+    // Luau: a script that did not compile is said to run on no VM, which
+    // reads as LSO, and is not taken for one (ALScriptWorkspace::targetFor).
     if (!state.compileTarget.empty() && !doc.targetChosen && state.compileTarget != doc.language.compileTarget &&
-        (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua))
+        (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua) &&
+        ALScriptWorkspace::targetFor(doc.language.lua, state.compileTarget) == state.compileTarget)
     {
         doc.language.compileTarget = state.compileTarget;
         targetChanged(doc);
