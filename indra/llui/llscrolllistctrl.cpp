@@ -1749,7 +1749,9 @@ void LLScrollListCtrl::drawItems()
 
             if( mScrollLines <= line && line < mScrollLines + num_page_lines )
             {
-                fg_color = (item->getEnabled() ? mFgUnselectedColor.get() : mFgDisabledColor.get());
+                // A disabled list shows every row disabled, whatever the row's own state.
+                const bool row_enabled = mCanSelect && item->getEnabled();
+                fg_color = (row_enabled ? mFgUnselectedColor.get() : mFgDisabledColor.get());
                 if( item->getSelected() && mCanSelect)
                 {
                     if(item->getHighlighted())  // if it's highlighted, average the colors
@@ -1761,7 +1763,7 @@ void LLScrollListCtrl::drawItems()
                         select_color = mBgSelectedColor.get();
                     }
 
-                    fg_color = (item->getEnabled() ? mFgSelectedColor.get() : mFgDisabledColor.get());
+                    fg_color = (row_enabled ? mFgSelectedColor.get() : mFgDisabledColor.get());
                 }
                 if (mHighlightedItem == line && mCanSelect)
                 {
@@ -1786,7 +1788,7 @@ void LLScrollListCtrl::drawItems()
                     }
                 }
 
-                if (!item->getEnabled())
+                if (!row_enabled)
                 {
                     hover_color = mBgReadOnlyColor.get();
                 }
@@ -1842,15 +1844,9 @@ void LLScrollListCtrl::setEnabled(bool enabled)
     setTabStop(enabled);
     mScrollbar->setTabStop(!enabled && mScrollbar->getPageSize() < mScrollbar->getDocSize());
 
-    // when the table is disabled also disable its items
-    for (LLScrollListItem* item : mItemList)
-    {
-        item->setEnabled(enabled);
-        if (!enabled)
-        {
-            item->setSelected(false);
-        }
-    }
+    // The rows keep their own enabled state and the selection: a disabled list
+    // draws every row disabled and takes no clicks on them (draw(),
+    // handleClick()), and switching it back on restores both as they were.
 }
 
 bool LLScrollListCtrl::handleScrollWheel(S32 x, S32 y, LLScrollDelta delta)
@@ -2259,8 +2255,9 @@ bool LLScrollListCtrl::handleClick(S32 x, S32 y, MASK mask)
     LLScrollListCell* hit_cell = hit_item->getColumn(column_index);
     if (!hit_cell) return false;
 
-    // if cell handled click directly (i.e. clicked on an embedded checkbox)
-    if (hit_cell->handleClick())
+    // if cell handled click directly (i.e. clicked on an embedded checkbox);
+    // a disabled list's cells are not edited
+    if (mCanSelect && hit_cell->handleClick())
     {
         // if item not currently selected, select it
         if (!hit_item->getSelected())
@@ -2646,6 +2643,12 @@ bool LLScrollListCtrl::handleKeyHere(KEY key,MASK mask )
 bool LLScrollListCtrl::handleUnicodeCharHere(llwchar uni_char)
 {
     if ((uni_char < 0x20) || (uni_char == 0x7F)) // Control character or DEL
+    {
+        return false;
+    }
+
+    // a disabled list's selection is not moved by typing, as by keys or clicks
+    if (!mCanSelect)
     {
         return false;
     }

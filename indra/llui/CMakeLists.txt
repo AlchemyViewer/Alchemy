@@ -700,6 +700,7 @@ if(AL_BUILD_TESTS)
       tests/lllayoutstack_test.cpp
       tests/llradiogroup_test.cpp
       tests/llresizebar_test.cpp
+      tests/llscrolllistctrl_test.cpp
       tests/llspinctrl_test.cpp
       tests/llstatbar_test.cpp
       tests/lltabcontainer_test.cpp
