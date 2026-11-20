@@ -109,6 +109,9 @@ namespace
     private:
         // The script converted with the units uncommented, each one's verdict.
         std::vector<Verdict> trial(const std::vector<Unit>& units);
+        // A unit tried, and where it is not code, its pieces; what is taken,
+        // and how many are left.
+        void settle(const Unit& unit, std::vector<std::pair<Unit, std::string>>& taken, S32& left, ALLSLCommentCode::Report* report);
         // The SLua a unit's code is written as where it stood, from the
         // trial's lines that are its own, commented as the unit was; nothing
         // where it cannot stand there.
@@ -381,6 +384,46 @@ namespace
         return joined(out);
     }
 
+    void Trials::settle(const Unit& unit, std::vector<std::pair<Unit, std::string>>& taken, S32& left, ALLSLCommentCode::Report* report)
+    {
+        Verdict v;
+        v.outcome = Outcome::Capped;
+        if (mConversions <= ALLSLCommentCode::MAX_TRIALS)
+        {
+            v = trial({ unit }).front();
+        }
+        if (v.outcome == Outcome::Converted)
+        {
+            taken.emplace_back(unit, std::move(v.text));
+            if (report)
+            {
+                report->tried.push_back({ unit, v.outcome });
+            }
+            return;
+        }
+        // A run that is not code whole: split at its lines of words, each
+        // stretch between them tried whole; one of them that is not, a line
+        // at a time.
+        if (v.outcome != Outcome::Capped && unit.shape == Unit::Shape::Lines && unit.first < unit.last)
+        {
+            std::vector<Unit> pieces = ALLSLComments::runOf(unit, mLsl, mComments, false);
+            if (pieces.size() == 1 && pieces.front().first == unit.first && pieces.front().last == unit.last)
+            {
+                pieces = ALLSLComments::runOf(unit, mLsl, mComments, true);
+            }
+            for (const Unit& piece : pieces)
+            {
+                settle(piece, taken, left, report);
+            }
+            return;
+        }
+        ++left;
+        if (report)
+        {
+            report->tried.push_back({ unit, v.outcome });
+        }
+    }
+
     ALLSLToSLua::Result Trials::run(ALLSLCommentCode::Report* report)
     {
         ALLSLToSLua::Pass plain;
@@ -430,24 +473,7 @@ namespace
         S32                                       left = 0;
         for (const Unit& u : candidates)
         {
-            Verdict v;
-            v.outcome = Outcome::Capped;
-            if (mConversions <= ALLSLCommentCode::MAX_TRIALS)
-            {
-                v = trial({ u }).front();
-            }
-            if (v.outcome == Outcome::Converted)
-            {
-                taken.emplace_back(u, std::move(v.text));
-            }
-            else
-            {
-                ++left;
-            }
-            if (report)
-            {
-                report->tried.push_back({ u, v.outcome });
-            }
+            settle(u, taken, left, report);
         }
 
         ALLSLToSLua::Pass last;

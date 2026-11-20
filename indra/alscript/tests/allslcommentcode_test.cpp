@@ -187,18 +187,20 @@ namespace
         UNSCOPED_INFO("the plain conversion, byte for byte");
         CHECK(r.text == plain(lsl).text);
         CHECK(r.commentsConverted == 0);
-        CHECK(r.commentsLeft == 6);
-        REQUIRE(report.tried.size() == 6);
-        UNSCOPED_INFO("the prose not tried: what was, and why each was left");
+        CHECK(r.commentsLeft == 7);
+        REQUIRE(report.tried.size() == 7);
+        UNSCOPED_INFO("what was tried, a run line by line once whole it was not, and why each was left");
         CHECK(report.tried[0].unit.line == 3);
         CHECK(report.tried[0].outcome == ALLSLCommentCode::Outcome::Refused);
         CHECK(report.tried[1].unit.line == 6);
-        CHECK(report.tried[1].unit.endLine == 7);
+        CHECK(report.tried[1].unit.endLine == 6);
         CHECK(report.tried[1].outcome == ALLSLCommentCode::Outcome::Refused);
+        CHECK(report.tried[2].unit.line == 7);
         CHECK(report.tried[2].outcome == ALLSLCommentCode::Outcome::Refused);
         CHECK(report.tried[3].outcome == ALLSLCommentCode::Outcome::Refused);
         CHECK(report.tried[4].outcome == ALLSLCommentCode::Outcome::Refused);
-        CHECK(report.tried[5].outcome == ALLSLCommentCode::Outcome::NoStatement);
+        CHECK(report.tried[5].outcome == ALLSLCommentCode::Outcome::Refused);
+        CHECK(report.tried[6].outcome == ALLSLCommentCode::Outcome::NoStatement);
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a unit's lines: several for one; left where it would change another line",
@@ -284,6 +286,37 @@ namespace
         CAPTURE(on);
         CHECK(on.find("---[[\nif gCount > 2 then\n    ll.Say(0, \"off\")\nend\n--]]\n") != std::string::npos);
         require_checks_clean(on);
+    }
+
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a run of prose and code: its code converted, its prose kept",
+                     "[ALLSLCommentCode]")
+    {
+        const std::string lsl = "key gOwner;\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        gOwner = llGetOwner();\n"
+                                "        // old way:\n"                                  // words, kept
+                                "        // llSay(0, \"x\");\n"                         // converted
+                                "        llOwnerSay((string)gOwner);\n"
+                                "        //list l = llCSV2List(\"a,b\"); llSay(0, llList2String(l, 0));\n"
+                                "        //gOwner = \"abc\";\n"                         // a line at a time: the key made text
+                                "\n"
+                                "        //if (gOwner) llSay(0, \"a\");\n"              // whole, its else a line of words
+                                "        //else\n"
+                                "        //    llSay(0, \"b\");\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLCommentCode::Report  report;
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CAPTURE(r.text);
+        UNSCOPED_INFO("the words kept over the code converted");
+        CHECK(has(r, "\n-- old way:\n-- ll.Say(0, \"x\")\nprint(tostring(gOwner))\n"));
+        UNSCOPED_INFO("a line converted where the run with the next was not");
+        CHECK(has(r, "\n--local l = ll.CSV2List(\"a,b\")\n--ll.Say(0, l[1] or \"\")\n--gOwner = \"abc\";\n"));
+        UNSCOPED_INFO("a run whole where it is code whole");
+        CHECK(has(r, "\n\n--if gOwner.istruthy then\n--    ll.Say(0, \"a\")\n--else\n--    ll.Say(0, \"b\")\n--end\n"));
+        CHECK(r.commentsConverted == 3);
+        CHECK(r.commentsLeft == 1);
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: nothing noted of commented code; the live code's notes said still",
