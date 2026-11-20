@@ -4612,6 +4612,34 @@ namespace
         S32              line = 0;
     };
 
+    // Where a `local` statement's values end, from the word after its `=`:
+    // the first `;`, or the first word on a later line, outside brackets
+    // and blocks -- the next statement's, from which what it declares is in
+    // scope. `isExpression` tells an `if` that closes no block.
+    template <typename IsExpression>
+    size_t statementEnd(const std::vector<ScopeWord>& words, size_t from, IsExpression isExpression)
+    {
+        S32 depth = 0;
+        for (size_t k = from; k < words.size(); ++k)
+        {
+            const std::string_view t = words[k].text;
+            if (depth == 0 && k > from && (t == ";" || words[k].line > words[k - 1].line))
+            {
+                return k;
+            }
+            if (t == "(" || t == "[" || t == "{" || (words[k].ident && (t == "function" || t == "do" || t == "repeat")) ||
+                (words[k].ident && t == "if" && !isExpression(k)))
+            {
+                ++depth;
+            }
+            else if (t == ")" || t == "]" || t == "}" || (words[k].ident && (t == "end" || t == "until")))
+            {
+                depth = std::max(0, depth - 1);
+            }
+        }
+        return words.size();
+    }
+
     std::vector<bool> ownRequires(const std::vector<ScopeWord>& words)
     {
         const size_t      n = words.size();
@@ -4619,8 +4647,8 @@ namespace
         const auto is    = [&](size_t i, std::string_view t) { return i < n && words[i].text == t; };
         const auto ident = [&](size_t i) { return i < n && words[i].ident; };
         const auto named = [&](size_t i) { return ident(i) && words[i].text == "require" && !(i > 0 && (is(i - 1, ".") || is(i - 1, ":"))); };
-        // A block, and the line after which `require` is its own in it:
-        // none, or every line for a parameter or a loop's variable.
+        // A block, and the word after which `require` is its own in it:
+        // none, or every word for a parameter or a loop's variable.
         enum class Opened : U8
         {
             Chunk,
@@ -4629,18 +4657,20 @@ namespace
             If,
             Repeat
         };
+        typedef std::ptrdiff_t Place;
+        constexpr Place        NEVER  = std::numeric_limits<Place>::max();
+        constexpr Place        ALWAYS = -1;
         struct Scope
         {
             Opened opened;
-            S32    after = std::numeric_limits<S32>::max();
+            Place  after = NEVER;
         };
-        constexpr S32      ALWAYS = std::numeric_limits<S32>::min();
         std::vector<Scope> scopes{ { Opened::Chunk } };
         bool               global    = false;
         bool               loopBinds = false;
         size_t             exprIfs   = 0;
-        const auto inScope = [&](S32 line) {
-            return std::any_of(scopes.begin(), scopes.end(), [line](const Scope& scope) { return line > scope.after; });
+        const auto inScope = [&](size_t i) {
+            return std::any_of(scopes.begin(), scopes.end(), [i](const Scope& scope) { return static_cast<Place>(i) > scope.after; });
         };
         // An `if` where an expression goes, Luau's, which no `end` closes.
         constexpr std::string_view EXPRESSION_BEFORE[] = { "=", "(", "[", ",", "{", "return", "and", "or", "not", "..", "+", "-", "*", "/",
@@ -4764,7 +4794,8 @@ namespace
                 {
                     if (i > 0 && is(i - 1, "local"))
                     {
-                        scopes.back().after = std::min(scopes.back().after, words[i].line - 1);
+                        // In scope in its own body too.
+                        scopes.back().after = std::min(scopes.back().after, static_cast<Place>(i));
                     }
                     else
                     {
@@ -4807,9 +4838,10 @@ namespace
                                    !(is(j + 2, "(") || is(j + 2, ".") || is(j + 2, ":") || is(j + 2, "[") || (j + 2 < n && !words[j + 2].ident && words[j + 2].text.size() > 1 && (words[j + 2].text.front() == '"' || words[j + 2].text.front() == '\'')));
                 if (binds && !alias)
                 {
-                    // Its own from the next line: what it is set to reads
-                    // the global still.
-                    scopes.back().after = std::min(scopes.back().after, words[i].line);
+                    // Its own from the next statement, on its line or a
+                    // later one: what it is set to reads the global still.
+                    const size_t next = is(j, "=") ? statementEnd(words, j + 1, expression) : j;
+                    scopes.back().after = std::min(scopes.back().after, static_cast<Place>(next) - 1);
                 }
                 i = j - 1;
             }
@@ -4835,7 +4867,7 @@ namespace
             }
             else if (t == "do")
             {
-                scopes.push_back({ Opened::Block, loopBinds ? ALWAYS : std::numeric_limits<S32>::max() });
+                scopes.push_back({ Opened::Block, loopBinds ? ALWAYS : NEVER });
                 loopBinds = false;
             }
             else if (t == "if")
@@ -4858,7 +4890,7 @@ namespace
                 else if (scopes.back().opened == Opened::If)
                 {
                     // What one branch bound is not the next one's.
-                    scopes.back().after = std::numeric_limits<S32>::max();
+                    scopes.back().after = NEVER;
                 }
             }
             else if (t == "repeat")
@@ -4874,7 +4906,7 @@ namespace
             }
             else if (named(i))
             {
-                own[i] = inScope(words[i].line);
+                own[i] = inScope(i);
                 // `require = ...`, and `a, require = ...`, of no local in
                 // scope: the global's, from whenever it runs.
                 if (!own[i] && is(i + 1, "="))

@@ -2158,6 +2158,7 @@ namespace
             INFO("a require the script binds itself is its own: no reason, and nothing counted");
             for (const char* own : { "local function require(name) return name end\nprint(require(\"./lib\"))\n",
                                      "local require = function(n) return n end\nprint(require(\"./lib\"))\n",
+                                     "local require = function(name) return name end; print(require(\"./lib\"))\n",
                                      "local a, require = 1, print\nrequire(\"./lib\")\n",
                                      "local function use(require)\n    return require(\"./lib\")\nend\nprint(use(function(name) return name end))\n",
                                      "for _, require in ipairs({}) do\n    require(\"./lib\")\nend\n",
@@ -2189,6 +2190,11 @@ namespace
         CHECK(counted("if c then\n    local require = f\n    require(\"./a\")\nelse\n    require(\"./b\")\nend\n") == Names{ "./b" });
         UNSCOPED_INFO("what a local is set to reads the global still");
         CHECK(counted("local require = wrap(require(\"./lib\"))\nrequire(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("a local is its own from the next statement on its line too");
+        CHECK(counted("local require = function(name) return name end; print(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = wrap(require(\"./lib\")); require(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("and not inside a function it is set to, over several lines");
+        CHECK(counted("local require = function(n)\n    return require(\"./inner\")\nend\nrequire(\"./a\")\n") == Names{ "./inner" });
         UNSCOPED_INFO("the global kept by its name is the global");
         CHECK(counted("local require = require\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
         UNSCOPED_INFO("an if-expression closes no block");
