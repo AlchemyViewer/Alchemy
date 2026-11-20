@@ -372,6 +372,9 @@ private:
     // script is now, and the source shown in its place.
     void                      dropExpanded(Doc& doc) override;
     void                      toggleExpanded();
+    // Whether the tab has no expansion until asked for one, and can have
+    // one: a file of a script (QK6).
+    static bool               expandsOnAsking(const Doc& doc);
     // A view of the tab put in front, and the pane, the bars and the
     // toolbar shown as it now is; the keyboard with it where asked, or
     // where the view it replaces had it.

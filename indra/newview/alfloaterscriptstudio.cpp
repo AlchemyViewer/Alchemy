@@ -2831,8 +2831,17 @@ void ALFloaterScriptStudio::dropExpanded(Doc& doc)
 void ALFloaterScriptStudio::toggleExpanded()
 {
     Doc* doc = active();
-    if (!doc || !doc->expandedEditor)
+    if (!doc || (!doc->expandedEditor && !expandsOnAsking(*doc)))
     {
+        return;
+    }
+    if (!doc->expandedEditor)
+    {
+        // A file of a script, which nothing preprocesses until asked: run
+        // now, and shown when it lands (showExpanded), numbered as a send
+        // of it is, which a runtime error's line counts.
+        doc->view = Doc::View::Expanded;
+        mSaving.preprocess(*doc);
         return;
     }
     const bool to_expanded = doc->shownView() != Doc::View::Expanded;
@@ -2843,6 +2852,15 @@ void ALFloaterScriptStudio::toggleExpanded()
     {
         mSaving.preprocess(*doc);
     }
+}
+
+// static
+bool ALFloaterScriptStudio::expandsOnAsking(const Doc& doc)
+{
+    // A file of LSL or SLua on disk: what a send of it to a script it masters
+    // goes up as is the preprocessor's, though no load or save of the file
+    // runs it here.
+    return !doc.file.empty() && !doc.notecard && doc.loaded && doc.editor && !doc.preprocessing;
 }
 
 void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
@@ -9722,7 +9740,7 @@ void ALFloaterScriptStudio::addViewCommands()
         "expanded", [this]() { toggleExpanded(); },
         [this]() {
             Doc* doc = active();
-            return doc && doc->expandedEditor != nullptr;
+            return doc && (doc->expandedEditor != nullptr || expandsOnAsking(*doc));
         },
         [this]() {
             const Doc* doc = active();
