@@ -430,10 +430,15 @@ if(AL_BUILD_TESTS)
     )
     if(COMPILER_IS_MSVC)
       # Visual Studio points /Fa at the object's directory itself; Ninja leaves
-      # it to cl, which writes the listing to the build tree's root.
+      # it to cl, which writes the listing to the build tree's root. The
+      # listing is named in full and in the host's separators: MSVC 14.52's
+      # arm64 compiler fails to open one named by a directory in forward
+      # slashes (C1083).
       target_compile_options(
         alsimd_asm_probe
-        PRIVATE /FAs "/Fa$<PATH:GET_PARENT_PATH,$<TARGET_OBJECTS:alsimd_asm_probe>>/"
+        PRIVATE
+          /FAs
+          "/Fa$<PATH:NATIVE_PATH,$<PATH:REPLACE_FILENAME,$<TARGET_OBJECTS:alsimd_asm_probe>,alsimd_asm_probe.asm>>"
       )
       set(alsimd_asm_syntax masm)
     elseif(COMPILER_IS_CLANG_CL)
