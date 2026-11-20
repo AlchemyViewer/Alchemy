@@ -1426,7 +1426,8 @@ LLVector3d LLAgent::getPosGlobalFromAgent(const LLVector3 &pos_agent) const
 
 static void finish_sit_on_ground(bool success, void*)
 {
-    if (success)
+    // A restriction on sitting may have come during the walk or flight.
+    if (success && RlvActions::canGroundSit())
     {
         gAgent.setFlying(false);
         gAgent.clearControlFlags(AGENT_CONTROL_STAND_UP); // might have been set by autopilot
