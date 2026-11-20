@@ -75,8 +75,10 @@
 #include <stdint.h>
 
 /**
- * The version of the ABI this library implements: every struct's layout,
- * and every function's, constant's and status's meaning.
+ * The version of the ABI this library implements.
+ *
+ * The ABI is every struct's layout, and every function's, constant's and
+ * status's meaning.
  *
  * It increases with every change that would break a program built against
  * an earlier header. Adding a function, a constant, an enumeration value,
@@ -87,18 +89,23 @@
 
 /**
  * `pnj2k_decode_params.flags`: writes the last row first, as images
- * bottom-up in memory want. Not `PNJ2K_ENCODE_FLIP_ROWS`, the encode
- * flag, which a decode refuses.
+ * bottom-up in memory want.
+ *
+ * Not `PNJ2K_ENCODE_FLIP_ROWS`, the encode flag, which a decode refuses.
  */
 #define PNJ2K_FLIP_ROWS 1
 
 /**
- * `pnj2k_decode_params.flags`: runs the irreversible (9/7) wavelet in
- * 32-bit floating point for components of up to 8 bits.
+ * `pnj2k_decode_params.flags`: runs the irreversible (9/7) wavelet in 32-bit
+ * floating point.
+ *
+ * It applies to components of up to 8 bits.
  *
  * A decode runs it in 16-bit fixed point for them by default, which is
  * faster and within about a code value of floating point; the tightest
- * limits of ITU-T T.803 ask for floating point.
+ * limits of ITU-T T.803 ask for floating point. An image's alpha, the
+ * second component of two or the fourth of four, runs in floating point
+ * either way, so that its 0 and 255 stay 0 and 255.
  */
 #define PNJ2K_FLOATING_POINT 2
 
@@ -132,9 +139,10 @@
 #define PNJ2K_UPSAMPLE 16
 
 /**
- * `pnj2k_decode_params.flags`: interpolates between a subsampled
- * component's samples, where `PNJ2K_UPSAMPLE` or `PNJ2K_SRGB` upsamples
- * it, rather than repeating them.
+ * `pnj2k_decode_params.flags`: interpolates between a subsampled component's
+ * samples, rather than repeating them.
+ *
+ * It applies where `PNJ2K_UPSAMPLE` or `PNJ2K_SRGB` upsamples the component.
  *
  * A sample lies on the reference grid at its index times the
  * subsampling, moved by the component's registration offset (CRG)
@@ -150,9 +158,10 @@
 #define PNJ2K_INTERPOLATE 32
 
 /**
- * The alignment of the memory a decoder or encoder allocates for the
- * caller (an image's pixels, a plane's samples, an encoder's codestream
- * bytes), and that it asks a caller's allocator for.
+ * The alignment of the memory a decoder or encoder allocates for the caller.
+ *
+ * That memory is an image's pixels, a plane's samples and an encoder's
+ * codestream bytes. It is also the alignment asked of a caller's allocator.
  */
 #define PNJ2K_ALIGNMENT 16
 
@@ -163,7 +172,9 @@
 
 /**
  * `pnj2k_encode_params.flags`: lossless, with the 5/3 wavelet and the
- * reversible colour transform, and an unbounded last layer.
+ * reversible colour transform.
+ *
+ * The last layer is unbounded.
  *
  * The encode flags start at bit 16 and the decode flags at bit 0, so that
  * they share no bit; each call refuses the other's flags with
@@ -173,8 +184,9 @@
 
 /**
  * `pnj2k_encode_params.flags`: the image's rows run bottom to top, as
- * OpenGL's do. Not `PNJ2K_FLIP_ROWS`, the decode flag, which an encode
- * refuses.
+ * OpenGL's do.
+ *
+ * Not `PNJ2K_FLIP_ROWS`, the decode flag, which an encode refuses.
  */
 #define PNJ2K_ENCODE_FLIP_ROWS (1 << 17)
 
@@ -301,6 +313,11 @@
 #define PNJ2K_CS_REGISTRATION (1 << 19)
 
 /**
+ * `pnj2k_codestream_params.fields`: `ht_sets` set.
+ */
+#define PNJ2K_CS_HT_SETS (1 << 20)
+
+/**
  * `pnj2k_codestream_params.block_style`: the arithmetic coder bypassed
  * for the lower bit-planes' significance and refinement passes.
  */
@@ -334,6 +351,20 @@
  * each cleanup pass.
  */
 #define PNJ2K_BLOCK_SEGMENTATION 32
+
+/**
+ * `pnj2k_codestream_params.block_style`: HT code-blocks, in place of Part
+ * 1's.
+ *
+ * They are coded by the block coder of High-Throughput JPEG 2000 (ITU-T
+ * T.814).
+ *
+ * The codestream is then an HTJ2K one, and a JP2 header around it makes
+ * a JPH file. Of the other flags it takes only
+ * `PNJ2K_BLOCK_VERTICALLY_CAUSAL`, and over several quality layers its
+ * code-blocks are written as `pnj2k_codestream_params.ht_sets` says.
+ */
+#define PNJ2K_BLOCK_HT 64
 
 /**
  * `pnj2k_codestream_params.markers`: a start of packet marker segment
@@ -406,8 +437,10 @@
 #define PNJ2K_COMP_QUANTISATION (1 << 5)
 
 /**
- * `pnj2k_jp2_params.flags`: the image header box says the colour space
- * is not known to be right (UnkC).
+ * `pnj2k_jp2_params.flags`: the image header box says the colour space is
+ * unknown (UnkC).
+ *
+ * That is, not known to be right.
  */
 #define PNJ2K_JP2_COLOURSPACE_UNKNOWN 1
 
@@ -417,9 +450,10 @@
  */
 typedef enum pnj2k_pixel_format {
   /**
-   * In a request: the format the components suggest. One to four give
-   * grey, grey and alpha, RGB or RGBA, 16 bits per channel where any is
-   * deeper than 8.
+   * In a request: the format the components suggest.
+   *
+   * One to four give grey, grey and alpha, RGB or RGBA, 16 bits per
+   * channel where any is deeper than 8.
    */
   PNJ2K_FORMAT_AUTO = 0,
   /**
@@ -462,8 +496,11 @@ typedef enum pnj2k_pixel_format {
  */
 typedef enum pnj2k_mode {
   /**
-   * Decode every conforming codestream, and also work around damage and
-   * truncation where the data allows, reporting each as a warning.
+   * Decode every conforming codestream, and work around damage and
+   * truncation.
+   *
+   * A workaround is made where the data allows, and each is reported as a
+   * warning.
    */
   PNJ2K_MODE_LENIENT = 0,
   /**
@@ -511,8 +548,9 @@ typedef enum pnj2k_sample_type {
    */
   PNJ2K_SAMPLES_I64 = 1,
   /**
-   * `float`: unrounded, unclamped samples of components up to 16 bits,
-   * where the request asked for `PNJ2K_FLOAT_PLANES`.
+   * `float`: unrounded, unclamped samples of components up to 16 bits.
+   *
+   * Given where the request asked for `PNJ2K_FLOAT_PLANES`.
    */
   PNJ2K_SAMPLES_F32 = 2,
   /**
@@ -533,8 +571,9 @@ typedef enum pnj2k_warning_kind {
    */
   PNJ2K_WARNING_OTHER = 0,
   /**
-   * The data ends before the codestream does. A prefix of a file decodes
-   * to what its whole packets give.
+   * The data ends before the codestream does.
+   *
+   * A prefix of a file decodes to what its whole packets give.
    */
   PNJ2K_WARNING_TRUNCATED = 1,
   /**
@@ -546,8 +585,9 @@ typedef enum pnj2k_warning_kind {
    */
   PNJ2K_WARNING_LENGTH_PAST_END = 3,
   /**
-   * The tile-part at `offset` has a length that does not end on a
-   * marker; it runs to the next one.
+   * The tile-part at `offset` has a length that does not end on a marker.
+   *
+   * It runs to the next one.
    */
   PNJ2K_WARNING_LENGTH_MISMATCH = 4,
   /**
@@ -556,14 +596,15 @@ typedef enum pnj2k_warning_kind {
    */
   PNJ2K_WARNING_UNKNOWN_MARKER = 5,
   /**
-   * The marker segment `code` at `offset` runs past the end of its
-   * header or of the data.
+   * The marker segment `code` at `offset` runs past its header or the
+   * data.
    */
   PNJ2K_WARNING_SEGMENT_OVERRUN = 6,
   /**
-   * The marker segment `code` at `offset` has a wrong length: one that
-   * does not end on a marker, that counts bytes past the segment's last
-   * field, or that is below the least the segment can have.
+   * The marker segment `code` at `offset` has a wrong length.
+   *
+   * The length does not end on a marker, counts bytes past the segment's
+   * last field, or is below the least the segment can have.
    */
   PNJ2K_WARNING_BAD_SEGMENT_LENGTH = 7,
   /**
@@ -603,42 +644,50 @@ typedef enum pnj2k_warning_kind {
   PNJ2K_WARNING_COLOUR_TRANSFORM_SKIPPED = 15,
   /**
    * `tile`'s POC marker segments give more progression volumes than
-   * `pnj2k_parse_params.max_progression_volumes`; packets only later
-   * volumes give are not read.
+   * `pnj2k_parse_params.max_progression_volumes`.
+   *
+   * Packets only later volumes give are not read.
    */
   PNJ2K_WARNING_TOO_MANY_VOLUMES = 16,
   /**
-   * The codestream declares Profile 0 or Profile 1 but breaks one of the
-   * profile's restrictions (T.800 Table A.45), which the message names.
+   * The codestream breaks a restriction of the profile it declares (T.800
+   * Table A.45).
+   *
+   * It declares Profile 0 or Profile 1, and the message names the
+   * restriction.
    */
   PNJ2K_WARNING_PROFILE_RESTRICTION = 17,
   /**
-   * A box a JP2 file must hold is missing; `code` is its type, its four
-   * bytes as a big-endian number (0x66747970 for 'ftyp'). The file is
-   * read without it.
+   * A box a JP2 file must hold is missing.
+   *
+   * `code` is its type, its four bytes as a big-endian number (0x66747970
+   * for 'ftyp'). The file is read without it.
    */
   PNJ2K_WARNING_MISSING_BOX = 18,
   /**
-   * The JP2 box of type `code` at `offset` is not allowed there. It is
-   * read where it lies, or ignored where it repeats one.
+   * The JP2 box of type `code` at `offset` is not allowed there.
+   *
+   * It is read where it lies, or ignored where it repeats one.
    */
   PNJ2K_WARNING_MISPLACED_BOX = 19,
   /**
-   * The JP2 box of type `code` at `offset` disagrees with the
-   * codestream: an image header box whose height, width or component
-   * count is not SIZ's, a component mapping box with a reserved mapping
-   * type, read as direct use, or that names a component or palette
-   * column the file does not have, which a decode into pixels refuses
-   * with `PNJ2K_INVALID_DATA`, or a channel definition box that names a
-   * channel the image does not have, leaves one out, gives a colour no
-   * channel, or gives two channels one type and association. The
-   * codestream's size is used, and a definition of a channel the image
-   * lacks is ignored.
+   * The JP2 box of type `code` at `offset` disagrees with the codestream.
+   *
+   * It is an image header box whose height, width or component count is
+   * not SIZ's; a component mapping box with a reserved mapping type, read
+   * as direct use, or that names a component or palette column the file
+   * does not have, which a decode into pixels refuses with
+   * `PNJ2K_INVALID_DATA`; or a channel definition box that names a channel
+   * the image does not have, leaves one out, gives a colour no channel, or
+   * gives two channels one type and association. The codestream's size is
+   * used, and a definition of a channel the image lacks is ignored.
    */
   PNJ2K_WARNING_INVALID_BOX = 20,
   /**
    * The colour transform joins components of different bit depths in
-   * `tile`, which T.800 does not allow; it is applied all the same.
+   * `tile`.
+   *
+   * T.800 does not allow that; it is applied all the same.
    */
   PNJ2K_WARNING_COLOUR_TRANSFORM_DEPTH = 21,
 } pnj2k_warning_kind;
@@ -648,18 +697,22 @@ typedef enum pnj2k_warning_kind {
  */
 typedef enum pnj2k_content {
   /**
-   * Colour: base colour, emissive, any ordinary image. The first three
-   * components are coded through the colour transform.
+   * Colour: base colour, emissive, any ordinary image.
+   *
+   * The first three components are coded through the colour transform.
    */
   PNJ2K_CONTENT_COLOUR = 0,
   /**
-   * Data packed into channels: metallic and roughness, masks. No colour
-   * transform, and every component weighs the same.
+   * Data packed into channels: metallic and roughness, masks.
+   *
+   * No colour transform, and every component weighs the same.
    */
   PNJ2K_CONTENT_DATA = 1,
   /**
-   * A normal map: resized with its vectors renormalised, coded as data,
-   * and losslessly with whichever colour transform gives less.
+   * A normal map: resized with its vectors renormalised, and coded as
+   * data.
+   *
+   * Losslessly, it is coded with whichever colour transform gives less.
    */
   PNJ2K_CONTENT_NORMAL = 2,
 } pnj2k_content;
@@ -683,8 +736,10 @@ typedef enum pnj2k_weighting {
   PNJ2K_WEIGHTING_CHROMA = 2,
   /**
    * Luminance and chroma weighted by T.800 Annex J's contrast sensitivity
-   * weights for texels seen at `pnj2k_encode_params.pixels_per_degree`
-   * per degree.
+   * weights.
+   *
+   * The weights are for texels seen at
+   * `pnj2k_encode_params.pixels_per_degree` per degree.
    */
   PNJ2K_WEIGHTING_DISTANCE = 3,
 } pnj2k_weighting;
@@ -737,11 +792,40 @@ typedef enum pnj2k_tile_allocation {
    */
   PNJ2K_TILE_ALLOCATION_GLOBAL = 0,
   /**
-   * Each tile's layers allocated alone, at its share of each target,
-   * and its tile-parts written together.
+   * Each tile's layers allocated alone, at its share of each target.
+   *
+   * Its tile-parts are written together.
    */
   PNJ2K_TILE_ALLOCATION_PER_TILE = 1,
 } pnj2k_tile_allocation;
+
+/**
+ * How HT code-blocks (`PNJ2K_BLOCK_HT`) are written over several quality
+ * layers, for `pnj2k_codestream_params.ht_sets`.
+ *
+ * An HT code-block's passes come in HT sets of three, a cleanup pass and
+ * two refinement passes, and each set codes the block over again
+ * (T.814 Annex B): a decoder takes one.
+ */
+typedef enum pnj2k_ht_sets {
+  /**
+   * One HT set to a code-block, whole in one layer.
+   *
+   * The last layer is as good as one layer of its size, and a layer before
+   * it holds the code-blocks most worth their bytes and nothing of the
+   * rest. Every HTJ2K decoder reads it.
+   */
+  PNJ2K_HT_SETS_SINGLE = 0,
+  /**
+   * A layer may add refinement passes to a code-block's HT set, or send
+   * another set.
+   *
+   * Each layer is then nearer the best image for its size, and each after
+   * the first the poorer for the sets before it. Few decoders read more
+   * than one HT set of a code-block.
+   */
+  PNJ2K_HT_SETS_MULTIPLE = 1,
+} pnj2k_ht_sets;
 
 /**
  * The restrictions a codestream declares and keeps to, for
@@ -793,7 +877,9 @@ typedef enum pnj2k_layer_kind {
   PNJ2K_LAYER_BYTES = 1,
   /**
    * The passes that remove at least `value` weighted squared error per
-   * byte, in 8-bit code values.
+   * byte.
+   *
+   * The error is in 8-bit code values.
    */
   PNJ2K_LAYER_SLOPE = 2,
   /**
@@ -843,8 +929,10 @@ typedef struct pnj2k_cancel pnj2k_cancel;
 typedef struct pnj2k_codestream pnj2k_codestream;
 
 /**
- * A decoder: the working memory decodes reuse, the allocator for what it
- * hands out, and what its last call reported.
+ * A decoder: the working memory decodes reuse, and what its last call
+ * reported.
+ *
+ * It also holds the allocator for what it hands out.
  *
  * A program makes one for each thread that decodes. It is used by one
  * thread at a time, and may be freed on any thread.
@@ -852,8 +940,9 @@ typedef struct pnj2k_codestream pnj2k_codestream;
 typedef struct pnj2k_decoder pnj2k_decoder;
 
 /**
- * An encoder: the working memory encodes reuse, the allocator for the
- * bytes it hands out, and the last call's failure.
+ * An encoder: the working memory encodes reuse, and the last call's failure.
+ *
+ * It also holds the allocator for the bytes it hands out.
  *
  * A program makes one for each thread that encodes. It is used by one
  * thread at a time, and may be freed on any thread.
@@ -930,9 +1019,11 @@ typedef struct pnj2k_info {
    */
   uint32_t levels;
   /**
-   * The most levels a decode can discard: from a parsed codestream, the
-   * fewest any tile-component has; from a probe, which reads only the
-   * main header's coding style, `levels`.
+   * The most levels a decode can discard.
+   *
+   * From a parsed codestream it is the fewest any tile-component has; from
+   * a probe, which reads only the main header's coding style, it is
+   * `levels`.
    */
   uint32_t max_reduce;
   /**
@@ -952,8 +1043,10 @@ typedef struct pnj2k_info {
    */
   uint32_t code_block_height;
   /**
-   * The capabilities field (Rsiz): 0 for unrestricted Part 1, 1 and 2 for
-   * Profiles 0 and 1, other values for later profiles.
+   * The capabilities field (Rsiz).
+   *
+   * It is 0 for unrestricted Part 1, 1 and 2 for Profiles 0 and 1, and
+   * other values for later profiles.
    */
   uint32_t profile;
   /**
@@ -998,8 +1091,9 @@ typedef struct pnj2k_parse_params {
    */
   size_t struct_size;
   /**
-   * The most samples on the reference grid, width times height; 0 for
-   * the default, 65535 times 65535.
+   * The most samples on the reference grid, width times height.
+   *
+   * 0 for the default, 65535 times 65535.
    */
   uint64_t max_area;
   /**
@@ -1008,8 +1102,9 @@ typedef struct pnj2k_parse_params {
    */
   uint64_t max_code_blocks;
   /**
-   * The most memory a decode may take for samples, in bytes; 0 for the
-   * default, 1 GiB.
+   * The most memory a decode may take for samples, in bytes.
+   *
+   * 0 for the default, 1 GiB.
    */
   uint64_t max_decoded_bytes;
   /**
@@ -1035,18 +1130,22 @@ typedef struct pnj2k_parse_params {
    */
   uint32_t max_tiles;
   /**
-   * The most progression volumes a tile's walk through its packets takes
-   * from its POC marker segments; 0 for the default, 9361. A tile whose
-   * POC segments give more is walked through that many, and the decode
-   * warns `PNJ2K_WARNING_TOO_MANY_VOLUMES`, which strict mode fails on.
+   * The most progression volumes a tile's packet walk takes from its POC
+   * marker segments.
+   *
+   * 0 for the default, 9361. A tile whose POC segments give more is walked
+   * through that many, and the decode warns
+   * `PNJ2K_WARNING_TOO_MANY_VOLUMES`, which strict mode fails on.
    */
   uint32_t max_progression_volumes;
   /**
-   * The most memory the layout of code-blocks, precincts and their tag
-   * trees, with the contributions its packets add, may take, in bytes:
-   * one tile's, for a decode or a reach, and every tile's together for a
-   * codestream that `pnj2k_codestream_extend` has read; 0 for the
-   * default, 256 MiB.
+   * The most memory the layout of code-blocks and precincts may take, in
+   * bytes.
+   *
+   * The layout holds the code-blocks, the precincts and their tag trees,
+   * with the contributions its packets add. The limit is on one tile's,
+   * for a decode or a reach, and on every tile's together for a codestream
+   * that `pnj2k_codestream_extend` has read. 0 for the default, 256 MiB.
    */
   uint64_t max_layout_bytes;
 } pnj2k_parse_params;
@@ -1099,8 +1198,9 @@ typedef struct pnj2k_comment {
    */
   size_t len;
   /**
-   * 0 for binary data, 1 for ISO/IEC 8859-15 text; other values are
-   * reserved, and passed through as read.
+   * 0 for binary data, 1 for ISO/IEC 8859-15 text.
+   *
+   * Other values are reserved, and passed through as read.
    */
   uint32_t registration;
   /**
@@ -1110,9 +1210,10 @@ typedef struct pnj2k_comment {
 } pnj2k_comment;
 
 /**
- * How much of a codestream some data holds: for each number of discarded
- * levels, the quality layers whose packets are wholly present for the
- * resolutions such a decode needs.
+ * How much of a codestream some data holds.
+ *
+ * For each number of discarded levels, it gives the quality layers whose
+ * packets are wholly present for the resolutions such a decode needs.
  */
 typedef struct pnj2k_reach {
   /**
@@ -1139,9 +1240,10 @@ typedef struct pnj2k_reach {
 } pnj2k_reach;
 
 /**
- * What to decode, and into what. All zeros are the defaults: the whole
- * image, every component, at full resolution, in the format the components
- * suggest, top row first.
+ * What to decode, and into what.
+ *
+ * All zeros are the defaults: the whole image, every component, at full
+ * resolution, in the format the components suggest, top row first.
  */
 typedef struct pnj2k_decode_params {
   /**
@@ -1149,14 +1251,18 @@ typedef struct pnj2k_decode_params {
    */
   size_t struct_size;
   /**
-   * How `pnj2k_decode` and `pnj2k_decode_planes` parse the data; NULL
-   * for the defaults. A codestream's decodes keep its own.
+   * How `pnj2k_decode` and `pnj2k_decode_planes` parse the data; NULL for
+   * the defaults.
+   *
+   * A codestream's decodes keep its own.
    */
   const struct pnj2k_parse_params *parse;
   /**
    * A token that, once raised, ends the decode with `PNJ2K_CANCELLED`;
-   * NULL for none. It is checked between code-blocks and between
-   * transform levels, and must stay valid until the decode returns.
+   * NULL for none.
+   *
+   * It is checked between code-blocks and between transform levels, and
+   * must stay valid until the decode returns.
    */
   const struct pnj2k_cancel *cancel;
   /**
@@ -1169,9 +1275,10 @@ typedef struct pnj2k_decode_params {
    */
   uint32_t first_component;
   /**
-   * How many components to decode; 0 for every one from
-   * `first_component`. Components a colour transform joins to them are
-   * decoded as well, but not output.
+   * How many components to decode; 0 for every one from `first_component`.
+   *
+   * Components a colour transform joins to them are decoded as well, but
+   * not output.
    */
   uint32_t component_count;
   /**
@@ -1181,8 +1288,9 @@ typedef struct pnj2k_decode_params {
   uint32_t format;
   /**
    * `PNJ2K_FLIP_ROWS`, `PNJ2K_FLOATING_POINT`, `PNJ2K_FLOAT_PLANES`,
-   * `PNJ2K_SRGB`, `PNJ2K_UPSAMPLE` and `PNJ2K_INTERPOLATE`, or'd. Any
-   * other bit, an encode flag's included, is `PNJ2K_INVALID_ARGUMENT`.
+   * `PNJ2K_SRGB`, `PNJ2K_UPSAMPLE` and `PNJ2K_INTERPOLATE`, or'd.
+   *
+   * Any other bit, an encode flag's included, is `PNJ2K_INVALID_ARGUMENT`.
    */
   uint32_t flags;
   /**
@@ -1190,11 +1298,12 @@ typedef struct pnj2k_decode_params {
    */
   uint32_t layers;
   /**
-   * The left column of the rectangle to decode, of the image as
-   * decoded after `reduce`, in the first component's samples: the
-   * pixels wherever the components are of one size, or where the
-   * decode upsamples. Tiles it misses are not read, and the output is
-   * the rectangle, clipped to the image.
+   * The left column of the rectangle to decode.
+   *
+   * The rectangle is of the image as decoded after `reduce`, in the first
+   * component's samples: the pixels wherever the components are of one
+   * size, or where the decode upsamples. Tiles it misses are not read, and
+   * the output is the rectangle, clipped to the image.
    */
   uint32_t region_x;
   /**
@@ -1210,9 +1319,10 @@ typedef struct pnj2k_decode_params {
    */
   uint32_t region_height;
   /**
-   * Number of decode threads, including the caller. Other threads
-   * decode blocks ahead of the transform. Output, warnings and errors
-   * match a decode on the caller alone.
+   * Number of decode threads, including the caller.
+   *
+   * Other threads decode blocks ahead of the transform. Output, warnings
+   * and errors match a decode on the caller alone.
    *
    * 0 or 1 uses only the caller. The count is capped at the machine's
    * available parallelism. Threads start for each decode unless the
@@ -1251,22 +1361,26 @@ typedef struct pnj2k_image {
    */
   size_t struct_size;
   /**
-   * The first row's first sample, aligned to 2 for a 16-bit format; NULL
-   * on input for the decoder to allocate the pixels.
+   * The first row's first sample, aligned to 2 for a 16-bit format.
+   *
+   * NULL on input for the decoder to allocate the pixels.
    */
   uint8_t *pixels;
   /**
-   * Buffer size in bytes. Caller-owned buffers keep their supplied size
-   * after decoding. For decoder-allocated pixels, this is the image's
-   * byte count. After `pnj2k_codestream_image_info`, it is the size needed
-   * to decode with the same parameters. `pnj2k_image_free` frees
-   * `capacity` bytes and does not read this field.
+   * Buffer size in bytes.
+   *
+   * Caller-owned buffers keep their supplied size after decoding. For
+   * decoder-allocated pixels, this is the image's byte count. After
+   * `pnj2k_codestream_image_info`, it is the size needed to decode with
+   * the same parameters. `pnj2k_image_free` frees `capacity` bytes and
+   * does not read this field.
    */
   size_t size;
   /**
-   * Bytes from one row to the next, even for a 16-bit format; 0 on input
-   * for rows packed together. `pnj2k_image_free` clears it with the
-   * pixels it frees.
+   * Bytes from one row to the next, even for a 16-bit format.
+   *
+   * 0 on input for rows packed together. `pnj2k_image_free` clears it with
+   * the pixels it frees.
    */
   size_t stride;
   /**
@@ -1286,11 +1400,12 @@ typedef struct pnj2k_image {
    */
   uint32_t reserved;
   /**
-   * Where the decoder allocated `pixels`, the function that frees them,
-   * which `pnj2k_image_free` calls; NULL where the pixels are the
-   * caller's. A decode or resize refuses an image whose `pixels` and
-   * `release` are both set, with `PNJ2K_INVALID_ARGUMENT`, until
-   * `pnj2k_image_free` frees them.
+   * The function that frees `pixels`, where the decoder allocated them.
+   *
+   * `pnj2k_image_free` calls it; NULL where the pixels are the caller's. A
+   * decode or resize refuses an image whose `pixels` and `release` are
+   * both set, with `PNJ2K_INVALID_ARGUMENT`, until `pnj2k_image_free`
+   * frees them.
    */
   pnj2k_free_fn release;
   /**
@@ -1298,10 +1413,11 @@ typedef struct pnj2k_image {
    */
   void *release_user;
   /**
-   * The library's: where the decoder allocated `pixels`, the size of the
-   * allocation, which `pnj2k_image_free` gives `release`; 0 otherwise.
-   * Only a decode and `pnj2k_image_free` write it, and the caller never
-   * does.
+   * The library's: the size of the allocation, where the decoder allocated
+   * `pixels`.
+   *
+   * `pnj2k_image_free` gives it to `release`; 0 otherwise. Only a decode
+   * and `pnj2k_image_free` write it, and the caller never does.
    */
   size_t capacity;
 } pnj2k_image;
@@ -1316,9 +1432,10 @@ typedef struct pnj2k_image {
 typedef void *(*pnj2k_alloc_fn)(void *user, size_t size, size_t align);
 
 /**
- * Where a decoder or encoder takes the memory it hands to the caller: the
- * pixels of an image a decoder allocates, the samples of planes, and an
- * encoder's codestream bytes.
+ * Where a decoder or encoder takes the memory it hands to the caller.
+ *
+ * That memory is the pixels of an image a decoder allocates, the samples of
+ * planes, and an encoder's codestream bytes.
  *
  * Its working memory comes from the system allocator. The decoder or
  * encoder keeps a copy of the struct; its functions and `user` must work
@@ -1352,8 +1469,10 @@ typedef struct pnj2k_warning {
    */
   size_t struct_size;
   /**
-   * A description, valid until the next parse, extend, reach, image info
-   * or decode on the decoder, or its free.
+   * A description of the warning.
+   *
+   * It is valid until the next parse, extend, reach, image info or decode
+   * on the decoder, or its free.
    */
   const char *message;
   /**
@@ -1365,9 +1484,11 @@ typedef struct pnj2k_warning {
    */
   uint32_t kind;
   /**
-   * The marker code the kind describes, 0xFF00 to 0xFFFF, or the JP2
-   * box type, its four bytes as a big-endian number; 0 where it has
+   * The marker code or JP2 box type the kind describes; 0 where it has
    * none.
+   *
+   * A marker code is 0xFF00 to 0xFFFF, and a box type is its four bytes as
+   * a big-endian number.
    */
   uint32_t code;
   /**
@@ -1390,7 +1511,9 @@ typedef struct pnj2k_plane {
   size_t struct_size;
   /**
    * The first row's first sample, of `sample_type`; NULL where the plane
-   * is empty. Valid until the planes are freed.
+   * is empty.
+   *
+   * Valid until the planes are freed.
    */
   const void *samples;
   /**
@@ -1433,8 +1556,9 @@ typedef struct pnj2k_plane {
 } pnj2k_plane;
 
 /**
- * An image to encode: rows of interleaved samples of 8 bits, or of 9 to
- * 16 bits in `uint16_t`.
+ * An image to encode: rows of interleaved samples.
+ *
+ * The samples are of 8 bits, or of 9 to 16 bits in `uint16_t`.
  */
 typedef struct pnj2k_source {
   /**
@@ -1446,13 +1570,15 @@ typedef struct pnj2k_source {
    */
   const uint8_t *pixels;
   /**
-   * The buffer's size in bytes: at least `stride * (height - 1)` plus a
-   * row's bytes.
+   * The buffer's size in bytes.
+   *
+   * It is at least `stride * (height - 1)` plus a row's bytes.
    */
   size_t size;
   /**
-   * Bytes from one row to the next, at least a row's; 0 for rows packed
-   * together.
+   * Bytes from one row to the next, at least a row's.
+   *
+   * 0 for rows packed together.
    */
   size_t stride;
   /**
@@ -1468,11 +1594,12 @@ typedef struct pnj2k_source {
    */
   uint32_t channels;
   /**
-   * The samples' bits: 0 or 8 for rows of bytes; 9 to 16 for rows of
-   * `uint16_t` in the machine's byte order, each sample below `1 <<
-   * bits`, which an encode takes as one component of that precision a
-   * channel. Resizing and filling under alpha take 8-bit rows only, and
-   * an opaque alpha channel of deeper rows is kept.
+   * The samples' bits: 0 or 8 for bytes, 9 to 16 for `uint16_t`.
+   *
+   * Rows of `uint16_t` are in the machine's byte order, each sample below
+   * `1 << bits`, and an encode takes them as one component of that
+   * precision a channel. Resizing and filling under alpha take 8-bit rows
+   * only, and an opaque alpha channel of deeper rows is kept.
    */
   uint32_t bits;
 } pnj2k_source;
@@ -1538,8 +1665,9 @@ typedef struct pnj2k_layer {
 } pnj2k_layer;
 
 /**
- * One component's own coding parameters (COC, QCC), in place of the
- * image's where `fields` names them.
+ * One component's own coding parameters (COC, QCC), in place of the image's.
+ *
+ * They take the image's place where `fields` names them.
  */
 typedef struct pnj2k_component_params {
   /**
@@ -1587,8 +1715,9 @@ typedef struct pnj2k_component_params {
    */
   double step;
   /**
-   * Precinct exponents, width then height, one pair a resolution from
-   * the lowest, the last repeated; `2 * precinct_count` bytes.
+   * Precinct exponents, width then height: `2 * precinct_count` bytes.
+   *
+   * There is one pair a resolution from the lowest, the last repeated.
    */
   const uint8_t *precincts;
   /**
@@ -1598,8 +1727,9 @@ typedef struct pnj2k_component_params {
 } pnj2k_component_params;
 
 /**
- * A region of interest, coded first (T.800 Annex H): rectangles on the
- * reference grid, a mask over the image, or both.
+ * A region of interest, coded first (T.800 Annex H).
+ *
+ * It is rectangles on the reference grid, a mask over the image, or both.
  */
 typedef struct pnj2k_roi {
   /**
@@ -1639,9 +1769,10 @@ typedef struct pnj2k_roi {
 } pnj2k_roi;
 
 /**
- * The codestream's parameters, past the preset's. Each member counts
- * only where `fields` names it, so that 0 never has to mean the default
- * where 0 is a value.
+ * The codestream's parameters, past the preset's.
+ *
+ * Each member counts only where `fields` names it, so that 0 never has to
+ * mean the default where 0 is a value.
  */
 typedef struct pnj2k_codestream_params {
   /**
@@ -1723,8 +1854,9 @@ typedef struct pnj2k_codestream_params {
    */
   double step;
   /**
-   * Precinct exponents, width then height, one pair a resolution from
-   * the lowest, the last repeated; `2 * precinct_count` bytes.
+   * Precinct exponents, width then height: `2 * precinct_count` bytes.
+   *
+   * There is one pair a resolution from the lowest, the last repeated.
    */
   const uint8_t *precincts;
   /**
@@ -1760,9 +1892,11 @@ typedef struct pnj2k_codestream_params {
    */
   const struct pnj2k_roi *roi;
   /**
-   * Comments, written after `pnj2k_encode_params.comment`: each
-   * `pnj2k_comment`'s `data` and `len` its bytes and `registration` 0
-   * for binary data or 1 for UTF-8 text, written in ISO/IEC 8859-15.
+   * Comments, written after `pnj2k_encode_params.comment`.
+   *
+   * Each `pnj2k_comment`'s `data` and `len` are its bytes, and its
+   * `registration` is 0 for binary data or 1 for UTF-8 text, written in
+   * ISO/IEC 8859-15.
    */
   const struct pnj2k_comment *comments;
   /**
@@ -1770,14 +1904,24 @@ typedef struct pnj2k_codestream_params {
    */
   size_t comment_count;
   /**
-   * Component registration offsets (CRG), x then y in 65,536ths of a
-   * sample, one pair a component; `2 * registration_count` values.
+   * Component registration offsets (CRG): `2 * registration_count` values.
+   *
+   * There is one pair a component, x then y in 65,536ths of a sample.
    */
   const uint16_t *registration;
   /**
    * The pairs `registration` holds.
    */
   size_t registration_count;
+  /**
+   * A `pnj2k_ht_sets`: how HT code-blocks are written over several
+   * quality layers.
+   */
+  uint32_t ht_sets;
+  /**
+   * Zero.
+   */
+  uint32_t reserved;
 } pnj2k_codestream_params;
 
 /**
@@ -1827,8 +1971,9 @@ typedef struct pnj2k_channel_definition {
 } pnj2k_channel_definition;
 
 /**
- * A grid resolution: each axis's numerator, denominator and power of
- * ten, (N / D) * 10^E reference grid points per metre.
+ * A grid resolution: each axis's numerator, denominator and power of ten.
+ *
+ * An axis has (N / D) * 10^E reference grid points per metre.
  */
 typedef struct pnj2k_resolution {
   /**
@@ -1880,8 +2025,9 @@ typedef struct pnj2k_jp2_params {
    */
   uint32_t flags;
   /**
-   * An enumerated colour space, 16 sRGB, 17 greyscale or 18 sYCC; 0 for
-   * the default, or for `icc`.
+   * An enumerated colour space: 16 sRGB, 17 greyscale or 18 sYCC.
+   *
+   * 0 for the default, or for `icc`.
    */
   uint32_t enumerated;
   /**
@@ -1894,9 +2040,11 @@ typedef struct pnj2k_jp2_params {
    */
   size_t icc_len;
   /**
-   * The palette's columns, each a precision less 1 in the low seven bits
-   * with the high bit set where signed, as the palette box writes them;
-   * NULL for no palette.
+   * The palette's columns, as the palette box writes them; NULL for no
+   * palette.
+   *
+   * Each is a precision less 1 in the low seven bits, with the high bit
+   * set where signed.
    */
   const uint8_t *palette_columns;
   /**
@@ -1904,8 +2052,9 @@ typedef struct pnj2k_jp2_params {
    */
   size_t palette_column_count;
   /**
-   * The palette's values, entry by entry, as many entries as there are
-   * whole rows of columns.
+   * The palette's values, entry by entry.
+   *
+   * There are as many entries as there are whole rows of columns.
    */
   const int64_t *palette_values;
   /**
@@ -1921,9 +2070,11 @@ typedef struct pnj2k_jp2_params {
    */
   size_t mapping_count;
   /**
-   * Channel definitions, or NULL if none are supplied. Undefined
-   * channels are assigned unclaimed colours in order, so the written box
-   * defines every channel. Supplying only the alpha definition is enough.
+   * Channel definitions, or NULL if none are supplied.
+   *
+   * Undefined channels are assigned unclaimed colours in order, so the
+   * written box defines every channel. Supplying only the alpha definition
+   * is enough.
    */
   const struct pnj2k_channel_definition *channels;
   /**
@@ -1957,18 +2108,21 @@ typedef struct pnj2k_encode_params {
    */
   size_t struct_size;
   /**
-   * The text of a comment (COM) marker segment, NUL-terminated UTF-8;
-   * NULL for none. It is written in ISO/IEC 8859-15 (Latin-9), as its
-   * registration says: text with a character Latin-9 does not have, or
-   * of more than 65,531 characters, is `PNJ2K_INVALID_REQUEST`, and
-   * bytes that are not UTF-8 are `PNJ2K_INVALID_ARGUMENT`.
+   * The text of a comment (COM) marker segment, NUL-terminated UTF-8; NULL
+   * for none.
+   *
+   * It is written in ISO/IEC 8859-15 (Latin-9), as its registration says:
+   * text with a character Latin-9 does not have, or of more than 65,531
+   * characters, is `PNJ2K_INVALID_REQUEST`, and bytes that are not UTF-8
+   * are `PNJ2K_INVALID_ARGUMENT`.
    */
   const char *comment;
   /**
    * `PNJ2K_ENCODE_REVERSIBLE`, `PNJ2K_ENCODE_FLIP_ROWS`,
    * `PNJ2K_ENCODE_PACKET_LENGTHS`, `PNJ2K_ENCODE_FILL_TRANSPARENT` and
-   * `PNJ2K_ENCODE_NO_QUALITY_CAP`, or'd. Any other bit, a decode flag's
-   * included, is `PNJ2K_INVALID_ARGUMENT`.
+   * `PNJ2K_ENCODE_NO_QUALITY_CAP`, or'd.
+   *
+   * Any other bit, a decode flag's included, is `PNJ2K_INVALID_ARGUMENT`.
    */
   uint32_t flags;
   /**
@@ -1992,15 +2146,17 @@ typedef struct pnj2k_encode_params {
    */
   uint32_t resize_height;
   /**
-   * The last lossy layer's size as a fraction of the raw image's bytes,
-   * above 0 and at most 1, a layer as large as the raw image; 0 for an
-   * eighth. A fraction worth fewer than 600 bytes gives one lossy layer
+   * The last lossy layer's size as a fraction of the raw image's bytes.
+   *
+   * It is above 0 and at most 1, a layer as large as the raw image; 0 for
+   * an eighth. A fraction worth fewer than 600 bytes gives one lossy layer
    * of 600 bytes. Any other value is `PNJ2K_INVALID_ARGUMENT`.
    */
   float rate;
   /**
-   * The mean squared error per sample past which no more passes are
-   * added, in 8-bit code values, above 0; 0 for the default, so that a
+   * The mean squared error per sample past which no more passes are added.
+   *
+   * It is in 8-bit code values, above 0; 0 for the default, so that a
    * zeroed struct takes it. A cap of 0 would add every pass, which
    * `PNJ2K_ENCODE_NO_QUALITY_CAP` asks for. Any other value is
    * `PNJ2K_INVALID_ARGUMENT`. Ignored under `PNJ2K_ENCODE_NO_QUALITY_CAP`
@@ -2021,8 +2177,9 @@ typedef struct pnj2k_encode_params {
    */
   const struct pnj2k_codestream_params *codestream;
   /**
-   * The header of a JP2 file to write around the codestream; NULL for a
-   * raw codestream.
+   * The header of a JP2 file to write around the codestream.
+   *
+   * NULL for a raw codestream.
    */
   const struct pnj2k_jp2_params *jp2;
 } pnj2k_encode_params;
@@ -2079,8 +2236,9 @@ typedef struct pnj2k_component_source {
    */
   size_t size;
   /**
-   * Bytes from one row to the next, a whole number of samples and at
-   * least a row's; 0 for rows packed together.
+   * Bytes from one row to the next, a whole number of samples.
+   *
+   * It is at least a row's; 0 for rows packed together.
    */
   size_t stride;
   /**
@@ -2120,7 +2278,9 @@ typedef struct pnj2k_component_source {
 
 /**
  * A planar image to encode: its area on the reference grid and its
- * components, each sized from the area as T.800 B.2 has it.
+ * components.
+ *
+ * Each component is sized from the area as T.800 B.2 has it.
  */
 typedef struct pnj2k_components {
   /**
@@ -2241,15 +2401,19 @@ typedef struct pnj2k_components {
 #define PNJ2K_INVALID_ARGUMENT 10
 
 /**
- * An output buffer is smaller than the image, or its stride shorter than
- * a row. A source buffer that is too short is `PNJ2K_INVALID_REQUEST`.
+ * An output buffer is smaller than the image, or its stride shorter than a
+ * row.
+ *
+ * A source buffer that is too short is `PNJ2K_INVALID_REQUEST`.
  */
 #define PNJ2K_BUFFER_TOO_SMALL 11
 
 /**
- * An allocator returned NULL: the caller's, or the system's for memory
- * handed to the caller, for a decode's samples, working planes and tile
- * layouts, or for an encode's or a resize's working memory.
+ * An allocator returned NULL.
+ *
+ * It was the caller's, or the system's for memory handed to the caller, for
+ * a decode's samples, working planes and tile layouts, or for an encode's or
+ * a resize's working memory.
  */
 #define PNJ2K_OUT_OF_MEMORY 12
 
@@ -2373,9 +2537,10 @@ pnj2k_status pnj2k_codestream_extend(struct pnj2k_decoder *dec,
                                      size_t len);
 
 /**
- * Fills `out` with what the codestream's main header says, and in
- * `max_reduce` the most levels a decode of it can discard. Keeps no
- * message.
+ * Fills `out` with what the codestream's main header says.
+ *
+ * Its `max_reduce` is the most levels a decode of the codestream can
+ * discard. Keeps no message.
  *
  * # Safety
  *
@@ -2465,9 +2630,10 @@ pnj2k_status pnj2k_codestream_image_info(struct pnj2k_decoder *dec,
                                          struct pnj2k_image *out);
 
 /**
- * Decodes the codestream from `data`, the data it was parsed from or a
- * longer prefix of it, into `out`, as `pnj2k_decode` does.
- * `params->parse` is ignored: the codestream's mode and limits hold.
+ * Decodes the codestream from `data` into `out`, as `pnj2k_decode` does.
+ *
+ * `data` is the data the codestream was parsed from, or a longer prefix of
+ * it. `params->parse` is ignored: the codestream's mode and limits hold.
  *
  * # Safety
  *
@@ -2483,8 +2649,10 @@ pnj2k_status pnj2k_codestream_decode(struct pnj2k_decoder *dec,
 
 /**
  * Decodes the codestream from `data` into planes, as `pnj2k_decode_planes`
- * does: `*out` is set to the planes, or to NULL on every failure.
- * `params->parse` is ignored.
+ * does.
+ *
+ * `*out` is set to the planes, or to NULL on every failure. `params->parse`
+ * is ignored.
  *
  * # Safety
  *
@@ -2517,8 +2685,10 @@ pnj2k_status pnj2k_codestream_decode_planes(struct pnj2k_decoder *dec,
 struct pnj2k_decoder *pnj2k_decoder_new(const struct pnj2k_allocator *alloc);
 
 /**
- * Frees a decoder, and with it its message and warnings. Images and planes
- * it decoded, and codestreams it parsed, stay valid. NULL is ignored.
+ * Frees a decoder, and with it its message and warnings.
+ *
+ * Images and planes it decoded, and codestreams it parsed, stay valid. NULL
+ * is ignored.
  *
  * # Safety
  *
@@ -2541,16 +2711,20 @@ void pnj2k_decoder_free(struct pnj2k_decoder *dec);
 const char *pnj2k_decoder_last_error(const struct pnj2k_decoder *dec);
 
 /**
- * A static description of a `pnj2k_status`, "unknown status" for a value
- * this library does not name. `pnj2k_decoder_last_error` and
- * `pnj2k_encoder_last_error` give the details of a failure.
+ * A static description of a `pnj2k_status`.
+ *
+ * It is "unknown status" for a value this library does not name.
+ * `pnj2k_decoder_last_error` and `pnj2k_encoder_last_error` give the details
+ * of a failure.
  */
 const char *pnj2k_status_message(uint32_t status);
 
 /**
  * How many warnings the last successful parse, extend or decode on `dec`
- * reported: what lenient mode worked around. 0 after any other call on
- * `dec`, and for NULL.
+ * reported.
+ *
+ * They are what lenient mode worked around. 0 after any other call on `dec`,
+ * and for NULL.
  *
  * # Safety
  *
@@ -2575,8 +2749,10 @@ pnj2k_status pnj2k_decoder_warning(const struct pnj2k_decoder *dec,
 
 /**
  * Fills `out` with the reach of the last successful decode, or reach, on
- * `dec`. Fails with `PNJ2K_INVALID_ARGUMENT` where its last call was
- * neither. Keeps no message of its own failure.
+ * `dec`.
+ *
+ * Fails with `PNJ2K_INVALID_ARGUMENT` where its last call was neither. Keeps
+ * no message of its own failure.
  *
  * # Safety
  *
@@ -2586,14 +2762,18 @@ pnj2k_status pnj2k_decoder_warning(const struct pnj2k_decoder *dec,
 pnj2k_status pnj2k_decoder_reach(const struct pnj2k_decoder *dec, struct pnj2k_reach *out);
 
 /**
- * Makes a cancellation token, lowered. Never NULL; running out of memory
- * aborts. Free it with `pnj2k_cancel_free`.
+ * Makes a cancellation token, lowered.
+ *
+ * Never NULL; running out of memory aborts. Free it with
+ * `pnj2k_cancel_free`.
  */
 struct pnj2k_cancel *pnj2k_cancel_new(void);
 
 /**
- * Raises `token`: decodes given it end with `PNJ2K_CANCELLED` at their
- * next check. Any thread may call it while they run. NULL is ignored.
+ * Raises `token`: decodes given it end with `PNJ2K_CANCELLED` at their next
+ * check.
+ *
+ * Any thread may call it while they run. NULL is ignored.
  *
  * # Safety
  *
@@ -2631,8 +2811,9 @@ bool pnj2k_cancel_is_raised(const struct pnj2k_cancel *token);
 void pnj2k_cancel_free(struct pnj2k_cancel *token);
 
 /**
- * Parses `data` and decodes it into `out` in one call: as
- * `pnj2k_codestream_parse` with `params->parse`, then
+ * Parses `data` and decodes it into `out` in one call.
+ *
+ * It does as `pnj2k_codestream_parse` with `params->parse`, then
  * `pnj2k_codestream_decode`.
  *
  * `params` may be NULL for the defaults: the whole image, every component,
@@ -2695,7 +2876,8 @@ void pnj2k_image_free(struct pnj2k_image *image);
  * `PNJ2K_UPSAMPLE`. Samples of the reversible wavelet are exact, but for
  * those `PNJ2K_INTERPOLATE` makes between a component's own. The
  * irreversible wavelet of components of up to 8 bits runs in 16-bit fixed
- * point unless `PNJ2K_FLOATING_POINT` asks for floating point.
+ * point unless `PNJ2K_FLOATING_POINT` asks for floating point, but for an
+ * image's alpha, which runs in floating point.
  * `*out` is set to the planes, or to NULL on every failure; free them with
  * `pnj2k_planes_free`.
  *
@@ -2720,8 +2902,10 @@ pnj2k_status pnj2k_decode_planes(struct pnj2k_decoder *dec,
 size_t pnj2k_planes_count(const struct pnj2k_planes *planes);
 
 /**
- * Fills `out` with plane `index`, whose samples are valid until the
- * planes are freed. Any number of threads may call it at once.
+ * Fills `out` with plane `index`, whose samples are valid until the planes
+ * are freed.
+ *
+ * Any number of threads may call it at once.
  *
  * # Safety
  *
@@ -2733,8 +2917,9 @@ pnj2k_status pnj2k_planes_get(const struct pnj2k_planes *planes,
                               struct pnj2k_plane *out);
 
 /**
- * Frees planes and their samples, through the decoder's allocator. It
- * needs no decoder and runs on any thread, once no other thread reads the
+ * Frees planes and their samples, through the decoder's allocator.
+ *
+ * It needs no decoder and runs on any thread, once no other thread reads the
  * planes. NULL is ignored.
  *
  * # Safety
@@ -2761,8 +2946,9 @@ void pnj2k_planes_free(struct pnj2k_planes *planes);
 struct pnj2k_encoder *pnj2k_encoder_new(const struct pnj2k_allocator *alloc);
 
 /**
- * Frees an encoder, and with it its message. Codestreams it made stay
- * valid. NULL is ignored.
+ * Frees an encoder, and with it its message.
+ *
+ * Codestreams it made stay valid. NULL is ignored.
  *
  * # Safety
  *
