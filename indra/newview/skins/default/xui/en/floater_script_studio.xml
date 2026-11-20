@@ -150,6 +150,7 @@
     <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with unsaved changes</floater.string>
     <floater.string name="SearchReplacedLeft">[SCRIPTS] skipped (changed since the search)</floater.string>
     <floater.string name="SearchReplaceNothing">Nothing to replace.</floater.string>
+    <floater.string name="SearchReplaceNonePicked">Select the matches to replace in the list first: Ctrl-click or Shift-click selects several.</floater.string>
     <floater.string name="SearchNoObject">no object selected</floater.string>
     <floater.string name="SearchNoObjectTip">Open a script from an object, or select an object in the Explorer, to search its contents</floater.string>
     <floater.string name="SearchObjectTip">[OBJECT]: [HITS] in [FILES]</floater.string>
@@ -2774,6 +2775,16 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              tool_tip="Replace all matches after you confirm. Scripts that are not open are opened, changes unsaved."
                              top="28"
                              width="90" />
+                            <button
+                             follows="top|right"
+                             height="22"
+                             label="Replace"
+                             layout="topleft"
+                             name="search_replace_selected"
+                             right="-96"
+                             tool_tip="Replace only the matches selected in the list: Ctrl-click or Shift-click selects several. Asks first if that opens scripts that are not open, with the changes unsaved."
+                             top="28"
+                             width="70" />
                             <line_editor
                              commit_on_focus_lost="false"
                              follows="top|left|right"
@@ -2782,9 +2793,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              layout="topleft"
                              left="0"
                              name="search_replacement"
-                             tool_tip="Replacement text; Return or Replace All asks before replacing"
+                             tool_tip="Replacement text; Return or Replace All asks before replacing all matches, Replace replaces those selected"
                              top_delta="0"
-                             width="478" />
+                             width="404" />
                             <pane_list
                              draw_heading="true"
                              heading_height="18"
@@ -2792,8 +2803,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              height="116"
                              layout="topleft"
                              left="0"
+                             multi_select="true"
                              name="search_results"
-                             tool_tip="Matches, kept up to date as open scripts change. Return or double-click goes there."
+                             tool_tip="Matches, kept up to date as open scripts change. Return or double-click goes there; Ctrl-click or Shift-click selects several for Replace."
                              top_pad="2"
                              width="574">
                                 <pane_list.columns label="Where" name="where" width="200" />

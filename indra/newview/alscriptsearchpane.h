@@ -46,7 +46,7 @@ class LLTextBox;
 // where asked what each includes, said as a sentence -- find `timer` as
 // [text] [ignoring case] in [open scripts] [and what they include] --
 // each place found a row, with the count of them; and Replace All over
-// them, asked about first. A script open is searched as it stands in its
+// them, asked about first, or Replace over the rows picked. A script open is searched as it stands in its
 // tab, and again a moment after it is typed in; any other as the region
 // has it, fetched, and what an earlier search is answered is dropped.
 // Going to a place, and fetching, are the window's.
@@ -132,6 +132,8 @@ public:
     // it uses and which it asks what it does not do itself.
     explicit ALScriptSearchPane(const LLPanel::Params& params = getDefaultParams());
     bool postBuild() override;
+    // Tab and Shift+Tab through the pane in an order of its own (tabOrder).
+    bool handleKeyHere(KEY key, MASK mask) override;
 
     // What the sentence says, searched for; and the words to look for
     // given the keyboard, what is chosen on a line of a tab in front put
@@ -158,6 +160,11 @@ public:
     // said, and searched again.
     void askReplaceAll();
     void replaceAll();
+    // Replace: the places picked in the list alone, ctrl- or shift-click
+    // picking several (Tapple's, QK9) -- asked about only where a script
+    // not open would be opened for it, since in an open one it is a step
+    // to undo -- and otherwise as Replace All.
+    void askReplaceSelected();
 
     const ALScriptSearch& search() const { return mSearch; }
     ALPaneList*           list() const { return mResults; }
@@ -199,6 +206,15 @@ private:
     // Replace All would change it, which its question counts by.
     Doc* tabOf(const ALScriptSearch::Found& one);
     bool replaceable(const ALScriptSearch::Found& one);
+    // The places of `found`, each a script with the places in it to change,
+    // replaced, said, and searched again.
+    void replaceIn(const std::vector<ALScriptSearch::Found>& found);
+
+    // The keyboard's order through the pane: what to find and what to put in
+    // its place side by side, then Replace All, then how and where to look,
+    // then what was found (Tapple's, QK8). The sentence's parts are asked
+    // for each time, since building it again makes them anew.
+    std::vector<LLUICtrl*> tabOrder() const;
 
     ALScriptStudioServices* mServices = nullptr;
     Window*                 mWindow   = nullptr;
@@ -207,6 +223,7 @@ private:
     LLTextBox*              mCount       = nullptr;
     LLLineEditor*           mReplacement = nullptr;
     LLButton*               mReplace     = nullptr;
+    LLButton*               mReplaceSome = nullptr;
     ALScriptSearch          mSearch;
     // The files included that this search has searched.
     std::set<std::string>   mIncludesSearched;

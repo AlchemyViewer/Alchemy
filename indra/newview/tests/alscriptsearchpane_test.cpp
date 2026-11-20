@@ -28,6 +28,9 @@
 
 #include "alpanelist.h"
 #include "alscopebar.h"
+#include "llbutton.h"
+#include "llfocusmgr.h"
+#include "llscrolllistitem.h"
 #include "llfontgl.h"
 #include "lllineeditor.h"
 #include "lltextbox.h"
@@ -421,6 +424,112 @@ namespace
                           services.words("SearchReplacedOpened",
                                          { { "[PLACES]", services.counted("Places", 3) }, { "[SCRIPTS]", services.counted("ScriptsNotecards", 2) } }) +
                           ".");
+    }
+
+    // Tapple's (QK9): some of the matches, not all or nothing.
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Replace changes only the matches picked, at once where they are open", "[ALScriptSearchPane]")
+    {
+        ALScriptSearchPane& out  = make();
+        Doc&                door = doc("door", "timer one\ntimer two\ntimer three\n");
+        Doc&                lamp = doc("lamp", "a timer\n");
+        find("timer");
+        REQUIRE(out.list()->getItemCount() == 4);
+        window.find<LLLineEditor>("search_replacement")->setText(std::string("clock"));
+
+        UNSCOPED_INFO("nothing picked: nothing done, and said");
+        out.list()->deselectAllItems();
+        out.askReplaceSelected();
+        CHECK(door.editor->text() == "timer one\ntimer two\ntimer three\n");
+        REQUIRE_FALSE(services.statuses.empty());
+        CHECK(services.statuses.back() == services.words("SearchReplaceNonePicked"));
+
+        // The first and third of the door's, and the lamp's: by what each
+        // row is of, whatever the list's order.
+        for (LLScrollListItem* item : out.list()->getAllData())
+        {
+            const size_t found = static_cast<size_t>(item->getValue()["found"].asInteger());
+            const size_t place = static_cast<size_t>(item->getValue()["place"].asInteger());
+            const bool   ours  = out.search().found()[found].doc == door.id;
+            item->setSelected(ours ? place != 1 : true);
+        }
+        out.askReplaceSelected();
+        UNSCOPED_INFO("open scripts: not asked");
+        CHECK(studio.asked.empty());
+        UNSCOPED_INFO("those picked replaced, the other left");
+        CHECK(door.editor->text() == "clock one\ntimer two\nclock three\n");
+        CHECK(lamp.editor->text() == "a clock\n");
+        UNSCOPED_INFO("one step to undo in each");
+        door.editor->undo();
+        CHECK(door.editor->text() == "timer one\ntimer two\ntimer three\n");
+        UNSCOPED_INFO("searched again");
+        CHECK(out.search().found().size() == size_t(1));
+    }
+
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Replace asks first where it opens a script", "[ALScriptSearchPane]")
+    {
+        ALScriptSearchPane& out  = make();
+        Doc&                door = doc("door", "timer\n");
+        const ALScriptRef   away(fresh(), fresh());
+        const LLUUID        root = door.ref.object;
+        studio.objects           = { { root, "Thing", { door.ref, away } } };
+        studio.inHand            = root;
+        find("timer", "object");
+        REQUIRE(studio.fetches.size() == size_t(1));
+        out.fetched(studio.fetches[0].generation, "Thing", away, "away.lsl", std::make_shared<const std::string>("timer\ntimer\n"), false);
+        services.whenOpened = [this](const ALScriptRef& ref, const std::string&) { doc("away", "timer\ntimer\n").ref = ref; };
+        window.find<LLLineEditor>("search_replacement")->setText(std::string("clock"));
+        // The second place of the script not open.
+        for (LLScrollListItem* item : out.list()->getAllData())
+        {
+            const ALScriptSearch::Found& one = out.search().found()[static_cast<size_t>(item->getValue()["found"].asInteger())];
+            item->setSelected(one.ref == away && item->getValue()["place"].asInteger() == 1);
+        }
+        out.askReplaceSelected();
+        UNSCOPED_INFO("asked, of what was picked");
+        REQUIRE(studio.asked.size() == size_t(1));
+        CHECK(studio.asked[0]["PLACES"].asString() == services.counted("Places", 1));
+        CHECK(studio.asked[0]["SCRIPTS"].asString() == services.counted("ScriptsNotecards", 1));
+        UNSCOPED_INFO("the open one left");
+        CHECK(door.editor->text() == "timer\n");
+        const Doc* opened = services.findDoc(away);
+        REQUIRE(opened != nullptr);
+        UNSCOPED_INFO("the one change waiting on its text: its second line");
+        REQUIRE(opened->pendingEdits.size() == size_t(1));
+        CHECK(opened->pendingEdits[0].now == "clock");
+        CHECK(opened->pendingEdits[0].span.line == 1);
+    }
+
+    // Tapple's (QK8): Find and Replace side by side on the keyboard.
+    TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Tab goes from Find to Replace, the buttons, how and where, then the matches", "[ALScriptSearchPane]")
+    {
+        ALScriptSearchPane& out = make();
+        doc("door", "timer\n");
+        find("timer");
+        const std::vector<LLUICtrl*> parts = out.bar()->tabStops();
+        REQUIRE(parts.size() >= 2);
+        LLUICtrl* const query = parts[0];
+        UNSCOPED_INFO("the field first among the sentence's stops");
+        REQUIRE(query->as<LLLineEditor>() != nullptr);
+        std::vector<LLUICtrl*> order = { query, window.find<LLLineEditor>("search_replacement"), window.find<LLButton>("search_replace_selected"),
+                                         window.find<LLButton>("search_replace") };
+        order.insert(order.end(), parts.begin() + 1, parts.end());
+        order.push_back(out.list());
+        query->setFocus(true);
+        REQUIRE(gFocusMgr.getKeyboardFocusCtrl() == query);
+        // As the window hands a key on: to what has the keyboard, then up.
+        const auto tab = [](MASK mask) { gFocusMgr.getKeyboardFocusCtrl()->handleKey(KEY_TAB, mask, false); };
+        for (size_t i = 1; i < order.size(); ++i)
+        {
+            tab(MASK_NONE);
+            INFO("stop " << i << ": " << order[i]->getName());
+            CHECK(gFocusMgr.getKeyboardFocusCtrl() == order[i]);
+        }
+        for (size_t i = order.size() - 1; i-- > 0;)
+        {
+            tab(MASK_SHIFT);
+            INFO("back to stop " << i << ": " << order[i]->getName());
+            CHECK(gFocusMgr.getKeyboardFocusCtrl() == order[i]);
+        }
     }
 
     TEST_CASE_METHOD(alscriptsearchpane_data, "ALScriptSearchPane: Replace All's step for a found script follows where it is now", "[ALScriptSearchPane]")

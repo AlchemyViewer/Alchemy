@@ -237,6 +237,34 @@ void ALScopeBar::reshape(S32 width, S32 height, bool called_from_parent)
     layout();
 }
 
+std::vector<LLUICtrl*> ALScopeBar::tabStops() const
+{
+    std::vector<LLUICtrl*> out;
+    for (size_t i = 0; i < mSegments.size() && i < mParts.size(); ++i)
+    {
+        if (mSegments[i].kind != Segment::Kind::Word)
+        {
+            if (LLUICtrl* ctrl = mParts[i]->as<LLUICtrl>())
+            {
+                out.push_back(ctrl);
+            }
+        }
+    }
+    return out;
+}
+
+bool ALScopeBar::handleKeyHere(KEY key, MASK mask)
+{
+    // Tab and Shift+Tab are the parent's, which moves through its own
+    // controls and, unless it lays out an order of its own, these as the
+    // panel here would have: in the order they read.
+    if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT))
+    {
+        return false;
+    }
+    return LLPanel::handleKeyHere(key, mask);
+}
+
 std::string ALScopeBar::valueOf(std::string_view name) const
 {
     for (size_t i = 0; i < mSegments.size() && i < mParts.size(); ++i)
