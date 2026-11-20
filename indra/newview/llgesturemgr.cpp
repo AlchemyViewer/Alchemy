@@ -536,6 +536,12 @@ void LLGestureMgr::replaceGesture(const LLUUID& item_id, const LLUUID& new_asset
     LLGestureMgr::instance().replaceGesture(base_item_id, gesture, new_asset_id);
 }
 
+std::optional<LLGestureMgr::usage_clock::time_point> LLGestureMgr::getLastUsedTime(const LLUUID& item_id) const
+{
+    const auto found = mLastUsed.find(gInventory.getLinkedItemID(item_id));
+    return found == mLastUsed.end() ? std::nullopt : std::make_optional(found->second);
+}
+
 void LLGestureMgr::playGesture(LLMultiGesture* gesture, bool fromKeyPress)
 {
     if (!gesture) return;
@@ -544,6 +550,21 @@ void LLGestureMgr::playGesture(LLMultiGesture* gesture, bool fromKeyPress)
     if (!RlvActions::canPlayGestures())
         return;
 // [/RLVa:KB]
+
+    // Every inventory playback path reaches here. Editor previews have no
+    // active inventory entry and must not change that item's usage history.
+    const auto active = std::find_if(mActive.begin(), mActive.end(),
+        [gesture](const auto& entry) { return entry.second == gesture; });
+    if (active != mActive.end())
+    {
+        if (!mLastUsed.contains(active->first) && mLastUsed.size() == MAX_RECENT_GESTURES)
+        {
+            const auto oldest = std::min_element(mLastUsed.begin(), mLastUsed.end(),
+                [](const auto& lhs, const auto& rhs) { return lhs.second < rhs.second; });
+            mLastUsed.erase(oldest);
+        }
+        mLastUsed[active->first] = usage_clock::now();
+    }
 
     // Reset gesture to first step
     gesture->reset();

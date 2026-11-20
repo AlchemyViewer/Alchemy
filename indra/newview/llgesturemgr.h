@@ -27,7 +27,9 @@
 #ifndef LL_LLGESTUREMGR_H
 #define LL_LLGESTUREMGR_H
 
+#include <chrono>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -100,6 +102,10 @@ public:
     bool isGesturePlaying(LLMultiGesture* gesture);
 
     const item_map_t& getActiveGestures() const { return mActive; }
+
+    using usage_clock = std::chrono::steady_clock;
+    // Session-only history, shared by inventory items and their links.
+    std::optional<usage_clock::time_point> getLastUsedTime(const LLUUID& item_id) const;
     // Force a gesture to be played, for example, if it is being
     // previewed.
     void playGesture(LLMultiGesture* gesture, bool fromKeyPress);
@@ -180,6 +186,10 @@ private:
     // there is a gesture with that item_id, but the asset data
     // is still on its way down from the server.
     item_map_t mActive;
+
+    // Keep history across deactivation, but bound it independently of inventory size.
+    static constexpr size_t MAX_RECENT_GESTURES = 1024;
+    std::map<LLUUID, usage_clock::time_point> mLastUsed;
 
     S32 mLoadingCount;
     std::string mDeactivateSimilarNames;

@@ -9,10 +9,23 @@
 	<floater.string name="copy_name">
 		Cópia de [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]s</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]min</floater.string>
+	<floater.string name="last_used_hours">[COUNT]h</floater.string>
+	<floater.string name="last_used_days">[COUNT]d</floater.string>
+	<floater.string name="no_gestures">Nenhum gesto</floater.string>
+	<floater.string name="no_matching_gestures">Nenhum gesto correspondente</floater.string>
+	<floater.string name="menu_activate">Ativar</floater.string>
+	<floater.string name="menu_deactivate">Desativar</floater.string>
+	<floater.string name="menu_play">Executar</floater.string>
+	<floater.string name="menu_stop">Parar</floater.string>
+	<filter_editor label="Filtrar por nome, bate-papo ou tecla" name="gesture_filter" tool_tip="Filtrar gestos por nome, gatilho no bate-papo ou tecla de atalho"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nome" name="name"/>
 		<scroll_list.columns label="Bate-papo" name="trigger"/>
 		<scroll_list.columns label="Chave" name="shortcut"/>
+		<scroll_list.columns label="Último" name="last_used" tool_tip="Tempo desde o último uso nesta sessão. Mantém os 1.024 gestos usados mais recentemente. Clique para ordenar."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Mais opções"/>
@@ -20,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Ativar/Desativar gesto selecionado"/>
 		<button name="del_btn" tool_tip="Excluir este gesto"/>
 	</panel>
-	<button label="Editar" name="edit_btn" tool_tip="Abrir janela para edição do gesto selecionado."/>
+	<button label="Abrir" name="edit_btn" tool_tip="Abrir janela para edição do gesto selecionado."/>
 	<button label="Executar" name="play_btn" tool_tip="Executar o gesto selecionado no mundo."/>
 	<button label="Parar" name="stop_btn"/>
 </floater>

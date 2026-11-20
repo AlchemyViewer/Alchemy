@@ -5,5 +5,5 @@
 	<menu_item_call label="Sæt ind" name="paste"/>
 	<menu_item_call label="Kopiér UUID" name="copy_uuid"/>
 	<menu_item_call label="Gem til nuværende sæt" name="save_to_outfit"/>
-	<menu_item_call label="Editér" name="edit_gesture"/>
+	<menu_item_call label="åben" name="edit_gesture"/>
 </menu>
