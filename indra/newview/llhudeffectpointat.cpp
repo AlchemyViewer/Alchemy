@@ -37,6 +37,7 @@
 #include "llviewerobjectlist.h"
 #include "llvoavatar.h"
 #include "message.h"
+#include "skcombatlockout.h" // <SK:Nexii> combat render lockout
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -320,7 +321,7 @@ void LLHUDEffectPointAt::setSourceObject(LLViewerObject* objectp)
 void LLHUDEffectPointAt::render()
 {
     update();
-    if (sDebugPointAt && mTargetType != POINTAT_TARGET_NONE)
+    if (sDebugPointAt && !SKCombatLockout::active() && mTargetType != POINTAT_TARGET_NONE) // <SK:Nexii/> combat render lockout
     {
         //LLGLDisable gls_stencil(GL_STENCIL_TEST);
         gGL.getTextureSlot(0)->unbind();
