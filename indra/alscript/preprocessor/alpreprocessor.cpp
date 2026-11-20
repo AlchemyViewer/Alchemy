@@ -4863,14 +4863,15 @@ namespace
                     }
                     ++j;
                 }
-                // `local require = require`: the global, kept by its name.
-                const bool alias = is(j, "=") && is(j + 1, "require") &&
-                                   !(is(j + 2, "(") || is(j + 2, ".") || is(j + 2, ":") || is(j + 2, "[") || (j + 2 < n && !words[j + 2].ident && words[j + 2].text.size() > 1 && (words[j + 2].text.front() == '"' || words[j + 2].text.front() == '\'')));
+                // Where its values end: from there it is in scope.
+                const size_t next = is(j, "=") ? statementEnd(words, j + 1, expression) : j;
+                // `local require = require`, that alone: the global, kept by
+                // its name.
+                const bool alias = is(j, "=") && is(j + 1, "require") && next == j + 2;
                 if (binds && !alias)
                 {
                     // Its own from the next statement, on its line or a
                     // later one: what it is set to reads the global still.
-                    const size_t next = is(j, "=") ? statementEnd(words, j + 1, expression) : j;
                     scopes.back().after = std::min(scopes.back().after, static_cast<Place>(next) - 1);
                 }
                 i = j - 1;

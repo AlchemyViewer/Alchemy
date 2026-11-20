@@ -2206,6 +2206,10 @@ namespace
         CHECK(counted("local require = function(n)\n    return require(\"./inner\")\nend\nrequire(\"./a\")\n") == Names{ "./inner" });
         UNSCOPED_INFO("the global kept by its name is the global");
         CHECK(counted("local require = require\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        CHECK(counted("local require = require; local m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("but only that alone");
+        CHECK(counted("local require = require and function(name) return name end\nprint(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = require \"./x\"\nprint(require(\"./lib\"))\n") == Names{});
         UNSCOPED_INFO("an if-expression closes no block");
         CHECK(counted("local x = if c then 1 else 2\ndo\n    local require = f\nend\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
         UNSCOPED_INFO("a field named require, or a comparison, binds nothing");
