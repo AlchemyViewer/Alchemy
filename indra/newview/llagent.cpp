@@ -117,10 +117,9 @@ const F32 AUTOPILOT_MIN_TARGET_HEIGHT_OFF_GROUND = 1.f; // meters
 const F32 AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK = 1.5f;       // seconds
 const F32 AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY = 2.5f;        // seconds. Flying is less presize, needs a bit more time
 
-// Ground-sit requests that do not originate from a click on the ground (e.g. the
-// game-control/keyboard "toggle sit" action) have no target position to check
-// against, so refuse them outright when the ground below the agent is farther
-// than this away, rather than snapping the agent down onto distant terrain.
+// Game-control ground-sit requests made while flying have no target position
+// to check against, so refuse them outright when the ground below the agent
+// is farther than this away, rather than snapping the agent down onto distant terrain.
 const F32 MAX_SIT_ON_GROUND_DISTANCE = 30.f;                // meters
 
 const F32 MAX_VELOCITY_AUTO_LAND_SQUARED = 4.f * 4.f;
@@ -1441,6 +1440,22 @@ void LLAgent::sitDown()
     if (!RlvActions::canGroundSit())
         return;
 // [/RLVa:KB]
+
+    setControlFlags(AGENT_CONTROL_SIT_ON_GROUND);
+}
+
+void LLAgent::sitDownNearby()
+{
+    // The walk or flight to the spot ends in the sit itself, past sitDown()'s check.
+    if (!RlvActions::canGroundSit())
+        return;
+
+    // When standing on a surface, send the request immediately.
+    if (!getFlying() && isAgentAvatarValid() && !gAgentAvatarp->mInAir)
+    {
+        sitDown();
+        return;
+    }
 
     // Sit on the ground directly beneath (or above) the agent's current position.
     // Refuse if that spot is too far away, and otherwise walk/fly there first,
@@ -5331,7 +5346,7 @@ void LLAgent::applyExternalActions(const LLGameControl::AgentActions& actions)
         }
         else
         {
-            sitDown();
+            sitDownNearby();
         }
     }
 
@@ -5614,7 +5629,7 @@ void LLAgent::applyExternalActions(const LLGameControl::AgentActions& actions)
     {
         // "Sit": only sit if currently standing; a no-op otherwise
         // (already sitting, flying, or airborne).
-        sitDown();
+        sitDownNearby();
     }
     else if ((mExternalActionFlags & AGENT_CONTROL_STAND_UP) > 0 && isSitting())
     {
