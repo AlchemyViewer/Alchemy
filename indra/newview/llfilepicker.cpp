@@ -67,6 +67,7 @@ LLFilePicker LLFilePicker::sInstance;
 #define SCRIPT_FILTER L"Script files (*.lsl; *.lua; *.luau)\0*.lsl;*.lua;*.luau\0"
 #define DICTIONARY_FILTER L"Dictionary files (*.dic; *.xcu)\0*.dic;*.xcu\0"
 #define ZIP_FILTER L"ZIP files (*.zip)\0*.zip\0"
+#define FONT_FILTER L"Font files (*.ttf; *.otf; *.woff2)\0*.ttf;*.otf;*.woff2\0"
 #endif
 
 #if LL_DARWIN && !LL_SDL_WINDOW
@@ -235,6 +236,9 @@ namespace
             break;
         case LLFilePicker::FFLOAD_ZIP:
             filter_vec.push_back({ "ZIP files (*.zip)", "zip" });
+            break;
+        case LLFilePicker::FFLOAD_FONT:
+            filter_vec.push_back({ "Font files (*.ttf; *.otf; *.woff2)", "ttf;otf;woff2" });
             break;
         default:
             break;
@@ -645,6 +649,10 @@ bool LLFilePicker::setupFilter(ELoadFilter filter)
         break;
     case FFLOAD_ZIP:
         mOFN.lpstrFilter = ZIP_FILTER \
+            L"\0";
+        break;
+    case FFLOAD_FONT:
+        mOFN.lpstrFilter = FONT_FILTER \
             L"\0";
         break;
     default:
@@ -1136,6 +1144,11 @@ std::unique_ptr<std::vector<std::string>> LLFilePicker::navOpenFilterProc(ELoadF
             break;
         case FFLOAD_ZIP:
             allowedv->push_back("zip");
+            break;
+        case FFLOAD_FONT:
+            allowedv->push_back("ttf");
+            allowedv->push_back("otf");
+            allowedv->push_back("woff2");
             break;
         case FFLOAD_DIRECTORY:
             break;

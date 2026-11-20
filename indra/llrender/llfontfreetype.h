@@ -158,6 +158,18 @@ public:
     // touches no instance state, so callers don't need a live freetype.
     static S32 getNumFaces(const std::string& filename);
 
+    struct FaceInfo
+    {
+        bool        valid       = false;
+        std::string family;
+        bool        bold        = false;
+        bool        italic      = false;
+        bool        fixed_width = false;
+        bool        has_color   = false;
+    };
+    // Probe the first face of a font file.
+    static FaceInfo probeFaceInfo(const std::string& filename);
+
     typedef std::function<bool(llwchar)> char_functor_t;
     void addFallbackFont(const LLPointer<LLFontFreetype>& fallback_font, const char_functor_t& functor = nullptr) const;
     typedef std::pair<LLPointer<LLFontFreetype>, char_functor_t> fallback_font_t;

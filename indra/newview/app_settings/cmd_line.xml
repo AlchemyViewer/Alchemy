@@ -297,6 +297,14 @@
       <string>ReplaySession</string>
     </map>
 
+    <key>resetfonts</key>
+    <map>
+      <key>desc</key>
+      <string>Clear all custom UI/monospace/emoji font overrides before fonts load, restoring the built-in fonts. Recovery for an unreadable UI. Imported fonts are not deleted.</string>
+      <key>map-to</key>
+      <string>AlchemyResetFontsOnStartup</string>
+    </map>
+
     <key>rotate</key>
     <map>
       <key>map-to</key>
