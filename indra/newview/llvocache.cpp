@@ -170,6 +170,27 @@ bool LLGLTFOverrideCacheEntry::sameOverride(const LLGLTFMaterial* held, const LL
     return held && wanted && *held == *wanted;
 }
 
+static_assert(LLTEContents::MAX_TES <= 64, "a face's hold is a bit of a U64");
+
+void LLGLTFOverrideCacheEntry::hold(S32 side, F64 now)
+{
+    if (side < 0 || side >= LLTEContents::MAX_TES)
+    {
+        return;
+    }
+    if (now >= mHeldUntil)
+    {
+        mHeldFaces = 0;
+    }
+    mHeldFaces |= U64(1) << side;
+    mHeldUntil = now + HOLD_SECONDS;
+}
+
+bool LLGLTFOverrideCacheEntry::isHeld(S32 side, F64 now) const
+{
+    return now < mHeldUntil && side >= 0 && side < LLTEContents::MAX_TES && (mHeldFaces & (U64(1) << side)) != 0;
+}
+
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;

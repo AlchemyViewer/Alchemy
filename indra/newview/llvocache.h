@@ -51,7 +51,7 @@ class LLGLTFOverrideCacheEntry
 public:
     static const std::string VERSION_LABEL;
     static const int VERSION;
-    // How long the entry waits for the region to answer an edit the viewer sent for the object, showing the edit
+    // How long the faces of an edit the viewer sent for the object wait for the region to answer it, showing the edit
     // meanwhile. The answer replaces the entry.
     static constexpr F64 HOLD_SECONDS = 10.0;
 
@@ -67,8 +67,10 @@ public:
     // Whether a face holding `held` shows `wanted`: the same override by value, or none on both.
     static bool sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted);
 
-    void hold(F64 now) { mHeldUntil = now + HOLD_SECONDS; }
-    bool isHeld(F64 now) const { return now < mHeldUntil; }
+    // Holds face `side` from the entry's override for HOLD_SECONDS, and the faces held with it for as long; a face held
+    // before the last hold ran out is let go.
+    void hold(S32 side, F64 now);
+    bool isHeld(S32 side, F64 now) const;
 
     // Whether the entry is for the object `id`: one naming no object is taken to be.
     bool isFor(const LLUUID& id) const { return mObjectId.isNull() || mObjectId == id; }
@@ -78,6 +80,7 @@ public:
     boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
     boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side, empty until materialize()
     U64 mRegionHandle = 0;
+    U64 mHeldFaces = 0; // a bit a face
     F64 mHeldUntil = 0.0;
 };
 

@@ -912,19 +912,39 @@ namespace
         CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(nullptr, held));
     }
 
-    TEST_CASE("LLGLTFOverrideCacheEntry: a hold lasts until the region answers or its time is up", "[LLVOCache]")
+    TEST_CASE("LLGLTFOverrideCacheEntry: a hold keeps the edited face until the region answers or its time is up", "[LLVOCache]")
     {
+        constexpr F64 HOLD = LLGLTFOverrideCacheEntry::HOLD_SECONDS;
         LLGLTFOverrideCacheEntry entry;
-        CHECK_FALSE(entry.isHeld(0.0));
-        entry.hold(100.0);
-        CHECK(entry.isHeld(100.0));
-        CHECK(entry.isHeld(100.0 + LLGLTFOverrideCacheEntry::HOLD_SECONDS - 0.5));
-        CHECK_FALSE(entry.isHeld(100.0 + LLGLTFOverrideCacheEntry::HOLD_SECONDS));
+        CHECK_FALSE(entry.isHeld(2, 0.0));
+        entry.hold(2, 100.0);
+        CHECK(entry.isHeld(2, 100.0));
+        CHECK(entry.isHeld(2, 100.0 + HOLD - 0.5));
+        CHECK_FALSE(entry.isHeld(2, 100.0 + HOLD));
+        UNSCOPED_INFO("only the edited face");
+        CHECK_FALSE(entry.isHeld(0, 100.0));
+        CHECK_FALSE(entry.isHeld(3, 100.0));
+
+        UNSCOPED_INFO("a face edited while another is held is held with it for as long");
+        entry.hold(0, 105.0);
+        CHECK(entry.isHeld(0, 105.0 + HOLD - 0.5));
+        CHECK(entry.isHeld(2, 105.0 + HOLD - 0.5));
+
+        UNSCOPED_INFO("a hold that ran out lets its faces go at the next one");
+        entry.hold(5, 300.0);
+        CHECK(entry.isHeld(5, 300.0));
+        CHECK_FALSE(entry.isHeld(0, 300.0));
+        CHECK_FALSE(entry.isHeld(2, 300.0));
+
+        UNSCOPED_INFO("no face outside an object's range is held");
+        entry.hold(-1, 300.0);
+        entry.hold(LLTEContents::MAX_TES, 300.0);
+        CHECK_FALSE(entry.isHeld(-1, 300.0));
+        CHECK_FALSE(entry.isHeld(LLTEContents::MAX_TES, 300.0));
 
         UNSCOPED_INFO("the region's answer replaces the entry and the hold with it");
-        entry.hold(200.0);
         entry = LLGLTFOverrideCacheEntry();
-        CHECK_FALSE(entry.isHeld(200.0));
+        CHECK_FALSE(entry.isHeld(5, 300.0));
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: an override is kept only for the object its local ID holds", "[LLVOCache]")

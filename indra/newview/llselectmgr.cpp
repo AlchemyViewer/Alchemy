@@ -3339,7 +3339,7 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
                     tep->setGLTFMaterialOverride(material);
                     if (LLViewerRegion* regionp = object->getRegion())
                     {
-                        regionp->holdGLTFOverride(object->getLocalID());
+                        regionp->holdGLTFOverride(object->getLocalID(), te_num);
                     }
 
                     F32 scale_x = 1;

@@ -3094,12 +3094,12 @@ void LLViewerRegion::cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry overri
     iter->second = std::move(override_data);
 }
 
-void LLViewerRegion::holdGLTFOverride(U32 local_id)
+void LLViewerRegion::holdGLTFOverride(U32 local_id, S32 side)
 {
     auto iter = mImpl->mGLTFOverridesLLSD.find(local_id);
     if (iter != mImpl->mGLTFOverridesLLSD.end())
     {
-        iter->second.hold(LLFrameTimer::getTotalSeconds());
+        iter->second.hold(side, LLFrameTimer::getTotalSeconds());
     }
 }
 
@@ -4304,10 +4304,9 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
         return;
     }
 
-    // An object the region has sent nothing for keeps what its faces hold, as one waiting on the region's answer to
-    // an edit of the viewer's own shows the edit.
+    // An object the region has sent nothing for keeps what its faces hold.
     auto iter = mImpl->mGLTFOverridesLLSD.find(obj->getLocalID());
-    if (iter == mImpl->mGLTFOverridesLLSD.end() || iter->second.isHeld(LLFrameTimer::getTotalSeconds()))
+    if (iter == mImpl->mGLTFOverridesLLSD.end())
     {
         return;
     }
@@ -4324,12 +4323,18 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
 
     // The entry is all the region gave the object, so a face it leaves out takes none. A face whose material is
     // missing or still fetching takes nothing yet (setTEGLTFMaterialOverride); it is asked again once the material
-    // completes (onRenderMaterialFetched).
+    // completes (onRenderMaterialFetched). A face waiting on the region's answer to an edit of the viewer's own
+    // shows the edit; the answer reaches it as it replaces the entry (LLGLTFMaterialList::applyOverrideMessage).
+    const F64 now = LLFrameTimer::getTotalSeconds();
     const S32 num_tes = (S32)obj->getNumTEs();
     const S32 first = te < 0 ? 0 : te;
     const S32 last = te < 0 ? num_tes : llmin(te + 1, num_tes);
     for (S32 i = first; i < last; ++i)
     {
+        if (entry.isHeld(i, now))
+        {
+            continue;
+        }
         const LLTextureEntry* tep = obj->getTE((U8)i);
         LLGLTFMaterial* wanted = entry.overrideFor(i);
         if (tep && !LLGLTFOverrideCacheEntry::sameOverride(tep->getGLTFMaterialOverride(), wanted))

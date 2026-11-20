@@ -350,13 +350,13 @@ void LLGLTFMaterialList::applyQueuedOverrides(LLViewerObject* obj, S32 te)
 
 namespace
 {
-    // The region's overrides for an object wait for its answer to an edit the viewer sends, so that a rebuild before
-    // the answer does not put back what the edit replaced.
-    void hold_region_overrides(const LLViewerObject* obj)
+    // The region's override for a face waits for its answer to an edit the viewer sends, so that a rebuild before the
+    // answer does not put back what the edit replaced.
+    void hold_region_override(const LLViewerObject* obj, S32 side)
     {
         if (LLViewerRegion* regionp = obj ? obj->getRegion() : nullptr)
         {
-            regionp->holdGLTFOverride(obj->getLocalID());
+            regionp->holdGLTFOverride(obj->getLocalID(), side);
         }
     }
 }
@@ -372,7 +372,7 @@ void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const 
     }
     if (obj && obj->getRenderMaterialID(side).notNull())
     {
-        hold_region_overrides(obj);
+        hold_region_override(obj, side);
         if (mat == nullptr)
         {
             sModifyQueue.push_back({ obj->getID(), side, LLGLTFMaterial(), false });
@@ -390,7 +390,7 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     {
         return; // client-only preview: no sim material sync (see queueModify)
     }
-    hold_region_overrides(obj);
+    hold_region_override(obj, side);
     const LLGLTFMaterial* material_override = obj->getTE(side)->getGLTFMaterialOverride();
     if (material_override)
     {
@@ -417,7 +417,7 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     }
     else
     {
-        hold_region_overrides(obj);
+        hold_region_override(obj, side);
         sApplyQueue.push_back({ obj->getID(), side, asset_id, nullptr, override_json });
     }
 }
@@ -435,7 +435,7 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     }
     else
     {
-        hold_region_overrides(obj);
+        hold_region_override(obj, side);
         LLGLTFMaterial* material = new LLGLTFMaterial(*material_override);
         sApplyQueue.push_back({ obj->getID(), side, asset_id, material });
     }
