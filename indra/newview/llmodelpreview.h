@@ -172,6 +172,10 @@ public:
     void setHasPivot(bool val) { mHasPivot = val; }
     void setModelPivot(const LLVector3& pivot) { mModelPivot = pivot; }
 
+    // <SK:Nexii> Mesh uploader LODs by name: a file's NAME_LOD0-2 and NAME_PHYS models fill those slots of NAME
+    void splitSuffixedModels(const std::string& filename);
+    // </SK:Nexii>
+
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
     //Accessors for joint position upload friendly rigs
     const bool isRigValidForJointPositionUpload(void) const { return mRigValidJointUpload; }
@@ -271,6 +275,7 @@ protected:
     bool        mResetJoints;
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
+    bool        mLODFromHighFile[LLModel::NUM_LODS]{}; // <SK:Nexii> Mesh uploader LODs by name
 
     std::map<std::string, bool> mViewOption;
 
