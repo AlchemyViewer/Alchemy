@@ -389,14 +389,12 @@ public:
     {
         std::string name;
     };
-    // None where the script binds the name itself (bindsRequire).
+    // A call to a require of the script's own is none of these, and no run
+    // puts a module in its place: one the script binds -- a local, a
+    // function's parameter, a loop's variable -- in scope at the call, or a
+    // global it defines or assigns anywhere. `local require = require`
+    // keeps the global, and binds nothing of its own.
     static std::vector<Required> requiresIn(std::string_view text);
-    // Whether a script of SLua binds `require` itself -- `local function
-    // require`, `local require`, `function require`, `require = ...` -- so
-    // that its calls are its own function's, not modules': neither counted
-    // (requiresIn) nor put in a module's place by a run. Whole-script: a
-    // script that names its own require anywhere uses no modules by it.
-    static bool bindsRequire(std::string_view text);
 
 private:
     // The optimizer alone, which is the first half of `finish`.

@@ -4598,6 +4598,301 @@ namespace
     // sends.
     void assemble(const Tokens& tokens, ALPreprocessor::Result& result, bool lua);
 
+    // Where a script's `require` is its own rather than the global a run
+    // answers with modules: a name it binds -- a local, a function's
+    // parameter, a loop's variable -- in scope there, or a global it
+    // assigns or defines anywhere, which no reading of the text can place
+    // in time. `local require = require` keeps the global under the same
+    // name, and binds nothing of its own. Over the script's words, blanks
+    // and comments left out; true for each word that is such a `require`.
+    struct ScopeWord
+    {
+        bool             ident = false;
+        std::string_view text;
+        S32              line = 0;
+    };
+
+    std::vector<bool> ownRequires(const std::vector<ScopeWord>& words)
+    {
+        const size_t      n = words.size();
+        std::vector<bool> own(n, false);
+        const auto is    = [&](size_t i, std::string_view t) { return i < n && words[i].text == t; };
+        const auto ident = [&](size_t i) { return i < n && words[i].ident; };
+        const auto named = [&](size_t i) { return ident(i) && words[i].text == "require" && !(i > 0 && (is(i - 1, ".") || is(i - 1, ":"))); };
+        // A block, and the line after which `require` is its own in it:
+        // none, or every line for a parameter or a loop's variable.
+        enum class Opened : U8
+        {
+            Chunk,
+            Function,
+            Block,
+            If,
+            Repeat
+        };
+        struct Scope
+        {
+            Opened opened;
+            S32    after = std::numeric_limits<S32>::max();
+        };
+        constexpr S32      ALWAYS = std::numeric_limits<S32>::min();
+        std::vector<Scope> scopes{ { Opened::Chunk } };
+        bool               global    = false;
+        bool               loopBinds = false;
+        size_t             exprIfs   = 0;
+        const auto inScope = [&](S32 line) {
+            return std::any_of(scopes.begin(), scopes.end(), [line](const Scope& scope) { return line > scope.after; });
+        };
+        // An `if` where an expression goes, Luau's, which no `end` closes.
+        constexpr std::string_view EXPRESSION_BEFORE[] = { "=", "(", "[", ",", "{", "return", "and", "or", "not", "..", "+", "-", "*", "/",
+                                                           "//", "%", "^", "==", "~=", "<", ">", "<=", ">=", "+=", "-=", "*=", "/=", "//=",
+                                                           "%=", "^=", "..=", "in", "then", "else" };
+        const auto expression = [&](size_t i) {
+            if (i == 0)
+            {
+                return false;
+            }
+            // `then if` and `else if` start statements; an expression's
+            // `if` follows its own `then` or `else` only inside one.
+            if ((is(i - 1, "then") || is(i - 1, "else")) && exprIfs == 0)
+            {
+                return false;
+            }
+            return std::find(std::begin(EXPRESSION_BEFORE), std::end(EXPRESSION_BEFORE), words[i - 1].text) != std::end(EXPRESSION_BEFORE);
+        };
+        // Past a type after `:`: names, `.`, `?`, `|`, `&` and bracketed
+        // groups, up to `,`, `=`, `)` or a name where a new statement
+        // begins.
+        const auto pastType = [&](size_t j) {
+            S32  depth = 0;
+            bool ended = false;
+            while (j < n)
+            {
+                const std::string_view t = words[j].text;
+                if (t == "(" || t == "{" || t == "[" || t == "<")
+                {
+                    ++depth;
+                }
+                else if (t == ")" || t == "}" || t == "]" || t == ">")
+                {
+                    if (depth == 0)
+                    {
+                        break;
+                    }
+                    --depth;
+                }
+                else if (depth == 0 && (t == "," || t == "="))
+                {
+                    break;
+                }
+                else if (depth == 0 && words[j].ident && ended)
+                {
+                    break;
+                }
+                ended = depth == 0 && (words[j].ident || t == ")" || t == "}" || t == "]" || t == ">" || t == "?");
+                ++j;
+            }
+            return j;
+        };
+        // A parameter list from its `(`: whether it names `require`, and
+        // where it ends.
+        const auto parameters = [&](size_t open) {
+            bool   binds = false;
+            bool   name  = true;
+            S32    depth = 0;
+            size_t j     = open;
+            for (; j < n; ++j)
+            {
+                const std::string_view t = words[j].text;
+                if (t == "(" || t == "{" || t == "[")
+                {
+                    ++depth;
+                    continue;
+                }
+                if (t == ")" || t == "}" || t == "]")
+                {
+                    if (--depth == 0)
+                    {
+                        ++j;
+                        break;
+                    }
+                    continue;
+                }
+                if (depth != 1)
+                {
+                    continue;
+                }
+                if (t == ",")
+                {
+                    name = true;
+                }
+                else if (name && words[j].ident)
+                {
+                    binds = binds || t == "require";
+                    name  = false;
+                }
+                else
+                {
+                    name = false;
+                }
+            }
+            return std::make_pair(binds, j);
+        };
+        for (size_t i = 0; i < n; ++i)
+        {
+            if (!words[i].ident)
+            {
+                continue;
+            }
+            const std::string_view t = words[i].text;
+            if (t == "function")
+            {
+                // Its name, `a.b:c` or a plain one; the plain one bound
+                // where the function is local, made the global's otherwise.
+                size_t j     = i + 1;
+                bool   plain = false;
+                if (ident(j))
+                {
+                    plain = words[j].text == "require";
+                    ++j;
+                    while (is(j, ".") || is(j, ":"))
+                    {
+                        plain = false;
+                        j += 2;
+                    }
+                }
+                if (plain)
+                {
+                    if (i > 0 && is(i - 1, "local"))
+                    {
+                        scopes.back().after = std::min(scopes.back().after, words[i].line - 1);
+                    }
+                    else
+                    {
+                        global = true;
+                    }
+                }
+                Scope body{ Opened::Function };
+                if (is(j, "("))
+                {
+                    const auto [binds, after] = parameters(j);
+                    if (binds)
+                    {
+                        body.after = ALWAYS;
+                    }
+                    j = after;
+                }
+                scopes.push_back(body);
+                i = j - 1;
+            }
+            else if (t == "local" && !is(i + 1, "function"))
+            {
+                size_t j     = i + 1;
+                bool   binds = false;
+                while (ident(j))
+                {
+                    binds = binds || words[j].text == "require";
+                    ++j;
+                    if (is(j, ":"))
+                    {
+                        j = pastType(j + 1);
+                    }
+                    if (!is(j, ","))
+                    {
+                        break;
+                    }
+                    ++j;
+                }
+                // `local require = require`: the global, kept by its name.
+                const bool alias = is(j, "=") && is(j + 1, "require") &&
+                                   !(is(j + 2, "(") || is(j + 2, ".") || is(j + 2, ":") || is(j + 2, "[") || (j + 2 < n && !words[j + 2].ident && words[j + 2].text.size() > 1 && (words[j + 2].text.front() == '"' || words[j + 2].text.front() == '\'')));
+                if (binds && !alias)
+                {
+                    // Its own from the next line: what it is set to reads
+                    // the global still.
+                    scopes.back().after = std::min(scopes.back().after, words[i].line);
+                }
+                i = j - 1;
+            }
+            else if (t == "for")
+            {
+                size_t j  = i + 1;
+                loopBinds = false;
+                while (ident(j))
+                {
+                    loopBinds = loopBinds || words[j].text == "require";
+                    ++j;
+                    if (is(j, ":"))
+                    {
+                        j = pastType(j + 1);
+                    }
+                    if (!is(j, ","))
+                    {
+                        break;
+                    }
+                    ++j;
+                }
+                i = j - 1;
+            }
+            else if (t == "do")
+            {
+                scopes.push_back({ Opened::Block, loopBinds ? ALWAYS : std::numeric_limits<S32>::max() });
+                loopBinds = false;
+            }
+            else if (t == "if")
+            {
+                if (expression(i))
+                {
+                    ++exprIfs;
+                }
+                else
+                {
+                    scopes.push_back({ Opened::If });
+                }
+            }
+            else if (t == "elseif" || t == "else")
+            {
+                if (exprIfs > 0)
+                {
+                    exprIfs -= t == "else" ? 1 : 0;
+                }
+                else if (scopes.back().opened == Opened::If)
+                {
+                    // What one branch bound is not the next one's.
+                    scopes.back().after = std::numeric_limits<S32>::max();
+                }
+            }
+            else if (t == "repeat")
+            {
+                scopes.push_back({ Opened::Repeat });
+            }
+            else if (t == "end" || t == "until")
+            {
+                if (scopes.size() > 1)
+                {
+                    scopes.pop_back();
+                }
+            }
+            else if (named(i))
+            {
+                own[i] = inScope(words[i].line);
+                // `require = ...`, and `a, require = ...`, of no local in
+                // scope: the global's, from whenever it runs.
+                if (!own[i] && is(i + 1, "="))
+                {
+                    global = true;
+                }
+            }
+        }
+        if (global)
+        {
+            for (size_t i = 0; i < n; ++i)
+            {
+                own[i] = own[i] || named(i);
+            }
+        }
+        return own;
+    }
+
     class Requires
     {
     public:
@@ -4609,12 +4904,31 @@ namespace
         void gather(Tokens& tokens, const std::string& from)
         {
             const boost::unordered_flat_map<std::string, size_t, ll::string_hash, std::equal_to<>> named = namesIn(tokens);
+            // The calls to a require of the script's own, left as they are.
+            std::vector<bool> own(tokens.size(), false);
+            {
+                std::vector<ScopeWord> words;
+                std::vector<size_t>    at;
+                for (size_t k = 0; k < tokens.size(); ++k)
+                {
+                    if (!tokens[k].blank())
+                    {
+                        words.push_back({ tokens[k].kind == Kind::Ident, tokens[k].text, tokens[k].line });
+                        at.push_back(k);
+                    }
+                }
+                const std::vector<bool> mine = ownRequires(words);
+                for (size_t w = 0; w < words.size(); ++w)
+                {
+                    own[at[w]] = mine[w];
+                }
+            }
             Tokens out;
             size_t i = 0;
             while (i < tokens.size())
             {
                 const Token& t = tokens[i];
-                if (t.is(Kind::Ident, "require") && !indexed(out))
+                if (t.is(Kind::Ident, "require") && !indexed(out) && !own[i])
                 {
                     const size_t a = skipBlank(tokens, i + 1);
                     const size_t b = a < tokens.size() && tokens[a].is(Kind::Punct, "(") ? skipBlank(tokens, a + 1) : tokens.size();
@@ -5440,11 +5754,7 @@ ALPreprocessor::Result ALPreprocessor::run(std::string_view source, const Option
         {
             as_made = tokens;
         }
-        // A script with a require of its own calls that, not modules.
-        if (!bindsRequire(source))
-        {
-            gathered.gather(tokens, std::string());
-        }
+        gathered.gather(tokens, std::string());
         gathered.noteUnread();
         if (options.apart && !gathered.apart().empty())
         {
@@ -5858,69 +6168,30 @@ std::vector<ALPreprocessor::Token> ALPreprocessor::tokenize(std::string_view tex
 }
 
 // static
-namespace
-{
-    // Whether the tokens bind `require` (ALPreprocessor::bindsRequire).
-    bool bindsRequireIn(const std::vector<ALPreprocessor::Token>& tokens)
-    {
-        typedef ALPreprocessor::Token::Kind Kind;
-        std::vector<const ALPreprocessor::Token*> code;
-        code.reserve(tokens.size());
-        for (const ALPreprocessor::Token& token : tokens)
-        {
-            if (token.kind != Kind::Space && token.kind != Kind::Newline && token.kind != Kind::Comment)
-            {
-                code.push_back(&token);
-            }
-        }
-        const auto is = [&code](size_t i, Kind kind, std::string_view word) {
-            return i < code.size() && code[i]->kind == kind && code[i]->text == word;
-        };
-        for (size_t i = 0; i < code.size(); ++i)
-        {
-            if (!is(i, Kind::Ident, "require") || (i > 0 && (is(i - 1, Kind::Punct, ".") || is(i - 1, Kind::Punct, ":"))))
-            {
-                continue;
-            }
-            // `function require`, `local function require`, `local require`,
-            // and `require = ...` where it stands alone as what is assigned.
-            if (i > 0 && (is(i - 1, Kind::Ident, "function") || is(i - 1, Kind::Ident, "local")))
-            {
-                return true;
-            }
-            if (is(i + 1, Kind::Punct, "="))
-            {
-                return true;
-            }
-            // `local a, b, require`: back over the names and commas to `local`.
-            size_t at = i;
-            while (at >= 2 && is(at - 1, Kind::Punct, ",") && code[at - 2]->kind == Kind::Ident)
-            {
-                at -= 2;
-            }
-            if (at != i && at > 0 && is(at - 1, Kind::Ident, "local"))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-}
-
-// static
-bool ALPreprocessor::bindsRequire(std::string_view text)
-{
-    return bindsRequireIn(tokenize(text, true));
-}
-
 std::vector<ALPreprocessor::Required> ALPreprocessor::requiresIn(std::string_view text)
 {
     // The shape Requires::gather takes: the word, `(`, a quoted string and
     // `)`, blanks and comments between them, and no `.` or `:` before it.
     const std::vector<Token> tokens = tokenize(text, true);
-    if (bindsRequireIn(tokens))
+    // Calls to a require of the script's own are none of these.
+    std::vector<bool> own(tokens.size(), false);
     {
-        return {};
+        std::vector<ScopeWord> words;
+        std::vector<size_t>    at;
+        for (size_t k = 0; k < tokens.size(); ++k)
+        {
+            const Token::Kind kind = tokens[k].kind;
+            if (kind != Token::Kind::Space && kind != Token::Kind::Newline && kind != Token::Kind::Comment)
+            {
+                words.push_back({ kind == Token::Kind::Ident, tokens[k].text, tokens[k].line });
+                at.push_back(k);
+            }
+        }
+        const std::vector<bool> mine = ownRequires(words);
+        for (size_t w = 0; w < words.size(); ++w)
+        {
+            own[at[w]] = mine[w];
+        }
     }
     const auto blank = [&tokens](size_t i) {
         const Token::Kind kind = tokens[i].kind;
@@ -5946,7 +6217,7 @@ std::vector<ALPreprocessor::Required> ALPreprocessor::requiresIn(std::string_vie
         }
         const bool field = indexed;
         indexed          = is(i, Token::Kind::Punct, ".") || is(i, Token::Kind::Punct, ":");
-        if (field || !is(i, Token::Kind::Ident, "require"))
+        if (field || !is(i, Token::Kind::Ident, "require") || own[i])
         {
             continue;
         }
