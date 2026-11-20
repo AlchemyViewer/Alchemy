@@ -36,6 +36,7 @@ target_sources(
     lint/alscriptfixes.cpp
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
+    lsl/allslcomments.cpp
     lsl/allslconsts.cpp
     lsl/allsldepth.cpp
     lsl/allsleffects.cpp
@@ -118,6 +119,7 @@ target_sources(
         lint/alscriptfixes.h
         lint/alscriptlintpass.h
         lint/alselenefilters.h
+        lsl/allslcomments.h
         lsl/allslconsts.h
         lsl/allsldepth.h
         lsl/allsleffects.h
@@ -265,6 +267,7 @@ if(AL_BUILD_TESTS)
       tests/alincludeidentity_test.cpp
       tests/alincludesearch_test.cpp
       tests/allinelabel_test.cpp
+      tests/allslcomments_test.cpp
       tests/allslconsts_test.cpp
       tests/allslcosts_test.cpp
       tests/allsleffects_test.cpp

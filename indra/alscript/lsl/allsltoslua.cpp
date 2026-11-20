@@ -30,6 +30,7 @@
 
 #include "alscriptengine.h"
 #include "alscriptstack.h"
+#include "allslcomments.h"
 #include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslservice.h"
@@ -546,6 +547,8 @@ namespace
         {
             Pos         at;
             S32         endLine = 0;
+            // The byte of the LSL it begins at.
+            size_t      begin   = 0;
             // As SLua writes it: a block comment's lines past its first as
             // they were.
             std::string text;
@@ -1567,72 +1570,25 @@ namespace
             return;
         }
         // Each comment, past strings, where it begins.
-        const std::string_view src    = mSource;
-        Pos                    at     = { 1, 1 };
-        const auto             step   = [&](char c) {
-            if (c == '\n')
-            {
-                ++at.line;
-                at.column = 1;
-            }
-            else
-            {
-                ++at.column;
-            }
-        };
+        const std::string_view                    src     = mSource;
+        const std::vector<ALLSLComments::Comment> scanned = ALLSLComments::scan(src);
         // The byte a toggle's level is marked with: one the script has none
         // of, so nothing written of it has one either.
-        for (char c = 1; c < ' ' && !mToggleMark; ++c)
-        {
-            if (c != '\t' && c != '\n' && c != '\r' && src.find(c) == std::string_view::npos)
-            {
-                mToggleMark = c;
-            }
-        }
+        mToggleMark            = ALLSLComments::freeByte(src);
         const std::string mark = mToggleMark ? std::string(1, mToggleMark) : std::string();
-        // The openers since the last closer, by the comment and what follows
-        // the star; and each opener with the closer it was paired with.
-        std::vector<std::pair<size_t, std::string>> pending;
-        std::vector<std::pair<size_t, size_t>>      pairs;
-        for (size_t i = 0; i < src.size();)
+        // Each opener with the closer it was paired with.
+        std::vector<std::pair<size_t, size_t>> pairs;
+        for (const ALLSLComments::Comment& s : scanned)
         {
-            const char c = src[i];
-            if (c == '"')
-            {
-                step(src[i++]);
-                while (i < src.size() && src[i] != '"')
-                {
-                    if (src[i] == '\\' && i + 1 < src.size())
-                    {
-                        step(src[i++]);
-                    }
-                    step(src[i++]);
-                }
-                if (i < src.size())
-                {
-                    step(src[i++]);
-                }
-                continue;
-            }
-            if (c != '/' || i + 1 >= src.size() || (src[i + 1] != '/' && src[i + 1] != '*'))
-            {
-                step(src[i++]);
-                continue;
-            }
             Comment k;
-            k.at = at;
-            size_t end;
+            k.at    = { s.line, s.column };
+            k.begin = s.begin;
             // //* over code and //*/ under it, which a / taken out of the
             // first makes a block comment: ---[[ and --]], which a - taken
-            // out of the first makes one. A closer is one whatever is before
-            // it, and so is a block comment that ends in one, the toggle
-            // turned off; an opener is one where something after it closes
-            // it, and a comment that begins with a star where nothing does.
-            bool closes = false;
-            if (src[i + 1] == '/')
+            // out of the first makes one.
+            if (s.kind == ALLSLComments::Comment::Kind::Line)
             {
-                end              = std::min(src.find('\n', i), src.size());
-                std::string body = std::string(src.substr(i + 2, end - i - 2));
+                std::string body(ALLSLComments::body(src, s));
                 while (!body.empty() && (body.back() == '\r' || body.back() == ' ' || body.back() == '\t'))
                 {
                     body.pop_back();
@@ -1643,7 +1599,7 @@ namespace
                     body = " " + body;
                 }
                 k.text = "--" + body;
-                if (body.compare(0, 2, "*/") == 0)
+                if (s.closer)
                 {
                     // What follows it is the LSL's code once the toggle is
                     // off, and a comment there SLua's.
@@ -1656,14 +1612,11 @@ namespace
                     }
                     k.text   = "--]" + mark + "]" + rest;
                     k.closer = true;
-                    closes   = true;
                 }
-                else if (!body.empty() && body[0] == '*' && (body.size() == 1 || (body[1] != '*' && body[1] != '/')) &&
-                         body.find("*/") == std::string::npos)
+                else if (s.opener)
                 {
-                    // A word after the star or not, but no rule of stars, nor
-                    // a block comment closed on its line once a / is out.
-                    pending.emplace_back(mComments.size(), body.substr(1));
+                    k.text = "---[" + mark + "[" + body.substr(1);
+                    pairs.emplace_back(mComments.size(), s.closedBy);
                 }
                 else if (!body.empty() && body[0] == '/')
                 {
@@ -1674,17 +1627,9 @@ namespace
             }
             else
             {
-                const size_t close = src.find("*/", i + 2);
-                end                = close == std::string_view::npos ? src.size() : close + 2;
-                std::string body   = std::string(src.substr(i + 2, (close == std::string_view::npos ? src.size() : close) - i - 2));
                 // The toggle's other way, /* over code and //*/ under it: --]]
                 // under it, which ---[[ over it would leave a line comment.
-                const bool toggled = body.size() >= 2 && body.compare(body.size() - 2, 2, "//") == 0 &&
-                                     body.find('\n') != std::string::npos;
-                if (toggled)
-                {
-                    body.resize(body.size() - 2);
-                }
+                std::string body(ALLSLComments::body(src, s));
                 // Brackets of a level nothing in it closes.
                 std::string level;
                 while (body.find("]" + level + "]") != std::string::npos)
@@ -1697,9 +1642,8 @@ namespace
                 }
                 // A toggle's, marked: its level is what nothing from the
                 // first opener over it closes.
-                const std::string bracket = toggled && !mark.empty() ? mark : level;
-                k.text                    = "--[" + bracket + "[" + body + (toggled ? "--" : "") + "]" + bracket + "]";
-                closes                    = toggled;
+                const std::string bracket = s.toggled && !mark.empty() ? mark : level;
+                k.text                    = "--[" + bracket + "[" + body + (s.toggled ? "--" : "") + "]" + bracket + "]";
                 if (body.size() > 1 && body.front() == '*' && body.back() == '*' && body.find('\n') == std::string::npos)
                 {
                     // A rule of stars on its line, a heading in it or not: of
@@ -1713,20 +1657,7 @@ namespace
             {
                 k.text.insert(2, " ");
             }
-            while (i < end)
-            {
-                step(src[i++]);
-            }
-            k.endLine = at.line;
-            if (closes)
-            {
-                for (const auto& [opener, rest] : pending)
-                {
-                    mComments[opener].text = "---[" + mark + "[" + rest;
-                    pairs.emplace_back(opener, mComments.size());
-                }
-                pending.clear();
-            }
+            k.endLine = s.endLine;
             mComments.push_back(std::move(k));
         }
         // Whether a line of the LSL, from one, is blank.
