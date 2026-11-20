@@ -176,7 +176,11 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
 
     LLSD data;
 
-    LLSDSerialize::fromNotation(data, str, data_in.length());
+    if (LLSDSerialize::fromNotation(data, str, data_in.length()) == LLSDParser::PARSE_FAILURE)
+    {
+        LL_WARNS_ONCE("GLTF") << "Dropping a GLTF material override that does not parse" << LL_ENDL;
+        return;
+    }
 
     const LLHost& host = msg->getSender();
 
@@ -198,6 +202,15 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
 
         const LLSD& tes = data["te"];
         const LLSD& od = data["od"];
+
+        // Each face listed takes the override beside it: lists of two lengths pair nothing reliably, and a face short
+        // of one would take an empty override in place of the region's.
+        if (tes.size() != od.size())
+        {
+            LL_WARNS_ONCE("GLTF") << "Dropping a GLTF material override for " << id << " listing " << tes.size() << " faces and "
+                                  << od.size() << " overrides" << LL_ENDL;
+            return;
+        }
 
         constexpr U32 MAX_TES = 45;
         bool has_te[MAX_TES] = { false };
