@@ -37,6 +37,7 @@
 #include "llviewercontrol.h"
 #include "llmd5.h"
 #include "llfindlocale.h"
+#include "llfocusmgr.h"
 #include "llversioninfo.h"
 
 #include <exception>
@@ -550,7 +551,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_CONTINUE;
     }
 #endif
-    return LLWindowSDL::handleEvents(*event);
+    return LLWindowSDL::handleEvents(*event, gFocusMgr.getAppHasFocus());
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)

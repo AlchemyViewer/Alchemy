@@ -10424,7 +10424,7 @@ LLRenderTarget* LLPipeline::renderDoF(ALTransientTargets& scope)
 
                 if (focus_point.isExactlyZero())
                 {
-                    if (LLViewerJoystick::getInstance()->getOverrideCamera() || RenderFocusPointFollowsPointer)
+                    if (gAgent.isCameraExternallyDriven() || RenderFocusPointFollowsPointer)
                     { // focus on point under cursor
                         focus_point.set(gDebugRaycastIntersection.getF32ptr());
                     }

@@ -342,7 +342,7 @@ void LLGestureMgr::deactivateGesture(const LLUUID& item_id)
     msg->addU32Fast(_PREHASH_Flags, 0x0);
 
     msg->nextBlockFast(_PREHASH_Data);
-    msg->addUUIDFast(_PREHASH_ItemID, item_id);
+    msg->addUUIDFast(_PREHASH_ItemID, base_item_id);
     msg->addU32Fast(_PREHASH_GestureFlags, 0x0);
 
     gAgent.sendReliableMessage();

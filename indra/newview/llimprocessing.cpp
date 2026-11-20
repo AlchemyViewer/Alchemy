@@ -633,6 +633,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             break;
 
         case IM_NOTHING_SPECIAL:    // p2p IM
+            // Record delivery metadata so live transport can be distinguished from history retrieval.
+            LL_INFOS("ChatServiceHistory") << "Direct IM received: sender_id=" << from_id
+                << ", offline=" << (offline == IM_OFFLINE)
+                << ", timestamp=" << timestamp << ", bytes=" << message.size() << LL_ENDL;
             // Don't show dialog, just do IM
             if (!gAgent.isGodlike()
                 && gAgent.inPrelude()
@@ -803,6 +807,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         real_name = SYSTEM_FROM;
                     }
 
+                    // Keep the undecorated body for matching against service history.
                     gIMMgr->addMessage(session_id,
                         from_id,
                         name,
@@ -816,7 +821,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         region_message,
                         timestamp,
                         LLUUID::null,
-                        real_name);
+                        real_name,
+                        notice_name.empty() ? LLSD(message) : LLSD());
                 }
                 else
                 {
@@ -1758,7 +1764,13 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())
             {
                 const std::string& notification_name = panel.getNotificationName();
-                if (notification_name == "OfferFriendship" && panel.isControlPanelEnabled())
+                LLNotificationPtr panel_notification = LLNotificationsUtil::find(panel.getID());
+                // Only a live actionable offer from this sender makes the packet a duplicate.
+                if (!panel.isDead()
+                    && notification_name == "OfferFriendship"
+                    && panel_notification
+                    && panel_notification->getPayload()["from_id"].asUUID() == from_id
+                    && panel.isControlPanelEnabled())
                 {
                     // Only an offer still open from this sender stands for this
                     // one; another resident's says nothing of it.

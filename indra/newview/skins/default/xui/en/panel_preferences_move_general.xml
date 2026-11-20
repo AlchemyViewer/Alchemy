@@ -271,7 +271,7 @@
   </combo_box>
   <button
    height="23"
-   label="Other Devices"
+   label="3Dconnexion devices"
    left="30"
    name="joystick_setup_button"
    top="30"

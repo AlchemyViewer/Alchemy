@@ -34,7 +34,7 @@ typedef struct _script_perm {
     question(q), permbit(b), caution(c) {}
 } script_perm_t;
 
-const U32 NUM_SCRIPT_PERMISSIONS = 19;
+const U32 NUM_SCRIPT_PERMISSIONS = 20;
 const S32 SCRIPT_PERMISSION_DEBIT = 0;
 // [RLVa:KB] - Checked: RLVa-2.0.0
 const S32 SCRIPT_PERMISSION_TAKE_CONTROLS = 1;
@@ -65,6 +65,7 @@ static const std::array<script_perm_t, NUM_SCRIPT_PERMISSIONS> SCRIPT_PERMISSION
     _script_perm("ScriptReturnObjects", (0x1 << 16), false),
     _script_perm("ForceSitAvatar",      (0x1 << 17), false),
     _script_perm("ChangeEnvSettings",   (0x1 << 18), false),
-    _script_perm("PrivilegedLandAccess",(0x1 << 19), true)
+    _script_perm("PrivilegedLandAccess",(0x1 << 19), true),
+    _script_perm("UseGameControlInputs",(0x1 << 20), false)
     } };
 

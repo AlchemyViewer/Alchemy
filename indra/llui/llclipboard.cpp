@@ -133,6 +133,11 @@ bool LLClipboard::addToClipboard(std::string_view src, S32 byte_pos, S32 byte_le
         LL_WARNS() << "Can't add the substring to clipboard: " << e.what() << LL_ENDL;
         return false;
     }
+
+    // Clipboards cannot contain NULL characters, so remove them first so they
+    // do not truncate the string.
+    std::erase(held, '\0');
+
     // The system clipboard is the window's; without one the text is held
     // here and nowhere else.
     LLWindow* window = LLView::getWindow();

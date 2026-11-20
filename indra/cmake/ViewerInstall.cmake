@@ -465,6 +465,7 @@ install(
   PATTERN "*.ini"
   PATTERN "*.xml"
   PATTERN "alchemy_logo.png"
+  PATTERN "gamecontrollerdb.txt"
   PATTERN "shaders" EXCLUDE
   PATTERN "camera" EXCLUDE
   PATTERN "windlight" EXCLUDE

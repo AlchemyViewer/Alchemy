@@ -42,6 +42,7 @@
 #include "llavatariconctrl.h"
 #include "llavatarnamecache.h"
 #include "llcallbacklist.h"
+#include "llchatservicehistory.h"
 #include "lldonotdisturbnotificationstorage.h"
 #include "llgroupactions.h"
 #include "llgroupiconctrl.h"
@@ -1459,6 +1460,13 @@ void LLFloaterIMContainer::doToSelectedConversation(const std::string& command, 
         }
         else if("chat_history" == command)
         {
+            // The deletion latch hides every local history source until its durable
+            // sweep completes.
+            if (LLChatServiceHistory::historySuppressed())
+            {
+                return;
+            }
+
             if (selectedIDS.size() > 0)
             {
                 if(conversationItem->getType() == LLConversationItem::CONV_SESSION_GROUP)
@@ -1494,7 +1502,10 @@ void LLFloaterIMContainer::doToSelectedConversation(const std::string& command, 
         {
             if("chat_history" == command)
             {
-                LLFloaterReg::showInstance("preview_conversation", LLSD(LLUUID::null), true);
+                if (!LLChatServiceHistory::historySuppressed())
+                {
+                    LLFloaterReg::showInstance("preview_conversation", LLSD(LLUUID::null), true);
+                }
             }
 }
     }
@@ -1603,6 +1614,11 @@ bool LLFloaterIMContainer::enableContextMenuItem(const LLSD& userdata)
     //Enable Chat history item for ad-hoc and group conversations
     if ("can_chat_history" == item && uuids.size() > 0)
     {
+        // History is unavailable while an account-wide deletion is pending.
+        if (LLChatServiceHistory::historySuppressed())
+        {
+            return false;
+        }
         //Disable menu item if selected participant is user agent
         if(uuids.front() != gAgentID)
         {
@@ -1622,7 +1638,7 @@ bool LLFloaterIMContainer::enableContextMenuItem(const LLSD& userdata)
             else
             {
                 bool is_group = (getCurSelectedViewModelItem()->getType() == LLConversationItem::CONV_SESSION_GROUP);
-                return LLLogChat::isTranscriptExist(uuids.front(),is_group);
+                return LLLogChat::isTranscriptExist(uuids.front(), is_group);
             }
         }
     }
@@ -1654,7 +1670,7 @@ bool LLFloaterIMContainer::enableContextMenuItem(const std::string& item, uuid_v
 
     if ("can_chat_history" == item && is_single_select)
     {
-        return LLLogChat::isTranscriptExist(uuids.front(),false);
+        return LLLogChat::isTranscriptExist(uuids.front(), false);
     }
 
     // Handle options that are applicable to all including the user agent
