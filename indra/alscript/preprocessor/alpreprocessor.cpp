@@ -4613,30 +4613,47 @@ namespace
     };
 
     // Where a `local` statement's values end, from the word after its `=`:
-    // the first `;`, or the first word on a later line that starts a new
-    // statement rather than going on with the value -- the line before
-    // ending on a value, not an operator, and this one not beginning with
-    // an operator, an index, a call or a field -- outside brackets and
-    // blocks: the next statement's, from which what it declares is in
-    // scope. `isExpression` tells an `if` that closes no block.
+    // the first `;`, or the first name or keyword -- but those that go on
+    // with an expression -- straight after a word that ends a value, outside
+    // brackets and blocks.
+    // Two values never stand side by side in an expression (a call's string
+    // or table is no name), so that is the next statement's first word, on
+    // the same line or a later one, from which what the local declares is
+    // in scope; and a line that goes on with an operator, a field, a call
+    // or an index goes on with the value. `isExpression` tells an `if` that
+    // closes no block.
     template <typename IsExpression>
     size_t statementEnd(const std::vector<ScopeWord>& words, size_t from, IsExpression isExpression)
     {
-        // What leaves a value to come after it.
-        constexpr std::string_view OPEN_AFTER[] = { "=", ",", "and", "or", "not", "..", "+", "-", "*", "/", "//", "%", "^", "#",
-                                                    "==", "~=", "<", ">", "<=", ">=", "return", "local", "in", "::", "->" };
-        // What goes on with the value before it.
-        constexpr std::string_view GOES_ON[] = { "and", "or", "..", "+", "-", "*", "/", "//", "%", "^", "==", "~=",
-                                                 "<", ">", "<=", ">=", ".", ":", "(", "[", "{", "::" };
-        const auto among = [](std::string_view t, const auto& list) { return std::find(std::begin(list), std::end(list), t) != std::end(list); };
-        const auto quoted = [](const ScopeWord& w) { return !w.ident && !w.text.empty() && (w.text.front() == '"' || w.text.front() == '\'' || w.text.front() == '['); };
+        // The words that lead on to a value rather than end one.
+        constexpr std::string_view LEADS_ON[] = { "and", "or", "not", "local", "return", "in", "then", "do", "else",
+                                                  "elseif", "if", "while", "for", "repeat", "until", "function" };
+        const auto endsValue = [&LEADS_ON](const ScopeWord& w) {
+            if (w.ident)
+            {
+                return std::find(std::begin(LEADS_ON), std::end(LEADS_ON), w.text) == std::end(LEADS_ON);
+            }
+            const std::string_view t = w.text;
+            if (t == ")" || t == "]" || t == "}" || t == "...")
+            {
+                return true;
+            }
+            // A number, or a string: quoted, or long, as `[[` begins one.
+            return !t.empty() && (std::isdigit(static_cast<unsigned char>(t.front())) || t.front() == '"' || t.front() == '\'' ||
+                                  (t.size() > 1 && t.front() == '[') || (t.size() > 1 && t.front() == '.' && std::isdigit(static_cast<unsigned char>(t[1]))));
+        };
+        // A name or a keyword, but the ones that go on with an expression:
+        // `and`, `or`, and an if-expression's `then`, `else` and `elseif`.
+        // (Taken past a statement-if's `else`, the local's block ends there
+        // anyway.)
+        const auto startsStatement = [](const ScopeWord& w) {
+            return w.ident && w.text != "and" && w.text != "or" && w.text != "then" && w.text != "else" && w.text != "elseif";
+        };
         S32 depth = 0;
         for (size_t k = from; k < words.size(); ++k)
         {
             const std::string_view t = words[k].text;
-            const bool newLine = k > from && words[k].line > words[k - 1].line && !among(words[k - 1].text, OPEN_AFTER) && !among(t, GOES_ON) &&
-                                 !quoted(words[k]);
-            if (depth == 0 && k > from && (t == ";" || newLine))
+            if (depth == 0 && k > from && (t == ";" || (endsValue(words[k - 1]) && startsStatement(words[k]))))
             {
                 return k;
             }

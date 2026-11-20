@@ -2193,6 +2193,12 @@ namespace
         UNSCOPED_INFO("a local is its own from the next statement on its line too");
         CHECK(counted("local require = function(name) return name end; print(require(\"./lib\"))\n").empty());
         CHECK(counted("local require = wrap(require(\"./lib\")); require(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("and from the next statement on its line with no `;` between");
+        CHECK(counted("local require = function(name) return name end print(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = wrap(require(\"./lib\")) print(require(\"./a\"))\n") == Names{ "./lib" });
+        CHECK(counted("local require = t[1] require(\"./a\")\n").empty());
+        UNSCOPED_INFO("an if-expression's then and else go on with the value");
+        CHECK(counted("local require = if c then require(\"./lib\") else f require(\"./a\")\n") == Names{ "./lib" });
         UNSCOPED_INFO("what it is set to goes on over the lines it goes on over");
         CHECK(counted("local require = false or\n    require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
         CHECK(counted("local require = f\n    .. require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
