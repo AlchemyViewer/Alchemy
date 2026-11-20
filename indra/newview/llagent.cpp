@@ -1441,6 +1441,8 @@ void LLAgent::sitDown()
         return;
 // [/RLVa:KB]
 
+    // An autopilot still running would go on steering the avatar once it sits.
+    stopAutoPilot(true);
     setControlFlags(AGENT_CONTROL_SIT_ON_GROUND);
 }
 
