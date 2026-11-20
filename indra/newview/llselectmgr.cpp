@@ -4395,15 +4395,16 @@ namespace
 {
     // The prims a delete of the selection takes, told to the disk masters,
     // whose links to files go with them (QK3): every prim of each linkset
-    // in it, since a delete is sent of the roots alone (SEND_ONLY_ROOTS).
+    // the delete is sent for, which is the selection's roots alone
+    // (SEND_ONLY_ROOTS, applyToRootNodes): a child picked on its own sends
+    // nothing, and takes nothing.
     void deletingLinksets(LLObjectSelectionHandle selection)
     {
         std::vector<LLUUID> prims;
         boost::unordered_flat_set<LLUUID> seen;
-        for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+        for (LLObjectSelection::root_iterator iter = selection->root_begin(); iter != selection->root_end(); ++iter)
         {
-            LLViewerObject* object = (*iter)->getObject();
-            LLViewerObject* root   = object ? object->getRootEdit() : nullptr;
+            LLViewerObject* root = (*iter)->getObject();
             if (!root || !seen.insert(root->getID()).second)
             {
                 continue;
