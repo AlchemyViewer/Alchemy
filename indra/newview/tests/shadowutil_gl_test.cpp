@@ -174,10 +174,14 @@ namespace
             UNSCOPED_INFO("program maps");
             REQUIRE(mProgram.mapUniforms());
 
-            // Every receiver to the map's centre at half depth, which the map's texels lie nearer the light than.
+            // Every receiver to the map's centre at half depth, which the map's texels lie nearer the light than. The map
+            // looks down the line the receivers lie on, its u and v running square to it as a projection's do: the
+            // fixed kernels' push takes the map's ray from their gradients, and the receivers' normal lies along it.
             DeferredBlock block{};
             for (auto& matrix : block.shadow_matrix)
             {
+                matrix[0] = 1.f;
+                matrix[5] = 1.f;
                 matrix[12] = 0.5f;
                 matrix[13] = 0.5f;
                 matrix[14] = 0.5f;
