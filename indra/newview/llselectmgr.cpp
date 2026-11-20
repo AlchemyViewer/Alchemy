@@ -53,6 +53,7 @@
 // viewer includes
 #include "alhoverglow.h"
 #include "alobjectproperties.h"
+#include "alscriptdiskmasters.h"
 #include "alselectionoutline.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -4390,6 +4391,36 @@ void LLSelectMgr::selectDelete()
 }
 
 // static
+namespace
+{
+    // The prims a delete of the selection takes, told to the disk masters,
+    // whose links to files go with them (QK3): every prim of each linkset
+    // in it, since a delete is sent of the roots alone (SEND_ONLY_ROOTS).
+    void deletingLinksets(LLObjectSelectionHandle selection)
+    {
+        std::vector<LLUUID> prims;
+        boost::unordered_flat_set<LLUUID> seen;
+        for (LLObjectSelection::iterator iter = selection->begin(); iter != selection->end(); ++iter)
+        {
+            LLViewerObject* object = (*iter)->getObject();
+            LLViewerObject* root   = object ? object->getRootEdit() : nullptr;
+            if (!root || !seen.insert(root->getID()).second)
+            {
+                continue;
+            }
+            prims.push_back(root->getID());
+            for (const LLViewerObject* child : root->getChildren())
+            {
+                if (child && !child->isAvatar())
+                {
+                    prims.push_back(child->getID());
+                }
+            }
+        }
+        ALScriptDiskMasters::deleting(prims);
+    }
+}
+
 bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, LLObjectSelectionHandle handle)
 {
     S32 option = LLNotification::getSelectedOption(notification, response);
@@ -4406,6 +4437,7 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
             // TODO: Make sure you have delete permissions on all of them.
             const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
             // attempt to derez into the trash.
+            deletingLinksets(LLSelectMgr::getInstance()->mSelectedObjects);
             LLDeRezInfo info(DRD_TRASH, trash_id);
             LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
@@ -4447,6 +4479,7 @@ void LLSelectMgr::selectForceDelete()
         return;
     }
 
+    deletingLinksets(mSelectedObjects);
     sendListToRegions(
         "ObjectDelete",
         packDeleteHeader,

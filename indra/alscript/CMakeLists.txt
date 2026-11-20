@@ -74,6 +74,7 @@ target_sources(
     luau/alluautypes.cpp
     masters/almasterburst.cpp
     masters/almasterclock.cpp
+    masters/almasterdeletes.cpp
     masters/almasterindex.cpp
     masters/almasterlinks.cpp
     masters/almastermatch.cpp
@@ -160,6 +161,7 @@ target_sources(
         luau/alluautypes.h
         masters/almasterburst.h
         masters/almasterclock.h
+        masters/almasterdeletes.h
         masters/almasterindex.h
         masters/almasterlinks.h
         masters/almastermatch.h
@@ -276,6 +278,7 @@ if(AL_BUILD_TESTS)
       tests/alluaunavigation_test.cpp
       tests/alluauservice_test.cpp
       tests/almasterburst_test.cpp
+      tests/almasterdeletes_test.cpp
       tests/almasterindex_test.cpp
       tests/almasterlinks_test.cpp
       tests/almastermatch_test.cpp

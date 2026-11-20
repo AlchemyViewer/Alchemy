@@ -25,6 +25,7 @@
 #pragma once
 
 #include "aldiskincludes.h"
+#include "almasterdeletes.h"
 #include "almasterindex.h"
 #include "almasterlinks.h"
 #include "almasterplan.h"
@@ -43,6 +44,7 @@
 #include <vector>
 
 class ALScriptMasterAdopt;
+class LLViewerObject;
 class ALScriptMasterFanOut;
 class ALScriptMasterToasts;
 
@@ -210,6 +212,14 @@ public:
     // out of sight, as a selected one is, so that a save of its file finds
     // it (LLViewerRegion::killObject). False before the links are read.
     static bool holdsLinked(const LLUUID& prim);
+    // The prims of linksets the agent asked the region to delete (Tapple's,
+    // QK3): each one's links let go of as the region says it is gone
+    // (killed), where it says so within ALMasterDeletes::WAIT, so that a
+    // delete refused keeps them. A prim gone any other way -- taken,
+    // returned, out of sight -- keeps its links. Prims holding no link are
+    // not kept.
+    static void deleting(const std::vector<LLUUID>& prims);
+    static void killed(const LLViewerObject& object);
 
 private:
     // The index of the account in hand: read the first time it is asked
@@ -249,4 +259,5 @@ private:
     std::unique_ptr<ALScriptMasterToasts>                                     mToasts;
     std::vector<Outcome>                                                      mUnheard;
     boost::unordered_flat_set<LLUUID>                                         mHolding;
+    ALMasterDeletes                                                           mDeletes;
 };
