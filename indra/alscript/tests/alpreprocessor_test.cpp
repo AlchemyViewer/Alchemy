@@ -2139,6 +2139,21 @@ namespace
         CHECK(P::wanted(directives(false), false) == P::Wanted::No);
         UNSCOPED_INFO("by text");
         CHECK(P::wanted("#define X 1\n", false, false) == P::Wanted::Directives);
+
+        // Tapple's (QK4): SLua calling require goes up with its modules,
+        // the setting off, as only the preprocessor answers it.
+        {
+            INFO("a require, after directives and before the setting");
+            CHECK(P::wanted(directives(false), false, directives(true)) == P::Wanted::Requires);
+            CHECK(P::wanted(directives(false), true, directives(true)) == P::Wanted::Requires);
+            CHECK(P::wanted(directives(true), false, directives(true)) == P::Wanted::Directives);
+            CHECK(P::wanted(directives(false), true, directives(false)) == P::Wanted::Setting);
+        }
+        UNSCOPED_INFO("by text: SLua's require, not a field's or a comment's, nor LSL's");
+        CHECK(P::wanted("local m = require(\"./lib\")\n", true, false) == P::Wanted::Requires);
+        CHECK(P::wanted("local m = t.require(\"./lib\")\n", true, false) == P::Wanted::No);
+        CHECK(P::wanted("-- require(\"./lib\")\n", true, false) == P::Wanted::No);
+        CHECK(P::wanted("default { state_entry() { require(\"lib\"); } }\n", false, false) == P::Wanted::No);
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require only the old search found is said with a fix each way", "[alpreprocessor]")

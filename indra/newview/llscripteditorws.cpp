@@ -1878,8 +1878,8 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
     // Sent as the studio sends it: expanded afresh where a save runs the
-    // preprocessor (ALPreprocessor::wanted) -- it is on, the script is in
-    // its envelope, or it has a directive -- so that its includes
+    // preprocessor (ALPreprocessor::wanted) -- it is on, or the script has
+    // a directive or, in SLua, a require by name -- so that its includes
     // are current -- sent whatever the preprocessor found, since a save is
     // someone's work, with what it found said. But an envelope whose
     // compiled half was edited here, its source as it was, goes up as it

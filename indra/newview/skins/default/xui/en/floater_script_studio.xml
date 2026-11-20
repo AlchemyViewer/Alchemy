@@ -384,9 +384,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
     <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
     <floater.string name="TrailerPreprocessedDirectives">A save preprocesses it: it has directives, which the server could compile no other way.</floater.string>
+    <floater.string name="TrailerPreprocessedRequires">A save preprocesses it: it calls require, which only the preprocessor answers, putting the modules in with it.</floater.string>
     <floater.string name="TrailerPreprocessedSetting">A save preprocesses it: Build &gt; Preprocess on Save is on.</floater.string>
     <floater.string name="TrailerNotPreprocessed">Not preprocessed on save</floater.string>
-    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written, without the preprocessor's envelope: it has no directive, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
+    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written, without the preprocessor's envelope: it has no directive or require, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>
@@ -816,7 +817,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is a Firestorm extension: turn on Build &gt; Preprocess on Save and Build &gt; Firestorm &gt; Switch Statements)</floater.string>
-    <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="PreprocHintConst">([WORD] declares a constant, and lets a global be computed from other globals: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="PreprocHintDirective">(lines starting with # are the preprocessor's: turn on Build &gt; Preprocess on Save)</floater.string>

@@ -307,12 +307,10 @@ private:
     // What is made of the problems, and they shown.
     void showProblems(Doc& doc);
     // What is made of the problems: imports offered, what a comment says
-    // is not wanted dropped, the preprocessor's words and a require
-    // explained.
+    // is not wanted dropped, the preprocessor's words explained.
     void offerImports(Doc& doc);
     void noLint(Doc& doc);
     void explainTransformWords(Doc& doc);
-    void explainRequires(Doc& doc);
     // Each "-- LSL:" comment the converter left in an SLua script, a note
     // to see to, with its lint's fix where there is one
     // (ALLSLToSLua::notesIn).

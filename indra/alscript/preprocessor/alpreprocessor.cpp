@@ -5783,11 +5783,15 @@ bool ALPreprocessor::usesDirectives(std::string_view text, bool lua)
 }
 
 // static
-ALPreprocessor::Wanted ALPreprocessor::wanted(const std::function<bool()>& directives, bool setting)
+ALPreprocessor::Wanted ALPreprocessor::wanted(const std::function<bool()>& directives, bool setting, const std::function<bool()>& modules)
 {
     if (directives && directives())
     {
         return Wanted::Directives;
+    }
+    if (modules && modules())
+    {
+        return Wanted::Requires;
     }
     return setting ? Wanted::Setting : Wanted::No;
 }
@@ -5795,7 +5799,8 @@ ALPreprocessor::Wanted ALPreprocessor::wanted(const std::function<bool()>& direc
 // static
 ALPreprocessor::Wanted ALPreprocessor::wanted(std::string_view text, bool lua, bool setting)
 {
-    return wanted([text, lua]() { return usesDirectives(text, lua); }, setting);
+    return wanted([text, lua]() { return usesDirectives(text, lua); }, setting,
+                  lua ? std::function<bool()>([text]() { return !requiresIn(text).empty(); }) : std::function<bool()>());
 }
 
 // static
