@@ -97,8 +97,9 @@ public:
     static void queueUpdate(const LLSD& data);
 
     // Called by batch builder to give LLGLTMaterialList an opportunity to apply
-    // any override data that arrived before the object was ready to receive it
-    void applyQueuedOverrides(LLViewerObject* obj);
+    // any override data that arrived before the object was ready to receive it,
+    // and when a face's material completes, for that face (te).
+    void applyQueuedOverrides(LLViewerObject* obj, S32 te = -1);
 
     // Apply an override update with the given data
     void applyOverrideMessage(LLMessageSystem* msg, const std::string& data);

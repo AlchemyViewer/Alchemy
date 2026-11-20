@@ -808,6 +808,64 @@ namespace
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
     }
 
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face takes the region's override for it or none", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1025 * 256, 1000 * 256);
+        LLSD data = vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 2);
+        data["sides"][1] = 2; // faces 0 and 2
+        LLGLTFOverrideCacheEntry entry;
+        REQUIRE(entry.fromLLSD(data));
+        entry.materialize();
+
+        CHECK(entry.overrideFor(0) != nullptr);
+        CHECK(entry.overrideFor(2) != nullptr);
+        UNSCOPED_INFO("each face its own");
+        CHECK(entry.overrideFor(0) != entry.overrideFor(2));
+        CHECK(entry.overrideFor(2) == entry.mGLTFMaterial.at(2).get());
+        UNSCOPED_INFO("a face the region left out takes none");
+        CHECK(entry.overrideFor(1) == nullptr);
+        CHECK(entry.overrideFor(LLTEContents::MAX_TES - 1) == nullptr);
+
+        UNSCOPED_INFO("an entry with no sides gives every face none");
+        LLGLTFOverrideCacheEntry removed;
+        removed.mLocalId = 7;
+        removed.materialize();
+        CHECK(removed.overrideFor(0) == nullptr);
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face showing the override by value takes no change", "[LLVOCache]")
+    {
+        LLPointer<LLGLTFMaterial> held = new LLGLTFMaterial();
+        held->mRoughnessFactor = 0.5f;
+        LLPointer<LLGLTFMaterial> copy = new LLGLTFMaterial(*held);
+        LLPointer<LLGLTFMaterial> other = new LLGLTFMaterial(*held);
+        other->mRoughnessFactor = 0.25f;
+
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(nullptr, nullptr));
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(held, held));
+        UNSCOPED_INFO("a copy is the same override");
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(held, copy));
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(held, other));
+        UNSCOPED_INFO("an override and none differ either way");
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(held, nullptr));
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(nullptr, held));
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a hold lasts until the region answers or its time is up", "[LLVOCache]")
+    {
+        LLGLTFOverrideCacheEntry entry;
+        CHECK_FALSE(entry.isHeld(0.0));
+        entry.hold(100.0);
+        CHECK(entry.isHeld(100.0));
+        CHECK(entry.isHeld(100.0 + LLGLTFOverrideCacheEntry::HOLD_SECONDS - 0.5));
+        CHECK_FALSE(entry.isHeld(100.0 + LLGLTFOverrideCacheEntry::HOLD_SECONDS));
+
+        UNSCOPED_INFO("the region's answer replaces the entry and the hold with it");
+        entry.hold(200.0);
+        entry = LLGLTFOverrideCacheEntry();
+        CHECK_FALSE(entry.isHeld(200.0));
+    }
+
     TEST_CASE("LLVOCacheEntry: an entry killed for an update keeps its object's overrides and one killed as gone takes them", "[LLVOCache]")
     {
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;

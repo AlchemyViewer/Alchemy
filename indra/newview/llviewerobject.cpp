@@ -5950,6 +5950,9 @@ void LLViewerObject::onRenderMaterialFetched(U8 te)
         return;
     }
 
+    // The face could take no override while its material fetched: it takes the region's now, or lets go of one the
+    // region has since removed, before its render material is built from it.
+    gGLTFMaterialList.applyQueuedOverrides(this, te);
     initRenderMaterial(te);
     // The material named no bake when the face took it and has filled in its textures since, so
     // initRenderMaterial saw none of them change: look from nothing
@@ -7905,7 +7908,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             // Also, sometimes, the material has baked textures, which requires
             // a copy unique to this object.
             // Currently, we do not deduplicate render materials.
-            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching()]()
+            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching(), local_origin]()
             {
                 LLViewerObject* obj = gObjectList.findObject(obj_id);
                 if (!obj) { return; }
@@ -7915,6 +7918,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
                 }
                 else
                 {
+                    // A material the region gave the face takes the override the region gave it, which may have come
+                    // before the material and found the face with none to take it on.
+                    if (!local_origin)
+                    {
+                        gGLTFMaterialList.applyQueuedOverrides(obj, te);
+                    }
                     obj->initRenderMaterial(te);
                 }
             });

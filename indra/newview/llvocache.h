@@ -44,11 +44,17 @@
 // Cache entries
 class LLCamera;
 
+// The overrides a region last sent for one object: every face it lists, and none for the faces it leaves out. An entry
+// with no sides says the region removed the object's overrides; it lives for the session and is never written.
 class LLGLTFOverrideCacheEntry
 {
 public:
     static const std::string VERSION_LABEL;
     static const int VERSION;
+    // How long the entry waits for the region to answer an edit the viewer sent for the object, showing the edit
+    // meanwhile. The answer replaces the entry.
+    static constexpr F64 HOLD_SECONDS = 10.0;
+
     bool fromLLSD(const LLSD& data);
     LLSD toLLSD() const;
     // Build mGLTFMaterial from mSides if it has not been built. Loading the
@@ -56,11 +62,20 @@ public:
     // created; the first apply to an object builds them.
     void materialize();
 
+    // The override a face takes from the entry: the region's for it, or none. Built by materialize().
+    LLGLTFMaterial* overrideFor(S32 side) const;
+    // Whether a face holding `held` shows `wanted`: the same override by value, or none on both.
+    static bool sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted);
+
+    void hold(F64 now) { mHeldUntil = now + HOLD_SECONDS; }
+    bool isHeld(F64 now) const { return now < mHeldUntil; }
+
     LLUUID mObjectId;
     U32    mLocalId = 0;
     boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
     boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side, empty until materialize()
     U64 mRegionHandle = 0;
+    F64 mHeldUntil = 0.0;
 };
 
 class LLVOCacheEntry

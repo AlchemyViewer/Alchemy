@@ -154,6 +154,22 @@ void LLGLTFOverrideCacheEntry::materialize()
     }
 }
 
+LLGLTFMaterial* LLGLTFOverrideCacheEntry::overrideFor(S32 side) const
+{
+    const auto iter = mGLTFMaterial.find(side);
+    return iter != mGLTFMaterial.end() ? iter->second.get() : nullptr;
+}
+
+// static
+bool LLGLTFOverrideCacheEntry::sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted)
+{
+    if (held == wanted)
+    {
+        return true;
+    }
+    return held && wanted && *held == *wanted;
+}
+
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;
