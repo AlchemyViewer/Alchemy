@@ -810,22 +810,13 @@ void LLViewerRegion::loadObjectCache()
     if(LLVOCache::instanceExists())
     {
         LLVOCache & vocache = LLVOCache::instance();
-        // A read that fails marks the cache dirty so it is rewritten rather
-        // than left corrupted; a file that yielded nothing is dropped now.
-        const bool cache_ok = vocache.readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap);
+        // The objects and their overrides are one file: one that cannot be read whole yields neither, and is dropped
+        // now, so that the simulator sends both afresh and the next save writes the cache again.
+        const bool cache_ok = vocache.readFromCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mImpl->mGLTFOverridesLLSD);
         mCacheDirty = !cache_ok;
-        if (!cache_ok && mImpl->mCacheMap.empty())
+        if (!cache_ok)
         {
             vocache.removeEntry(mHandle);
-        }
-
-        // Overrides mean nothing without the objects they belong to, so a bad
-        // extras file takes the object cache with it and the simulator sends
-        // both afresh.
-        if (!vocache.readGenericExtrasFromCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap))
-        {
-            mImpl->mGLTFOverridesLLSD.clear();
-            vocache.removeGenericExtrasForHandle(mHandle);
         }
 
         if (mImpl->mCacheMap.empty())
@@ -863,10 +854,8 @@ void LLViewerRegion::saveObjectCache()
 
         LLVOCache & instance = LLVOCache::instance();
 
-        instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled);
-        // The two files are one cache, so the extras go out with every write
-        // of the objects as well as when the overrides change.
-        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
+        // The overrides go out in the one file with the objects, so a change to either writes both.
+        instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mImpl->mGLTFOverridesLLSD, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
         mCacheDirty = false;
         mGLTFOverridesDirty = false;
     }
