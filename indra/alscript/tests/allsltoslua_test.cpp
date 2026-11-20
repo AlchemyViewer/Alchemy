@@ -2097,8 +2097,8 @@ namespace
             CHECK(has(r, "---[[\nlocal function get("));
             CHECK(has(r, "end\n--]]\n"));
         }
-        UNSCOPED_INFO("the toggle the other way");
-        CHECK(has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
+        UNSCOPED_INFO("the toggle the other way, its code SLua (ALLSLCommentCode)");
+        CHECK(has(r, "--[[\nlocal function old(): string\n    return \"\"\nend\n--]]"));
         UNSCOPED_INFO("an if on one line on one");
         CHECK(has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
         UNSCOPED_INFO("one on two lines on three");

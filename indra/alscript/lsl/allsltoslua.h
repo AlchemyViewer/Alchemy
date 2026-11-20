@@ -108,6 +108,11 @@ public:
         // // as --, and /* */ as --[[ ]]; a rule of stars or slashes as one of
         // dashes, and the //* ... //*/ toggle as ---[[ ... --]].
         bool keepComments = true;
+        // With them, the code a comment switched off written as SLua, still
+        // commented, where it stood: each comment that, uncommented where it
+        // stands, parses and changes nothing else the script is written as
+        // (ALLSLCommentCode). One that does not stays as the LSL had it.
+        bool commentCode = true;
         // What a note says, by its key -- the studio's own words for it,
         // in its skin's language -- where given; else the English, its
         // marks filled from the args.
@@ -136,6 +141,8 @@ public:
         S32 lslLast   = 0;
         S32 sluaFirst = 0;
         S32 sluaLast  = 0;
+        // The column its LSL begins at on its first line, from nought.
+        S32 lslColumn = 0;
     };
 
     struct Result
@@ -161,9 +168,39 @@ public:
         // its semicolons, which it lets go of (ALDiffSame).
         std::vector<std::pair<std::string, std::string>> same;
         std::vector<std::string>                         dropped;
+        // Of the comments that may hold code (ALLSLComments::units), how
+        // many were written as SLua, and how many were left as the LSL had
+        // them (Options::commentCode).
+        S32 commentsConverted = 0;
+        S32 commentsLeft      = 0;
     };
 
     static Result convert(std::string_view lsl, const Options& options);
+
+    // One conversion with some of the script's comments written otherwise,
+    // and some of its code tried uncommented, as the comment conversion asks
+    // for it (ALLSLCommentCode); never more than the one.
+    struct Pass
+    {
+        // A comment, by the byte of the LSL it begins at, written as `text`:
+        // nothing, its place kept, where that is empty; and where `indented`,
+        // each of its lines past the first at the depth it is written at.
+        struct Written
+        {
+            size_t      begin = 0;
+            std::string text;
+            bool        indented = false;
+        };
+        std::vector<Written> comments;
+        // The stretches of the LSL uncommented for a trial, each [begin, end)
+        // in bytes: nothing is noted of code that begins in one, and each
+        // comment that begins in one is written followed by `inner`, the
+        // stretch's index, and `inner` again.
+        std::vector<std::pair<size_t, size_t>> tried;
+        char                                   inner = 0;
+    };
+    static Result convert(std::string_view lsl, const Options& options, Pass& pass);
+
     // The studio's own lint that finds in SLua what a note says of the LSL,
     // by the note's key -- SlCompatCall for an llcompat call ll's could
     // make -- or null where none does. A note carries it as its code, so

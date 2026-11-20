@@ -36,6 +36,7 @@ target_sources(
     lint/alscriptfixes.cpp
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
+    lsl/allslcommentcode.cpp
     lsl/allslcomments.cpp
     lsl/allslconsts.cpp
     lsl/allsldepth.cpp
@@ -119,6 +120,7 @@ target_sources(
         lint/alscriptfixes.h
         lint/alscriptlintpass.h
         lint/alselenefilters.h
+        lsl/allslcommentcode.h
         lsl/allslcomments.h
         lsl/allslconsts.h
         lsl/allsldepth.h
@@ -267,6 +269,7 @@ if(AL_BUILD_TESTS)
       tests/alincludeidentity_test.cpp
       tests/alincludesearch_test.cpp
       tests/allinelabel_test.cpp
+      tests/allslcommentcode_test.cpp
       tests/allslcomments_test.cpp
       tests/allslconsts_test.cpp
       tests/allslcosts_test.cpp
@@ -319,6 +322,7 @@ if(AL_BUILD_TESTS)
       "AL_LSCRIPT_REGRESSION_DIR=\"${INDRA_SOURCE_DIR}/lscript/tests/regressions\""
     RERUN newsolver
     RERUN_SOURCES
+      tests/allslcommentcode_test.cpp
       tests/alluaufragment_test.cpp
       tests/alluaunavigation_test.cpp
       tests/alluauservice_test.cpp

@@ -30,6 +30,7 @@
 
 #include "alscriptengine.h"
 #include "alscriptstack.h"
+#include "allslcommentcode.h"
 #include "allslcomments.h"
 #include "allsldepth.h"
 #include "allsleffects.h"
@@ -479,9 +480,10 @@ namespace
     class Writer
     {
     public:
-        Writer(LSLScript* script, std::string_view source, const ALLSLToSLua::Options& options)
-            : mScript(script), mSource(source), mOptions(options), mEffects(script)
+        Writer(LSLScript* script, std::string_view source, const ALLSLToSLua::Options& options, const ALLSLToSLua::Pass& pass)
+            : mScript(script), mSource(source), mOptions(options), mEffects(script), mPass(pass)
         {
+            tryStretches();
         }
 
         std::string write();
@@ -557,6 +559,9 @@ namespace
             bool        written = false;
             // A toggle's closer, //*/, which is about the code over it.
             bool        closer  = false;
+            // Its text's lines past the first written at the depth it is
+            // (ALLSLToSLua::Pass::Written).
+            bool        indented = false;
         };
         // Each comment in the LSL, given to the node it is written over --
         // a global, a function, a state, a handler, a statement -- or to
@@ -1082,7 +1087,13 @@ namespace
         SamePairs                                        mSame;
         // An LSL word written otherwise here, kept in mSame.
         void                                             sameAs(std::string_view lsl, std::string_view slua);
-        std::optional<std::pair<S32, S32>>               mAnchorPending;
+        struct Anchor
+        {
+            S32 first  = 0;
+            S32 last   = 0;
+            S32 column = 0;
+        };
+        std::optional<Anchor>                            mAnchorPending;
         void                                             endSpans();
         size_t                                           mCounted      = 0;
         S32                                              mCountedLines = 0;
@@ -1098,6 +1109,16 @@ namespace
         // top; and by what each is given to.
         std::vector<Comment>                                         mComments;
         std::vector<size_t>                                          mLeadComments;
+        // What the comment conversion asks of this one (ALLSLToSLua::Pass):
+        // the stretches of the LSL it uncommented, where they begin and end.
+        const ALLSLToSLua::Pass&                                     mPass;
+        std::vector<std::pair<Pos, Pos>>                             mTried;
+        void tryStretches();
+        // Whether a node begins in one of them: code switched off, of which
+        // nothing is noted.
+        bool tried(LSLASTNode* node) const;
+        // A comment written with its lines past the first at the depth it is.
+        std::string commentText(const Comment& c);
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsAfter;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
@@ -1205,6 +1226,10 @@ namespace
 
     void Writer::note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args)
     {
+        if (tried(at))
+        {
+            return;
+        }
         std::string words = said(key, english, args);
         if (std::find(mPending.begin(), mPending.end(), words) != mPending.end())
         {
@@ -1253,7 +1278,7 @@ namespace
         {
             once += '\x1f' + arg;
         }
-        if (mOnce.insert(once).second)
+        if (!tried(at) && mOnce.insert(once).second)
         {
             note(at, key, english, std::move(args));
         }
@@ -1467,7 +1492,7 @@ namespace
         if (mAnchorPending && !mInline && !text.empty())
         {
             const S32 at = linesWritten();
-            mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->second, at, at });
+            mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->last, at, at, mAnchorPending->column });
             mAnchorPending.reset();
         }
         // A block LSL opened and closed with braces.
@@ -1658,6 +1683,27 @@ namespace
                 k.text.insert(2, " ");
             }
             k.endLine = s.endLine;
+            // As the comment conversion asks: written otherwise, or marked as
+            // inside what it uncommented.
+            if (const auto given = std::find_if(mPass.comments.begin(), mPass.comments.end(),
+                                                [&s](const ALLSLToSLua::Pass::Written& w) { return w.begin == s.begin; });
+                given != mPass.comments.end())
+            {
+                k.text     = given->text;
+                k.indented = given->indented;
+                k.written  = k.text.empty();
+            }
+            else
+            {
+                for (size_t n = 0; n < mPass.tried.size(); ++n)
+                {
+                    if (s.begin >= mPass.tried[n].first && s.begin < mPass.tried[n].second)
+                    {
+                        k.text += mPass.inner + std::to_string(n) + mPass.inner;
+                        break;
+                    }
+                }
+            }
             mComments.push_back(std::move(k));
         }
         // Whether a line of the LSL, from one, is blank.
@@ -1988,14 +2034,82 @@ namespace
         {
             // Under the code it closes, over the blank line written after
             // that, which the LSL did not have.
-            putTrailing(mText.size() - 1, indent() + c.text + "\n");
+            putTrailing(mText.size() - 1, indent() + commentText(c) + "\n");
             return;
         }
         if (c.apart && !mText.empty() && !blank_over && mText.size() != mBlockStart)
         {
             mText += "\n";
         }
-        mText += indent() + c.text + "\n";
+        mText += indent() + commentText(c) + "\n";
+    }
+
+    std::string Writer::commentText(const Comment& c)
+    {
+        if (!c.indented || c.text.find('\n') == std::string::npos)
+        {
+            return c.text;
+        }
+        const std::string depth = indent();
+        std::string       out;
+        for (size_t from = 0;;)
+        {
+            const size_t cut = std::min(c.text.find('\n', from), c.text.size());
+            if (from > 0 && cut > from)
+            {
+                out += depth;
+            }
+            out.append(c.text, from, cut - from);
+            if (cut == c.text.size())
+            {
+                break;
+            }
+            out += '\n';
+            from = cut + 1;
+        }
+        return out;
+    }
+
+    void Writer::tryStretches()
+    {
+        if (mPass.tried.empty())
+        {
+            return;
+        }
+        // Where each stretch begins and ends, by line and column from one.
+        std::vector<size_t> starts{ 0 };
+        for (size_t i = 0; i < mSource.size(); ++i)
+        {
+            if (mSource[i] == '\n')
+            {
+                starts.push_back(i + 1);
+            }
+        }
+        const auto at = [&starts](size_t byte) {
+            const size_t line = static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), byte) - starts.begin());
+            return Pos{ static_cast<S32>(line), static_cast<S32>(byte - starts[line - 1]) + 1 };
+        };
+        for (const auto& [begin, end] : mPass.tried)
+        {
+            mTried.emplace_back(at(begin), at(end));
+        }
+    }
+
+    bool Writer::tried(LSLASTNode* node) const
+    {
+        if (mTried.empty() || isNull(node) || !node->getLoc())
+        {
+            return false;
+        }
+        const Pos begins = { node->getLoc()->first_line, node->getLoc()->first_column };
+        for (const auto& [from, to] : mTried)
+        {
+            if (!(begins < from) && begins < to)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     void Writer::commentsBefore(LSLASTNode* node)
@@ -2026,7 +2140,7 @@ namespace
         if (!isNull(node) && node->getLoc())
         {
             const S32 first = zeroBased(node->getLoc()->first_line);
-            mAnchorPending  = std::make_pair(first, std::max(first, zeroBased(node->getLoc()->last_line)));
+            mAnchorPending  = Anchor{ first, std::max(first, zeroBased(node->getLoc()->last_line)), zeroBased(node->getLoc()->first_column) };
         }
     }
 
@@ -8541,7 +8655,10 @@ end
         {
             for (size_t k : mLeadComments)
             {
-                out += mComments[k].text + "\n";
+                if (!mComments[k].text.empty())
+                {
+                    out += mComments[k].text + "\n";
+                }
             }
             out += "\n";
         }
@@ -8800,6 +8917,17 @@ void ALLSLToSLua::linkNotes(ALScriptProblems& notes, const ALScriptProblems& fou
 // static
 ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& options)
 {
+    if (options.keepComments && options.commentCode)
+    {
+        return ALLSLCommentCode::convert(lsl, options);
+    }
+    Pass plain;
+    return convert(lsl, options, plain);
+}
+
+// static
+ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& options, Pass& pass)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Result result;
     if (!ALLSLService::builtinsLoaded())
@@ -8841,7 +8969,7 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
             }
             return;
         }
-        Writer writer(script, lsl, options);
+        Writer writer(script, lsl, options, pass);
         result.text      = writer.write();
         result.notes     = std::move(writer.notes());
         result.spans     = writer.spans();
