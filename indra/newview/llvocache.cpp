@@ -308,6 +308,18 @@ bool LLVOCacheEntry::killEntryOverrides(U32 local_id, bool object_stays, vocache
     return !object_stays && overrides.erase(local_id) > 0;
 }
 
+// static
+bool LLVOCacheEntry::dropOverridesOfAnother(U32 local_id, const LLUUID& object_id, vocache_gltf_overrides_map_t& overrides)
+{
+    const auto iter = overrides.find(local_id);
+    if (iter == overrides.end() || iter->second.isFor(object_id))
+    {
+        return false;
+    }
+    overrides.erase(iter);
+    return true;
+}
+
 LLVOCacheEntry* LLVOCacheEntry::leaveParent(const vocache_entry_map_t& entries)
 {
     if (!mParentID)
@@ -532,6 +544,16 @@ LLDataPackerBinaryBuffer *LLVOCacheEntry::getDP() const
 bool LLVOCacheEntry::isObject(const LLUUID& id) const
 {
     return mDP.getBufferSize() >= UUID_BYTES && memcmp(mDP.getBuffer(), id.mData, UUID_BYTES) == 0;
+}
+
+LLUUID LLVOCacheEntry::getObjectID() const
+{
+    LLUUID id;
+    if (mDP.getBufferSize() >= UUID_BYTES)
+    {
+        memcpy(id.mData, mDP.getBuffer(), UUID_BYTES);
+    }
+    return id;
 }
 
 void LLVOCacheEntry::recordHit()
@@ -2090,9 +2112,15 @@ bool LLVOCache::readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCac
         const U32 local_id = entry.mLocalId;
         // only add entries that exist in the primary cache
         // this is a self-healing test that avoids us polluting the cache with entries that are no longer valid based on the main cache.
-        if(cache_entry_map.find(local_id)!= cache_entry_map.end())
+        // An override is kept only for the object the primary cache holds under its local ID, which it is then
+        // named for; one written for another object that had the local ID is not this one's. One already in memory
+        // came from the region since and is the newer.
+        const auto object = cache_entry_map.find(local_id);
+        const LLUUID object_id = (object != cache_entry_map.end() && object->second.notNull()) ? object->second->getObjectID() : LLUUID::null;
+        if (object != cache_entry_map.end() && entry.isFor(object_id))
         {
-            cache_extras_entry_map[local_id] = std::move(entry);
+            entry.mObjectId = object_id;
+            cache_extras_entry_map.try_emplace(local_id, std::move(entry));
             loaded++;
         }
         else
@@ -2264,7 +2292,8 @@ void LLVOCache::removeGenericExtrasForHandle(U64 handle)
     }
 }
 
-void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled)
+void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map,
+                                          const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled)
 {
     if(!mEnabled)
     {
@@ -2300,10 +2329,6 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
         return;
     }
 
-    // get ViewerRegion pointer from handle
-    LLWorld* world = LLWorld::getInstance();
-    LLViewerRegion* pRegion = world ? world->getRegionFromHandle(handle) : nullptr;
-
     // Laid out in memory first and written once: a text version line an older
     // reader can reject, the cache id, the count of records actually written,
     // then each record as its length followed by its LLSD in binary form. The
@@ -2321,15 +2346,22 @@ void LLVOCache::writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LL
     size_t inmem_entries = cache_extras_entry_map.size();
     for (const auto& [local_id, entry] : cache_extras_entry_map)
     {
-        // Only write out GLTFOverrides that we can actually apply again on import.
-        // worst case we have an extra cache miss.
-        // Note: A null mObjectId is valid when in memory as we might have a data race between GLTF of the object itself.
-        // This remains a valid state to persist as it is consistent with the localid checks on import with the main cache.
-        // the mObjectId will be updated if/when the local object is updated from the gObject list (due to full update)
-        LLUUID object_id = entry.mObjectId;
-        if(object_id.isNull() && pRegion)
+        // An override goes out only beside its object, as writeToCache writes it: an entry the region has not
+        // confirmed this session is written only while removal is off. The reader keeps no override without its
+        // object, so the two files hold the same objects.
+        // It is named for the object the entry holds, and goes out only where it is that object's: one the region sent
+        // before the object's update came to light (a null ID) is taken to be.
+        const auto object = cache_entry_map.find(local_id);
+        if (object == cache_entry_map.end() || object->second.isNull() || (removal_enabled && !object->second->isValid()))
         {
-            gObjectList.getUUIDFromLocal( object_id, local_id, pRegion->getHost().getAddress(), pRegion->getHost().getPort() );
+            skipped++;
+            continue;
+        }
+        const LLUUID object_id = object->second->getObjectID();
+        if (!entry.isFor(object_id))
+        {
+            skipped++;
+            continue;
         }
 
         // The file holds the override LLSD; the materials are rebuilt from it

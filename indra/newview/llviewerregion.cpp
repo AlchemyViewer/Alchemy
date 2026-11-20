@@ -859,7 +859,7 @@ void LLViewerRegion::saveObjectCache()
         instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled);
         // The two files are one cache, so the extras go out with every write
         // of the objects as well as when the overrides change.
-        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
+        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
         mCacheDirty = false;
         mGLTFOverridesDirty = false;
     }
@@ -3057,6 +3057,13 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         decodeBoundingInfo(entry);
     }
     entry->setUpdateFlags(flags);
+
+    // The local ID may hold another object than it did, whose overrides are not this one's.
+    if (LLVOCacheEntry::dropOverridesOfAnother(local_id, entry->getObjectID(), mImpl->mGLTFOverridesLLSD))
+    {
+        LL_DEBUGS("GLTF") << "Overrides under local ID " << local_id << " in " << getName() << " were another object's, dropped" << LL_ENDL;
+        mGLTFOverridesDirty = true;
+    }
 
     return result;
     }
