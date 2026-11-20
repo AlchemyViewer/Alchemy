@@ -54,6 +54,7 @@
 #include <iterator>
 #include <optional>
 #include <string_view>
+#include <tuple>
 
 using namespace Tailslide;
 
@@ -1112,8 +1113,15 @@ namespace
         // What the comment conversion asks of this one (ALLSLToSLua::Pass):
         // the stretches of the LSL it uncommented, where they begin and end.
         const ALLSLToSLua::Pass&                                     mPass;
+        // Its comments written otherwise, by the byte each begins at; the
+        // stretches it uncommented, in the order written, by byte -- each
+        // with its index in the pass -- and by line and column.
+        boost::unordered_flat_map<size_t, const ALLSLToSLua::Pass::Written*> mWritten;
+        std::vector<std::tuple<size_t, size_t, size_t>>              mTriedBytes;
         std::vector<std::pair<Pos, Pos>>                             mTried;
         void tryStretches();
+        // The index in the pass of the stretch a byte is in, or npos.
+        size_t triedAt(size_t byte) const;
         // Whether a node begins in one of them: code switched off, of which
         // nothing is noted.
         bool tried(LSLASTNode* node) const;
@@ -1685,24 +1693,15 @@ namespace
             k.endLine = s.endLine;
             // As the comment conversion asks: written otherwise, or marked as
             // inside what it uncommented.
-            if (const auto given = std::find_if(mPass.comments.begin(), mPass.comments.end(),
-                                                [&s](const ALLSLToSLua::Pass::Written& w) { return w.begin == s.begin; });
-                given != mPass.comments.end())
+            if (const auto given = mWritten.find(s.begin); given != mWritten.end())
             {
-                k.text     = given->text;
-                k.indented = given->indented;
+                k.text     = given->second->text;
+                k.indented = given->second->indented;
                 k.written  = k.text.empty();
             }
-            else
+            else if (const size_t n = triedAt(s.begin); n != std::string::npos)
             {
-                for (size_t n = 0; n < mPass.tried.size(); ++n)
-                {
-                    if (s.begin >= mPass.tried[n].first && s.begin < mPass.tried[n].second)
-                    {
-                        k.text += mPass.inner + std::to_string(n) + mPass.inner;
-                        break;
-                    }
-                }
+                k.text += mPass.inner + std::to_string(n) + mPass.inner;
             }
             mComments.push_back(std::move(k));
         }
@@ -2072,6 +2071,10 @@ namespace
 
     void Writer::tryStretches()
     {
+        for (const ALLSLToSLua::Pass::Written& w : mPass.comments)
+        {
+            mWritten.emplace(w.begin, &w);
+        }
         if (mPass.tried.empty())
         {
             return;
@@ -2089,10 +2092,27 @@ namespace
             const size_t line = static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), byte) - starts.begin());
             return Pos{ static_cast<S32>(line), static_cast<S32>(byte - starts[line - 1]) + 1 };
         };
-        for (const auto& [begin, end] : mPass.tried)
+        for (size_t n = 0; n < mPass.tried.size(); ++n)
+        {
+            mTriedBytes.emplace_back(mPass.tried[n].first, mPass.tried[n].second, n);
+        }
+        std::sort(mTriedBytes.begin(), mTriedBytes.end());
+        for (const auto& [begin, end, n] : mTriedBytes)
         {
             mTried.emplace_back(at(begin), at(end));
         }
+    }
+
+    size_t Writer::triedAt(size_t byte) const
+    {
+        const auto after = std::upper_bound(mTriedBytes.begin(), mTriedBytes.end(), byte,
+                                            [](size_t b, const std::tuple<size_t, size_t, size_t>& t) { return b < std::get<0>(t); });
+        if (after == mTriedBytes.begin())
+        {
+            return std::string::npos;
+        }
+        const auto& [begin, end, n] = *(after - 1);
+        return byte < end ? n : std::string::npos;
     }
 
     bool Writer::tried(LSLASTNode* node) const
@@ -2101,15 +2121,11 @@ namespace
         {
             return false;
         }
-        const Pos begins = { node->getLoc()->first_line, node->getLoc()->first_column };
-        for (const auto& [from, to] : mTried)
-        {
-            if (!(begins < from) && begins < to)
-            {
-                return true;
-            }
-        }
-        return false;
+        // The stretches do not overlap, and are in the order written.
+        const Pos  begins = { node->getLoc()->first_line, node->getLoc()->first_column };
+        const auto after  = std::upper_bound(mTried.begin(), mTried.end(), begins,
+                                             [](const Pos& p, const std::pair<Pos, Pos>& t) { return p < t.first; });
+        return after != mTried.begin() && begins < (after - 1)->second;
     }
 
     void Writer::commentsBefore(LSLASTNode* node)

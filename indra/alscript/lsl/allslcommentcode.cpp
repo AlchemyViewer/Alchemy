@@ -28,6 +28,7 @@
 
 #include "llprofiler.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
 #include <tailslide/logger.hh>
 
 #include <algorithm>
@@ -150,7 +151,7 @@ namespace
         // parse and each converts, then all taken; where one changes another
         // line, each half tried so. What is not taken is tried alone, but
         // for those the parser refused inside, which alone it would too.
-        void together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, std::vector<size_t>& refused,
+        void together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, boost::unordered_flat_set<size_t>& refused,
                       ALLSLCommentCode::Report* report);
         // A run that is not code whole in pieces: split at its lines of words,
         // or where it has none, a line at a time. Nothing for another unit.
@@ -201,19 +202,22 @@ namespace
                 source[i] = source[i] == '\n' || source[i] == '\r' ? source[i] : ' ';
             }
         }
-        ALLSLToSLua::Pass    pass;
+        ALLSLToSLua::Pass pass;
         pass.inner = mInner;
-        for (const Unit& u : units)
+        // The unit each comment is in, by its index in `units`.
+        std::vector<S32> owner(mComments.size(), -1);
+        for (size_t i = 0; i < units.size(); ++i)
         {
-            ALLSLComments::uncomment(source, mComments, u);
-            pass.tried.emplace_back(u.begin, u.end);
+            ALLSLComments::uncomment(source, mComments, units[i]);
+            pass.tried.emplace_back(units[i].begin, units[i].end);
+            for (size_t k = units[i].first; k <= units[i].last; ++k)
+            {
+                owner[k] = static_cast<S32>(i);
+            }
         }
-        const auto inside = [&units](size_t k) {
-            return std::any_of(units.begin(), units.end(), [k](const Unit& u) { return k >= u.first && k <= u.last; });
-        };
         for (size_t k : mUnitComments)
         {
-            if (!inside(k))
+            if (owner[k] < 0)
             {
                 pass.comments.push_back({ mComments[k].begin, sentinel(k), false });
             }
@@ -229,58 +233,91 @@ namespace
             return out;
         }
         const std::vector<std::string_view> lines = linesOf(r.text);
-        std::vector<bool>                   mine(lines.size(), false);
+        // Each unit's spans: the first and last line of SLua they give, and
+        // whether one runs on past its last line. Units are in the order
+        // written, so each span's is found by where it begins.
+        std::vector<Pos> begins(units.size());
+        std::vector<Pos> ends(units.size());
         for (size_t i = 0; i < units.size(); ++i)
         {
-            const Unit& u     = units[i];
-            Verdict&    v     = out[i];
-            const Pos   begin = { u.line, u.column };
-            const Pos   end   = at(u.end);
-            S32         lo    = static_cast<S32>(lines.size());
-            S32         hi    = -1;
-            v.outcome         = Outcome::NoStatement;
-            for (const ALLSLToSLua::Span& span : r.spans)
-            {
-                const Pos starts = { span.lslFirst + 1, span.lslColumn + 1 };
-                if (starts < begin || !(starts < end))
-                {
-                    continue;
-                }
-                if (span.lslLast + 1 > u.endLine)
-                {
-                    v.outcome = Outcome::Spills;
-                    break;
-                }
-                lo = std::min(lo, span.sluaFirst);
-                hi = std::max(hi, span.sluaLast);
-            }
-            if (v.outcome == Outcome::Spills || hi < 0)
+            begins[i] = { units[i].line, units[i].column };
+            ends[i]   = at(units[i].end);
+        }
+        std::vector<S32>  lo(units.size(), static_cast<S32>(lines.size()));
+        std::vector<S32>  hi(units.size(), -1);
+        std::vector<bool> spills(units.size(), false);
+        for (const ALLSLToSLua::Span& span : r.spans)
+        {
+            const Pos  starts = { span.lslFirst + 1, span.lslColumn + 1 };
+            const auto after  = std::upper_bound(begins.begin(), begins.end(), starts);
+            if (after == begins.begin())
             {
                 continue;
             }
-            // Its own comments, wherever the trial wrote them, and nothing of
-            // the script's between.
-            const std::string tag   = std::string(1, mInner) + std::to_string(i) + mInner;
-            S32               first = lo;
-            S32               last  = hi;
-            for (S32 l = 0; l < static_cast<S32>(lines.size()); ++l)
+            const size_t i = static_cast<size_t>(after - begins.begin()) - 1;
+            if (!(starts < ends[i]))
             {
-                if (lines[static_cast<size_t>(l)].find(tag) != std::string_view::npos)
-                {
-                    first = std::min(first, l);
-                    last  = std::max(last, l);
-                }
+                continue;
             }
+            spills[i] = spills[i] || span.lslLast + 1 > units[i].endLine;
+            lo[i]     = std::min(lo[i], span.sluaFirst);
+            hi[i]     = std::max(hi[i], span.sluaLast);
+        }
+        // Each unit's own comments, wherever the trial wrote them: the lines
+        // that carry its mark, and the line each mark is on.
+        std::vector<S32>                                first(units.size(), static_cast<S32>(lines.size()));
+        std::vector<S32>                                last(units.size(), -1);
+        std::vector<std::vector<std::pair<S32, size_t>>> marks(lines.size());
+        for (size_t l = 0; l < lines.size(); ++l)
+        {
+            const std::string_view line = lines[l];
+            for (size_t at = line.find(mInner); at != std::string_view::npos;)
+            {
+                const size_t close = line.find(mInner, at + 1);
+                if (close == std::string_view::npos)
+                {
+                    break;
+                }
+                const size_t i = static_cast<size_t>(std::strtoul(std::string(line.substr(at + 1, close - at - 1)).c_str(), nullptr, 10));
+                if (i < units.size())
+                {
+                    first[i] = std::min(first[i], static_cast<S32>(l));
+                    last[i]  = std::max(last[i], static_cast<S32>(l));
+                    marks[l].emplace_back(static_cast<S32>(i), at);
+                }
+                at = line.find(mInner, close + 1);
+            }
+        }
+        std::vector<bool> mine(lines.size(), false);
+        for (size_t i = 0; i < units.size(); ++i)
+        {
+            const Unit& u = units[i];
+            Verdict&    v = out[i];
+            if (spills[i])
+            {
+                v.outcome = Outcome::Spills;
+                continue;
+            }
+            if (hi[i] < 0)
+            {
+                v.outcome = Outcome::NoStatement;
+                continue;
+            }
+            // Its lines, and nothing of the script's between.
+            const S32                from = std::min(lo[i], first[i]);
+            const S32                to   = std::max(hi[i], last[i]);
             std::vector<std::string> code;
             bool                     own = true;
-            for (S32 l = first; l <= last && own; ++l)
+            for (S32 l = from; l <= to && own; ++l)
             {
-                const std::string_view line = lines[static_cast<size_t>(l)];
-                own = (l >= lo && l <= hi) || blank(line) || line.find(tag) != std::string_view::npos;
+                const size_t           at      = static_cast<size_t>(l);
+                const std::string_view line    = lines[at];
+                const bool             carries = std::any_of(marks[at].begin(), marks[at].end(), [i](const auto& m) { return m.first == static_cast<S32>(i); });
+                own = (l >= lo[i] && l <= hi[i]) || blank(line) || carries;
                 std::string kept(line);
-                for (size_t found = kept.find(tag); found != std::string::npos; found = kept.find(tag))
+                for (auto m = marks[at].rbegin(); m != marks[at].rend(); ++m)
                 {
-                    kept.erase(found, tag.size());
+                    kept.erase(m->second, kept.find(mInner, m->second + 1) + 1 - m->second);
                 }
                 code.push_back(std::move(kept));
             }
@@ -289,7 +326,7 @@ namespace
                 v.outcome = Outcome::Spills;
                 continue;
             }
-            for (S32 l = first; l <= last; ++l)
+            for (S32 l = from; l <= to; ++l)
             {
                 mine[static_cast<size_t>(l)] = true;
             }
@@ -347,16 +384,25 @@ namespace
         for (size_t l = 0; l < mBaseLines.size(); ++l)
         {
             std::string line = gone[l] ? kept[l] : std::string(mBaseLines[l]);
-            for (const Unit& u : units)
+            // Less the sentinels of the comments tried, each with the space
+            // before it.
+            for (size_t at = line.find(mSentinel); at != std::string::npos;)
             {
-                for (size_t k = u.first; k <= u.last; ++k)
+                const size_t close = line.find(mSentinel, at + 1);
+                if (close == std::string::npos || at < 2 || line.compare(at - 2, 2, "--") != 0)
                 {
-                    const std::string mark = sentinel(k);
-                    for (size_t found = line.find(mark); found != std::string::npos; found = line.find(mark))
-                    {
-                        const size_t from = found > 0 && line[found - 1] == ' ' ? found - 1 : found;
-                        line.erase(from, found + mark.size() - from);
-                    }
+                    break;
+                }
+                const size_t k = static_cast<size_t>(std::strtoul(line.substr(at + 1, close - at - 1).c_str(), nullptr, 10));
+                if (k < owner.size() && owner[k] >= 0)
+                {
+                    const size_t from = at >= 3 && line[at - 3] == ' ' ? at - 3 : at - 2;
+                    line.erase(from, close + 1 - from);
+                    at = line.find(mSentinel, from);
+                }
+                else
+                {
+                    at = line.find(mSentinel, close + 1);
                 }
             }
             line = squeezed(line);
@@ -518,7 +564,7 @@ namespace
         return joined(out);
     }
 
-    void Trials::together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, std::vector<size_t>& refused,
+    void Trials::together(std::vector<Unit> group, std::vector<std::pair<Unit, std::string>>& taken, boost::unordered_flat_set<size_t>& refused,
                           ALLSLCommentCode::Report* report)
     {
         while (group.size() > 1 && mConversions <= ALLSLCommentCode::MAX_TRIALS)
@@ -535,23 +581,21 @@ namespace
                 // another declaration may be (CC10), alone would be too: its
                 // code does not parse, or names what nothing declares.
                 std::vector<bool> out(group.size(), false);
+                std::vector<Pos>  begins;
+                for (const Unit& u : group)
+                {
+                    begins.push_back({ u.line, u.column });
+                }
                 for (const ALLSLToSLua::Pass::Error& error : errors)
                 {
-                    const Pos at    = { error.line + 1, error.column + 1 };
-                    size_t    which = 0;
-                    for (size_t i = 0; i < group.size(); ++i)
+                    const Pos    at    = { error.line + 1, error.column + 1 };
+                    const auto   after = std::upper_bound(begins.begin(), begins.end(), at);
+                    const size_t which = after == begins.begin() ? 0 : static_cast<size_t>(after - begins.begin()) - 1;
+                    out[which]         = true;
+                    const bool inside  = !(at < begins[which]) && at < this->at(group[which].end);
+                    if (inside && error.code != Tailslide::E_DUPLICATE_DECLARATION)
                     {
-                        if (!(at < Pos{ group[i].line, group[i].column }))
-                        {
-                            which = i;
-                        }
-                    }
-                    out[which] = true;
-                    const bool inside = !(at < Pos{ group[which].line, group[which].column }) && at < this->at(group[which].end);
-                    if (inside && error.code != Tailslide::E_DUPLICATE_DECLARATION &&
-                        std::find(refused.begin(), refused.end(), group[which].first) == refused.end())
-                    {
-                        refused.push_back(group[which].first);
+                        refused.insert(group[which].first);
                     }
                 }
                 std::vector<Unit> rest;
@@ -594,7 +638,7 @@ namespace
                 taken.emplace_back(group[i], verdicts[i].text);
                 if (report)
                 {
-                    report->tried.push_back({ group[i], Outcome::Converted });
+                    report->tried.push_back({ group[i], Outcome::Converted, verdicts[i].text });
                 }
             }
             return;
@@ -663,20 +707,24 @@ namespace
         std::vector<Unit>                         round = candidates;
         while (!round.empty())
         {
-            std::vector<size_t> refused;
-            const size_t        before = taken.size();
+            boost::unordered_flat_set<size_t> refused;
+            const size_t                      before = taken.size();
             together(round, taken, refused, report);
+            boost::unordered_flat_set<size_t> together_taken;
+            for (size_t t = before; t < taken.size(); ++t)
+            {
+                together_taken.insert(taken[t].first.first);
+            }
             std::vector<Unit> next;
             for (const Unit& u : round)
             {
-                if (std::any_of(taken.begin() + static_cast<std::ptrdiff_t>(before), taken.end(),
-                                [&u](const auto& t) { return t.first.first == u.first; }))
+                if (together_taken.contains(u.first))
                 {
                     continue;
                 }
                 Verdict v;
                 v.outcome = Outcome::Capped;
-                if (std::find(refused.begin(), refused.end(), u.first) != refused.end())
+                if (refused.contains(u.first))
                 {
                     v.outcome = Outcome::Refused;
                 }
@@ -686,11 +734,11 @@ namespace
                 }
                 if (v.outcome == Outcome::Converted)
                 {
-                    taken.emplace_back(u, std::move(v.text));
                     if (report)
                     {
-                        report->tried.push_back({ u, v.outcome });
+                        report->tried.push_back({ u, v.outcome, v.text });
                     }
+                    taken.emplace_back(u, std::move(v.text));
                     continue;
                 }
                 const std::vector<Unit> split = v.outcome == Outcome::Capped ? std::vector<Unit>() : pieces(u);

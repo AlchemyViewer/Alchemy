@@ -67,6 +67,9 @@ public:
     {
         ALLSLComments::Unit unit;
         Outcome             outcome = Outcome::Refused;
+        // What it was written as, where it was converted: its lines past
+        // the first as deep as the first, which the writer indents.
+        std::string         text;
     };
     // What one conversion tried, for the corpus counts: each unit's last
     // outcome, a run's pieces after it, and how many conversions it took.
