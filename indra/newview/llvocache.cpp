@@ -191,6 +191,35 @@ bool LLGLTFOverrideCacheEntry::isHeld(S32 side, F64 now) const
     return now < mHeldUntil && side >= 0 && side < LLTEContents::MAX_TES && (mHeldFaces & (U64(1) << side)) != 0;
 }
 
+// static
+ALGLTFOverrideFaceState LLGLTFOverrideCacheEntry::faceState(const LLGLTFOverrideCacheEntry* entry, S32 side,
+                                                            const LLGLTFMaterial* held, F64 now)
+{
+    if (!entry)
+    {
+        return ALGLTFOverrideFaceState::UNSENT;
+    }
+    if (entry->isHeld(side, now))
+    {
+        return ALGLTFOverrideFaceState::HELD;
+    }
+    return sameOverride(held, entry->overrideFor(side)) ? ALGLTFOverrideFaceState::MATCHES : ALGLTFOverrideFaceState::DIFFERS;
+}
+
+bool ALGLTFOverrideCounts::any() const
+{
+    return mMessages || mFacesSet || mFacesDeferred || mFacesReconciled || mKeptOnUpdate || mTakenWithObject || mDroppedAsOther
+           || mAskedAgain;
+}
+
+std::string ALGLTFOverrideCounts::summary() const
+{
+    return fmt::format("{} messages, {} faces set at once, {} found waiting on a material, {} set later, {} kept through an update, "
+                       "{} taken with their object, {} dropped as another object's, {} objects asked for again",
+                       mMessages, mFacesSet, mFacesDeferred, mFacesReconciled, mKeptOnUpdate, mTakenWithObject, mDroppedAsOther,
+                       mAskedAgain);
+}
+
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_NETWORK;

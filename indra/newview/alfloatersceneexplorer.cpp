@@ -60,6 +60,7 @@
 #include "llavatarname.h"
 #include "llavatarnamecache.h"
 #include "llcachename.h"
+#include "llfetchedgltfmaterial.h"
 #include "llfloaterreg.h"
 #include "llfloatertools.h"
 #include "llselectmgr.h"
@@ -243,6 +244,32 @@ namespace
     {
         return canRevealAssetId(asset_id) ? asset_id.asString()
                                           : std::string("(needs a full-perm copy to view)");
+    }
+
+    // How a PBR face's glTF override stands against what its region sent, read as it is when the face list is built.
+    std::string overrideStateForDisplay(LLViewerObject* obj, U8 te)
+    {
+        LLViewerRegion* regionp = obj ? obj->getRegion() : nullptr;
+        const LLTextureEntry* tep = obj ? obj->getTE(te) : nullptr;
+        if (!regionp || !tep)
+        {
+            return std::string();
+        }
+        const bool has_override = tep->getGLTFMaterialOverride() != nullptr;
+        const LLFetchedGLTFMaterial* base = static_cast<const LLFetchedGLTFMaterial*>(tep->getGLTFMaterial());
+        const std::string fetching = (base && base->isFetching()) ? std::string(", material fetching") : std::string();
+        switch (regionp->gltfOverrideState(obj, te))
+        {
+            case ALGLTFOverrideFaceState::UNSENT:
+                return has_override ? " +override, none from region" + fetching : fetching;
+            case ALGLTFOverrideFaceState::HELD:
+                return " +override, edit awaiting region" + fetching;
+            case ALGLTFOverrideFaceState::MATCHES:
+                return (has_override ? std::string(" +override") : std::string()) + fetching;
+            case ALGLTFOverrideFaceState::DIFFERS:
+                return " override differs from region" + fetching;
+        }
+        return std::string();
     }
 
     // Rough heat indicator for cost numbers: normal / caution / red.
@@ -2341,6 +2368,7 @@ void ALFloaterSceneExplorer::fillObjectDetail(ALSceneExplorerItem* item)
             if (mat_id.notNull())
             {
                 material = "PBR " + assetIdForDisplay(mat_id);
+                material += overrideStateForDisplay(obj, i);
             }
             else
             {

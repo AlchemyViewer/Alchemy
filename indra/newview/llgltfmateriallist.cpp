@@ -222,6 +222,23 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             cache.mObjectId = id;
             cache.mRegionHandle = region->getHandle();
 
+            // A face takes its override at once, or waits for a material it has not got or that is still fetching
+            ALGLTFOverrideCounts& counts = region->gltfOverrideCounts();
+            ++counts.mMessages;
+            const auto count_face = [&counts, obj](S32 te, S32 changed)
+            {
+                const LLTextureEntry* tep = obj->getTE((U8)te);
+                const LLFetchedGLTFMaterial* base = tep ? static_cast<const LLFetchedGLTFMaterial*>(tep->getGLTFMaterial()) : nullptr;
+                if (changed)
+                {
+                    ++counts.mFacesSet;
+                }
+                else if (!base || base->isFetching())
+                {
+                    ++counts.mFacesDeferred;
+                }
+            };
+
             auto count = llmin(tes.size(), MAX_TES);
             for (size_t i = 0; i < count; ++i)
             {
@@ -242,7 +259,7 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
 
                 if (obj)
                 {
-                    obj->setTEGLTFMaterialOverride(te, mat);
+                    count_face(te, obj->setTEGLTFMaterialOverride(te, mat));
                     if (obj->getTE(te) && obj->getTE(te)->isSelected())
                     {
                         handle_gltf_override_message.doSelectionCallbacks(id, te);
@@ -258,7 +275,7 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
                     LLTextureEntry* te = obj->getTE(i);
                     if (!has_te[i] && te && te->getGLTFMaterialOverride())
                     {
-                        obj->setTEGLTFMaterialOverride(i, nullptr);
+                        count_face(i, obj->setTEGLTFMaterialOverride(i, nullptr));
                         handle_gltf_override_message.doSelectionCallbacks(id, i);
                     }
                 }

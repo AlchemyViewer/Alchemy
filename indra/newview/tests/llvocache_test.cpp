@@ -947,6 +947,54 @@ namespace
         CHECK_FALSE(entry.isHeld(5, 300.0));
     }
 
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face stands as unsent or held or matching or differing", "[LLVOCache]")
+    {
+        using EFaceState = ALGLTFOverrideFaceState;
+        const U64 handle = to_region_handle(1027 * 256, 1000 * 256);
+        LLGLTFOverrideCacheEntry entry;
+        REQUIRE(entry.fromLLSD(vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 1))); // face 0
+        entry.materialize();
+        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*entry.overrideFor(0));
+        LLPointer<LLGLTFMaterial> other = new LLGLTFMaterial(*same);
+        other->mRoughnessFactor = 0.75f;
+
+        UNSCOPED_INFO("the region sent nothing for the object");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, same, 0.0) == EFaceState::UNSENT);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, nullptr, 0.0) == EFaceState::UNSENT);
+
+        UNSCOPED_INFO("a face showing the region's override, or none where it sent none");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, same, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, nullptr, 0.0) == EFaceState::MATCHES);
+
+        UNSCOPED_INFO("a face showing another override, none in place of the region's, or one where it sent none");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, other, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, nullptr, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, same, 0.0) == EFaceState::DIFFERS);
+
+        UNSCOPED_INFO("a face waiting on the region's answer to an edit, whatever it shows");
+        entry.hold(0, 100.0);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, other, 100.0) == EFaceState::HELD);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, same, 100.0) == EFaceState::DIFFERS);
+    }
+
+    TEST_CASE("ALGLTFOverrideCounts: a region with nothing counted logs nothing", "[LLVOCache]")
+    {
+        ALGLTFOverrideCounts counts;
+        CHECK_FALSE(counts.any());
+        CHECK(counts.summary().find("0 messages") == 0u);
+
+        for (U32 ALGLTFOverrideCounts::*count : { &ALGLTFOverrideCounts::mMessages, &ALGLTFOverrideCounts::mFacesSet,
+                                                  &ALGLTFOverrideCounts::mFacesDeferred, &ALGLTFOverrideCounts::mFacesReconciled,
+                                                  &ALGLTFOverrideCounts::mKeptOnUpdate, &ALGLTFOverrideCounts::mTakenWithObject,
+                                                  &ALGLTFOverrideCounts::mDroppedAsOther, &ALGLTFOverrideCounts::mAskedAgain })
+        {
+            ALGLTFOverrideCounts one;
+            ++(one.*count);
+            UNSCOPED_INFO("any one count is something to log");
+            CHECK(one.any());
+        }
+    }
+
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: an override is kept only for the object its local ID holds", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1026 * 256, 1000 * 256);

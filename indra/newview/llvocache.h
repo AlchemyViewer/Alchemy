@@ -32,6 +32,7 @@
 #include "lldir.h"
 #include "llvieweroctree.h"
 #include "llgltfmaterial.h"
+#include "algltfoverridestate.h"
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered/unordered_node_map.hpp>
@@ -74,6 +75,10 @@ public:
 
     // Whether the entry is for the object `id`: one naming no object is taken to be.
     bool isFor(const LLUUID& id) const { return mObjectId.isNull() || mObjectId == id; }
+
+    // The state of face `side`, holding `held`, against `entry` (null where the region has sent nothing), its
+    // materials built by materialize().
+    static ALGLTFOverrideFaceState faceState(const LLGLTFOverrideCacheEntry* entry, S32 side, const LLGLTFMaterial* held, F64 now);
 
     LLUUID mObjectId;
     U32    mLocalId = 0;

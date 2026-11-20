@@ -839,6 +839,13 @@ void LLViewerRegion::loadObjectCache()
 void LLViewerRegion::saveObjectCache()
 {
     LL_PROFILE_ZONE_SCOPED;
+    // Once for the region's life so far: the save on its removal and the one as it is destroyed log one line between them.
+    if (mGLTFOverrideCounts.any())
+    {
+        LL_INFOS("GLTF") << "glTF overrides in " << getName() << ": " << mGLTFOverrideCounts.summary() << LL_ENDL;
+        mGLTFOverrideCounts = ALGLTFOverrideCounts();
+    }
+
     if (!mCacheLoaded)
     {
         return;
@@ -1252,10 +1259,12 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
     {
         LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " go with its entry" << LL_ENDL;
         mGLTFOverridesDirty = true;
+        ++mGLTFOverrideCounts.mTakenWithObject;
     }
     else if (for_rendering && mImpl->mGLTFOverridesLLSD.count(local_id))
     {
         LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " kept as its entry leaves for an update" << LL_ENDL;
+        ++mGLTFOverrideCounts.mKeptOnUpdate;
     }
     //will remove it from the object cache, real deletion
     entry->setState(LLVOCacheEntry::INACTIVE);
@@ -1272,6 +1281,7 @@ void LLViewerRegion::killCacheEntry(U32 local_id)
                                     [this](LLVOCacheEntry* entry) { killCacheEntry(entry); }))
     {
         mGLTFOverridesDirty = true;
+        ++mGLTFOverrideCounts.mTakenWithObject;
     }
 }
 
@@ -3018,6 +3028,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         {
             LL_DEBUGS("GLTF") << "Overrides under local ID " << local_id << " in " << getName() << " were another object's, dropped" << LL_ENDL;
             mGLTFOverridesDirty = true;
+            ++mGLTFOverrideCounts.mDroppedAsOther;
         }
     };
 
@@ -4339,9 +4350,25 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
         LLGLTFMaterial* wanted = entry.overrideFor(i);
         if (tep && !LLGLTFOverrideCacheEntry::sameOverride(tep->getGLTFMaterialOverride(), wanted))
         {
-            obj->setTEGLTFMaterialOverride((U8)i, wanted);
+            if (obj->setTEGLTFMaterialOverride((U8)i, wanted))
+            {
+                ++mGLTFOverrideCounts.mFacesReconciled;
+            }
         }
     }
+}
+
+ALGLTFOverrideFaceState LLViewerRegion::gltfOverrideState(const LLViewerObject* obj, S32 te)
+{
+    const LLTextureEntry* tep = obj ? obj->getTE((U8)te) : nullptr;
+    auto iter = obj ? mImpl->mGLTFOverridesLLSD.find(obj->getLocalID()) : mImpl->mGLTFOverridesLLSD.end();
+    LLGLTFOverrideCacheEntry* entry = nullptr;
+    if (iter != mImpl->mGLTFOverridesLLSD.end())
+    {
+        entry = &iter->second;
+        entry->materialize();
+    }
+    return LLGLTFOverrideCacheEntry::faceState(entry, te, tep ? tep->getGLTFMaterialOverride() : nullptr, LLFrameTimer::getTotalSeconds());
 }
 
 

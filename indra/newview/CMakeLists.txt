@@ -1153,6 +1153,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuistudio.h
     alviewcapture.h
     algltfmaterialretry.h
+    algltfoverridestate.h
     algradehistory.h
     algroupchanges.h
     algroupmembers.h
