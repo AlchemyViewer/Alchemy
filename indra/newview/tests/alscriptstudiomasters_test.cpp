@@ -84,7 +84,12 @@ namespace
         }
         void send(const ALScriptRef& ref, ALMasterPlan::Send kind) override { sent.emplace_back(ref, kind); }
         void wrote(const std::string& path) override { written.push_back(path); }
-        void tookWorld(const std::string& path, const ALScriptRef& from) override { took.emplace_back(path, from); }
+        void tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text) override
+        {
+            took.emplace_back(path, from);
+            tookAssets.push_back(asset);
+            tookTexts.push_back(text);
+        }
         boost::signals2::connection onOutcome(std::function<void(const Outcome& outcome)> heard) override { return told.connect(std::move(heard)); }
         boost::signals2::connection onChanged(std::function<void()> heard) override { return changed.connect(std::move(heard)); }
         std::vector<Outcome>        takeUnheard() override
@@ -100,6 +105,8 @@ namespace
         // What the masters asked beyond the links.
         std::vector<std::string>                                written;
         std::vector<std::pair<std::string, ALScriptRef>>        took;
+        std::vector<LLUUID>                                     tookAssets;
+        std::vector<std::string>                                tookTexts;
         std::vector<std::pair<ALScriptRef, ALMasterPlan::Send>> sent;
         std::vector<Outcome>                                    unheard;
         boost::signals2::signal<void(const Outcome&)>           told;
@@ -591,9 +598,10 @@ namespace
         }
         unit->offer(*lamp, "master_compare");
         ALScriptLoaded read;
-        read.ref  = other_ref;
-        read.name = "lamp";
-        read.text = "default { state_entry() {} }\n";
+        read.ref     = other_ref;
+        read.name    = "lamp";
+        read.text    = "default { state_entry() {} }\n";
+        read.assetId = LLUUID::generateNewID();
         studio->toLoad(read);
         {
             INFO("read: the file's tab beside what the world holds");
@@ -626,6 +634,9 @@ namespace
             REQUIRE(disk.took.size() == size_t(1));
             CHECK(disk.took.back().first == in("lamp.lsl"));
             CHECK(disk.took.back().second == other_ref);
+            INFO("with the world's asset and text, for the link to be of");
+            CHECK(disk.tookAssets.back() == read.assetId);
+            CHECK(disk.tookTexts.back() == read.text);
             CHECK(disk.sent.empty());
             CHECK(disk.written.empty());
         }
@@ -636,13 +647,31 @@ namespace
             CHECK(lamp->editor->isDirty());
         }
         unit->offer(*lamp, "master_take_world");
-        studio->toLoad(read);
         {
-            INFO("typed in and not saved: asked first, naming the script");
+            // Answered through a copy: the answer asks for the script again,
+            // which puts a new callback where this one was.
+            const auto answer = studio->toLoad;
+            answer(read);
+        }
+        {
+            INFO("typed in and not saved: asked first, naming the script, and read again once answered");
             REQUIRE(studio->askedTake.size() == size_t(1));
             CHECK(studio->askedTake.back() == lamp->id + " lamp");
-            CHECK(lamp->editor->wholeText() == "default { state_entry() {} }\n");
+            CHECK(lamp->editor->wholeText() == "default {}\n");
+            CHECK(studio->loads.back() == other_ref);
+        }
+        ALScriptLoaded saved_meanwhile = read;
+        saved_meanwhile.text           = "default { touch_start(integer n) {} }\n";
+        saved_meanwhile.assetId        = LLUUID::generateNewID();
+        studio->toLoad(saved_meanwhile);
+        {
+            INFO("what the script holds as it is read again is what the file takes");
+            CHECK(lamp->editor->wholeText() == "default { touch_start(integer n) {} }\n");
             CHECK_FALSE(lamp->editor->isDirty());
+            std::string on_disk;
+            REQUIRE(ALFileRead::whole(in("lamp.lsl"), on_disk, ALDiskIncludes::MAX_BYTES));
+            CHECK(on_disk == saved_meanwhile.text);
+            CHECK(disk.tookAssets.back() == saved_meanwhile.assetId);
         }
         lamp->editor->undo();
         studio->takeAnswer = false;
@@ -657,7 +686,7 @@ namespace
         lamp->editor->redo();
         lamp->editor->resetDirty();
         unit->offer(*lamp, "master_take_world");
-        studio->toLoad(read);
+        studio->toLoad(saved_meanwhile);
         {
             INFO("already the same: said, the link put in step, nothing more to undo");
             CHECK(says(said().text, "MasterTookSame"));

@@ -175,11 +175,12 @@ public:
     // that include it sent again.
     void wrote(const std::string& path);
     // The master written here with what `from` holds in-world (Update
-    // File): its link put in step with the file as it is now, as linking
-    // it to a file holding the same does, with nothing sent to it; and the
+    // File), its asset and its whole text, envelope and all: its link put
+    // in step with the file as it is now and with that text
+    // (ALMasterIndex::inStep), with nothing sent to it; and the
     // file's other scripts, and those including it, sent as wrote() sends
     // them.
-    void tookWorld(const std::string& path, const ALScriptRef& from);
+    void tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text);
     // A script sent from its master now: as a save of it is, or as the
     // studio's own send is, which a change in the world holds.
     void send(const ALScriptRef& ref, ALMasterPlan::Send kind);

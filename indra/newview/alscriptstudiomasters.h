@@ -140,11 +140,12 @@ public:
         // masters sent as its save sends it.
         virtual void send(const ALScriptRef& ref, ALMasterPlan::Send kind) = 0;
         virtual void wrote(const std::string& path)                         = 0;
-        // The file written with what `from` holds in-world (Update File):
+        // The file written with what `from` holds in-world (Update File),
+        // its asset and whole text given:
         // that script left as it is, in step with the file, and the file's
         // other scripts, and those including it, sent as any write of it
         // sends them.
-        virtual void tookWorld(const std::string& path, const ALScriptRef& from) = 0;
+        virtual void tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text) = 0;
         // What came of each send, or of the world heard changing under a
         // link; the links changing; and what was said with no window to
         // hear it, given once.
@@ -248,11 +249,11 @@ private:
     // a tab with unsaved changes asked about first (Update File).
     void takeWorld(Doc& doc, const ALScriptRef& ref);
     // What the world holds written to the file and put in its tab.
-    void writeWorld(Doc& tab, const ALScriptRef& ref, const std::string& theirs, const std::string& name);
+    void writeWorld(Doc& tab, const ALScriptRef& ref, const std::string& theirs, const ALScriptLoaded& loaded);
     // The world's text of a script, out of its envelope, given to `then`
     // with the master's tab where both are still there; a read that failed
     // said on the tab.
-    void loadWorld(Doc& doc, const ALScriptRef& ref, std::function<void(Doc& tab, const std::string& theirs, const std::string& name)> then);
+    void loadWorld(Doc& doc, const ALScriptRef& ref, std::function<void(Doc& tab, const std::string& theirs, const ALScriptLoaded& loaded)> then);
 
     ALScriptStudioServices&            mServices;
     ALScriptStudioAnalysis&            mAnalysis;

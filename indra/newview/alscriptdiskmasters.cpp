@@ -291,7 +291,7 @@ void ALScriptDiskMasters::wrote(const std::string& path)
     mFanOut->changed({ file }, { file });
 }
 
-void ALScriptDiskMasters::tookWorld(const std::string& path, const ALScriptRef& from)
+void ALScriptDiskMasters::tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text)
 {
     ALMasterIndex* index = links();
     if (!index)
@@ -303,14 +303,10 @@ void ALScriptDiskMasters::tookWorld(const std::string& path, const ALScriptRef& 
     {
         mWatch->seen(file);
     }
-    if (std::optional<ALMasterLink> link = index->linkOf(from.object, from.item); link && link->master == file)
-    {
-        // The file as the world has it: the link starts from it, as from a
-        // send of it, so that nothing marks the file as changed since.
-        link->stamp = ALFileStamp::of(file).time;
-        link->state = ALMasterLink::State::Active;
-        index->link(std::move(*link));
-    }
+    // The file as the world has it: the link starts from it, as from a send
+    // of it, so that nothing marks the file as changed since, and a save of
+    // the same text from elsewhere is what the link is of.
+    index->inStep(from.object, from.item, file, asset, text, ALFileStamp::of(file).time);
     for (const ALMasterLink& one : mastering(file))
     {
         if (one.object != from.object || one.item != from.item)

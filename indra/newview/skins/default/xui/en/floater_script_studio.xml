@@ -758,7 +758,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeMasterSend">Send File</floater.string>
     <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
     <floater.string name="NoticeMasterTakeWorld">Update File</floater.string>
-    <floater.string name="NoticeMasterTakeWorldTip">Write what the script holds in-world to the file on disk, and to its tab as one step to undo; nothing is sent</floater.string>
+    <floater.string name="NoticeMasterTakeWorldTip">Write what the script holds in-world to the file on disk, and to its tab as one step to undo. That script is left as it is; any other script linked to the file is sent it</floater.string>
     <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
     <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
     <floater.string name="NoticeMasterGiveWay">Switch to File</floater.string>
@@ -774,7 +774,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionMasterSend">Send file</floater.string>
     <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
     <floater.string name="ActionMasterTakeWorld">Update file</floater.string>
-    <floater.string name="ActionMasterTakeWorldTip">Write what the script holds in-world to [NAME] on disk</floater.string>
+    <floater.string name="ActionMasterTakeWorldTip">Write what the script holds in-world to [NAME] on disk; any other script linked to it is sent it</floater.string>
     <floater.string name="ActionMasterCompare">Compare</floater.string>
     <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
     <floater.string name="ActionMasterGiveWay">Switch to file</floater.string>
