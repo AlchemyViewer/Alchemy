@@ -288,10 +288,14 @@ void LLFetchedGLTFMaterial::onMaterialComplete(std::function<void()> material_co
     if (!mFetching)
     {
         material_complete();
+        if (mFetchCompletion.mRetry.isPending())
+        {
+            mFetchCompletion.mCallbacks.push_back(std::move(material_complete));
+        }
         return;
     }
 
-    materialCompleteCallbacks.push_back(material_complete);
+    mFetchCompletion.mCallbacks.push_back(std::move(material_complete));
 }
 
 void LLFetchedGLTFMaterial::materialComplete(bool success)
@@ -300,10 +304,22 @@ void LLFetchedGLTFMaterial::materialComplete(bool success)
     mFetching = false;
     mFetchSuccess = success;
 
-    for (std::function<void()> material_complete : materialCompleteCallbacks)
+    // The callbacks run from a list of their own, since one may add another as it runs: one added to a material
+    // awaiting a retry runs at once and is kept.
+    std::vector<std::function<void()>> callbacks;
+    callbacks.swap(mFetchCompletion.mCallbacks);
+    for (const std::function<void()>& material_complete : callbacks)
     {
         material_complete();
     }
-    materialCompleteCallbacks.clear();
-    materialCompleteCallbacks.shrink_to_fit();
+
+    // A failure that is fetched again keeps every callback, those added as they ran after the rest, to run them again
+    // when the retry completes
+    if (!success && mFetchCompletion.mRetry.isPending())
+    {
+        callbacks.insert(callbacks.end(),
+                         std::make_move_iterator(mFetchCompletion.mCallbacks.begin()),
+                         std::make_move_iterator(mFetchCompletion.mCallbacks.end()));
+        mFetchCompletion.mCallbacks.swap(callbacks);
+    }
 }

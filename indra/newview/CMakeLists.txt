@@ -1152,6 +1152,7 @@ if(AL_BUILD_VIEWER)
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
     alviewcapture.h
+    algltfmaterialretry.h
     algradehistory.h
     algroupchanges.h
     algroupmembers.h
@@ -2575,6 +2576,7 @@ if(AL_BUILD_TESTS)
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
       tests/alfriendbacklog_test.cpp
+      tests/algltfmaterialretry_test.cpp
       tests/algradehistory_test.cpp
       tests/algroupchanges_test.cpp
       tests/algroupmembers_test.cpp
