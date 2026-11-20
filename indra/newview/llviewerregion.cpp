@@ -3010,6 +3010,17 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         return CACHE_UPDATE_DUPE;
     }
 
+    // The local ID may hold another object than it did, whose overrides are not this one's. They go before anything
+    // is made from the entry, as decodeBoundingInfo makes the object there and then with culling off.
+    const auto drop_overrides_of_another = [this, local_id](const LLVOCacheEntry* held)
+    {
+        if (LLVOCacheEntry::dropOverridesOfAnother(local_id, held->getObjectID(), mImpl->mGLTFOverridesLLSD))
+        {
+            LL_DEBUGS("GLTF") << "Overrides under local ID " << local_id << " in " << getName() << " were another object's, dropped" << LL_ENDL;
+            mGLTFOverridesDirty = true;
+        }
+    };
+
     if (entry)
     {
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
@@ -3036,6 +3047,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 
             result = CACHE_UPDATE_CHANGED;
         }
+        drop_overrides_of_another(entry);
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
         if (fUpdateObj)
@@ -3053,17 +3065,11 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         record(LLStatViewer::OBJECT_CACHE_HIT_RATE, LLUnits::Ratio::fromValue(0));
 
         mImpl->mCacheMap[local_id] = entry;
+        drop_overrides_of_another(entry);
 
         decodeBoundingInfo(entry);
     }
     entry->setUpdateFlags(flags);
-
-    // The local ID may hold another object than it did, whose overrides are not this one's.
-    if (LLVOCacheEntry::dropOverridesOfAnother(local_id, entry->getObjectID(), mImpl->mGLTFOverridesLLSD))
-    {
-        LL_DEBUGS("GLTF") << "Overrides under local ID " << local_id << " in " << getName() << " were another object's, dropped" << LL_ENDL;
-        mGLTFOverridesDirty = true;
-    }
 
     return result;
     }
