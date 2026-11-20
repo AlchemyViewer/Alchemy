@@ -8829,14 +8829,8 @@ namespace
             }
             return std::make_pair(begin, end);
         };
-        struct Seen
-        {
-            LSLASTNode*      scope;
-            int              kind;
-            std::string_view name;
-            LSLASTNode*      node;
-        };
-        std::vector<Seen> seen;
+        // The first of each kind and name in each scope.
+        boost::unordered_flat_map<std::string, LSLASTNode*> seen;
         walk(script, [&](LSLASTNode* node) {
             int            kind = 0;
             LSLIdentifier* id   = nullptr;
@@ -8858,18 +8852,13 @@ namespace
             {
                 return;
             }
-            const std::string_view name = id->getName();
-            for (const Seen& s : seen)
+            const std::string key = std::to_string(reinterpret_cast<uintptr_t>(node->getParent())) + ':' + std::to_string(kind) + ':' + id->getName();
+            if (const auto [first, fresh] = seen.emplace(key, node); !fresh)
             {
-                if (s.scope == node->getParent() && s.kind == kind && s.name == name)
-                {
-                    const auto [begin, end]           = bytes(node);
-                    const auto [first_begin, first_end] = bytes(s.node);
-                    out.push_back({ begin, end, first_begin, first_end });
-                    break;
-                }
+                const auto [begin, end]             = bytes(node);
+                const auto [first_begin, first_end] = bytes(first->second);
+                out.push_back({ begin, end, first_begin, first_end });
             }
-            seen.push_back({ node->getParent(), kind, name, node });
         });
     }
 }
