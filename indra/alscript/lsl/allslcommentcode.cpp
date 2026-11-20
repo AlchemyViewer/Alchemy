@@ -499,7 +499,7 @@ namespace
         const size_t           cut    = std::min(text.find('\n'), text.size());
         const std::string_view head   = text.substr(0, cut);
         const std::string_view tail   = text.substr(text.rfind('\n') == std::string_view::npos ? 0 : text.rfind('\n') + 1);
-        const bool             opens  = !blank(head);
+        const bool             opens  = !blank(head) && !unit.labelled;
         const bool             closes = !blank(tail);
         const bool             toggle = unit.shape == Unit::Shape::Toggle;
         std::string            bracket;
@@ -509,7 +509,7 @@ namespace
         }
         else
         {
-            const std::string all = joined(code);
+            const std::string all = joined(code) + std::string(head);
             while (all.find("]" + bracket + "]") != std::string::npos)
             {
                 bracket += "=";
@@ -521,6 +521,20 @@ namespace
         {
             out.push_back("--[" + bracket + "[" + std::string(leadingBlanks(head)) + code.front());
             from = 1;
+        }
+        else if (unit.labelled)
+        {
+            // Its label as it was.
+            std::string label(head);
+            while (!label.empty() && (label.back() == ' ' || label.back() == '\t' || label.back() == '\r'))
+            {
+                label.pop_back();
+            }
+            if (!label.empty() && label.back() == ']')
+            {
+                label += " ";
+            }
+            out.push_back("--[" + bracket + "[" + label);
         }
         else
         {
@@ -628,6 +642,20 @@ namespace
 
     std::vector<Unit> Trials::pieces(const Unit& unit) const
     {
+        // A block with words on its first line and code after: those words
+        // as its label.
+        if ((unit.shape == Unit::Shape::Block || unit.shape == Unit::Shape::Toggle) && !unit.labelled)
+        {
+            const std::string_view text = ALLSLComments::body(mLsl, mComments[unit.first]);
+            const size_t           cut  = text.find('\n');
+            if (cut == std::string_view::npos || blank(text.substr(0, cut)) || !ALLSLComments::endsCode(text.substr(cut)))
+            {
+                return {};
+            }
+            Unit labelled     = unit;
+            labelled.labelled = true;
+            return { labelled };
+        }
         if (unit.shape != Unit::Shape::Lines || unit.first == unit.last)
         {
             return {};

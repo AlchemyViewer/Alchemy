@@ -96,6 +96,9 @@ public:
         S32    line    = 1;
         S32    column  = 1;
         S32    endLine = 1;
+        // A block or toggle whose first line is its label, /* old code: or
+        // /* DEBUG: kept as words, its code from the next line on.
+        bool   labelled = false;
     };
     // The units, in the order written: each run of line comments alone on
     // consecutive lines, each block comment and toggle alone on their lines,
@@ -121,7 +124,8 @@ public:
     // function, handler and state ends with a ; or a }.
     static bool endsCode(std::string_view text);
     // The source with the unit's markers blanked to spaces, so that what
-    // they held is code where it stands, every line and column where it was.
+    // they held is code where it stands, every line and column where it was;
+    // a labelled block's label with them.
     static std::string uncommented(std::string_view source, const std::vector<Comment>& comments, const Unit& unit);
     static void        uncomment(std::string& source, const std::vector<Comment>& comments, const Unit& unit);
 

@@ -330,6 +330,10 @@ void ALLSLComments::uncomment(std::string& source, const std::vector<Comment>& c
             {
                 source[i] = ' ';
             }
+            for (size_t i = c.begin + 2; unit.labelled && i < c.end && source[i] != '\n'; ++i)
+            {
+                source[i] = source[i] == '\r' ? '\r' : ' ';
+            }
         }
     }
 }

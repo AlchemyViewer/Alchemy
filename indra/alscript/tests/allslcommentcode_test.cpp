@@ -465,6 +465,39 @@ namespace
         CHECK(past > 0);
     }
 
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a block's first line of words its label, its code after",
+                     "[ALLSLCommentCode]")
+    {
+        const std::string lsl = "/* old code:\n"
+                                "integer unused() { return 1; }\n"
+                                "*/\n"
+                                "/* DEBUG ]] on\n"
+                                "integer gVerbose = 1;\n"
+                                "//*/\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        /* llSay(0, \"a\");\n"   // code on its first line: whole
+                                "        llSay(0, \"b\"); */\n"
+                                "        /* the old way;\n"        // words with a ;, then nothing that resolves
+                                "        nope(); */\n"
+                                "        llSay(0, \"c\");\n"
+                                "    }\n"
+                                "}\n";
+        ALLSLCommentCode::Report  report;
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CAPTURE(r.text);
+        CHECK(has(r, "\n--[[ old code:\nlocal function unused()\n    return 1\nend\n]]\n"));
+        UNSCOPED_INFO("the toggle's label kept, its level past what the label has");
+        CHECK(has(r, "\n--[=[ DEBUG ]] on\nlocal gVerbose = 1\n--]=]\n"));
+        CHECK(has(r, "\n--[[ ll.Say(0, \"a\")\nll.Say(0, \"b\") ]]\n"));
+        CHECK(has(r, "\n--[[ the old way;\n        nope(); ]]\n"));
+        CHECK(r.commentsConverted == 3);
+        CHECK(r.commentsLeft == 1);
+        std::string on = r.text;
+        on.insert(on.find("--[=[ DEBUG"), "-");
+        require_checks_clean(on);
+    }
+
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: nothing noted of commented code; the live code's notes said still",
                      "[ALLSLCommentCode]")
     {
