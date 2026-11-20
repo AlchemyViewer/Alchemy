@@ -483,10 +483,20 @@ void LLSyntaxDefCache::applyOverrides()
     }
     for (const std::string& file : gDirUtilp->getFilesInDir(dir))
     {
-        if (!file.empty() && file.front() != '.' && file.size() <= MAX_DEFINITION_NAME_LENGTH)
+        if (file.empty() || file.front() == '.' || file.size() > MAX_DEFINITION_NAME_LENGTH)
         {
-            mFileCachePaths.addNamePath(file, gDirUtilp->add(dir, file));
+            continue;
         }
+        const std::string path = gDirUtilp->add(dir, file);
+        // A keyword file that does not read as definitions this viewer
+        // knows leaves the region's or the shipped one in its place, which
+        // the keywords are read from.
+        if (MEMCACHED_LLSD.contains(file) && !isSupportedVersion(loadDeserializedCacheFile(path)))
+        {
+            LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file " << path << ", not used." << LL_ENDL;
+            continue;
+        }
+        mFileCachePaths.addNamePath(file, path);
     }
     ++mOverridesLaid;
 }

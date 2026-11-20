@@ -90,7 +90,7 @@ namespace
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
         "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
-        "ALScriptStudioVimClipboard",
+        "ALScriptStudioVimClipboard", "ALScriptDefinitionsFolder",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatBraceSpaces", "ALScriptFormatWidth",       "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
