@@ -2131,7 +2131,7 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 
                         if (model->mLabel.empty())
                         {
-                            label = getLodlessLabel(instance_geo);
+                            label = mLod == LLModel::LOD_HIGH ? getElementLabel(instance_geo) : getLodlessLabel(instance_geo); // <SK:Nexii> Mesh uploader LODs by name
 
                             llassert(!label.empty());
 
@@ -2146,7 +2146,11 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
                         {
                             // Don't change model's name if possible, it will play havoc with scenes that already use said model.
                             size_t ext_pos = getSuffixPosition(model->mLabel);
-                            if (ext_pos != std::string::npos)
+                            if (mLod == LLModel::LOD_HIGH)
+                            {
+                                label = model->mLabel; // <SK:Nexii> Mesh uploader LODs by name: the instance is named as its model is
+                            }
+                            else if (ext_pos != std::string::npos)
                             {
                                 label = model->mLabel.substr(0, ext_pos);
                             }
@@ -2512,7 +2516,8 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
     LLModel* ret = new LLModel(volume_params, 0.f);
 
-    std::string model_name = getLodlessLabel(mesh);
+    // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps its suffixes for the preview to sort out
+    std::string model_name = mLod == LLModel::LOD_HIGH ? getElementLabel(mesh) : getLodlessLabel(mesh);
     ret->mLabel = model_name + lod_suffix[mLod];
 
     llassert(!ret->mLabel.empty());

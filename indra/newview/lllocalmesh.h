@@ -48,6 +48,7 @@
 #include <filesystem>
 #include <list>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -85,6 +86,8 @@ struct LLLocalMeshPart
     std::string               mName;          // sub-mesh (model/instance) name, for build-floater display
     LLUUID                    mWorldID;       // unique mesh id objects/repository reference
     LLPointer<LLVolume>       mVolume;        // normalized geometry (<= 8 faces)
+    LLPointer<LLVolume>       mLODVolumes[LLModel::LOD_HIGH]; // the file's NAME_LOD0-2, null where it has none
+    std::shared_ptr<LLModel::Decomposition> mPhysics; // the file's NAME_PHYS as a physics mesh, null where it has none
     LLPointer<LLMeshSkinInfo> mSkinInfo;      // null if not rigged
     LLVector3                 mScale;         // object scale (decomposed instance scale; rigged: authored size)
     LLQuaternion              mRotation;      // object rotation (decomposed instance rotation; rigged: identity)
@@ -236,7 +239,9 @@ public:
 
     // Mesh repository injection: resolve a part's world id to its decoded data.
     bool                  isLocal(const LLUUID& world_id) const;
-    LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
+    // The part's geometry for a LOD: the file's own model for it, else the High one.
+    LLVolume*             getVolumeForWorldID(const LLUUID& world_id, S32 lod = LLModel::LOD_HIGH) const;
+    LLModel::Decomposition* getDecompositionForWorldID(const LLUUID& world_id) const;
     const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
     // Despawn in-world preview copies but KEEP the loaded unit so it can be re-spawned
