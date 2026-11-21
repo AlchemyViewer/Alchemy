@@ -788,6 +788,49 @@ end</floater.string>
              top_pad="4"
              width="370"
              wrap="true" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="definitions_heading"
+             top_pad="12"
+             width="370">
+                Language definitions
+            </text>
+            <line_editor
+             commit_on_focus_lost="true"
+             control_name="ALScriptDefinitionsFolder"
+             follows="left|top"
+             height="22"
+             label="The region's"
+             layout="topleft"
+             left="412"
+             name="definitions_folder"
+             tool_tip="A folder of newer definitions than the region's: each file in it (secondlife.d.luau, secondlife.docs.json, builtins.txt, lsl_keywords.xml, lua_keywords.xml) is read in place of the region's of the same name, for checks, hovers, completions and colours. The region still compiles with its own. Empty: the region's alone."
+             top_pad="4"
+             width="230" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Browse..."
+             layout="topleft"
+             left_pad="6"
+             name="definitions_browse"
+             tool_tip="Choose the folder of definitions"
+             top_delta="0"
+             width="64" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="definitions_clear"
+             tool_tip="Use the region's definitions alone"
+             top_delta="0"
+             width="64" />
         </panel>
         <panel
          follows="all"

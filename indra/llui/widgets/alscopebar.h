@@ -113,6 +113,14 @@ public:
         return mRun.connect(cb);
     }
 
+    // The parts the keyboard stops at, in the order they read: the field
+    // and the dropdowns. A caller laying out a tab order of its own -- the
+    // field beside a box of its own, say -- takes them from here, since
+    // Tab and Shift+Tab are passed on to the bar's parent, where they move
+    // through the parent's controls as they would have through the bar's.
+    std::vector<LLUICtrl*> tabStops() const;
+    bool handleKeyHere(KEY key, MASK mask) override;
+
     void reshape(S32 width, S32 height, bool called_from_parent = true) override;
     ~ALScopeBar() override;
 

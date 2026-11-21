@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llviewermessage.h"
 
+#include "alscriptdiskmasters.h"
 #include "alscriptstudio.h"
 #include "alscripttypes.h"
 #include "alnotecarditems.h"
@@ -4065,6 +4066,10 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
                 gPipeline.addDebugBlip(objectp->getPositionAgent(), color);
                 LL_DEBUGS("MessageBlip") << "Kill blip for local " << local_id << " at " << objectp->getPositionAgent() << LL_ENDL;
             }
+
+            // A prim deleted from here: its scripts' links to files go
+            // with it (QK3); gone any other way, they stay.
+            ALScriptDiskMasters::killed(*objectp);
 
             // Do the kill
             gObjectList.killObject(objectp);

@@ -862,22 +862,34 @@ namespace
         UNSCOPED_INFO("its transform on: not");
         CHECK(doc.check->analysis[0].message == std::string("syntax error"));
 
+        // Tapple's (QK4): SLua calling require is preprocessed, the setting
+        // off, since only the preprocessor answers it.
         preprocessing       = false;
         Doc& lua            = tab("b", "local x = require(\"lib\")\n");
         lua.language.lua    = true;
-        checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
-        studio.asks.back().answered(answer(lua));
         {
-            INFO("a require the preprocessor does not run over, warned of");
-            REQUIRE(lua.check->analysis.size() == 1);
-            CHECK(lua.check->analysis[0].message == "RequireNotPreprocessed [NAME]=lib");
+            INFO("preprocessed for its require");
+            CHECK(checking.preprocessed(lua));
+            CHECK(checking.preprocessedWhy(lua) == ALPreprocessor::Wanted::Requires);
         }
-        preprocessing = true;
+        const size_t before_lua = expansions.size();
         checking.ask(lua, Kind::Check, ALTextPos(), ALTextPos());
+        UNSCOPED_INFO("expanded");
+        REQUIRE(expansions.size() == before_lua + 1);
         expansions.back().second(plain);
         studio.asks.back().answered(answer(lua));
-        UNSCOPED_INFO("preprocessed: not");
+        UNSCOPED_INFO("and nothing warned of");
         REQUIRE(lua.check->analysis.empty());
+        {
+            INFO("a require taken out: plain again");
+            lua.editor->setText("local x = 1\n");
+            CHECK(checking.preprocessedWhy(lua) == ALPreprocessor::Wanted::No);
+        }
+        {
+            INFO("LSL's no reason");
+            Doc& lsl = tab("r", "default { state_entry() { require(\"lib\"); } }\n");
+            CHECK(checking.preprocessedWhy(lsl) == ALPreprocessor::Wanted::No);
+        }
 
         // `inline` is taken off whenever the preprocessor runs, the
         // extensions on or not: said as the preprocessor's alone.

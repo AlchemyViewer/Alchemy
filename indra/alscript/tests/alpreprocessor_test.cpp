@@ -2139,6 +2139,82 @@ namespace
         CHECK(P::wanted(directives(false), false) == P::Wanted::No);
         UNSCOPED_INFO("by text");
         CHECK(P::wanted("#define X 1\n", false, false) == P::Wanted::Directives);
+
+        // Tapple's (QK4): SLua calling require goes up with its modules,
+        // the setting off, as only the preprocessor answers it.
+        {
+            INFO("a require, after directives and before the setting");
+            CHECK(P::wanted(directives(false), false, directives(true)) == P::Wanted::Requires);
+            CHECK(P::wanted(directives(false), true, directives(true)) == P::Wanted::Requires);
+            CHECK(P::wanted(directives(true), false, directives(true)) == P::Wanted::Directives);
+            CHECK(P::wanted(directives(false), true, directives(false)) == P::Wanted::Setting);
+        }
+        UNSCOPED_INFO("by text: SLua's require, not a field's or a comment's, nor LSL's");
+        CHECK(P::wanted("local m = require(\"./lib\")\n", true, false) == P::Wanted::Requires);
+        CHECK(P::wanted("local m = t.require(\"./lib\")\n", true, false) == P::Wanted::No);
+        CHECK(P::wanted("-- require(\"./lib\")\n", true, false) == P::Wanted::No);
+        CHECK(P::wanted("default { state_entry() { require(\"lib\"); } }\n", false, false) == P::Wanted::No);
+        {
+            INFO("a require the script binds itself is its own: no reason, and nothing counted");
+            for (const char* own : { "local function require(name) return name end\nprint(require(\"./lib\"))\n",
+                                     "local require = function(n) return n end\nprint(require(\"./lib\"))\n",
+                                     "local require = function(name) return name end; print(require(\"./lib\"))\n",
+                                     "local a, require = 1, print\nrequire(\"./lib\")\n",
+                                     "local function use(require)\n    return require(\"./lib\")\nend\nprint(use(function(name) return name end))\n",
+                                     "for _, require in ipairs({}) do\n    require(\"./lib\")\nend\n",
+                                     "function require(n) return n end\nrequire(\"./lib\")\n",
+                                     "require(\"./lib\")\nrequire = print\n" })
+            {
+                CAPTURE(own);
+                CHECK(P::requiresIn(own).empty());
+                CHECK(P::wanted(own, true, false) == P::Wanted::No);
+            }
+        }
+        // Scoped: a local, a parameter or a loop's is its own only where it is in scope.
+        const auto counted = [](const char* text) {
+            std::vector<std::string> names;
+            for (const P::Required& one : P::requiresIn(text))
+            {
+                names.push_back(one.name);
+            }
+            return names;
+        };
+        using Names = std::vector<std::string>;
+        UNSCOPED_INFO("one in a block of its own leaves the global's after it");
+        CHECK(counted("do\n    local require = function(n) return n end\n    print(require(\"./a\"))\nend\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("a parameter's ends with its function");
+        CHECK(counted("local function use(require)\n    return require(\"./a\")\nend\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("a loop's ends with the loop");
+        CHECK(counted("for _, require in ipairs({}) do\n    require(\"./a\")\nend\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("one branch's is not the next one's");
+        CHECK(counted("if c then\n    local require = f\n    require(\"./a\")\nelse\n    require(\"./b\")\nend\n") == Names{ "./b" });
+        UNSCOPED_INFO("what a local is set to reads the global still");
+        CHECK(counted("local require = wrap(require(\"./lib\"))\nrequire(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("a local is its own from the next statement on its line too");
+        CHECK(counted("local require = function(name) return name end; print(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = wrap(require(\"./lib\")); require(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("and from the next statement on its line with no `;` between");
+        CHECK(counted("local require = function(name) return name end print(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = wrap(require(\"./lib\")) print(require(\"./a\"))\n") == Names{ "./lib" });
+        CHECK(counted("local require = t[1] require(\"./a\")\n").empty());
+        UNSCOPED_INFO("an if-expression's then and else go on with the value");
+        CHECK(counted("local require = if c then require(\"./lib\") else f require(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("what it is set to goes on over the lines it goes on over");
+        CHECK(counted("local require = false or\n    require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
+        CHECK(counted("local require = f\n    .. require(\"./lib\")\nrequire(\"./a\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("and not inside a function it is set to, over several lines");
+        CHECK(counted("local require = function(n)\n    return require(\"./inner\")\nend\nrequire(\"./a\")\n") == Names{ "./inner" });
+        UNSCOPED_INFO("the global kept by its name is the global");
+        CHECK(counted("local require = require\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        CHECK(counted("local require = require; local m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("but only that alone");
+        CHECK(counted("local require = require and function(name) return name end\nprint(require(\"./lib\"))\n").empty());
+        CHECK(counted("local require = require \"./x\"\nprint(require(\"./lib\"))\n") == Names{});
+        UNSCOPED_INFO("an if-expression closes no block");
+        CHECK(counted("local x = if c then 1 else 2\ndo\n    local require = f\nend\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        UNSCOPED_INFO("a field named require, or a comparison, binds nothing");
+        CHECK(counted("local t = {}\nt.require = 1\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
+        CHECK(counted("if require == nil then end\nlocal m = require(\"./lib\")\n") == Names{ "./lib" });
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require only the old search found is said with a fix each way", "[alpreprocessor]")
@@ -2188,6 +2264,35 @@ namespace
         CHECK(r.problems[1].key == std::string("PreprocModuleNotFound"));
         UNSCOPED_INFO("with no fix");
         REQUIRE(r.problems[1].fixes.empty());
+    }
+
+    // QK4's review: a script's own require is called as it is, and a run leaves those calls be.
+    TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a script's own require is left as its calls", "[alpreprocessor]")
+    {
+        ALPreprocessor::Options o = options(true);
+        S32                     asked = 0;
+        o.resolve                 = [&asked](const ALPreprocessor::Ask&, ALPreprocessor::Include& out) {
+            ++asked;
+            out.text = "return 1\n";
+            out.name = "lib.luau";
+            out.path = "disk:/proj/lib.luau";
+            return ALPreprocessor::Found::Yes;
+        };
+        const ALPreprocessor::Result own = ALPreprocessor::run("local function require(name) return name end\nprint(require(\"./lib\"))\n", o);
+        UNSCOPED_INFO("nothing resolved or gathered: " << own.text);
+        CHECK(asked == 0);
+        CHECK(own.text.find("require(\"./lib\")") != std::string::npos);
+        CHECK(own.text.find("dangerouslyexecuterequiredmodule") == std::string::npos);
+        const ALPreprocessor::Result modules = ALPreprocessor::run("print(require(\"./lib\"))\n", o);
+        UNSCOPED_INFO("the global's still gathered: " << modules.text);
+        CHECK(asked == 1);
+        CHECK(modules.text.find("require(1)") != std::string::npos);
+        const ALPreprocessor::Result both = ALPreprocessor::run(
+            "local function use(require)\n    return require(\"./a\")\nend\nprint(use(print), require(\"./lib\"))\n", o);
+        UNSCOPED_INFO("a parameter's left, the global's gathered beside it: " << both.text);
+        CHECK(asked == 2);
+        CHECK(both.text.find("require(\"./a\")") != std::string::npos);
+        CHECK(both.text.find("require(1)") != std::string::npos);
     }
 
     TEST_CASE_METHOD(alpreprocessor_data, "alpreprocessor: a require of a file beside a same-named folder init warns naming both", "[alpreprocessor]")

@@ -776,7 +776,6 @@
 	<floater.string name="FileOpenElsewhere">[FILE]は別のタブで開かれています。</floater.string>
 	<floater.string name="NoRecentFiles">最近使ったファイルはありません</floater.string>
 	<floater.string name="PreprocHintSwitch">（[WORD]はFirestormの拡張機能です：「ビルド」＞「保存時にプリプロセス」と「ビルド」＞「Firestorm」＞「switch文」をオンにしてください）</floater.string>
-	<floater.string name="RequireNotPreprocessed">require("[NAME]")は書かれたとおりに保存されますが、グリッドはrequireをサポートしていません：モジュールを取り込むには「ビルド」＞「保存時にプリプロセス」をオンにしてください</floater.string>
 	<floater.string name="PreprocHintExtensions">（[WORD]は拡張機能です：「ビルド」＞「保存時にプリプロセス」と「ビルド」＞「拡張機能」をオンにしてください）</floater.string>
 	<floater.string name="PreprocHintConst">（[WORD]は定数を宣言し、他のグローバル変数から計算したグローバル変数を使えるようにします：「ビルド」＞「保存時にプリプロセス」をオンにしてください）</floater.string>
 	<floater.string name="PreprocHintDirective">（#で始まる行はプリプロセッサー用です：「ビルド」＞「保存時にプリプロセス」をオンにしてください）</floater.string>

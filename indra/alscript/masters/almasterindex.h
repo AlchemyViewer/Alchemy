@@ -186,6 +186,13 @@ public:
     // later. False where it is not linked, or had the name already.
     bool renamed(const LLUUID& object, const LLUUID& item, const std::string& name);
 
+    // A link put in step with what its item holds in-world, its master
+    // having been written to hold the same (Update File): the world's asset
+    // and the hash of its text, as heardSaved hashes it, as what the link is
+    // of; the master's stamp; Active. Written at once. False where the item
+    // is not linked to that master.
+    bool inStep(const LLUUID& object, const LLUUID& item, const std::string& master, const LLUUID& asset, const std::string& text, S64 stamp);
+
     // What the item's next send sets, picked in its file's tab: the compile
     // target, and the experience, each where given. Written at once. False
     // where it is not linked, or had them already.

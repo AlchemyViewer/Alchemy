@@ -110,6 +110,8 @@ private:
     void refreshIncludeFolder();
     // The external editor's program, chosen; the command made from it.
     void onBrowseExternalEditor();
+    // The folder of the scripter's own language definitions picked (QK7).
+    void onBrowseDefinitions();
     // What new scripts start with and the macros every script has, from
     // the settings, and back to them as they are edited.
     void refreshTemplates();

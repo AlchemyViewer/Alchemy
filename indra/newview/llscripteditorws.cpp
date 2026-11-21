@@ -1878,8 +1878,8 @@ LLSD LLScriptEditorWSServer::saveScript(LLViewerObject* prim, LLInventoryItem* i
         throw LLJSONRPCConnection::InternalError("UpdateScriptTask capability not available");
 
     // Sent as the studio sends it: expanded afresh where a save runs the
-    // preprocessor (ALPreprocessor::wanted) -- it is on, the script is in
-    // its envelope, or it has a directive -- so that its includes
+    // preprocessor (ALPreprocessor::wanted) -- it is on, or the script has
+    // a directive or, in SLua, a require by name -- so that its includes
     // are current -- sent whatever the preprocessor found, since a save is
     // someone's work, with what it found said. But an envelope whose
     // compiled half was edited here, its source as it was, goes up as it
@@ -2822,12 +2822,17 @@ void LLScriptEditorWSConnection::sendHandshake()
     handshake["viewer_name"]      = LLVersionInfo::instance().getChannel();
     handshake["viewer_version"]   = LLVersionInfo::instance().getVersion();
 
-    // Who is logged in is told once the client has proven itself, with
-    // session.ok: anything can connect and be sent this. Read here, on the
-    // main thread; kept as a plain id and string, which -- unlike an LLSD --
-    // may be read on the server's thread as a copy here goes.
+    // Who is logged in, said here as the official viewer says it, which is
+    // where its clients read it, and again with session.ok. Only a program
+    // on this machine gets this far, since the server refuses a browser's
+    // page (acceptOrigin), and such a program can read the name from the
+    // viewer's own logs anyway. Read here, on the main thread; kept for
+    // session.ok as a plain id and string, which -- unlike an LLSD -- may be
+    // read on the server's thread as a copy here goes.
     const LLUUID      agent_id   = gAgent.getID();
     const std::string agent_name = gAgentUsername;
+    handshake["agent_id"]        = agent_id;
+    handshake["agent_name"]      = agent_name;
 
     const Challenge challenge = writeChallenge();
     if (challenge.mFile.empty())
@@ -2969,8 +2974,7 @@ void LLScriptEditorWSConnection::handleHandshakeResponse(const LLSD& result, con
     }
 
     // Let in before it is told so: what it asks on hearing it must be
-    // answered. Who is logged in is told now, to a client that has shown
-    // it runs as the user.
+    // answered. Who is logged in is told again, as the handshake said it.
     setAuthenticated(true);
     LLSD ok;
     ok["agent_id"]   = agent_id;

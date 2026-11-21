@@ -152,7 +152,19 @@ ALPreprocessor::Wanted ALScriptStudioChecking::preprocessedWhy(const Doc& doc) c
         }
         return doc.directives;
     };
-    return ALPreprocessor::wanted(directives, ALScriptStudioViewer::get().preprocessing());
+    // SLua's requires, which only the preprocessor answers: kept by the text's
+    // version, as namedAt keeps them.
+    const auto modules = [&doc]() {
+        const ALTextDocument& text = doc.editor->document();
+        if (doc.requiresOf != text.version())
+        {
+            doc.requiresFound = ALPreprocessor::requiresIn(text.text());
+            doc.requiresOf    = text.version();
+        }
+        return !doc.requiresFound.empty();
+    };
+    return ALPreprocessor::wanted(directives, ALScriptStudioViewer::get().preprocessing(),
+                                  doc.language.lua ? std::function<bool()>(modules) : std::function<bool()>());
 }
 
 ALScriptPreprocessor::Request ALScriptStudioChecking::preprocessRequest(const Doc& doc, bool with_source) const
@@ -1160,7 +1172,6 @@ void ALScriptStudioChecking::showProblems(Doc& doc)
     noLint(doc);
     if (doc.language.lua)
     {
-        explainRequires(doc);
         notesAsProblems(doc);
     }
     else
@@ -1383,31 +1394,6 @@ void ALScriptStudioChecking::explainTransformWords(Doc& doc)
                                   : marker                       ? (word == "const" ? "PreprocHintConst" : "PreprocHintInline")
                                                                  : "PreprocHintExtensions",
                                   args);
-    }
-}
-
-void ALScriptStudioChecking::explainRequires(Doc& doc)
-{
-    // Luau's own globals have a require, so nothing else says so: the
-    // script runs until the call, and stops there. A file is not what goes
-    // up, and a notecard is read into a script that is preprocessed.
-    if (doc.notecard || !doc.file.empty() || preprocessed(doc))
-    {
-        return;
-    }
-    for (const ALPreprocessor::Required& required : ALPreprocessor::requiresIn(doc.editor->wholeText()))
-    {
-        ALScriptProblem problem;
-        problem.severity  = ALScriptProblem::Severity::Warning;
-        problem.source    = ALScriptProblem::Source::Preprocessor;
-        problem.line      = required.line;
-        problem.column    = required.column;
-        problem.endLine   = required.endLine;
-        problem.endColumn = required.endColumn;
-        LLStringUtil::format_map_t args;
-        args["[NAME]"]  = required.name;
-        problem.message = mServices.words("RequireNotPreprocessed", args);
-        doc.check->analysis.push_back(std::move(problem));
     }
 }
 
