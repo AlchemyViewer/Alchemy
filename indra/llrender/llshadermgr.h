@@ -430,6 +430,9 @@ public:
         METER_PARAMS,                       //  "meter_params"          the exposure meter's per-pass parameters
         METER_MAP,                          //  "meterMap"              the exposure meter's grid
         METER_WATER_MAP,                    //  "meterWaterMap"         the G-buffer's normals under the water, for the meter
+        METER_ALBEDO_MAP,                   //  "meterAlbedoMap"        the G-buffer's albedo, which the meter divides out
+        METER_BLEND_MAP,                    //  "meterBlendMap"         where a blended surface shades, which the albedo cannot speak for
+        METER_ALBEDO_PARAMS,                //  "meter_albedo_params"   strength (0 meters reflected light, 1 the light on surfaces), albedo floor, trusted from, to
         EXPOSURE_HISTOGRAM,                 //  "exposureHistogram"     64x1, per bin (weight, weight * log2 luminance)
 
         // Alchemy-specific uniforms for Sky

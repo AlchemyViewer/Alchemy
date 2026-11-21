@@ -603,6 +603,7 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "AlchemyExposureSpeedDown",
         "AlchemyExposureMeteringMode",
         "AlchemyExposureSkyWeight",
+        "AlchemyExposureIncidentStrength",
         // Color LUT
         "RenderColorGrade",
         "RenderColorGradeLUT",

@@ -1581,6 +1581,8 @@ bool LLShaderMgr::saveCachedProgramBinary(LLGLSLShader* shader)
 }
 
 //virtual
+/// Fills the reserved attribute and uniform name lists. The order of the pushes is the order of the enums in
+/// llshadermgr.h, so a name added to one is added at the same place in the other.
 void LLShaderMgr::initAttribsAndUniforms()
 {
     //MUST match order of enum in LLVertexBuffer.h
@@ -2012,6 +2014,9 @@ void LLShaderMgr::initAttribsAndUniforms()
     mReservedUniforms.push_back("meter_params");
     mReservedUniforms.push_back("meterMap");
     mReservedUniforms.push_back("meterWaterMap");
+    mReservedUniforms.push_back("meterAlbedoMap");
+    mReservedUniforms.push_back("meterBlendMap");
+    mReservedUniforms.push_back("meter_albedo_params");
     mReservedUniforms.push_back("exposureHistogram");
 
     // Stars/Aurora/Meteors
