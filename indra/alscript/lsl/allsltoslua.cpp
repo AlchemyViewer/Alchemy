@@ -30,6 +30,8 @@
 
 #include "alscriptengine.h"
 #include "alscriptstack.h"
+#include "allslcommentcode.h"
+#include "allslcomments.h"
 #include "allsldepth.h"
 #include "allsleffects.h"
 #include "allslservice.h"
@@ -52,6 +54,7 @@
 #include <iterator>
 #include <optional>
 #include <string_view>
+#include <tuple>
 
 using namespace Tailslide;
 
@@ -478,9 +481,10 @@ namespace
     class Writer
     {
     public:
-        Writer(LSLScript* script, std::string_view source, const ALLSLToSLua::Options& options)
-            : mScript(script), mSource(source), mOptions(options), mEffects(script)
+        Writer(LSLScript* script, std::string_view source, const ALLSLToSLua::Options& options, const ALLSLToSLua::Pass& pass)
+            : mScript(script), mSource(source), mOptions(options), mEffects(script), mPass(pass)
         {
+            tryStretches();
         }
 
         std::string write();
@@ -546,6 +550,8 @@ namespace
         {
             Pos         at;
             S32         endLine = 0;
+            // The byte of the LSL it begins at.
+            size_t      begin   = 0;
             // As SLua writes it: a block comment's lines past its first as
             // they were.
             std::string text;
@@ -554,6 +560,9 @@ namespace
             bool        written = false;
             // A toggle's closer, //*/, which is about the code over it.
             bool        closer  = false;
+            // Its text's lines past the first written at the depth it is
+            // (ALLSLToSLua::Pass::Written).
+            bool        indented = false;
         };
         // Each comment in the LSL, given to the node it is written over --
         // a global, a function, a state, a handler, a statement -- or to
@@ -1079,7 +1088,13 @@ namespace
         SamePairs                                        mSame;
         // An LSL word written otherwise here, kept in mSame.
         void                                             sameAs(std::string_view lsl, std::string_view slua);
-        std::optional<std::pair<S32, S32>>               mAnchorPending;
+        struct Anchor
+        {
+            S32 first  = 0;
+            S32 last   = 0;
+            S32 column = 0;
+        };
+        std::optional<Anchor>                            mAnchorPending;
         void                                             endSpans();
         size_t                                           mCounted      = 0;
         S32                                              mCountedLines = 0;
@@ -1095,6 +1110,23 @@ namespace
         // top; and by what each is given to.
         std::vector<Comment>                                         mComments;
         std::vector<size_t>                                          mLeadComments;
+        // What the comment conversion asks of this one (ALLSLToSLua::Pass):
+        // the stretches of the LSL it uncommented, where they begin and end.
+        const ALLSLToSLua::Pass&                                     mPass;
+        // Its comments written otherwise, by the byte each begins at; the
+        // stretches it uncommented, in the order written, by byte -- each
+        // with its index in the pass -- and by line and column.
+        boost::unordered_flat_map<size_t, const ALLSLToSLua::Pass::Written*> mWritten;
+        std::vector<std::tuple<size_t, size_t, size_t>>              mTriedBytes;
+        std::vector<std::pair<Pos, Pos>>                             mTried;
+        void tryStretches();
+        // The index in the pass of the stretch a byte is in, or npos.
+        size_t triedAt(size_t byte) const;
+        // Whether a node begins in one of them: code switched off, of which
+        // nothing is noted.
+        bool tried(LSLASTNode* node) const;
+        // A comment written with its lines past the first at the depth it is.
+        std::string commentText(const Comment& c);
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsBefore;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsAfter;
         boost::unordered_flat_map<LSLASTNode*, std::vector<size_t>> mCommentsWithin;
@@ -1202,6 +1234,10 @@ namespace
 
     void Writer::note(LSLASTNode* at, const char* key, const char* english, std::vector<std::string> args)
     {
+        if (tried(at))
+        {
+            return;
+        }
         std::string words = said(key, english, args);
         if (std::find(mPending.begin(), mPending.end(), words) != mPending.end())
         {
@@ -1250,7 +1286,7 @@ namespace
         {
             once += '\x1f' + arg;
         }
-        if (mOnce.insert(once).second)
+        if (!tried(at) && mOnce.insert(once).second)
         {
             note(at, key, english, std::move(args));
         }
@@ -1464,7 +1500,7 @@ namespace
         if (mAnchorPending && !mInline && !text.empty())
         {
             const S32 at = linesWritten();
-            mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->second, at, at });
+            mSpans.push_back(ALLSLToSLua::Span{ mAnchorPending->first, mAnchorPending->last, at, at, mAnchorPending->column });
             mAnchorPending.reset();
         }
         // A block LSL opened and closed with braces.
@@ -1567,72 +1603,25 @@ namespace
             return;
         }
         // Each comment, past strings, where it begins.
-        const std::string_view src    = mSource;
-        Pos                    at     = { 1, 1 };
-        const auto             step   = [&](char c) {
-            if (c == '\n')
-            {
-                ++at.line;
-                at.column = 1;
-            }
-            else
-            {
-                ++at.column;
-            }
-        };
+        const std::string_view                    src     = mSource;
+        const std::vector<ALLSLComments::Comment> scanned = ALLSLComments::scan(src);
         // The byte a toggle's level is marked with: one the script has none
         // of, so nothing written of it has one either.
-        for (char c = 1; c < ' ' && !mToggleMark; ++c)
-        {
-            if (c != '\t' && c != '\n' && c != '\r' && src.find(c) == std::string_view::npos)
-            {
-                mToggleMark = c;
-            }
-        }
+        mToggleMark            = ALLSLComments::freeByte(src);
         const std::string mark = mToggleMark ? std::string(1, mToggleMark) : std::string();
-        // The openers since the last closer, by the comment and what follows
-        // the star; and each opener with the closer it was paired with.
-        std::vector<std::pair<size_t, std::string>> pending;
-        std::vector<std::pair<size_t, size_t>>      pairs;
-        for (size_t i = 0; i < src.size();)
+        // Each opener with the closer it was paired with.
+        std::vector<std::pair<size_t, size_t>> pairs;
+        for (const ALLSLComments::Comment& s : scanned)
         {
-            const char c = src[i];
-            if (c == '"')
-            {
-                step(src[i++]);
-                while (i < src.size() && src[i] != '"')
-                {
-                    if (src[i] == '\\' && i + 1 < src.size())
-                    {
-                        step(src[i++]);
-                    }
-                    step(src[i++]);
-                }
-                if (i < src.size())
-                {
-                    step(src[i++]);
-                }
-                continue;
-            }
-            if (c != '/' || i + 1 >= src.size() || (src[i + 1] != '/' && src[i + 1] != '*'))
-            {
-                step(src[i++]);
-                continue;
-            }
             Comment k;
-            k.at = at;
-            size_t end;
+            k.at    = { s.line, s.column };
+            k.begin = s.begin;
             // //* over code and //*/ under it, which a / taken out of the
             // first makes a block comment: ---[[ and --]], which a - taken
-            // out of the first makes one. A closer is one whatever is before
-            // it, and so is a block comment that ends in one, the toggle
-            // turned off; an opener is one where something after it closes
-            // it, and a comment that begins with a star where nothing does.
-            bool closes = false;
-            if (src[i + 1] == '/')
+            // out of the first makes one.
+            if (s.kind == ALLSLComments::Comment::Kind::Line)
             {
-                end              = std::min(src.find('\n', i), src.size());
-                std::string body = std::string(src.substr(i + 2, end - i - 2));
+                std::string body(ALLSLComments::body(src, s));
                 while (!body.empty() && (body.back() == '\r' || body.back() == ' ' || body.back() == '\t'))
                 {
                     body.pop_back();
@@ -1643,7 +1632,7 @@ namespace
                     body = " " + body;
                 }
                 k.text = "--" + body;
-                if (body.compare(0, 2, "*/") == 0)
+                if (s.closer)
                 {
                     // What follows it is the LSL's code once the toggle is
                     // off, and a comment there SLua's.
@@ -1656,14 +1645,11 @@ namespace
                     }
                     k.text   = "--]" + mark + "]" + rest;
                     k.closer = true;
-                    closes   = true;
                 }
-                else if (!body.empty() && body[0] == '*' && (body.size() == 1 || (body[1] != '*' && body[1] != '/')) &&
-                         body.find("*/") == std::string::npos)
+                else if (s.opener)
                 {
-                    // A word after the star or not, but no rule of stars, nor
-                    // a block comment closed on its line once a / is out.
-                    pending.emplace_back(mComments.size(), body.substr(1));
+                    k.text = "---[" + mark + "[" + body.substr(1);
+                    pairs.emplace_back(mComments.size(), s.closedBy);
                 }
                 else if (!body.empty() && body[0] == '/')
                 {
@@ -1674,17 +1660,9 @@ namespace
             }
             else
             {
-                const size_t close = src.find("*/", i + 2);
-                end                = close == std::string_view::npos ? src.size() : close + 2;
-                std::string body   = std::string(src.substr(i + 2, (close == std::string_view::npos ? src.size() : close) - i - 2));
                 // The toggle's other way, /* over code and //*/ under it: --]]
                 // under it, which ---[[ over it would leave a line comment.
-                const bool toggled = body.size() >= 2 && body.compare(body.size() - 2, 2, "//") == 0 &&
-                                     body.find('\n') != std::string::npos;
-                if (toggled)
-                {
-                    body.resize(body.size() - 2);
-                }
+                std::string body(ALLSLComments::body(src, s));
                 // Brackets of a level nothing in it closes.
                 std::string level;
                 while (body.find("]" + level + "]") != std::string::npos)
@@ -1697,9 +1675,8 @@ namespace
                 }
                 // A toggle's, marked: its level is what nothing from the
                 // first opener over it closes.
-                const std::string bracket = toggled && !mark.empty() ? mark : level;
-                k.text                    = "--[" + bracket + "[" + body + (toggled ? "--" : "") + "]" + bracket + "]";
-                closes                    = toggled;
+                const std::string bracket = s.toggled && !mark.empty() ? mark : level;
+                k.text                    = "--[" + bracket + "[" + body + (s.toggled ? "--" : "") + "]" + bracket + "]";
                 if (body.size() > 1 && body.front() == '*' && body.back() == '*' && body.find('\n') == std::string::npos)
                 {
                     // A rule of stars on its line, a heading in it or not: of
@@ -1713,19 +1690,18 @@ namespace
             {
                 k.text.insert(2, " ");
             }
-            while (i < end)
+            k.endLine = s.endLine;
+            // As the comment conversion asks: written otherwise, or marked as
+            // inside what it uncommented.
+            if (const auto given = mWritten.find(s.begin); given != mWritten.end())
             {
-                step(src[i++]);
+                k.text     = given->second->text;
+                k.indented = given->second->indented;
+                k.written  = k.text.empty();
             }
-            k.endLine = at.line;
-            if (closes)
+            else if (const size_t n = triedAt(s.begin); n != std::string::npos)
             {
-                for (const auto& [opener, rest] : pending)
-                {
-                    mComments[opener].text = "---[" + mark + "[" + rest;
-                    pairs.emplace_back(opener, mComments.size());
-                }
-                pending.clear();
+                k.text += mPass.inner + std::to_string(n) + mPass.inner;
             }
             mComments.push_back(std::move(k));
         }
@@ -2057,14 +2033,99 @@ namespace
         {
             // Under the code it closes, over the blank line written after
             // that, which the LSL did not have.
-            putTrailing(mText.size() - 1, indent() + c.text + "\n");
+            putTrailing(mText.size() - 1, indent() + commentText(c) + "\n");
             return;
         }
         if (c.apart && !mText.empty() && !blank_over && mText.size() != mBlockStart)
         {
             mText += "\n";
         }
-        mText += indent() + c.text + "\n";
+        mText += indent() + commentText(c) + "\n";
+    }
+
+    std::string Writer::commentText(const Comment& c)
+    {
+        if (!c.indented || c.text.find('\n') == std::string::npos)
+        {
+            return c.text;
+        }
+        const std::string depth = indent();
+        std::string       out;
+        for (size_t from = 0;;)
+        {
+            const size_t cut = std::min(c.text.find('\n', from), c.text.size());
+            if (from > 0 && cut > from)
+            {
+                out += depth;
+            }
+            out.append(c.text, from, cut - from);
+            if (cut == c.text.size())
+            {
+                break;
+            }
+            out += '\n';
+            from = cut + 1;
+        }
+        return out;
+    }
+
+    void Writer::tryStretches()
+    {
+        for (const ALLSLToSLua::Pass::Written& w : mPass.comments)
+        {
+            mWritten.emplace(w.begin, &w);
+        }
+        if (mPass.tried.empty())
+        {
+            return;
+        }
+        // Where each stretch begins and ends, by line and column from one.
+        std::vector<size_t> starts{ 0 };
+        for (size_t i = 0; i < mSource.size(); ++i)
+        {
+            if (mSource[i] == '\n')
+            {
+                starts.push_back(i + 1);
+            }
+        }
+        const auto at = [&starts](size_t byte) {
+            const size_t line = static_cast<size_t>(std::upper_bound(starts.begin(), starts.end(), byte) - starts.begin());
+            return Pos{ static_cast<S32>(line), static_cast<S32>(byte - starts[line - 1]) + 1 };
+        };
+        for (size_t n = 0; n < mPass.tried.size(); ++n)
+        {
+            mTriedBytes.emplace_back(mPass.tried[n].first, mPass.tried[n].second, n);
+        }
+        std::sort(mTriedBytes.begin(), mTriedBytes.end());
+        for (const auto& [begin, end, n] : mTriedBytes)
+        {
+            mTried.emplace_back(at(begin), at(end));
+        }
+    }
+
+    size_t Writer::triedAt(size_t byte) const
+    {
+        const auto after = std::upper_bound(mTriedBytes.begin(), mTriedBytes.end(), byte,
+                                            [](size_t b, const std::tuple<size_t, size_t, size_t>& t) { return b < std::get<0>(t); });
+        if (after == mTriedBytes.begin())
+        {
+            return std::string::npos;
+        }
+        const auto& [begin, end, n] = *(after - 1);
+        return byte < end ? n : std::string::npos;
+    }
+
+    bool Writer::tried(LSLASTNode* node) const
+    {
+        if (mTried.empty() || isNull(node) || !node->getLoc())
+        {
+            return false;
+        }
+        // The stretches do not overlap, and are in the order written.
+        const Pos  begins = { node->getLoc()->first_line, node->getLoc()->first_column };
+        const auto after  = std::upper_bound(mTried.begin(), mTried.end(), begins,
+                                             [](const Pos& p, const std::pair<Pos, Pos>& t) { return p < t.first; });
+        return after != mTried.begin() && begins < (after - 1)->second;
     }
 
     void Writer::commentsBefore(LSLASTNode* node)
@@ -2095,7 +2156,7 @@ namespace
         if (!isNull(node) && node->getLoc())
         {
             const S32 first = zeroBased(node->getLoc()->first_line);
-            mAnchorPending  = std::make_pair(first, std::max(first, zeroBased(node->getLoc()->last_line)));
+            mAnchorPending  = Anchor{ first, std::max(first, zeroBased(node->getLoc()->last_line)), zeroBased(node->getLoc()->first_column) };
         }
     }
 
@@ -2304,8 +2365,9 @@ namespace
                     holder = holder->getParent();
                 }
                 const std::optional<std::string> hex = hexAsWritten(c, v);
-                // Past 0x7FFFFFFF: what SLua reads it as, said once.
-                if (hex && v < 0 && !mSaidHexSign)
+                // Past 0x7FFFFFFF: what SLua reads it as, said once, and not
+                // of code a comment switched off, whose note is not said.
+                if (hex && v < 0 && !mSaidHexSign && !tried(c))
                 {
                     mSaidHexSign = true;
                     note(c, "SluaHexSign",
@@ -4024,7 +4086,7 @@ namespace
         {
             return { call };
         }
-        if (!mSaidSigned)
+        if (!mSaidSigned && !tried(at))
         {
             mSaidSigned = true;
             note(at, "SluaBit32Signed",
@@ -8610,7 +8672,10 @@ end
         {
             for (size_t k : mLeadComments)
             {
-                out += mComments[k].text + "\n";
+                if (!mComments[k].text.empty())
+                {
+                    out += mComments[k].text + "\n";
+                }
             }
             out += "\n";
         }
@@ -8727,6 +8792,87 @@ end
             }
             span.sluaLast = std::max(span.sluaFirst, end);
         }
+    }
+}
+
+namespace
+{
+    // Each declaration declared again in its scope -- a global variable or a
+    // function beside an earlier one of its kind and name, a local beside one
+    // in its block -- with that earlier one, by the bytes each spans: where
+    // the two are of one type, a function's parameters too, so that one may
+    // stand in the other's stead.
+    void declaredTwice(LSLScript* script, std::string_view source, std::vector<ALLSLToSLua::Pass::Twice>& out)
+    {
+        std::vector<size_t> starts{ 0 };
+        for (size_t i = 0; i < source.size(); ++i)
+        {
+            if (source[i] == '\n')
+            {
+                starts.push_back(i + 1);
+            }
+        }
+        const auto byte = [&](int line, int column) {
+            const size_t at = static_cast<size_t>(std::clamp(line, 1, static_cast<int>(starts.size()))) - 1;
+            return std::min(starts[at] + static_cast<size_t>(std::max(column, 1)) - 1, source.size());
+        };
+        // From its first byte to one past its last, and the ; that ends it.
+        const auto bytes = [&](LSLASTNode* node) {
+            const auto*  loc   = node->getLoc();
+            const size_t   begin = byte(loc->first_line, loc->first_column);
+            size_t         end   = std::max(begin, byte(loc->last_line, loc->last_column));
+            size_t         after = end;
+            while (after < source.size() && (source[after] == ' ' || source[after] == '\t'))
+            {
+                ++after;
+            }
+            if (after < source.size() && source[after] == ';')
+            {
+                end = after + 1;
+            }
+            return std::make_pair(begin, end);
+        };
+        // The first of each kind and name in each scope, and its types.
+        boost::unordered_flat_map<std::string, std::pair<LSLASTNode*, std::string>> seen;
+        walk(script, [&](LSLASTNode* node) {
+            int            kind = 0;
+            LSLIdentifier* id   = nullptr;
+            if (node->getNodeType() == NODE_GLOBAL_VARIABLE)
+            {
+                id = static_cast<LSLGlobalVariable*>(node)->getIdentifier();
+            }
+            else if (node->getNodeType() == NODE_GLOBAL_FUNCTION)
+            {
+                kind = 1;
+                id   = static_cast<LSLGlobalFunction*>(node)->getIdentifier();
+            }
+            else if (node->getNodeType() == NODE_STATEMENT && node->getNodeSubType() == NODE_DECLARATION)
+            {
+                kind = 2;
+                id   = static_cast<LSLDeclaration*>(node)->getIdentifier();
+            }
+            if (!id || !id->getName() || !node->getLoc())
+            {
+                return;
+            }
+            // Its type, and a function's parameters' types.
+            std::string types = std::to_string(static_cast<int>(id->getIType()));
+            if (kind == 1)
+            {
+                LSLASTNode* params = static_cast<LSLGlobalFunction*>(node)->getArguments();
+                for (LSLASTNode* p = isNull(params) ? nullptr : params->getChild(0); p; p = p->getNext())
+                {
+                    types += ',' + std::to_string(static_cast<int>(p->getIType()));
+                }
+            }
+            const std::string key = std::to_string(reinterpret_cast<uintptr_t>(node->getParent())) + ':' + std::to_string(kind) + ':' + id->getName();
+            if (const auto [first, fresh] = seen.emplace(key, std::make_pair(node, types)); !fresh && first->second.second == types)
+            {
+                const auto [begin, end]             = bytes(node);
+                const auto [first_begin, first_end] = bytes(first->second.first);
+                out.push_back({ begin, end, first_begin, first_end });
+            }
+        });
     }
 }
 
@@ -8869,6 +9015,17 @@ void ALLSLToSLua::linkNotes(ALScriptProblems& notes, const ALScriptProblems& fou
 // static
 ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& options)
 {
+    if (options.keepComments && options.commentCode)
+    {
+        return ALLSLCommentCode::convert(lsl, options);
+    }
+    Pass plain;
+    return convert(lsl, options, plain);
+}
+
+// static
+ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& options, Pass& pass)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
     Result result;
     if (!ALLSLService::builtinsLoaded())
@@ -8906,11 +9063,17 @@ ALLSLToSLua::Result ALLSLToSLua::convert(std::string_view lsl, const Options& op
                 p.line     = zeroBased(message->getLoc()->first_line);
                 p.column   = zeroBased(message->getLoc()->first_column);
                 p.message  = message->getMessage();
+                pass.errors.push_back({ p.line, p.column, static_cast<S32>(message->getError()) });
                 result.problems.push_back(std::move(p));
+            }
+            if (script && !pass.errors.empty() &&
+                std::all_of(pass.errors.begin(), pass.errors.end(), [](const Pass::Error& e) { return e.code == E_DUPLICATE_DECLARATION; }))
+            {
+                declaredTwice(script, lsl, pass.twice);
             }
             return;
         }
-        Writer writer(script, lsl, options);
+        Writer writer(script, lsl, options, pass);
         result.text      = writer.write();
         result.notes     = std::move(writer.notes());
         result.spans     = writer.spans();

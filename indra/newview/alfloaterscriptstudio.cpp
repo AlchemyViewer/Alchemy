@@ -8305,6 +8305,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
+    options.commentCode   = gSavedSettings.getBOOL("ALScriptConvertCommentCode");
     // Its tables' braces as the formatter writes them.
     options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
     // Its notes, and its comments, in the skin's words, read where it is
@@ -8450,7 +8451,19 @@ void ALFloaterScriptStudio::convertedToSLua(Doc& doc, const std::string& lsl, bo
     }
     args["[NEW]"]   = name;
     args["[NOTES]"] = counted("ConvertNotes", static_cast<S32>(converted.notes.size()));
-    report(getString(expanded ? "ConvertedExpanded" : "Converted", args), false, &doc);
+    std::string said = getString(expanded ? "ConvertedExpanded" : "Converted", args);
+    // How many comments holding code were written as SLua, and how many
+    // were left as the LSL had them.
+    if (converted.commentsConverted > 0 || converted.commentsLeft > 0)
+    {
+        args["[CONVERTED]"] = counted("ConvertComments", converted.commentsConverted);
+        args["[LEFT]"]      = counted("ConvertComments", converted.commentsLeft);
+        said += " " + getString(converted.commentsLeft == 0       ? "ConvertCommentCodeAll"
+                                : converted.commentsConverted == 0 ? "ConvertCommentCodeNone"
+                                                                   : "ConvertCommentCode",
+                                args);
+    }
+    report(said, false, &doc);
 }
 
 void ALFloaterScriptStudio::convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting)
