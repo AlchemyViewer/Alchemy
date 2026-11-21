@@ -64,6 +64,26 @@ namespace
         const std::vector<Comment> open = ALLSLComments::scan("/* never closed\ninteger a;");
         REQUIRE(open.size() == 1);
         CHECK_FALSE(open[0].closed);
+        UNSCOPED_INFO("one never closed that ends in // is no toggle, and pairs no opener");
+        const std::string          ends  = "//* a\n/* never closed\ninteger a; //";
+        const std::vector<Comment> loose = ALLSLComments::scan(ends);
+        REQUIRE(loose.size() == 2);
+        CHECK_FALSE(loose[0].opener);
+        CHECK_FALSE(loose[1].closed);
+        CHECK_FALSE(loose[1].toggled);
+        CHECK(ALLSLComments::body(ends, loose[1]) == " never closed\ninteger a; //");
+        UNSCOPED_INFO("alone, among many on one line");
+        std::string line(1, ' ');
+        for (int n = 0; n < 3; ++n)
+        {
+            line += "/* x */ ";
+        }
+        const std::vector<Comment> many = ALLSLComments::scan(line + "\n  /* y */\n");
+        REQUIRE(many.size() == 4);
+        CHECK_FALSE(many[0].alone);
+        CHECK_FALSE(many[1].alone);
+        CHECK_FALSE(many[2].alone);
+        CHECK(many[3].alone);
     }
 
     TEST_CASE("ALLSLComments: the toggle's markers paired; the toggle turned off", "[ALLSLComments]")

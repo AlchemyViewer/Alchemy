@@ -208,8 +208,9 @@ public:
         };
         std::vector<Error> errors;
         // Given back where every error is a name declared again in its scope
-        // (Tailslide's E_DUPLICATE_DECLARATION): each such declaration, and
-        // the one before it, by the bytes each spans, its ; with it.
+        // (Tailslide's E_DUPLICATE_DECLARATION): each such declaration of the
+        // type of the one before it, a function's parameters too, and that
+        // one, by the bytes each spans, its ; with it.
         struct Twice
         {
             size_t begin      = 0;

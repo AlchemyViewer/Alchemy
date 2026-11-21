@@ -30,11 +30,6 @@
 
 namespace
 {
-    bool blank(std::string_view text)
-    {
-        return text.find_first_not_of(" \t\r") == std::string_view::npos;
-    }
-
     // Whether every string the text opens it closes, as LSL reads one: to its
     // next quote, past backslashed bytes.
     bool stringsClosed(std::string_view text)
@@ -75,15 +70,19 @@ std::vector<ALLSLComments::Comment> ALLSLComments::scan(std::string_view src)
     std::vector<Comment> out;
     S32                  line   = 1;
     S32                  column = 1;
+    // Whether only blanks are before the byte on its line.
+    bool                 blanks = true;
     const auto           step   = [&](char c) {
         if (c == '\n')
         {
             ++line;
             column = 1;
+            blanks = true;
         }
         else
         {
             ++column;
+            blanks = blanks && (c == ' ' || c == '\t' || c == '\r');
         }
     };
     // The openers since the last closer.
@@ -114,9 +113,10 @@ std::vector<ALLSLComments::Comment> ALLSLComments::scan(std::string_view src)
             continue;
         }
         Comment k;
-        k.begin  = i;
-        k.line   = line;
-        k.column = column;
+        k.begin             = i;
+        k.line              = line;
+        k.column            = column;
+        const bool blank_in = blanks;
         // A closer is one whatever is before it, and so is a block comment
         // that ends in one, the toggle turned off; an opener is one where
         // something after it closes it, and a comment that begins with a
@@ -151,7 +151,7 @@ std::vector<ALLSLComments::Comment> ALLSLComments::scan(std::string_view src)
             k.closed            = close != std::string_view::npos;
             k.end               = k.closed ? close + 2 : src.size();
             const std::string_view text = src.substr(i + 2, (k.closed ? close : src.size()) - i - 2);
-            k.toggled           = text.size() >= 2 && text.substr(text.size() - 2) == "//" && text.find('\n') != std::string_view::npos;
+            k.toggled = k.closed && text.size() >= 2 && text.substr(text.size() - 2) == "//" && text.find('\n') != std::string_view::npos;
             closes              = k.toggled;
         }
         while (i < k.end)
@@ -168,9 +168,10 @@ std::vector<ALLSLComments::Comment> ALLSLComments::scan(std::string_view src)
             }
             pending.clear();
         }
-        const size_t starts = k.begin == 0 ? 0 : src.rfind('\n', k.begin - 1) + 1;
-        const size_t ends   = std::min(src.find('\n', k.end), src.size());
-        k.alone             = blank(src.substr(starts, k.begin - starts)) && blank(src.substr(k.end, ends - k.end));
+        // Alone: blanks before it on its first line, and after it on its
+        // last, up to the line's break.
+        const size_t after = src.find_first_not_of(" \t\r", k.end);
+        k.alone            = blank_in && (after == std::string_view::npos || src[after] == '\n');
         out.push_back(k);
     }
     return out;

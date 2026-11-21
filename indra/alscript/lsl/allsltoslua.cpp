@@ -2365,8 +2365,9 @@ namespace
                     holder = holder->getParent();
                 }
                 const std::optional<std::string> hex = hexAsWritten(c, v);
-                // Past 0x7FFFFFFF: what SLua reads it as, said once.
-                if (hex && v < 0 && !mSaidHexSign)
+                // Past 0x7FFFFFFF: what SLua reads it as, said once, and not
+                // of code a comment switched off, whose note is not said.
+                if (hex && v < 0 && !mSaidHexSign && !tried(c))
                 {
                     mSaidHexSign = true;
                     note(c, "SluaHexSign",
@@ -4085,7 +4086,7 @@ namespace
         {
             return { call };
         }
-        if (!mSaidSigned)
+        if (!mSaidSigned && !tried(at))
         {
             mSaidSigned = true;
             note(at, "SluaBit32Signed",
@@ -8798,7 +8799,9 @@ namespace
 {
     // Each declaration declared again in its scope -- a global variable or a
     // function beside an earlier one of its kind and name, a local beside one
-    // in its block -- with that earlier one, by the bytes each spans.
+    // in its block -- with that earlier one, by the bytes each spans: where
+    // the two are of one type, a function's parameters too, so that one may
+    // stand in the other's stead.
     void declaredTwice(LSLScript* script, std::string_view source, std::vector<ALLSLToSLua::Pass::Twice>& out)
     {
         std::vector<size_t> starts{ 0 };
@@ -8829,8 +8832,8 @@ namespace
             }
             return std::make_pair(begin, end);
         };
-        // The first of each kind and name in each scope.
-        boost::unordered_flat_map<std::string, LSLASTNode*> seen;
+        // The first of each kind and name in each scope, and its types.
+        boost::unordered_flat_map<std::string, std::pair<LSLASTNode*, std::string>> seen;
         walk(script, [&](LSLASTNode* node) {
             int            kind = 0;
             LSLIdentifier* id   = nullptr;
@@ -8852,11 +8855,21 @@ namespace
             {
                 return;
             }
+            // Its type, and a function's parameters' types.
+            std::string types = std::to_string(static_cast<int>(id->getIType()));
+            if (kind == 1)
+            {
+                LSLASTNode* params = static_cast<LSLGlobalFunction*>(node)->getArguments();
+                for (LSLASTNode* p = isNull(params) ? nullptr : params->getChild(0); p; p = p->getNext())
+                {
+                    types += ',' + std::to_string(static_cast<int>(p->getIType()));
+                }
+            }
             const std::string key = std::to_string(reinterpret_cast<uintptr_t>(node->getParent())) + ':' + std::to_string(kind) + ':' + id->getName();
-            if (const auto [first, fresh] = seen.emplace(key, node); !fresh)
+            if (const auto [first, fresh] = seen.emplace(key, std::make_pair(node, types)); !fresh && first->second.second == types)
             {
                 const auto [begin, end]             = bytes(node);
-                const auto [first_begin, first_end] = bytes(first->second);
+                const auto [first_begin, first_end] = bytes(first->second.first);
                 out.push_back({ begin, end, first_begin, first_end });
             }
         });

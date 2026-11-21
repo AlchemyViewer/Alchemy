@@ -643,12 +643,14 @@ namespace
     std::vector<Unit> Trials::pieces(const Unit& unit) const
     {
         // A block with words on its first line and code after: those words
-        // as its label.
+        // as its label. Words alone, never a statement that did not resolve,
+        // which would be left as LSL in a block said to be SLua.
         if ((unit.shape == Unit::Shape::Block || unit.shape == Unit::Shape::Toggle) && !unit.labelled)
         {
             const std::string_view text = ALLSLComments::body(mLsl, mComments[unit.first]);
             const size_t           cut  = text.find('\n');
-            if (cut == std::string_view::npos || blank(text.substr(0, cut)) || !ALLSLComments::endsCode(text.substr(cut)))
+            if (cut == std::string_view::npos || blank(text.substr(0, cut)) || ALLSLComments::mayBeCode(text.substr(0, cut)) ||
+                !ALLSLComments::endsCode(text.substr(cut)))
             {
                 return {};
             }
@@ -679,7 +681,25 @@ namespace
         const std::vector<char> marks = ALLSLComments::freeBytes(mLsl, 2, mToggle);
         if (candidates.empty() || marks.size() < 2)
         {
-            return ALLSLToSLua::convert(mLsl, mOptions, plain);
+            // None to try, or no byte left to mark them by: each left.
+            ++mConversions;
+            ALLSLToSLua::Result r = ALLSLToSLua::convert(mLsl, mOptions, plain);
+            if (r.converted)
+            {
+                r.commentsLeft = static_cast<S32>(candidates.size());
+                for (const Unit& u : candidates)
+                {
+                    if (report)
+                    {
+                        report->tried.push_back({ u, Outcome::Capped });
+                    }
+                }
+            }
+            if (report)
+            {
+                report->conversions = mConversions;
+            }
+            return r;
         }
         mSentinel = marks[0];
         mInner    = marks[1];
@@ -704,6 +724,10 @@ namespace
         mBase = ALLSLToSLua::convert(mLsl, mOptions, base);
         if (!mBase.converted)
         {
+            if (report)
+            {
+                report->conversions = mConversions;
+            }
             return mBase;
         }
         mBaseLines = linesOf(mBase.text);
@@ -792,6 +816,10 @@ namespace
 ALLSLToSLua::Result ALLSLCommentCode::convert(std::string_view lsl, const ALLSLToSLua::Options& options, Report* report)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_SCRIPTDEV;
+    if (report)
+    {
+        *report = Report();
+    }
     Trials trials(lsl, options);
     return trials.run(report);
 }

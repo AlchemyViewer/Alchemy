@@ -60,7 +60,8 @@ public:
         Changes,
         // Its SLua cannot stand where it was: more than a line after code.
         Unplaced,
-        // Past the trials one conversion makes.
+        // Not tried: past the trials one conversion makes, or with no byte
+        // left that the script does not have to mark them by.
         Capped,
     };
     struct Tried
@@ -73,6 +74,7 @@ public:
     };
     // What one conversion tried, for the corpus counts: each unit's last
     // outcome, a run's pieces after it, and how many conversions it took.
+    // Emptied as a conversion begins.
     struct Report
     {
         std::vector<Tried> tried;

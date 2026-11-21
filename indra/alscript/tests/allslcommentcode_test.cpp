@@ -31,6 +31,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <set>
 #include <sstream>
 
 namespace
@@ -232,7 +233,9 @@ namespace
                                 "string NAME = \"door\";\n"
                                 "//string NAME = \"gate\";\n"
                                 "integer SPEED = 1;\n"
-                                "// float SPEED = 2.0;\n"                          // another type: other lines change
+                                "// float SPEED = 2.0;\n"                          // another type: left
+                                "integer UNUSED = 1;\n"
+                                "// string UNUSED = \"x\";\n"                     // another type, read nowhere: left
                                 "integer twice(integer x) { return x * 2; }\n"
                                 "//integer twice(integer x) { return x + x; }\n"
                                 "default {\n"
@@ -251,12 +254,14 @@ namespace
         UNSCOPED_INFO("a function, and a local");
         CHECK(has(r, "\n--local function twice(x)\n--    return x + x\n--end\n"));
         CHECK(has(r, "\nlocal count = 0\n--local count = 10\n"));
-        UNSCOPED_INFO("of another type, left");
+        UNSCOPED_INFO("of another type, left, whether or not anything reads it");
         CHECK(has(r, "\n-- float SPEED = 2.0;\n"));
+        CHECK(has(r, "\n-- string UNUSED = \"x\";\n"));
         CHECK(r.commentsConverted == 4);
-        CHECK(r.commentsLeft == 1);
-        REQUIRE(report.tried.size() == 5);
-        CHECK(report.tried[2].outcome == ALLSLCommentCode::Outcome::Changes);
+        CHECK(r.commentsLeft == 2);
+        REQUIRE(report.tried.size() == 6);
+        CHECK(report.tried[2].outcome == ALLSLCommentCode::Outcome::Refused);
+        CHECK(report.tried[3].outcome == ALLSLCommentCode::Outcome::Refused);
         require_checks_clean(r.text);
         require_checks_clean(switchedOn(r.text, "-- local DEBUG = true", 1));
         require_checks_clean(switchedOn(r.text, "--local function twice", 3));
@@ -480,6 +485,8 @@ namespace
                                 "        llSay(0, \"b\"); */\n"
                                 "        /* the old way;\n"        // words with a ;, then nothing that resolves
                                 "        nope(); */\n"
+                                "        /* integer old = missing;\n"   // a statement that does not resolve: no label
+                                "        llSay(0, \"d\"); */\n"
                                 "        llSay(0, \"c\");\n"
                                 "    }\n"
                                 "}\n";
@@ -491,8 +498,9 @@ namespace
         CHECK(has(r, "\n--[=[ DEBUG ]] on\nlocal gVerbose = 1\n--]=]\n"));
         CHECK(has(r, "\n--[[ ll.Say(0, \"a\")\nll.Say(0, \"b\") ]]\n"));
         CHECK(has(r, "\n--[[ the old way;\n        nope(); ]]\n"));
+        CHECK(has(r, "\n--[[ integer old = missing;\n        llSay(0, \"d\"); ]]\n"));
         CHECK(r.commentsConverted == 3);
-        CHECK(r.commentsLeft == 1);
+        CHECK(r.commentsLeft == 2);
         std::string on = r.text;
         on.insert(on.find("--[=[ DEBUG"), "-");
         require_checks_clean(on);
@@ -517,6 +525,59 @@ namespace
             vector_notes += p.key == "SluaVectorText" ? 1 : 0;
         }
         CHECK(vector_notes == 1);
+    }
+
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: a note said once in the script still said of the live code", "[ALLSLCommentCode]")
+    {
+        const std::string lsl = "integer n = 5;\n"
+                                "default {\n"
+                                "    state_entry() {\n"
+                                "        // n = ~n;\n"
+                                "        n = ~n;\n"
+                                "        // integer m = 0xFFFFFFF0;\n"
+                                "        integer k = 0xFFFFFFF0;\n"
+                                "        llSay(0, (string)(n + 1) + (string)(k + 1));\n"
+                                "    }\n"
+                                "}\n";
+        const ALLSLToSLua::Result r = converted(lsl);
+        CAPTURE(r.text);
+        CHECK(r.commentsConverted == 2);
+        CHECK(has(r, "\n-- n = bit32.s32(bit32.bnot(n))\n-- LSL: bit32 answers"));
+        CHECK(has(r, "\n-- local m = 0xFFFFFFF0\n-- LSL: SLua reads 0xFFFFFFF0"));
+        std::set<std::string> keys;
+        for (const ALScriptProblem& p : r.notes)
+        {
+            keys.insert(p.key + ":" + std::to_string(p.line));
+        }
+        CHECK(keys == std::set<std::string>{ "SluaBit32Signed:4", "SluaHexSign:6" });
+    }
+
+    TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: the report each conversion's own; with no byte to mark by, each left", "[ALLSLCommentCode]")
+    {
+        ALLSLCommentCode::Report report;
+        converted("default { state_entry() {\n    //llSay(0, \"a\");\n    //nope();\n    llSay(0, \"b\");\n} }\n", &report);
+        CHECK(report.tried.size() == 2);
+        converted("default { state_entry() { llSay(0, \"b\"); } }\n", &report);
+        CHECK(report.tried.empty());
+        CHECK(report.conversions == 1);
+
+        // Every byte below a space the script has, in a comment: none left
+        // to mark what a trial writes by.
+        std::string lsl = "// ";
+        for (char c = 1; c < ' '; ++c)
+        {
+            if (c != '\t' && c != '\n' && c != '\r')
+            {
+                lsl += c;
+            }
+        }
+        lsl += "\ndefault { state_entry() {\n    //llSay(0, \"a\");\n    llSay(0, \"b\");\n} }\n";
+        const ALLSLToSLua::Result r = converted(lsl, &report);
+        CHECK(r.text == plain(lsl).text);
+        CHECK(r.commentsConverted == 0);
+        CHECK(r.commentsLeft == 1);
+        REQUIRE(report.tried.size() == 1);
+        CHECK(report.tried[0].outcome == ALLSLCommentCode::Outcome::Capped);
     }
 
     TEST_CASE_METHOD(allslcommentcode_data, "ALLSLCommentCode: off, or with no comments kept, nothing tried", "[ALLSLCommentCode]")
