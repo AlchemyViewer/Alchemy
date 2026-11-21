@@ -18,7 +18,7 @@ path = "src/lib.rs"
 crate-type = ["staticlib"]
 
 [dependencies]
-pnj2k-capi = { git = "https://github.com/AlchemyViewer/pnj2k", rev = "a01228ef88d42a1d2c015b7dc805bbd36e9fee73" }
+pnj2k-capi = { git = "https://github.com/AlchemyViewer/pnj2k", rev = "d59f25944733cb8d5fbacb90ab3028f807a72f53" }
 
 # A workspace of its own, with its own Cargo.lock: in one workspace with
 # velopack_libc, every cargo run would fetch pnj2k's repository, a build

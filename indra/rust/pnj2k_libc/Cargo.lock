@@ -11,7 +11,7 @@ checksum = "629c9d6b6f30b5604089e0980f4d924a013aacb1654a6cdf5d3d852224f68651"
 [[package]]
 name = "pnj2k"
 version = "0.1.0"
-source = "git+https://github.com/AlchemyViewer/pnj2k?rev=a01228ef88d42a1d2c015b7dc805bbd36e9fee73#a01228ef88d42a1d2c015b7dc805bbd36e9fee73"
+source = "git+https://github.com/AlchemyViewer/pnj2k?rev=d59f25944733cb8d5fbacb90ab3028f807a72f53#d59f25944733cb8d5fbacb90ab3028f807a72f53"
 dependencies = [
  "fearless_simd",
  "thiserror",
@@ -20,7 +20,7 @@ dependencies = [
 [[package]]
 name = "pnj2k-capi"
 version = "0.1.0"
-source = "git+https://github.com/AlchemyViewer/pnj2k?rev=a01228ef88d42a1d2c015b7dc805bbd36e9fee73#a01228ef88d42a1d2c015b7dc805bbd36e9fee73"
+source = "git+https://github.com/AlchemyViewer/pnj2k?rev=d59f25944733cb8d5fbacb90ab3028f807a72f53#d59f25944733cb8d5fbacb90ab3028f807a72f53"
 dependencies = [
  "pnj2k",
 ]

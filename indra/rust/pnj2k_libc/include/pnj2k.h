@@ -85,7 +85,7 @@
  * a status, or a field in a struct's `reserved` bytes or at its end, which
  * `struct_size` tells apart, does not.
  */
-#define PNJ2K_ABI_VERSION 4
+#define PNJ2K_ABI_VERSION 5
 
 /**
  * `pnj2k_decode_params.flags`: writes the last row first, as images
@@ -1214,6 +1214,11 @@ typedef struct pnj2k_comment {
  *
  * For each number of discarded levels, it gives the quality layers whose
  * packets are wholly present for the resolutions such a decode needs.
+ *
+ * A decode that discards levels reads a tile's packets only as far as the
+ * last of the resolutions it keeps, and its reach counts for its own
+ * number of discards and more alone, from `first`. `pnj2k_codestream_reach`
+ * reads every packet.
  */
 typedef struct pnj2k_reach {
   /**
@@ -1221,18 +1226,22 @@ typedef struct pnj2k_reach {
    */
   size_t struct_size;
   /**
-   * How many entries of `layers` mean anything: a decode can discard
-   * fewer levels than this.
+   * One past the last entry of `layers` that means anything: a decode
+   * can discard fewer levels than this.
    */
   uint32_t levels;
   /**
-   * Whether every packet of every tile was wholly present.
+   * Whether every packet of every tile was read and wholly present: not
+   * for a decode that discards levels where a packet comes after the
+   * last of the resolutions it keeps.
    */
   bool complete;
   /**
-   * Written zero; reserved for a later field.
+   * The first entry of `layers` that means anything: the levels the
+   * decode discarded, or 0 from `pnj2k_codestream_reach`. Those before
+   * it are 0.
    */
-  uint8_t reserved;
+  uint8_t first;
   /**
    * Complete layers for a decode that discards each number of levels.
    */
