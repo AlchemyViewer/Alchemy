@@ -180,3 +180,9 @@ bool ALInventorySync::isLibraryOwner(const LLUUID& owner, const LLUUID& library_
 {
     return library_owner.notNull() && owner == library_owner;
 }
+
+// static
+S32 ALInventorySync::listedVersion(const LLSD& folder)
+{
+    return folder.has("version") ? folder["version"].asInteger() : VERSION_UNKNOWN;
+}

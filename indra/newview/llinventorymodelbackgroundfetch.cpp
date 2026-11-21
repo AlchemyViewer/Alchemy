@@ -1439,7 +1439,10 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
 
             LLUUID parent_id(folder_sd["folder_id"].asUUID());
             LLUUID owner_id(folder_sd["owner_id"].asUUID());
-            S32    version(folder_sd["version"].asInteger());
+            // Read before anything takes "version" from folder_sd through its
+            // mutable [], which adds the key where the entry gives none.
+            const S32 listed_version = ALInventorySync::listedVersion(folder_sd);
+            S32    version(folder_sd.get("version").asInteger());
             S32    descendents(folder_sd["descendents"].asInteger());
 
             // Each entry below is read into a folder or an item of its own,
@@ -1480,9 +1483,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             }
             // A listing of no version removes nothing, though the folder
             // takes the 0 it reads as.
-            listed_folders.emplace_back(parent_id,
-                                        folder_sd.has("version") ? version : ALInventorySync::VERSION_UNKNOWN,
-                                        pcat->getVersion());
+            listed_folders.emplace_back(parent_id, listed_version, pcat->getVersion());
 
             LLSD categories(folder_sd["categories"]);
             for (LLSD::array_const_iterator category_it = categories.beginArray();

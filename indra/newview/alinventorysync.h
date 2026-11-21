@@ -224,6 +224,12 @@ public:
     // library.
     static bool isLibraryOwner(const LLUUID& owner, const LLUUID& library_owner);
 
+    // The version a background fetch's reply lists one of its folders at:
+    // the entry's "version", or VERSION_UNKNOWN where it gives none. It
+    // reads the entry without changing it, as a mutable LLSD's [] would by
+    // adding the key it reads.
+    static S32 listedVersion(const LLSD& folder);
+
     // Has a folder found out of step with the server's fetched when next
     // asked for, by forgetting its version. One whose version is already
     // unknown is asked for now, as `fetch()` asks for it.

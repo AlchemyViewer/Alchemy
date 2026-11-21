@@ -550,4 +550,30 @@ namespace
         CHECK(folder.version == Sync::VERSION_UNKNOWN);
         CHECK(asked == 1);
     }
+
+    TEST_CASE("alinventorysync: a background fetch's folder entry of no version prunes nothing", "[alinventorysync]")
+    {
+        // An entry of FOLDER, held at an unknown version with ITEM and
+        // NEW_ITEM, that lists ITEM alone.
+        LLSD unversioned;
+        unversioned["folder_id"] = FOLDER;
+        CHECK(Sync::listedVersion(unversioned) == Sync::VERSION_UNKNOWN);
+        // Reading it adds no key a later read would take for a version.
+        CHECK_FALSE(unversioned.has("version"));
+        CHECK(Sync::listedVersion(unversioned) == Sync::VERSION_UNKNOWN);
+        CHECK(Sync::unlisted(HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, Sync::listedVersion(unversioned),
+                             Sync::VERSION_UNKNOWN)
+                  .empty());
+
+        LLSD versioned = unversioned;
+        versioned["version"] = 7;
+        CHECK(Sync::listedVersion(versioned) == 7);
+        CHECK(Sync::unlisted(HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, Sync::listedVersion(versioned),
+                             Sync::VERSION_UNKNOWN)
+              == uuid_vec_t{ NEW_ITEM });
+
+        LLSD zero = unversioned;
+        zero["version"] = 0;
+        CHECK(Sync::listedVersion(zero) == 0);
+    }
 }
