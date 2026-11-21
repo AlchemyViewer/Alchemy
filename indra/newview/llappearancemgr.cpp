@@ -4166,9 +4166,12 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
     }
     S32 retryCount(0);
     bool bRetry;
-    // What was last asked for before this request, which a request that fails is put back to, so that it
-    // holds back no later request for the same version.
+    // What was last asked for before this request. A request that ends with every attempt failed puts it
+    // back, so that it holds back no later request for the same version: one that runs out of retries or
+    // is not retried, and one whose retry stops before asking again, the loop going round only after a
+    // failure.
     const S32 requested_before = gAgentAvatarp->mLastUpdateRequestCOFVersion;
+    const auto give_back = [&requested_before] { gAgentAvatarp->mLastUpdateRequestCOFVersion = requested_before; };
     do
     {
         // If we have already received an update for this or higher cof version,
@@ -4186,6 +4189,10 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
             LL_INFOS("AVatar") << "COF version is unknown... not requesting until COF version is known." << LL_ENDL;
             // Asked for again once it is known.
             mRerequestAppearanceBake = true;
+            if (retryCount > 0)
+            {
+                give_back();
+            }
             return;
         }
         else
@@ -4194,12 +4201,20 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
             {
                 LL_WARNS("Avatar") << "Have already received update for cof version " << lastRcv
                     << " but requesting for " << cofVersion << LL_ENDL;
+                if (retryCount > 0)
+                {
+                    give_back();
+                }
                 return;
             }
             if (lastReq >= cofVersion)
             {
                 LL_WARNS("Avatar") << "Request already in flight for cof version " << lastReq
                     << " but requesting for " << cofVersion << LL_ENDL;
+                if (retryCount > 0)
+                {
+                    give_back();
+                }
                 return;
             }
         }
@@ -4265,7 +4280,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
                 if (++retryCount > BAKE_RETRY_MAX_COUNT)
                 {
                     LL_WARNS("Avatar") << "Bake retry count exceeded!" << LL_ENDL;
-                    gAgentAvatarp->mLastUpdateRequestCOFVersion = requested_before;
+                    give_back();
                     break;
                 }
                 F32 timeout = pow(BAKE_RETRY_TIMEOUT, static_cast<float>(retryCount)) - 1.0f;
@@ -4283,7 +4298,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
             else
             {
                 LL_WARNS("Avatar") << "No retry attempted." << LL_ENDL;
-                gAgentAvatarp->mLastUpdateRequestCOFVersion = requested_before;
+                give_back();
                 break;
             }
         }
