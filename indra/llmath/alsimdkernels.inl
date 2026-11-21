@@ -258,8 +258,26 @@ struct ALSimd8
         const reg t = fnmadd(mul(a, r), r, set1(3.f));
         return mul(mul(set1(0.5f), r), t);
     }
-    static AL_SIMD_INLINE reg abs(reg a) { return _mm256_andnot_ps(_mm256_set1_ps(-0.f), a); }
-    static AL_SIMD_INLINE reg neg(reg a) { return _mm256_xor_ps(a, _mm256_set1_ps(-0.f)); }
+    // The sign bit cleared or flipped as integer bits, for the reason alsimd::neg gives; without AVX2's 256-bit integer
+    // operations, a half at a time.
+    static AL_SIMD_INLINE reg abs(reg a)
+    {
+#if AL_SIMD_AVX2
+        return _mm256_castsi256_ps(_mm256_and_si256(_mm256_castps_si256(a), _mm256_set1_epi32(INT32_MAX)));
+#else
+        return _mm256_insertf128_ps(_mm256_castps128_ps256(alsimd::abs(_mm256_castps256_ps128(a))),
+                                    alsimd::abs(_mm256_extractf128_ps(a, 1)), 1);
+#endif
+    }
+    static AL_SIMD_INLINE reg neg(reg a)
+    {
+#if AL_SIMD_AVX2
+        return _mm256_castsi256_ps(_mm256_xor_si256(_mm256_castps_si256(a), _mm256_set1_epi32(INT32_MIN)));
+#else
+        return _mm256_insertf128_ps(_mm256_castps128_ps256(alsimd::neg(_mm256_castps256_ps128(a))),
+                                    alsimd::neg(_mm256_extractf128_ps(a, 1)), 1);
+#endif
+    }
     static AL_SIMD_INLINE mask cmpeq(reg a, reg b) { return _mm256_cmp_ps(a, b, _CMP_EQ_OQ); }
     static AL_SIMD_INLINE mask cmpne(reg a, reg b) { return _mm256_cmp_ps(a, b, _CMP_NEQ_UQ); }
     static AL_SIMD_INLINE mask cmplt(reg a, reg b) { return _mm256_cmp_ps(a, b, _CMP_LT_OQ); }
