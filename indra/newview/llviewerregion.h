@@ -402,6 +402,9 @@ public:
     eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
 
     void cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data);
+    // An update put the object object_id under local_id: the overrides kept there for another object go, before
+    // anything of them reaches it.
+    void dropGLTFOverridesOfAnother(U32 local_id, const LLUUID& object_id);
     // The viewer sent an edit of face `side`'s override: the face keeps what the edit gave it until the region
     // answers, or LLGLTFOverrideCacheEntry::HOLD_SECONDS pass.
     void holdGLTFOverride(U32 local_id, S32 side);
