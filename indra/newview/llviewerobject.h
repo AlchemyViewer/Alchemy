@@ -207,7 +207,7 @@ public:
     // The faces that share face `te`'s settings, [first, last), selected and edited as one (LLPrimitive::faceGroup).
     std::pair<S32, S32> getFaceGroup(S32 te) const;
     // Selects face `te` with the faces that share its settings.
-    void setTESelected(const U8 te, bool sel) override;
+    virtual void setTESelected(const U8 te, bool sel);
 
     // The render material the parameter block gives face `te` (LLRenderMaterialParams::getMaterialFor).
     const LLUUID& getRenderMaterialID(U8 te) const;
