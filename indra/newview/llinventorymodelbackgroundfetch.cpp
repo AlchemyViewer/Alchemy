@@ -1478,7 +1478,11 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             {
                 continue;
             }
-            listed_folders.emplace_back(parent_id, version, pcat->getVersion());
+            // A listing of no version removes nothing, though the folder
+            // takes the 0 it reads as.
+            listed_folders.emplace_back(parent_id,
+                                        folder_sd.has("version") ? version : ALInventorySync::VERSION_UNKNOWN,
+                                        pcat->getVersion());
 
             LLSD categories(folder_sd["categories"]);
             for (LLSD::array_const_iterator category_it = categories.beginArray();
