@@ -4104,8 +4104,11 @@ void LLAppearanceMgr::onIdle(void *)
 void LLAppearanceMgr::requestServerAppearanceUpdate()
 {
     // Workaround: we shouldn't request update from server prior to uploading all attachments, but it is
-    // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete
-    if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0)
+    // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete.
+    // The request names the current outfit's version, so it waits too while that is unknown, as it is
+    // while the folder is fetched again.
+    if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0
+        && getCOFVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN)
     {
         mRerequestAppearanceBake = false;
         LLCoprocedureManager::CoProcedure_t proc = boost::bind(&LLAppearanceMgr::serverAppearanceUpdateCoro, this, _1);
@@ -4169,6 +4172,8 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
         if (cofVersion == LLViewerInventoryCategory::VERSION_UNKNOWN)
         {
             LL_INFOS("AVatar") << "COF version is unknown... not requesting until COF version is known." << LL_ENDL;
+            // Asked for again once it is known.
+            mRerequestAppearanceBake = true;
             return;
         }
         else

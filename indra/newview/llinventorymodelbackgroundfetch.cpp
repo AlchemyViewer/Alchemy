@@ -27,6 +27,7 @@
 #include "llviewerprecompiledheaders.h"
 #include "llinventorymodelbackgroundfetch.h"
 
+#include "alinventorysync.h"
 #include "llaisapi.h"
 #include "llagent.h"
 #include "llappviewer.h"
@@ -45,6 +46,10 @@
 #include "bufferarray.h"
 #include "bufferstream.h"
 #include "llcorehttputil.h"
+
+#include <tuple>
+
+static_assert(ALInventorySync::VERSION_UNKNOWN == LLViewerInventoryCategory::VERSION_UNKNOWN);
 
 // History (may be apocryphal)
 //
@@ -147,7 +152,8 @@ public:
     BGFolderHttpHandler(const LLSD& request_sd, const uuid_vec_t& recursive_cats)
         : LLCore::HttpHandler(),
           mRequestSD(request_sd),
-          mRecursiveCatUUIDs(recursive_cats)
+          mRecursiveCatUUIDs(recursive_cats),
+          mRequest(gInventory.getContentChanges(), LLFrameTimer::getTotalSeconds())
         {
             LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
         }
@@ -174,6 +180,10 @@ private:
 private:
     LLSD mRequestSD;
     const uuid_vec_t mRecursiveCatUUIDs; // hack for storing away which cat fetches are recursive
+    // How far the changes to what folders hold had come as the request
+    // went, made just before it is posted, which spares the folders of the
+    // reply that changed after or shortly before.
+    ALInventorySync::Request mRequest;
 };
 
 
@@ -952,7 +962,7 @@ void LLInventoryModelBackgroundFetch::bulkFetchViaAis(const FetchQueueInfo& fetc
                         };
 
                         AISAPI::ITEM_TYPE item_type = AISAPI::INVENTORY;
-                        if (ALEXANDRIA_LINDEN_ID == cat->getOwnerID())
+                        if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                         {
                             item_type = AISAPI::LIBRARY;
                         }
@@ -1009,7 +1019,7 @@ void LLInventoryModelBackgroundFetch::bulkFetchViaAis(const FetchQueueInfo& fetc
                         };
 
                         AISAPI::ITEM_TYPE item_type = AISAPI::INVENTORY;
-                        if (ALEXANDRIA_LINDEN_ID == cat->getOwnerID())
+                        if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                         {
                             item_type = AISAPI::LIBRARY;
                         }
@@ -1160,7 +1170,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
                             folder_sd["fetch_folders"] = LLSD::Boolean(true); //(LLSD::Boolean)sFullFetchStarted;
                             folder_sd["fetch_items"] = LLSD::Boolean(true);
 
-                            if (ALEXANDRIA_LINDEN_ID == cat->getOwnerID())
+                            if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                             {
                                 folder_request_body_lib["folders"].append(folder_sd);
                             }
@@ -1396,6 +1406,22 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
     {
         LLSD folders(content["folders"]);
 
+        // What the reply lists anywhere, and each folder it lists whole --
+        // every folder asked for is asked for with its folders and items --
+        // with the version the reply lists and the version held before it.
+        uuid_set_t listed;
+        std::vector<std::tuple<LLUUID, S32, S32>> listed_folders;
+
+        // Which folders the reply lists that changed after the request
+        // was posted, or shortly before, read before any of the reply is
+        // applied, since applying it changes them too.
+        uuid_vec_t folder_ids;
+        for (LLSD::array_const_iterator folder_it = folders.beginArray(); folder_it != folders.endArray(); ++folder_it)
+        {
+            folder_ids.push_back((*folder_it)["folder_id"].asUUID());
+        }
+        mRequest.spareChanged(gInventory.getContentChanges(), folder_ids);
+
         for (LLSD::array_const_iterator folder_it = folders.beginArray();
             folder_it != folders.endArray();
             ++folder_it)
@@ -1452,6 +1478,11 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             {
                 continue;
             }
+            // A listing of no version removes nothing, though the folder
+            // takes the 0 it reads as.
+            listed_folders.emplace_back(parent_id,
+                                        folder_sd.has("version") ? version : ALInventorySync::VERSION_UNKNOWN,
+                                        pcat->getVersion());
 
             LLSD categories(folder_sd["categories"]);
             for (LLSD::array_const_iterator category_it = categories.beginArray();
@@ -1461,6 +1492,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 LLSD category(*category_it);
                 LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
                 tcategory->fromLLSD(category);
+                listed.insert(tcategory->getUUID());
 
                 const bool recursive(getIsRecursive(tcategory->getUUID()));
                 if (recursive)
@@ -1481,6 +1513,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 LLSD item(*item_it);
                 LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
                 titem->unpackMessage(item);
+                listed.insert(titem->getUUID());
 
                 gInventory.updateItem(titem);
             }
@@ -1492,6 +1525,39 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 cat->setVersion(version);
                 cat->setDescendentCount(descendents);
                 cat->determineFolderType();
+            }
+        }
+
+        // What each folder listed still holds that the reply lists nowhere,
+        // once what it moved elsewhere has moved.
+        uuid_vec_t out_of_step;
+        for (const auto& [folder_id, listed_version, held_version] : listed_folders)
+        {
+            LLInventoryModel::cat_array_t* categories = nullptr;
+            LLInventoryModel::item_array_t* items = nullptr;
+            gInventory.getDirectDescendentsOf(folder_id, categories, items);
+            const ALInventorySync::Request::Applied applied = mRequest.apply(
+                ALInventorySync::readListing(folder_id, ALInventorySync::children(categories, items),
+                                             ALInventorySync::Listing::Whole, listed, listed_version, held_version));
+            for (const LLUUID& child_id : applied.removed)
+            {
+                LL_DEBUGS(LOG_INV) << "removed " << child_id << ", which fetched folder " << folder_id
+                                   << " no longer lists" << LL_ENDL;
+                gInventory.onObjectDeletedFromServer(child_id, false, false, false);
+            }
+            if (applied.out_of_step)
+            {
+                out_of_step.push_back(folder_id);
+            }
+        }
+
+        // A folder that changed while the request was out, and holds what
+        // the reply doesn't name, is fetched again now.
+        for (const LLUUID& folder_id : out_of_step)
+        {
+            if (LLViewerInventoryCategory* cat = gInventory.getCategory(folder_id))
+            {
+                ALInventorySync::fetchAgain(*cat, [fetcher, &folder_id] { fetcher->start(folder_id, false); });
             }
         }
     }

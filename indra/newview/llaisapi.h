@@ -31,6 +31,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include "alinventorysync.h"
 #include "llviewerinventory.h"
 #include "llcorehttputil.h"
 #include "llcoproceduremanager.h"
@@ -94,14 +95,16 @@ private:
 
     static void EnqueueAISCommand(const std::string &procName, LLCoprocedureManager::CoProcedure_t proc);
     static void onIdle(void *userdata); // launches postponed AIS commands
-    static void onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body);
+    static void onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
+                                 const ALInventorySync::Request& request);
 
     static std::string getInvCap();
     static std::string getLibCap();
 
+    // `request` is noted as the command is asked for, before it is queued.
     static void InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter,
         invokationFn_t invoke, std::string url, LLUUID targetId, LLSD body,
-        completion_t callback, COMMAND_TYPE type);
+        completion_t callback, COMMAND_TYPE type, ALInventorySync::Request request);
 
     typedef std::pair<std::string, LLCoprocedureManager::CoProcedure_t> ais_query_item_t;
     static std::list<ais_query_item_t> sPostponedQuery;
@@ -111,7 +114,8 @@ class AISUpdate
 {
     LOG_CLASS(AISUpdate);
 public:
-    AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body);
+    AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body,
+              const ALInventorySync::Request& request);
     void parseUpdate(const LLSD& update);
     void parseMeta(const LLSD& update);
     void parseContent(const LLSD& update);
@@ -123,6 +127,7 @@ public:
     void parseItem(const LLSD& link_map);
     void parseCategory(const LLSD& link_map, S32 depth);
     void parseDescendentCount(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded);
+    void parseUnlisted(const LLUUID& category_id, LLFolderType::EType type, const LLSD& embedded, S32 version);
     void parseEmbedded(const LLSD& embedded, S32 depth);
     void parseEmbeddedLinks(const LLSD& links, S32 depth);
     void parseEmbeddedItems(const LLSD& items);
@@ -154,6 +159,13 @@ private:
     typedef std::map<LLUUID,LLPointer<LLViewerInventoryCategory> > deferred_category_map_t;
     deferred_category_map_t mCategoriesCreated;
     deferred_category_map_t mCategoriesUpdated;
+
+    // Each folder a fetch listed whole, read against what the model held
+    // as the reply was read.
+    std::vector<ALInventorySync::FolderListing> mListings;
+    // The request this is the reply to, which spares the folders listed
+    // that changed after it was asked for.
+    ALInventorySync::Request mRequest;
 
     // These keep track of uuid's mentioned in meta values.
     // Useful for filtering out which content we are interested in.
