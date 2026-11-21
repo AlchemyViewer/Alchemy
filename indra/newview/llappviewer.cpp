@@ -688,9 +688,8 @@ LLAppViewer::LLAppViewer()
 
     mDumpPath ="";
 
-    // Need to do this initialization before we do anything else, since anything
-    // that touches files should really go through the lldir API
-    gDirUtilp->initAppDirs("AlchemyNext");
+    // The viewer's directories were set by main (initAppDirs()), before the
+    // crash reporter started.
     //
     // IMPORTANT! Do NOT put anything that will write
     // into the log files during normal startup until AFTER
@@ -711,6 +710,11 @@ LLAppViewer::LLAppViewer()
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
 
+    // The marker a crash leaves for the next launch, composed as soon as it
+    // is known whether this is the first instance, for the crash handler to
+    // write without allocating.
+    prepareCrashMarker();
+
     LLLoginInstance::instance().setPlatformInfo(gPlatform, LLOSInfo::instance().getOSVersionString(), LLOSInfo::instance().getOSStringSimple());
 
     // Under some circumstances we want to read the static_debug_info.log file
@@ -728,6 +732,18 @@ LLAppViewer::LLAppViewer()
     mDumpPath = logdir;
 
     setDebugFileNames(logdir);
+
+    // What the previous run left, read before this run writes its own over
+    // it; then what the crash reporter, running since main, needed the
+    // viewer for.
+    ALCrashReporter::readLastRun();
+    ALCrashReporter::attachRun();
+}
+
+// static
+void LLAppViewer::initAppDirs()
+{
+    gDirUtilp->initAppDirs("AlchemyNext");
 }
 
 LLAppViewer::~LLAppViewer()
@@ -796,17 +812,7 @@ bool LLAppViewer::init()
 
     setupErrorHandling(mSecondInstance);
 
-    // The marker a crash leaves for the next launch, composed before there
-    // is a crash handler to write it.
-    prepareCrashMarker();
-
-    // What the previous run left, read before this run writes its own over it.
-    ALCrashReporter::readLastRun();
     startDebugInfo();
-
-    // As early as consent can be read: before the settings, on the sentinel
-    // they keep for it.
-    ALCrashReporter::init();
 
     //
     // Start of the application

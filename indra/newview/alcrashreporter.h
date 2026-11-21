@@ -38,11 +38,11 @@ class LLSD;
 class LLUUID;
 class LLVector3;
 
-// Engaged from the top of the viewer's init unless the user turned crash
-// reports down, and closed last thing in cleanup. Until the user allows them,
-// the reports it makes are kept on disk and nothing is sent. Where no reporter
-// is built in, every entry point is a no-op, so the call sites carry no
-// conditions.
+// Started from main before the viewer is constructed, unless the user turned
+// crash reports down, and closed last thing in cleanup. Until the user allows
+// them, the reports it makes are kept on disk and nothing is sent. Where no
+// reporter is built in, every entry point is a no-op, so the call sites carry
+// no conditions.
 namespace ALCrashReporter
 {
     // Whether this build has a reporter and sends.
@@ -136,16 +136,19 @@ namespace ALCrashReporter
     std::optional<PreviousReport> previousRunCrash(std::string_view event_id, std::string_view crashed_run_id,
                                                    std::string_view previous_run_id);
 
-    // What the previous run left, read once from the top of init, before
-    // this run writes its own static debug file over that run's: the file,
-    // and the freeze report the run recorded. A second instance reads
-    // nothing, since the files are the running first instance's.
+    // What the previous run left, read once at the end of the viewer's
+    // constructor, before this run writes its own static debug file over
+    // that run's: the file, and the freeze report the run recorded. A second
+    // instance reads nothing, since the files are the running first
+    // instance's.
     void readLastRun();
     // What the previous run's static debug file says, and its text.
     const PreviousRun& lastRun();
     const std::string& lastRunDebugInfo();
     // A crash report the reporter found as it started, which becomes the
-    // previous report when it is the previous run's.
+    // previous report when it is the previous run's. The reporter starts
+    // before the previous run is read, so what it finds first waits for
+    // readLastRun().
     void foundCrashReport(std::string_view event_id, std::string_view crashed_run_id);
     // The report the previous run ended with, when one was filed and is known.
     std::optional<PreviousReport> previousReport();
@@ -173,9 +176,15 @@ namespace ALCrashReporter
     inline constexpr U32 FATAL_APP_EXIT = 0x40000015; // STATUS_FATAL_APP_EXIT
 
 #if AL_SENTRY
-    // Engages unless the record says crash reports were declined; it sends
-    // only when the record allows them.
-    bool init();
+    // From main, once the viewer's directories are set and before anything
+    // else: engages unless the record says crash reports were declined, and
+    // sends only when the record allows them. It needs nothing of the viewer.
+    bool start();
+    // From the end of the viewer's constructor, once the log is open and the
+    // previous run is read: what start() could not know yet. The log, the
+    // static debug file and the tags of the run go on its reports, and what
+    // the SDK said as it started is written to the log.
+    void attachRun();
     // The settings' answer, once readable and whenever it changes: recorded,
     // and the reporter engaged, holding, sending or closed to match. A run
     // that may not run the reporter (DisableCrashLogger) closes it and keeps
@@ -195,7 +204,8 @@ namespace ALCrashReporter
     bool reportFreeze(const std::string& description);
     bool handleException(void* exception_pointers);
 #else
-    inline bool init() { return false; }
+    inline bool start() { return false; }
+    inline void attachRun() {}
     inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
     inline void shutdown() {}
     inline bool isEngaged() { return false; }

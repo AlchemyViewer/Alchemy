@@ -124,6 +124,10 @@ public:
     // from the entry point, before anything can throw.
     static void installTerminateHandler();
 
+    // Where the viewer keeps its files. Called from the entry point BEFORE
+    // LLAppViewer is constructed: the crash reporter starts on them first.
+    static void initAppDirs();
+
     // The log the previous run wrote, or empty when there is none. Known
     // once the viewer is constructed, which moves the logs into place.
     static std::string previousLogFile();

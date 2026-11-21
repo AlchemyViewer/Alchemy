@@ -28,6 +28,7 @@
 
 #include "llappviewersdl.h"
 
+#include "alcrashreporter.h"
 #include "llcommandlineparser.h"
 
 #include "lldiriterator.h"
@@ -423,6 +424,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     LL_PROFILER_FRAME_END;
     LL_PROFILER_SET_THREAD_NAME("App");
 
+    // The crash reporter next, so that whatever crashes from here on is
+    // reported: it needs only the viewer's directories. After Velopack, which
+    // may be replacing the crash handler's executable.
+    LLAppViewer::initAppDirs();
+    ALCrashReporter::start();
+    LLAppViewer::installTerminateHandler();
+
     gSDLMainHandled = true;
 
     gArgC = argc;
@@ -457,8 +465,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
     << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
     << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
-
-    LLAppViewer::installTerminateHandler();
 
 #if LL_WINDOWS
     // Set a debug info flag to indicate if multiple instances are running.
