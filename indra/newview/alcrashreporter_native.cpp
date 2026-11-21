@@ -64,6 +64,9 @@
 namespace
 {
     bool sEngaged = false;
+    // Engaged with the user's consent; otherwise the reports it makes wait
+    // in the database until it is given.
+    bool sSending = false;
 
     // Raised while a signal handler of ours calls into the SDK, whose
     // warnings would otherwise reach the log's locks from inside it.
@@ -387,13 +390,52 @@ namespace
     }
 #endif
 
-    bool engage()
+    // The SDK sends only once consent is given. Until then, because events
+    // are kept (cache_keep), crashpad keeps its reports pending rather than
+    // marking them skipped, and giving consent sends them, whichever run made
+    // them. Events wait in the cache, which only http_retry would send. The
+    // SDK's own record of the answer is the database's `user-consent`, which
+    // follows ours.
+    void apply_consent(ALCrashReporter::Consent consent)
+    {
+        sSending = consent == ALCrashReporter::Consent::Allowed;
+        if (sSending)
+        {
+            sentry_user_consent_give();
+        }
+        else
+        {
+            sentry_user_consent_reset();
+        }
+    }
+
+    // What was kept for a yes that did not come: the crash reports held in
+    // the database and the events cached beside them. The first instance
+    // only, with the SDK closed: a second instance's database is the first's.
+    void discard_reports()
+    {
+        if (LLAppViewer::instance()->isSecondInstance())
+        {
+            return;
+        }
+        const std::string database = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
+        if (LLFile::isdir(database))
+        {
+            gDirUtilp->deleteDirAndContents(database);
+            LL_INFOS("CrashReporter") << "Crash reports kept for consent deleted" << LL_ENDL;
+        }
+        ALCrashReporter::forgetPreviousReport();
+    }
+
+    bool engage(ALCrashReporter::Consent consent)
     {
         LLAppViewer* app = LLAppViewer::instance();
         const ALCrashReporter::Release release = ALCrashReporter::release();
 
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AL_SENTRY_DSN);
+        sentry_options_set_require_user_consent(options, 1);
+        sentry_options_set_cache_keep(options, SENTRY_CACHE_KEEP_OFFLINE);
         sentry_options_set_release(options, release.name.c_str());
         sentry_options_set_environment(options, release.environment.c_str());
         sentry_options_set_dist(options, release.dist.c_str());
@@ -415,6 +457,7 @@ namespace
             return false;
         }
         sEngaged = true;
+        apply_consent(consent);
         follow_wer(true);
 
         for (const auto& [key, value] : ALCrashReporter::commonTags())
@@ -435,7 +478,9 @@ namespace
         prepare_frozen_walk();
 #endif
 
-        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion()
+                                  << (sSending ? "; sending reports" : "; keeping reports until the user allows them")
+                                  << LL_ENDL;
         return true;
     }
 
@@ -445,6 +490,7 @@ namespace
         {
             sentry_close();
             sEngaged = false;
+            sSending = false;
         }
     }
 }
@@ -454,29 +500,51 @@ bool ALCrashReporter::init()
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (!consentRecorded(consentSentinel()))
+    const Consent consent = recordedConsent(consentDirectory());
+    if (consent == Consent::Declined)
     {
-        LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
+        LL_INFOS("CrashReporter") << "Crash reports declined; Sentry stays off" << LL_ENDL;
         follow_wer(false);
         return false;
     }
-    return engage();
+    return engage(consent);
 #endif
 }
 
-void ALCrashReporter::refreshConsent(bool allowed)
+void ALCrashReporter::refreshConsent(Consent consent, bool may_run)
 {
-    recordConsent(consentSentinel(), allowed);
+    recordConsent(consentDirectory(), consent);
 #if LL_SEND_CRASH_REPORTS
-    if (allowed && !sEngaged)
+    if (!may_run || consent == Consent::Declined)
     {
-        engage();
-    }
-    else if (!allowed && sEngaged)
-    {
-        close_sdk();
+        if (sEngaged)
+        {
+            if (consent == Consent::Declined)
+            {
+                sentry_user_consent_revoke();
+            }
+            close_sdk();
+            LL_INFOS("CrashReporter") << (may_run ? "Crash reports declined; Sentry closed"
+                                                  : "Crash logger disabled; Sentry closed") << LL_ENDL;
+        }
         follow_wer(false);
-        LL_INFOS("CrashReporter") << "Consent to crash reports withdrawn; Sentry closed" << LL_ENDL;
+        if (consent == Consent::Declined)
+        {
+            discard_reports();
+        }
+        return;
+    }
+
+    if (!sEngaged)
+    {
+        engage(consent);
+    }
+    else if ((consent == Consent::Allowed) != sSending)
+    {
+        apply_consent(consent);
+        LL_INFOS("CrashReporter") << (sSending ? "Crash reports allowed; sending those kept and any to come"
+                                               : "Crash reports unanswered; keeping them until the user allows them")
+                                  << LL_ENDL;
     }
 #endif
 }
@@ -489,6 +557,11 @@ void ALCrashReporter::shutdown()
 bool ALCrashReporter::isEngaged()
 {
     return sEngaged;
+}
+
+bool ALCrashReporter::isSending()
+{
+    return sSending;
 }
 
 void ALCrashReporter::setUser(const LLUUID& id, const std::string& name)

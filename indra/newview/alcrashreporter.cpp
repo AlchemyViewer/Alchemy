@@ -107,26 +107,66 @@ void ALCrashReporter::fatal(std::string_view, const std::string&)
 }
 #endif
 
-std::string ALCrashReporter::consentSentinel()
+ALCrashReporter::Consent ALCrashReporter::consentFromSetting(S32 value)
 {
-    return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "crash_reports_allowed");
-}
-
-bool ALCrashReporter::consentRecorded(const std::string& sentinel)
-{
-    return LLFile::isfile(sentinel);
-}
-
-void ALCrashReporter::recordConsent(const std::string& sentinel, bool allowed)
-{
-    if (allowed)
+    switch (value)
     {
-        llofstream file(sentinel);
+        case static_cast<S32>(Consent::Allowed):
+            return Consent::Allowed;
+        case static_cast<S32>(Consent::Declined):
+            return Consent::Declined;
+        default:
+            return Consent::Unasked;
+    }
+}
+
+namespace
+{
+    constexpr const char* ALLOWED_FILE = "crash_reports_allowed";
+    constexpr const char* DECLINED_FILE = "crash_reports_declined";
+}
+
+std::string ALCrashReporter::consentDirectory()
+{
+    return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "");
+}
+
+ALCrashReporter::Consent ALCrashReporter::recordedConsent(const std::string& directory)
+{
+    const bool allowed = LLFile::isfile(gDirUtilp->add(directory, ALLOWED_FILE));
+    const bool declined = LLFile::isfile(gDirUtilp->add(directory, DECLINED_FILE));
+    if (allowed == declined)
+    {
+        return Consent::Unasked;
+    }
+    return allowed ? Consent::Allowed : Consent::Declined;
+}
+
+void ALCrashReporter::recordConsent(const std::string& directory, Consent consent)
+{
+    const std::string allowed = gDirUtilp->add(directory, ALLOWED_FILE);
+    const std::string declined = gDirUtilp->add(directory, DECLINED_FILE);
+
+    // The other answer goes first: stopped between the two, the record reads
+    // as unasked, which sends nothing.
+    if (consent != Consent::Allowed)
+    {
+        LLFile::remove(allowed, ENOENT);
+    }
+    if (consent != Consent::Declined)
+    {
+        LLFile::remove(declined, ENOENT);
+    }
+
+    if (consent == Consent::Allowed)
+    {
+        llofstream file(allowed);
         file << "Crash reports may be sent. Preferences holds the answer; this file lets the reporter start before Preferences is read.\n";
     }
-    else
+    else if (consent == Consent::Declined)
     {
-        LLFile::remove(sentinel, ENOENT);
+        llofstream file(declined);
+        file << "Crash reports may not be sent. Preferences holds the answer; this file lets the reporter stay off before Preferences is read.\n";
     }
 }
 

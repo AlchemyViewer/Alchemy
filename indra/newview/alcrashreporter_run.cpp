@@ -120,6 +120,12 @@ std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
     return sPreviousReport;
 }
 
+void ALCrashReporter::forgetPreviousReport()
+{
+    LLMutexLock lock(&sPreviousReportMutex);
+    sPreviousReport.reset();
+}
+
 std::optional<ALCrashReporter::LastRunEnd> ALCrashReporter::lastRunEnd()
 {
     // A second instance's markers are the running first instance's.

@@ -172,24 +172,27 @@ namespace
     }
 }
 
+// The Cocoa SDK has no way to keep a report until consent is given, so it is
+// engaged only once crash reports are allowed.
 bool ALCrashReporter::init()
 {
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (!consentRecorded(consentSentinel()))
+    if (recordedConsent(consentDirectory()) != Consent::Allowed)
     {
-        LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
+        LL_INFOS("CrashReporter") << "Crash reports not allowed; none are sent until they are" << LL_ENDL;
         return false;
     }
     return engage();
 #endif
 }
 
-void ALCrashReporter::refreshConsent(bool allowed)
+void ALCrashReporter::refreshConsent(Consent consent, bool may_run)
 {
-    recordConsent(consentSentinel(), allowed);
+    recordConsent(consentDirectory(), consent);
 #if LL_SEND_CRASH_REPORTS
+    const bool allowed = may_run && consent == Consent::Allowed;
     if (allowed && !sEngaged)
     {
         engage();
@@ -197,7 +200,8 @@ void ALCrashReporter::refreshConsent(bool allowed)
     else if (!allowed && sEngaged)
     {
         close_sdk();
-        LL_INFOS("CrashReporter") << "Consent to crash reports withdrawn; Sentry closed" << LL_ENDL;
+        LL_INFOS("CrashReporter") << (may_run ? "Consent to crash reports withdrawn; Sentry closed"
+                                              : "Crash logger disabled; Sentry closed") << LL_ENDL;
     }
 #endif
 }
@@ -208,6 +212,11 @@ void ALCrashReporter::shutdown()
 }
 
 bool ALCrashReporter::isEngaged()
+{
+    return sEngaged;
+}
+
+bool ALCrashReporter::isSending()
 {
     return sEngaged;
 }

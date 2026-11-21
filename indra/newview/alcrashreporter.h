@@ -38,9 +38,10 @@ class LLSD;
 class LLUUID;
 class LLVector3;
 
-// Engaged from the top of the viewer's init, on a consent it can read before
-// the settings exist, and closed last thing in cleanup. Where no reporter is
-// built in, every entry point is a no-op, so the call sites carry no
+// Engaged from the top of the viewer's init unless the user turned crash
+// reports down, and closed last thing in cleanup. Until the user allows them,
+// the reports it makes are kept on disk and nothing is sent. Where no reporter
+// is built in, every entry point is a no-op, so the call sites carry no
 // conditions.
 namespace ALCrashReporter
 {
@@ -76,12 +77,28 @@ namespace ALCrashReporter
     // file, so a report filed on the next launch can be joined to the crash.
     const std::string& runId();
 
-    // Consent is a sentinel file in the user's settings directory: present
-    // means reports may be sent. It is what lets the reporter start before
-    // the settings are readable; once they are, they refresh it.
-    std::string consentSentinel();
-    bool consentRecorded(const std::string& sentinel);
-    void recordConsent(const std::string& sentinel, bool allowed);
+    // What the user said about crash reports, as AlchemyCrashReportConsent
+    // holds it.
+    enum class Consent : S32
+    {
+        Unasked = 0,
+        Allowed = 1,
+        Declined = 2,
+    };
+    // A value the setting cannot hold reads as unasked, so the user is asked.
+    Consent consentFromSetting(S32 value);
+
+    // The answer is also kept as files in the user's settings directory,
+    // which is what lets the reporter start before the settings are
+    // readable: crash_reports_allowed or crash_reports_declined, neither
+    // until the user is asked. Two files rather than one holding the answer,
+    // since a build that knows only the first takes it for a yes whatever it
+    // says. Both at once, which only such a build leaves, read as unasked.
+    // The record is written whenever the answer changes; the setting only
+    // reaches disk at a clean exit.
+    std::string consentDirectory();
+    Consent recordedConsent(const std::string& directory);
+    void recordConsent(const std::string& directory, Consent consent);
 
     // What the previous run's static debug file says, for a reporter that
     // only notices a crash on the next launch.
@@ -132,6 +149,9 @@ namespace ALCrashReporter
     void foundCrashReport(std::string_view event_id, std::string_view crashed_run_id);
     // The report the previous run ended with, when one was filed and is known.
     std::optional<PreviousReport> previousReport();
+    // The reports kept for a yes that did not come are deleted, and with
+    // them the one the previous run ended with.
+    void forgetPreviousReport();
 
     // How the previous run ended, when it crashed or froze.
     struct LastRunEnd
@@ -153,13 +173,19 @@ namespace ALCrashReporter
     inline constexpr U32 FATAL_APP_EXIT = 0x40000015; // STATUS_FATAL_APP_EXIT
 
 #if AL_SENTRY
-    // Engages if the sentinel allows it.
+    // Engages unless the record says crash reports were declined; it sends
+    // only when the record allows them.
     bool init();
     // The settings' answer, once readable and whenever it changes: recorded,
-    // and the reporter engaged or closed to match.
-    void refreshConsent(bool allowed);
+    // and the reporter engaged, holding, sending or closed to match. A run
+    // that may not run the reporter (DisableCrashLogger) closes it and keeps
+    // the answer. Declining deletes what was kept.
+    void refreshConsent(Consent consent, bool may_run);
     void shutdown();
+    // Running, whether it sends or keeps its reports.
     bool isEngaged();
+    // Running, and allowed to send.
+    bool isSending();
     void setUser(const LLUUID& id, const std::string& name);
     void setTag(std::string_view key, std::string_view value);
     // A named group of values shown together on every report from here on.
@@ -170,9 +196,10 @@ namespace ALCrashReporter
     bool handleException(void* exception_pointers);
 #else
     inline bool init() { return false; }
-    inline void refreshConsent(bool allowed) { recordConsent(consentSentinel(), allowed); }
+    inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
     inline void shutdown() {}
     inline bool isEngaged() { return false; }
+    inline bool isSending() { return false; }
     inline void setUser(const LLUUID&, const std::string&) {}
     inline void setTag(std::string_view, std::string_view) {}
     inline void setContext(std::string_view,

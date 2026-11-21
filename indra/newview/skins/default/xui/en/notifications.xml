@@ -13907,7 +13907,7 @@ Always Run disabled.
   type="alertmodal">
 Send crash reports to the Alchemy developers?
 
-A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Preferences can change the answer later.
+A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Until you answer, reports of crashes stay on this computer: sending sends them too, and not sending deletes them. Preferences can change the answer later.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"

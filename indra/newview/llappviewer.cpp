@@ -864,24 +864,27 @@ bool LLAppViewer::init()
     }
 
     // The settings hold the answer on crash reports from here: it refreshes
-    // the sentinel the reporter started on, and follows changes to it.
-    // The setting only reaches disk at a clean exit: a run that crashed
-    // after the answer was given left it unasked, while the sentinel kept
-    // the answer. The sentinel's yes becomes the setting's.
-    if (gSavedSettings.getS32("AlchemyCrashReportConsent") == 0
-        && ALCrashReporter::consentRecorded(ALCrashReporter::consentSentinel()))
+    // the record the reporter started on, and follows changes to it.
+    // The record is written whenever the answer changes and the setting only
+    // at a clean exit, so a run that crashed after the answer was given left
+    // the setting behind the record: an answer the record holds is the newer.
+    const ALCrashReporter::Consent recorded_consent =
+        ALCrashReporter::recordedConsent(ALCrashReporter::consentDirectory());
+    if (recorded_consent != ALCrashReporter::Consent::Unasked)
     {
-        gSavedSettings.setS32("AlchemyCrashReportConsent", 1);
+        gSavedSettings.setS32("AlchemyCrashReportConsent", static_cast<S32>(recorded_consent));
     }
-    auto crash_reports_allowed = []()
+    auto refresh_crash_reports = []()
     {
-        return gSavedSettings.getS32("AlchemyCrashReportConsent") == 1 && !LLApp::isCrashloggerDisabled();
+        ALCrashReporter::refreshConsent(
+            ALCrashReporter::consentFromSetting(gSavedSettings.getS32("AlchemyCrashReportConsent")),
+            !LLApp::isCrashloggerDisabled());
     };
-    ALCrashReporter::refreshConsent(crash_reports_allowed());
+    refresh_crash_reports();
     gSavedSettings.getControl("AlchemyCrashReportConsent")->getSignal()->connect(
-        [crash_reports_allowed](LLControlVariable*, const LLSD&, const LLSD&)
+        [refresh_crash_reports](LLControlVariable*, const LLSD&, const LLSD&)
         {
-            ALCrashReporter::refreshConsent(crash_reports_allowed());
+            refresh_crash_reports();
         });
     gAgent.addRegionChangedCallback([]()
     {
