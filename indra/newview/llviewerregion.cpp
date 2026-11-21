@@ -859,7 +859,7 @@ void LLViewerRegion::saveObjectCache()
         instance.writeToCache(mHandle, mImpl->mCacheID, mImpl->mCacheMap, mCacheDirty, removal_enabled);
         // The two files are one cache, so the extras go out with every write
         // of the objects as well as when the overrides change.
-        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
+        instance.writeGenericExtrasToCache(mHandle, mImpl->mCacheID, mImpl->mGLTFOverridesLLSD, mImpl->mCacheMap, mCacheDirty || mGLTFOverridesDirty, removal_enabled);
         mCacheDirty = false;
         mGLTFOverridesDirty = false;
     }
@@ -1244,10 +1244,18 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
             child = entry->getChild();
         }
     }
-    // Kill the assocaited overrides
-    if (mImpl->mGLTFOverridesLLSD.erase(entry->getLocalID()))
+    // An entry killed for rendering is the cached copy of an object that stays in the world, made from the region's
+    // update: it keeps the object's overrides, which the region sends only with the object's full update and which a
+    // face whose material is still fetching has yet to take. An entry killed because its object is gone takes them.
+    const U32 local_id = entry->getLocalID();
+    if (LLVOCacheEntry::killEntryOverrides(local_id, /*object_stays=*/for_rendering, mImpl->mGLTFOverridesLLSD))
     {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " go with its entry" << LL_ENDL;
         mGLTFOverridesDirty = true;
+    }
+    else if (for_rendering && mImpl->mGLTFOverridesLLSD.count(local_id))
+    {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " kept as its entry leaves for an update" << LL_ENDL;
     }
     //will remove it from the object cache, real deletion
     entry->setState(LLVOCacheEntry::INACTIVE);
@@ -3002,6 +3010,17 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         return CACHE_UPDATE_DUPE;
     }
 
+    // The local ID may hold another object than it did, whose overrides are not this one's. They go before anything
+    // is made from the entry, as decodeBoundingInfo makes the object there and then with culling off.
+    const auto drop_overrides_of_another = [this, local_id](const LLVOCacheEntry* held)
+    {
+        if (LLVOCacheEntry::dropOverridesOfAnother(local_id, held->getObjectID(), mImpl->mGLTFOverridesLLSD))
+        {
+            LL_DEBUGS("GLTF") << "Overrides under local ID " << local_id << " in " << getName() << " were another object's, dropped" << LL_ENDL;
+            mGLTFOverridesDirty = true;
+        }
+    };
+
     if (entry)
     {
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
@@ -3028,6 +3047,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
 
             result = CACHE_UPDATE_CHANGED;
         }
+        drop_overrides_of_another(entry);
 
 // [SL:KB] - Patch: World-Derender | Checked: 2014-08-10 (Catznip-3.7)
         if (fUpdateObj)
@@ -3045,6 +3065,7 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLDataPackerB
         record(LLStatViewer::OBJECT_CACHE_HIT_RATE, LLUnits::Ratio::fromValue(0));
 
         mImpl->mCacheMap[local_id] = entry;
+        drop_overrides_of_another(entry);
 
         decodeBoundingInfo(entry);
     }
@@ -3062,15 +3083,23 @@ LLViewerRegion::eCacheUpdateResult LLViewerRegion::cacheFullUpdate(LLViewerObjec
 
 void LLViewerRegion::cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data)
 {
-    U32 local_id = override_data.mLocalId;
-    if (override_data.mSides.size() > 0)
-    { // empty override means overrides were removed from this object
-        mImpl->mGLTFOverridesLLSD[local_id] = std::move(override_data);
-        mGLTFOverridesDirty = true;
-    }
-    else if (mImpl->mGLTFOverridesLLSD.erase(local_id))
+    // An entry with no sides says the region removed the object's overrides. It stays as one, so that a face whose
+    // material was still fetching lets its override go once it can (applyCacheMiscExtras); the cache file keeps no
+    // empty entry, so only a change to what it holds dirties it.
+    auto [iter, added] = mImpl->mGLTFOverridesLLSD.try_emplace(override_data.mLocalId);
+    if (!override_data.mSides.empty() || !iter->second.mSides.empty())
     {
         mGLTFOverridesDirty = true;
+    }
+    iter->second = std::move(override_data);
+}
+
+void LLViewerRegion::holdGLTFOverride(U32 local_id, S32 side)
+{
+    auto iter = mImpl->mGLTFOverridesLLSD.find(local_id);
+    if (iter != mImpl->mGLTFOverridesLLSD.end())
+    {
+        iter->second.hold(side, LLFrameTimer::getTotalSeconds());
     }
 }
 
@@ -4264,27 +4293,53 @@ bool LLViewerRegion::isRegionWebRTCEnabled()
     return false;
 }
 
-void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj)
+void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_DISPLAY;
     llassert(obj);
 
-    U32 local_id = obj->getLocalID();
-    auto iter = mImpl->mGLTFOverridesLLSD.find(local_id);
-    if (iter != mImpl->mGLTFOverridesLLSD.end())
+    // A client-only object is none of the region's, whatever local ID it carries.
+    if (obj->isLocalOnly())
     {
-        // UUID can be inserted null, so backfill the UUID if it was left empty
-        if (iter->second.mObjectId.isNull())
-        {
-            iter->second.mObjectId = obj->getID();
-        }
-        // An entry loaded from the cache carries only the override LLSD until
-        // an object actually needs the materials.
-        iter->second.materialize();
+        return;
+    }
 
-        for (auto& side : iter->second.mGLTFMaterial)
+    // An object the region has sent nothing for keeps what its faces hold.
+    auto iter = mImpl->mGLTFOverridesLLSD.find(obj->getLocalID());
+    if (iter == mImpl->mGLTFOverridesLLSD.end())
+    {
+        return;
+    }
+    LLGLTFOverrideCacheEntry& entry = iter->second;
+
+    // UUID can be inserted null, so backfill the UUID if it was left empty
+    if (entry.mObjectId.isNull())
+    {
+        entry.mObjectId = obj->getID();
+    }
+    // An entry loaded from the cache carries only the override LLSD until
+    // an object actually needs the materials.
+    entry.materialize();
+
+    // The entry is all the region gave the object, so a face it leaves out takes none. A face whose material is
+    // missing or still fetching takes nothing yet (setTEGLTFMaterialOverride); it is asked again once the material
+    // completes (onRenderMaterialFetched). A face waiting on the region's answer to an edit of the viewer's own
+    // shows the edit; the answer reaches it as it replaces the entry (LLGLTFMaterialList::applyOverrideMessage).
+    const F64 now = LLFrameTimer::getTotalSeconds();
+    const S32 num_tes = (S32)obj->getNumTEs();
+    const S32 first = te < 0 ? 0 : te;
+    const S32 last = te < 0 ? num_tes : llmin(te + 1, num_tes);
+    for (S32 i = first; i < last; ++i)
+    {
+        if (entry.isHeld(i, now))
         {
-            obj->setTEGLTFMaterialOverride(side.first, side.second);
+            continue;
+        }
+        const LLTextureEntry* tep = obj->getTE((U8)i);
+        LLGLTFMaterial* wanted = entry.overrideFor(i);
+        if (tep && !LLGLTFOverrideCacheEntry::sameOverride(tep->getGLTFMaterialOverride(), wanted))
+        {
+            obj->setTEGLTFMaterialOverride((U8)i, wanted);
         }
     }
 }

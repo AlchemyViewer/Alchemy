@@ -44,11 +44,17 @@
 // Cache entries
 class LLCamera;
 
+// The overrides a region last sent for one object: every face it lists, and none for the faces it leaves out. An entry
+// with no sides says the region removed the object's overrides; it lives for the session and is never written.
 class LLGLTFOverrideCacheEntry
 {
 public:
     static const std::string VERSION_LABEL;
     static const int VERSION;
+    // How long the faces of an edit the viewer sent for the object wait for the region to answer it, showing the edit
+    // meanwhile. The answer replaces the entry.
+    static constexpr F64 HOLD_SECONDS = 10.0;
+
     bool fromLLSD(const LLSD& data);
     LLSD toLLSD() const;
     // Build mGLTFMaterial from mSides if it has not been built. Loading the
@@ -56,11 +62,26 @@ public:
     // created; the first apply to an object builds them.
     void materialize();
 
+    // The override a face takes from the entry: the region's for it, or none. Built by materialize().
+    LLGLTFMaterial* overrideFor(S32 side) const;
+    // Whether a face holding `held` shows `wanted`: the same override by value, or none on both.
+    static bool sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted);
+
+    // Holds face `side` from the entry's override for HOLD_SECONDS, and the faces held with it for as long; a face held
+    // before the last hold ran out is let go.
+    void hold(S32 side, F64 now);
+    bool isHeld(S32 side, F64 now) const;
+
+    // Whether the entry is for the object `id`: one naming no object is taken to be.
+    bool isFor(const LLUUID& id) const { return mObjectId.isNull() || mObjectId == id; }
+
     LLUUID mObjectId;
     U32    mLocalId = 0;
     boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
     boost::unordered_map<S32, LLPointer<LLGLTFMaterial> > mGLTFMaterial; //GLTF material per side, empty until materialize()
     U64 mRegionHandle = 0;
+    U64 mHeldFaces = 0; // a bit a face
+    F64 mHeldUntil = 0.0;
 };
 
 class LLVOCacheEntry
@@ -139,6 +160,8 @@ public:
     LLDataPackerBinaryBuffer *getDP() const;
     // Whether this entry is the object of this UUID, which its data opens with.
     bool isObject(const LLUUID& id) const;
+    // The UUID the entry's data opens with, its object's; null where the data is too short to hold one.
+    LLUUID getObjectID() const;
     void recordHit();
 
     /*virtual*/ void setOctreeEntry(LLViewerOctreeEntry* entry);
@@ -266,6 +289,15 @@ public:
     // would take them. True where it took any overrides.
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
+
+    // What a kill of an entry takes of its object's glTF overrides: none where the object stays in the world, its entry
+    // killed so that it is made from the region's update, since the region sends them only with the object's full
+    // update; all where the object is gone. True where it took any.
+    static bool killEntryOverrides(U32 local_id, bool object_stays, vocache_gltf_overrides_map_t& overrides);
+
+    // The region sent an entry for local_id holding object_id's data: overrides kept under the local ID for another
+    // object are dropped. True where it dropped any.
+    static bool dropOverridesOfAnother(U32 local_id, const LLUUID& object_id, vocache_gltf_overrides_map_t& overrides);
 
     // Takes this entry off the entry of the parent it names in `entries`, where that entry holds its children: a
     // valid one, or one invalid for a refused update (wasRefused), which keeps them for the object the region's update
@@ -448,7 +480,9 @@ public:
     bool readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map);
 
     void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
-    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, bool dirty_cache, bool removal_enabled);
+    // Writes an override only beside the entry writeToCache writes for its object, given the same map and removal.
+    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map,
+                                   const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
     void removeEntry(U64 handle) ;
     // Removes a region's entry as removeEntry does, once removeRequestedEntries runs: the removal lets go of the
     // region's objects in memory, one of which an object update asking for it is read from.

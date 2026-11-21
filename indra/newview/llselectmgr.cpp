@@ -3331,11 +3331,15 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
 
                 if (tep->getGLTFMaterial())
                 {
-                    LLPointer<LLGLTFMaterial> material = tep->getGLTFMaterialOverride();
-                    if (!material)
+                    // The face changes a copy of its own, as the override it holds may be the region's record of it,
+                    // and the region's overrides wait for the edit, sent or still being dragged, so that a rebuild
+                    // meanwhile does not put the region's back.
+                    const LLGLTFMaterial* held = tep->getGLTFMaterialOverride();
+                    LLPointer<LLGLTFMaterial> material = held ? new LLGLTFMaterial(*held) : new LLGLTFMaterial();
+                    tep->setGLTFMaterialOverride(material);
+                    if (LLViewerRegion* regionp = object->getRegion())
                     {
-                        material = new LLGLTFMaterial();
-                        tep->setGLTFMaterialOverride(material);
+                        regionp->holdGLTFOverride(object->getLocalID(), te_num);
                     }
 
                     F32 scale_x = 1;

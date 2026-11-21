@@ -401,6 +401,9 @@ public:
     eCacheUpdateResult cacheFullUpdate(LLViewerObject* objectp, LLDataPackerBinaryBuffer &dp, U32 flags);
 
     void cacheFullUpdateGLTFOverride(LLGLTFOverrideCacheEntry override_data);
+    // The viewer sent an edit of face `side`'s override: the face keeps what the edit gave it until the region
+    // answers, or LLGLTFOverrideCacheEntry::HOLD_SECONDS pass.
+    void holdGLTFOverride(U32 local_id, S32 side);
 
     LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
     LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
@@ -480,7 +483,9 @@ private:
     LLViewerObject* addNewObject(LLVOCacheEntry* entry);
     void killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list); //adds entry into list if it is safe to move into cache
     void removeFromVOCacheTree(LLVOCacheEntry* entry);
-    void killCacheEntry(LLVOCacheEntry* entry, bool for_rendering = false); //physically delete the cache entry
+    // Physically delete the cache entry. One deleted for rendering, its object made from the region's update, keeps
+    // the object's glTF overrides; one deleted because its object is gone takes them.
+    void killCacheEntry(LLVOCacheEntry* entry, bool for_rendering = false);
     void killInvisibleObjects(F32 max_time);
     void createVisibleObjects();
     void updateVisibleEntries(F32 max_time); //update visible entries
@@ -493,7 +498,9 @@ private:
     bool cacheRemovalRequested() const;
 
 public:
-    void applyCacheMiscExtras(LLViewerObject* obj);
+    // Gives the object's faces, or face `te`, the glTF overrides the region last sent for the object, a face it left
+    // out taking none. An object it has sent none for, and a face whose edit it has yet to answer, keep what they have.
+    void applyCacheMiscExtras(LLViewerObject* obj, S32 te = -1);
 
     struct CompareDistance
     {
