@@ -222,6 +222,23 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             cache.mObjectId = id;
             cache.mRegionHandle = region->getHandle();
 
+            // A face takes its override at once, or waits for a material it has not got or that is still fetching
+            ALGLTFOverrideCounts& counts = region->gltfOverrideCounts();
+            ++counts.mMessages;
+            const auto count_face = [&counts, obj](S32 te, S32 changed)
+            {
+                const LLTextureEntry* tep = obj->getTE((U8)te);
+                const LLFetchedGLTFMaterial* base = tep ? static_cast<const LLFetchedGLTFMaterial*>(tep->getGLTFMaterial()) : nullptr;
+                if (changed)
+                {
+                    ++counts.mFacesSet;
+                }
+                else if (!base || base->isFetching())
+                {
+                    ++counts.mFacesDeferred;
+                }
+            };
+
             auto count = llmin(tes.size(), MAX_TES);
             for (size_t i = 0; i < count; ++i)
             {
@@ -242,7 +259,7 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
 
                 if (obj)
                 {
-                    obj->setTEGLTFMaterialOverride(te, mat);
+                    count_face(te, obj->setTEGLTFMaterialOverride(te, mat));
                     if (obj->getTE(te) && obj->getTE(te)->isSelected())
                     {
                         handle_gltf_override_message.doSelectionCallbacks(id, te);
@@ -258,7 +275,7 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
                     LLTextureEntry* te = obj->getTE(i);
                     if (!has_te[i] && te && te->getGLTFMaterialOverride())
                     {
-                        obj->setTEGLTFMaterialOverride(i, nullptr);
+                        count_face(i, obj->setTEGLTFMaterialOverride(i, nullptr));
                         handle_gltf_override_message.doSelectionCallbacks(id, i);
                     }
                 }
@@ -577,6 +594,56 @@ public:
     LLPointer<LLFetchedGLTFMaterial> mMaterial;
 };
 
+namespace
+{
+    // Decodes a material asset's bytes into the glTF model they carry; false where they carry none
+    bool decode_material_asset(const LLUUID& id, const std::vector<char>& buffer, tinygltf::Model& model)
+    {
+        LL_PROFILE_ZONE_NAMED("gltf deserialize asset");
+
+        LLSD asset;
+
+        boost::iostreams::stream<boost::iostreams::array_source> str(buffer.data(), buffer.size());
+        if (LLSDSerialize::deserialize(asset, str, buffer.size()))
+        {
+            if (asset.has("version") && LLGLTFMaterial::isAcceptedVersion(asset["version"].asString()))
+            {
+                if (asset.has("type") && asset["type"].asString() == LLGLTFMaterial::ASSET_TYPE)
+                {
+                    if (asset.has("data") && asset["data"].isString())
+                    {
+                        std::string data = asset["data"];
+
+                        std::string warn_msg, error_msg;
+
+                        LL_PROFILE_ZONE_SCOPED;
+                        tinygltf::TinyGLTF gltf;
+
+                        if (!gltf.LoadASCIIFromString(&model, &error_msg, &warn_msg, data.c_str(), static_cast<U32>(data.length()), ""))
+                        {
+                            LL_WARNS("GLTF") << "Failed to decode material asset " << id << ": "
+                                << LL_NEWLINE
+                                << warn_msg
+                                << LL_NEWLINE
+                                << error_msg
+                                << LL_ENDL;
+                            return false;
+                        }
+                        return true;
+                    }
+                }
+            }
+            LL_WARNS("GLTF") << "Material asset " << id << " holds no glTF material of a version the viewer reads" << LL_ENDL;
+        }
+        else
+        {
+            LL_WARNS("GLTF") << "Failed to deserialize material LLSD of asset " << id << LL_ENDL;
+        }
+
+        return false;
+    }
+}
+
 void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::EType asset_type, void* user_data, S32 status, LLExtStat ext_status)
 {
     LL_PROFILE_ZONE_NAMED("gltf asset callback");
@@ -585,7 +652,7 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
     if (status != LL_ERR_NOERR)
     {
         LL_WARNS("GLTF") << "Error getting material asset data: " << LLAssetStorage::getErrorString(status) << " (" << status << ") for asset " << id << LL_ENDL;
-        asset_data->mMaterial->materialComplete(false);
+        gGLTFMaterialList.onFetchComplete(id, asset_data->mMaterial, false);
         delete asset_data;
     }
     else
@@ -608,60 +675,27 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
             {
                 LL_PROFILE_ZONE_NAMED("gltf read asset");
                 LLFileSystem file(id, asset_type, LLFileSystem::READ);
-                auto size = file.getSize();
-                if (!size)
+                const S32 size = file.getSize();
+                if (size <= 0)
                 {
                     return false;
                 }
 
                 buffer.resize(size);
-                file.read((U8*)&buffer[0], static_cast<S32>(buffer.size()));
+                if (!file.read((U8*)buffer.data(), size) || file.getLastBytesRead() != size)
+                {
+                    LL_WARNS("GLTF") << "Failed to read material asset " << id << LL_ENDL;
+                    return false;
+                }
             }
 
+            if (!decode_material_asset(id, buffer, asset_data->mModelIn))
             {
-                LL_PROFILE_ZONE_NAMED("gltf deserialize asset");
-
-                LLSD asset;
-
-                // read file into buffer
-                boost::iostreams::stream<boost::iostreams::array_source> str(buffer.data(), buffer.size());
-                if (LLSDSerialize::deserialize(asset, str, buffer.size()))
-                {
-                    if (asset.has("version") && LLGLTFMaterial::isAcceptedVersion(asset["version"].asString()))
-                    {
-                        if (asset.has("type") && asset["type"].asString() == LLGLTFMaterial::ASSET_TYPE)
-                        {
-                            if (asset.has("data") && asset["data"].isString())
-                            {
-                                std::string data = asset["data"];
-
-                                std::string warn_msg, error_msg;
-
-                                LL_PROFILE_ZONE_SCOPED;
-                                tinygltf::TinyGLTF gltf;
-
-                                if (!gltf.LoadASCIIFromString(&asset_data->mModelIn, &error_msg, &warn_msg, data.c_str(), static_cast<U32>(data.length()), ""))
-                                {
-                                    LL_WARNS("GLTF") << "Failed to decode material asset: "
-                                        << LL_NEWLINE
-                                        << warn_msg
-                                        << LL_NEWLINE
-                                        << error_msg
-                                        << LL_ENDL;
-                                    return false;
-                                }
-                                return true;
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    LL_WARNS("GLTF") << "Failed to deserialize material LLSD" << LL_ENDL;
-                }
+                // The cached copy goes, so that a retry downloads the asset again rather than read the same bytes
+                LLFileSystem::removeFile(id, asset_type);
+                return false;
             }
-
-            return false;
+            return true;
         },
             [id, asset_data = owned_data](bool result) // Callback to main thread
             {
@@ -675,8 +709,98 @@ void LLGLTFMaterialList::onAssetLoadComplete(const LLUUID& id, LLAssetType::ETyp
                 LL_DEBUGS("GLTF") << "Failed to get material " << id << LL_ENDL;
             }
 
-            asset_data->mMaterial->materialComplete(true);
+            gGLTFMaterialList.onFetchComplete(id, asset_data->mMaterial, result);
         });
+    }
+}
+
+// static
+void LLGLTFMaterialList::fetchAsset(const LLUUID& id, LLFetchedGLTFMaterial* material)
+{
+    material->materialBegin();
+
+    AssetLoadUserData* user_data = new AssetLoadUserData();
+    user_data->mMaterial = material;
+
+    gAssetStorage->getAssetData(id, LLAssetType::AT_MATERIAL, onAssetLoadComplete, (void*)user_data);
+}
+
+void LLGLTFMaterialList::onFetchComplete(const LLUUID& id, LLFetchedGLTFMaterial* material, bool success)
+{
+    ALGLTFMaterialRetry& retry = material->mFetchCompletion.mRetry;
+    if (success)
+    {
+        retry.reset();
+    }
+    else
+    {
+        // A retry finds the material by its ID, so one the list no longer holds under it is given up
+        const uuid_mat_map_t::const_iterator iter = mList.find(id);
+        const std::optional<F64> due = (iter != mList.end() && iter->second.get() == material)
+            ? retry.recordFailure(LLFrameTimer::getTotalSeconds())
+            : std::nullopt;
+        if (due)
+        {
+            // An entry left under the ID by a material the list has since let go of is replaced
+            std::erase_if(mPendingRetries, [&id](const PendingRetry& pending) { return pending.mID == id; });
+            mPendingRetries.push_back({ id, *due });
+            LL_DEBUGS("GLTF") << "Material " << id << " is fetched again at " << *due << LL_ENDL;
+        }
+        else
+        {
+            retry.giveUp();
+            LL_WARNS("GLTF") << "Material " << id << " failed and is not fetched again this session" << LL_ENDL;
+        }
+    }
+
+    material->materialComplete(success);
+}
+
+void LLGLTFMaterialList::retryFailedMaterials()
+{
+    if (mPendingRetries.empty())
+    {
+        return;
+    }
+
+    LL_PROFILE_ZONE_SCOPED;
+    const F64 now = LLFrameTimer::getTotalSeconds();
+
+    // The fetches start once the walk is done, since one the asset storage fails at once schedules its next retry
+    std::vector<std::pair<LLUUID, LLPointer<LLFetchedGLTFMaterial>>> due;
+    for (auto it = mPendingRetries.begin(); it != mPendingRetries.end();)
+    {
+        if (now < it->mDue)
+        {
+            ++it;
+            continue;
+        }
+
+        // An entry whose material the list has let go of, or that is no longer awaiting a retry, goes
+        const uuid_mat_map_t::iterator iter = mList.find(it->mID);
+        if (iter == mList.end() || iter->second->isFetching() || !iter->second->mFetchCompletion.mRetry.isPending())
+        {
+            it = mPendingRetries.erase(it);
+            continue;
+        }
+
+        // A material only the list holds is not fetched again. Its entry stays, and is looked at again each frame
+        // until something takes the material up or the list lets it go.
+        LLFetchedGLTFMaterial* material = iter->second;
+        if (!material->mFetchCompletion.mRetry.isDue(now) || material->getNumRefs() == 1)
+        {
+            ++it;
+            continue;
+        }
+
+        due.emplace_back(iter->first, material);
+        it = mPendingRetries.erase(it);
+    }
+
+    for (const auto& [id, material] : due)
+    {
+        LL_DEBUGS("GLTF") << "Fetching material " << id << " again" << LL_ENDL;
+        fetchAsset(id, material);
     }
 }
 
@@ -692,12 +816,7 @@ LLFetchedGLTFMaterial* LLGLTFMaterialList::getMaterial(const LLUUID& id)
 
         if (!mat->mFetching)
         {
-            mat->materialBegin();
-
-            AssetLoadUserData *user_data = new AssetLoadUserData();
-            user_data->mMaterial = mat;
-
-            gAssetStorage->getAssetData(id, LLAssetType::AT_MATERIAL, onAssetLoadComplete, (void*)user_data);
+            fetchAsset(id, mat);
         }
 
         return mat;
@@ -774,6 +893,8 @@ void LLGLTFMaterialList::flushMaterials()
     {
         mLastUpdateKey.setNull();
     }
+
+    retryFailedMaterials();
 
     {
         using namespace LLStatViewer;

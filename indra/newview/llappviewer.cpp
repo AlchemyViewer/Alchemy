@@ -5135,7 +5135,7 @@ U32 LLAppViewer::getObjectCacheVersion()
 {
     // Viewer object cache version, change if object update
     // format changes. JC
-    const U32 INDRA_OBJECT_CACHE_VERSION = 20;
+    const U32 INDRA_OBJECT_CACHE_VERSION = 21;
 
     return INDRA_OBJECT_CACHE_VERSION;
 }

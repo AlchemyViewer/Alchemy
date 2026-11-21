@@ -32,6 +32,7 @@
 #include "lldir.h"
 #include "llvieweroctree.h"
 #include "llgltfmaterial.h"
+#include "algltfoverridestate.h"
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered/unordered_node_map.hpp>
@@ -49,8 +50,6 @@ class LLCamera;
 class LLGLTFOverrideCacheEntry
 {
 public:
-    static const std::string VERSION_LABEL;
-    static const int VERSION;
     // How long the faces of an edit the viewer sent for the object wait for the region to answer it, showing the edit
     // meanwhile. The answer replaces the entry.
     static constexpr F64 HOLD_SECONDS = 10.0;
@@ -75,6 +74,10 @@ public:
     // Whether the entry is for the object `id`: one naming no object is taken to be.
     bool isFor(const LLUUID& id) const { return mObjectId.isNull() || mObjectId == id; }
 
+    // The state of face `side`, holding `held`, against `entry` (null where the region has sent nothing), its
+    // materials built by materialize().
+    static ALGLTFOverrideFaceState faceState(const LLGLTFOverrideCacheEntry* entry, S32 side, const LLGLTFMaterial* held, F64 now);
+
     LLUUID mObjectId;
     U32    mLocalId = 0;
     boost::unordered_map<S32, LLSD> mSides; //override LLSD per side
@@ -83,6 +86,7 @@ public:
     U64 mHeldFaces = 0; // a bit a face
     F64 mHeldUntil = 0.0;
 };
+
 
 class LLVOCacheEntry
 :   public LLViewerOctreeEntryData
@@ -474,22 +478,19 @@ public:
     void initCache(ELLPath location, U32 size, U32 cache_version);
     void removeCache(ELLPath location, bool started = false) ;
 
-    bool readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map) ;
-    // Neither read touches the region or the object list; each reports whether
-    // the file was usable and leaves removal to the caller.
-    bool readGenericExtrasFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map);
-
-    void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
-    // Writes an override only beside the entry writeToCache writes for its object, given the same map and removal.
-    void writeGenericExtrasToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_gltf_overrides_map_t& cache_extras_entry_map,
-                                   const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map, bool dirty_cache, bool removal_enabled);
+    // A region's objects and the glTF overrides kept beside them are one file, read and written whole. The read
+    // touches neither the region nor the object list, reports whether the file was usable, and leaves removal to the
+    // caller; the write keeps an override only beside the object entry it writes.
+    bool readFromCache(U64 handle, const LLUUID& id, LLVOCacheEntry::vocache_entry_map_t& cache_entry_map,
+                       LLVOCacheEntry::vocache_gltf_overrides_map_t& overrides);
+    void writeToCache(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& cache_entry_map,
+                      const LLVOCacheEntry::vocache_gltf_overrides_map_t& overrides, bool dirty_cache, bool removal_enabled);
     void removeEntry(U64 handle) ;
     // Removes a region's entry as removeEntry does, once removeRequestedEntries runs: the removal lets go of the
     // region's objects in memory, one of which an object update asking for it is read from.
     void requestRemoval(U64 handle);
     bool isRemovalRequested(U64 handle) const;
     void removeRequestedEntries();
-    void removeGenericExtrasForHandle(U64 handle);
 
     U32 getCacheEntries() { return mNumEntries; }
     U32 getCacheEntriesMax() { return mCacheSize; }
@@ -498,7 +499,6 @@ private:
     void setDirNames(ELLPath location);
     // determine the cache filename for the region from the region handle
     std::filesystem::path getObjectCacheFilename(U64 handle);
-    std::filesystem::path getObjectCacheExtrasFilename(U64 handle);
     void removeFromCache(HeaderEntryInfo* entry);
     void readCacheHeader();
     void writeCacheHeader();

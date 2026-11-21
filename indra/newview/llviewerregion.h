@@ -44,6 +44,7 @@
 #include "llframetimer.h"
 #include "llreflectionmap.h"
 #include "llpointer.h"
+#include "algltfoverridestate.h"
 
 // Surface id's
 #define LAND  1
@@ -404,6 +405,9 @@ public:
     // The viewer sent an edit of face `side`'s override: the face keeps what the edit gave it until the region
     // answers, or LLGLTFOverrideCacheEntry::HOLD_SECONDS pass.
     void holdGLTFOverride(U32 local_id, S32 side);
+    // How face `te` of the object stands against the overrides the region sent for it.
+    ALGLTFOverrideFaceState gltfOverrideState(const LLViewerObject* obj, S32 te);
+    ALGLTFOverrideCounts& gltfOverrideCounts() { return mGLTFOverrideCounts; }
 
     LLVOCacheEntry* getCacheEntryForOctree(U32 local_id);
     LLVOCacheEntry* getCacheEntry(U32 local_id, bool valid = true);
@@ -635,6 +639,7 @@ public:
     bool                                    mCacheLoaded;
     bool                                    mCacheDirty;
     bool                                    mGLTFOverridesDirty;
+    ALGLTFOverrideCounts                    mGLTFOverrideCounts;
     bool    mAlive;                 // can become false if circuit disconnects
     bool    mRetiring = false;
     bool    mSimulatorFeaturesReceived;
