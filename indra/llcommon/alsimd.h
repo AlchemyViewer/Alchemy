@@ -854,22 +854,58 @@ AL_SIMD_INLINE f32x4 div(f32x4 a, f32x4 b)
 }
 
 // The sign bit flipped, so that a negated zero is a negative zero even where
-// the build lets the compiler ignore the sign of zero.
+// the build lets the compiler ignore the sign of zero. On x86 the flip is an
+// integer xor of an integer mask: /fp:fast lets MSVC take a float-typed sign
+// mask for zero however it is built, and MSVC 14.52 for x64 does, for
+// _mm_set1_ps(-0.f) and set1_bits(0x80000000) alike, leaving an xor that
+// flips nothing. An integer operation is none of the float operations it may
+// rewrite.
 AL_SIMD_INLINE f32x4 neg(f32x4 a)
 {
 #if AL_SIMD_X86
-    return _mm_xor_ps(a, _mm_set1_ps(-0.f));
+    return _mm_castsi128_ps(_mm_xor_si128(_mm_castps_si128(a), _mm_set1_epi32(INT32_MIN)));
 #else
     return vnegq_f32(a);
 #endif
 }
 
+// The sign bit cleared, as an integer operation for neg's reason.
 AL_SIMD_INLINE f32x4 abs(f32x4 a)
 {
 #if AL_SIMD_X86
-    return _mm_andnot_ps(_mm_set1_ps(-0.f), a);
+    return _mm_castsi128_ps(_mm_and_si128(_mm_castps_si128(a), _mm_set1_epi32(INT32_MAX)));
 #else
     return vabsq_f32(a);
+#endif
+}
+
+// The sign bits of the lanes named flipped, and the rest left, as neg flips
+// them: LLQuaternion2's conjugate flips x, y and z, and its product flips w.
+template <bool X, bool Y, bool Z, bool W>
+AL_SIMD_INLINE f32x4 flip_signs(f32x4 a)
+{
+#if AL_SIMD_X86
+    return _mm_castsi128_ps(_mm_xor_si128(_mm_castps_si128(a), _mm_setr_epi32(X ? INT32_MIN : 0, Y ? INT32_MIN : 0,
+                                                                                Z ? INT32_MIN : 0, W ? INT32_MIN : 0)));
+#else
+    uint32x4_t sign = vdupq_n_u32(0u);
+    if constexpr (X)
+    {
+        sign = vsetq_lane_u32(0x80000000u, sign, 0);
+    }
+    if constexpr (Y)
+    {
+        sign = vsetq_lane_u32(0x80000000u, sign, 1);
+    }
+    if constexpr (Z)
+    {
+        sign = vsetq_lane_u32(0x80000000u, sign, 2);
+    }
+    if constexpr (W)
+    {
+        sign = vsetq_lane_u32(0x80000000u, sign, 3);
+    }
+    return vreinterpretq_f32_u32(veorq_u32(vreinterpretq_u32_f32(a), sign));
 #endif
 }
 
