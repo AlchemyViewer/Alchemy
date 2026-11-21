@@ -4118,6 +4118,15 @@ void LLAppearanceMgr::requestServerAppearanceUpdate()
     {
         // Shedule update
         mRerequestAppearanceBake = true;
+        // A current outfit of unknown version is asked for, so that the update waits on nothing else.
+        // fetch() asks only once its last request has had its time, however often this is asked.
+        if (getCOFVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+        {
+            if (LLViewerInventoryCategory* cof = gInventory.getCategory(getCOF()))
+            {
+                cof->fetch();
+            }
+        }
     }
 }
 
