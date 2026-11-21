@@ -26,6 +26,7 @@
 
 #include "llerror.h"
 #include "llsd.h"
+#include "llstl.h"
 #include "lluuid.h"
 
 #include <boost/unordered/unordered_flat_map.hpp>
@@ -68,29 +69,62 @@ public:
         bool   link = false;
     };
 
+    // A folder's children as the model holds them, from its arrays of
+    // folders and items, either of which may be null.
+    template <typename Categories, typename Items>
+    static std::vector<Child> children(const Categories* categories, const Items* items);
+
+    // The children of a folder of the kinds a listing covers that `listed`
+    // doesn't name: each one, or under a listing of links alone each link.
+    static uuid_vec_t unnamed(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed);
+
     // The children of a folder held at `held_version` that a reply's
     // listing of it at `listed_version` leaves out, which the folder no
-    // longer holds: each one `listed` doesn't name, or under a listing of
-    // links alone each such link. None where the listing's version is
+    // longer holds: those unnamed(). None where the listing's version is
     // unknown or older than the folder held, which a change the viewer
     // made since may have outrun.
     static uuid_vec_t unlisted(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed,
                                S32 listed_version, S32 held_version);
 
+    // A reply's listing of one folder, read against what the folder held.
+    struct FolderListing
+    {
+        LLUUID     folder_id;
+        uuid_vec_t unlisted;        // what unlisted() leaves out
+        bool       unnamed = false; // whether unnamed() leaves anything out
+    };
+
+    // Reads a reply's listing of `folder_id` against `children`, as
+    // unlisted() and unnamed() read it.
+    static FolderListing readListing(const LLUUID& folder_id, const std::vector<Child>& children, Listing listing,
+                                     const uuid_set_t& listed, S32 listed_version, S32 held_version);
+
     // The changes made to what folders hold, in all: an object made in a
     // folder, moved into or out of it, or removed from it, by the viewer
-    // or by a reply. The inventory model notes each one.
+    // or by a reply. The inventory model makes each through attach() or
+    // detach(), which note it, or notes it.
     class ContentChanges
     {
     public:
         // How far the changes have come, which a request notes as it goes.
         U64 stamp() const { return mCount; }
 
-        // Notes that what `folder_id` holds changed.
-        void note(const LLUUID& folder_id);
+        // Notes that what `folder_id` holds changed at `now`, in seconds.
+        void note(const LLUUID& folder_id, F64 now);
 
-        // Whether what `folder_id` holds changed after `stamp`.
-        bool changedSince(const LLUUID& folder_id, U64 stamp) const;
+        // Puts `child` into `folder_id`'s array, where the model holds one,
+        // and notes the change.
+        template <typename Array, typename Element>
+        void attach(Array* array, const Element& child, const LLUUID& folder_id, F64 now);
+
+        // Takes `child` out of `folder_id`'s array, where the model holds
+        // one, and notes the change.
+        template <typename Array, typename Element>
+        void detach(Array* array, const Element& child, const LLUUID& folder_id, F64 now);
+
+        // Whether what `folder_id` holds changed after `stamp`, or after
+        // `since` seconds.
+        bool changedSince(const LLUUID& folder_id, U64 stamp, F64 since) const;
 
         // Forgets a folder that has gone.
         void forget(const LLUUID& folder_id);
@@ -99,41 +133,67 @@ public:
         void clear();
 
     private:
-        U64                                    mCount = 0;
-        boost::unordered_flat_map<LLUUID, U64> mLastChange;
+        struct Change
+        {
+            U64 count = 0;
+            F64 at    = 0.0;
+        };
+
+        U64                                       mCount = 0;
+        boost::unordered_flat_map<LLUUID, Change> mLastChange;
     };
 
     // A request whose reply may list folders whole. The reply is written
     // before any change made after the request went, so it doesn't list
     // what such a change put in a folder, and the version it gives such a
     // folder is not the folder's as the viewer holds it, which a change
-    // the viewer made need not have raised.
+    // the viewer made need not have raised. Nor need it list a change made
+    // shortly before, which reached the server another way: a move goes
+    // over UDP to the region, a fetch over HTTP to the inventory service.
     class Request
     {
     public:
-        // As the request goes.
-        explicit Request(const ContentChanges& changes);
+        // How long before a request a change may still be missing from its
+        // reply.
+        static constexpr F64 GRACE_SECONDS = 10.0;
+
+        // As the request is asked for, at `now` in seconds.
+        Request(const ContentChanges& changes, F64 now);
 
         // As the reply comes, before any of it is applied, since applying
         // it changes the folders it lists too: spares each of
-        // `listed_folders` whose contents changed after the request went.
+        // `listed_folders` whose contents changed after the request was
+        // asked for, or within GRACE_SECONDS before.
         void spareChanged(const ContentChanges& changes, const uuid_vec_t& listed_folders);
 
         // Whether the reply leaves `folder_id` holding whatever it doesn't
         // list, rather than removing it as unlisted() would.
         bool spares(const LLUUID& folder_id) const;
 
-        // Once the reply is applied: has each folder it spared fetched
-        // again, by forgetting the version the reply gave it, as
-        // markOutOfStep does. `find(folder_id)` is a pointer to the folder,
-        // or null where it has gone.
-        template <typename FindFolder>
-        void forgetSpared(FindFolder&& find) const;
+        // What applying a listing does to its folder.
+        struct Applied
+        {
+            uuid_vec_t removed;             // the children to remove
+            bool       out_of_step = false; // to fetch again, once the reply is applied
+        };
+
+        // What applying `listing` does to its folder: removes what it
+        // leaves out; or where the folder is spared, removes nothing, and
+        // where it holds what the listing doesn't name, has it fetched
+        // again.
+        Applied apply(const FolderListing& listing) const;
 
     private:
-        U64        mSent = 0;
+        U64        mSent   = 0;
+        F64        mSentAt = 0.0;
         uuid_set_t mSpared;
     };
+
+    // Has a folder found out of step with the reply just applied fetched
+    // again now: forgets the version the reply gave it, so that it reads as
+    // not fetched until the new reply comes, and calls `fetch()`.
+    template <typename Folder, typename Fetch>
+    static void fetchAgain(Folder& folder, Fetch&& fetch);
 
     // The folders an inventory's cache keeps, from its root down through
     // the folders of the root's owner, in the order met: each complete
@@ -176,16 +236,52 @@ void ALInventorySync::markOutOfStep(Folder& folder)
     }
 }
 
-template <typename FindFolder>
-void ALInventorySync::Request::forgetSpared(FindFolder&& find) const
+template <typename Categories, typename Items>
+std::vector<ALInventorySync::Child> ALInventorySync::children(const Categories* categories, const Items* items)
 {
-    for (const LLUUID& folder_id : mSpared)
+    std::vector<Child> held;
+    if (categories)
     {
-        if (auto* folder = find(folder_id))
+        for (const auto& category : *categories)
         {
-            markOutOfStep(*folder);
+            held.push_back({ category->getUUID(), false });
         }
     }
+    if (items)
+    {
+        for (const auto& item : *items)
+        {
+            held.push_back({ item->getUUID(), item->getIsLinkType() });
+        }
+    }
+    return held;
+}
+
+template <typename Array, typename Element>
+void ALInventorySync::ContentChanges::attach(Array* array, const Element& child, const LLUUID& folder_id, F64 now)
+{
+    if (array)
+    {
+        array->push_back(child);
+        note(folder_id, now);
+    }
+}
+
+template <typename Array, typename Element>
+void ALInventorySync::ContentChanges::detach(Array* array, const Element& child, const LLUUID& folder_id, F64 now)
+{
+    if (array)
+    {
+        vector_replace_with_last(*array, child);
+        note(folder_id, now);
+    }
+}
+
+template <typename Folder, typename Fetch>
+void ALInventorySync::fetchAgain(Folder& folder, Fetch&& fetch)
+{
+    folder.setVersion(VERSION_UNKNOWN);
+    fetch();
 }
 
 template <typename ParentOwner>

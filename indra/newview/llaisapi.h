@@ -101,9 +101,10 @@ private:
     static std::string getInvCap();
     static std::string getLibCap();
 
+    // `request` is noted as the command is asked for, before it is queued.
     static void InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter,
         invokationFn_t invoke, std::string url, LLUUID targetId, LLSD body,
-        completion_t callback, COMMAND_TYPE type);
+        completion_t callback, COMMAND_TYPE type, ALInventorySync::Request request);
 
     typedef std::pair<std::string, LLCoprocedureManager::CoProcedure_t> ais_query_item_t;
     static std::list<ais_query_item_t> sPostponedQuery;
@@ -159,14 +160,11 @@ private:
     deferred_category_map_t mCategoriesCreated;
     deferred_category_map_t mCategoriesUpdated;
 
-    // What a fetched folder held that the fetch's listing of it left out:
-    // each child's id and the folder's.
-    std::vector<std::pair<LLUUID, LLUUID>> mChildrenUnlisted;
-    // Each folder a fetch's listing was read for, whether or not it left
-    // anything out.
-    uuid_vec_t mFoldersListed;
+    // Each folder a fetch listed whole, read against what the model held
+    // as the reply was read.
+    std::vector<ALInventorySync::FolderListing> mListings;
     // The request this is the reply to, which spares the folders listed
-    // that changed after it went.
+    // that changed after it was asked for.
     ALInventorySync::Request mRequest;
 
     // These keep track of uuid's mentioned in meta values.

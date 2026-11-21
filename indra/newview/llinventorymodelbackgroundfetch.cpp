@@ -153,7 +153,7 @@ public:
         : LLCore::HttpHandler(),
           mRequestSD(request_sd),
           mRecursiveCatUUIDs(recursive_cats),
-          mRequest(gInventory.getContentChanges())
+          mRequest(gInventory.getContentChanges(), LLFrameTimer::getTotalSeconds())
         {
             LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
         }
@@ -182,7 +182,7 @@ private:
     const uuid_vec_t mRecursiveCatUUIDs; // hack for storing away which cat fetches are recursive
     // How far the changes to what folders hold had come as the request
     // went, made just before it is posted, which spares the folders of the
-    // reply that changed after.
+    // reply that changed after or shortly before.
     ALInventorySync::Request mRequest;
 };
 
@@ -1413,8 +1413,8 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
         std::vector<std::tuple<LLUUID, S32, S32>> listed_folders;
 
         // Which folders the reply lists that changed after the request
-        // went, read before any of the reply is applied, since applying it
-        // changes them too.
+        // was posted, or shortly before, read before any of the reply is
+        // applied, since applying it changes them too.
         uuid_vec_t folder_ids;
         for (LLSD::array_const_iterator folder_it = folders.beginArray(); folder_it != folders.endArray(); ++folder_it)
         {
@@ -1530,44 +1530,36 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
 
         // What each folder listed still holds that the reply lists nowhere,
         // once what it moved elsewhere has moved.
+        uuid_vec_t out_of_step;
         for (const auto& [folder_id, listed_version, held_version] : listed_folders)
         {
-            // Unless the folder changed after the request went, which the
-            // reply, written before, doesn't list.
-            if (mRequest.spares(folder_id))
-            {
-                continue;
-            }
             LLInventoryModel::cat_array_t* categories = nullptr;
             LLInventoryModel::item_array_t* items = nullptr;
             gInventory.getDirectDescendentsOf(folder_id, categories, items);
-            std::vector<ALInventorySync::Child> children;
-            if (categories)
-            {
-                for (const LLPointer<LLViewerInventoryCategory>& category : *categories)
-                {
-                    children.push_back({ category->getUUID(), false });
-                }
-            }
-            if (items)
-            {
-                for (const LLPointer<LLViewerInventoryItem>& item : *items)
-                {
-                    children.push_back({ item->getUUID(), item->getIsLinkType() });
-                }
-            }
-            for (const LLUUID& child_id : ALInventorySync::unlisted(children, ALInventorySync::Listing::Whole, listed,
-                                                                    listed_version, held_version))
+            const ALInventorySync::Request::Applied applied = mRequest.apply(
+                ALInventorySync::readListing(folder_id, ALInventorySync::children(categories, items),
+                                             ALInventorySync::Listing::Whole, listed, listed_version, held_version));
+            for (const LLUUID& child_id : applied.removed)
             {
                 LL_DEBUGS(LOG_INV) << "removed " << child_id << ", which fetched folder " << folder_id
                                    << " no longer lists" << LL_ENDL;
                 gInventory.onObjectDeletedFromServer(child_id, false, false, false);
             }
+            if (applied.out_of_step)
+            {
+                out_of_step.push_back(folder_id);
+            }
         }
 
-        // Each folder spared forgets the version the reply gave it, and is
-        // fetched again.
-        mRequest.forgetSpared([](const LLUUID& folder_id) { return gInventory.getCategory(folder_id); });
+        // A folder that changed while the request was out, and holds what
+        // the reply doesn't name, is fetched again now.
+        for (const LLUUID& folder_id : out_of_step)
+        {
+            if (LLViewerInventoryCategory* cat = gInventory.getCategory(folder_id))
+            {
+                ALInventorySync::fetchAgain(*cat, [fetcher, &folder_id] { fetcher->start(folder_id, false); });
+            }
+        }
     }
 
     if (content.has("bad_folders"))

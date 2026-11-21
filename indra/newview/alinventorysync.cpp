@@ -66,14 +66,9 @@ uuid_set_t ALInventorySync::embeddedIds(const LLSD& embedded, Listing listing)
 }
 
 // static
-uuid_vec_t ALInventorySync::unlisted(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed,
-                                     S32 listed_version, S32 held_version)
+uuid_vec_t ALInventorySync::unnamed(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed)
 {
     uuid_vec_t left_out;
-    if (listed_version == VERSION_UNKNOWN || (held_version != VERSION_UNKNOWN && listed_version < held_version))
-    {
-        return left_out;
-    }
     for (const Child& child : children)
     {
         if ((listing == Listing::Whole || child.link) && !listed.contains(child.id))
@@ -84,15 +79,38 @@ uuid_vec_t ALInventorySync::unlisted(const std::vector<Child>& children, Listing
     return left_out;
 }
 
-void ALInventorySync::ContentChanges::note(const LLUUID& folder_id)
+// static
+uuid_vec_t ALInventorySync::unlisted(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed,
+                                     S32 listed_version, S32 held_version)
 {
-    mLastChange[folder_id] = ++mCount;
+    if (listed_version == VERSION_UNKNOWN || (held_version != VERSION_UNKNOWN && listed_version < held_version))
+    {
+        return {};
+    }
+    return unnamed(children, listing, listed);
 }
 
-bool ALInventorySync::ContentChanges::changedSince(const LLUUID& folder_id, U64 stamp) const
+// static
+ALInventorySync::FolderListing ALInventorySync::readListing(const LLUUID& folder_id, const std::vector<Child>& children,
+                                                            Listing listing, const uuid_set_t& listed,
+                                                            S32 listed_version, S32 held_version)
+{
+    FolderListing read;
+    read.folder_id = folder_id;
+    read.unlisted  = unlisted(children, listing, listed, listed_version, held_version);
+    read.unnamed   = !unnamed(children, listing, listed).empty();
+    return read;
+}
+
+void ALInventorySync::ContentChanges::note(const LLUUID& folder_id, F64 now)
+{
+    mLastChange[folder_id] = { ++mCount, now };
+}
+
+bool ALInventorySync::ContentChanges::changedSince(const LLUUID& folder_id, U64 stamp, F64 since) const
 {
     const auto found = mLastChange.find(folder_id);
-    return found != mLastChange.end() && found->second > stamp;
+    return found != mLastChange.end() && (found->second.count > stamp || found->second.at > since);
 }
 
 void ALInventorySync::ContentChanges::forget(const LLUUID& folder_id)
@@ -105,8 +123,9 @@ void ALInventorySync::ContentChanges::clear()
     mLastChange.clear();
 }
 
-ALInventorySync::Request::Request(const ContentChanges& changes)
+ALInventorySync::Request::Request(const ContentChanges& changes, F64 now)
 : mSent(changes.stamp())
+, mSentAt(now)
 {
 }
 
@@ -114,7 +133,7 @@ void ALInventorySync::Request::spareChanged(const ContentChanges& changes, const
 {
     for (const LLUUID& folder_id : listed_folders)
     {
-        if (changes.changedSince(folder_id, mSent))
+        if (changes.changedSince(folder_id, mSent, mSentAt - GRACE_SECONDS))
         {
             mSpared.insert(folder_id);
         }
@@ -124,6 +143,20 @@ void ALInventorySync::Request::spareChanged(const ContentChanges& changes, const
 bool ALInventorySync::Request::spares(const LLUUID& folder_id) const
 {
     return mSpared.contains(folder_id);
+}
+
+ALInventorySync::Request::Applied ALInventorySync::Request::apply(const FolderListing& listing) const
+{
+    Applied applied;
+    if (spares(listing.folder_id))
+    {
+        applied.out_of_step = listing.unnamed;
+    }
+    else
+    {
+        applied.removed = listing.unlisted;
+    }
+    return applied;
 }
 
 // static

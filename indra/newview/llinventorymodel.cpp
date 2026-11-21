@@ -1585,14 +1585,9 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
         if(old_parent_id != new_parent_id)
         {
             // need to update the parent-child tree
-            item_array_t* item_array;
-            item_array = get_ptr_in_map(mParentChildItemTree, old_parent_id);
-            if(item_array)
-            {
-                vector_replace_with_last(*item_array, old_item);
-                mContentChanges.note(old_parent_id);
-            }
-            item_array = get_ptr_in_map(mParentChildItemTree, new_parent_id);
+            mContentChanges.detach(get_ptr_in_map(mParentChildItemTree, old_parent_id), old_item, old_parent_id,
+                                   LLFrameTimer::getTotalSeconds());
+            item_array_t* item_array = get_ptr_in_map(mParentChildItemTree, new_parent_id);
             if(item_array)
             {
                 if (update_parent_on_server)
@@ -1600,8 +1595,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
                     LLInventoryModel::LLCategoryUpdate update(new_parent_id, 1);
                     gInventory.accountForUpdate(update);
                 }
-                item_array->push_back(old_item);
-                mContentChanges.note(new_parent_id);
+                mContentChanges.attach(item_array, old_item, new_parent_id, LLFrameTimer::getTotalSeconds());
             }
             mask |= LLInventoryObserver::STRUCTURE;
         }
@@ -1646,8 +1640,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
 
                 // *FIX: bit of a hack to call update server from here...
                 new_item->updateParentOnServer(false);
-                item_array->push_back(new_item);
-                mContentChanges.note(category_id);
+                mContentChanges.attach(item_array, new_item, category_id, LLFrameTimer::getTotalSeconds());
             }
             else
             {
@@ -1675,8 +1668,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
             item_array_t* item_array = get_ptr_in_map(mParentChildItemTree, parent_id);
             if(item_array)
             {
-                item_array->push_back(new_item);
-                mContentChanges.note(parent_id);
+                mContentChanges.attach(item_array, new_item, parent_id, LLFrameTimer::getTotalSeconds());
             }
             else
             {
@@ -1693,8 +1685,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
                     // *FIX: bit of a hack to call update server from
                     // here...
                     new_item->updateParentOnServer(false);
-                    item_array->push_back(new_item);
-                    mContentChanges.note(parent_id);
+                    mContentChanges.attach(item_array, new_item, parent_id, LLFrameTimer::getTotalSeconds());
                 }
                 else
                 {
@@ -1785,19 +1776,9 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
         if(old_parent_id != new_parent_id)
         {
             // need to update the parent-child tree
-            cat_array_t* cat_array;
-            cat_array = getUnlockedCatArray(old_parent_id);
-            if(cat_array)
-            {
-                vector_replace_with_last(*cat_array, old_cat);
-                mContentChanges.note(old_parent_id);
-            }
-            cat_array = getUnlockedCatArray(new_parent_id);
-            if(cat_array)
-            {
-                cat_array->push_back(old_cat);
-                mContentChanges.note(new_parent_id);
-            }
+            const F64 now = LLFrameTimer::getTotalSeconds();
+            mContentChanges.detach(getUnlockedCatArray(old_parent_id), old_cat, old_parent_id, now);
+            mContentChanges.attach(getUnlockedCatArray(new_parent_id), old_cat, new_parent_id, now);
             mask |= LLInventoryObserver::STRUCTURE;
             mask |= LLInventoryObserver::INTERNAL;
         }
@@ -1840,13 +1821,8 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
         addCategory(new_cat);
 
         // make sure this category is correctly referenced by its parent.
-        cat_array_t* cat_array;
-        cat_array = getUnlockedCatArray(cat->getParentUUID());
-        if(cat_array)
-        {
-            cat_array->push_back(new_cat);
-            mContentChanges.note(cat->getParentUUID());
-        }
+        mContentChanges.attach(getUnlockedCatArray(cat->getParentUUID()), new_cat, cat->getParentUUID(),
+                               LLFrameTimer::getTotalSeconds());
 
         // make space in the tree for this category's children.
         llassert_always(!mCategoryLock[new_cat->getUUID()]);
@@ -1879,20 +1855,10 @@ void LLInventoryModel::moveObject(const LLUUID& object_id, const LLUUID& cat_id)
     if(cat && (cat->getParentUUID() != cat_id))
     {
         LL_DEBUGS(LOG_INV) << "Move category '" << make_path(cat) << "' to '" << make_inventory_path(cat_id) << "'" << LL_ENDL;
-        cat_array_t* cat_array;
-        cat_array = getUnlockedCatArray(cat->getParentUUID());
-        if (cat_array)
-        {
-            vector_replace_with_last(*cat_array, cat);
-            mContentChanges.note(cat->getParentUUID());
-        }
-        cat_array = getUnlockedCatArray(cat_id);
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        mContentChanges.detach(getUnlockedCatArray(cat->getParentUUID()), cat, cat->getParentUUID(), now);
         cat->setParent(cat_id);
-        if (cat_array)
-        {
-            cat_array->push_back(cat);
-            mContentChanges.note(cat_id);
-        }
+        mContentChanges.attach(getUnlockedCatArray(cat_id), cat, cat_id, now);
         addChangedMask(LLInventoryObserver::STRUCTURE, object_id);
         return;
     }
@@ -1900,20 +1866,10 @@ void LLInventoryModel::moveObject(const LLUUID& object_id, const LLUUID& cat_id)
     if(item && (item->getParentUUID() != cat_id))
     {
         LL_DEBUGS(LOG_INV) << "Move item '" << make_path(item) << "' to '" << make_inventory_path(cat_id) << "'" << LL_ENDL;
-        item_array_t* item_array;
-        item_array = getUnlockedItemArray(item->getParentUUID());
-        if (item_array)
-        {
-            vector_replace_with_last(*item_array, item);
-            mContentChanges.note(item->getParentUUID());
-        }
-        item_array = getUnlockedItemArray(cat_id);
+        const F64 now = LLFrameTimer::getTotalSeconds();
+        mContentChanges.detach(getUnlockedItemArray(item->getParentUUID()), item, item->getParentUUID(), now);
         item->setParent(cat_id);
-        if (item_array)
-        {
-            item_array->push_back(item);
-            mContentChanges.note(cat_id);
-        }
+        mContentChanges.attach(getUnlockedItemArray(cat_id), item, cat_id, now);
         addChangedMask(LLInventoryObserver::STRUCTURE, object_id);
         return;
     }
@@ -2206,21 +2162,13 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
     // instead of unconditionally cross-casting (which is UB).
     if (LLViewerInventoryItem* item_ptr = dynamic_cast<LLViewerInventoryItem*>(obj.get()))
     {
-        if (item_array_t* item_list = getUnlockedItemArray(parent_id))
-        {
-            LLPointer<LLViewerInventoryItem> item(item_ptr);
-            vector_replace_with_last(*item_list, item);
-            mContentChanges.note(parent_id);
-        }
+        const LLPointer<LLViewerInventoryItem> item(item_ptr);
+        mContentChanges.detach(getUnlockedItemArray(parent_id), item, parent_id, LLFrameTimer::getTotalSeconds());
     }
     else if (LLViewerInventoryCategory* cat_ptr = dynamic_cast<LLViewerInventoryCategory*>(obj.get()))
     {
-        if (cat_array_t* cat_list = getUnlockedCatArray(parent_id))
-        {
-            LLPointer<LLViewerInventoryCategory> cat(cat_ptr);
-            vector_replace_with_last(*cat_list, cat);
-            mContentChanges.note(parent_id);
-        }
+        const LLPointer<LLViewerInventoryCategory> cat(cat_ptr);
+        mContentChanges.detach(getUnlockedCatArray(parent_id), cat, parent_id, LLFrameTimer::getTotalSeconds());
         mContentChanges.forget(id);
     }
 

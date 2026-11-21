@@ -33,6 +33,7 @@
 #include "llappviewer.h"
 #include "llcallbacklist.h"
 #include "llinventorymodel.h"
+#include "llinventorymodelbackgroundfetch.h"
 #include "llinventoryobserver.h"
 #include "llnotificationsutil.h"
 #include "llsdutil.h"
@@ -57,6 +58,13 @@ const S32 MAX_SIMULTANEOUS_COROUTINES = 2048;
 // AIS3 allows '*' requests, but in reality those will be cut at some point
 // Specify own depth to be able to anticipate it and mark folders as incomplete
 const S32 MAX_FOLDER_DEPTH_REQUEST = 50;
+
+// A request as it is asked for, before it waits its turn in the queue:
+// how far the changes to what folders hold have come.
+static ALInventorySync::Request requestNow()
+{
+    return ALInventorySync::Request(gInventory.getContentChanges(), LLFrameTimer::getTotalSeconds());
+}
 
 //-------------------------------------------------------------------------
 /*static*/
@@ -138,7 +146,7 @@ void AISAPI::CreateInventory(const LLUUID& parentId, const LLSD& newInventory, c
         (&LLCoreHttpUtil::HttpCoroutineAdapter::postAndSuspend), _1, _2, _3, _4, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, postFn, url, parentId, newInventory, callback, CREATEINVENTORY));
+        _1, postFn, url, parentId, newInventory, callback, CREATEINVENTORY, requestNow()));
     EnqueueAISCommand("CreateInventory", proc);
 }
 
@@ -175,7 +183,7 @@ void AISAPI::SlamFolder(const LLUUID& folderId, const LLSD& newInventory, comple
         (&LLCoreHttpUtil::HttpCoroutineAdapter::putAndSuspend), _1, _2, _3, _4, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, putFn, url, folderId, newInventory, callback, SLAMFOLDER));
+        _1, putFn, url, folderId, newInventory, callback, SLAMFOLDER, requestNow()));
 
     EnqueueAISCommand("SlamFolder", proc);
 }
@@ -211,7 +219,7 @@ void AISAPI::RemoveCategory(const LLUUID &categoryId, completion_t callback)
         (&LLCoreHttpUtil::HttpCoroutineAdapter::deleteAndSuspend), _1, _2, _3, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, delFn, url, categoryId, LLSD(), callback, REMOVECATEGORY));
+        _1, delFn, url, categoryId, LLSD(), callback, REMOVECATEGORY, requestNow()));
 
     EnqueueAISCommand("RemoveCategory", proc);
 }
@@ -248,7 +256,7 @@ void AISAPI::RemoveItem(const LLUUID &itemId, completion_t callback)
         (&LLCoreHttpUtil::HttpCoroutineAdapter::deleteAndSuspend), _1, _2, _3, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, delFn, url, itemId, LLSD(), callback, REMOVEITEM));
+        _1, delFn, url, itemId, LLSD(), callback, REMOVEITEM, requestNow()));
 
     EnqueueAISCommand("RemoveItem", proc);
 }
@@ -295,7 +303,7 @@ void AISAPI::CopyLibraryCategory(const LLUUID& sourceId, const LLUUID& destId, b
         (&LLCoreHttpUtil::HttpCoroutineAdapter::copyAndSuspend), _1, _2, _3, destination, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, copyFn, url, destId, LLSD(), callback, COPYLIBRARYCATEGORY));
+        _1, copyFn, url, destId, LLSD(), callback, COPYLIBRARYCATEGORY, requestNow()));
 
     EnqueueAISCommand("CopyLibraryCategory", proc);
 }
@@ -332,7 +340,7 @@ void AISAPI::PurgeDescendents(const LLUUID &categoryId, completion_t callback)
         (&LLCoreHttpUtil::HttpCoroutineAdapter::deleteAndSuspend), _1, _2, _3, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, delFn, url, categoryId, LLSD(), callback, PURGEDESCENDENTS));
+        _1, delFn, url, categoryId, LLSD(), callback, PURGEDESCENDENTS, requestNow()));
 
     EnqueueAISCommand("PurgeDescendents", proc);
 }
@@ -368,7 +376,7 @@ void AISAPI::UpdateCategory(const LLUUID &categoryId, const LLSD &updates, compl
         (&LLCoreHttpUtil::HttpCoroutineAdapter::patchAndSuspend), _1, _2, _3, _4, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, patchFn, url, categoryId, updates, callback, UPDATECATEGORY));
+        _1, patchFn, url, categoryId, updates, callback, UPDATECATEGORY, requestNow()));
 
     EnqueueAISCommand("UpdateCategory", proc);
 }
@@ -404,7 +412,7 @@ void AISAPI::UpdateItem(const LLUUID &itemId, const LLSD &updates, completion_t 
         (&LLCoreHttpUtil::HttpCoroutineAdapter::patchAndSuspend), _1, _2, _3, _4, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, patchFn, url, itemId, updates, callback, UPDATEITEM));
+        _1, patchFn, url, itemId, updates, callback, UPDATEITEM, requestNow()));
 
     EnqueueAISCommand("UpdateItem", proc);
 }
@@ -439,7 +447,7 @@ void AISAPI::FetchItem(const LLUUID &itemId, ITEM_TYPE type, completion_t callba
         (&LLCoreHttpUtil::HttpCoroutineAdapter::getAndSuspend), _1, _2, _3, _5, _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, getFn, url, itemId, LLSD(), callback, FETCHITEM));
+        _1, getFn, url, itemId, LLSD(), callback, FETCHITEM, requestNow()));
 
     EnqueueAISCommand("FetchItem", proc);
 }
@@ -490,7 +498,7 @@ void AISAPI::FetchCategoryChildren(const LLUUID &catId, ITEM_TYPE type, bool rec
     LLSD body;
     body["depth"] = depth;
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, getFn, url, catId, body, callback, FETCHCATEGORYCHILDREN));
+        _1, getFn, url, catId, body, callback, FETCHCATEGORYCHILDREN, requestNow()));
 
     EnqueueAISCommand("FetchCategoryChildren", proc);
 }
@@ -543,7 +551,7 @@ void AISAPI::FetchCategoryChildren(const std::string &identifier, bool recursive
     LLSD body;
     body["depth"] = depth;
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, getFn, url, LLUUID::null, body, callback, FETCHCATEGORYCHILDREN));
+        _1, getFn, url, LLUUID::null, body, callback, FETCHCATEGORYCHILDREN, requestNow()));
 
     EnqueueAISCommand("FetchCategoryChildren", proc);
 }
@@ -594,7 +602,7 @@ void AISAPI::FetchCategoryCategories(const LLUUID &catId, ITEM_TYPE type, bool r
     LLSD body;
     body["depth"] = depth;
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-        _1, getFn, url, catId, body, callback, FETCHCATEGORYCATEGORIES));
+        _1, getFn, url, catId, body, callback, FETCHCATEGORYCATEGORIES, requestNow()));
 
     EnqueueAISCommand("FetchCategoryCategories", proc);
 }
@@ -671,7 +679,7 @@ void AISAPI::FetchCategorySubset(const LLUUID& catId,
     LLSD body;
     body["depth"] = depth;
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-                                                         _1, getFn, url, catId, body, callback, FETCHCATEGORYSUBSET));
+                                                         _1, getFn, url, catId, body, callback, FETCHCATEGORYSUBSET, requestNow()));
 
     EnqueueAISCommand("FetchCategorySubset", proc);
 }
@@ -709,7 +717,7 @@ void AISAPI::FetchCOF(completion_t callback)
     // link with embedded outfit folder for request to parse
     body["depth"] = 0;
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro,
-                                                         _1, getFn, url, LLUUID::null, body, callback, FETCHCOF));
+                                                         _1, getFn, url, LLUUID::null, body, callback, FETCHCOF, requestNow()));
 
     EnqueueAISCommand("FetchCOF", proc);
 }
@@ -745,7 +753,7 @@ void AISAPI::FetchCategoryLinks(const LLUUID &catId, completion_t callback)
     LLSD body;
     body["depth"] = 0;
     LLCoprocedureManager::CoProcedure_t proc(
-        boost::bind(&AISAPI::InvokeAISCommandCoro, _1, getFn, url, LLUUID::null, body, callback, FETCHCATEGORYLINKS));
+        boost::bind(&AISAPI::InvokeAISCommandCoro, _1, getFn, url, LLUUID::null, body, callback, FETCHCATEGORYLINKS, requestNow()));
 
     EnqueueAISCommand("FetchCategoryLinks", proc);
 }
@@ -778,7 +786,7 @@ void AISAPI::FetchOrphans(completion_t callback)
         (&LLCoreHttpUtil::HttpCoroutineAdapter::getAndSuspend) , _1 , _2 , _3 , _5 , _6);
 
     LLCoprocedureManager::CoProcedure_t proc(boost::bind(&AISAPI::InvokeAISCommandCoro ,
-                                                         _1 , getFn , url , LLUUID::null , LLSD() , callback , FETCHORPHANS));
+                                                         _1 , getFn , url , LLUUID::null , LLSD() , callback , FETCHORPHANS, requestNow()));
 
     EnqueueAISCommand("FetchOrphans" , proc);
 }
@@ -852,7 +860,8 @@ void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD&
 /*static*/
 void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t httpAdapter,
         invokationFn_t invoke, std::string url,
-        LLUUID targetId, LLSD body, completion_t callback, COMMAND_TYPE type)
+        LLUUID targetId, LLSD body, completion_t callback, COMMAND_TYPE type,
+        ALInventorySync::Request request)
 {
     if (gDisconnected)
     {
@@ -875,8 +884,6 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     LLSD httpResults;
     LLCore::HttpStatus status;
 
-    // How far the changes to what folders hold have come as the request goes.
-    const ALInventorySync::Request request(gInventory.getContentChanges());
     result = invoke(httpAdapter , httpRequest , url , body , httpOptions , httpHeaders);
     httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
@@ -1112,8 +1119,7 @@ void AISUpdate::clearParseResults()
     mItemsUpdated.clear();
     mCategoriesCreated.clear();
     mCategoriesUpdated.clear();
-    mChildrenUnlisted.clear();
-    mFoldersListed.clear();
+    mListings.clear();
     mObjectsDeletedIds.clear();
     mItemIds.clear();
     mCategoryIds.clear();
@@ -1564,33 +1570,13 @@ void AISUpdate::parseUnlisted(const LLUUID& category_id, LLFolderType::EType typ
     {
         return;
     }
-    mFoldersListed.push_back(category_id);
 
     LLInventoryModel::cat_array_t* categories = nullptr;
     LLInventoryModel::item_array_t* items = nullptr;
     gInventory.getDirectDescendentsOf(category_id, categories, items);
-    std::vector<ALInventorySync::Child> children;
-    if (categories)
-    {
-        for (const LLPointer<LLViewerInventoryCategory>& category : *categories)
-        {
-            children.push_back({ category->getUUID(), false });
-        }
-    }
-    if (items)
-    {
-        for (const LLPointer<LLViewerInventoryItem>& item : *items)
-        {
-            children.push_back({ item->getUUID(), item->getIsLinkType() });
-        }
-    }
-
-    for (const LLUUID& child_id : ALInventorySync::unlisted(children, *listing,
-                                                            ALInventorySync::embeddedIds(embedded, *listing),
-                                                            version, held->getVersion()))
-    {
-        mChildrenUnlisted.emplace_back(child_id, category_id);
-    }
+    mListings.push_back(ALInventorySync::readListing(category_id, ALInventorySync::children(categories, items), *listing,
+                                                     ALInventorySync::embeddedIds(embedded, *listing), version,
+                                                     held->getVersion()));
 }
 
 void AISUpdate::parseEmbedded(const LLSD& embedded, S32 depth)
@@ -1719,10 +1705,16 @@ void AISUpdate::doUpdate()
 {
     checkTimeout();
 
-    // Which folders the reply lists that changed after the request went,
-    // read before any of the reply is applied, since applying it changes
-    // them too, and after the parse, which may have yielded to the frame.
-    mRequest.spareChanged(gInventory.getContentChanges(), mFoldersListed);
+    // Which folders the reply lists that changed after the request was asked
+    // for, read before any of the reply is applied, since applying it
+    // changes them too, and after the parse, which may have yielded to the
+    // frame.
+    uuid_vec_t listed_folders;
+    for (const ALInventorySync::FolderListing& listing : mListings)
+    {
+        listed_folders.push_back(listing.folder_id);
+    }
+    mRequest.spareChanged(gInventory.getContentChanges(), listed_folders);
 
     // Do version/descendant accounting.
     for (std::map<LLUUID,size_t>::const_iterator catit = mCatDescendentDeltas.begin();
@@ -1859,21 +1851,24 @@ void AISUpdate::doUpdate()
     }
 
     // REMOVE WHAT FETCHED FOLDERS NO LONGER LIST
-    for (const auto& [child_id, folder_id] : mChildrenUnlisted)
+    uuid_vec_t out_of_step;
+    for (const ALInventorySync::FolderListing& listing : mListings)
     {
-        // Unless the folder changed after the request went, which the
-        // reply, written before, doesn't list.
-        if (mRequest.spares(folder_id))
+        const ALInventorySync::Request::Applied applied = mRequest.apply(listing);
+        for (const LLUUID& child_id : applied.removed)
         {
-            continue;
+            // Unless it has moved since, by this update or another.
+            const LLInventoryObject* child = gInventory.getObject(child_id);
+            if (child && child->getParentUUID() == listing.folder_id)
+            {
+                LL_DEBUGS("Inventory") << "removed " << child_id << ", which fetched folder " << listing.folder_id
+                                       << " no longer lists" << LL_ENDL;
+                gInventory.onObjectDeletedFromServer(child_id, false, false, false);
+            }
         }
-        // Unless it has moved since, by this update or another.
-        const LLInventoryObject* child = gInventory.getObject(child_id);
-        if (child && child->getParentUUID() == folder_id)
+        if (applied.out_of_step)
         {
-            LL_DEBUGS("Inventory") << "removed " << child_id << ", which fetched folder " << folder_id
-                                   << " no longer lists" << LL_ENDL;
-            gInventory.onObjectDeletedFromServer(child_id, false, false, false);
+            out_of_step.push_back(listing.folder_id);
         }
     }
 
@@ -1931,9 +1926,16 @@ void AISUpdate::doUpdate()
         }
     }
 
-    // Each folder spared forgets the version the reply gave it, and is
-    // fetched again.
-    mRequest.forgetSpared([](const LLUUID& folder_id) { return gInventory.getCategory(folder_id); });
+    // A folder that changed while the request was out, and holds what the
+    // reply doesn't name, is fetched again now.
+    for (const LLUUID& folder_id : out_of_step)
+    {
+        if (LLViewerInventoryCategory* cat = gInventory.getCategory(folder_id))
+        {
+            ALInventorySync::fetchAgain(*cat, [&folder_id]
+                                        { LLInventoryModelBackgroundFetch::instance().start(folder_id, false); });
+        }
+    }
 
     checkTimeout();
 
