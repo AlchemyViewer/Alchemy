@@ -366,9 +366,10 @@ namespace
         require_ulps("div", r, expected, 1);
 
         // The negative zero as its bits, in and out: /fp:fast lets the
-        // compiler take -0.f for 0.f, and MSVC for arm64 does.
-        const LLVector4a signs(alsimd::or_(alsimd::set(-1.5f, 0.f, 0.f, -INF),
-                                           alsimd::and_(alsimd::set1_bits(0x80000000u), alsimd::mask_lane<2>())));
+        // compiler take a float-typed -0.f for 0.f, and MSVC for arm64 and
+        // MSVC 14.52 for x64 do, so the input's negative zero is made as
+        // setNeg makes one.
+        const LLVector4a signs(alsimd::flip_signs<false, false, true, false>(alsimd::set(-1.5f, 0.f, 0.f, -INF)));
         r.setAbs(signs);
         require_bits("setAbs", r, bits_of(1.5f), 0u, 0u, bits_of(INF));
         r.setNeg(signs);
