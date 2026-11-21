@@ -7980,11 +7980,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         // A face past the faces the region counts, which the block names no
         // material for, takes the last counted face's: it follows that face
         // here, since the region's echo of the change is the block as it now
-        // stands and applies nothing. An edit of the viewer's own clears its
-        // override but the transforms, as the edited face's, and holds the
-        // region's override for it until the answer, as queueApply holds the
-        // edited face's, so that the reconcile the follow brings does not put
-        // back what the edit cleared.
+        // stands and applies nothing. An edit of the viewer's own clears the
+        // override it takes from that face but the transforms, as the edited
+        // face's, and holds the region's override for it until the answer, as
+        // queueApply holds the edited face's, so that the reconcile the follow
+        // brings does not put back what the edit cleared. One the region sent
+        // an override for itself keeps it.
         if (region_faces > 0 && start_idx < region_faces && region_faces <= end_idx)
         {
             LLViewerRegion* regionp = update_server && !isLocalOnly() ? getRegion() : nullptr;
@@ -7995,11 +7996,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
                     continue;
                 }
                 LLTextureEntry* follower = getTE(te);
-                if (regionp)
+                const bool inherits = update_server && !(regionp && regionp->namesGLTFOverride(getLocalID(), te));
+                if (inherits && regionp)
                 {
                     regionp->holdGLTFOverride(getLocalID(), te);
                 }
-                const bool reset = update_server && follower->setBaseMaterial();
+                const bool reset = inherits && follower->setBaseMaterial();
                 if (reset || follower->getGLTFMaterial() != new_material)
                 {
                     setRenderMaterialID(te, id, false, false);

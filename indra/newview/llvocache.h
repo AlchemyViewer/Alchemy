@@ -64,6 +64,8 @@ public:
     // The override a face takes from the entry, on an object the region counts `region_faces` faces on: the region's
     // for it; for a face past them it sent none for, the last counted face's; otherwise none. Built by materialize().
     LLGLTFMaterial* overrideFor(S32 side, S32 region_faces) const;
+    // Whether the region sent an override for face `side` itself.
+    bool names(S32 side) const { return mSides.find(side) != mSides.end(); }
     // Whether a face holding `held` shows `wanted`: the same override by value, or none on both.
     static bool sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted);
 

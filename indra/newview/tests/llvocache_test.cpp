@@ -908,6 +908,11 @@ namespace
         UNSCOPED_INFO("a face past them the region sent one for keeps its own");
         CHECK(two.overrideFor(2, 1) == two.mGLTFMaterial.at(2).get());
         CHECK(two.overrideFor(1, 1) == two.overrideFor(0, 1));
+        UNSCOPED_INFO("the entry names the faces the region sent an override for, and no face that takes another's");
+        CHECK(two.names(0));
+        CHECK(two.names(2));
+        CHECK_FALSE(two.names(1));
+        CHECK_FALSE(two.names(3));
 
         using EFaceState = ALGLTFOverrideFaceState;
         LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*one.overrideFor(0, 1));

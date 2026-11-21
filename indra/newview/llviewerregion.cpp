@@ -3103,6 +3103,12 @@ void LLViewerRegion::holdGLTFOverride(U32 local_id, S32 side)
     }
 }
 
+bool LLViewerRegion::namesGLTFOverride(U32 local_id, S32 side) const
+{
+    auto iter = mImpl->mGLTFOverridesLLSD.find(local_id);
+    return iter != mImpl->mGLTFOverridesLLSD.end() && iter->second.names(side);
+}
+
 LLVOCacheEntry* LLViewerRegion::getCacheEntryForOctree(U32 local_id)
 {
     if(!sVOCacheCullingEnabled)
