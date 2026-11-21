@@ -106,6 +106,13 @@ public:
     void processObjectUpdate(LLMessageSystem *mesgsys, void **user_data, EObjectUpdateType update_type, bool compressed=false);
     void processCompressedObjectUpdate(LLMessageSystem *mesgsys, void **user_data, EObjectUpdateType update_type);
     void processCachedObjectUpdate(LLMessageSystem *mesgsys, void **user_data, EObjectUpdateType update_type);
+    // Whether an update of this type names the object it carries by UUID, and so says whose its local ID is now: a
+    // full update, compressed or not. A terse update, and the region's word that it holds an object cached, name only
+    // the local ID and find the object from it.
+    static constexpr bool updateNamesObject(EObjectUpdateType update_type)
+    {
+        return update_type == OUT_FULL || update_type == OUT_FULL_COMPRESSED;
+    }
     void updateApparentAngles(LLAgent &agent);
     void update(LLAgent &agent);
 

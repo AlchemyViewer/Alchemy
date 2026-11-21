@@ -1078,6 +1078,21 @@ namespace
         CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(9, other_id, overrides));
     }
 
+    // An update that names its object drops the overrides another object left under its local ID, whether the cache
+    // takes it or not (LLViewerObjectList::processObjectUpdate).
+    TEST_CASE("LLViewerObjectList: a full update names its object by UUID and a terse or cached one does not", "[LLVOCache]")
+    {
+        UNSCOPED_INFO("an update sent uncompressed");
+        CHECK(LLViewerObjectList::updateNamesObject(OUT_FULL));
+        UNSCOPED_INFO("a compressed one, a temporary object's among them, which the cache does not take");
+        CHECK(LLViewerObjectList::updateNamesObject(OUT_FULL_COMPRESSED));
+        UNSCOPED_INFO("a terse update finds its object from the local ID");
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_TERSE_IMPROVED));
+        UNSCOPED_INFO("as does the region's word that it holds an object cached");
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_FULL_CACHED));
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_UNKNOWN));
+    }
+
     // Removing a region's entry lets go of its objects in memory, and an
     // object update that finds the cache bogus is read from one of them.
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: a removal asked for waits for the removals asked for to be carried out", "[LLVOCache]")

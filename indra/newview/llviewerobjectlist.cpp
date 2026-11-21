@@ -628,6 +628,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                                      << " update_cache " << (S32) update_cache << " compressed " << compressed
                                      << " update_type "  << update_type << LL_ENDL;
 
+        // The local ID may hold another object than the one the region's glTF overrides under it came for. A full
+        // update the cache takes drops them as it is cached (cacheFullUpdate); one it does not take, a temporary
+        // object's or one sent uncompressed, drops them here, before the object is made or updated from it.
+        if (updateNamesObject(update_type))
+        {
+            regionp->dropGLTFOverridesOfAnother(local_id, fullid);
+        }
+
         if(update_cache)
         {
             //update object cache if the object receives a full-update or terse update
