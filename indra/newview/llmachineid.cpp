@@ -327,7 +327,7 @@ bool LLWMIMethods::getGenericSerialNumber(const BSTR &select, const LPCWSTR &var
                 continue;
             }
         }
-        LL_INFOS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(std::wstring(vtProp.bstrVal, SysStringLen(vtProp.bstrVal))) << LL_ENDL;
+        LL_DEBUGS("AppInit") << " Serial Number : " << ll_convert_wide_to_string(std::wstring(vtProp.bstrVal, SysStringLen(vtProp.bstrVal))) << LL_ENDL;
 
         unsigned int j = 0;
 
