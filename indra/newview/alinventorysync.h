@@ -90,12 +90,12 @@ public:
     struct FolderListing
     {
         LLUUID     folder_id;
-        uuid_vec_t unlisted;        // what unlisted() leaves out
-        bool       unnamed = false; // whether unnamed() leaves anything out
+        Listing    listing = Listing::Whole;
+        uuid_vec_t unlisted; // what unlisted() left out of the children it was read against
     };
 
     // Reads a reply's listing of `folder_id` against `children`, as
-    // unlisted() and unnamed() read it.
+    // unlisted() reads it.
     static FolderListing readListing(const LLUUID& folder_id, const std::vector<Child>& children, Listing listing,
                                      const uuid_set_t& listed, S32 listed_version, S32 held_version);
 
@@ -166,6 +166,12 @@ public:
         // asked for, or within GRACE_SECONDS before.
         void spareChanged(const ContentChanges& changes, const uuid_vec_t& listed_folders);
 
+        // Where applying the reply pauses, to give the frame its turn,
+        // what changes until it resumes is none of the reply's own: spares
+        // each of `listed_folders` changed after `paused`, the stamp the
+        // changes stood at as it paused.
+        void spareChangedWhilePaused(const ContentChanges& changes, const uuid_vec_t& listed_folders, U64 paused);
+
         // Whether the reply leaves `folder_id` holding whatever it doesn't
         // list, rather than removing it as unlisted() would.
         bool spares(const LLUUID& folder_id) const;
@@ -177,11 +183,12 @@ public:
             bool       out_of_step = false; // to fetch again, once the reply is applied
         };
 
-        // What applying `listing` does to its folder: removes what it
-        // leaves out; or where the folder is spared, removes nothing, and
-        // where it holds what the listing doesn't name, has it fetched
-        // again.
-        Applied apply(const FolderListing& listing) const;
+        // What applying `listing`, which names `listed`, does to its
+        // folder, which now holds `children`: removes what it left out of
+        // the children it was read against; or where the folder is spared,
+        // removes nothing, and where `children` holds what the listing
+        // doesn't name, has it fetched again.
+        Applied apply(const FolderListing& listing, const std::vector<Child>& children, const uuid_set_t& listed) const;
 
     private:
         U64        mSent   = 0;
@@ -190,8 +197,9 @@ public:
     };
 
     // Has a folder found out of step with the reply just applied fetched
-    // again now: forgets the version the reply gave it, so that it reads as
-    // not fetched until the new reply comes, and calls `fetch()`.
+    // again: forgets the version the reply gave it, so that it reads as
+    // not fetched until the new reply comes, and calls `fetch()`, which
+    // asks for it or holds it to ask once its request has finished.
     template <typename Folder, typename Fetch>
     static void fetchAgain(Folder& folder, Fetch&& fetch);
 

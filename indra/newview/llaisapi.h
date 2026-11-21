@@ -95,8 +95,10 @@ private:
 
     static void EnqueueAISCommand(const std::string &procName, LLCoprocedureManager::CoProcedure_t proc);
     static void onIdle(void *userdata); // launches postponed AIS commands
-    static void onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
-                                 const ALInventorySync::Request& request);
+    // Applies a reply, and gives the folders it found out of step, to ask for
+    // once the request has finished.
+    static uuid_vec_t onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
+                                       const ALInventorySync::Request& request);
 
     static std::string getInvCap();
     static std::string getLibCap();
@@ -135,6 +137,9 @@ public:
     void parseEmbeddedItem(const LLSD& item);
     void parseEmbeddedCategory(const LLSD& category, S32 depth);
     void doUpdate();
+    // The folders the update found out of step, whose versions it forgot,
+    // to ask for once the request has finished.
+    const uuid_vec_t& foldersToFetchAgain() const { return mFetchAgain; }
 private:
     void clearParseResults();
     void checkTimeout();
@@ -161,11 +166,22 @@ private:
     deferred_category_map_t mCategoriesUpdated;
 
     // Each folder a fetch listed whole, read against what the model held
-    // as the reply was read.
-    std::vector<ALInventorySync::FolderListing> mListings;
+    // as the reply was read, and what the listing names.
+    struct ListedFolder
+    {
+        ALInventorySync::FolderListing listing;
+        uuid_set_t                     names;
+    };
+    std::vector<ListedFolder> mListings;
     // The request this is the reply to, which spares the folders listed
     // that changed after it was asked for.
     ALInventorySync::Request mRequest;
+    // The folders of mListings, as doUpdate reads them.
+    uuid_vec_t mListedFolders;
+    // Whether doUpdate is applying the reply, until it removes what the
+    // listings leave out.
+    bool mApplying = false;
+    uuid_vec_t mFetchAgain;
 
     // These keep track of uuid's mentioned in meta values.
     // Useful for filtering out which content we are interested in.

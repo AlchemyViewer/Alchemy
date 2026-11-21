@@ -1536,9 +1536,11 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             LLInventoryModel::cat_array_t* categories = nullptr;
             LLInventoryModel::item_array_t* items = nullptr;
             gInventory.getDirectDescendentsOf(folder_id, categories, items);
-            const ALInventorySync::Request::Applied applied = mRequest.apply(
-                ALInventorySync::readListing(folder_id, ALInventorySync::children(categories, items),
-                                             ALInventorySync::Listing::Whole, listed, listed_version, held_version));
+            const std::vector<ALInventorySync::Child> children = ALInventorySync::children(categories, items);
+            const ALInventorySync::Request::Applied applied =
+                mRequest.apply(ALInventorySync::readListing(folder_id, children, ALInventorySync::Listing::Whole, listed,
+                                                            listed_version, held_version),
+                               children, listed);
             for (const LLUUID& child_id : applied.removed)
             {
                 LL_DEBUGS(LOG_INV) << "removed " << child_id << ", which fetched folder " << folder_id

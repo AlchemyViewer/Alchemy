@@ -26,6 +26,8 @@
 
 #include "alinventorysync.h"
 
+#include <limits>
+
 namespace
 {
     void addKeys(const LLSD& map, uuid_set_t& ids)
@@ -97,8 +99,8 @@ ALInventorySync::FolderListing ALInventorySync::readListing(const LLUUID& folder
 {
     FolderListing read;
     read.folder_id = folder_id;
+    read.listing   = listing;
     read.unlisted  = unlisted(children, listing, listed, listed_version, held_version);
-    read.unnamed   = !unnamed(children, listing, listed).empty();
     return read;
 }
 
@@ -140,17 +142,31 @@ void ALInventorySync::Request::spareChanged(const ContentChanges& changes, const
     }
 }
 
+void ALInventorySync::Request::spareChangedWhilePaused(const ContentChanges& changes, const uuid_vec_t& listed_folders,
+                                                       U64 paused)
+{
+    for (const LLUUID& folder_id : listed_folders)
+    {
+        if (changes.changedSince(folder_id, paused, std::numeric_limits<F64>::infinity()))
+        {
+            mSpared.insert(folder_id);
+        }
+    }
+}
+
 bool ALInventorySync::Request::spares(const LLUUID& folder_id) const
 {
     return mSpared.contains(folder_id);
 }
 
-ALInventorySync::Request::Applied ALInventorySync::Request::apply(const FolderListing& listing) const
+ALInventorySync::Request::Applied ALInventorySync::Request::apply(const FolderListing& listing,
+                                                                  const std::vector<Child>& children,
+                                                                  const uuid_set_t& listed) const
 {
     Applied applied;
     if (spares(listing.folder_id))
     {
-        applied.out_of_step = listing.unnamed;
+        applied.out_of_step = !unnamed(children, listing.listing, listed).empty();
     }
     else
     {

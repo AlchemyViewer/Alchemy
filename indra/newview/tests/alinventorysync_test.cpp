@@ -397,28 +397,25 @@ namespace
               == uuid_vec_t{ OTHER_FOLDER, OTHER_ITEM, OTHER_LINK });
         CHECK(Sync::unnamed(CHILDREN, Sync::Listing::LinksOnly, { LINK }) == uuid_vec_t{ OTHER_LINK });
 
-        // An older listing leaves nothing out, but still doesn't name them.
+        // An older listing leaves nothing out.
         const Sync::FolderListing older = Sync::readListing(FOLDER, CHILDREN, Sync::Listing::Whole, {}, 5, 6);
         CHECK(older.folder_id == FOLDER);
+        CHECK(older.listing == Sync::Listing::Whole);
         CHECK(older.unlisted.empty());
-        CHECK(older.unnamed);
 
-        const Sync::FolderListing whole =
-            Sync::readListing(FOLDER, CHILDREN, Sync::Listing::Whole,
-                              { FOLDER, ITEM, LINK, OTHER_FOLDER, OTHER_ITEM, OTHER_LINK }, 7, 6);
-        CHECK(whole.unlisted.empty());
-        CHECK_FALSE(whole.unnamed);
+        const Sync::FolderListing links = Sync::readListing(FOLDER, CHILDREN, Sync::Listing::LinksOnly, { LINK }, 7, 6);
+        CHECK(links.listing == Sync::Listing::LinksOnly);
+        CHECK(links.unlisted == uuid_vec_t{ OTHER_LINK });
     }
 
-    // A folder no reply below lists, one gone by the time a reply is
-    // applied, and an item made while a fetch is out.
+    // A folder no reply below lists, and an item made while a fetch is out.
     const LLUUID UNLISTED_FOLDER("10000000-0000-4000-8000-000000000007");
-    const LLUUID GONE_FOLDER("10000000-0000-4000-8000-000000000008");
     const LLUUID NEW_ITEM("10000000-0000-4000-8000-000000000009");
 
     // A folder holding ITEM, which a reply lists, and NEW_ITEM, which it
-    // doesn't.
+    // doesn't; and holding ITEM alone.
     const std::vector<Sync::Child> HELD_WITH_NEW = { { ITEM, false }, { NEW_ITEM, false } };
+    const std::vector<Sync::Child> HELD_ITEM     = { { ITEM, false } };
 
     TEST_CASE("alinventorysync: a folder changed while its fetch was out keeps what the reply leaves out and is fetched again", "[alinventorysync]")
     {
@@ -432,26 +429,50 @@ namespace
         changes.note(UNLISTED_FOLDER, 106.0);
         fetch.spareChanged(changes, uuid_vec_t{ FOLDER, OTHER_FOLDER });
 
-        const Sync::Request::Applied folder =
-            fetch.apply(Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, 6, 6));
+        const uuid_set_t listed = { ITEM };
+        const Sync::Request::Applied folder = fetch.apply(
+            Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 6, 6), HELD_WITH_NEW, listed);
         CHECK(folder.removed.empty());
         CHECK(folder.out_of_step);
 
         // A folder of unknown version, as the background fetch asks for.
-        const Sync::Request::Applied unknown = fetch.apply(
-            Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, 1, Sync::VERSION_UNKNOWN));
+        const Sync::Request::Applied unknown =
+            fetch.apply(Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 1, Sync::VERSION_UNKNOWN),
+                        HELD_WITH_NEW, listed);
         CHECK(unknown.removed.empty());
         CHECK(unknown.out_of_step);
 
         // Changed long before the fetch was asked for: what the reply
         // doesn't name goes.
-        const Sync::Request::Applied other =
-            fetch.apply(Sync::readListing(OTHER_FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, 7, 6));
+        const Sync::Request::Applied other = fetch.apply(
+            Sync::readListing(OTHER_FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 7, 6), HELD_WITH_NEW, listed);
         CHECK(other.removed == uuid_vec_t{ NEW_ITEM });
         CHECK_FALSE(other.out_of_step);
 
         // Changed after it, but not a folder the reply lists.
         CHECK_FALSE(fetch.spares(UNLISTED_FOLDER));
+    }
+
+    TEST_CASE("alinventorysync: a spared folder is fetched again for what it holds as the reply is applied", "[alinventorysync]")
+    {
+        Sync::ContentChanges changes;
+        Sync::Request fetch(changes, 100.0);
+        changes.note(FOLDER, 105.0);
+        fetch.spareChanged(changes, uuid_vec_t{ FOLDER });
+        const uuid_set_t listed = { ITEM };
+
+        // Read while the folder held ITEM alone, which the reply names;
+        // NEW_ITEM was made in it before the reply was applied.
+        const Sync::Request::Applied made =
+            fetch.apply(Sync::readListing(FOLDER, HELD_ITEM, Sync::Listing::Whole, listed, 6, 6), HELD_WITH_NEW, listed);
+        CHECK(made.removed.empty());
+        CHECK(made.out_of_step);
+
+        // Read while it held NEW_ITEM, which had gone by then.
+        const Sync::Request::Applied gone =
+            fetch.apply(Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 6, 6), HELD_ITEM, listed);
+        CHECK(gone.removed.empty());
+        CHECK_FALSE(gone.out_of_step);
     }
 
     TEST_CASE("alinventorysync: a folder changed shortly before its fetch was asked for is spared", "[alinventorysync]")
@@ -479,8 +500,9 @@ namespace
         changes.note(FOLDER, 105.0);
         fetch.spareChanged(changes, uuid_vec_t{ FOLDER });
 
-        const Sync::Request::Applied folder =
-            fetch.apply(Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, { ITEM, NEW_ITEM }, 7, 6));
+        const uuid_set_t listed = { ITEM, NEW_ITEM };
+        const Sync::Request::Applied folder = fetch.apply(
+            Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 7, 6), HELD_WITH_NEW, listed);
         CHECK(fetch.spares(FOLDER));
         CHECK(folder.removed.empty());
         CHECK_FALSE(folder.out_of_step);
@@ -495,13 +517,31 @@ namespace
         changes.note(FOLDER, 120.0);
         CHECK_FALSE(fetch.spares(FOLDER));
 
-        const Sync::Request::Applied folder =
-            fetch.apply(Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, { ITEM }, 6, 6));
+        const uuid_set_t listed = { ITEM };
+        const Sync::Request::Applied folder = fetch.apply(
+            Sync::readListing(FOLDER, HELD_WITH_NEW, Sync::Listing::Whole, listed, 6, 6), HELD_WITH_NEW, listed);
         CHECK(folder.removed == uuid_vec_t{ NEW_ITEM });
         CHECK_FALSE(folder.out_of_step);
     }
 
-    TEST_CASE("alinventorysync: a folder out of step with its reply forgets its version and is asked for now", "[alinventorysync]")
+    TEST_CASE("alinventorysync: a folder changed while applying its reply waits for the frame is spared", "[alinventorysync]")
+    {
+        Sync::ContentChanges changes;
+        Sync::Request fetch(changes, 100.0);
+        fetch.spareChanged(changes, uuid_vec_t{ FOLDER, OTHER_FOLDER });
+
+        // The reply changes FOLDER, then waits for the frame, while which
+        // something else changes OTHER_FOLDER.
+        changes.note(FOLDER, 120.0);
+        const U64 paused = changes.stamp();
+        changes.note(OTHER_FOLDER, 120.5);
+        fetch.spareChangedWhilePaused(changes, uuid_vec_t{ FOLDER, OTHER_FOLDER }, paused);
+
+        CHECK_FALSE(fetch.spares(FOLDER));
+        CHECK(fetch.spares(OTHER_FOLDER));
+    }
+
+    TEST_CASE("alinventorysync: a folder out of step with its reply forgets its version and is asked for", "[alinventorysync]")
     {
         // As the reply applied leaves it, at the version it lists.
         StepFolder folder{ 6 };

@@ -842,8 +842,8 @@ void AISAPI::onIdle(void *userdata)
 }
 
 /*static*/
-void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
-                              const ALInventorySync::Request& request)
+uuid_vec_t AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
+                                    const ALInventorySync::Request& request)
 {
     LLTimer timer;
     if ( (type == UPDATECATEGORY || type == UPDATEITEM)
@@ -855,6 +855,7 @@ void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD&
     AISUpdate ais_update(update, type, request_body, request);
     ais_update.doUpdate(); // execute the updates in the appropriate order.
     LL_DEBUGS("Inventory", "AIS3") << "Elapsed processing: " << timer.getElapsedTimeF32() << LL_ENDL;
+    return ais_update.foldersToFetchAgain();
 }
 
 /*static*/
@@ -968,7 +969,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     }
 
     LL_DEBUGS("Inventory", "AIS3") << "Result: " << result << LL_ENDL;
-    onUpdateReceived(result, type, body, request);
+    const uuid_vec_t fetch_again = onUpdateReceived(result, type, body, request);
 
     if (callback != nullptr)
     {
@@ -1058,6 +1059,14 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
         }
     }
 
+    // Each folder the reply found out of step is asked for only now, once the
+    // callback has marked this request's folders as no longer being fetched:
+    // the background fetch passes over a folder still marked.
+    for (const LLUUID& folder_id : fetch_again)
+    {
+        LLInventoryModelBackgroundFetch::instance().start(folder_id, false);
+    }
+
 }
 
 //-------------------------------------------------------------------------
@@ -1139,8 +1148,14 @@ void AISUpdate::checkTimeout()
         // If we use normal suspend(), there will be a chance of
         // waking up from other suspends, before main coro had
         // a chance, so wait for a frame tick instead.
+        const U64 paused = gInventory.getContentChanges().stamp();
         llcoro::suspendUntilNextFrame();
         LLCoros::checkStop();
+        if (mApplying)
+        {
+            // What changed while this waited is none of the reply's doing.
+            mRequest.spareChangedWhilePaused(gInventory.getContentChanges(), mListedFolders, paused);
+        }
         mTaskTimer.setTimerExpirySec(AIS_TASK_EXPIRY_SECONDS);
 
         U32 current_frame = LLFrameTimer::getFrameCount();
@@ -1574,9 +1589,11 @@ void AISUpdate::parseUnlisted(const LLUUID& category_id, LLFolderType::EType typ
     LLInventoryModel::cat_array_t* categories = nullptr;
     LLInventoryModel::item_array_t* items = nullptr;
     gInventory.getDirectDescendentsOf(category_id, categories, items);
-    mListings.push_back(ALInventorySync::readListing(category_id, ALInventorySync::children(categories, items), *listing,
-                                                     ALInventorySync::embeddedIds(embedded, *listing), version,
-                                                     held->getVersion()));
+    ListedFolder listed;
+    listed.names   = ALInventorySync::embeddedIds(embedded, *listing);
+    listed.listing = ALInventorySync::readListing(category_id, ALInventorySync::children(categories, items), *listing,
+                                                  listed.names, version, held->getVersion());
+    mListings.push_back(std::move(listed));
 }
 
 void AISUpdate::parseEmbedded(const LLSD& embedded, S32 depth)
@@ -1708,13 +1725,15 @@ void AISUpdate::doUpdate()
     // Which folders the reply lists that changed after the request was asked
     // for, read before any of the reply is applied, since applying it
     // changes them too, and after the parse, which may have yielded to the
-    // frame.
-    uuid_vec_t listed_folders;
-    for (const ALInventorySync::FolderListing& listing : mListings)
+    // frame. Until the removals below, a pause to the frame spares what
+    // changes while it waits (checkTimeout).
+    mListedFolders.clear();
+    for (const ListedFolder& listed : mListings)
     {
-        listed_folders.push_back(listing.folder_id);
+        mListedFolders.push_back(listed.listing.folder_id);
     }
-    mRequest.spareChanged(gInventory.getContentChanges(), listed_folders);
+    mRequest.spareChanged(gInventory.getContentChanges(), mListedFolders);
+    mApplying = true;
 
     // Do version/descendant accounting.
     for (std::map<LLUUID,size_t>::const_iterator catit = mCatDescendentDeltas.begin();
@@ -1851,10 +1870,16 @@ void AISUpdate::doUpdate()
     }
 
     // REMOVE WHAT FETCHED FOLDERS NO LONGER LIST
+    mApplying = false;
     uuid_vec_t out_of_step;
-    for (const ALInventorySync::FolderListing& listing : mListings)
+    for (const ListedFolder& listed : mListings)
     {
-        const ALInventorySync::Request::Applied applied = mRequest.apply(listing);
+        const ALInventorySync::FolderListing& listing = listed.listing;
+        LLInventoryModel::cat_array_t* categories = nullptr;
+        LLInventoryModel::item_array_t* items = nullptr;
+        gInventory.getDirectDescendentsOf(listing.folder_id, categories, items);
+        const ALInventorySync::Request::Applied applied =
+            mRequest.apply(listing, ALInventorySync::children(categories, items), listed.names);
         for (const LLUUID& child_id : applied.removed)
         {
             // Unless it has moved since, by this update or another.
@@ -1927,13 +1952,14 @@ void AISUpdate::doUpdate()
     }
 
     // A folder that changed while the request was out, and holds what the
-    // reply doesn't name, is fetched again now.
+    // reply doesn't name, is fetched again, once the request has finished
+    // (AISAPI::InvokeAISCommandCoro).
+    mFetchAgain.clear();
     for (const LLUUID& folder_id : out_of_step)
     {
         if (LLViewerInventoryCategory* cat = gInventory.getCategory(folder_id))
         {
-            ALInventorySync::fetchAgain(*cat, [&folder_id]
-                                        { LLInventoryModelBackgroundFetch::instance().start(folder_id, false); });
+            ALInventorySync::fetchAgain(*cat, [this, &folder_id] { mFetchAgain.push_back(folder_id); });
         }
     }
 
