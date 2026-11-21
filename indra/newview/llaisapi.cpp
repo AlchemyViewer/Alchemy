@@ -834,7 +834,8 @@ void AISAPI::onIdle(void *userdata)
 }
 
 /*static*/
-void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body)
+void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
+                              const ALInventorySync::Request& request)
 {
     LLTimer timer;
     if ( (type == UPDATECATEGORY || type == UPDATEITEM)
@@ -843,7 +844,7 @@ void AISAPI::onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD&
         dump_sequential_xml(gAgentAvatarp->getDebugName() + "_ais_update", update);
     }
 
-    AISUpdate ais_update(update, type, request_body);
+    AISUpdate ais_update(update, type, request_body, request);
     ais_update.doUpdate(); // execute the updates in the appropriate order.
     LL_DEBUGS("Inventory", "AIS3") << "Elapsed processing: " << timer.getElapsedTimeF32() << LL_ENDL;
 }
@@ -874,6 +875,8 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     LLSD httpResults;
     LLCore::HttpStatus status;
 
+    // How far the changes to what folders hold have come as the request goes.
+    const ALInventorySync::Request request(gInventory.getContentChanges());
     result = invoke(httpAdapter , httpRequest , url , body , httpOptions , httpHeaders);
     httpResults = result[LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS];
     status = LLCoreHttpUtil::HttpCoroutineAdapter::getStatusFromLLSD(httpResults);
@@ -958,7 +961,7 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
     }
 
     LL_DEBUGS("Inventory", "AIS3") << "Result: " << result << LL_ENDL;
-    onUpdateReceived(result, type, body);
+    onUpdateReceived(result, type, body, request);
 
     if (callback != nullptr)
     {
@@ -1054,8 +1057,10 @@ void AISAPI::InvokeAISCommandCoro(LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t ht
 U32 AISUpdate::sBatchFrameCount = 0;
 LLTimer AISUpdate::sBatchTimer;
 
-AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body)
-: mType(type)
+AISUpdate::AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body,
+                     const ALInventorySync::Request& request)
+: mRequest(request)
+, mType(type)
 {
     mFetch = (type == AISAPI::FETCHITEM)
         || (type == AISAPI::FETCHCATEGORYCHILDREN)
@@ -1108,6 +1113,7 @@ void AISUpdate::clearParseResults()
     mCategoriesCreated.clear();
     mCategoriesUpdated.clear();
     mChildrenUnlisted.clear();
+    mFoldersListed.clear();
     mObjectsDeletedIds.clear();
     mItemIds.clear();
     mCategoryIds.clear();
@@ -1558,6 +1564,7 @@ void AISUpdate::parseUnlisted(const LLUUID& category_id, LLFolderType::EType typ
     {
         return;
     }
+    mFoldersListed.push_back(category_id);
 
     LLInventoryModel::cat_array_t* categories = nullptr;
     LLInventoryModel::item_array_t* items = nullptr;
@@ -1712,6 +1719,11 @@ void AISUpdate::doUpdate()
 {
     checkTimeout();
 
+    // Which folders the reply lists that changed after the request went,
+    // read before any of the reply is applied, since applying it changes
+    // them too, and after the parse, which may have yielded to the frame.
+    mRequest.spareChanged(gInventory.getContentChanges(), mFoldersListed);
+
     // Do version/descendant accounting.
     for (std::map<LLUUID,size_t>::const_iterator catit = mCatDescendentDeltas.begin();
          catit != mCatDescendentDeltas.end(); ++catit)
@@ -1849,6 +1861,12 @@ void AISUpdate::doUpdate()
     // REMOVE WHAT FETCHED FOLDERS NO LONGER LIST
     for (const auto& [child_id, folder_id] : mChildrenUnlisted)
     {
+        // Unless the folder changed after the request went, which the
+        // reply, written before, doesn't list.
+        if (mRequest.spares(folder_id))
+        {
+            continue;
+        }
         // Unless it has moved since, by this update or another.
         const LLInventoryObject* child = gInventory.getObject(child_id);
         if (child && child->getParentUUID() == folder_id)
@@ -1912,6 +1930,10 @@ void AISUpdate::doUpdate()
             }
         }
     }
+
+    // Each folder spared forgets the version the reply gave it, and is
+    // fetched again.
+    mRequest.forgetSpared([](const LLUUID& folder_id) { return gInventory.getCategory(folder_id); });
 
     checkTimeout();
 

@@ -1590,6 +1590,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
             if(item_array)
             {
                 vector_replace_with_last(*item_array, old_item);
+                mContentChanges.note(old_parent_id);
             }
             item_array = get_ptr_in_map(mParentChildItemTree, new_parent_id);
             if(item_array)
@@ -1600,6 +1601,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
                     gInventory.accountForUpdate(update);
                 }
                 item_array->push_back(old_item);
+                mContentChanges.note(new_parent_id);
             }
             mask |= LLInventoryObserver::STRUCTURE;
         }
@@ -1645,6 +1647,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
                 // *FIX: bit of a hack to call update server from here...
                 new_item->updateParentOnServer(false);
                 item_array->push_back(new_item);
+                mContentChanges.note(category_id);
             }
             else
             {
@@ -1673,6 +1676,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
             if(item_array)
             {
                 item_array->push_back(new_item);
+                mContentChanges.note(parent_id);
             }
             else
             {
@@ -1690,6 +1694,7 @@ U32 LLInventoryModel::updateItem(const LLViewerInventoryItem* item, U32 mask)
                     // here...
                     new_item->updateParentOnServer(false);
                     item_array->push_back(new_item);
+                    mContentChanges.note(parent_id);
                 }
                 else
                 {
@@ -1785,11 +1790,13 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
             if(cat_array)
             {
                 vector_replace_with_last(*cat_array, old_cat);
+                mContentChanges.note(old_parent_id);
             }
             cat_array = getUnlockedCatArray(new_parent_id);
             if(cat_array)
             {
                 cat_array->push_back(old_cat);
+                mContentChanges.note(new_parent_id);
             }
             mask |= LLInventoryObserver::STRUCTURE;
             mask |= LLInventoryObserver::INTERNAL;
@@ -1838,6 +1845,7 @@ void LLInventoryModel::updateCategory(const LLViewerInventoryCategory* cat, U32 
         if(cat_array)
         {
             cat_array->push_back(new_cat);
+            mContentChanges.note(cat->getParentUUID());
         }
 
         // make space in the tree for this category's children.
@@ -1873,10 +1881,18 @@ void LLInventoryModel::moveObject(const LLUUID& object_id, const LLUUID& cat_id)
         LL_DEBUGS(LOG_INV) << "Move category '" << make_path(cat) << "' to '" << make_inventory_path(cat_id) << "'" << LL_ENDL;
         cat_array_t* cat_array;
         cat_array = getUnlockedCatArray(cat->getParentUUID());
-        if(cat_array) vector_replace_with_last(*cat_array, cat);
+        if (cat_array)
+        {
+            vector_replace_with_last(*cat_array, cat);
+            mContentChanges.note(cat->getParentUUID());
+        }
         cat_array = getUnlockedCatArray(cat_id);
         cat->setParent(cat_id);
-        if(cat_array) cat_array->push_back(cat);
+        if (cat_array)
+        {
+            cat_array->push_back(cat);
+            mContentChanges.note(cat_id);
+        }
         addChangedMask(LLInventoryObserver::STRUCTURE, object_id);
         return;
     }
@@ -1886,10 +1902,18 @@ void LLInventoryModel::moveObject(const LLUUID& object_id, const LLUUID& cat_id)
         LL_DEBUGS(LOG_INV) << "Move item '" << make_path(item) << "' to '" << make_inventory_path(cat_id) << "'" << LL_ENDL;
         item_array_t* item_array;
         item_array = getUnlockedItemArray(item->getParentUUID());
-        if(item_array) vector_replace_with_last(*item_array, item);
+        if (item_array)
+        {
+            vector_replace_with_last(*item_array, item);
+            mContentChanges.note(item->getParentUUID());
+        }
         item_array = getUnlockedItemArray(cat_id);
         item->setParent(cat_id);
-        if(item_array) item_array->push_back(item);
+        if (item_array)
+        {
+            item_array->push_back(item);
+            mContentChanges.note(cat_id);
+        }
         addChangedMask(LLInventoryObserver::STRUCTURE, object_id);
         return;
     }
@@ -2186,6 +2210,7 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
         {
             LLPointer<LLViewerInventoryItem> item(item_ptr);
             vector_replace_with_last(*item_list, item);
+            mContentChanges.note(parent_id);
         }
     }
     else if (LLViewerInventoryCategory* cat_ptr = dynamic_cast<LLViewerInventoryCategory*>(obj.get()))
@@ -2194,7 +2219,9 @@ void LLInventoryModel::deleteObject(const LLUUID& id, bool fix_broken_links, boo
         {
             LLPointer<LLViewerInventoryCategory> cat(cat_ptr);
             vector_replace_with_last(*cat_list, cat);
+            mContentChanges.note(parent_id);
         }
+        mContentChanges.forget(id);
     }
 
     // Note : We need to tell the inventory observers that those things are going to be deleted *before* the tree is cleared or they won't know what to delete (in views and view models)
@@ -2795,6 +2822,7 @@ void LLInventoryModel::empty()
         mParentChildItemTree.end(),
         DeletePairedPointer());
     mParentChildItemTree.clear();
+    mContentChanges.clear();
     mBacklinkMMap.clear(); // forget all backlink information.
     mCategoryMap.clear(); // remove all references (should delete entries)
     mItemMap.clear(); // remove all references (should delete entries)

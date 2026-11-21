@@ -31,6 +31,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include "alinventorysync.h"
 #include "llviewerinventory.h"
 #include "llcorehttputil.h"
 #include "llcoproceduremanager.h"
@@ -94,7 +95,8 @@ private:
 
     static void EnqueueAISCommand(const std::string &procName, LLCoprocedureManager::CoProcedure_t proc);
     static void onIdle(void *userdata); // launches postponed AIS commands
-    static void onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body);
+    static void onUpdateReceived(const LLSD& update, COMMAND_TYPE type, const LLSD& request_body,
+                                 const ALInventorySync::Request& request);
 
     static std::string getInvCap();
     static std::string getLibCap();
@@ -111,7 +113,8 @@ class AISUpdate
 {
     LOG_CLASS(AISUpdate);
 public:
-    AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body);
+    AISUpdate(const LLSD& update, AISAPI::COMMAND_TYPE type, const LLSD& request_body,
+              const ALInventorySync::Request& request);
     void parseUpdate(const LLSD& update);
     void parseMeta(const LLSD& update);
     void parseContent(const LLSD& update);
@@ -159,6 +162,12 @@ private:
     // What a fetched folder held that the fetch's listing of it left out:
     // each child's id and the folder's.
     std::vector<std::pair<LLUUID, LLUUID>> mChildrenUnlisted;
+    // Each folder a fetch's listing was read for, whether or not it left
+    // anything out.
+    uuid_vec_t mFoldersListed;
+    // The request this is the reply to, which spares the folders listed
+    // that changed after it went.
+    ALInventorySync::Request mRequest;
 
     // These keep track of uuid's mentioned in meta values.
     // Useful for filtering out which content we are interested in.

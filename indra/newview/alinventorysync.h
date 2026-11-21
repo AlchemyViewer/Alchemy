@@ -28,6 +28,8 @@
 #include "llsd.h"
 #include "lluuid.h"
 
+#include <boost/unordered/unordered_flat_map.hpp>
+
 #include <deque>
 #include <optional>
 #include <vector>
@@ -75,6 +77,64 @@ public:
     static uuid_vec_t unlisted(const std::vector<Child>& children, Listing listing, const uuid_set_t& listed,
                                S32 listed_version, S32 held_version);
 
+    // The changes made to what folders hold, in all: an object made in a
+    // folder, moved into or out of it, or removed from it, by the viewer
+    // or by a reply. The inventory model notes each one.
+    class ContentChanges
+    {
+    public:
+        // How far the changes have come, which a request notes as it goes.
+        U64 stamp() const { return mCount; }
+
+        // Notes that what `folder_id` holds changed.
+        void note(const LLUUID& folder_id);
+
+        // Whether what `folder_id` holds changed after `stamp`.
+        bool changedSince(const LLUUID& folder_id, U64 stamp) const;
+
+        // Forgets a folder that has gone.
+        void forget(const LLUUID& folder_id);
+
+        // Forgets every folder, as the model empties.
+        void clear();
+
+    private:
+        U64                                    mCount = 0;
+        boost::unordered_flat_map<LLUUID, U64> mLastChange;
+    };
+
+    // A request whose reply may list folders whole. The reply is written
+    // before any change made after the request went, so it doesn't list
+    // what such a change put in a folder, and the version it gives such a
+    // folder is not the folder's as the viewer holds it, which a change
+    // the viewer made need not have raised.
+    class Request
+    {
+    public:
+        // As the request goes.
+        explicit Request(const ContentChanges& changes);
+
+        // As the reply comes, before any of it is applied, since applying
+        // it changes the folders it lists too: spares each of
+        // `listed_folders` whose contents changed after the request went.
+        void spareChanged(const ContentChanges& changes, const uuid_vec_t& listed_folders);
+
+        // Whether the reply leaves `folder_id` holding whatever it doesn't
+        // list, rather than removing it as unlisted() would.
+        bool spares(const LLUUID& folder_id) const;
+
+        // Once the reply is applied: has each folder it spared fetched
+        // again, by forgetting the version the reply gave it, as
+        // markOutOfStep does. `find(folder_id)` is a pointer to the folder,
+        // or null where it has gone.
+        template <typename FindFolder>
+        void forgetSpared(FindFolder&& find) const;
+
+    private:
+        U64        mSent = 0;
+        uuid_set_t mSpared;
+    };
+
     // The folders an inventory's cache keeps, from its root down through
     // the folders of the root's owner, in the order met: each complete
     // folder, the root among them only where it is complete, whose record
@@ -112,6 +172,18 @@ void ALInventorySync::markOutOfStep(Folder& folder)
     else
     {
         folder.setVersion(VERSION_UNKNOWN);
+    }
+}
+
+template <typename FindFolder>
+void ALInventorySync::Request::forgetSpared(FindFolder&& find) const
+{
+    for (const LLUUID& folder_id : mSpared)
+    {
+        if (auto* folder = find(folder_id))
+        {
+            markOutOfStep(*folder);
+        }
     }
 }
 

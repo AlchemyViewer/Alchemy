@@ -152,7 +152,8 @@ public:
     BGFolderHttpHandler(const LLSD& request_sd, const uuid_vec_t& recursive_cats)
         : LLCore::HttpHandler(),
           mRequestSD(request_sd),
-          mRecursiveCatUUIDs(recursive_cats)
+          mRecursiveCatUUIDs(recursive_cats),
+          mRequest(gInventory.getContentChanges())
         {
             LLInventoryModelBackgroundFetch::instance().incrFetchCount(1);
         }
@@ -179,6 +180,10 @@ private:
 private:
     LLSD mRequestSD;
     const uuid_vec_t mRecursiveCatUUIDs; // hack for storing away which cat fetches are recursive
+    // How far the changes to what folders hold had come as the request
+    // went, made just before it is posted, which spares the folders of the
+    // reply that changed after.
+    ALInventorySync::Request mRequest;
 };
 
 
@@ -1407,6 +1412,16 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
         uuid_set_t listed;
         std::vector<std::tuple<LLUUID, S32, S32>> listed_folders;
 
+        // Which folders the reply lists that changed after the request
+        // went, read before any of the reply is applied, since applying it
+        // changes them too.
+        uuid_vec_t folder_ids;
+        for (LLSD::array_const_iterator folder_it = folders.beginArray(); folder_it != folders.endArray(); ++folder_it)
+        {
+            folder_ids.push_back((*folder_it)["folder_id"].asUUID());
+        }
+        mRequest.spareChanged(gInventory.getContentChanges(), folder_ids);
+
         for (LLSD::array_const_iterator folder_it = folders.beginArray();
             folder_it != folders.endArray();
             ++folder_it)
@@ -1513,6 +1528,12 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
         // once what it moved elsewhere has moved.
         for (const auto& [folder_id, listed_version, held_version] : listed_folders)
         {
+            // Unless the folder changed after the request went, which the
+            // reply, written before, doesn't list.
+            if (mRequest.spares(folder_id))
+            {
+                continue;
+            }
             LLInventoryModel::cat_array_t* categories = nullptr;
             LLInventoryModel::item_array_t* items = nullptr;
             gInventory.getDirectDescendentsOf(folder_id, categories, items);
@@ -1539,6 +1560,10 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 gInventory.onObjectDeletedFromServer(child_id, false, false, false);
             }
         }
+
+        // Each folder spared forgets the version the reply gave it, and is
+        // fetched again.
+        mRequest.forgetSpared([](const LLUUID& folder_id) { return gInventory.getCategory(folder_id); });
     }
 
     if (content.has("bad_folders"))

@@ -84,6 +84,48 @@ uuid_vec_t ALInventorySync::unlisted(const std::vector<Child>& children, Listing
     return left_out;
 }
 
+void ALInventorySync::ContentChanges::note(const LLUUID& folder_id)
+{
+    mLastChange[folder_id] = ++mCount;
+}
+
+bool ALInventorySync::ContentChanges::changedSince(const LLUUID& folder_id, U64 stamp) const
+{
+    const auto found = mLastChange.find(folder_id);
+    return found != mLastChange.end() && found->second > stamp;
+}
+
+void ALInventorySync::ContentChanges::forget(const LLUUID& folder_id)
+{
+    mLastChange.erase(folder_id);
+}
+
+void ALInventorySync::ContentChanges::clear()
+{
+    mLastChange.clear();
+}
+
+ALInventorySync::Request::Request(const ContentChanges& changes)
+: mSent(changes.stamp())
+{
+}
+
+void ALInventorySync::Request::spareChanged(const ContentChanges& changes, const uuid_vec_t& listed_folders)
+{
+    for (const LLUUID& folder_id : listed_folders)
+    {
+        if (changes.changedSince(folder_id, mSent))
+        {
+            mSpared.insert(folder_id);
+        }
+    }
+}
+
+bool ALInventorySync::Request::spares(const LLUUID& folder_id) const
+{
+    return mSpared.contains(folder_id);
+}
+
 // static
 bool ALInventorySync::isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner)
 {
