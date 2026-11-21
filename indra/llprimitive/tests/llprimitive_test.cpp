@@ -634,6 +634,41 @@ namespace
             CHECK(params.getMaterial(i) == expected);
         }
     }
+
+    // A mesh asset can have more faces than the region counts on the object:
+    // the uploader splits a material too large for 16-bit indices into faces
+    // of its own, which the region's block names nothing for.
+    TEST_CASE("LLRenderMaterialParams: a face past the faces the region counts takes the last counted face's", "[LLRenderMaterialParams]")
+    {
+        const LLUUID leaf = LLUUID::generateNewID();
+        LLRenderMaterialParams one;
+        one.setMaterial(0, leaf);
+        CHECK(one.getMaterialFor(0, 1) == leaf);
+        CHECK(one.getMaterialFor(1, 1) == leaf);
+        CHECK(one.getMaterialFor(2, 1) == leaf);
+        UNSCOPED_INFO("the block alone still names face 0 only");
+        CHECK(one.getMaterial(1).isNull());
+        UNSCOPED_INFO("a face the region counts and the block names none for takes none");
+        CHECK(one.getMaterialFor(1, 3).isNull());
+        UNSCOPED_INFO("an object the region counts no faces on takes nothing past them");
+        CHECK(one.getMaterialFor(1, 0).isNull());
+
+        const LLUUID soil = LLUUID::generateNewID();
+        const LLUUID pot = LLUUID::generateNewID();
+        LLRenderMaterialParams three;
+        three.setMaterial(1, pot);
+        three.setMaterial(0, soil);
+        UNSCOPED_INFO("the last counted face's, wherever the block lists it");
+        CHECK(three.getMaterialFor(2, 2) == pot);
+        CHECK(three.getMaterialFor(5, 2) == pot);
+        UNSCOPED_INFO("none where the last counted face has none");
+        CHECK(three.getMaterialFor(3, 3).isNull());
+        UNSCOPED_INFO("a face past them the block names keeps its own");
+        const LLUUID own = LLUUID::generateNewID();
+        three.setMaterial(4, own);
+        CHECK(three.getMaterialFor(4, 2) == own);
+        CHECK(three.getMaterialFor(3, 2) == pot);
+    }
 }
 
 #include "llmessagesystem_stub.cpp"

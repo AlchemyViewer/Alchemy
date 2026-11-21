@@ -2382,3 +2382,13 @@ const LLUUID& LLRenderMaterialParams::getMaterial(U8 te) const
     return LLUUID::null;
 }
 
+const LLUUID& LLRenderMaterialParams::getMaterialFor(U8 te, U8 region_faces) const
+{
+    const LLUUID& id = getMaterial(te);
+    if (id.isNull() && region_faces > 0 && te >= region_faces)
+    {
+        return getMaterial(region_faces - 1);
+    }
+    return id;
+}
+

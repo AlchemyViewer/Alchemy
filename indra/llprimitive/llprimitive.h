@@ -421,6 +421,10 @@ public:
 
     void setMaterial(U8 te_idx, const LLUUID& id);
     const LLUUID& getMaterial(U8 te_idx) const;
+    // The material face `te_idx` takes on an object the region counts `region_faces` faces on: the one the block names
+    // for it, or, for a face past them that it names none for, the last counted face's. A mesh can have more faces than
+    // the region counts, which knows nothing of the faces past them.
+    const LLUUID& getMaterialFor(U8 te_idx, U8 region_faces) const;
 
     bool isEmpty() { return mEntries.empty(); }
 };

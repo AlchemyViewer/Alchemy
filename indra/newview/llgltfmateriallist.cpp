@@ -268,14 +268,20 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             }
 
             if (obj)
-            { // null out overrides on TEs that shouldn't have them
+            { // a face the message leaves out takes none, or, past the faces the region counts, the last counted face's
+                const S32 region_faces = (S32)obj->getRegionFaceCount();
                 U32 count = llmin(obj->getNumTEs(), MAX_TES);
                 for (U32 i = 0; i < count; ++i)
                 {
                     LLTextureEntry* te = obj->getTE(i);
-                    if (!has_te[i] && te && te->getGLTFMaterialOverride())
+                    if (has_te[i] || !te)
                     {
-                        count_face(i, obj->setTEGLTFMaterialOverride(i, nullptr));
+                        continue;
+                    }
+                    LLGLTFMaterial* wanted = cache.overrideFor((S32)i, region_faces);
+                    if (!LLGLTFOverrideCacheEntry::sameOverride(te->getGLTFMaterialOverride(), wanted))
+                    {
+                        count_face(i, obj->setTEGLTFMaterialOverride(i, wanted));
                         handle_gltf_override_message.doSelectionCallbacks(id, i);
                     }
                 }

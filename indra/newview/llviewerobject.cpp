@@ -5247,8 +5247,9 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
         {
             // The faces gained took their values from the texture entry last
             // unpacked. Each takes the render material the parameter block
-            // names for it, and the override the region holds for it, rather
-            // than the last face's.
+            // gives it and the override the region's record gives it: the
+            // face's own, or, past the faces the region counts, the last
+            // counted face's (getRegionFaceCount).
             if (original_tes < getNumTEs())
             {
                 for (int i = original_tes; i < getNumTEs(); ++i)
@@ -7805,12 +7806,24 @@ void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
     }
 }
 
+U8 LLViewerObject::getRegionFaceCount() const
+{
+    // The shape stands in for a mesh until its asset loads, and its faces are the ones the region counts. The asset
+    // can have more: the uploader splits a material too large for 16-bit indices into faces of its own.
+    const LLVolume* volume = getVolume();
+    if (volume && volume->getParams().isMeshSculpt())
+    {
+        return (U8)llmin(volume->getProfile().mFaces.size(), (size_t)U8_MAX);
+    }
+    return getNumTEs();
+}
+
 const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
 {
     const LLRenderMaterialParams* param_block = getRenderMaterialParams();
     if (param_block)
     {
-        return param_block->getMaterial(te);
+        return param_block->getMaterialFor(te, getRegionFaceCount());
     }
 
     return LLUUID::null;
@@ -7861,6 +7874,8 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         new_material = gGLTFMaterialList.getMaterial(id);
     }
 
+    const U8 region_faces = getRegionFaceCount();
+
     // update local state
     for (S32 te = start_idx; te < end_idx; ++te)
     {
@@ -7873,7 +7888,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         // checked for equality on unpacking. In that case, checking the
         // material ID for inequality won't work, because the material ID has
         // already been set.
-        bool material_changed = !local_origin || !param_block || id != param_block->getMaterial(te);
+        bool material_changed = !local_origin || !param_block || id != param_block->getMaterialFor(te, region_faces);
 
         if (update_server)
         {
@@ -7952,11 +7967,28 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     { // update existing parameter block
         for (S32 te = start_idx; te < end_idx; ++te)
         {
-            // Only where the block names another material: a face given no
-            // material where it names none takes no entry for it.
-            if (param_block->getMaterial(te) != id)
+            // Only where the block gives the face another material: a face
+            // given no material where it names none takes no entry for it,
+            // nor one past the faces the region counts given the last
+            // counted face's.
+            if (param_block->getMaterialFor(te, region_faces) != id)
             {
                 param_block->setMaterial(te, id);
+            }
+        }
+
+        // A face past the faces the region counts, which the block names no
+        // material for, takes the last counted face's: it follows that face
+        // here, since the region's echo of the change is the block as it now
+        // stands and applies nothing.
+        if (region_faces > 0 && start_idx < region_faces && region_faces <= end_idx)
+        {
+            for (S32 te = llmax(end_idx, (S32)region_faces); te < (S32)getNumTEs(); ++te)
+            {
+                if (param_block->getMaterial(te).isNull() && getTE(te)->getGLTFMaterial() != new_material)
+                {
+                    setRenderMaterialID(te, id, false, false);
+                }
             }
         }
     }
@@ -7991,9 +8023,10 @@ void LLViewerObject::setRenderMaterialIDs(const LLRenderMaterialParams* material
 {
     if (!local_origin)
     {
+        const U8 region_faces = getRegionFaceCount();
         for (S32 te = 0; te < getNumTEs(); ++te)
         {
-            const LLUUID& id = material_params ? material_params->getMaterial(te) : LLUUID::null;
+            const LLUUID& id = material_params ? material_params->getMaterialFor((U8)te, region_faces) : LLUUID::null;
             // We know material_params has updated or been created, because
             // extra params are checked for equality on unpacking.
             setRenderMaterialID(te, id, false, false);
