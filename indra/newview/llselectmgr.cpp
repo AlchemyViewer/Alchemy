@@ -7003,14 +7003,19 @@ void LLSelectNode::selectTE(S32 te_index, bool selected)
     {
         return;
     }
-    S32 mask = 0x1 << te_index;
-    if(selected)
+    // The faces that share the face's settings go with it (LLViewerObject::getFaceGroup)
+    const auto [first, last] = mObject ? mObject->getFaceGroup(te_index) : std::make_pair(te_index, te_index + 1);
+    for (S32 te = first; te < llmin(last, (S32)SELECT_MAX_TES); ++te)
     {
-        mTESelectMask |= mask;
-    }
-    else
-    {
-        mTESelectMask &= ~mask;
+        S32 mask = 0x1 << te;
+        if (selected)
+        {
+            mTESelectMask |= mask;
+        }
+        else
+        {
+            mTESelectMask &= ~mask;
+        }
     }
     mLastTESelected = te_index;
 }

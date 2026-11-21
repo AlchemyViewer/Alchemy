@@ -634,6 +634,11 @@ public:
     static U8 pCodeToLegacy(const LLPCode pcode);
     static bool getTESTAxes(const U8 face, U32* s_axis, U32* t_axis);
 
+    // The faces that share face `te`'s settings, [first, last), on a primitive the region counts `region_faces` of its
+    // `num_tes` faces on: the face alone, or the last counted face and every face past it, which take its settings
+    // (LLRenderMaterialParams::getMaterialFor). They are selected and edited as one.
+    static std::pair<S32, S32> faceGroup(S32 te, S32 num_tes, S32 region_faces);
+
     bool hasRenderMaterialParams() const;
 
     inline static bool isPrimitive(const LLPCode pcode);

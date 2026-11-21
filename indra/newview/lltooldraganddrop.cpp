@@ -1282,6 +1282,9 @@ void LLToolDragAndDrop::dropMaterial(LLViewerObject* hit_obj,
     }
     else
     {
+        // A face past the faces the region counts takes the drop through the last counted face, whose settings it
+        // takes (LLViewerObject::getFaceGroup)
+        hit_face = hit_obj->getFaceGroup(hit_face).first;
         dropMaterialOneFace(hit_obj, hit_face, item, source, src_id);
 
         // If user dropped a material onto face it implies
@@ -1669,6 +1672,9 @@ void LLToolDragAndDrop::dropTexture(LLViewerObject* hit_obj,
     }
     else
     {
+        // A face past the faces the region counts takes the drop through the last counted face, whose settings it
+        // takes (LLViewerObject::getFaceGroup)
+        hit_face = hit_obj->getFaceGroup(hit_face).first;
         dropTextureOneFace(hit_obj, hit_face, item, source, src_id, remove_pbr, tex_channel);
 
         // If user dropped a texture onto face it implies

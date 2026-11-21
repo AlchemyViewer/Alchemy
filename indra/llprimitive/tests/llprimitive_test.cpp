@@ -669,6 +669,26 @@ namespace
         CHECK(three.getMaterialFor(4, 2) == own);
         CHECK(three.getMaterialFor(3, 2) == pot);
     }
+
+    TEST_CASE("LLPrimitive: the last counted face and the faces past it are one group", "[LLPrimitive]")
+    {
+        using Group = std::pair<S32, S32>;
+        // A mesh of three faces on an object the region counts one face on
+        CHECK(LLPrimitive::faceGroup(0, 3, 1) == Group(0, 3));
+        CHECK(LLPrimitive::faceGroup(1, 3, 1) == Group(0, 3));
+        CHECK(LLPrimitive::faceGroup(2, 3, 1) == Group(0, 3));
+        UNSCOPED_INFO("a face before the last counted one is its own");
+        CHECK(LLPrimitive::faceGroup(0, 5, 2) == Group(0, 1));
+        CHECK(LLPrimitive::faceGroup(1, 5, 2) == Group(1, 5));
+        CHECK(LLPrimitive::faceGroup(4, 5, 2) == Group(1, 5));
+        UNSCOPED_INFO("every face is its own where the region counts them all, or none");
+        CHECK(LLPrimitive::faceGroup(2, 3, 3) == Group(2, 3));
+        CHECK(LLPrimitive::faceGroup(1, 3, 0) == Group(1, 2));
+        CHECK(LLPrimitive::faceGroup(0, 1, 2) == Group(0, 1));
+        UNSCOPED_INFO("a face the primitive does not have is its own");
+        CHECK(LLPrimitive::faceGroup(-1, 3, 1) == Group(-1, 0));
+        CHECK(LLPrimitive::faceGroup(3, 3, 1) == Group(3, 4));
+    }
 }
 
 #include "llmessagesystem_stub.cpp"

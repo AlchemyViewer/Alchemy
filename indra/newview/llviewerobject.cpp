@@ -7818,6 +7818,20 @@ U8 LLViewerObject::getRegionFaceCount() const
     return getNumTEs();
 }
 
+std::pair<S32, S32> LLViewerObject::getFaceGroup(S32 te) const
+{
+    return LLPrimitive::faceGroup(te, getNumTEs(), getRegionFaceCount());
+}
+
+void LLViewerObject::setTESelected(const U8 te, bool sel)
+{
+    const auto [first, last] = getFaceGroup(te);
+    for (S32 face = first; face < last; ++face)
+    {
+        LLPrimitive::setTESelected((U8)face, sel);
+    }
+}
+
 const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
 {
     const LLRenderMaterialParams* param_block = getRenderMaterialParams();

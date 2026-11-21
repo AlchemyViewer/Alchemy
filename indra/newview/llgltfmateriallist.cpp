@@ -382,6 +382,14 @@ namespace
             regionp->holdGLTFOverride(obj->getLocalID(), side);
         }
     }
+
+    // Whether the region counts face `side` of the object. A face past them is edited with the last counted face, whose
+    // settings it takes (LLViewerObject::getFaceGroup); the region, which knows nothing of it, is sent that face's edit
+    // alone.
+    bool region_counts(const LLViewerObject* obj, S32 side)
+    {
+        return !obj || side < (S32)obj->getRegionFaceCount();
+    }
 }
 
 void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const LLGLTFMaterial* mat)
@@ -396,6 +404,10 @@ void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const 
     if (obj && obj->getRenderMaterialID(side).notNull())
     {
         hold_region_override(obj, side);
+        if (!region_counts(obj, side))
+        {
+            return;
+        }
         if (mat == nullptr)
         {
             sModifyQueue.push_back({ obj->getID(), side, LLGLTFMaterial(), false });
@@ -414,6 +426,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
         return; // client-only preview: no sim material sync (see queueModify)
     }
     hold_region_override(obj, side);
+    if (!region_counts(obj, side))
+    {
+        return;
+    }
     const LLGLTFMaterial* material_override = obj->getTE(side)->getGLTFMaterialOverride();
     if (material_override)
     {
@@ -441,7 +457,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     else
     {
         hold_region_override(obj, side);
-        sApplyQueue.push_back({ obj->getID(), side, asset_id, nullptr, override_json });
+        if (region_counts(obj, side))
+        {
+            sApplyQueue.push_back({ obj->getID(), side, asset_id, nullptr, override_json });
+        }
     }
 }
 
@@ -459,8 +478,11 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     else
     {
         hold_region_override(obj, side);
-        LLGLTFMaterial* material = new LLGLTFMaterial(*material_override);
-        sApplyQueue.push_back({ obj->getID(), side, asset_id, material });
+        if (region_counts(obj, side))
+        {
+            LLGLTFMaterial* material = new LLGLTFMaterial(*material_override);
+            sApplyQueue.push_back({ obj->getID(), side, asset_id, material });
+        }
     }
 
     if (sUpdates.size() >= MAX_TASK_UPDATES)

@@ -423,6 +423,16 @@ S32 LLPrimitive::setTEGlow(const U8 index, const F32 glow)
     return mTextureList.setGlow(index, glow);
 }
 
+// static
+std::pair<S32, S32> LLPrimitive::faceGroup(S32 te, S32 num_tes, S32 region_faces)
+{
+    if (region_faces > 0 && region_faces < num_tes && te >= region_faces - 1 && te < num_tes)
+    {
+        return { region_faces - 1, num_tes };
+    }
+    return { te, te + 1 };
+}
+
 void LLPrimitive::setAllTESelected(bool sel)
 {
     for (int i = 0, cnt = getNumTEs(); i < cnt; i++)
