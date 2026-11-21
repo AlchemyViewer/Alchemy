@@ -151,9 +151,10 @@ public:
     template <typename ParentOwner>
     static LLUUID newFolderOwner(const LLSD& category_map, ParentOwner&& parent_owner, const LLUUID& fallback);
 
-    // Whether a folder of `owner` is the library's, whose owner the login
-    // names as `library_owner`. A login that names none has no library.
-    static bool isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner);
+    // Whether a folder or item of `owner` is the library's, whose owner the
+    // login names as `library_owner`. A login that names none has no
+    // library.
+    static bool isLibraryOwner(const LLUUID& owner, const LLUUID& library_owner);
 
     // Has a folder found out of step with the server's fetched when next
     // asked for, by forgetting its version. One whose version is already

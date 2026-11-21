@@ -250,19 +250,19 @@ namespace
     TEST_CASE("alinventorysync: a folder is the library's where its owner is the one the login names", "[alinventorysync]")
     {
         // A grid whose library is not Linden Lab's library account's.
-        CHECK(Sync::isLibraryFolder(LIBRARY, LIBRARY));
-        CHECK_FALSE(Sync::isLibraryFolder(AGENT, LIBRARY));
-        CHECK_FALSE(Sync::isLibraryFolder(ALEXANDRIA_LINDEN_ID, LIBRARY));
+        CHECK(Sync::isLibraryOwner(LIBRARY, LIBRARY));
+        CHECK_FALSE(Sync::isLibraryOwner(AGENT, LIBRARY));
+        CHECK_FALSE(Sync::isLibraryOwner(ALEXANDRIA_LINDEN_ID, LIBRARY));
 
         // Linden Lab's grids, whose logins name that account.
-        CHECK(Sync::isLibraryFolder(ALEXANDRIA_LINDEN_ID, ALEXANDRIA_LINDEN_ID));
-        CHECK_FALSE(Sync::isLibraryFolder(AGENT, ALEXANDRIA_LINDEN_ID));
+        CHECK(Sync::isLibraryOwner(ALEXANDRIA_LINDEN_ID, ALEXANDRIA_LINDEN_ID));
+        CHECK_FALSE(Sync::isLibraryOwner(AGENT, ALEXANDRIA_LINDEN_ID));
     }
 
     TEST_CASE("alinventorysync: a login that names no library owner has no library folder", "[alinventorysync]")
     {
-        CHECK_FALSE(Sync::isLibraryFolder(LLUUID::null, LLUUID::null));
-        CHECK_FALSE(Sync::isLibraryFolder(AGENT, LLUUID::null));
+        CHECK_FALSE(Sync::isLibraryOwner(LLUUID::null, LLUUID::null));
+        CHECK_FALSE(Sync::isLibraryOwner(AGENT, LLUUID::null));
     }
 
     // A folder as one found out of step is: its version, and the fetches

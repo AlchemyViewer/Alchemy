@@ -127,7 +127,7 @@ bool ALInventorySync::Request::spares(const LLUUID& folder_id) const
 }
 
 // static
-bool ALInventorySync::isLibraryFolder(const LLUUID& owner, const LLUUID& library_owner)
+bool ALInventorySync::isLibraryOwner(const LLUUID& owner, const LLUUID& library_owner)
 {
     return library_owner.notNull() && owner == library_owner;
 }

@@ -962,7 +962,7 @@ void LLInventoryModelBackgroundFetch::bulkFetchViaAis(const FetchQueueInfo& fetc
                         };
 
                         AISAPI::ITEM_TYPE item_type = AISAPI::INVENTORY;
-                        if (ALInventorySync::isLibraryFolder(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
+                        if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                         {
                             item_type = AISAPI::LIBRARY;
                         }
@@ -1019,7 +1019,7 @@ void LLInventoryModelBackgroundFetch::bulkFetchViaAis(const FetchQueueInfo& fetc
                         };
 
                         AISAPI::ITEM_TYPE item_type = AISAPI::INVENTORY;
-                        if (ALInventorySync::isLibraryFolder(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
+                        if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                         {
                             item_type = AISAPI::LIBRARY;
                         }
@@ -1170,7 +1170,7 @@ void LLInventoryModelBackgroundFetch::bulkFetch()
                             folder_sd["fetch_folders"] = LLSD::Boolean(true); //(LLSD::Boolean)sFullFetchStarted;
                             folder_sd["fetch_items"] = LLSD::Boolean(true);
 
-                            if (ALInventorySync::isLibraryFolder(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
+                            if (ALInventorySync::isLibraryOwner(cat->getOwnerID(), gInventory.getLibraryOwnerID()))
                             {
                                 folder_request_body_lib["folders"].append(folder_sd);
                             }
