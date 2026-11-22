@@ -9,7 +9,7 @@
 # file carries a revision, every triplet states the revision it was written
 # against, and the two must agree. Editing either file means bumping both,
 # which changes every triplet's hash and rebuilds the ports.
-set(ALCHEMY_TRIPLET_BASE_REVISION 7)
+set(ALCHEMY_TRIPLET_BASE_REVISION 8)
 if(NOT ALCHEMY_TRIPLET_REVISION EQUAL ALCHEMY_TRIPLET_BASE_REVISION)
   message(
     FATAL_ERROR
@@ -50,6 +50,13 @@ if(NOT DEFINED VCPKG_CMAKE_SYSTEM_NAME)
   al_isa_flags(${ALCHEMY_ISA_TIER} Windows ${VCPKG_TARGET_ARCHITECTURE} isa_flags)
   set(VCPKG_C_FLAGS "${isa_flags}")
   set(VCPKG_CXX_FLAGS "${isa_flags} /std:c++20 /Zc:__cplusplus")
+  # MSVC 19.52's aligned loads of unaligned memory in x64 zero tests, turned
+  # off as 00-Common.cmake turns them off for the viewer. A triplet cannot ask
+  # the compiler its version, but a port builds in its toolset's environment.
+  if(VCPKG_TARGET_ARCHITECTURE STREQUAL "x64" AND "$ENV{VCToolsVersion}" MATCHES "^14\\.52\\.")
+    string(APPEND VCPKG_C_FLAGS " /d2pattern-opt-lowered-post-color-")
+    string(APPEND VCPKG_CXX_FLAGS " /d2pattern-opt-lowered-post-color-")
+  endif()
   set(VCPKG_CMAKE_CONFIGURE_OPTIONS "-DCMAKE_CXX_STANDARD=20")
 else()
   set(VCPKG_CRT_LINKAGE dynamic)
