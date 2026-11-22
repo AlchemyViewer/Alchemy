@@ -43,6 +43,7 @@
 #include "alaudioechobuffer.h"
 #include <cstdint>
 #include <memory>
+#include <mutex>
 
 // Work around webrtc on gcc 16 libstdc++ headers
 #include <cstddef>
@@ -597,6 +598,9 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public ALAudioDeviceNotifie
     webrtc::scoped_refptr<LLWebRTCAudioDeviceModule>           mDeviceModule;
     std::unique_ptr<ALAudioDeviceNotifier>                     mDeviceNotifier;
     std::vector<LLWebRTCDevicesObserver *>                     mVoiceDevicesObserverList;
+    // Guards the list above, and is held through updateDevices()'s callbacks,
+    // so a thread holding it knows no observer is being called.
+    std::timed_mutex                                           mDevicesObserversMutex;
     // Set by terminate() when it gives up on the worker thread; from then on
     // updateDevices() notifies no observer.
     std::atomic<bool>                                          mDevicesObserversDetached{ false };
