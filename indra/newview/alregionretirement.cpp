@@ -51,6 +51,14 @@ namespace
     // ends anyway.
     constexpr F64 MAX_DRAIN_WAIT_SECONDS = 5.0;
 
+    // Whether a retired region is removed and its circuit closed at once, rather than kept until its simulator
+    // disables it.
+    bool closes_circuit()
+    {
+        static LLCachedControl<bool> close_circuit(gSavedSettings, "AlchemyRetireDepartedRegionsCloseCircuit", false);
+        return close_circuit;
+    }
+
     // Whether the object's death hands its entry back to its region's object cache, which makes it again once the
     // region's idle update resumes (LLDrawable::removeFromOctree, LLViewerRegion::removeActiveCacheEntry).
     bool returns_to_cache(LLViewerObject* objectp)
@@ -246,9 +254,10 @@ void ALRegionRetirement::startNext()
         std::vector<LLPointer<LLViewerObject>> objects;
         gObjectList.getRegionObjects(regionp, objects);
         const bool resumed = regionp->isRetiring();
-        if (resumed && objects.empty())
+        if (resumed && objects.empty() && !closes_circuit())
         {
-            // retired already, and waiting for its simulator to let the agent go there
+            // retired already, and waiting for its simulator to let the agent go there. Where finish() closes circuits a
+            // retiring region still listed is one a teleport paused before it finished: it goes on to finish().
             continue;
         }
 
@@ -314,8 +323,7 @@ void ALRegionRetirement::finish()
 
     const std::string name = regionp->getName();
     const F64 seconds = LLFrameTimer::getTotalSeconds() - mStartTime;
-    static LLCachedControl<bool> close_circuit(gSavedSettings, "AlchemyRetireDepartedRegionsCloseCircuit", false);
-    if (!close_circuit || regionp == gAgent.getRegion())
+    if (!closes_circuit() || regionp == gAgent.getRegion())
     {
         // Kept, with its land, its handshake and its object cache, for as long as its simulator holds the agent there:
         // DisableSimulator removes it as it would without retirement, and a teleport back revives it.
