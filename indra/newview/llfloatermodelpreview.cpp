@@ -181,14 +181,14 @@ bool LLFloaterModelPreview::postBuild()
     childSetCommitCallback("upload_textures", boost::bind(&LLFloaterModelPreview::onUploadOptionChecked, this, _1), NULL);
 
     // The packing and the weights' rounding change the LOD blocks the fee is
-    // charged for, whether the floater or anything else sets them. Standard
-    // packing rounds nothing.
+    // charged for, so changing either drops the fee, whether the floater or
+    // anything else sets them. Standard packing rounds nothing.
     auto packing_changed = [this](LLControlVariable*, const LLSD&, const LLSD&)
     {
         childSetEnabled("upload_round_weights", gSavedSettings.getU32("AlchemyMeshUploadPacking") != LLModel::PACK_PLAIN);
         if (mModelPreview)
         {
-            toggleCalculateButton(true);
+            modelUpdated(true);
         }
     };
     mPackingConnection = gSavedSettings.getControl("AlchemyMeshUploadPacking")->getSignal()->connect(packing_changed);
