@@ -426,9 +426,19 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
 
     // The crash reporter next, so that whatever crashes from here on is
     // reported: it needs only the viewer's directories. After Velopack, which
-    // may be replacing the crash handler's executable.
+    // may be replacing the crash handler's executable. --disablecrashlogger
+    // (or -disablecrashlogger) is read here from the command line: the
+    // settings that hold it come later.
+    bool crash_logger_disabled = false;
+    for (int i = 1; i < argc; ++i)
+    {
+        if (argv[i] && (strcmp(argv[i], "--disablecrashlogger") == 0 || strcmp(argv[i], "-disablecrashlogger") == 0))
+        {
+            crash_logger_disabled = true;
+        }
+    }
     LLAppViewer::initAppDirs();
-    ALCrashReporter::start();
+    ALCrashReporter::start(!crash_logger_disabled);
     LLAppViewer::installTerminateHandler();
 
     // A crash of the last run waiting for an answer is asked about before

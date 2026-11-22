@@ -98,6 +98,7 @@ namespace
     enum class StartState
     {
         NotStarted,
+        Disabled,
         NotAllowed,
         Failed,
         Engaged,
@@ -211,11 +212,16 @@ namespace
 
 // The Cocoa SDK has no way to keep a report until consent is given, so it is
 // engaged only once crash reports are allowed.
-bool ALCrashReporter::start()
+bool ALCrashReporter::start(bool may_run)
 {
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
+    if (!may_run)
+    {
+        sStartState = StartState::Disabled;
+        return false;
+    }
     if (recordedConsent(consentDirectory()) != Consent::Allowed)
     {
         sStartState = StartState::NotAllowed;
@@ -237,6 +243,10 @@ void ALCrashReporter::attachRun()
     {
         attach_run();
         log_engaged();
+    }
+    else if (sStartState == StartState::Disabled)
+    {
+        LL_INFOS("CrashReporter") << "Crash logger disabled; Sentry stays off" << LL_ENDL;
     }
     else if (sStartState == StartState::NotAllowed)
     {

@@ -468,8 +468,8 @@ namespace
     // What was kept for a yes that did not come: the crash reports held in
     // the database and the events cached beside them. The first instance
     // only, with the SDK closed: a second instance's database is the first's.
-    // Before the viewer exists which instance this is is not known; the
-    // settings' answer, once read, deletes them then.
+    // Before the viewer exists which instance this is is not known;
+    // attachRun() deletes them then.
     void discard_reports()
     {
         LLAppViewer* app = LLAppViewer::instance();
@@ -490,6 +490,7 @@ namespace
     enum class StartState
     {
         NotStarted,
+        Disabled,
         Declined,
         Failed,
         Engaged,
@@ -595,11 +596,17 @@ namespace
     }
 }
 
-bool ALCrashReporter::start()
+bool ALCrashReporter::start(bool may_run)
 {
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
+    if (!may_run)
+    {
+        sStartState = StartState::Disabled;
+        follow_wer(false);
+        return false;
+    }
     const Consent consent = recordedConsent(consentDirectory());
     if (consent == Consent::Declined)
     {
@@ -653,6 +660,12 @@ void ALCrashReporter::attachRun()
     {
         attach_run();
         log_engaged();
+        return;
+    }
+
+    if (sStartState == StartState::Disabled)
+    {
+        LL_INFOS("CrashReporter") << "Crash logger disabled; Sentry stays off" << LL_ENDL;
     }
     else if (sStartState == StartState::Declined)
     {
@@ -661,6 +674,15 @@ void ALCrashReporter::attachRun()
     else if (sStartState == StartState::Failed)
     {
         LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
+    }
+
+    // What was kept for an answer that was no, this run's or an earlier
+    // one's, goes as soon as it is known whether this is the first instance,
+    // which owns it: a run that crashes before the settings are read would
+    // otherwise keep it.
+    if (recordedConsent(consentDirectory()) == Consent::Declined)
+    {
+        discard_reports();
     }
 }
 

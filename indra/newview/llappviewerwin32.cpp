@@ -317,9 +317,11 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
 
     // The crash reporter next, so that whatever crashes from here on is
     // reported: it needs only the viewer's directories. After Velopack, which
-    // may be replacing the crash handler's executable.
+    // may be replacing the crash handler's executable. --disablecrashlogger
+    // (or -disablecrashlogger) is read here from the command line: the
+    // settings that hold it come later.
     LLAppViewer::initAppDirs();
-    ALCrashReporter::start();
+    ALCrashReporter::start(!(pCmdLine && wcsstr(pCmdLine, L"-disablecrashlogger")));
     LLAppViewer::installTerminateHandler();
 
     const S32 MAX_HEAPS = 255;

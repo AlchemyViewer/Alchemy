@@ -190,7 +190,10 @@ namespace ALCrashReporter
     // From main, once the viewer's directories are set and before anything
     // else: engages unless the record says crash reports were declined, and
     // sends only when the record allows them. It needs nothing of the viewer.
-    bool start();
+    // A run that may not run the reporter (--disablecrashlogger, which main
+    // reads from the command line, the settings coming later) does not
+    // engage, and keeps the recorded answer.
+    bool start(bool may_run);
     // From main straight after start(), but not in the GPU benchmark child:
     // when the last run crashed while its reports were kept for an answer,
     // the user is asked with the system's own dialog, before anything else
@@ -201,7 +204,8 @@ namespace ALCrashReporter
     // From the end of the viewer's constructor, once the log is open and the
     // previous run is read: what start() could not know yet. The log, the
     // static debug file and the tags of the run go on its reports, and what
-    // the SDK said as it started is written to the log.
+    // the SDK said as it started is written to the log. When crash reports
+    // are declined, the first instance deletes what was kept for an answer.
     void attachRun();
     // The settings' answer, once readable and whenever it changes: recorded,
     // and the reporter engaged, holding, sending or closed to match. A run
@@ -222,7 +226,7 @@ namespace ALCrashReporter
     bool reportFreeze(const std::string& description);
     bool handleException(void* exception_pointers);
 #else
-    inline bool start() { return false; }
+    inline bool start(bool) { return false; }
     inline void askAfterHeldCrash() {}
     inline void attachRun() {}
     inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
