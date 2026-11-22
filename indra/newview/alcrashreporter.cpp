@@ -105,21 +105,46 @@ bool ALCrashReporter::crashLoggerDisabledBy(const std::vector<std::string>& argu
         }
     }
 
-    // Then each --set name value, in order; a value the setting cannot read
-    // as a boolean stores false.
-    for (size_t i = 0; i + 2 < arguments.size(); ++i)
+    // Then each --set name value, in order: "--set name value", or
+    // "--set=name value", the parser taking the attached name as the first
+    // of its two values. A value the setting cannot read as a boolean stores
+    // false.
+    constexpr std::string_view SET_LONG = "--set=";
+    constexpr std::string_view SET_DISGUISED = "-set=";
+    for (size_t i = 0; i < arguments.size(); ++i)
     {
-        if (arguments[i] != "--set" && arguments[i] != "-set")
+        const std::string_view argument = arguments[i];
+        std::string_view name;
+        size_t value_index = 0;
+        if (argument == "--set" || argument == "-set")
+        {
+            if (i + 2 >= arguments.size())
+            {
+                break;
+            }
+            name = arguments[i + 1];
+            value_index = i + 2;
+        }
+        else if (argument.starts_with(SET_LONG) || argument.starts_with(SET_DISGUISED))
+        {
+            if (i + 1 >= arguments.size())
+            {
+                break;
+            }
+            name = argument.substr(argument.find('=') + 1);
+            value_index = i + 1;
+        }
+        else
         {
             continue;
         }
-        const std::string& name = arguments[i + 1];
+
         if (name == "DisableCrashLogger" || name == "Global.DisableCrashLogger")
         {
             bool value = false;
-            disabled = LLStringUtil::convertToBOOL(arguments[i + 2], value) && value;
+            disabled = LLStringUtil::convertToBOOL(arguments[value_index], value) && value;
         }
-        i += 2;
+        i = value_index;
     }
     return disabled;
 }

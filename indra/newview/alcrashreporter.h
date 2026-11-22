@@ -189,8 +189,9 @@ namespace ALCrashReporter
     // Whether a command line (its arguments, without the program) turns the
     // crash logger off, read before the settings are, as initConfiguration()
     // applies it: --disablecrashlogger, then each --set DisableCrashLogger
-    // (or Global.DisableCrashLogger), the last one winning, with the value
-    // read as the setting reads it. Every option may also have one dash.
+    // or --set=DisableCrashLogger (or Global.DisableCrashLogger), the last
+    // one winning, with the value read as the setting reads it. Every option
+    // may also have one dash.
     bool crashLoggerDisabledBy(const std::vector<std::string>& arguments);
 
 #if AL_SENTRY

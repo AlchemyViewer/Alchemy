@@ -210,6 +210,16 @@ namespace
         CHECK_FALSE(disabled({ "--disablecrashlogger", "--set", "DisableCrashLogger", "0" }));
         CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "0", "--disablecrashlogger" }));
         CHECK(disabled({ "--set", "DisableCrashLogger", "0", "--set", "DisableCrashLogger", "1" }));
+
+        UNSCOPED_INFO("--set=name takes the name from the option and the value from the next argument");
+        CHECK(disabled({ "--set=DisableCrashLogger", "1" }));
+        CHECK(disabled({ "-set=DisableCrashLogger", "true" }));
+        CHECK(disabled({ "--set=Global.DisableCrashLogger", "T" }));
+        CHECK_FALSE(disabled({ "--set=DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set=DisableCrashLogger" }));
+        CHECK_FALSE(disabled({ "--set=OtherSetting", "1" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "1", "--set=DisableCrashLogger", "0" }));
+        CHECK(disabled({ "--set=DisableCrashLogger", "0", "--set", "DisableCrashLogger", "1" }));
     }
 
     TEST_CASE("alcrashreporter: a location written into a buffer is the same or cut to fit", "[alcrashreporter]")
