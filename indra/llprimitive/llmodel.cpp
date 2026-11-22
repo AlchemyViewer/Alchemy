@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "llmodel.h"
+#include "almeshfacepack.h"
 #include "llmemory.h"
 #include "llconvexdecomposition.h"
 #include "llsdserialize.h"
@@ -628,7 +629,7 @@ LLSD LLModel::writeModel(
     EWriteModelMode write_mode,
     bool as_slm,
     int submodel_id,
-    EBlockZip block_zip)
+    EBlockPacking packing)
 {
     LLSD mdl;
 
@@ -911,12 +912,12 @@ LLSD LLModel::writeModel(
         }
     }
 
-    return writeModelToStream(ostr, mdl, write_mode, as_slm, block_zip);
+    return writeModelToStream(ostr, mdl, write_mode, as_slm, packing);
 }
 
-LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockZip block_zip)
+LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockPacking packing)
 {
-    auto zip = [block_zip](LLSD& block) { return block_zip == ZIP_LLSD_MODEL ? zip_llsd_model(block) : zip_llsd(block); };
+    auto zip = [packing](LLSD& block) { return packing == PACK_PLAIN ? zip_llsd(block) : zip_llsd_model(block); };
 
     std::string::size_type cur_offset = 0;
 
@@ -968,7 +969,17 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
     {
         if (mdl.has(model_names[i]))
         {
-            out[i] = zip(mdl[model_names[i]]);
+            LLSD& block = mdl[model_names[i]];
+            if (packing != PACK_PLAIN)
+            {
+                const ALMeshFacePack::Normals normals =
+                    packing == PACK_SMALL_SNAPPED ? ALMeshFacePack::Normals::SNAP_12_BITS : ALMeshFacePack::Normals::KEEP;
+                for (LLSD::array_iterator face = block.beginArray(); face != block.endArray(); ++face)
+                {
+                    ALMeshFacePack::repack(*face, normals);
+                }
+            }
+            out[i] = zip(block);
 
             U32 size = static_cast<U32>(out[i].size());
 

@@ -174,12 +174,16 @@ public:
         WRITE_HUMAN,
     };
 
-    // What zips each block of the asset: zip_llsd, or zip_llsd_model, whose
-    // smaller LOD blocks lower an upload's download weight and take longer.
-    enum EBlockZip
+    // How the asset's blocks are packed: each zipped by zip_llsd; or, for
+    // smaller LOD blocks and so a lower download weight for an upload, each
+    // LOD face repacked to draw the same (ALMeshFacePack) and every block
+    // zipped by zip_llsd_model, which takes longer; or that with the faces'
+    // normals snapped to 12 bits as well.
+    enum EBlockPacking
     {
-        ZIP_LLSD = 0,
-        ZIP_LLSD_MODEL,
+        PACK_PLAIN = 0,
+        PACK_SMALL,
+        PACK_SMALL_SNAPPED,
     };
 
     static LLSD writeModel(
@@ -196,13 +200,13 @@ public:
         EWriteModelMode write_mode = WRITE_BINARY,
         bool as_slm = false,
         int submodel_id = 0,
-        EBlockZip block_zip = ZIP_LLSD);
+        EBlockPacking packing = PACK_PLAIN);
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
         LLSD& mdl,
         EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false,
-        EBlockZip block_zip = ZIP_LLSD);
+        EBlockPacking packing = PACK_PLAIN);
 
     void ClearFacesAndMaterials() { mVolumeFaces.clear(); mMaterialList.clear(); }
 
