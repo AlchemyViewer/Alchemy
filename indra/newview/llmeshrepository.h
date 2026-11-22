@@ -864,7 +864,7 @@ protected:
         );
 
     // A fingerprint of what the model's asset is written from: each LOD's
-    // model and its faces' sizes, and the decomposition the hull is made
+    // model and its faces' geometry, and the decomposition the hull is made
     // from, as packModelIntance takes them from the model's first instance.
     static size_t assetSource(LLModel* base_model, const instance_list_t& instances);
 

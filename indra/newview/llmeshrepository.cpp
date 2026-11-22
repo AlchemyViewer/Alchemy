@@ -76,8 +76,8 @@
 #include "llfloaterreg.h"
 #include "llvoavatarself.h"
 #include "llskinningutil.h"
+#include "hbxxh.h"
 
-#include "boost/container_hash/hash.hpp"
 #include "boost/iostreams/device/array.hpp"
 #include "boost/iostreams/stream.hpp"
 #include "boost/lexical_cast.hpp"
@@ -2849,32 +2849,54 @@ LLSD llsd_from_file(std::string filename)
 //static
 size_t LLMeshUploadThread::assetSource(LLModel* base_model, const instance_list_t& instances)
 {
-    size_t seed = 0;
-    boost::hash_combine(seed, base_model);
+    // Each LOD's faces are hashed whole, so that a model whose geometry
+    // changed in place, its counts kept, is not taken for the one the asset
+    // was written from.
+    HBXXH64 hash;
+    auto add = [&hash](const void* data, size_t bytes)
+    {
+        if (data && bytes)
+        {
+            hash.update(data, bytes);
+        }
+    };
+    auto add_value = [&add](const auto& value) { add(&value, sizeof(value)); };
+
+    add_value(base_model);
     const LLModelInstance& first_instance = instances.front();
     for (const LLPointer<LLModel>& model : first_instance.mLOD)
     {
-        boost::hash_combine(seed, model.get());
-        if (model.isNull())
+        const LLModel* lod = model.get();
+        add_value(lod);
+        if (!lod)
         {
             continue;
         }
-        boost::hash_combine(seed, model->getNumVolumeFaces());
-        for (S32 f = 0; f < model->getNumVolumeFaces(); ++f)
+        const S32 faces = lod->getNumVolumeFaces();
+        add_value(faces);
+        for (S32 f = 0; f < faces; ++f)
         {
-            const LLVolumeFace& face = model->getVolumeFace(f);
-            boost::hash_combine(seed, face.mNumVertices);
-            boost::hash_combine(seed, face.mNumIndices);
+            const LLVolumeFace& face = lod->getVolumeFace(f);
+            const size_t vertices = face.mNumVertices > 0 ? (size_t)face.mNumVertices : 0;
+            const size_t indices = face.mNumIndices > 0 ? (size_t)face.mNumIndices : 0;
+            add_value(vertices);
+            add_value(indices);
+            add(face.mPositions, vertices * sizeof(LLVector4a));
+            add(face.mNormals, vertices * sizeof(LLVector4a));
+            add(face.mTexCoords, vertices * sizeof(LLVector2));
+            add(face.mWeights, vertices * sizeof(LLVector4a));
+            add(face.mIndices, indices * sizeof(U16));
         }
-        boost::hash_combine(seed, model->mSkinWeights.size());
+        add_value(lod->mSkinWeights.size());
     }
     const LLModel* physics = first_instance.mLOD[LLModel::LOD_PHYSICS].notNull() ? first_instance.mLOD[LLModel::LOD_PHYSICS].get() : base_model;
-    boost::hash_combine(seed, physics->mPhysics.mHull.size());
+    add_value(physics->mPhysics.mHull.size());
     for (const auto& hull : physics->mPhysics.mHull)
     {
-        boost::hash_combine(seed, hull.size());
+        add_value(hull.size());
+        add(hull.data(), hull.size() * sizeof(hull[0]));
     }
-    return seed;
+    return (size_t)hash.digest();
 }
 
 bool LLMeshUploadThread::feeAssetsServe() const
