@@ -77,6 +77,7 @@
 #include "llvoavatarself.h"
 #include "llskinningutil.h"
 
+#include "boost/container_hash/hash.hpp"
 #include "boost/iostreams/device/array.hpp"
 #include "boost/iostreams/stream.hpp"
 #include "boost/lexical_cast.hpp"
@@ -2709,7 +2710,8 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
                                        bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                                        const std::string & upload_url, LLUUID destination_folder_id, bool do_upload,
                                        LLHandle<LLWholeModelFeeObserver> fee_observer,
-                                       LLHandle<LLWholeModelUploadObserver> upload_observer)
+                                       LLHandle<LLWholeModelUploadObserver> upload_observer,
+                                       std::shared_ptr<const ALMeshUploadAssets> fee_assets)
   : LLThread("mesh upload"),
     LLCore::HttpHandler(),
     mDiscarded(false),
@@ -2717,7 +2719,8 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mWholeModelUploadURL(upload_url),
     mDestinationFolderId(destination_folder_id),
     mFeeObserverHandle(fee_observer),
-    mUploadObserverHandle(upload_observer)
+    mUploadObserverHandle(upload_observer),
+    mFeeAssets(do_upload ? std::move(fee_assets) : nullptr)
 {
     mInstanceList = data;
     mLodSources = sources_list;
@@ -2739,6 +2742,11 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mBlockPacking = !gSavedSettings.getBOOL("AlchemyMeshUploadMaxCompression") ? LLModel::PACK_PLAIN
                     : gSavedSettings.getBOOL("AlchemyMeshUploadSnapNormals")   ? LLModel::PACK_SMALL_SNAPPED
                                                                                : LLModel::PACK_SMALL;
+    if (!do_upload)
+    {
+        mWrittenAssets = std::make_shared<ALMeshUploadAssets>();
+        mWrittenAssets->mOptions = { mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking };
+    }
 
     mHttpRequest = new LLCore::HttpRequest;
     mHttpOptions = std::make_shared<LLCore::HttpOptions>();
@@ -2838,6 +2846,55 @@ LLSD llsd_from_file(std::string filename)
     return result;
 }
 
+//static
+size_t LLMeshUploadThread::assetSource(LLModel* base_model, const instance_list_t& instances)
+{
+    size_t seed = 0;
+    boost::hash_combine(seed, base_model);
+    const LLModelInstance& first_instance = instances.front();
+    for (const LLPointer<LLModel>& model : first_instance.mLOD)
+    {
+        boost::hash_combine(seed, model.get());
+        if (model.isNull())
+        {
+            continue;
+        }
+        boost::hash_combine(seed, model->getNumVolumeFaces());
+        for (S32 f = 0; f < model->getNumVolumeFaces(); ++f)
+        {
+            const LLVolumeFace& face = model->getVolumeFace(f);
+            boost::hash_combine(seed, face.mNumVertices);
+            boost::hash_combine(seed, face.mNumIndices);
+        }
+        boost::hash_combine(seed, model->mSkinWeights.size());
+    }
+    const LLModel* physics = first_instance.mLOD[LLModel::LOD_PHYSICS].notNull() ? first_instance.mLOD[LLModel::LOD_PHYSICS].get() : base_model;
+    boost::hash_combine(seed, physics->mPhysics.mHull.size());
+    for (const auto& hull : physics->mPhysics.mHull)
+    {
+        boost::hash_combine(seed, hull.size());
+    }
+    return seed;
+}
+
+bool LLMeshUploadThread::feeAssetsServe() const
+{
+    if (!mFeeAssets || !(mFeeAssets->mOptions == ALMeshUploadAssets::Options{ mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking }) ||
+        mFeeAssets->mAssets.size() != mInstance.size())
+    {
+        return false;
+    }
+    for (const auto& [model, instances] : mInstance)
+    {
+        const auto found = mFeeAssets->mAssets.find(model.get());
+        if (instances.empty() || found == mFeeAssets->mAssets.end() || found->second.source != assetSource(model, instances))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void LLMeshUploadThread::packModelIntance(
     LLModel* model,
     LLMeshUploadThread::instance_list_t& instance_list,
@@ -2870,35 +2927,46 @@ void LLMeshUploadThread::packModelIntance(
             model_name = data.mBaseModel->getName();
         }
 
-        std::stringstream ostr;
+        if (mSendFeeAssets)
+        {
+            // feeAssetsServe() found the model's asset
+            data.mAssetData = mFeeAssets->mAssets.at(model).bytes;
+        }
+        else
+        {
+            std::stringstream ostr;
 
-        LLModel::Decomposition& decomp =
-            data.mModel[LLModel::LOD_PHYSICS].notNull() ?
-            data.mModel[LLModel::LOD_PHYSICS]->mPhysics :
-            data.mBaseModel->mPhysics;
+            LLModel::Decomposition& decomp =
+                data.mModel[LLModel::LOD_PHYSICS].notNull() ?
+                data.mModel[LLModel::LOD_PHYSICS]->mPhysics :
+                data.mBaseModel->mPhysics;
 
-        decomp.mBaseHull = mHullMap[data.mBaseModel];
+            decomp.mBaseHull = mHullMap[data.mBaseModel];
 
-        LLSD mesh_header = LLModel::writeModel(
-            ostr,
-            data.mModel[LLModel::LOD_PHYSICS],
-            data.mModel[LLModel::LOD_HIGH],
-            data.mModel[LLModel::LOD_MEDIUM],
-            data.mModel[LLModel::LOD_LOW],
-            data.mModel[LLModel::LOD_IMPOSTOR],
-            decomp,
-            mUploadSkin,
-            mUploadJoints,
-            mLockScaleIfJointPosition,
-            LLModel::WRITE_BINARY,
-            false,
-            data.mBaseModel->mSubmodelID,
-            mBlockPacking);
+            LLModel::writeModel(
+                ostr,
+                data.mModel[LLModel::LOD_PHYSICS],
+                data.mModel[LLModel::LOD_HIGH],
+                data.mModel[LLModel::LOD_MEDIUM],
+                data.mModel[LLModel::LOD_LOW],
+                data.mModel[LLModel::LOD_IMPOSTOR],
+                decomp,
+                mUploadSkin,
+                mUploadJoints,
+                mLockScaleIfJointPosition,
+                LLModel::WRITE_BINARY,
+                false,
+                data.mBaseModel->mSubmodelID,
+                mBlockPacking);
 
-        data.mAssetData = ostr.str();
-        std::string str = ostr.str();
+            data.mAssetData = ostr.str();
+        }
+        if (mWrittenAssets)
+        {
+            mWrittenAssets->mAssets[model] = { assetSource(model, instance_list), data.mAssetData };
+        }
 
-        res["mesh_list"][mesh_num] = LLSD::Binary(str.begin(), str.end());
+        res["mesh_list"][mesh_num] = LLSD::Binary(data.mAssetData.begin(), data.mAssetData.end());
         mesh_index[data.mBaseModel] = mesh_num;
         mesh_num++;
     }
@@ -3254,8 +3322,18 @@ void LLMeshUploadThread::doWholeModelUpload()
     }
     else
     {
-        generateHulls();
-        LL_DEBUGS(LOG_MESH) << "Hull generation completed." << LL_ENDL;
+        // What the fee was quoted for, where it still stands for what this
+        // upload would write.
+        mSendFeeAssets = feeAssetsServe();
+        if (mSendFeeAssets)
+        {
+            LL_INFOS(LOG_MESH) << "Sending the " << mFeeAssets->mAssets.size() << " assets the fee request wrote." << LL_ENDL;
+        }
+        else
+        {
+            generateHulls();
+            LL_DEBUGS(LOG_MESH) << "Hull generation completed." << LL_ENDL;
+        }
 
         mModelData = LLSD::emptyMap();
         mTextureFiles.clear();
@@ -3486,8 +3564,12 @@ void LLMeshUploadThread::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResp
                 body["data"]["upload_price"] = body["upload_price"];
                 const LLSD fee_data = body["data"];
                 const std::string upload_url = mWholeModelUploadURL;
-                notify_upload_observer(observer, [fee_data, upload_url](LLWholeModelFeeObserver* o)
-                    { o->onModelPhysicsFeeReceived(fee_data, upload_url); });
+                std::shared_ptr<const ALMeshUploadAssets> assets = mWrittenAssets;
+                notify_upload_observer(observer, [fee_data, upload_url, assets](LLWholeModelFeeObserver* o)
+                    {
+                        o->onModelAssetsWritten(assets);
+                        o->onModelPhysicsFeeReceived(fee_data, upload_url);
+                    });
             }
             else
             {
@@ -5570,11 +5652,13 @@ void LLMeshRepository::uploadModel(std::vector<LLModelInstance>& data, const std
                                    LLVector3& scale, bool upload_textures,
                                    bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                                    std::string upload_url, const LLUUID& destination_folder_id, bool do_upload,
-                                   LLHandle<LLWholeModelFeeObserver> fee_observer, LLHandle<LLWholeModelUploadObserver> upload_observer)
+                                   LLHandle<LLWholeModelFeeObserver> fee_observer, LLHandle<LLWholeModelUploadObserver> upload_observer,
+                                   std::shared_ptr<const ALMeshUploadAssets> fee_assets)
 {
     LLMeshUploadThread* thread = new LLMeshUploadThread(data, lod_sources, scale, upload_textures,
                                                         upload_skin, upload_joints, lock_scale_if_joint_position,
-                                                        upload_url, destination_folder_id, do_upload, fee_observer, upload_observer);
+                                                        upload_url, destination_folder_id, do_upload, fee_observer, upload_observer,
+                                                        std::move(fee_assets));
     mUploadWaitList.push_back(thread);
 }
 

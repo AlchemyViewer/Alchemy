@@ -126,6 +126,7 @@ public:
     // called when error occurs during permissions request
     /*virtual*/ void setPermissonsErrorStatus(S32 status, const std::string& reason) override;
 
+    void onModelAssetsWritten(const std::shared_ptr<const ALMeshUploadAssets>& assets) override;
     /*virtual*/ void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) override;
                 void handleModelPhysicsFeeReceived();
     /*virtual*/ void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) override;
@@ -202,6 +203,9 @@ protected:
     LLMutex* mStatusLock;
 
     LLSD mModelPhysicsFee;
+
+    // The assets the fee shown was quoted for, while it stands.
+    std::shared_ptr<const ALMeshUploadAssets> mFeeAssets;
 
 private:
     void onClickCalculateBtn();
