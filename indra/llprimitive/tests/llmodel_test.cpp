@@ -28,8 +28,15 @@
 #include "llmodel.h"
 #include "almeshsimplifier.h"
 #include "llmath.h"
+#include "llsdserialize.h"
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
 namespace
 {
@@ -129,5 +136,122 @@ namespace
             lod->mSkinWeights = model->mSkinWeights;
             CHECK(weightsFound(*lod));
         }
+    }
+
+    // An asset as writeModel writes it, with the header it returns and the
+    // bytes that header takes at the front of the stream.
+    struct WrittenAsset
+    {
+        std::string stream;
+        LLSD header;
+        size_t header_bytes = 0;
+
+        std::string block(const char* name) const
+        {
+            const LLSD& entry = header[name];
+            return stream.substr(header_bytes + (size_t)entry["offset"].asInteger(), (size_t)entry["size"].asInteger());
+        }
+    };
+
+    TEST_CASE("llmodel: an asset whose blocks zip_llsd_model zipped holds what zip_llsd's does", "[llmodel]")
+    {
+        LLPointer<LLModel> model = riggedSphere(48, 24);
+        LLModel::Decomposition decomp;
+        decomp.mBaseHull = { LLVector3(-0.5f, -0.5f, -0.5f), LLVector3(0.5f, -0.5f, -0.5f), LLVector3(0.f, 0.5f, -0.5f),
+                             LLVector3(0.f, 0.f, 0.5f) };
+
+        auto write = [&](LLModel::EBlockZip block_zip)
+        {
+            std::ostringstream ostr;
+            WrittenAsset asset;
+            asset.header = LLModel::writeModel(ostr, nullptr, model, model, model, model, decomp, true, false, false, LLModel::WRITE_BINARY,
+                                               false, 0, block_zip);
+            asset.stream = ostr.str();
+            std::ostringstream header;
+            LLSDSerialize::toBinary(asset.header, header);
+            asset.header_bytes = header.str().size();
+            return asset;
+        };
+        const WrittenAsset by_zlib = write(LLModel::ZIP_LLSD);
+        const WrittenAsset by_model = write(LLModel::ZIP_LLSD_MODEL);
+
+        const char* const lods[] = { "lowest_lod", "low_lod", "medium_lod", "high_lod" };
+        const char* const blocks[] = { "skin", "physics_convex", "lowest_lod", "low_lod", "medium_lod", "high_lod" };
+        for (const WrittenAsset* asset : { &by_zlib, &by_model })
+        {
+            // The blocks lie one after another from the header to the end.
+            std::vector<std::pair<S64, S64>> spans;
+            for (const char* name : blocks)
+            {
+                CAPTURE(name);
+                REQUIRE(asset->header.has(name));
+                spans.emplace_back(asset->header[name]["offset"].asInteger(), asset->header[name]["size"].asInteger());
+            }
+            std::sort(spans.begin(), spans.end());
+            S64 at = 0;
+            for (const auto& [offset, size] : spans)
+            {
+                CHECK(offset == at);
+                CHECK(size > 0);
+                at = offset + size;
+            }
+            CHECK(asset->header_bytes + (size_t)at == asset->stream.size());
+        }
+
+        // Each block unzips to the same value either way, and is what its
+        // own zip makes of that value.
+        for (const char* name : blocks)
+        {
+            CAPTURE(name);
+            const std::string zlib_block = by_zlib.block(name);
+            const std::string model_block = by_model.block(name);
+            LLSD zlib_value, model_value;
+            REQUIRE(LLUZipHelper::unzip_llsd(zlib_value, (const U8*)zlib_block.data(), (S32)zlib_block.size()) == LLUZipHelper::ZR_OK);
+            REQUIRE(LLUZipHelper::unzip_llsd(model_value, (const U8*)model_block.data(), (S32)model_block.size()) == LLUZipHelper::ZR_OK);
+            CHECK(zip_llsd(zlib_value) == zlib_block);
+            CHECK(zip_llsd_model(model_value) == model_block);
+            std::ostringstream zlib_binary, model_binary;
+            LLSDSerialize::toBinary(zlib_value, zlib_binary);
+            LLSDSerialize::toBinary(model_value, model_binary);
+            CHECK(zlib_binary.str() == model_binary.str());
+        }
+
+        // The LOD blocks, which the download weight charges, are smaller.
+        S64 zlib_lod_bytes = 0, model_lod_bytes = 0;
+        for (const char* name : lods)
+        {
+            zlib_lod_bytes += by_zlib.header[name]["size"].asInteger();
+            model_lod_bytes += by_model.header[name]["size"].asInteger();
+        }
+        INFO("LOD blocks: zip_llsd_model " << model_lod_bytes << " bytes, zip_llsd " << zlib_lod_bytes);
+        CHECK(model_lod_bytes < zlib_lod_bytes);
+
+        // Read back as the mesh repository reads an asset, the high LOD has
+        // the same faces either way.
+        auto load = [](const WrittenAsset& asset)
+        {
+            LLPointer<LLModel> back = new LLModel(meshParams(), (F32)LLModel::LOD_HIGH);
+            std::istringstream is(asset.stream);
+            REQUIRE(back->loadModel(is));
+            return back;
+        };
+        LLPointer<LLModel> zlib_back = load(by_zlib);
+        LLPointer<LLModel> model_back = load(by_model);
+        REQUIRE(zlib_back->getNumVolumeFaces() == 1);
+        REQUIRE(model_back->getNumVolumeFaces() == 1);
+        const LLVolumeFace& zlib_face = zlib_back->getVolumeFace(0);
+        const LLVolumeFace& model_face = model_back->getVolumeFace(0);
+        REQUIRE(zlib_face.mNumVertices > 0);
+        REQUIRE(model_face.mNumVertices == zlib_face.mNumVertices);
+        REQUIRE(model_face.mNumIndices == zlib_face.mNumIndices);
+        CHECK(std::equal(model_face.mIndices, model_face.mIndices + model_face.mNumIndices, zlib_face.mIndices));
+        bool positions_match = true;
+        for (S32 v = 0; v < model_face.mNumVertices; ++v)
+        {
+            positions_match &= std::equal(model_face.mPositions[v].getF32ptr(), model_face.mPositions[v].getF32ptr() + 3,
+                                          zlib_face.mPositions[v].getF32ptr());
+        }
+        CHECK(positions_match);
+        CHECK(model_back->mSkinWeights.size() == zlib_back->mSkinWeights.size());
     }
 }

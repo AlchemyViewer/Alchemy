@@ -1948,6 +1948,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyMeshUploadMaxCompression</key>
+        <map>
+            <key>Comment</key>
+            <string>Compress a mesh upload's blocks at libdeflate's strongest level rather than zlib's best: smaller LOD blocks, so a lower download weight, at more time to write them. Read when the upload or fee request starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>AlchemyMinimapChatRings</key>
         <map>
             <key>Comment</key>

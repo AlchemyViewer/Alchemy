@@ -2736,6 +2736,7 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mOrigin += gAgent.getAtAxis() * scale.magVec();
 
     mMeshUploadTimeOut = gSavedSettings.getS32("MeshUploadTimeOut");
+    mBlockZip = gSavedSettings.getBOOL("AlchemyMeshUploadMaxCompression") ? LLModel::ZIP_LLSD_MODEL : LLModel::ZIP_LLSD;
 
     mHttpRequest = new LLCore::HttpRequest;
     mHttpOptions = std::make_shared<LLCore::HttpOptions>();
@@ -2889,7 +2890,8 @@ void LLMeshUploadThread::packModelIntance(
             mLockScaleIfJointPosition,
             LLModel::WRITE_BINARY,
             false,
-            data.mBaseModel->mSubmodelID);
+            data.mBaseModel->mSubmodelID,
+            mBlockZip);
 
         data.mAssetData = ostr.str();
         std::string str = ostr.str();

@@ -173,6 +173,15 @@ public:
         WRITE_BINARY,
         WRITE_HUMAN,
     };
+
+    // What zips each block of the asset: zip_llsd, or zip_llsd_model, whose
+    // smaller LOD blocks lower an upload's download weight and take longer.
+    enum EBlockZip
+    {
+        ZIP_LLSD = 0,
+        ZIP_LLSD_MODEL,
+    };
+
     static LLSD writeModel(
         std::ostream& ostr,
         LLModel* physics,
@@ -186,12 +195,14 @@ public:
         bool lock_scale_if_joint_position,
         EWriteModelMode write_mode = WRITE_BINARY,
         bool as_slm = false,
-        int submodel_id = 0);
+        int submodel_id = 0,
+        EBlockZip block_zip = ZIP_LLSD);
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
         LLSD& mdl,
-        EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false);
+        EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false,
+        EBlockZip block_zip = ZIP_LLSD);
 
     void ClearFacesAndMaterials() { mVolumeFaces.clear(); mMaterialList.clear(); }
 

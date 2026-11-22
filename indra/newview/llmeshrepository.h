@@ -801,6 +801,7 @@ public:
     bool            mUploadSkin;
     bool            mUploadJoints;
     bool            mLockScaleIfJointPosition;
+    LLModel::EBlockZip mBlockZip; // AlchemyMeshUploadMaxCompression, read on the main thread
     volatile bool   mDiscarded;
 
     LLHost          mHost;

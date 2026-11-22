@@ -627,7 +627,8 @@ LLSD LLModel::writeModel(
     bool lock_scale_if_joint_position,
     EWriteModelMode write_mode,
     bool as_slm,
-    int submodel_id)
+    int submodel_id,
+    EBlockZip block_zip)
 {
     LLSD mdl;
 
@@ -910,11 +911,13 @@ LLSD LLModel::writeModel(
         }
     }
 
-    return writeModelToStream(ostr, mdl, write_mode, as_slm);
+    return writeModelToStream(ostr, mdl, write_mode, as_slm, block_zip);
 }
 
-LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm)
+LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockZip block_zip)
 {
+    auto zip = [block_zip](LLSD& block) { return block_zip == ZIP_LLSD_MODEL ? zip_llsd_model(block) : zip_llsd(block); };
+
     std::string::size_type cur_offset = 0;
 
     LLSD header;
@@ -928,7 +931,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
 
     if (mdl.has("skin"))
     { //write out skin block
-        skin = zip_llsd(mdl["skin"]);
+        skin = zip(mdl["skin"]);
 
         U32 size = static_cast<U32>(skin.size());
         if (size > 0)
@@ -943,7 +946,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
 
     if (mdl.has("physics_convex"))
     { //write out convex decomposition
-        decomposition = zip_llsd(mdl["physics_convex"]);
+        decomposition = zip(mdl["physics_convex"]);
 
         U32 size = static_cast<U32>(decomposition.size());
         if (size > 0)
@@ -965,7 +968,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
     {
         if (mdl.has(model_names[i]))
         {
-            out[i] = zip_llsd(mdl[model_names[i]]);
+            out[i] = zip(mdl[model_names[i]]);
 
             U32 size = static_cast<U32>(out[i].size());
 
