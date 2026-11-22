@@ -326,7 +326,8 @@ class LLWebRTCVoiceClient::DevicesObserver : public llwebrtc::LLWebRTCDevicesObs
     }
 
     // On WebRTC's worker thread, under a lock llwebrtc::terminate() waits a
-    // second at most for, so this never blocks on a full queue.
+    // second at most for, so this never blocks on a full queue, nor asks the
+    // queue anything without a timeout once the post has given up.
     void OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
                           const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices) override
     {
@@ -337,10 +338,9 @@ class LLWebRTCVoiceClient::DevicesObserver : public llwebrtc::LLWebRTCDevicesObs
                                [client = mClient, render_devices, capture_devices]
                                {
                                    client->OnDevicesChangedImpl(render_devices, capture_devices);
-                               }) &&
-            !queue->isClosed())
+                               }))
         {
-            LL_WARNS("Voice") << "Dropped a device list update: the voice work queue is full" << LL_ENDL;
+            LL_WARNS("Voice") << "Dropped a device list update: the voice work queue is full or closed" << LL_ENDL;
         }
     }
 
