@@ -226,6 +226,11 @@ bool ALCrashReporter::start()
 #endif
 }
 
+// Nothing is kept for an answer here, so there is nothing to ask about.
+void ALCrashReporter::askAfterHeldCrash()
+{
+}
+
 void ALCrashReporter::attachRun()
 {
     if (sEngaged)

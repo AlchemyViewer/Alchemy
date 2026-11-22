@@ -180,6 +180,13 @@ namespace ALCrashReporter
     // else: engages unless the record says crash reports were declined, and
     // sends only when the record allows them. It needs nothing of the viewer.
     bool start();
+    // From main straight after start(), but not in the GPU benchmark child:
+    // when the last run crashed while its reports were kept for an answer,
+    // the user is asked with the system's own dialog, before anything else
+    // can crash and keep them from ever being asked, and the answer is
+    // recorded. A dialog that cannot be shown leaves the question to the
+    // login screen.
+    void askAfterHeldCrash();
     // From the end of the viewer's constructor, once the log is open and the
     // previous run is read: what start() could not know yet. The log, the
     // static debug file and the tags of the run go on its reports, and what
@@ -205,6 +212,7 @@ namespace ALCrashReporter
     bool handleException(void* exception_pointers);
 #else
     inline bool start() { return false; }
+    inline void askAfterHeldCrash() {}
     inline void attachRun() {}
     inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
     inline void shutdown() {}

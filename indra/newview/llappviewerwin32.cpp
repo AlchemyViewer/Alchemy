@@ -365,6 +365,14 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
         }
     }
 
+    // A crash of the last run waiting for an answer is asked about before
+    // anything else can crash. The benchmark child asks nothing: its parent
+    // does.
+    if (!gGPUBenchmarkMode)
+    {
+        ALCrashReporter::askAfterHeldCrash();
+    }
+
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
     // Set a debug info flag to indicate if multiple instances are running.

@@ -50,6 +50,7 @@
 #include "lluuid.h"
 #include "llversioninfo.h"
 #include "llviewerregion.h"
+#include "llwindow.h"
 
 #include <algorithm>
 #include <atomic>
@@ -494,6 +495,8 @@ namespace
         Engaged,
     };
     StartState sStartState = StartState::NotStarted;
+    // What the user answered askAfterHeldCrash(), for attachRun() to log.
+    std::optional<ALCrashReporter::Consent> sAnswerAfterCrash;
 
     void log_engaged()
     {
@@ -609,9 +612,43 @@ bool ALCrashReporter::start()
 #endif
 }
 
+void ALCrashReporter::askAfterHeldCrash()
+{
+#if LL_SEND_CRASH_REPORTS
+    // Only a run keeping its reports for an answer, after a run that crashed
+    // while it was: the report of that crash is waiting. A viewer that
+    // crashes before the login screen every launch is asked here or never.
+    if (!sEngaged || sSending || sentry_get_crashed_last_run() != 1)
+    {
+        return;
+    }
+
+    // The strings are not read until the settings are, so the text is
+    // English, as the other dialogs from before the settings are.
+    const S32 button = OSMessageBox(
+        "Alchemy closed unexpectedly the last time it ran, and kept a report of the crash on this computer.\n\n"
+        "Send crash reports to the Alchemy developers?\n\n"
+        "A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to "
+        "Sentry, where only the Alchemy developers can see it, and never without this permission. Yes sends "
+        "this report and any to come; No deletes it and sends none. Preferences can change the answer later.",
+        "Alchemy crash reports", OSMB_YESNO);
+    if (button != OSBTN_YES && button != OSBTN_NO)
+    {
+        return;
+    }
+    sAnswerAfterCrash = button == OSBTN_YES ? Consent::Allowed : Consent::Declined;
+    refreshConsent(*sAnswerAfterCrash, true);
+#endif
+}
+
 void ALCrashReporter::attachRun()
 {
     write_early_sdk_lines();
+    if (sAnswerAfterCrash)
+    {
+        LL_INFOS("CrashReporter") << "Asked about the last run's crash: crash reports "
+                                  << (*sAnswerAfterCrash == Consent::Allowed ? "allowed" : "declined") << LL_ENDL;
+    }
     if (sEngaged)
     {
         attach_run();

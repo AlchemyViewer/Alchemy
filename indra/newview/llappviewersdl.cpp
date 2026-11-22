@@ -431,6 +431,14 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     ALCrashReporter::start();
     LLAppViewer::installTerminateHandler();
 
+    // A crash of the last run waiting for an answer is asked about before
+    // anything else can crash. The benchmark child asks nothing: its parent
+    // does.
+    if (!gGPUBenchmarkMode)
+    {
+        ALCrashReporter::askAfterHeldCrash();
+    }
+
     gSDLMainHandled = true;
 
     gArgC = argc;
