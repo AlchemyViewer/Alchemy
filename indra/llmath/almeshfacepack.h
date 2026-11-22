@@ -35,8 +35,9 @@ class LLSD;
 // triangles: it welds the vertices and orders both again as it loads them.
 // A repacked face holds the same triangles in an order that zips smaller:
 //  - a vertex the same in every array as another is one vertex;
-//  - a triangle naming a vertex twice, or two vertices at one position, has
-//    no area and is dropped, and a vertex no triangle names goes with it;
+//  - a triangle naming a vertex twice, or two vertices at one position that
+//    the same influences move, has no area in any pose and is dropped, and a
+//    vertex no triangle names goes with it;
 //  - the triangles run as meshoptimizer's strips order them, the vertices
 //    numbered as the triangles first take them, and each triangle then
 //    starts at its lowest-numbered vertex, its winding kept.
@@ -62,7 +63,8 @@ public:
     // Repacks one face in place. False, leaving it as it was, for a face
     // with no geometry, one whose arrays do not each hold its vertices, whose
     // weights do not read to their end at its last vertex, which names a
-    // vertex it does not hold, or which has no triangle with area.
+    // vertex it does not hold, or which has no triangle with area in any
+    // pose.
     static bool repack(LLSD& face, Normals normals = Normals::KEEP);
 };
 

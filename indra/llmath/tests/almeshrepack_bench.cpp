@@ -255,9 +255,20 @@ namespace
         bool shipped = false; // ALMeshFacePack's, which is the strip order, lowest first
     };
 
-    bool positions_equal(const QuantizedFace& q, U32 a, U32 b)
+    // Whether two vertices lie at one place in every pose: at one position,
+    // and, where the face is rigged, moved by the same influences as written,
+    // as ALMeshFacePack takes them.
+    bool same_place(const QuantizedFace& q, U32 a, U32 b)
     {
-        return std::equal(&q.positions[a * 3], &q.positions[a * 3] + 3, &q.positions[b * 3]);
+        return std::equal(&q.positions[a * 3], &q.positions[a * 3] + 3, &q.positions[b * 3]) &&
+               (q.weights.empty() || q.weights[a] == q.weights[b]);
+    }
+
+    // As same_place, the influences in any order: what a triangle draws.
+    bool same_drawn_place(const QuantizedFace& q, U32 a, U32 b)
+    {
+        return std::equal(&q.positions[a * 3], &q.positions[a * 3] + 3, &q.positions[b * 3]) &&
+               (q.weights.empty() || sorted_influences(q.weights[a]) == sorted_influences(q.weights[b]));
     }
 
     // The face with each vertex v moved to place[v], those placed at ~0u
@@ -381,7 +392,7 @@ namespace
             for (size_t t = 0; t < q.indices.size(); t += 3)
             {
                 const U32 a = q.indices[t], b = q.indices[t + 1], c = q.indices[t + 2];
-                if (a == b || b == c || a == c || positions_equal(q, a, b) || positions_equal(q, b, c) || positions_equal(q, a, c))
+                if (a == b || b == c || a == c || same_place(q, a, b) || same_place(q, b, c) || same_place(q, a, c))
                 {
                     continue;
                 }
@@ -452,7 +463,7 @@ namespace
         for (size_t t = 0; t < q.indices.size(); t += 3)
         {
             const U32 a = q.indices[t], b = q.indices[t + 1], c = q.indices[t + 2];
-            if (positions_equal(q, a, b) || positions_equal(q, b, c) || positions_equal(q, a, c))
+            if (same_drawn_place(q, a, b) || same_drawn_place(q, b, c) || same_drawn_place(q, a, c))
             {
                 continue;
             }
@@ -575,7 +586,9 @@ namespace
                         totals[w].vertices += (S64)repacked.vertices;
                         totals[w].triangles += (S64)repacked.indices.size() / 3;
                     }
-                    const S64 bytes = (S64)zip_llsd_model(block).size();
+                    const std::string zipped = zip_llsd_model(block);
+                    REQUIRE_FALSE(zipped.empty());
+                    const S64 bytes = (S64)zipped.size();
                     totals[w].bytes[lod.lod] += bytes;
                     totals[w].tris[lod.lod] += repack_charged_tris(bytes);
                 }

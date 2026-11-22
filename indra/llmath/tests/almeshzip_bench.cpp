@@ -172,6 +172,7 @@ namespace
                 start = std::chrono::steady_clock::now();
                 const std::string by_model = zip_llsd_model(block);
                 const F64 model_ns = (F64)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - start).count();
+                REQUIRE_FALSE(by_zlib.empty());
 
                 LLSD back;
                 bool round_trip = !by_model.empty() &&

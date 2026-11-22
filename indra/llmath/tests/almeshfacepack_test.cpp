@@ -204,7 +204,12 @@ namespace
                 }
                 corners.push_back(std::move(corner));
             }
-            auto same = [&](S32 a, S32 b) { return std::equal(corners[a].begin(), corners[a].begin() + 3, corners[b].begin()); };
+            // two corners at one position, moved alike in every pose
+            auto same = [&](S32 a, S32 b)
+            {
+                return std::equal(corners[a].begin(), corners[a].begin() + 3, corners[b].begin()) &&
+                       (!f.mWeights || std::equal(corners[a].begin() + 8, corners[a].end(), corners[b].begin() + 8));
+            };
             if (same(0, 1) || same(1, 2) || same(0, 2))
             {
                 continue;
@@ -360,6 +365,29 @@ namespace
         CHECK(kept["Position"].asBinary().size() / 6 == 5);
         CHECK(snapped["Position"].asBinary().size() / 6 == 4);
         CHECK(u16s_of(snapped["TriangleList"].asBinary()).size() == 6);
+    }
+
+    TEST_CASE("almeshfacepack: a triangle whose corners at one position are weighted apart is kept", "[almeshfacepack]")
+    {
+        // A triangle, and one whose first corner lies at the position of the
+        // first's first, moved by another joint: in a pose it has area.
+        Arrays a;
+        a.add({ 0, 0, 0 }, { 32768, 32768, 65535 }, { 0, 0 }, { { 0, 65535 } });
+        a.add({ 65535, 0, 0 }, { 32768, 32768, 65535 }, { 65535, 0 }, { { 0, 65535 } });
+        a.add({ 0, 65535, 0 }, { 32768, 32768, 65535 }, { 0, 65535 }, { { 0, 65535 } });
+        a.add({ 0, 0, 0 }, { 32768, 32768, 65535 }, { 0, 0 }, { { 1, 65535 } });
+        a.indices = { 0, 1, 2, 3, 0, 1 };
+
+        LLSD rigged = face_of(a, true);
+        REQUIRE(ALMeshFacePack::repack(rigged));
+        CHECK(u16s_of(rigged["TriangleList"].asBinary()).size() == 6);
+        CHECK(rigged["Position"].asBinary().size() / 6 == 4);
+
+        // Unrigged, the two are one vertex, and the second triangle has none.
+        LLSD unrigged = face_of(a, false);
+        REQUIRE(ALMeshFacePack::repack(unrigged));
+        CHECK(u16s_of(unrigged["TriangleList"].asBinary()).size() == 3);
+        CHECK(unrigged["Position"].asBinary().size() / 6 == 3);
     }
 
     TEST_CASE("almeshfacepack: a face it cannot read is left as it was", "[almeshfacepack]")

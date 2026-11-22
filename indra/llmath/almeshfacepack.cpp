@@ -193,9 +193,12 @@ namespace
         face = std::move(out);
     }
 
-    bool same_position(const Face& face, U32 a, U32 b)
+    // Whether two vertices lie at one place in every pose: at one position,
+    // and, where the face is rigged, moved by the same influences.
+    bool same_place(const Face& face, U32 a, U32 b)
     {
-        return std::equal(&face.positions[(size_t)a * 3], &face.positions[(size_t)a * 3] + 3, &face.positions[(size_t)b * 3]);
+        return std::equal(&face.positions[(size_t)a * 3], &face.positions[(size_t)a * 3] + 3, &face.positions[(size_t)b * 3]) &&
+               (face.weights.empty() || face.weights[a] == face.weights[b]);
     }
 
     // A normal component on the 12-bit grid: the nearest multiple of 16, the
@@ -238,14 +241,14 @@ bool ALMeshFacePack::repack(LLSD& sd, Normals normals)
         meshopt_generateVertexRemapMulti(place.data(), face.indices.data(), face.indices.size(), face.vertices, streams.data(), streams.size());
     renumber(face, place, distinct);
 
-    // The triangles with area.
+    // The triangles with area in some pose.
     size_t kept = 0;
     for (size_t t = 0; t < face.indices.size(); t += 3)
     {
         const U32 a = face.indices[t];
         const U32 b = face.indices[t + 1];
         const U32 c = face.indices[t + 2];
-        if (same_position(face, a, b) || same_position(face, b, c) || same_position(face, a, c))
+        if (same_place(face, a, b) || same_place(face, b, c) || same_place(face, a, c))
         {
             continue;
         }
