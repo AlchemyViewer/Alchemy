@@ -502,6 +502,7 @@ void LLFloaterModelPreview::onClickCalculateBtn()
 
     mUploadModelUrl.clear();
     mModelPhysicsFee.clear();
+    mFeeAssets.reset();
 
     lod_sources_map_t lod_sources;
     fillLODSourceStatistics(lod_sources);
@@ -1739,7 +1740,9 @@ void LLFloaterModelPreview::onUpload(void* user_data)
                           mp->childGetValue("upload_textures").asBoolean(),
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mp->mUploadModelUrl, mp->mDestinationFolderId,
-                          true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle());
+                          true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle(),
+                          std::move(mp->mFeeAssets));
+    mp->mFeeAssets.reset();
 }
 
 
@@ -1795,11 +1798,17 @@ void LLFloaterModelPreview::toggleCalculateButton()
 void LLFloaterModelPreview::modelUpdated(bool calculate_visible)
 {
     mModelPhysicsFee.clear();
+    mFeeAssets.reset();
     toggleCalculateButton(calculate_visible);
 }
 
 void LLFloaterModelPreview::toggleCalculateButton(bool visible)
 {
+    if (visible)
+    {
+        // The fee no longer stands, nor what it was quoted for.
+        mFeeAssets.reset();
+    }
     mCalculateBtn->setVisible(visible);
 
     bool uploadingSkin           = childGetValue("upload_skin").asBoolean();
@@ -1908,6 +1917,11 @@ void LLFloaterModelPreview::clearLogTab()
     mTabContainer->setTabPanelFlashing(panel, false);
 }
 
+void LLFloaterModelPreview::onModelAssetsWritten(const std::shared_ptr<const ALMeshUploadAssets>& assets)
+{
+    mFeeAssets = assets;
+}
+
 void LLFloaterModelPreview::onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url)
 {
     mModelPhysicsFee = result;
@@ -1988,6 +2002,9 @@ bool LLFloaterModelPreview::isModelUploadAllowed()
     if (mModelPreview)
     {
         allow_upload &= mModelPreview->mModelNoErrors;
+        // Levels of detail still being made are not what the fee was quoted
+        // for; their end drops the fee.
+        allow_upload &= !mModelPreview->isGeneratingLODs();
     }
     return allow_upload;
 }

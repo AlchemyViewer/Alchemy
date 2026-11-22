@@ -1161,6 +1161,7 @@ if(AL_BUILD_VIEWER)
     allegacynotificationwellwindow.h
     allightboxdirectory.h
     almaturitypreference.h
+    almeshuploadassets.h
     almotionpredictor.h
     almutelookup.h
     alobjectproperties.h

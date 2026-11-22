@@ -78,6 +78,7 @@ al_import(ll::fastfloat    PACKAGE FastFloat       CONFIG TARGETS FastFloat::fas
 al_import(ll::fmt          PACKAGE fmt             CONFIG TARGETS fmt::fmt)
 al_import(ll::freetype     PACKAGE Freetype               TARGETS Freetype::Freetype)
 al_import(ll::libavif      PACKAGE libavif         CONFIG TARGETS avif)
+al_import(ll::libdeflate   PACKAGE libdeflate      CONFIG TARGETS libdeflate::libdeflate_static)
 al_import(ll::libjpeg      PACKAGE JPEG                   TARGETS JPEG::JPEG)
 al_import(ll::libpng       PACKAGE PNG                    TARGETS PNG::PNG)
 al_import(ll::libwebp      PACKAGE WebP            CONFIG TARGETS WebP::webp WebP::webpdecoder WebP::webpdemux)

@@ -30,6 +30,10 @@
 #include "llfloater.h"
 #include "llhandle.h"
 
+#include <memory>
+
+class ALMeshUploadAssets;
+
 class LLUploadPermissionsObserver
 {
 public:
@@ -54,6 +58,10 @@ public:
 
     virtual void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) = 0;
     virtual void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) = 0;
+
+    // The assets the fee request wrote, just before the fee it was quoted
+    // for: an upload of the same models with the same options may send them.
+    virtual void onModelAssetsWritten(const std::shared_ptr<const ALMeshUploadAssets>& assets) {}
 
     LLHandle<LLWholeModelFeeObserver> getWholeModelFeeObserverHandle() const { return mWholeModelFeeObserverHandle; }
 

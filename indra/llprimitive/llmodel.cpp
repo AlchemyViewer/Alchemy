@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "llmodel.h"
+#include "almeshfacepack.h"
 #include "llmemory.h"
 #include "llconvexdecomposition.h"
 #include "llsdserialize.h"
@@ -627,7 +628,8 @@ LLSD LLModel::writeModel(
     bool lock_scale_if_joint_position,
     EWriteModelMode write_mode,
     bool as_slm,
-    int submodel_id)
+    int submodel_id,
+    EBlockPacking packing)
 {
     LLSD mdl;
 
@@ -910,11 +912,13 @@ LLSD LLModel::writeModel(
         }
     }
 
-    return writeModelToStream(ostr, mdl, write_mode, as_slm);
+    return writeModelToStream(ostr, mdl, write_mode, as_slm, packing);
 }
 
-LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm)
+LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockPacking packing)
 {
+    auto zip = [packing](LLSD& block) { return packing == PACK_PLAIN ? zip_llsd(block) : zip_llsd_model(block); };
+
     std::string::size_type cur_offset = 0;
 
     LLSD header;
@@ -928,7 +932,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
 
     if (mdl.has("skin"))
     { //write out skin block
-        skin = zip_llsd(mdl["skin"]);
+        skin = zip(mdl["skin"]);
 
         U32 size = static_cast<U32>(skin.size());
         if (size > 0)
@@ -943,7 +947,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
 
     if (mdl.has("physics_convex"))
     { //write out convex decomposition
-        decomposition = zip_llsd(mdl["physics_convex"]);
+        decomposition = zip(mdl["physics_convex"]);
 
         U32 size = static_cast<U32>(decomposition.size());
         if (size > 0)
@@ -965,7 +969,17 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
     {
         if (mdl.has(model_names[i]))
         {
-            out[i] = zip_llsd(mdl[model_names[i]]);
+            LLSD& block = mdl[model_names[i]];
+            if (packing != PACK_PLAIN)
+            {
+                const ALMeshFacePack::Normals normals =
+                    packing == PACK_SMALL_SNAPPED ? ALMeshFacePack::Normals::SNAP_12_BITS : ALMeshFacePack::Normals::KEEP;
+                for (LLSD::array_iterator face = block.beginArray(); face != block.endArray(); ++face)
+                {
+                    ALMeshFacePack::repack(*face, normals);
+                }
+            }
+            out[i] = zip(block);
 
             U32 size = static_cast<U32>(out[i].size());
 

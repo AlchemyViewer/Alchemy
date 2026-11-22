@@ -1948,6 +1948,28 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>AlchemyMeshUploadMaxCompression</key>
+        <map>
+            <key>Comment</key>
+            <string>Pack a mesh upload's blocks as small as they go: each LOD face's vertices welded and its triangles reordered, as the viewer draws them the same, and every block compressed at libdeflate's strongest level rather than zlib's best. Smaller LOD blocks, so a lower download weight, at more time to write them. Read when the upload or fee request starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyMeshUploadSnapNormals</key>
+        <map>
+            <key>Comment</key>
+            <string>With AlchemyMeshUploadMaxCompression on, round each normal component of a mesh upload's LOD faces to 12 bits rather than 16. A normal turns by 0.024 degrees at most, well under what normal maps and shading already hold, and the LOD blocks come out about 4% smaller. Read when the upload or fee request starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
+        </map>
         <key>AlchemyMinimapChatRings</key>
         <map>
             <key>Comment</key>

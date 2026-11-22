@@ -173,6 +173,19 @@ public:
         WRITE_BINARY,
         WRITE_HUMAN,
     };
+
+    // How the asset's blocks are packed: each zipped by zip_llsd; or, for
+    // smaller LOD blocks and so a lower download weight for an upload, each
+    // LOD face repacked to draw the same (ALMeshFacePack) and every block
+    // zipped by zip_llsd_model, which takes longer; or that with the faces'
+    // normals snapped to 12 bits as well.
+    enum EBlockPacking
+    {
+        PACK_PLAIN = 0,
+        PACK_SMALL,
+        PACK_SMALL_SNAPPED,
+    };
+
     static LLSD writeModel(
         std::ostream& ostr,
         LLModel* physics,
@@ -186,12 +199,14 @@ public:
         bool lock_scale_if_joint_position,
         EWriteModelMode write_mode = WRITE_BINARY,
         bool as_slm = false,
-        int submodel_id = 0);
+        int submodel_id = 0,
+        EBlockPacking packing = PACK_PLAIN);
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
         LLSD& mdl,
-        EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false);
+        EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false,
+        EBlockPacking packing = PACK_PLAIN);
 
     void ClearFacesAndMaterials() { mVolumeFaces.clear(); mMaterialList.clear(); }
 
