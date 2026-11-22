@@ -469,7 +469,7 @@ namespace
     // the database and the events cached beside them. The first instance
     // only, with the SDK closed: a second instance's database is the first's.
     // Before the viewer exists which instance this is is not known;
-    // attachRun() deletes them then.
+    // discardDeclined() deletes them then.
     void discard_reports()
     {
         LLAppViewer* app = LLAppViewer::instance();
@@ -675,12 +675,14 @@ void ALCrashReporter::attachRun()
     {
         LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
     }
+}
 
+void ALCrashReporter::discardDeclined()
+{
     // What was kept for an answer that was no, this run's or an earlier
-    // one's, goes as soon as it is known whether this is the first instance,
-    // which owns it: a run that crashes before the settings are read would
-    // otherwise keep it.
-    if (recordedConsent(consentDirectory()) == Consent::Declined)
+    // one's: a run that crashes before the settings are read would otherwise
+    // keep it, run after run.
+    if (!sEngaged && recordedConsent(consentDirectory()) == Consent::Declined)
     {
         discard_reports();
     }

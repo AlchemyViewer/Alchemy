@@ -232,8 +232,13 @@ bool ALCrashReporter::start(bool may_run)
 #endif
 }
 
-// Nothing is kept for an answer here, so there is nothing to ask about.
+// Nothing is kept for an answer here, so there is nothing to ask about or
+// to delete.
 void ALCrashReporter::askAfterHeldCrash()
+{
+}
+
+void ALCrashReporter::discardDeclined()
 {
 }
 

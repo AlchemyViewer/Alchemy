@@ -710,9 +710,11 @@ LLAppViewer::LLAppViewer()
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
 
-    // The marker a crash leaves for the next launch, composed as soon as it
-    // is known whether this is the first instance, for the crash handler to
+    // As soon as it is known whether this is the first instance: crash
+    // reports kept for an answer that was no are deleted, and the marker a
+    // crash leaves for the next launch is composed, for the crash handler to
     // write without allocating.
+    ALCrashReporter::discardDeclined();
     prepareCrashMarker();
     ALCrashReporter::probe("ctor");
 
@@ -3166,15 +3168,6 @@ bool LLAppViewer::initConfiguration()
         return false;
     }
 
-    // Register the core crash option as soon as we can
-    // if we want gdb post-mortem on cores we need to be up and running
-    // ASAP or we might miss init issue etc.
-    if (gSavedSettings.getBOOL("DisableCrashLogger"))
-    {
-        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
-        disableCrashlogger();
-    }
-
     gNonInteractive = gSavedSettings.getBOOL("NonInteractive");
     // Handle initialization from settings.
     // Start up the debugging console before handling other options.
@@ -3217,6 +3210,16 @@ bool LLAppViewer::initConfiguration()
                 }
             }
         }
+    }
+
+    // The crash logger switch, once every command line value has been
+    // applied: --disablecrashlogger, and --set DisableCrashLogger after it.
+    // The crash reporter read the same from the command line before it
+    // started; this keeps it off when the settings are refreshed.
+    if (gSavedSettings.getBOOL("DisableCrashLogger"))
+    {
+        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
+        disableCrashlogger();
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

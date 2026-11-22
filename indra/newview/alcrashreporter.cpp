@@ -93,6 +93,37 @@ const std::string& ALCrashReporter::runId()
     return id;
 }
 
+bool ALCrashReporter::crashLoggerDisabledBy(const std::vector<std::string>& arguments)
+{
+    // The switch is applied with the other options, before any --set.
+    bool disabled = false;
+    for (const std::string& argument : arguments)
+    {
+        if (argument == "--disablecrashlogger" || argument == "-disablecrashlogger")
+        {
+            disabled = true;
+        }
+    }
+
+    // Then each --set name value, in order; a value the setting cannot read
+    // as a boolean stores false.
+    for (size_t i = 0; i + 2 < arguments.size(); ++i)
+    {
+        if (arguments[i] != "--set" && arguments[i] != "-set")
+        {
+            continue;
+        }
+        const std::string& name = arguments[i + 1];
+        if (name == "DisableCrashLogger" || name == "Global.DisableCrashLogger")
+        {
+            bool value = false;
+            disabled = LLStringUtil::convertToBOOL(arguments[i + 2], value) && value;
+        }
+        i += 2;
+    }
+    return disabled;
+}
+
 #ifndef LL_RELEASE_FOR_DOWNLOAD
 void ALCrashReporter::probe(std::string_view point)
 {

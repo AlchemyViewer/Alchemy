@@ -182,6 +182,36 @@ namespace
         CHECK_FALSE(directory.has("crash_reports_allowed"));
     }
 
+    TEST_CASE("alcrashreporter: the crash logger switch is read from the command line as the settings apply it", "[alcrashreporter]")
+    {
+        using Arguments = std::vector<std::string>;
+        auto disabled = [](const Arguments& arguments) { return ALCrashReporter::crashLoggerDisabledBy(arguments); };
+
+        CHECK_FALSE(disabled({}));
+        CHECK(disabled({ "--disablecrashlogger" }));
+        CHECK(disabled({ "-disablecrashlogger" }));
+        CHECK(disabled({ "--grid", "agni", "--disablecrashlogger" }));
+
+        UNSCOPED_INFO("an option's value that only contains the name is no switch");
+        CHECK_FALSE(disabled({ "--logfile", "C:\\logs\\viewer-disablecrashlogger.log" }));
+        CHECK_FALSE(disabled({ "--disablecrashloggers" }));
+
+        UNSCOPED_INFO("--set takes the value as the setting reads a string");
+        CHECK(disabled({ "--set", "DisableCrashLogger", "1" }));
+        CHECK(disabled({ "--set", "DisableCrashLogger", "true" }));
+        CHECK(disabled({ "-set", "DisableCrashLogger", "TRUE" }));
+        CHECK(disabled({ "--set", "Global.DisableCrashLogger", "T" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "yes" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger" }));
+        CHECK_FALSE(disabled({ "--set", "OtherSetting", "1" }));
+
+        UNSCOPED_INFO("--set comes after the switch, the last one winning");
+        CHECK_FALSE(disabled({ "--disablecrashlogger", "--set", "DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "0", "--disablecrashlogger" }));
+        CHECK(disabled({ "--set", "DisableCrashLogger", "0", "--set", "DisableCrashLogger", "1" }));
+    }
+
     TEST_CASE("alcrashreporter: a location written into a buffer is the same or cut to fit", "[alcrashreporter]")
     {
         const LLVector3 position(128.4f, -63.6f, 22.5f);

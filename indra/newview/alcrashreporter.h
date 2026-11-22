@@ -186,13 +186,20 @@ namespace ALCrashReporter
     void probe(std::string_view point);
 #endif
 
+    // Whether a command line (its arguments, without the program) turns the
+    // crash logger off, read before the settings are, as initConfiguration()
+    // applies it: --disablecrashlogger, then each --set DisableCrashLogger
+    // (or Global.DisableCrashLogger), the last one winning, with the value
+    // read as the setting reads it. Every option may also have one dash.
+    bool crashLoggerDisabledBy(const std::vector<std::string>& arguments);
+
 #if AL_SENTRY
     // From main, once the viewer's directories are set and before anything
     // else: engages unless the record says crash reports were declined, and
     // sends only when the record allows them. It needs nothing of the viewer.
-    // A run that may not run the reporter (--disablecrashlogger, which main
-    // reads from the command line, the settings coming later) does not
-    // engage, and keeps the recorded answer.
+    // A run that may not run the reporter (crashLoggerDisabledBy() the
+    // command line, the settings coming later) does not engage, and keeps the
+    // recorded answer.
     bool start(bool may_run);
     // From main straight after start(), but not in the GPU benchmark child:
     // when the last run crashed while its reports were kept for an answer,
@@ -201,11 +208,16 @@ namespace ALCrashReporter
     // recorded. A dialog that cannot be shown leaves the question to the
     // login screen.
     void askAfterHeldCrash();
+    // From the viewer's constructor as soon as it knows whether it is the
+    // first instance: when crash reports are declined, the first instance
+    // deletes what was kept for an answer, before anything after it can crash
+    // and keep it. A second instance deletes nothing, the database being the
+    // running first instance's.
+    void discardDeclined();
     // From the end of the viewer's constructor, once the log is open and the
     // previous run is read: what start() could not know yet. The log, the
     // static debug file and the tags of the run go on its reports, and what
-    // the SDK said as it started is written to the log. When crash reports
-    // are declined, the first instance deletes what was kept for an answer.
+    // the SDK said as it started is written to the log.
     void attachRun();
     // The settings' answer, once readable and whenever it changes: recorded,
     // and the reporter engaged, holding, sending or closed to match. A run
@@ -228,6 +240,7 @@ namespace ALCrashReporter
 #else
     inline bool start(bool) { return false; }
     inline void askAfterHeldCrash() {}
+    inline void discardDeclined() {}
     inline void attachRun() {}
     inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
     inline void shutdown() {}
