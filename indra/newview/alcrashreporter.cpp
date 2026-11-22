@@ -46,6 +46,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <stdexcept>
 
 std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 build)
 {
@@ -91,6 +92,31 @@ const std::string& ALCrashReporter::runId()
     static const std::string id = LLUUID::generateNewID().asString();
     return id;
 }
+
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+void ALCrashReporter::probe(std::string_view point)
+{
+    const char* named = getenv("AL_CRASH_PROBE");
+    if (!named)
+    {
+        return;
+    }
+    const std::string_view named_point(named);
+    constexpr std::string_view THROW_SUFFIX = ":throw";
+    if (named_point == point)
+    {
+        // A wild write, as the viewer's own crashes are, rather than a crash
+        // the reporter is handed.
+        volatile S32* nowhere = nullptr;
+        *nowhere = 0;
+    }
+    else if (named_point.size() == point.size() + THROW_SUFFIX.size() && named_point.starts_with(point)
+             && named_point.ends_with(THROW_SUFFIX))
+    {
+        throw std::runtime_error(fmt::format("AL_CRASH_PROBE {}", named_point));
+    }
+}
+#endif
 
 #if !AL_SENTRY
 // Without a reporter the crash takes the usual unhandled route; on Windows

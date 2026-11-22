@@ -438,6 +438,7 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     {
         ALCrashReporter::askAfterHeldCrash();
     }
+    ALCrashReporter::probe("main");
 
     gSDLMainHandled = true;
 

@@ -175,6 +175,17 @@ namespace ALCrashReporter
     [[noreturn]] void fatal(std::string_view kind, const std::string& message);
     inline constexpr U32 FATAL_APP_EXIT = 0x40000015; // STATUS_FATAL_APP_EXIT
 
+    // Crashes on purpose where AL_CRASH_PROBE names the point it is called
+    // at, so a test can see what the reporter does with a crash there:
+    // "<point>" writes through a null pointer, "<point>:throw" throws. The
+    // points are "main", "ctor" (the viewer's constructor, once it knows
+    // which instance it is) and "init". Not in a build for download.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    inline void probe(std::string_view) {}
+#else
+    void probe(std::string_view point);
+#endif
+
 #if AL_SENTRY
     // From main, once the viewer's directories are set and before anything
     // else: engages unless the record says crash reports were declined, and

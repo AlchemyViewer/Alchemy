@@ -372,6 +372,7 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     {
         ALCrashReporter::askAfterHeldCrash();
     }
+    ALCrashReporter::probe("main");
 
     LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 

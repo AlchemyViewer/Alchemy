@@ -714,6 +714,7 @@ LLAppViewer::LLAppViewer()
     // is known whether this is the first instance, for the crash handler to
     // write without allocating.
     prepareCrashMarker();
+    ALCrashReporter::probe("ctor");
 
     LLLoginInstance::instance().setPlatformInfo(gPlatform, LLOSInfo::instance().getOSVersionString(), LLOSInfo::instance().getOSStringSimple());
 
@@ -813,6 +814,7 @@ bool LLAppViewer::init()
     setupErrorHandling(mSecondInstance);
 
     startDebugInfo();
+    ALCrashReporter::probe("init");
 
     //
     // Start of the application
