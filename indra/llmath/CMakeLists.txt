@@ -158,8 +158,9 @@ if(AL_BUILD_TESTS)
     # Nanoseconds per element for the SIMD math the geometry rebuild spends
     # its time in, and for the choices the SIMD series makes by a number;
     # what generating prims, sculpts and their tangents, a flexible frame,
-    # a mesh LOD's cacheOptimize and each index order cost.
-    BENCH_SOURCES tests/llsimd_bench.cpp tests/llvolume_bench.cpp
+    # a mesh LOD's cacheOptimize and each index order cost; and a mesh LOD
+    # block's bytes, charge and time zipped for upload, over the real corpus.
+    BENCH_SOURCES tests/almeshzip_bench.cpp tests/llsimd_bench.cpp tests/llvolume_bench.cpp
     LIBRARIES llmath llcommon
   )
 
