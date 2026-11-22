@@ -27,6 +27,7 @@
 #ifndef LL_LLMODEL_H
 #define LL_LLMODEL_H
 
+#include "almeshfacepack.h"
 #include "llpointer.h"
 #include "llvolume.h"
 #include "v4math.h"
@@ -178,12 +179,15 @@ public:
     // smaller LOD blocks and so a lower download weight for an upload, each
     // LOD face repacked to draw the same (ALMeshFacePack) and every block
     // zipped by zip_llsd_model, which takes longer; or that with the faces'
-    // normals snapped to 12 bits as well.
+    // normals snapped to 12 or 10 bits as well. Packed other than plain, the
+    // LOD faces' skin weights may also be rounded (ALMeshFacePack::Weights).
     enum EBlockPacking
     {
         PACK_PLAIN = 0,
         PACK_SMALL,
-        PACK_SMALL_SNAPPED,
+        PACK_SMALL_NORMALS_12,
+        PACK_SMALL_NORMALS_10,
+        PACK_COUNT
     };
 
     static LLSD writeModel(
@@ -200,13 +204,15 @@ public:
         EWriteModelMode write_mode = WRITE_BINARY,
         bool as_slm = false,
         int submodel_id = 0,
-        EBlockPacking packing = PACK_PLAIN);
+        EBlockPacking packing = PACK_PLAIN,
+        ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP);
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
         LLSD& mdl,
         EWriteModelMode write_mode = WRITE_BINARY, bool as_slm = false,
-        EBlockPacking packing = PACK_PLAIN);
+        EBlockPacking packing = PACK_PLAIN,
+        ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP);
 
     void ClearFacesAndMaterials() { mVolumeFaces.clear(); mMaterialList.clear(); }
 

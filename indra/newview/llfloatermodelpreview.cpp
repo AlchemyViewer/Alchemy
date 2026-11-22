@@ -180,6 +180,21 @@ bool LLFloaterModelPreview::postBuild()
     childSetCommitCallback("lock_scale_if_joint_position", boost::bind(&LLFloaterModelPreview::onUploadOptionChecked, this, _1), NULL);
     childSetCommitCallback("upload_textures", boost::bind(&LLFloaterModelPreview::onUploadOptionChecked, this, _1), NULL);
 
+    // The packing and the weights' rounding change the LOD blocks the fee is
+    // charged for, whether the floater or anything else sets them. Standard
+    // packing rounds nothing.
+    auto packing_changed = [this](LLControlVariable*, const LLSD&, const LLSD&)
+    {
+        childSetEnabled("upload_round_weights", gSavedSettings.getU32("AlchemyMeshUploadPacking") != LLModel::PACK_PLAIN);
+        if (mModelPreview)
+        {
+            toggleCalculateButton(true);
+        }
+    };
+    mPackingConnection = gSavedSettings.getControl("AlchemyMeshUploadPacking")->getSignal()->connect(packing_changed);
+    mRoundWeightsConnection = gSavedSettings.getControl("AlchemyMeshUploadRoundWeights")->getSignal()->connect(packing_changed);
+    childSetEnabled("upload_round_weights", gSavedSettings.getU32("AlchemyMeshUploadPacking") != LLModel::PACK_PLAIN);
+
     childSetTextArg("status", "[STATUS]", getString("status_idle"));
 
     childSetAction("ok_btn", onUpload, this);

@@ -629,7 +629,8 @@ LLSD LLModel::writeModel(
     EWriteModelMode write_mode,
     bool as_slm,
     int submodel_id,
-    EBlockPacking packing)
+    EBlockPacking packing,
+    ALMeshFacePack::Weights weights)
 {
     LLSD mdl;
 
@@ -912,10 +913,11 @@ LLSD LLModel::writeModel(
         }
     }
 
-    return writeModelToStream(ostr, mdl, write_mode, as_slm, packing);
+    return writeModelToStream(ostr, mdl, write_mode, as_slm, packing, weights);
 }
 
-LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockPacking packing)
+LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockPacking packing,
+                                 ALMeshFacePack::Weights weights)
 {
     auto zip = [packing](LLSD& block) { return packing == PACK_PLAIN ? zip_llsd(block) : zip_llsd_model(block); };
 
@@ -972,11 +974,12 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
             LLSD& block = mdl[model_names[i]];
             if (packing != PACK_PLAIN)
             {
-                const ALMeshFacePack::Normals normals =
-                    packing == PACK_SMALL_SNAPPED ? ALMeshFacePack::Normals::SNAP_12_BITS : ALMeshFacePack::Normals::KEEP;
+                const ALMeshFacePack::Normals normals = packing == PACK_SMALL_NORMALS_12 ? ALMeshFacePack::Normals::SNAP_12_BITS
+                                                        : packing == PACK_SMALL_NORMALS_10 ? ALMeshFacePack::Normals::SNAP_10_BITS
+                                                                                           : ALMeshFacePack::Normals::KEEP;
                 for (LLSD::array_iterator face = block.beginArray(); face != block.endArray(); ++face)
                 {
-                    ALMeshFacePack::repack(*face, normals);
+                    ALMeshFacePack::repack(*face, normals, weights);
                 }
             }
             out[i] = zip(block);

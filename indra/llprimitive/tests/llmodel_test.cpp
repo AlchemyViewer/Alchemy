@@ -41,6 +41,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -211,23 +212,28 @@ namespace
         decomp.mBaseHull = { LLVector3(-0.5f, -0.5f, -0.5f), LLVector3(0.5f, -0.5f, -0.5f), LLVector3(0.f, 0.5f, -0.5f),
                              LLVector3(0.f, 0.f, 0.5f) };
 
-        auto write = [&](LLModel::EBlockPacking packing)
+        auto write = [&](LLModel::EBlockPacking packing, ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP)
         {
             std::ostringstream ostr;
             WrittenAsset asset;
             asset.header = LLModel::writeModel(ostr, nullptr, model, model, model, model, decomp, true, false, false, LLModel::WRITE_BINARY,
-                                               false, 0, packing);
+                                               false, 0, packing, weights);
             asset.stream = ostr.str();
             asset.header_bytes = binaryOf(asset.header).size();
             return asset;
         };
         const WrittenAsset plain = write(LLModel::PACK_PLAIN);
         const WrittenAsset small = write(LLModel::PACK_SMALL);
-        const WrittenAsset snapped = write(LLModel::PACK_SMALL_SNAPPED);
+        const WrittenAsset snapped_12 = write(LLModel::PACK_SMALL_NORMALS_12);
+        const WrittenAsset snapped_10 = write(LLModel::PACK_SMALL_NORMALS_10);
+        const WrittenAsset rounded = write(LLModel::PACK_SMALL, ALMeshFacePack::Weights::ROUND_8_BITS);
+
+        // Packed plain, the weights are written as they are.
+        CHECK(write(LLModel::PACK_PLAIN, ALMeshFacePack::Weights::ROUND_8_BITS).stream == plain.stream);
 
         const char* const lods[] = { "lowest_lod", "low_lod", "medium_lod", "high_lod" };
         const char* const blocks[] = { "skin", "physics_convex", "lowest_lod", "low_lod", "medium_lod", "high_lod" };
-        for (const WrittenAsset* asset : { &plain, &small, &snapped })
+        for (const WrittenAsset* asset : { &plain, &small, &snapped_12, &snapped_10, &rounded })
         {
             // The blocks lie one after another from the header to the end.
             std::vector<std::pair<S64, S64>> spans;
@@ -251,7 +257,8 @@ namespace
         // Each block is what its own zip makes of its value. The skin and
         // the hull hold the same value every way; a LOD packed small holds
         // the plain LOD's faces repacked, and one packed small and snapped
-        // holds them repacked with their normals snapped.
+        // holds them repacked with their normals snapped to that grid, and
+        // one packed small with its weights rounded holds them repacked so.
         for (const char* name : blocks)
         {
             CAPTURE(name);
@@ -260,10 +267,14 @@ namespace
             REQUIRE(LLUZipHelper::unzip_llsd(plain_value, (const U8*)plain_block.data(), (S32)plain_block.size()) == LLUZipHelper::ZR_OK);
             CHECK(zip_llsd(plain_value) == plain_block);
             const bool lod = std::any_of(std::begin(lods), std::end(lods), [&](const char* l) { return std::strcmp(l, name) == 0; });
-            for (const auto& [asset, normals] :
-                 { std::pair{ &small, ALMeshFacePack::Normals::KEEP }, std::pair{ &snapped, ALMeshFacePack::Normals::SNAP_12_BITS } })
+            using Normals = ALMeshFacePack::Normals;
+            using Weights = ALMeshFacePack::Weights;
+            for (const auto& [asset, normals, weights] : { std::tuple{ &small, Normals::KEEP, Weights::KEEP },
+                                                           std::tuple{ &snapped_12, Normals::SNAP_12_BITS, Weights::KEEP },
+                                                           std::tuple{ &snapped_10, Normals::SNAP_10_BITS, Weights::KEEP },
+                                                           std::tuple{ &rounded, Normals::KEEP, Weights::ROUND_8_BITS } })
             {
-                CAPTURE(normals == ALMeshFacePack::Normals::SNAP_12_BITS);
+                CAPTURE((int)normals, (int)weights);
                 const std::string packed_block = asset->block(name);
                 LLSD packed_value;
                 REQUIRE(LLUZipHelper::unzip_llsd(packed_value, (const U8*)packed_block.data(), (S32)packed_block.size()) ==
@@ -274,7 +285,7 @@ namespace
                 {
                     for (LLSD::array_iterator face = expected.beginArray(); face != expected.endArray(); ++face)
                     {
-                        CHECK(ALMeshFacePack::repack(*face, normals));
+                        CHECK(ALMeshFacePack::repack(*face, normals, weights));
                     }
                 }
                 CHECK(binaryOf(packed_value) == binaryOf(expected));

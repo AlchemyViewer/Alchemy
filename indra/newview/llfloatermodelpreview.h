@@ -207,6 +207,9 @@ protected:
     // The assets the fee shown was quoted for, while it stands.
     std::shared_ptr<const ALMeshUploadAssets> mFeeAssets;
 
+    boost::signals2::scoped_connection mPackingConnection;
+    boost::signals2::scoped_connection mRoundWeightsConnection;
+
 private:
     void onClickCalculateBtn();
     void onJointListSelection();

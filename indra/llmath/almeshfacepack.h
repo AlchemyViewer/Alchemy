@@ -45,12 +45,26 @@ class LLSD;
 // zip_llsd_model.
 //
 // It may also snap the normals, the one change to what a face draws: each
-// component to the nearest multiple of 16 of its sixteen bits, the top step
-// held at 65535 so that an axis keeps its ends and its middle. A normal
-// turns by 0.024 degrees at most, well under what an 8-bit normal map holds
-// or what shading across a triangle makes of a curved surface, and vertices
-// that then match in every array are welded with the rest. That takes about
-// 4% more off.
+// component to the nearest multiple of 16 (12 bits) or 64 (10 bits) of its
+// sixteen bits, the top step held at 65535 so that an axis keeps its ends
+// and its middle, and vertices that then match in every array are welded
+// with the rest. On the 12-bit grid a normal turns by 0.024 degrees at most,
+// well under what an 8-bit normal map holds or what shading across a
+// triangle makes of a curved surface, and that takes about 4% more off. On
+// the 10-bit grid it turns by 0.096 degrees at most, 0.042 on average, under
+// half what the G-buffer keeps of a normal without HDR; a smooth, curved,
+// mirror-like surface may show it in a sharp reflection. That takes about
+// 7% more off.
+//
+// A rigged face's skin weights may be rounded to 8 bits as well, as glTF's
+// unsigned-byte weights hold them: each to the nearest multiple of 256, the
+// top step held at 65535. A viewer normalizes a vertex's weights as it skins
+// it, so a skinned vertex moves by at most 0.5% (0.1% on average) of how far
+// apart its joints would each carry it, half a millimetre where they part by
+// 10 cm; clothing fitted closely over another mesh may show it in a pose
+// that bends a joint far. Vertices that then match are welded, and
+// triangles that then have no area in any pose dropped, with the rest. That
+// takes about 11% more off a rigged LOD block.
 class ALMeshFacePack
 {
 public:
@@ -58,6 +72,13 @@ public:
     {
         KEEP,
         SNAP_12_BITS,
+        SNAP_10_BITS,
+    };
+
+    enum class Weights
+    {
+        KEEP,
+        ROUND_8_BITS,
     };
 
     // Repacks one face in place. False, leaving it as it was, for a face
@@ -65,7 +86,7 @@ public:
     // weights do not read to their end at its last vertex, which names a
     // vertex it does not hold, or which has no triangle with area in any
     // pose.
-    static bool repack(LLSD& face, Normals normals = Normals::KEEP);
+    static bool repack(LLSD& face, Normals normals = Normals::KEEP, Weights weights = Weights::KEEP);
 };
 
 #endif // AL_MESHFACEPACK_H

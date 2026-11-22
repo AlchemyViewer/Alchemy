@@ -46,6 +46,7 @@ public:
         bool upload_joints = false;
         bool lock_scale_if_joint_position = false;
         LLModel::EBlockPacking packing = LLModel::PACK_PLAIN;
+        ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP;
 
         bool operator==(const Options&) const = default;
     };
