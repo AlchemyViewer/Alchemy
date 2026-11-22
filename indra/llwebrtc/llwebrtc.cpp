@@ -474,23 +474,25 @@ bool LLWebRTCImpl::terminate()
     // notifier's callbacks post to mWorkerThread, which the shutdown thread
     // takes below, and the shutdown thread, if detached, can outlive the
     // observers.  The notifier is released on the worker thread, where it was
-    // created.  A worker that has not run the release by the deadline is stuck
-    // -- an audio backend that never returns from a device call -- and every
-    // step of the shutdown goes through the worker, so none is attempted: the
-    // object is left whole, connections and threads included, for the caller
-    // to leak.
+    // created, and the devices observers are dropped there too, after any
+    // updateDevices() already queued has notified them.  A worker that has not
+    // run the release by the deadline is stuck -- an audio backend that never
+    // returns from a device call -- and every step of the shutdown goes
+    // through the worker, so none is attempted: the object is left whole,
+    // connections and threads included, for the caller to leak, and an
+    // updateDevices() the worker runs later notifies no observer.
     auto notifier_released = std::make_shared<std::promise<void> >();
     std::future<void> notifier_future = notifier_released->get_future();
     mWorkerThread->PostTask(
         [this, notifier_released]()
         {
             mDeviceNotifier.reset();
+            mVoiceDevicesObserverList.clear();
             notifier_released->set_value();
         });
-    const bool worker_responds = notifier_future.wait_until(deadline) != std::future_status::timeout;
-    mVoiceDevicesObserverList.clear();
-    if (!worker_responds)
+    if (notifier_future.wait_until(deadline) == std::future_status::timeout)
     {
+        mDevicesObserversDetached = true;
         RTC_LOG(LS_WARNING) << __FUNCTION__
             << ": the worker thread did not respond. Leaving WebRTC running;"
             " its resources will be leaked.";
@@ -1020,6 +1022,12 @@ void LLWebRTCImpl::updateDevices()
 
     for (auto &observer : mVoiceDevicesObserverList)
     {
+        // terminate() timed out waiting for this thread and returned; the
+        // observers may be gone.
+        if (mDevicesObserversDetached)
+        {
+            break;
+        }
         observer->OnDevicesChanged(mPlayoutDeviceList, mRecordingDeviceList);
     }
 

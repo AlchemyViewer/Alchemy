@@ -597,6 +597,9 @@ class LLWebRTCImpl : public LLWebRTCDeviceInterface, public ALAudioDeviceNotifie
     webrtc::scoped_refptr<LLWebRTCAudioDeviceModule>           mDeviceModule;
     std::unique_ptr<ALAudioDeviceNotifier>                     mDeviceNotifier;
     std::vector<LLWebRTCDevicesObserver *>                     mVoiceDevicesObserverList;
+    // Set by terminate() when it gives up on the worker thread; from then on
+    // updateDevices() notifies no observer.
+    std::atomic<bool>                                          mDevicesObserversDetached{ false };
 
     bool mBuiltinNS;
     bool mBuiltinAGC;
