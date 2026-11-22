@@ -27,6 +27,7 @@
 
 #include "llmodel.h"
 #include "almeshsimplifier.h"
+#include "hbxxh.h"
 #include "llmath.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
@@ -36,6 +37,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <initializer_list>
 #include <iterator>
 #include <sstream>
 #include <string>
@@ -311,5 +313,84 @@ namespace
         CHECK(plain_drawn.size() == (size_t)(model->getVolumeFace(0).mNumIndices / 3));
         CHECK(drawnTriangles(small_back->getVolumeFace(0)) == plain_drawn);
         CHECK(small_back->mSkinWeights.size() == plain_back->mSkinWeights.size());
+    }
+
+    // A skin block of two joints, each matrix its sixteen elements row by
+    // row: an inverse bind matrix and a joint position override for each
+    // joint, and the bind shape matrix.
+    LLSD twoJointSkin()
+    {
+        auto matrix = [](std::initializer_list<F64> elements)
+        {
+            LLSD out = LLSD::emptyArray();
+            for (F64 element : elements)
+            {
+                out.append(element);
+            }
+            return out;
+        };
+        LLSD skin;
+        skin["joint_names"] = llsd::array("mPelvis", "mTorso");
+        skin["inverse_bind_matrix"] = llsd::array(matrix({ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.33333, 0, -1.0625, 1 }),
+                                                  matrix({ 0, 1, 0, 0, -1, 0, 0, 0, 0, 0, 1, 0, 0.125, 0, -1.5, 1 }));
+        skin["bind_shape_matrix"] = matrix({ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0.25, 1 });
+        skin["alt_inverse_bind_matrix"] = llsd::array(matrix({ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -1.125, 1 }),
+                                                      matrix({ 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, -1.625, 1 }));
+        skin["pelvis_offset"] = 0.0625;
+        skin["lock_scale_if_joint_position"] = true;
+        return skin;
+    }
+
+    bool sameMatrices(const LLMeshSkinInfo::matrix_list_t& a, const LLMeshSkinInfo::matrix_list_t& b)
+    {
+        return std::equal(a.begin(), a.end(), b.begin(), b.end(),
+                          [](const LLMatrix4a& x, const LLMatrix4a& y) { return std::memcmp(&x, &y, sizeof(LLMatrix4a)) == 0; });
+    }
+
+    TEST_CASE("llmodel: a skin without joints hashes nothing", "[llmodel]")
+    {
+        // The skin writeModel writes for a model its loader found no joints
+        // in: the bind shape matrix alone.
+        LLSD jointless;
+        jointless["bind_shape_matrix"] = twoJointSkin()["bind_shape_matrix"];
+        const LLMeshSkinInfo none(jointless);
+        CHECK(none.mJointNames.empty());
+        CHECK(none.mInvBindMatrix.empty());
+        CHECK(none.mHash == HBXXH64::digest(std::string()));
+
+        // Joint names and inverse bind matrices that disagree in number are
+        // dropped together, which leaves the same.
+        LLSD mismatched = twoJointSkin();
+        mismatched["inverse_bind_matrix"].erase(1);
+        const LLMeshSkinInfo dropped(mismatched);
+        CHECK(dropped.mJointNames.empty());
+        CHECK(dropped.mInvBindMatrix.empty());
+        CHECK(dropped.mHash == none.mHash);
+    }
+
+    TEST_CASE("llmodel: a skin read back from an asset keeps its joints and its hash", "[llmodel]")
+    {
+        LLSD skin = twoJointSkin();
+        LLPointer<LLModel> model = riggedSphere(8, 4);
+        model->mSkinInfo.fromLLSD(skin);
+        const LLMeshSkinInfo& written = model->mSkinInfo;
+
+        // Render batches are keyed by the hash of the joint names, their
+        // numbers and the inverse bind matrices to four decimal places.
+        CHECK(written.mHash == 0x973f7b5efcbd0155ULL);
+
+        std::ostringstream ostr;
+        LLModel::writeModel(ostr, nullptr, model, model, model, model, LLModel::Decomposition(), true, true, true);
+        LLPointer<LLModel> back = new LLModel(meshParams(), (F32)LLModel::LOD_HIGH);
+        std::istringstream is(ostr.str());
+        REQUIRE(back->loadModel(is));
+        const LLMeshSkinInfo& read = back->mSkinInfo;
+        CHECK(read.mJointNames == written.mJointNames);
+        CHECK(sameMatrices(read.mInvBindMatrix, written.mInvBindMatrix));
+        CHECK(sameMatrices(read.mAlternateBindMatrix, written.mAlternateBindMatrix));
+        CHECK(sameMatrices({ read.mBindShapeMatrix }, { written.mBindShapeMatrix }));
+        CHECK(read.mPelvisOffset == written.mPelvisOffset);
+        CHECK(read.mLockScaleIfJointPosition);
+        CHECK(read.mHash == written.mHash);
     }
 }
