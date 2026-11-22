@@ -464,6 +464,56 @@ bool LLWebRTCImpl::terminate()
     // Run all blocking WebRTC shutdown calls on a separate thread so that a
     // hung BlockingCall cannot block the viewer shutdown indefinitely.
     // Webrtc is not mission critical, we need to save personal data.
+    //
+    // One deadline covers the whole shutdown, the device notifier's release
+    // included; past it, only a devices notification already under way is
+    // waited for, and briefly.
+    constexpr auto WEBRTC_TERMINATE_TIMEOUT = std::chrono::seconds(10);
+    const auto deadline = std::chrono::steady_clock::now() + WEBRTC_TERMINATE_TIMEOUT;
+
+    // Unregister the observers before the threads are handed over: the device
+    // notifier's callbacks post to mWorkerThread, which the shutdown thread
+    // takes below, and the shutdown thread, if detached, can outlive the
+    // observers.  The notifier is released on the worker thread, where it was
+    // created, and the devices observers are dropped there too, after any
+    // updateDevices() already queued has notified them.  A worker that has not
+    // run the release by the deadline is stuck -- an audio backend that never
+    // returns from a device call -- and every step of the shutdown goes
+    // through the worker, so none is attempted: the object is left whole,
+    // connections and threads included, for the caller to leak, and an
+    // updateDevices() the worker runs later notifies no observer.
+    auto notifier_released = std::make_shared<std::promise<void> >();
+    std::future<void> notifier_future = notifier_released->get_future();
+    mWorkerThread->PostTask(
+        [this, notifier_released]()
+        {
+            mDeviceNotifier.reset();
+            {
+                std::lock_guard<std::timed_mutex> lock(mDevicesObserversMutex);
+                mVoiceDevicesObserverList.clear();
+            }
+            notifier_released->set_value();
+        });
+    if (notifier_future.wait_until(deadline) == std::future_status::timeout)
+    {
+        // Let a devices notification already under way finish before the
+        // observers are given up, but no longer than a moment: a worker stuck
+        // inside one must not hold the shutdown.
+        std::unique_lock<std::timed_mutex> lock(mDevicesObserversMutex, std::defer_lock);
+        const bool notifying = !lock.try_lock_for(std::chrono::seconds(1));
+        mDevicesObserversDetached = true;
+        if (notifying)
+        {
+            RTC_LOG(LS_WARNING) << __FUNCTION__
+                << ": a devices notification is still under way on the worker thread.";
+        }
+        RTC_LOG(LS_WARNING) << __FUNCTION__
+            << ": the worker thread did not respond. Leaving WebRTC running;"
+            " its resources will be leaked.";
+        webrtc::LogMessage::RemoveLogToStream(mLogSink);
+        return false;
+    }
+
     auto done_promise = std::make_shared<std::promise<void> >();
     std::future<void> done_future = done_promise->get_future();
 
@@ -472,14 +522,6 @@ bool LLWebRTCImpl::terminate()
     // shutdown thread is detached and may still be working through them.
     std::vector<webrtc::scoped_refptr<LLWebRTCPeerConnectionImpl>> connections;
     connections.swap(mPeerConnections);
-
-    // Explicitely unregister observers before shutting down the threads.
-    // shutdown_thread, if detached, can outlive observer.
-    mWorkerThread->BlockingCall([this]()
-    {
-        mDeviceNotifier.reset();
-    });
-    mVoiceDevicesObserverList.clear();
 
     // shutdown_thread can be detached, then LLWebRTCImpl will be nulled out.
     // Capture what's needed in lambda, don't rely on [this].
@@ -572,8 +614,7 @@ bool LLWebRTCImpl::terminate()
         done_promise->set_value();
     });
 
-    constexpr auto WEBRTC_TERMINATE_TIMEOUT = std::chrono::seconds(10);
-    if (done_future.wait_for(WEBRTC_TERMINATE_TIMEOUT) == std::future_status::timeout)
+    if (done_future.wait_until(deadline) == std::future_status::timeout)
     {
         RTC_LOG(LS_WARNING) << __FUNCTION__
             << ": timed out waiting for WebRTC thread shutdown."
@@ -684,10 +725,15 @@ void LLWebRTCImpl::refreshDevices()
     mWorkerThread->PostTask([this]() { updateDevices(); });
 }
 
-void LLWebRTCImpl::setDevicesObserver(LLWebRTCDevicesObserver *observer) { mVoiceDevicesObserverList.emplace_back(observer); }
+void LLWebRTCImpl::setDevicesObserver(LLWebRTCDevicesObserver *observer)
+{
+    std::lock_guard<std::timed_mutex> lock(mDevicesObserversMutex);
+    mVoiceDevicesObserverList.emplace_back(observer);
+}
 
 void LLWebRTCImpl::unsetDevicesObserver(LLWebRTCDevicesObserver *observer)
 {
+    std::lock_guard<std::timed_mutex> lock(mDevicesObserversMutex);
     std::vector<LLWebRTCDevicesObserver *>::iterator it =
         std::find(mVoiceDevicesObserverList.begin(), mVoiceDevicesObserverList.end(), observer);
     if (it != mVoiceDevicesObserverList.end())
@@ -993,9 +1039,18 @@ void LLWebRTCImpl::updateDevices()
 
     RTC_LOG(LS_INFO) << "updateDevices, playout count: " << renderDeviceCount << "; capture count: " << captureDeviceCount;
 
-    for (auto &observer : mVoiceDevicesObserverList)
     {
-        observer->OnDevicesChanged(mPlayoutDeviceList, mRecordingDeviceList);
+        // Held through the callbacks, which only post to the viewer's queue.
+        // Once terminate() has given up on this thread, the observers may be
+        // gone.
+        std::lock_guard<std::timed_mutex> lock(mDevicesObserversMutex);
+        if (!mDevicesObserversDetached)
+        {
+            for (auto &observer : mVoiceDevicesObserverList)
+            {
+                observer->OnDevicesChanged(mPlayoutDeviceList, mRecordingDeviceList);
+            }
+        }
     }
 
     deployDevices();

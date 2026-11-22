@@ -58,7 +58,6 @@ extern const std::string WEBRTC_VOICE_SERVER_TYPE;
 
 class LLWebRTCVoiceClient : public LLSingleton<LLWebRTCVoiceClient>,
                             virtual public LLVoiceModuleInterface,
-                            public llwebrtc::LLWebRTCDevicesObserver,
                             public LLMuteListObserver,
                             public llwebrtc::LLWebRTCLogCallback
 {
@@ -234,13 +233,11 @@ public:
 
     //////////////////////////////
     /// @name Devices change notification
-    //  LLWebRTCDevicesObserver
+    //  Delivered by DevicesObserver, through the voice work queue.
     //@{
-    void OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
-                          const llwebrtc::LLWebRTCVoiceDeviceList &capture_devices) override;
-    //@}
     void OnDevicesChangedImpl(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
                               const llwebrtc::LLWebRTCVoiceDeviceList &capture_devices);
+    //@}
 
     struct participantState
     {
@@ -469,6 +466,14 @@ private:
     void drainConnections();
 
     LL::WorkQueue::ptr_t mVoiceWorkQueue;
+
+    // Receives llwebrtc's device notifications on its worker thread.  Never
+    // freed: llwebrtc's shutdown can give up on that thread with a
+    // notification under way, and this client may be gone when it lands.  It
+    // reaches the client only through work posted to mVoiceWorkQueue, which
+    // the client outlives.
+    class DevicesObserver;
+    DevicesObserver* mDevicesObserver = nullptr;
 
     F32 mTuningMicGain;
     int mTuningSpeakerVolume;

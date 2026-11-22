@@ -109,6 +109,9 @@ typedef std::vector<LLWebRTCVoiceDevice> LLWebRTCVoiceDeviceList;
 class LLWebRTCDevicesObserver
 {
   public:
+    // Called on WebRTC's worker thread, under a lock that terminate() waits
+    // a second at most for: return well within that, and don't call back
+    // into the device interface.
     virtual void OnDevicesChanged(const LLWebRTCVoiceDeviceList &render_devices,
                                   const LLWebRTCVoiceDeviceList &capture_devices) = 0;
 };
