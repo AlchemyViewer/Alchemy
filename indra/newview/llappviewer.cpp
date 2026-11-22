@@ -688,9 +688,8 @@ LLAppViewer::LLAppViewer()
 
     mDumpPath ="";
 
-    // Need to do this initialization before we do anything else, since anything
-    // that touches files should really go through the lldir API
-    gDirUtilp->initAppDirs("AlchemyNext");
+    // The viewer's directories were set by main (initAppDirs()), before the
+    // crash reporter started.
     //
     // IMPORTANT! Do NOT put anything that will write
     // into the log files during normal startup until AFTER
@@ -711,6 +710,14 @@ LLAppViewer::LLAppViewer()
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
 
+    // As soon as it is known whether this is the first instance: crash
+    // reports kept for an answer that was no are deleted, and the marker a
+    // crash leaves for the next launch is composed, for the crash handler to
+    // write without allocating.
+    ALCrashReporter::discardDeclined();
+    prepareCrashMarker();
+    ALCrashReporter::probe("ctor");
+
     LLLoginInstance::instance().setPlatformInfo(gPlatform, LLOSInfo::instance().getOSVersionString(), LLOSInfo::instance().getOSStringSimple());
 
     // Under some circumstances we want to read the static_debug_info.log file
@@ -728,6 +735,18 @@ LLAppViewer::LLAppViewer()
     mDumpPath = logdir;
 
     setDebugFileNames(logdir);
+
+    // What the previous run left, read before this run writes its own over
+    // it; then what the crash reporter, running since main, needed the
+    // viewer for.
+    ALCrashReporter::readLastRun();
+    ALCrashReporter::attachRun();
+}
+
+// static
+void LLAppViewer::initAppDirs()
+{
+    gDirUtilp->initAppDirs("AlchemyNext");
 }
 
 LLAppViewer::~LLAppViewer()
@@ -796,17 +815,8 @@ bool LLAppViewer::init()
 
     setupErrorHandling(mSecondInstance);
 
-    // The marker a crash leaves for the next launch, composed before there
-    // is a crash handler to write it.
-    prepareCrashMarker();
-
-    // What the previous run left, read before this run writes its own over it.
-    ALCrashReporter::readLastRun();
     startDebugInfo();
-
-    // As early as consent can be read: before the settings, on the sentinel
-    // they keep for it.
-    ALCrashReporter::init();
+    ALCrashReporter::probe("init");
 
     //
     // Start of the application
@@ -864,24 +874,27 @@ bool LLAppViewer::init()
     }
 
     // The settings hold the answer on crash reports from here: it refreshes
-    // the sentinel the reporter started on, and follows changes to it.
-    // The setting only reaches disk at a clean exit: a run that crashed
-    // after the answer was given left it unasked, while the sentinel kept
-    // the answer. The sentinel's yes becomes the setting's.
-    if (gSavedSettings.getS32("AlchemyCrashReportConsent") == 0
-        && ALCrashReporter::consentRecorded(ALCrashReporter::consentSentinel()))
+    // the record the reporter started on, and follows changes to it.
+    // The record is written whenever the answer changes and the setting only
+    // at a clean exit, so a run that crashed after the answer was given left
+    // the setting behind the record: an answer the record holds is the newer.
+    const ALCrashReporter::Consent recorded_consent =
+        ALCrashReporter::recordedConsent(ALCrashReporter::consentDirectory());
+    if (recorded_consent != ALCrashReporter::Consent::Unasked)
     {
-        gSavedSettings.setS32("AlchemyCrashReportConsent", 1);
+        gSavedSettings.setS32("AlchemyCrashReportConsent", static_cast<S32>(recorded_consent));
     }
-    auto crash_reports_allowed = []()
+    auto refresh_crash_reports = []()
     {
-        return gSavedSettings.getS32("AlchemyCrashReportConsent") == 1 && !LLApp::isCrashloggerDisabled();
+        ALCrashReporter::refreshConsent(
+            ALCrashReporter::consentFromSetting(gSavedSettings.getS32("AlchemyCrashReportConsent")),
+            !LLApp::isCrashloggerDisabled());
     };
-    ALCrashReporter::refreshConsent(crash_reports_allowed());
+    refresh_crash_reports();
     gSavedSettings.getControl("AlchemyCrashReportConsent")->getSignal()->connect(
-        [crash_reports_allowed](LLControlVariable*, const LLSD&, const LLSD&)
+        [refresh_crash_reports](LLControlVariable*, const LLSD&, const LLSD&)
         {
-            ALCrashReporter::refreshConsent(crash_reports_allowed());
+            refresh_crash_reports();
         });
     gAgent.addRegionChangedCallback([]()
     {
@@ -3155,15 +3168,6 @@ bool LLAppViewer::initConfiguration()
         return false;
     }
 
-    // Register the core crash option as soon as we can
-    // if we want gdb post-mortem on cores we need to be up and running
-    // ASAP or we might miss init issue etc.
-    if (gSavedSettings.getBOOL("DisableCrashLogger"))
-    {
-        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
-        disableCrashlogger();
-    }
-
     gNonInteractive = gSavedSettings.getBOOL("NonInteractive");
     // Handle initialization from settings.
     // Start up the debugging console before handling other options.
@@ -3206,6 +3210,16 @@ bool LLAppViewer::initConfiguration()
                 }
             }
         }
+    }
+
+    // The crash logger switch, once every command line value has been
+    // applied: --disablecrashlogger, and --set DisableCrashLogger after it.
+    // The crash reporter read the same from the command line before it
+    // started; this keeps it off when the settings are refreshed.
+    if (gSavedSettings.getBOOL("DisableCrashLogger"))
+    {
+        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
+        disableCrashlogger();
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

@@ -28,6 +28,8 @@
 
 #include "llappviewerwin32.h"
 
+#include "alcrashreporter.h"
+
 #if !LL_SDL_WINDOW
 #include "llwindowwin32.h" // for gIconResource, set in the native WINMAIN below
 #endif
@@ -313,6 +315,26 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
     LL_PROFILER_FRAME_END;
     LL_PROFILER_SET_THREAD_NAME("App");
 
+    // The crash reporter next, so that whatever crashes from here on is
+    // reported: it needs only the viewer's directories. After Velopack, which
+    // may be replacing the crash handler's executable. Whether the command
+    // line turns it off is read here, the settings that hold it coming later.
+    {
+        std::vector<std::string> arguments;
+        int argc = 0;
+        if (LPWSTR* argw = CommandLineToArgvW(GetCommandLineW(), &argc))
+        {
+            for (int i = 1; i < argc; ++i)
+            {
+                arguments.push_back(ll_convert_wide_to_string(argw[i]));
+            }
+            LocalFree(argw);
+        }
+        LLAppViewer::initAppDirs();
+        ALCrashReporter::start(!ALCrashReporter::crashLoggerDisabledBy(arguments));
+    }
+    LLAppViewer::installTerminateHandler();
+
     const S32 MAX_HEAPS = 255;
     DWORD heap_enable_lfh_error[MAX_HEAPS];
     S32 num_heaps = 0;
@@ -356,9 +378,16 @@ int APIENTRY WINMAIN(HINSTANCE hInstance,
         }
     }
 
-    LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
+    // A crash of the last run waiting for an answer is asked about before
+    // anything else can crash. The benchmark child asks nothing: its parent
+    // does.
+    if (!gGPUBenchmarkMode)
+    {
+        ALCrashReporter::askAfterHeldCrash();
+    }
+    ALCrashReporter::probe("main");
 
-    LLAppViewer::installTerminateHandler();
+    LLAppViewerWin32* viewer_app_ptr = new LLAppViewerWin32(ll_convert_wide_to_string(pCmdLine).c_str());
 
     // Set a debug info flag to indicate if multiple instances are running.
     bool found_other_instance = gGPUBenchmarkMode || !create_app_mutex();

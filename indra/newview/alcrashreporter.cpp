@@ -46,6 +46,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
+#include <stdexcept>
 
 std::string ALCrashReporter::releaseName(S32 major, S32 minor, S32 patch, U64 build)
 {
@@ -92,6 +93,87 @@ const std::string& ALCrashReporter::runId()
     return id;
 }
 
+bool ALCrashReporter::crashLoggerDisabledBy(const std::vector<std::string>& arguments)
+{
+    // The switch is applied with the other options, before any --set.
+    bool disabled = false;
+    for (const std::string& argument : arguments)
+    {
+        if (argument == "--disablecrashlogger" || argument == "-disablecrashlogger")
+        {
+            disabled = true;
+        }
+    }
+
+    // Then each --set name value, in order: "--set name value", or
+    // "--set=name value", the parser taking the attached name as the first
+    // of its two values. A value the setting cannot read as a boolean stores
+    // false.
+    constexpr std::string_view SET_LONG = "--set=";
+    constexpr std::string_view SET_DISGUISED = "-set=";
+    for (size_t i = 0; i < arguments.size(); ++i)
+    {
+        const std::string_view argument = arguments[i];
+        std::string_view name;
+        size_t value_index = 0;
+        if (argument == "--set" || argument == "-set")
+        {
+            if (i + 2 >= arguments.size())
+            {
+                break;
+            }
+            name = arguments[i + 1];
+            value_index = i + 2;
+        }
+        else if (argument.starts_with(SET_LONG) || argument.starts_with(SET_DISGUISED))
+        {
+            if (i + 1 >= arguments.size())
+            {
+                break;
+            }
+            name = argument.substr(argument.find('=') + 1);
+            value_index = i + 1;
+        }
+        else
+        {
+            continue;
+        }
+
+        if (name == "DisableCrashLogger" || name == "Global.DisableCrashLogger")
+        {
+            bool value = false;
+            disabled = LLStringUtil::convertToBOOL(arguments[value_index], value) && value;
+        }
+        i = value_index;
+    }
+    return disabled;
+}
+
+#ifndef LL_RELEASE_FOR_DOWNLOAD
+void ALCrashReporter::probe(std::string_view point)
+{
+    const char* named = getenv("AL_CRASH_PROBE");
+    if (!named)
+    {
+        return;
+    }
+    const std::string_view named_point(named);
+    constexpr std::string_view THROW_SUFFIX = ":throw";
+    if (named_point == point)
+    {
+        // A wild write, as the viewer's own crashes are, rather than a crash
+        // the reporter is handed.
+        volatile S32* nowhere = nullptr;
+        *nowhere = 0;
+    }
+    else if (named_point.size() == point.size() + THROW_SUFFIX.size() && named_point.starts_with(point)
+             && named_point.ends_with(THROW_SUFFIX))
+    {
+        throw std::runtime_error(fmt::format("AL_CRASH_PROBE {}", named_point));
+    }
+}
+#endif
+
 #if !AL_SENTRY
 // Without a reporter the crash takes the usual unhandled route; on Windows
 // as an exception every filter sees, since a fast-fail only Windows Error
@@ -107,26 +189,66 @@ void ALCrashReporter::fatal(std::string_view, const std::string&)
 }
 #endif
 
-std::string ALCrashReporter::consentSentinel()
+ALCrashReporter::Consent ALCrashReporter::consentFromSetting(S32 value)
 {
-    return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "crash_reports_allowed");
-}
-
-bool ALCrashReporter::consentRecorded(const std::string& sentinel)
-{
-    return LLFile::isfile(sentinel);
-}
-
-void ALCrashReporter::recordConsent(const std::string& sentinel, bool allowed)
-{
-    if (allowed)
+    switch (value)
     {
-        llofstream file(sentinel);
+        case static_cast<S32>(Consent::Allowed):
+            return Consent::Allowed;
+        case static_cast<S32>(Consent::Declined):
+            return Consent::Declined;
+        default:
+            return Consent::Unasked;
+    }
+}
+
+namespace
+{
+    constexpr const char* ALLOWED_FILE = "crash_reports_allowed";
+    constexpr const char* DECLINED_FILE = "crash_reports_declined";
+}
+
+std::string ALCrashReporter::consentDirectory()
+{
+    return gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "");
+}
+
+ALCrashReporter::Consent ALCrashReporter::recordedConsent(const std::string& directory)
+{
+    const bool allowed = LLFile::isfile(gDirUtilp->add(directory, ALLOWED_FILE));
+    const bool declined = LLFile::isfile(gDirUtilp->add(directory, DECLINED_FILE));
+    if (allowed == declined)
+    {
+        return Consent::Unasked;
+    }
+    return allowed ? Consent::Allowed : Consent::Declined;
+}
+
+void ALCrashReporter::recordConsent(const std::string& directory, Consent consent)
+{
+    const std::string allowed = gDirUtilp->add(directory, ALLOWED_FILE);
+    const std::string declined = gDirUtilp->add(directory, DECLINED_FILE);
+
+    // The other answer goes first: stopped between the two, the record reads
+    // as unasked, which sends nothing.
+    if (consent != Consent::Allowed)
+    {
+        LLFile::remove(allowed, ENOENT);
+    }
+    if (consent != Consent::Declined)
+    {
+        LLFile::remove(declined, ENOENT);
+    }
+
+    if (consent == Consent::Allowed)
+    {
+        llofstream file(allowed);
         file << "Crash reports may be sent. Preferences holds the answer; this file lets the reporter start before Preferences is read.\n";
     }
-    else
+    else if (consent == Consent::Declined)
     {
-        LLFile::remove(sentinel, ENOENT);
+        llofstream file(declined);
+        file << "Crash reports may not be sent. Preferences holds the answer; this file lets the reporter stay off before Preferences is read.\n";
     }
 }
 

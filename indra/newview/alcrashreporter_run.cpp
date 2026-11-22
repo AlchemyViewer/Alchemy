@@ -38,16 +38,19 @@
 
 namespace
 {
-    // Written once by readLastRun(), before any reporter starts, and only
-    // read after.
+    // Written once by readLastRun(), under the lock below, and only read
+    // after.
     ALCrashReporter::PreviousRun sLastRun;
     std::string sLastRunDebugInfo;
 
     // The report the previous run ended with: a freeze's from the record it
     // left, a crash's from the reporter, which may find it off the main
-    // thread.
+    // thread. The reporter starts before the previous run is read, so the
+    // crash reports it finds until then wait here for its id.
     LLMutex sPreviousReportMutex;
     std::optional<ALCrashReporter::PreviousReport> sPreviousReport;
+    bool sLastRunRead = false;
+    std::vector<std::pair<std::string, std::string>> sFoundCrashReports;
 }
 
 ALCrashReporter::Release ALCrashReporter::release()
@@ -72,26 +75,40 @@ std::vector<std::pair<std::string, std::string>> ALCrashReporter::commonTags()
 
 void ALCrashReporter::readLastRun()
 {
+    // A second instance knows no previous run, so the crash reports found
+    // for it are left waiting.
     LLAppViewer* app = LLAppViewer::instance();
     if (app->isSecondInstance())
     {
         return;
     }
 
-    sLastRunDebugInfo = LLFile::getContents(*app->getStaticDebugFile());
-    if (!sLastRunDebugInfo.empty())
+    std::string debug_info = LLFile::getContents(*app->getStaticDebugFile());
+    PreviousRun last_run;
+    if (!debug_info.empty())
     {
-        std::istringstream contents(sLastRunDebugInfo);
+        std::istringstream contents(debug_info);
         LLSD info;
         if (LLSDSerialize::deserialize(info, contents, LLSDSerialize::SIZE_UNLIMITED))
         {
-            sLastRun = previousRun(info);
+            last_run = previousRun(info);
         }
     }
-
     std::optional<PreviousReport> report = takeRecordedReport(reportRecordFile());
+
     LLMutexLock lock(&sPreviousReportMutex);
+    sLastRunDebugInfo = std::move(debug_info);
+    sLastRun = std::move(last_run);
+    sLastRunRead = true;
     sPreviousReport = std::move(report);
+    for (const auto& [event_id, crashed_run_id] : sFoundCrashReports)
+    {
+        if (std::optional<PreviousReport> crash = previousRunCrash(event_id, crashed_run_id, sLastRun.runId))
+        {
+            sPreviousReport = std::move(crash);
+        }
+    }
+    sFoundCrashReports.clear();
 }
 
 const ALCrashReporter::PreviousRun& ALCrashReporter::lastRun()
@@ -106,10 +123,14 @@ const std::string& ALCrashReporter::lastRunDebugInfo()
 
 void ALCrashReporter::foundCrashReport(std::string_view event_id, std::string_view crashed_run_id)
 {
-    // A second instance knows no previous run, so takes none.
+    LLMutexLock lock(&sPreviousReportMutex);
+    if (!sLastRunRead)
+    {
+        sFoundCrashReports.emplace_back(event_id, crashed_run_id);
+        return;
+    }
     if (std::optional<PreviousReport> report = previousRunCrash(event_id, crashed_run_id, sLastRun.runId))
     {
-        LLMutexLock lock(&sPreviousReportMutex);
         sPreviousReport = std::move(report);
     }
 }
@@ -118,6 +139,12 @@ std::optional<ALCrashReporter::PreviousReport> ALCrashReporter::previousReport()
 {
     LLMutexLock lock(&sPreviousReportMutex);
     return sPreviousReport;
+}
+
+void ALCrashReporter::forgetPreviousReport()
+{
+    LLMutexLock lock(&sPreviousReportMutex);
+    sPreviousReport.reset();
 }
 
 std::optional<ALCrashReporter::LastRunEnd> ALCrashReporter::lastRunEnd()

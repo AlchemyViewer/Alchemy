@@ -50,6 +50,7 @@
 #include "lluuid.h"
 #include "llversioninfo.h"
 #include "llviewerregion.h"
+#include "llwindow.h"
 
 #include <algorithm>
 #include <atomic>
@@ -64,24 +65,19 @@
 namespace
 {
     bool sEngaged = false;
+    // Engaged with the user's consent; otherwise the reports it makes wait
+    // in the database until it is given.
+    bool sSending = false;
 
     // Raised while a signal handler of ours calls into the SDK, whose
     // warnings would otherwise reach the log's locks from inside it.
     std::atomic<bool> sSdkLogMuted{ false };
 
-    // The SDK's own log, into ours: what it says about the handler, the
-    // Windows Error Reporting module and the transport is otherwise unseen.
     // Its debug level is the "Sentry" tag at DEBUG; its warnings are
     // advisory (one per thread whose stack it cannot reserve a guarantee
     // on) and go at INFO, so only its errors are ours.
-    void sdk_log(sentry_level_t level, const char* message, va_list args, void*)
+    void write_sdk_line(sentry_level_t level, const char* line)
     {
-        if (sSdkLogMuted.load(std::memory_order_relaxed))
-        {
-            return;
-        }
-        char line[1024];
-        vsnprintf(line, sizeof(line), message, args);
         switch (level)
         {
             case SENTRY_LEVEL_DEBUG:
@@ -95,6 +91,64 @@ namespace
                 LL_WARNS("Sentry") << line << LL_ENDL;
                 break;
         }
+    }
+
+    // What the SDK says before the log is open, which is what tells why a
+    // reporter did not start: kept here, from whichever thread, and written
+    // to the log by attachRun(). A line still being kept as the log opens,
+    // or past the last slot, is lost.
+    struct EarlySdkLine
+    {
+        std::atomic<bool> kept{ false };
+        sentry_level_t level = SENTRY_LEVEL_DEBUG;
+        char text[400] = {};
+    };
+    EarlySdkLine sEarlySdkLines[128];
+    std::atomic<U32> sEarlySdkLineCount{ 0 };
+    std::atomic<bool> sLogOpen{ false };
+
+    void write_early_sdk_lines()
+    {
+        sLogOpen.store(true, std::memory_order_release);
+        const U32 count = sEarlySdkLineCount.load(std::memory_order_acquire);
+        const U32 kept = std::min<U32>(count, static_cast<U32>(std::size(sEarlySdkLines)));
+        for (U32 i = 0; i < kept; ++i)
+        {
+            const EarlySdkLine& line = sEarlySdkLines[i];
+            if (line.kept.load(std::memory_order_acquire))
+            {
+                write_sdk_line(line.level, line.text);
+            }
+        }
+        if (count > kept)
+        {
+            LL_INFOS("Sentry") << (count - kept) << " more lines from before the log was open were not kept" << LL_ENDL;
+        }
+    }
+
+    // The SDK's own log, into ours: what it says about the handler, the
+    // Windows Error Reporting module and the transport is otherwise unseen.
+    void sdk_log(sentry_level_t level, const char* message, va_list args, void*)
+    {
+        if (sSdkLogMuted.load(std::memory_order_relaxed))
+        {
+            return;
+        }
+        if (!sLogOpen.load(std::memory_order_acquire))
+        {
+            const U32 slot = sEarlySdkLineCount.fetch_add(1, std::memory_order_acq_rel);
+            if (slot < std::size(sEarlySdkLines))
+            {
+                EarlySdkLine& line = sEarlySdkLines[slot];
+                line.level = level;
+                vsnprintf(line.text, sizeof(line.text), message, args);
+                line.kept.store(true, std::memory_order_release);
+            }
+            return;
+        }
+        char line[1024];
+        vsnprintf(line, sizeof(line), message, args);
+        write_sdk_line(level, line);
     }
 
 #if LL_WINDOWS
@@ -196,10 +250,15 @@ namespace
     // held the heap or a lock, so nothing here allocates or locks: the
     // region's name and the marker were set aside while the viewer ran, the
     // buffers are static, and the values made are sentry's, which on Linux
-    // come from an allocator of its own once crashed.
+    // come from an allocator of its own once crashed. The reporter starts
+    // before the viewer is constructed, so the viewer may not exist yet.
     sentry_value_t on_crash(const sentry_ucontext_t*, sentry_value_t event, sentry_hint_t*, void*)
     {
         LLAppViewer* app = LLAppViewer::instance();
+        if (!app)
+        {
+            return event;
+        }
 
         if (gAgent.getRegion())
         {
@@ -387,20 +446,82 @@ namespace
     }
 #endif
 
-    bool engage()
+    // The SDK sends only once consent is given. Until then, because events
+    // are kept (cache_keep), crashpad keeps its reports pending rather than
+    // marking them skipped, and giving consent sends them, whichever run made
+    // them. Events wait in the cache, which only http_retry would send. The
+    // SDK's own record of the answer is the database's `user-consent`, which
+    // follows ours.
+    void apply_consent(ALCrashReporter::Consent consent)
+    {
+        sSending = consent == ALCrashReporter::Consent::Allowed;
+        if (sSending)
+        {
+            sentry_user_consent_give();
+        }
+        else
+        {
+            sentry_user_consent_reset();
+        }
+    }
+
+    // What was kept for a yes that did not come: the crash reports held in
+    // the database and the events cached beside them. The first instance
+    // only, with the SDK closed: a second instance's database is the first's.
+    // Before the viewer exists which instance this is is not known;
+    // discardDeclined() deletes them then.
+    void discard_reports()
     {
         LLAppViewer* app = LLAppViewer::instance();
+        if (!app || app->isSecondInstance())
+        {
+            return;
+        }
+        const std::string database = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
+        if (LLFile::isdir(database))
+        {
+            gDirUtilp->deleteDirAndContents(database);
+            LL_INFOS("CrashReporter") << "Crash reports kept for consent deleted" << LL_ENDL;
+        }
+        ALCrashReporter::forgetPreviousReport();
+    }
+
+    // How start() went, for attachRun() to log once the log is open.
+    enum class StartState
+    {
+        NotStarted,
+        Disabled,
+        Declined,
+        Failed,
+        Engaged,
+    };
+    StartState sStartState = StartState::NotStarted;
+    // What the user answered askAfterHeldCrash(), for attachRun() to log.
+    std::optional<ALCrashReporter::Consent> sAnswerAfterCrash;
+
+    void log_engaged()
+    {
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion()
+                                  << (sSending ? "; sending reports" : "; keeping reports until the user allows them")
+                                  << LL_ENDL;
+    }
+
+    // What needs only the viewer's directories and its version: the SDK
+    // with its handler and database, consent, and the settings file. The
+    // reporter is running from here.
+    bool start_sdk(ALCrashReporter::Consent consent)
+    {
         const ALCrashReporter::Release release = ALCrashReporter::release();
 
         sentry_options_t* options = sentry_options_new();
         sentry_options_set_dsn(options, AL_SENTRY_DSN);
+        sentry_options_set_require_user_consent(options, 1);
+        sentry_options_set_cache_keep(options, SENTRY_CACHE_KEEP_OFFLINE);
         sentry_options_set_release(options, release.name.c_str());
         sentry_options_set_environment(options, release.environment.c_str());
         sentry_options_set_dist(options, release.dist.c_str());
         set_handler_path(options, gDirUtilp->getExpandedFilename(LL_PATH_EXECUTABLE, HANDLER_NAME));
         set_database_path(options, gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry"));
-        add_attachment(options, LLError::logFileName());
-        add_attachment(options, *app->getStaticDebugFile());
         add_attachment(options, gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "settings.xml"));
         sentry_options_set_on_crash(options, on_crash, nullptr);
         sentry_options_set_on_crashed_last_run(options, on_crashed_last_run, nullptr);
@@ -415,7 +536,19 @@ namespace
             return false;
         }
         sEngaged = true;
+        apply_consent(consent);
         follow_wer(true);
+        ALCrashReporter::setTag("run_id", ALCrashReporter::runId());
+        return true;
+    }
+
+    // What needs the viewer: its log, its static debug file, the tags of the
+    // run and the agent's region.
+    void attach_run()
+    {
+        LLAppViewer* app = LLAppViewer::instance();
+        attach_now(LLError::logFileName());
+        attach_now(*app->getStaticDebugFile());
 
         for (const auto& [key, value] : ALCrashReporter::commonTags())
         {
@@ -434,8 +567,21 @@ namespace
 #if LL_LINUX
         prepare_frozen_walk();
 #endif
+    }
 
-        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
+    // Engaged after start(), when the settings allow what the record did not.
+    // Before the viewer exists, attachRun() attaches the run later.
+    bool engage(ALCrashReporter::Consent consent)
+    {
+        if (!start_sdk(consent))
+        {
+            return false;
+        }
+        if (LLAppViewer::instance())
+        {
+            attach_run();
+            log_engaged();
+        }
         return true;
     }
 
@@ -445,38 +591,137 @@ namespace
         {
             sentry_close();
             sEngaged = false;
+            sSending = false;
         }
     }
 }
 
-bool ALCrashReporter::init()
+bool ALCrashReporter::start(bool may_run)
 {
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (!consentRecorded(consentSentinel()))
+    if (!may_run)
     {
-        LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
+        sStartState = StartState::Disabled;
         follow_wer(false);
         return false;
     }
-    return engage();
+    const Consent consent = recordedConsent(consentDirectory());
+    if (consent == Consent::Declined)
+    {
+        sStartState = StartState::Declined;
+        follow_wer(false);
+        return false;
+    }
+    sStartState = start_sdk(consent) ? StartState::Engaged : StartState::Failed;
+    return sStartState == StartState::Engaged;
 #endif
 }
 
-void ALCrashReporter::refreshConsent(bool allowed)
+void ALCrashReporter::askAfterHeldCrash()
 {
-    recordConsent(consentSentinel(), allowed);
 #if LL_SEND_CRASH_REPORTS
-    if (allowed && !sEngaged)
+    // Only a run keeping its reports for an answer, after a run that crashed
+    // while it was: the report of that crash is waiting. A viewer that
+    // crashes before the login screen every launch is asked here or never.
+    if (!sEngaged || sSending || sentry_get_crashed_last_run() != 1)
     {
-        engage();
+        return;
     }
-    else if (!allowed && sEngaged)
+
+    // The strings are not read until the settings are, so the text is
+    // English, as the other dialogs from before the settings are.
+    const S32 button = OSMessageBox(
+        "Alchemy closed unexpectedly the last time it ran, and kept a report of the crash on this computer.\n\n"
+        "Send crash reports to the Alchemy developers?\n\n"
+        "A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to "
+        "Sentry, where only the Alchemy developers can see it, and never without this permission. Yes sends "
+        "this report and any to come; No deletes it and sends none. Preferences can change the answer later.",
+        "Alchemy crash reports", OSMB_YESNO);
+    if (button != OSBTN_YES && button != OSBTN_NO)
     {
-        close_sdk();
+        return;
+    }
+    sAnswerAfterCrash = button == OSBTN_YES ? Consent::Allowed : Consent::Declined;
+    refreshConsent(*sAnswerAfterCrash, true);
+#endif
+}
+
+void ALCrashReporter::attachRun()
+{
+    write_early_sdk_lines();
+    if (sAnswerAfterCrash)
+    {
+        LL_INFOS("CrashReporter") << "Asked about the last run's crash: crash reports "
+                                  << (*sAnswerAfterCrash == Consent::Allowed ? "allowed" : "declined") << LL_ENDL;
+    }
+    if (sEngaged)
+    {
+        attach_run();
+        log_engaged();
+        return;
+    }
+
+    if (sStartState == StartState::Disabled)
+    {
+        LL_INFOS("CrashReporter") << "Crash logger disabled; Sentry stays off" << LL_ENDL;
+    }
+    else if (sStartState == StartState::Declined)
+    {
+        LL_INFOS("CrashReporter") << "Crash reports declined; Sentry stays off" << LL_ENDL;
+    }
+    else if (sStartState == StartState::Failed)
+    {
+        LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
+    }
+}
+
+void ALCrashReporter::discardDeclined()
+{
+    // What was kept for an answer that was no, this run's or an earlier
+    // one's: a run that crashes before the settings are read would otherwise
+    // keep it, run after run.
+    if (!sEngaged && recordedConsent(consentDirectory()) == Consent::Declined)
+    {
+        discard_reports();
+    }
+}
+
+void ALCrashReporter::refreshConsent(Consent consent, bool may_run)
+{
+    recordConsent(consentDirectory(), consent);
+#if LL_SEND_CRASH_REPORTS
+    if (!may_run || consent == Consent::Declined)
+    {
+        if (sEngaged)
+        {
+            if (consent == Consent::Declined)
+            {
+                sentry_user_consent_revoke();
+            }
+            close_sdk();
+            LL_INFOS("CrashReporter") << (may_run ? "Crash reports declined; Sentry closed"
+                                                  : "Crash logger disabled; Sentry closed") << LL_ENDL;
+        }
         follow_wer(false);
-        LL_INFOS("CrashReporter") << "Consent to crash reports withdrawn; Sentry closed" << LL_ENDL;
+        if (consent == Consent::Declined)
+        {
+            discard_reports();
+        }
+        return;
+    }
+
+    if (!sEngaged)
+    {
+        engage(consent);
+    }
+    else if ((consent == Consent::Allowed) != sSending)
+    {
+        apply_consent(consent);
+        LL_INFOS("CrashReporter") << (sSending ? "Crash reports allowed; sending those kept and any to come"
+                                               : "Crash reports unanswered; keeping them until the user allows them")
+                                  << LL_ENDL;
     }
 #endif
 }
@@ -489,6 +734,11 @@ void ALCrashReporter::shutdown()
 bool ALCrashReporter::isEngaged()
 {
     return sEngaged;
+}
+
+bool ALCrashReporter::isSending()
+{
+    return sSending;
 }
 
 void ALCrashReporter::setUser(const LLUUID& id, const std::string& name)
