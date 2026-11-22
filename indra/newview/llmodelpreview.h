@@ -192,6 +192,10 @@ public:
     void setLoadState(U32 state) { mLoadState = state; }
     U32 getLoadState() { return mLoadState; }
 
+    // Whether levels of detail are still being made on idle: until they are,
+    // the models are not the ones a fee or an upload should be written from.
+    bool isGeneratingLODs() const { return !mLodsQuery.empty(); }
+
     static bool         sIgnoreLoadedCallback;
     std::vector<S32> mLodsQuery;
     std::vector<S32> mLodsWithParsingError;

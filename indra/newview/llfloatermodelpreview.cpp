@@ -2002,6 +2002,9 @@ bool LLFloaterModelPreview::isModelUploadAllowed()
     if (mModelPreview)
     {
         allow_upload &= mModelPreview->mModelNoErrors;
+        // Levels of detail still being made are not what the fee was quoted
+        // for; their end drops the fee.
+        allow_upload &= !mModelPreview->isGeneratingLODs();
     }
     return allow_upload;
 }

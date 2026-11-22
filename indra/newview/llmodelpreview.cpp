@@ -963,6 +963,12 @@ void LLModelPreview::clearIncompatible(S32 lod)
             }
         }
 
+        if (!mLodsQuery.empty())
+        {
+            // What the fee was quoted for is being made again.
+            mModelUpdatedSignal(true);
+        }
+
         // Subscribe if we have pending work and not subscribed yet
         if (!mLodsQuery.empty() && subscribe_for_generation)
         {
@@ -2701,6 +2707,9 @@ void LLModelPreview::update()
             // adding all lods into query for generation
             mLodsQuery.push_back(lod);
         }
+
+        // What the fee was quoted for is being made again.
+        mModelUpdatedSignal(true);
 
         if (subscribe_for_generation)
         {
