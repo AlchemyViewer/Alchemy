@@ -1684,12 +1684,14 @@ void LLMeshSkinInfo::updateHash()
     hash.update((const void*)mJointNums.data(), sizeof(S32) * mJointNums.size());
 
     //mInvBindMatrix
-    F32* src = mInvBindMatrix[0].getF32ptr();
-
-    for (size_t i = 0, count = mInvBindMatrix.size() * 16; i < count; ++i)
+    for (const LLMatrix4a& matrix : mInvBindMatrix)
     {
-        S32 t = ll_round(src[i] * 10000.f);
-        hash.update((const void*)&t, sizeof(S32));
+        const F32* src = matrix.getF32ptr();
+        for (size_t i = 0; i < 16; ++i)
+        {
+            S32 t = ll_round(src[i] * 10000.f);
+            hash.update((const void*)&t, sizeof(S32));
+        }
     }
     //hash.update((const void*)mInvBindMatrix.data(), sizeof(LLMatrix4a) * mInvBindMatrix.size());
 

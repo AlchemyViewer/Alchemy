@@ -316,6 +316,40 @@ void LLWebRTCVoiceClient::cleanupSingleton()
 
 //---------------------------------------------------
 
+class LLWebRTCVoiceClient::DevicesObserver : public llwebrtc::LLWebRTCDevicesObserver
+{
+  public:
+    DevicesObserver(LLWebRTCVoiceClient* client, LL::WorkQueue::weak_t queue) :
+        mClient(client),
+        mQueue(std::move(queue))
+    {
+    }
+
+    // On WebRTC's worker thread, under a lock llwebrtc::terminate() waits a
+    // second at most for, so this never blocks on a full queue, nor asks the
+    // queue anything without a timeout once the post has given up.
+    void OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
+                          const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices) override
+    {
+        constexpr std::chrono::milliseconds POST_TIMEOUT(100);
+        LL::WorkQueue::ptr_t queue = mQueue.lock();
+        if (queue &&
+            !queue->tryPostFor(POST_TIMEOUT,
+                               [client = mClient, render_devices, capture_devices]
+                               {
+                                   client->OnDevicesChangedImpl(render_devices, capture_devices);
+                               }))
+        {
+            LL_WARNS("Voice") << "Dropped a device list update: the voice work queue is full or closed" << LL_ENDL;
+        }
+    }
+
+  private:
+    // Reached only by work run from mQueue, which the client outlives.
+    LLWebRTCVoiceClient* const  mClient;
+    const LL::WorkQueue::weak_t mQueue;
+};
+
 void LLWebRTCVoiceClient::init(LLPumpIO* pump)
 {
     // constructor will set up LLVoiceClient::getInstance()
@@ -324,11 +358,6 @@ void LLWebRTCVoiceClient::init(LLPumpIO* pump)
 
 void LLWebRTCVoiceClient::initWebRTC()
 {
-    llwebrtc::init(this);
-
-    mWebRTCDeviceInterface = llwebrtc::getDeviceInterface();
-    mWebRTCDeviceInterface->setDevicesObserver(this);
-
     if (!mVoiceWorkQueue)
     {
         mVoiceWorkQueue = std::make_shared<LL::WorkQueue>("VoiceWebRTC");
@@ -347,6 +376,15 @@ void LLWebRTCVoiceClient::initWebRTC()
             return false;
         });
     }
+    if (!mDevicesObserver)
+    {
+        mDevicesObserver = new DevicesObserver(this, mVoiceWorkQueue);
+    }
+
+    llwebrtc::init(this);
+
+    mWebRTCDeviceInterface = llwebrtc::getDeviceInterface();
+    mWebRTCDeviceInterface->setDevicesObserver(mDevicesObserver);
 
     // Connect StopMicCaptureWhenMuted control so the changes apply instantly
     if (!mStopMicCaptureOnMuteConnection.connected())
@@ -902,18 +940,6 @@ void LLWebRTCVoiceClient::setCaptureDevice(const std::string& name)
 void LLWebRTCVoiceClient::setDevicesListUpdated(bool state)
 {
     mDevicesListUpdated = state;
-}
-
-// the singleton 'this' pointer will outlive the work queue.
-void LLWebRTCVoiceClient::OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
-                                           const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices)
-{
-
-    LL::WorkQueue::postMaybe(mVoiceWorkQueue,
-                             [=, this]
-        {
-            OnDevicesChangedImpl(render_devices, capture_devices);
-        });
 }
 
 void LLWebRTCVoiceClient::OnDevicesChangedImpl(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
