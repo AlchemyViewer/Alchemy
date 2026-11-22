@@ -63,6 +63,14 @@
       ]
     },
     {
+      "name": "libdeflate",
+      "default-features": false,
+      "features": [
+        "compression",
+        "zlib"
+      ]
+    },
+    {
       "name": "libjpeg-turbo",
       "features": [
         "jpeg8"

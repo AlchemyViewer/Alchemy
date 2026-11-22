@@ -296,7 +296,7 @@ target_link_libraries(
     ll::simdutf
     ll::fmt
     Threads::Threads
-  PRIVATE ll::fastfloat ll::icu ll::re2
+  PRIVATE ll::fastfloat ll::icu ll::libdeflate ll::re2
 )
 
 if(AL_BUILD_TESTS)

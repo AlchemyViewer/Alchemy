@@ -43,6 +43,7 @@
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
+#include <libdeflate.h>
 #include <zlib.h>
 
 #if !LL_WINDOWS
@@ -2638,6 +2639,50 @@ std::string zip_llsd(LLSD& data)
         free(output);
 
     return result;
+}
+
+std::string zip_llsd_model(const LLSD& data)
+{
+    // libdeflate's strongest level: a near-optimal parse over a binary-tree
+    // match finder, where zlib's best is a lazy greedy one.
+    constexpr int LEVEL = 12;
+
+    std::ostringstream llsd_strm;
+    LLSDSerialize::toBinary(data, llsd_strm);
+    const std::string source = std::move(llsd_strm).str();
+
+    struct FreeCompressor
+    {
+        void operator()(libdeflate_compressor* compressor) const { libdeflate_free_compressor(compressor); }
+    };
+    const std::unique_ptr<libdeflate_compressor, FreeCompressor> compressor(libdeflate_alloc_compressor(LEVEL));
+    if (!compressor)
+    {
+        // zlib at its best compression, as zip_llsd writes it, rather than
+        // no block at all.
+        LL_WARNS_ONCE("LLSD") << "Could not allocate a level " << LEVEL << " compressor; zipping at zlib's best"
+                              << LL_ENDL;
+        uLongf size = compressBound(narrow(source.size()));
+        const std::unique_ptr<char[]> buffer(new char[size]);
+        if (compress2(reinterpret_cast<Bytef*>(buffer.get()), &size, reinterpret_cast<const Bytef*>(source.data()),
+                      narrow(source.size()), Z_BEST_COMPRESSION) != Z_OK)
+        {
+            LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
+            return std::string();
+        }
+        return std::string(buffer.get(), size);
+    }
+
+    // The bound leaves the compressor room for any input, so it cannot fail.
+    const size_t bound = libdeflate_zlib_compress_bound(compressor.get(), source.size());
+    const std::unique_ptr<char[]> buffer(new char[bound]);
+    const size_t size = libdeflate_zlib_compress(compressor.get(), source.data(), source.size(), buffer.get(), bound);
+    if (size == 0)
+    {
+        LL_WARNS() << "Failed to compress LLSD block." << LL_ENDL;
+        return std::string();
+    }
+    return std::string(buffer.get(), size);
 }
 
 //decompress a block of LLSD from provided istream

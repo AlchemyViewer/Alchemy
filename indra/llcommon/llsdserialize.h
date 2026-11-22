@@ -950,6 +950,12 @@ public:
 //dirty little zip functions -- yell at davep
 LL_COMMON_API std::string zip_llsd(LLSD& data);
 
+// The value in LLSD binary, zlib-wrapped as zip_llsd's is, by libdeflate at
+// its strongest level: smaller than zip_llsd's output and slower to make. For
+// blocks whose compressed size is charged, as a mesh asset's LODs are. Empty
+// where it fails.
+LL_COMMON_API std::string zip_llsd_model(const LLSD& data);
+
 
 LL_COMMON_API U8* unzip_llsdNavMesh( bool& valid, size_t& outsize,std::istream& is, S32 size);
 
