@@ -908,12 +908,16 @@ void LLWebRTCVoiceClient::setDevicesListUpdated(bool state)
 void LLWebRTCVoiceClient::OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
                                            const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices)
 {
-
-    LL::WorkQueue::postMaybe(mVoiceWorkQueue,
-                             [=, this]
-        {
-            OnDevicesChangedImpl(render_devices, capture_devices);
-        });
+    // On WebRTC's worker thread, under a lock llwebrtc::terminate() waits a
+    // second at most for, so this never blocks on a full queue.
+    constexpr std::chrono::milliseconds POST_TIMEOUT(100);
+    LL::WorkQueue::ptr_t queue = mVoiceWorkQueue;
+    if (queue &&
+        !queue->tryPostFor(POST_TIMEOUT, [=, this] { OnDevicesChangedImpl(render_devices, capture_devices); }) &&
+        !queue->isClosed())
+    {
+        LL_WARNS("Voice") << "Dropped a device list update: the voice work queue is full" << LL_ENDL;
+    }
 }
 
 void LLWebRTCVoiceClient::OnDevicesChangedImpl(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
