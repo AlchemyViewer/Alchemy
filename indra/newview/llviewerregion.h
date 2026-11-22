@@ -45,6 +45,7 @@
 #include "llreflectionmap.h"
 #include "llpointer.h"
 #include "algltfoverridestate.h"
+#include "alregionretirement.h"
 
 // Surface id's
 #define LAND  1
@@ -146,9 +147,12 @@ public:
 
     bool isAlive(); // can become false if circuit disconnects
 
-    // Left behind by a teleport and being removed (ALRegionRetirement): its simulator creates no new objects here.
+    // Left behind by a teleport, its objects killed (ALRegionRetirement): its simulator creates no new objects here,
+    // and what it sends of them is dropped and noted among the objects lost.
     bool isRetiring() const                     { return mRetiring; }
     void setRetiring(bool retiring)             { mRetiring = retiring; }
+    // What it lost while retiring, which a revival asks of its simulator again.
+    ALRetiredObjects& retiredObjects()          { return mRetiredObjects; }
 
     void setWaterHeight(F32 water_level);
     F32 getWaterHeight() const;
@@ -647,6 +651,7 @@ public:
     ALGLTFOverrideCounts                    mGLTFOverrideCounts;
     bool    mAlive;                 // can become false if circuit disconnects
     bool    mRetiring = false;
+    ALRetiredObjects mRetiredObjects;
     bool    mSimulatorFeaturesReceived;
     bool    mReleaseNotesRequested;
     bool    mDead;  //if true, this region is in the process of deleting.

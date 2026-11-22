@@ -110,4 +110,46 @@ namespace
         UNSCOPED_INFO("at the maximum, however busy");
         CHECK(ALRegionRetirement::settled(max_s, 1000, 1000));
     }
+
+    // The simulator still holds the agent in a retiring region it arrives at, and sends nothing it sent before: a new
+    // region in its place would stay empty.
+    TEST_CASE("ALRegionRetirement: a simulator arriving at a retiring region it still holds revives it", "[ALRegionRetirement]")
+    {
+        using EArrival = ALRegionRetirement::EArrival;
+        CHECK(ALRegionRetirement::arrivalAt(true, true, true) == EArrival::REVIVE);
+        CHECK(ALRegionRetirement::arrivalAt(true, true, false) == EArrival::REUSE);
+
+        UNSCOPED_INFO("another host, or a region whose circuit is gone, is replaced whether it retires or not");
+        CHECK(ALRegionRetirement::arrivalAt(false, true, true) == EArrival::REPLACE);
+        CHECK(ALRegionRetirement::arrivalAt(false, true, false) == EArrival::REPLACE);
+        CHECK(ALRegionRetirement::arrivalAt(true, false, true) == EArrival::REPLACE);
+        CHECK(ALRegionRetirement::arrivalAt(true, false, false) == EArrival::REPLACE);
+    }
+
+    TEST_CASE("ALRetiredObjects: a revival asks once for each object lost and for none its simulator killed", "[ALRegionRetirement]")
+    {
+        ALRetiredObjects lost;
+        CHECK(lost.empty());
+        lost.lost(30);
+        lost.lost(7);
+        // killed by the retirement, then dropped as its simulator sent an update of it
+        lost.lost(30);
+        lost.lost(12);
+        lost.killed(12);
+        UNSCOPED_INFO("a kill of an object never lost changes nothing");
+        lost.killed(99);
+        CHECK(lost.size() == 2);
+        CHECK(lost.take() == std::vector<U32>{ 7, 30 });
+        CHECK(lost.empty());
+        CHECK(lost.take().empty());
+    }
+
+    TEST_CASE("ALRetiredObjects: an object made under the local ID of one its simulator killed is asked for", "[ALRegionRetirement]")
+    {
+        ALRetiredObjects lost;
+        lost.lost(5);
+        lost.killed(5);
+        lost.lost(5);
+        CHECK(lost.take() == std::vector<U32>{ 5 });
+    }
 }

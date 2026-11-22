@@ -2941,7 +2941,7 @@
         <key>AlchemyRetireDepartedRegions</key>
         <map>
             <key>Comment</key>
-            <string>Once a teleport's arrival has settled, remove the regions it left behind that are neither the agent's, a neighbour of it, nor within draw distance plus a region width, instead of keeping them until their simulators disconnect them about a minute later. Their objects are killed a few each frame first.</string>
+            <string>Once a teleport's arrival has settled, kill the objects of the regions it left behind that are neither the agent's, a neighbour of it, nor within draw distance plus a region width, a few each frame, instead of keeping them until their simulators disconnect the regions about a minute later. The regions themselves stay until then, and one the agent comes back to meanwhile gets its objects back.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2952,7 +2952,7 @@
         <key>AlchemyRetireDepartedRegionsCloseCircuit</key>
         <map>
             <key>Comment</key>
-            <string>Close a retired region's circuit at once, telling its simulator with CloseCircuit, instead of leaving it for the simulator to close when it disconnects the region.</string>
+            <string>Remove a retired region and close its circuit at once, telling its simulator with CloseCircuit, instead of keeping the region until the simulator disconnects it.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
