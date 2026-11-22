@@ -550,7 +550,7 @@ void process_layer_data(LLMessageSystem *mesgsys, void **user_data)
 
     if(!regionp)
     {
-        // Once for each simulator: a retired region's simulator sends on until it disables the circuit.
+        // Once for each simulator: one can still send for a region removed before its circuit closed.
         LL_WARNS_ONCE() << "Invalid region for layer data from " << mesgsys->getSender() << LL_ENDL;
         return;
     }
@@ -4031,6 +4031,12 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
     {
         U32 local_id;
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
+
+        if (regionp && regionp->isRetiring())
+        {
+            // gone from its simulator too: a revival has nothing to ask for
+            regionp->retiredObjects().killed(local_id);
+        }
 
         gObjectList.getUUIDFromLocal(id, local_id, ip, port);
         if (id == LLUUID::null)

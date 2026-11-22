@@ -131,12 +131,19 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
     {
         LLHost old_host = regionp->getHost();
         // region already exists!
-        // One being retired has lost objects its simulator will not send again.
-        if (host == old_host && regionp->isAlive() && !regionp->isRetiring())
+        switch (ALRegionRetirement::arrivalAt(host == old_host, regionp->isAlive(), regionp->isRetiring()))
         {
+        case ALRegionRetirement::EArrival::REUSE:
             // This is a duplicate for the same host and it's alive, don't bother.
             LL_INFOS() << "Region already exists and is alive, using existing region" << LL_ENDL;
             return regionp;
+        case ALRegionRetirement::EArrival::REVIVE:
+            // Its simulator still holds the agent there, with everything it sent counted as sent: a new region would
+            // be sent none of it, so this one keeps what it has and asks again for what it lost.
+            mRegionRetirement.revive(regionp, "arrived at again while retiring");
+            return regionp;
+        case ALRegionRetirement::EArrival::REPLACE:
+            break;
         }
 
         if (host != old_host)
@@ -148,10 +155,6 @@ LLViewerRegion* LLWorld::addRegion(const U64 &region_handle, const LLHost &host)
         if (!regionp->isAlive())
         {
             LL_WARNS() << "LLWorld::addRegion exists, but isn't alive. Removing old region and creating new" << LL_ENDL;
-        }
-        else if (regionp->isRetiring())
-        {
-            LL_INFOS() << "LLWorld::addRegion exists, but is being retired. Removing old region and creating new" << LL_ENDL;
         }
 
         // Save capabilities seed URL
@@ -1101,7 +1104,7 @@ void process_disable_simulator(LLMessageSystem *mesgsys, void **user_data)
     LLHost host = mesgsys->getSender();
 
     //LL_INFOS() << "Disabling simulator with message from " << host << LL_ENDL;
-    // A region retired before its simulator disabled it is gone already, and only its circuit is left.
+    // A region whose retirement closed its circuit (AlchemyRetireDepartedRegionsCloseCircuit) is gone already.
     if (LLWorld::getInstance()->getRegion(host))
     {
         LLWorld::getInstance()->removeRegion(host);
