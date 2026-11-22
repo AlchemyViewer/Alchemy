@@ -267,8 +267,8 @@
    top_delta="2"
    name="avatar_attachment_action"
    text_color="White"
-   width="380">
-   Pressing enter or double clicking on an avatar attachment
+   width="415">
+   Pressing enter or double clicking on an attachment or clothing
   </text>
   <combo_box
    control_name="InventoryAddAttachmentBehavior"
@@ -280,11 +280,11 @@
    name="attach_combo"
    width="300">
     <combo_box.item
-      label="Adds attachment (recommended)"
+      label="Adds it (recommended)"
       name="0"
       value="0"/>
     <combo_box.item
-      label="Wear (removes attachment at that point)"
+      label="Wears it (replaces what is worn there)"
       name="1"
       value="1"/>
   </combo_box>

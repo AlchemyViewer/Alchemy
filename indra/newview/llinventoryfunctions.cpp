@@ -747,6 +747,25 @@ bool get_can_item_be_worn(const LLUUID& id)
     return false;
 }
 
+bool get_open_item_replaces_worn(const LLViewerInventoryItem* item)
+{
+    static LLCachedControl<U32> add_behavior(gSavedSettings, "InventoryAddAttachmentBehavior", 0);
+    if (!item || add_behavior() == 1)
+    {
+        return true;
+    }
+
+    switch (item->getType())
+    {
+        case LLAssetType::AT_OBJECT:
+            return false;
+        case LLAssetType::AT_CLOTHING:
+            return !LLWearableType::getAllowMultiwear(item->getWearableType());
+        default:
+            return true;
+    }
+}
+
 bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool check_worn)
 {
     if (!model)

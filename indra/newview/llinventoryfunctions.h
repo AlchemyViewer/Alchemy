@@ -52,6 +52,12 @@ bool get_is_item_worn(const LLViewerInventoryItem* item);
 // Could this item be worn (correct type + not already being worn)
 bool get_can_item_be_worn(const LLUUID& id);
 
+// Whether wearing an item by opening it (double-click, Enter) replaces what is
+// worn at its attachment point or layer, as InventoryAddAttachmentBehavior
+// chooses. Body parts, and clothing of a type worn one layer at a time, replace
+// whatever it chooses.
+bool get_open_item_replaces_worn(const LLViewerInventoryItem* item);
+
 bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool check_worn);
 
 // Performs the appropiate edit action (if one exists) for this item

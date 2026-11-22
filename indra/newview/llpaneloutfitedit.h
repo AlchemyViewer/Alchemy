@@ -145,7 +145,9 @@ public:
     void onListViewFilterCommitted(LLUICtrl* ctrl);
     void onSearchEdit(const std::string& string);
     void updatePlusButton();
-    void onPlusBtnClicked(void);
+    // Wears the selected items. "Wear Item" replaces what is worn; items opened by
+    // double-click replace or add as the inventory settings choose.
+    void wearSelectedItems(bool opened);
 
     void onVisibilityChanged(const LLSD &in_visible_chain);
 

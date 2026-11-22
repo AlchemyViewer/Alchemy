@@ -16627,7 +16627,7 @@
   <key>InventoryAddAttachmentBehavior</key>
   <map>
     <key>Comment</key>
-    <string>Defines behavior when hitting return on an inventory item</string>
+    <string>Pressing Enter or double-clicking an attachment or clothing in inventory: 0 adds it to what is worn, 1 replaces what is worn at its attachment point or layer. Body parts, and clothing worn one layer at a time, always replace.</string>
     <key>Persist</key>
     <integer>1</integer>
     <key>Type</key>
