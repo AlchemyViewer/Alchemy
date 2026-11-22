@@ -4613,15 +4613,24 @@ void LLViewerWindow::updateWorldViewRect(bool use_full_window)
     }
 #endif
 
-    if (mWorldViewRectRaw != new_world_rect)
+    const bool raw_changed = mWorldViewRectRaw != new_world_rect;
+    if (raw_changed)
     {
         mWorldViewRectRaw = new_world_rect;
         gPipeline.markRenderInputsDirty();
         LLViewerCamera::getInstance()->setViewHeightInPixels( mWorldViewRectRaw.getHeight() );
         LLViewerCamera::getInstance()->setAspect( getWorldViewAspectRatio() );
+    }
 
+    // A UI scale change leaves the raw pixel rect alone, so the comparison
+    // above does not run. mouseDirectionGlobal() measures scaled click
+    // coordinates against this rect, so a stale scaled rect leaves the
+    // pick ray offset from the cursor.
+    const LLRect new_world_rect_scaled = calcScaledRect(mWorldViewRectRaw, mDisplayScale);
+    if (raw_changed || mWorldViewRectScaled != new_world_rect_scaled)
+    {
         LLRect old_world_rect_scaled = mWorldViewRectScaled;
-        mWorldViewRectScaled = calcScaledRect(mWorldViewRectRaw, mDisplayScale);
+        mWorldViewRectScaled = new_world_rect_scaled;
 
         // sending a signal with a new WorldView rect
         mOnWorldViewRectUpdated(old_world_rect_scaled, mWorldViewRectScaled);
