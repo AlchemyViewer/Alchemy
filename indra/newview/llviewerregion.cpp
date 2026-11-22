@@ -3103,6 +3103,12 @@ void LLViewerRegion::holdGLTFOverride(U32 local_id, S32 side)
     }
 }
 
+bool LLViewerRegion::namesGLTFOverride(U32 local_id, S32 side) const
+{
+    auto iter = mImpl->mGLTFOverridesLLSD.find(local_id);
+    return iter != mImpl->mGLTFOverridesLLSD.end() && iter->second.names(side);
+}
+
 LLVOCacheEntry* LLViewerRegion::getCacheEntryForOctree(U32 local_id)
 {
     if(!sVOCacheCullingEnabled)
@@ -4321,12 +4327,14 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
     // an object actually needs the materials.
     entry.materialize();
 
-    // The entry is all the region gave the object, so a face it leaves out takes none. A face whose material is
+    // The entry is all the region gave the object, so a face it leaves out takes none, unless it is past the faces the
+    // region counts: that takes the last counted face's (LLViewerObject::getRegionFaceCount). A face whose material is
     // missing or still fetching takes nothing yet (setTEGLTFMaterialOverride); it is asked again once the material
     // completes (onRenderMaterialFetched). A face waiting on the region's answer to an edit of the viewer's own
     // shows the edit; the answer reaches it as it replaces the entry (LLGLTFMaterialList::applyOverrideMessage).
     const F64 now = LLFrameTimer::getTotalSeconds();
     const S32 num_tes = (S32)obj->getNumTEs();
+    const S32 region_faces = (S32)obj->getRegionFaceCount();
     const S32 first = te < 0 ? 0 : te;
     const S32 last = te < 0 ? num_tes : llmin(te + 1, num_tes);
     for (S32 i = first; i < last; ++i)
@@ -4336,7 +4344,7 @@ void LLViewerRegion::applyCacheMiscExtras(LLViewerObject* obj, S32 te)
             continue;
         }
         const LLTextureEntry* tep = obj->getTE((U8)i);
-        LLGLTFMaterial* wanted = entry.overrideFor(i);
+        LLGLTFMaterial* wanted = entry.overrideFor(i, region_faces);
         if (tep && !LLGLTFOverrideCacheEntry::sameOverride(tep->getGLTFMaterialOverride(), wanted))
         {
             if (obj->setTEGLTFMaterialOverride((U8)i, wanted))
@@ -4357,7 +4365,8 @@ ALGLTFOverrideFaceState LLViewerRegion::gltfOverrideState(const LLViewerObject* 
         entry = &iter->second;
         entry->materialize();
     }
-    return LLGLTFOverrideCacheEntry::faceState(entry, te, tep ? tep->getGLTFMaterialOverride() : nullptr, LLFrameTimer::getTotalSeconds());
+    return LLGLTFOverrideCacheEntry::faceState(entry, te, obj ? (S32)obj->getRegionFaceCount() : 0,
+                                               tep ? tep->getGLTFMaterialOverride() : nullptr, LLFrameTimer::getTotalSeconds());
 }
 
 

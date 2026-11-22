@@ -408,6 +408,8 @@ public:
     // The viewer sent an edit of face `side`'s override: the face keeps what the edit gave it until the region
     // answers, or LLGLTFOverrideCacheEntry::HOLD_SECONDS pass.
     void holdGLTFOverride(U32 local_id, S32 side);
+    // Whether the overrides the region sent for the object name one for face `side` itself.
+    bool namesGLTFOverride(U32 local_id, S32 side) const;
     // How face `te` of the object stands against the overrides the region sent for it.
     ALGLTFOverrideFaceState gltfOverrideState(const LLViewerObject* obj, S32 te);
     ALGLTFOverrideCounts& gltfOverrideCounts() { return mGLTFOverrideCounts; }

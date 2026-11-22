@@ -268,14 +268,20 @@ void LLGLTFMaterialList::applyOverrideMessage(LLMessageSystem* msg, const std::s
             }
 
             if (obj)
-            { // null out overrides on TEs that shouldn't have them
+            { // a face the message leaves out takes none, or, past the faces the region counts, the last counted face's
+                const S32 region_faces = (S32)obj->getRegionFaceCount();
                 U32 count = llmin(obj->getNumTEs(), MAX_TES);
                 for (U32 i = 0; i < count; ++i)
                 {
                     LLTextureEntry* te = obj->getTE(i);
-                    if (!has_te[i] && te && te->getGLTFMaterialOverride())
+                    if (has_te[i] || !te)
                     {
-                        count_face(i, obj->setTEGLTFMaterialOverride(i, nullptr));
+                        continue;
+                    }
+                    LLGLTFMaterial* wanted = cache.overrideFor((S32)i, region_faces);
+                    if (!LLGLTFOverrideCacheEntry::sameOverride(te->getGLTFMaterialOverride(), wanted))
+                    {
+                        count_face(i, obj->setTEGLTFMaterialOverride(i, wanted));
                         handle_gltf_override_message.doSelectionCallbacks(id, i);
                     }
                 }
@@ -376,6 +382,14 @@ namespace
             regionp->holdGLTFOverride(obj->getLocalID(), side);
         }
     }
+
+    // Whether the region counts face `side` of the object. A face past them is edited with the last counted face, whose
+    // settings it takes (LLViewerObject::getFaceGroup); the region, which knows nothing of it, is sent that face's edit
+    // alone.
+    bool region_counts(const LLViewerObject* obj, S32 side)
+    {
+        return !obj || side < (S32)obj->getRegionFaceCount();
+    }
 }
 
 void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const LLGLTFMaterial* mat)
@@ -390,6 +404,10 @@ void LLGLTFMaterialList::queueModify(const LLViewerObject* obj, S32 side, const 
     if (obj && obj->getRenderMaterialID(side).notNull())
     {
         hold_region_override(obj, side);
+        if (!region_counts(obj, side))
+        {
+            return;
+        }
         if (mat == nullptr)
         {
             sModifyQueue.push_back({ obj->getID(), side, LLGLTFMaterial(), false });
@@ -408,6 +426,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
         return; // client-only preview: no sim material sync (see queueModify)
     }
     hold_region_override(obj, side);
+    if (!region_counts(obj, side))
+    {
+        return;
+    }
     const LLGLTFMaterial* material_override = obj->getTE(side)->getGLTFMaterialOverride();
     if (material_override)
     {
@@ -435,7 +457,10 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     else
     {
         hold_region_override(obj, side);
-        sApplyQueue.push_back({ obj->getID(), side, asset_id, nullptr, override_json });
+        if (region_counts(obj, side))
+        {
+            sApplyQueue.push_back({ obj->getID(), side, asset_id, nullptr, override_json });
+        }
     }
 }
 
@@ -453,8 +478,11 @@ void LLGLTFMaterialList::queueApply(const LLViewerObject* obj, S32 side, const L
     else
     {
         hold_region_override(obj, side);
-        LLGLTFMaterial* material = new LLGLTFMaterial(*material_override);
-        sApplyQueue.push_back({ obj->getID(), side, asset_id, material });
+        if (region_counts(obj, side))
+        {
+            LLGLTFMaterial* material = new LLGLTFMaterial(*material_override);
+            sApplyQueue.push_back({ obj->getID(), side, asset_id, material });
+        }
     }
 
     if (sUpdates.size() >= MAX_TASK_UPDATES)

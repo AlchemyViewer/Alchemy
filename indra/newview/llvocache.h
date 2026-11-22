@@ -61,8 +61,11 @@ public:
     // created; the first apply to an object builds them.
     void materialize();
 
-    // The override a face takes from the entry: the region's for it, or none. Built by materialize().
-    LLGLTFMaterial* overrideFor(S32 side) const;
+    // The override a face takes from the entry, on an object the region counts `region_faces` faces on: the region's
+    // for it; for a face past them it sent none for, the last counted face's; otherwise none. Built by materialize().
+    LLGLTFMaterial* overrideFor(S32 side, S32 region_faces) const;
+    // Whether the region sent an override for face `side` itself.
+    bool names(S32 side) const { return mSides.find(side) != mSides.end(); }
     // Whether a face holding `held` shows `wanted`: the same override by value, or none on both.
     static bool sameOverride(const LLGLTFMaterial* held, const LLGLTFMaterial* wanted);
 
@@ -74,9 +77,10 @@ public:
     // Whether the entry is for the object `id`: one naming no object is taken to be.
     bool isFor(const LLUUID& id) const { return mObjectId.isNull() || mObjectId == id; }
 
-    // The state of face `side`, holding `held`, against `entry` (null where the region has sent nothing), its
-    // materials built by materialize().
-    static ALGLTFOverrideFaceState faceState(const LLGLTFOverrideCacheEntry* entry, S32 side, const LLGLTFMaterial* held, F64 now);
+    // The state of face `side` of an object the region counts `region_faces` faces on, holding `held`, against `entry`
+    // (null where the region has sent nothing), its materials built by materialize().
+    static ALGLTFOverrideFaceState faceState(const LLGLTFOverrideCacheEntry* entry, S32 side, S32 region_faces,
+                                             const LLGLTFMaterial* held, F64 now);
 
     LLUUID mObjectId;
     U32    mLocalId = 0;

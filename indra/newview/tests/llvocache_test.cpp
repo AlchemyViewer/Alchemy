@@ -866,20 +866,59 @@ namespace
         REQUIRE(entry.fromLLSD(data));
         entry.materialize();
 
-        CHECK(entry.overrideFor(0) != nullptr);
-        CHECK(entry.overrideFor(2) != nullptr);
+        CHECK(entry.overrideFor(0, LLTEContents::MAX_TES) != nullptr);
+        CHECK(entry.overrideFor(2, LLTEContents::MAX_TES) != nullptr);
         UNSCOPED_INFO("each face its own");
-        CHECK(entry.overrideFor(0) != entry.overrideFor(2));
-        CHECK(entry.overrideFor(2) == entry.mGLTFMaterial.at(2).get());
+        CHECK(entry.overrideFor(0, LLTEContents::MAX_TES) != entry.overrideFor(2, LLTEContents::MAX_TES));
+        CHECK(entry.overrideFor(2, LLTEContents::MAX_TES) == entry.mGLTFMaterial.at(2).get());
         UNSCOPED_INFO("a face the region left out takes none");
-        CHECK(entry.overrideFor(1) == nullptr);
-        CHECK(entry.overrideFor(LLTEContents::MAX_TES - 1) == nullptr);
+        CHECK(entry.overrideFor(1, LLTEContents::MAX_TES) == nullptr);
+        CHECK(entry.overrideFor(LLTEContents::MAX_TES - 1, LLTEContents::MAX_TES) == nullptr);
 
         UNSCOPED_INFO("an entry with no sides gives every face none");
         LLGLTFOverrideCacheEntry removed;
         removed.mLocalId = 7;
         removed.materialize();
-        CHECK(removed.overrideFor(0) == nullptr);
+        CHECK(removed.overrideFor(0, LLTEContents::MAX_TES) == nullptr);
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face past the faces the region counts takes the last counted face's", "[LLVOCache]")
+    {
+        // A mesh whose asset split one material into three faces, on an object the region counts one face on
+        const U64 handle = to_region_handle(1026 * 256, 1000 * 256);
+        LLGLTFOverrideCacheEntry one;
+        REQUIRE(one.fromLLSD(vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 1))); // face 0
+        one.materialize();
+        REQUIRE(one.overrideFor(0, 1) != nullptr);
+        CHECK(one.overrideFor(1, 1) == one.overrideFor(0, 1));
+        CHECK(one.overrideFor(2, 1) == one.overrideFor(0, 1));
+        UNSCOPED_INFO("a face the region counts and left out still takes none");
+        CHECK(one.overrideFor(1, 3) == nullptr);
+        UNSCOPED_INFO("an object the region counts no faces on takes nothing past them");
+        CHECK(one.overrideFor(1, 0) == nullptr);
+
+        LLSD data = vocacheTest::makeOverrideLLSD(8, handle, LLUUID::generateNewID(), 2);
+        data["sides"][1] = 2; // faces 0 and 2
+        LLGLTFOverrideCacheEntry two;
+        REQUIRE(two.fromLLSD(data));
+        two.materialize();
+        UNSCOPED_INFO("the last counted face's, whether or not the region sent one for the face before it");
+        CHECK(two.overrideFor(3, 3) == two.overrideFor(2, 3));
+        CHECK(two.overrideFor(1, 3) == nullptr);
+        UNSCOPED_INFO("a face past them the region sent one for keeps its own");
+        CHECK(two.overrideFor(2, 1) == two.mGLTFMaterial.at(2).get());
+        CHECK(two.overrideFor(1, 1) == two.overrideFor(0, 1));
+        UNSCOPED_INFO("the entry names the faces the region sent an override for, and no face that takes another's");
+        CHECK(two.names(0));
+        CHECK(two.names(2));
+        CHECK_FALSE(two.names(1));
+        CHECK_FALSE(two.names(3));
+
+        using EFaceState = ALGLTFOverrideFaceState;
+        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*one.overrideFor(0, 1));
+        UNSCOPED_INFO("a face past them showing the last counted face's override matches, and none differs");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&one, 2, 1, same, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&one, 2, 1, nullptr, 0.0) == EFaceState::DIFFERS);
     }
 
     TEST_CASE("LLGLTFOverrideCacheEntry: a face showing the override by value takes no change", "[LLVOCache]")
@@ -942,27 +981,27 @@ namespace
         LLGLTFOverrideCacheEntry entry;
         REQUIRE(entry.fromLLSD(vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 1))); // face 0
         entry.materialize();
-        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*entry.overrideFor(0));
+        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*entry.overrideFor(0, LLTEContents::MAX_TES));
         LLPointer<LLGLTFMaterial> other = new LLGLTFMaterial(*same);
         other->mRoughnessFactor = 0.75f;
 
         UNSCOPED_INFO("the region sent nothing for the object");
-        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, same, 0.0) == EFaceState::UNSENT);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, nullptr, 0.0) == EFaceState::UNSENT);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, LLTEContents::MAX_TES, same, 0.0) == EFaceState::UNSENT);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::UNSENT);
 
         UNSCOPED_INFO("a face showing the region's override, or none where it sent none");
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, same, 0.0) == EFaceState::MATCHES);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, nullptr, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, same, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::MATCHES);
 
         UNSCOPED_INFO("a face showing another override, none in place of the region's, or one where it sent none");
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, other, 0.0) == EFaceState::DIFFERS);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, nullptr, 0.0) == EFaceState::DIFFERS);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, same, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, other, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, same, 0.0) == EFaceState::DIFFERS);
 
         UNSCOPED_INFO("a face waiting on the region's answer to an edit, whatever it shows");
         entry.hold(0, 100.0);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, other, 100.0) == EFaceState::HELD);
-        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, same, 100.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, other, 100.0) == EFaceState::HELD);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, same, 100.0) == EFaceState::DIFFERS);
     }
 
     TEST_CASE("ALGLTFOverrideCounts: a region with nothing counted logs nothing", "[LLVOCache]")

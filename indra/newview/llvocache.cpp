@@ -150,9 +150,13 @@ void LLGLTFOverrideCacheEntry::materialize()
     }
 }
 
-LLGLTFMaterial* LLGLTFOverrideCacheEntry::overrideFor(S32 side) const
+LLGLTFMaterial* LLGLTFOverrideCacheEntry::overrideFor(S32 side, S32 region_faces) const
 {
-    const auto iter = mGLTFMaterial.find(side);
+    auto iter = mGLTFMaterial.find(side);
+    if (iter == mGLTFMaterial.end() && region_faces > 0 && side >= region_faces)
+    {
+        iter = mGLTFMaterial.find(region_faces - 1);
+    }
     return iter != mGLTFMaterial.end() ? iter->second.get() : nullptr;
 }
 
@@ -188,7 +192,7 @@ bool LLGLTFOverrideCacheEntry::isHeld(S32 side, F64 now) const
 }
 
 // static
-ALGLTFOverrideFaceState LLGLTFOverrideCacheEntry::faceState(const LLGLTFOverrideCacheEntry* entry, S32 side,
+ALGLTFOverrideFaceState LLGLTFOverrideCacheEntry::faceState(const LLGLTFOverrideCacheEntry* entry, S32 side, S32 region_faces,
                                                             const LLGLTFMaterial* held, F64 now)
 {
     if (!entry)
@@ -199,7 +203,8 @@ ALGLTFOverrideFaceState LLGLTFOverrideCacheEntry::faceState(const LLGLTFOverride
     {
         return ALGLTFOverrideFaceState::HELD;
     }
-    return sameOverride(held, entry->overrideFor(side)) ? ALGLTFOverrideFaceState::MATCHES : ALGLTFOverrideFaceState::DIFFERS;
+    return sameOverride(held, entry->overrideFor(side, region_faces)) ? ALGLTFOverrideFaceState::MATCHES
+                                                                      : ALGLTFOverrideFaceState::DIFFERS;
 }
 
 bool ALGLTFOverrideCounts::any() const

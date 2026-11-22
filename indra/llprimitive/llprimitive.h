@@ -421,6 +421,10 @@ public:
 
     void setMaterial(U8 te_idx, const LLUUID& id);
     const LLUUID& getMaterial(U8 te_idx) const;
+    // The material face `te_idx` takes on an object the region counts `region_faces` faces on: the one the block names
+    // for it, or, for a face past them that it names none for, the last counted face's. A mesh can have more faces than
+    // the region counts, which knows nothing of the faces past them.
+    const LLUUID& getMaterialFor(U8 te_idx, U8 region_faces) const;
 
     bool isEmpty() { return mEntries.empty(); }
 };
@@ -629,6 +633,11 @@ public:
     static LLPCode legacyToPCode(const U8 legacy);
     static U8 pCodeToLegacy(const LLPCode pcode);
     static bool getTESTAxes(const U8 face, U32* s_axis, U32* t_axis);
+
+    // The faces that share face `te`'s settings, [first, last), on a primitive the region counts `region_faces` of its
+    // `num_tes` faces on: the face alone, or the last counted face and every face past it, which take its settings
+    // (LLRenderMaterialParams::getMaterialFor). They are selected and edited as one.
+    static std::pair<S32, S32> faceGroup(S32 te, S32 num_tes, S32 region_faces);
 
     bool hasRenderMaterialParams() const;
 
