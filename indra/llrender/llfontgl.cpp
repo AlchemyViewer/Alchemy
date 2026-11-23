@@ -65,6 +65,7 @@ F32 LLFontGL::sScaleX = 1.f;
 F32 LLFontGL::sScaleY = 1.f;
 S32 LLFontGL::sResolutionGeneration = 0;
 bool LLFontGL::sFontsXmlDirty = false;
+bool LLFontGL::sImportedFontsOverlayEnabled = true;
 bool LLFontGL::sDisplayFont = true ;
 bool LLFontGL::sUseDarkEmojiPalette = false;
 bool LLFontGL::sForceMonochromeEmoji = false;
@@ -2461,6 +2462,18 @@ std::string LLFontGL::getImportedFontsOverlayPath()
         return {};
 
     return gDirUtilp->add(gDirUtilp->add(user_app_dir, "fonts"), "imported_fonts.xml");
+}
+
+// static
+void LLFontGL::setImportedFontsOverlayEnabled(bool enabled)
+{
+    sImportedFontsOverlayEnabled = enabled;
+}
+
+// static
+bool LLFontGL::isImportedFontsOverlayEnabled()
+{
+    return sImportedFontsOverlayEnabled;
 }
 
 void LLFontGL::renderTriangle(LLVector4a* vertex_out, LLVector2* uv_out, LLColor4U* colors_out, const LLRectf& screen_rect, const LLRectf& uv_rect, const LLColor4U& color, F32 slant_amt) const

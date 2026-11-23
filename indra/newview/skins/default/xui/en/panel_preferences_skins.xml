@@ -333,6 +333,7 @@ Jan 1, 2001
    Imported Fonts
   </text>
   <scroll_list
+   commit_on_selection_change="true"
    draw_heading="false"
    follows="left|top"
    height="70"
@@ -342,17 +343,39 @@ Jan 1, 2001
    top_pad="4"
    width="200">
   </scroll_list>
+  <combo_box
+   follows="left|top"
+   height="20"
+   layout="topleft"
+   left="300"
+   name="imported_font_category"
+   tool_tip="Category for the selected imported font. Change it if the font was misdetected (e.g. a monospace font detected as proportional)."
+   top_pad="4"
+   width="94">
+    <combo_box.item
+     label="Proportional"
+     name="proportional"
+     value="proportional" />
+    <combo_box.item
+     label="Monospace"
+     name="monospace"
+     value="monospace" />
+    <combo_box.item
+     label="Emoji"
+     name="emoji"
+     value="emoji" />
+  </combo_box>
   <button
    enabled="true"
    follows="left|top"
    height="19"
    label="Add..."
    layout="topleft"
-   left="300"
+   left_pad="4"
    name="add_imported_font"
    tool_tip="Choose TrueType, OpenType, or WOFF2 font files to add to the viewer. Copies are stored in your user profile."
-   top_pad="4"
-   width="62">
+   top_delta="0"
+   width="54">
     <button.commit_callback
      function="Pref.ImportFont" />
   </button>
@@ -362,11 +385,11 @@ Jan 1, 2001
    height="19"
    label="Remove"
    layout="topleft"
-   left_pad="6"
+   left_pad="4"
    name="remove_imported_font"
    tool_tip="Remove the selected imported font. Deletes only the copy the viewer made; your original file is untouched."
    top_delta="0"
-   width="62">
+   width="54">
     <button.commit_callback
      function="Pref.RemoveImportedFont" />
   </button>

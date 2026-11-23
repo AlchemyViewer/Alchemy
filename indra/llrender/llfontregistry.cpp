@@ -348,6 +348,7 @@ bool LLFontRegistry::parseFontInfo(const std::string& xml_filename, const LLSD& 
         success = parse_single_fonts_file(this, path) || success;
     }
 
+    if (LLFontGL::isImportedFontsOverlayEnabled())
     {
         const std::string overlay = LLFontGL::getImportedFontsOverlayPath();
         if (!overlay.empty() && gDirUtilp->fileExists(overlay))

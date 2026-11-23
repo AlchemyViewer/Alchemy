@@ -3230,10 +3230,19 @@ bool LLAppViewer::initConfiguration()
         gSavedSettings.setLLSD("AlchemyUIFontOverrides", LLSD::emptyMap());
     }
 
-    // Regenerate the imported-fonts overlay on startup.
-    if (ALImportedFonts::getImported().size() > 0)
+    // Regenerate the imported-fonts overlay on startup. An empty list still
+    // needs a rewrite when a stale overlay is present; with neither, skip it
+    // so a clean installation does not gain a user font directory.
+    const LLSD      imported = ALImportedFonts::getImported();
+    const std::string overlay = ALImportedFonts::getOverlayPath();
+    if (imported.size() > 0 || (!overlay.empty() && gDirUtilp->fileExists(overlay)))
     {
-        ALImportedFonts::regenerateOverlay();
+        if (ALImportedFonts::regenerateOverlay().empty())
+        {
+            LL_WARNS() << "Imported fonts: overlay regeneration failed; ignoring the "
+                          "stale overlay for this session and using built-in fonts" << LL_ENDL;
+            LLFontGL::setImportedFontsOverlayEnabled(false);
+        }
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

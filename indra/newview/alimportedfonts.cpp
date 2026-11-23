@@ -35,6 +35,7 @@
 #include "llstring.h"
 #include "lluuid.h"
 #include "llviewercontrol.h"
+#include "fsyspath.h"
 
 #include <cctype>
 #include <cstdint>
@@ -97,11 +98,6 @@ namespace
             slug = "font";
 
         return "AlchemyImported_" + slug + "_" + llformat("%08x", fnv1a(family));
-    }
-
-    std::string makeFileSuffix(const std::string& source_path)
-    {
-        return llformat("%08x", fnv1a(source_path));
     }
 
     const char* styleFromInfo(const LLFontFreetype::FaceInfo& info)
@@ -444,7 +440,14 @@ std::string ALImportedFonts::regenerateOverlay(const LLSD& imported)
     // after the write and close both succeed, so a failure preserves
     // the prior overlay instead of truncating it. Empty return signals
     // failure to callers (see importFiles).
-    const std::string tmp_path = path + ".tmp";
+    // A UUID-named temp in the overlay's own directory: concurrent writes
+    // never share a path, and the final rename stays on one filesystem.
+    std::string tmp_path;
+    do
+    {
+        tmp_path = path + "." + LLUUID::generateNewID().asString() + ".tmp";
+    } while (LLFile::isfile(tmp_path));
+
     LLFILE* fp = LLFile::fopen(tmp_path, LLFILE_MODE("wb"));
     if (!fp)
     {
@@ -470,6 +473,9 @@ std::string ALImportedFonts::regenerateOverlay(const LLSD& imported)
         LLFile::remove(tmp_path);
         return {};
     }
+    // A successful write clears a startup failure's session gate so a
+    // later import in this same session becomes visible immediately.
+    LLFontGL::setImportedFontsOverlayEnabled(true);
     return path;
 }
 
@@ -512,7 +518,7 @@ bool ALImportedFonts::importFiles(const std::vector<std::string>& sources, Impor
         }
 
         std::error_code size_ec;
-        const std::uintmax_t size = std::filesystem::file_size(source, size_ec);
+        const std::uintmax_t size = std::filesystem::file_size(fsyspath(source), size_ec);
         if (size_ec || size > kMaxImportedFontBytes)
         {
             LL_WARNS() << "Imported fonts: '" << source << "' is too large or unreadable" << LL_ENDL;
@@ -528,15 +534,13 @@ bool ALImportedFonts::importFiles(const std::vector<std::string>& sources, Impor
             continue;
         }
 
-        // Copy with a collision-proof name; getExtension() omits the dot.
-        // The per-import UUID makes each import's stored file distinct
-        // even when the same source path is imported again (possibly
-        // with changed contents), so a later import can never replace
-        // a file an earlier family/style entry still references. The
-        // family/style record below stores this import's dest_leaf.
+        // Copy under a fresh UUID: each import gets its own file even for
+        // the same source path, so a later import cannot replace a file an
+        // earlier family/style entry still references. Only the validated
+        // extension is carried over, keeping the basename short enough for
+        // any filesystem. The record below stores this import's dest_leaf.
         const std::string ext       = gDirUtilp->getExtension(leaf);
-        const std::string stem      = leaf.substr(0, leaf.size() - (ext.empty() ? 0 : ext.size() + 1));
-        const std::string dest_leaf = stem + "." + makeFileSuffix(source) + "." + LLUUID::generateNewID().asString() + "." + ext;
+        const std::string dest_leaf = LLUUID::generateNewID().asString() + "." + ext;
         const std::string dest      = gDirUtilp->add(dir, dest_leaf);
 
         std::error_code ec;
@@ -610,12 +614,44 @@ bool ALImportedFonts::removeFamily(const std::string& family_name)
 
     gSavedSettings.setLLSD(kSettingImported, kept);
     pruneOverridesForFamily(family_name);
-    // Delete the removed families' files only where no remaining
-    // entry still references them.
+    // Reconcile against the catalog as actually saved: if the write did
+    // not take, the removed entries are still there and their files stay,
+    // so startup cannot regenerate entries pointing at missing fonts.
+    const LLSD saved = getImported();
     for (LLSD::array_const_iterator it = removed_entries.beginArray(); it != removed_entries.endArray(); ++it)
     {
-        deleteFamilyFiles(*it, kept);
+        deleteFamilyFiles(*it, saved);
     }
+    notifyRegistryChanged();
+    return true;
+}
+
+// static
+bool ALImportedFonts::setCategory(const std::string& family_name, Category category)
+{
+    LLSD list = getImported();
+    if (!list.isArray())
+        return false;
+
+    bool found = false;
+    for (LLSD::array_iterator it = list.beginArray(); it != list.endArray(); ++it)
+    {
+        if ((*it)["name"].asString() == family_name)
+        {
+            (*it)["category"] = categoryToString(category);
+            found = true;
+            break;
+        }
+    }
+    if (!found)
+        return false;
+
+    // Generate the prospective overlay first so a failure leaves the
+    // setting untouched.
+    if (regenerateOverlay(list).empty())
+        return false;
+
+    gSavedSettings.setLLSD(kSettingImported, list);
     notifyRegistryChanged();
     return true;
 }

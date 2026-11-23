@@ -596,6 +596,17 @@ bool LLFloaterPreference::postBuild()
     populateUIFontDropdowns();
     refreshImportedFontList();
 
+    // Keep the imported-font category combo in sync with the selected
+    // family and apply changes when it is edited.
+    if (LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list"))
+    {
+        list->setCommitCallback(boost::bind(&LLFloaterPreference::syncImportedFontCategory, this));
+    }
+    if (LLComboBox* cat = findChild<LLComboBox>("imported_font_category"))
+    {
+        cat->setCommitCallback(boost::bind(&LLFloaterPreference::onImportedFontCategoryChanged, this));
+    }
+
     LLSliderCtrl* fov_slider = getChild<LLSliderCtrl>("camera_fov");
     fov_slider->setMinValue(LLViewerCamera::getInstance()->getMinView());
     fov_slider->setMaxValue(LLViewerCamera::getInstance()->getMaxView());
@@ -1209,6 +1220,12 @@ void LLFloaterPreference::refreshImportedFontList()
     LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list");
     if (!list) return;
 
+    // Preserve the selection across the rebuild so the category combo
+    // can follow the selected family.
+    std::string selected;
+    if (const LLScrollListItem* item = list->getFirstSelected())
+        selected = item->getValue().asString();
+
     list->clearRows();
     const LLSD imported = ALImportedFonts::getImported();
     for (LLSD::array_const_iterator it = imported.beginArray(); it != imported.endArray(); ++it)
@@ -1226,9 +1243,62 @@ void LLFloaterPreference::refreshImportedFontList()
         list->addElement(row);
     }
 
+    if (!selected.empty())
+        list->setSelectedByValue(LLSD(selected), true);
+
+    syncImportedFontCategory();
+
     LLButton* remove_btn = findChild<LLButton>("remove_imported_font");
     if (remove_btn)
         remove_btn->setEnabled(list->getItemCount() > 0);
+}
+
+void LLFloaterPreference::syncImportedFontCategory()
+{
+    LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list");
+    if (!list) return;
+    LLComboBox* cat_combo = findChild<LLComboBox>("imported_font_category");
+    if (!cat_combo) return;
+
+    const LLScrollListItem* item = list->getFirstSelected();
+    cat_combo->setEnabled(item != nullptr);
+    if (!item) return;
+
+    const std::string family = item->getValue().asString();
+    const LLSD imported = ALImportedFonts::getImported();
+    for (LLSD::array_const_iterator it = imported.beginArray(); it != imported.endArray(); ++it)
+    {
+        if ((*it)["name"].asString() == family)
+        {
+            const std::string cat = (*it)["category"].asString();
+            cat_combo->setSelectedByValue(LLSD(cat.empty() ? std::string("proportional") : cat), true);
+            break;
+        }
+    }
+}
+
+void LLFloaterPreference::onImportedFontCategoryChanged()
+{
+    LLScrollListCtrl* list = findChild<LLScrollListCtrl>("imported_font_list");
+    if (!list) return;
+    const LLScrollListItem* item = list->getFirstSelected();
+    if (!item) return;
+    const std::string family = item->getValue().asString();
+    if (family.empty()) return;
+
+    LLComboBox* combo = findChild<LLComboBox>("imported_font_category");
+    if (!combo) return;
+    const std::string cat = combo->getSelectedValue().asString();
+
+    ALImportedFonts::Category category = ALImportedFonts::Category::PROPORTIONAL;
+    if (cat == "monospace")      category = ALImportedFonts::Category::MONOSPACE;
+    else if (cat == "emoji")     category = ALImportedFonts::Category::EMOJI;
+
+    if (ALImportedFonts::setCategory(family, category))
+    {
+        refreshImportedFontList();
+        scheduleFontDropdownRefresh();
+    }
 }
 
 void LLFloaterPreference::onImportFont()

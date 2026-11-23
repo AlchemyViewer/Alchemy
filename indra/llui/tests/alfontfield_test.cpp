@@ -345,6 +345,33 @@ namespace
         field->die();
     }
 
+    TEST_CASE_METHOD(alfontfield_data, "alfontfield: several family flags list the families from each", "[alfontfield]")
+    {
+        if (!ui.ok())
+        {
+            SKIP("no UI: LLUI_TEST_APP_DIR does not point at the source tree");
+        }
+        LLMortician::updateClass();
+        ALFontField::Params p(LLUICtrlFactory::getDefaultParams<ALFontField>());
+        p.name     = "font";
+        p.rect     = LLRect(100, 322, 300, 300);
+        p.families = "monospace,proportional";
+        ALFontField* field = LLUICtrlFactory::create<ALFontField>(p);
+        gFloaterView->addChild(field);
+        field->handleMouseDown(4, 10, MASK_NONE);
+        ALPopover* popover = popoverOpen();
+        REQUIRE(popover != nullptr);
+        ALSpecimenList* fonts = popover->findChild<ALSpecimenList>("fonts", true);
+        REQUIRE(fonts != nullptr);
+        CHECK(fonts->findChild<LLView>("row_CascadiaCode", true) != nullptr);
+        CHECK(fonts->findChild<LLView>("row_DejaVu", true) != nullptr);
+        // Declared and user-selectable, but in neither filter: catches a
+        // fallback to the full declared-name list, which would list it.
+        CHECK(fonts->findChild<LLView>("row_NotoEmoji", true) == nullptr);
+        popover->escape();
+        field->die();
+    }
+
     TEST_CASE_METHOD(alfontfield_data, "alfontfield: Alt-Down and F4 open the popover as for a combo box but Down does not", "[alfontfield]")
     {
         if (!ui.ok())

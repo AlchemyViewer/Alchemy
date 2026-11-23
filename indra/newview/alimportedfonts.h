@@ -75,6 +75,11 @@ public:
     // Remove an imported family and its copied files.
     static bool removeFamily(const std::string& family_name);
 
+    // Change the category of an imported family (proportional/monospace/
+    // emoji). Returns false if the family is not found or the overlay
+    // cannot be regenerated.
+    static bool setCategory(const std::string& family_name, Category category);
+
     // The currently imported font families, from the saved setting.
     static LLSD getImported();
 

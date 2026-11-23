@@ -273,6 +273,10 @@ private:
     void onImportFontCallback(const std::vector<std::string>& filenames);
     // Prompt to remove the selected imported font family.
     void onRemoveImportedFont();
+    // Reflect the selected imported font's category in the combo.
+    void syncImportedFontCategory();
+    // Apply the selected category to the selected imported font family.
+    void onImportedFontCategoryChanged();
     // Handle the remove confirmation: delete files and refresh the list.
     void callbackRemoveImportedFont(const LLSD& notification, const LLSD& response);
     // Show the reset-fonts confirmation dialog.

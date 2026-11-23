@@ -274,9 +274,9 @@ public:
     // Families declared in fonts.xml (after skin layering and reference
     // resolution) that are user-selectable: the implicit "default" entry
     // and any family marked `user_selectable="false"` are filtered out;
-    // `filter` further constrains the result by the family's monospace
-    // attribute. Sorted by label. Used by the Preferences UI to populate
-    // font-override dropdowns.
+    // `filter` further constrains the result by the family's flags.
+    // Sorted by label. Used by the Preferences UI to populate font-override
+    // dropdowns and by ALFontField to populate its family list.
     std::vector<FamilyInfo> getAvailableFamilies(FamilyFilter filter = FamilyFilter::ANY) const;
 
     // The names a XUI file may write. `font="SansSerifSmall"` names a
