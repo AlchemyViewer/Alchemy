@@ -1236,6 +1236,11 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
         LLVOCacheEntry* child = entry->getChild();
         while(child != NULL)
         {
+            // The root's own is counted where its local ID is killed, and an update's kills are counted below.
+            if (!for_rendering && mImpl->mGLTFOverridesLLSD.count(child->getLocalID()))
+            {
+                ++mGLTFOverrideCounts.mKeptOnKill;
+            }
             killCacheEntry(child, for_rendering);
             child = entry->getChild();
         }
