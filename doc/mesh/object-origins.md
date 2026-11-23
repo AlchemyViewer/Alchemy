@@ -4,7 +4,7 @@
 
 A prim in Second Life turns about its own position, and a mesh prim's position is the object origin it was uploaded with. Put the origin on the hinge, and a script that turns the door with `llSetLocalRot` swings it on its hinge. Leave it in the middle, and the door spins about its centre.
 
-Until now the uploader always moved the origin to the middle of the object's bounding box. Doors were built with an invisible extra half, or a script had to move the prim as it turned it. The uploader's **Pivot** option keeps the origin you set in Blender instead.
+The uploader moves the origin to the middle of the object's bounding box unless told otherwise. Doors were built with an invisible extra half, or a script had to move the prim as it turned it. The uploader's **Pivot** option, set to **From file**, keeps the origin you set in Blender instead.
 
 ## Setting the origin in Blender
 
@@ -25,8 +25,8 @@ The **Pivot** row is on the **Upload options** tab. It has three modes, X/Y/Z sp
 
 | Mode | The origin goes | Works for |
 | --- | --- | --- |
-| From file (default) | where Blender's origin was, for each object | one object or many |
-| Centre | to the middle of the bounding box, as uploads always did | one object or many |
+| Centre (default) | to the middle of the bounding box, as uploads always did | one object or many |
+| From file | where Blender's origin was, for each object | one object or many |
 | Custom | where you type it in the spinners | a single object only |
 
 - The spinners show the pivot along the object's own axes, in **percent** of its half size (−100 to 100, 0 = centre) or in **metres**; the dropdown beside them switches the unit.

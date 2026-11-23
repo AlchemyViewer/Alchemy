@@ -297,7 +297,7 @@ protected:
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
     // <SK:Nexii> Mesh uploader pivot
-    EPivotMode  mPivotMode{PIVOT_FILE};
+    EPivotMode  mPivotMode{PIVOT_CENTRE};
     LLVector3   mCustomPivot;
     bool        mUploadPivotAllowed{true};   // some part may take a pivot
     std::set<const LLModel*> mPivotHeld; // parts held at the centre: rigged, or with physics not yet analyzed

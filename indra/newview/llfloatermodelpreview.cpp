@@ -215,7 +215,7 @@ bool LLFloaterModelPreview::postBuild()
     }
     childSetValue("pivot_units", "percent");
     getChild<LLUICtrl>("pivot_units")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotUnitsCommit, this));
-    childSetValue("pivot_mode", "file");
+    childSetValue("pivot_mode", "centre");
     getChild<LLUICtrl>("pivot_mode")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotModeCommit, this));
     // </SK:Nexii>
 
@@ -797,7 +797,7 @@ void LLFloaterModelPreview::updatePivotControls()
     {
         if (!single && mModelPreview->getPivotMode() == LLModelPreview::PIVOT_CUSTOM)
         {
-            mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+            mModelPreview->setPivotMode(LLModelPreview::PIVOT_CENTRE);
         }
         modes->setIndexEnabled(2, single);
         const LLModelPreview::EPivotMode mode = mModelPreview->getPivotMode();
@@ -2031,7 +2031,7 @@ void LLFloaterModelPreview::resetUploadOptions()
     childSetValue("pivot_units", "percent");
     if (mModelPreview)
     {
-        mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+        mModelPreview->setPivotMode(LLModelPreview::PIVOT_CENTRE);
         mModelPreview->setCustomPivot(LLVector3::zero);
     }
     updatePivotControls();
