@@ -293,18 +293,14 @@ public:
                            const std::function<void(LLVOCacheEntry*)>& leave_tree, std::vector<LLPointer<LLVOCacheEntry>>& keep);
 
     // What a kill of local_id takes from a region's cache: its entry, through `kill_entry`, where it has one a kill
-    // reaches (isKillable), and its glTF overrides whether or not it has, since an object given the local ID later
-    // would take them. True where it took any overrides.
+    // reaches (isKillable), and its glTF overrides where it has no entry for their object. An entry stays, killed or
+    // not, for the region to confirm if the object comes back, as one that only left the agent's interest does; the
+    // region sends no overrides with that, so the object's stay with the entry. True where it took any overrides.
     static bool killLocalID(U32 local_id, vocache_entry_map_t& entries, vocache_gltf_overrides_map_t& overrides,
                             const std::function<void(LLVOCacheEntry*)>& kill_entry);
 
-    // What a kill of an entry takes of its object's glTF overrides: none where the object stays in the world, its entry
-    // killed so that it is made from the region's update, since the region sends them only with the object's full
-    // update; all where the object is gone. True where it took any.
-    static bool killEntryOverrides(U32 local_id, bool object_stays, vocache_gltf_overrides_map_t& overrides);
-
-    // The region sent an entry for local_id holding object_id's data: overrides kept under the local ID for another
-    // object are dropped. True where it dropped any.
+    // local_id holds the object object_id: overrides kept under it for another object are dropped, and ones naming no
+    // object are named for this one. True where it dropped any.
     static bool dropOverridesOfAnother(U32 local_id, const LLUUID& object_id, vocache_gltf_overrides_map_t& overrides);
 
     // Takes this entry off the entry of the parent it names in `entries`, where that entry holds its children: a
