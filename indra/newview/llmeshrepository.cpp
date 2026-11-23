@@ -2739,13 +2739,15 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mOrigin += gAgent.getAtAxis() * scale.magVec();
 
     mMeshUploadTimeOut = gSavedSettings.getS32("MeshUploadTimeOut");
-    mBlockPacking = !gSavedSettings.getBOOL("AlchemyMeshUploadMaxCompression") ? LLModel::PACK_PLAIN
-                    : gSavedSettings.getBOOL("AlchemyMeshUploadSnapNormals")   ? LLModel::PACK_SMALL_SNAPPED
-                                                                               : LLModel::PACK_SMALL;
+    const U32 packing = gSavedSettings.getU32("AlchemyMeshUploadPacking");
+    mBlockPacking = packing < LLModel::PACK_COUNT ? (LLModel::EBlockPacking)packing : LLModel::PACK_SMALL;
+    mBlockWeights = mBlockPacking != LLModel::PACK_PLAIN && gSavedSettings.getBOOL("AlchemyMeshUploadRoundWeights")
+                        ? ALMeshFacePack::Weights::ROUND_8_BITS
+                        : ALMeshFacePack::Weights::KEEP;
     if (!do_upload)
     {
         mWrittenAssets = std::make_shared<ALMeshUploadAssets>();
-        mWrittenAssets->mOptions = { mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking };
+        mWrittenAssets->mOptions = { mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking, mBlockWeights };
     }
 
     mHttpRequest = new LLCore::HttpRequest;
@@ -2901,8 +2903,8 @@ size_t LLMeshUploadThread::assetSource(LLModel* base_model, const instance_list_
 
 bool LLMeshUploadThread::feeAssetsServe() const
 {
-    if (!mFeeAssets || !(mFeeAssets->mOptions == ALMeshUploadAssets::Options{ mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking }) ||
-        mFeeAssets->mAssets.size() != mInstance.size())
+    const ALMeshUploadAssets::Options options{ mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking, mBlockWeights };
+    if (!mFeeAssets || !(mFeeAssets->mOptions == options) || mFeeAssets->mAssets.size() != mInstance.size())
     {
         return false;
     }
@@ -2979,7 +2981,8 @@ void LLMeshUploadThread::packModelIntance(
                 LLModel::WRITE_BINARY,
                 false,
                 data.mBaseModel->mSubmodelID,
-                mBlockPacking);
+                mBlockPacking,
+                mBlockWeights);
 
             data.mAssetData = ostr.str();
         }

@@ -40,6 +40,7 @@
 #include <map>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -297,14 +298,12 @@ namespace
         CHECK(after < before);
     }
 
-    TEST_CASE("almeshfacepack: snapped normals sit on the 12-bit grid within half a step of those written", "[almeshfacepack]")
+    TEST_CASE("almeshfacepack: snapped normals sit on their grid within half a step of those written", "[almeshfacepack]")
     {
         const Arrays arrays = soup_grid(24, 16);
         const LLSD original = face_of(arrays, true);
         LLSD kept = llsd_clone(original);
-        LLSD snapped = llsd_clone(original);
         REQUIRE(ALMeshFacePack::repack(kept));
-        REQUIRE(ALMeshFacePack::repack(snapped, ALMeshFacePack::Normals::SNAP_12_BITS));
 
         // Each grid point's normal as written, by its position: the soup's
         // last three vertices are the one at a grid point's position with
@@ -318,53 +317,176 @@ namespace
             };
         }
 
-        const std::vector<U16> positions = u16s_of(snapped["Position"].asBinary());
-        const std::vector<U16> normals = u16s_of(snapped["Normal"].asBinary());
-        REQUIRE(normals.size() == positions.size());
-        bool found = true;
-        bool on_grid = true;
-        bool within_half_a_step = true;
-        for (size_t v = 0; v < positions.size() / 3; ++v)
-        {
-            const auto at = written.find({ positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2] });
-            found &= at != written.end();
-            for (size_t k = 0; at != written.end() && k < 3; ++k)
-            {
-                const S32 n = normals[v * 3 + k];
-                on_grid &= n % 16 == 0 || n == 65535;
-                within_half_a_step &= std::abs(n - (S32)at->second[k]) <= 8;
-            }
-        }
-        CHECK(found);
-        CHECK(on_grid);
-        CHECK(within_half_a_step);
-
+        // Each grid zips smaller than the finer one before it.
         LLSD kept_block = llsd::array(kept);
-        LLSD snapped_block = llsd::array(snapped);
-        const size_t kept_bytes = zip_llsd_model(kept_block).size();
-        const size_t snapped_bytes = zip_llsd_model(snapped_block).size();
-        INFO("zipped: " << snapped_bytes << " bytes snapped, " << kept_bytes << " kept");
-        CHECK(snapped_bytes < kept_bytes);
+        size_t finer_bytes = zip_llsd_model(kept_block).size();
+        for (const auto& [grid, step] :
+             { std::pair{ ALMeshFacePack::Normals::SNAP_12_BITS, 16 }, std::pair{ ALMeshFacePack::Normals::SNAP_10_BITS, 64 } })
+        {
+            CAPTURE(step);
+            LLSD snapped = llsd_clone(original);
+            REQUIRE(ALMeshFacePack::repack(snapped, grid));
+
+            const std::vector<U16> positions = u16s_of(snapped["Position"].asBinary());
+            const std::vector<U16> normals = u16s_of(snapped["Normal"].asBinary());
+            REQUIRE(normals.size() == positions.size());
+            bool found = true;
+            bool on_grid = true;
+            bool within_half_a_step = true;
+            for (size_t v = 0; v < positions.size() / 3; ++v)
+            {
+                const auto at = written.find({ positions[v * 3], positions[v * 3 + 1], positions[v * 3 + 2] });
+                found &= at != written.end();
+                for (size_t k = 0; at != written.end() && k < 3; ++k)
+                {
+                    const S32 n = normals[v * 3 + k];
+                    on_grid &= n % step == 0 || n == 65535;
+                    within_half_a_step &= std::abs(n - (S32)at->second[k]) <= step / 2;
+                }
+            }
+            CHECK(found);
+            CHECK(on_grid);
+            CHECK(within_half_a_step);
+
+            LLSD snapped_block = llsd::array(snapped);
+            const size_t snapped_bytes = zip_llsd_model(snapped_block).size();
+            INFO("zipped: " << snapped_bytes << " bytes snapped, " << finer_bytes << " on the finer grid");
+            CHECK(snapped_bytes < finer_bytes);
+            finer_bytes = snapped_bytes;
+        }
     }
 
-    TEST_CASE("almeshfacepack: snapping welds vertices that differ only below the 12-bit grid", "[almeshfacepack]")
+    TEST_CASE("almeshfacepack: snapping welds vertices that differ only below its grid", "[almeshfacepack]")
     {
-        // A quad of two triangles, the second naming a copy of the third
-        // vertex whose normal is three sixteen-bit steps off.
+        // A quad of two triangles, the second naming a copy of the second
+        // vertex whose normal is twenty sixteen-bit steps off, under the
+        // 10-bit grid's half step but over the 12-bit grid's, and a copy of
+        // the third whose normal is three off, under both.
         Arrays a;
         a.add({ 0, 0, 0 }, { 32768, 32768, 65535 }, { 0, 0 });
         a.add({ 65535, 0, 0 }, { 32768, 32768, 65535 }, { 65535, 0 });
         a.add({ 0, 65535, 0 }, { 32768, 32768, 65535 }, { 0, 65535 });
         a.add({ 65535, 65535, 0 }, { 32768, 32768, 65535 }, { 65535, 65535 });
         a.add({ 0, 65535, 0 }, { 32771, 32768, 65535 }, { 0, 65535 });
-        a.indices = { 0, 1, 2, 1, 3, 4 };
-        LLSD kept = face_of(a, false);
-        LLSD snapped = llsd_clone(kept);
+        a.add({ 65535, 0, 0 }, { 32788, 32768, 65535 }, { 65535, 0 });
+        a.indices = { 0, 1, 2, 5, 3, 4 };
+        const LLSD written = face_of(a, false);
+        for (const auto& [grid, vertices] : { std::tuple{ ALMeshFacePack::Normals::KEEP, 6 },
+                                              std::tuple{ ALMeshFacePack::Normals::SNAP_12_BITS, 5 },
+                                              std::tuple{ ALMeshFacePack::Normals::SNAP_10_BITS, 4 } })
+        {
+            CAPTURE(vertices);
+            LLSD face = llsd_clone(written);
+            REQUIRE(ALMeshFacePack::repack(face, grid));
+            CHECK(face["Position"].asBinary().size() / 6 == (size_t)vertices);
+            CHECK(u16s_of(face["TriangleList"].asBinary()).size() == 6);
+        }
+    }
+
+    TEST_CASE("almeshfacepack: rounded weights sit on the 8-bit grid within half a step of those written", "[almeshfacepack]")
+    {
+        // The soup with weights whose low bytes vary, as a real mesh's do:
+        // a grid point's first two influences moved off their even shares by
+        // a step its position sets, alike for every copy of the point.
+        Arrays arrays = soup_grid(24, 16);
+        for (size_t v = 0; v + 3 < arrays.vertices(); ++v)
+        {
+            auto& influences = arrays.weights[v];
+            if (influences.size() >= 2)
+            {
+                const U32 at = (U32)arrays.positions[v * 3] * 31u + (U32)arrays.positions[v * 3 + 1] * 17u;
+                const S32 shift = (S32)(at % 509u) - 254;
+                influences[0].second = (U16)(influences[0].second + shift);
+                influences[1].second = (U16)(influences[1].second - shift);
+            }
+        }
+        const LLSD original = face_of(arrays, true);
+        LLSD kept = llsd_clone(original);
+        LLSD rounded = llsd_clone(original);
         REQUIRE(ALMeshFacePack::repack(kept));
-        REQUIRE(ALMeshFacePack::repack(snapped, ALMeshFacePack::Normals::SNAP_12_BITS));
-        CHECK(kept["Position"].asBinary().size() / 6 == 5);
-        CHECK(snapped["Position"].asBinary().size() / 6 == 4);
-        CHECK(u16s_of(snapped["TriangleList"].asBinary()).size() == 6);
+        REQUIRE(ALMeshFacePack::repack(rounded, ALMeshFacePack::Normals::KEEP, ALMeshFacePack::Weights::ROUND_8_BITS));
+
+        // Each vertex's weights as written, by its position and its joints,
+        // which tell every vertex of the soup from the others at its place.
+        std::map<std::vector<U16>, std::vector<U16>> written;
+        for (size_t v = 0; v < arrays.vertices(); ++v)
+        {
+            std::vector<U16> key(&arrays.positions[v * 3], &arrays.positions[v * 3] + 3);
+            std::vector<U16> weights;
+            for (const auto& [joint, weight] : arrays.weights[v])
+            {
+                key.push_back(joint);
+                weights.push_back(weight);
+            }
+            written[key] = weights;
+        }
+
+        const std::vector<U16> positions = u16s_of(rounded["Position"].asBinary());
+        const LLSD::Binary& bytes = rounded["Weights"].asBinary();
+        size_t at = 0;
+        bool found = true;
+        bool on_grid = true;
+        bool within_half_a_step = true;
+        for (size_t v = 0; v < positions.size() / 3; ++v)
+        {
+            std::vector<U16> key(&positions[v * 3], &positions[v * 3] + 3);
+            std::vector<U16> weights;
+            while (weights.size() < 4 && at < bytes.size() && bytes[at] != 0xFF)
+            {
+                REQUIRE(bytes.size() - at >= 3);
+                key.push_back(bytes[at]);
+                weights.push_back((U16)(bytes[at + 1] | (bytes[at + 2] << 8)));
+                at += 3;
+            }
+            if (weights.size() < 4)
+            {
+                REQUIRE(at < bytes.size());
+                ++at;
+            }
+            const auto it = written.find(key);
+            found &= it != written.end() && it->second.size() == weights.size();
+            for (size_t i = 0; it != written.end() && i < weights.size() && i < it->second.size(); ++i)
+            {
+                on_grid &= weights[i] % 256 == 0 || weights[i] == 65535;
+                within_half_a_step &= std::abs((S32)weights[i] - (S32)it->second[i]) <= 128;
+            }
+        }
+        CHECK(at == bytes.size());
+        CHECK(found);
+        CHECK(on_grid);
+        CHECK(within_half_a_step);
+
+        LLSD kept_block = llsd::array(kept);
+        LLSD rounded_block = llsd::array(rounded);
+        const size_t kept_bytes = zip_llsd_model(kept_block).size();
+        const size_t rounded_bytes = zip_llsd_model(rounded_block).size();
+        INFO("zipped: " << rounded_bytes << " bytes rounded, " << kept_bytes << " kept");
+        CHECK(rounded_bytes < kept_bytes);
+    }
+
+    TEST_CASE("almeshfacepack: rounding welds vertices weighted apart only below the 8-bit grid", "[almeshfacepack]")
+    {
+        // A quad of two triangles, the second naming a copy of the third
+        // vertex whose weights are fifty sixteen-bit steps off, under the
+        // grid's half step, and a third triangle with both at its corners.
+        const std::vector<std::pair<U8, U16>> weights = { { 0, 40000 }, { 1, 25535 } };
+        Arrays a;
+        a.add({ 0, 0, 0 }, { 32768, 32768, 65535 }, { 0, 0 }, weights);
+        a.add({ 65535, 0, 0 }, { 32768, 32768, 65535 }, { 65535, 0 }, weights);
+        a.add({ 0, 65535, 0 }, { 32768, 32768, 65535 }, { 0, 65535 }, weights);
+        a.add({ 65535, 65535, 0 }, { 32768, 32768, 65535 }, { 65535, 65535 }, weights);
+        a.add({ 0, 65535, 0 }, { 32768, 32768, 65535 }, { 0, 65535 }, { { 0, 40050 }, { 1, 25485 } });
+        a.indices = { 0, 1, 2, 1, 3, 4, 2, 4, 3 };
+        const LLSD written = face_of(a, true);
+        for (const auto& [rounding, vertices, indices] : { std::tuple{ ALMeshFacePack::Weights::KEEP, 5, 9 },
+                                                           std::tuple{ ALMeshFacePack::Weights::ROUND_8_BITS, 4, 6 } })
+        {
+            CAPTURE(vertices);
+            LLSD face = llsd_clone(written);
+            REQUIRE(ALMeshFacePack::repack(face, ALMeshFacePack::Normals::KEEP, rounding));
+            CHECK(face["Position"].asBinary().size() / 6 == (size_t)vertices);
+            CHECK(u16s_of(face["TriangleList"].asBinary()).size() == (size_t)indices);
+        }
     }
 
     TEST_CASE("almeshfacepack: a triangle whose corners at one position are weighted apart is kept", "[almeshfacepack]")

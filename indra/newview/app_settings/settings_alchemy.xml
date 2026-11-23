@@ -1948,21 +1948,21 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>AlchemyMeshUploadMaxCompression</key>
+        <key>AlchemyMeshUploadPacking</key>
         <map>
             <key>Comment</key>
-            <string>Pack a mesh upload's blocks as small as they go: each LOD face's vertices welded and its triangles reordered, as the viewer draws them the same, and every block compressed at libdeflate's strongest level rather than zlib's best. Smaller LOD blocks, so a lower download weight, at more time to write them. Read when the upload or fee request starts.</string>
+            <string>How a mesh upload's blocks are packed. 0: as other viewers pack them. 1: as small as they go and drawn the same, each LOD face's vertices welded and its triangles reordered and every block compressed at libdeflate's strongest level, for smaller LOD blocks and so a lower download weight, at more time to write them. 2: that with each normal component of the LOD faces rounded to 12 bits, turning a normal by 0.024 degrees at most, about 4% smaller again. 3: that rounded to 10 bits, turning a normal by 0.096 degrees at most, about 7% smaller again. Read when the upload or fee request starts.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
-            <string>Boolean</string>
+            <string>U32</string>
             <key>Value</key>
             <integer>1</integer>
         </map>
-        <key>AlchemyMeshUploadSnapNormals</key>
+        <key>AlchemyMeshUploadRoundWeights</key>
         <map>
             <key>Comment</key>
-            <string>With AlchemyMeshUploadMaxCompression on, round each normal component of a mesh upload's LOD faces to 12 bits rather than 16. A normal turns by 0.024 degrees at most, well under what normal maps and shading already hold, and the LOD blocks come out about 4% smaller. Read when the upload or fee request starts.</string>
+            <string>With AlchemyMeshUploadPacking above 0, round each skin weight of a mesh upload's LOD faces to 8 bits rather than 16, as glTF's unsigned-byte weights hold them. Viewers normalize a vertex's weights as they skin it, so a skinned vertex moves by at most 0.5% (0.1% on average) of how far apart its joints would each carry it; clothing fitted closely over another mesh may show it where a joint bends far. Rigged LOD blocks come out about 11% smaller. Read when the upload or fee request starts.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

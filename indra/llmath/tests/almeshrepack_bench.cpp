@@ -252,6 +252,7 @@ namespace
         bool spatial = false;        // vertices in a space-filling order rather than by first use
         bool sort_influences = false;
         int normal_bits = 16; // fewer is lossy
+        int weight_bits = 16; // fewer is lossy
         bool shipped = false; // ALMeshFacePack's, which is the strip order, lowest first
     };
 
@@ -367,6 +368,20 @@ namespace
             for (U16& n : q.normals)
             {
                 n = (U16)std::min(65535.0, std::round(n / step) * step);
+            }
+        }
+        if (way.weight_bits < 16)
+        {
+            const F64 step = (F64)(1 << (16 - way.weight_bits));
+            for (Influences& vertex : q.weights)
+            {
+                for (size_t slot = 1; slot < 1 + (size_t)vertex[0] * 3; slot += 3)
+                {
+                    const U16 weight = (U16)(vertex[slot + 1] | (vertex[slot + 2] << 8));
+                    const U16 rounded = (U16)std::min(65535.0, std::round(weight / step) * step);
+                    vertex[slot + 1] = (U8)(rounded & 0xFF);
+                    vertex[slot + 2] = (U8)(rounded >> 8);
+                }
             }
         }
 
@@ -509,8 +524,11 @@ namespace
             { "+ strip, lowest, sort infl.", true, Order::STRIP, Rotate::LOWEST, false, false, true },
             { "lossy: + normals 12 bits", true, Order::STRIP, Rotate::LOWEST, false, false, false, 12 },
             { "lossy: + normals 10 bits", true, Order::STRIP, Rotate::LOWEST, false, false, false, 10 },
-            { "ALMeshFacePack::repack", true, Order::STRIP, Rotate::LOWEST, false, false, false, 16, true },
-            { "ALMeshFacePack::repack, snapped", true, Order::STRIP, Rotate::LOWEST, false, false, false, 12, true },
+            { "lossy: + weights 8 bits", true, Order::STRIP, Rotate::LOWEST, false, false, false, 16, 8 },
+            { "ALMeshFacePack::repack", true, Order::STRIP, Rotate::LOWEST, false, false, false, 16, 16, true },
+            { "ALMeshFacePack::repack, 12 bits", true, Order::STRIP, Rotate::LOWEST, false, false, false, 12, 16, true },
+            { "ALMeshFacePack::repack, 10 bits", true, Order::STRIP, Rotate::LOWEST, false, false, false, 10, 16, true },
+            { "ALMeshFacePack::repack, weights 8", true, Order::STRIP, Rotate::LOWEST, false, false, false, 16, 8, true },
         };
         auto way_named = [&](const char* name)
         {
@@ -518,25 +536,37 @@ namespace
         };
         const size_t strip_lowest = way_named("+ strip, lowest first");
         const size_t snapped_12 = way_named("lossy: + normals 12 bits");
+        const size_t snapped_10 = way_named("lossy: + normals 10 bits");
         const size_t shipped = way_named("ALMeshFacePack::repack");
-        const size_t shipped_snapped = way_named("ALMeshFacePack::repack, snapped");
-        REQUIRE(shipped_snapped < ways.size());
+        const size_t shipped_12 = way_named("ALMeshFacePack::repack, 12 bits");
+        const size_t shipped_10 = way_named("ALMeshFacePack::repack, 10 bits");
+        const size_t rounded_8 = way_named("lossy: + weights 8 bits");
+        const size_t shipped_8 = way_named("ALMeshFacePack::repack, weights 8");
+        REQUIRE(shipped_10 < ways.size());
+        REQUIRE(shipped_8 < ways.size());
 
         struct Totals
         {
             std::array<S64, REPACK_LODS> bytes{};
             std::array<F64, REPACK_LODS> tris{};
+            S64 rigged_bytes = 0; // of the blocks with a rigged face
             S64 vertices = 0;
             S64 triangles = 0;
         };
         std::vector<Totals> totals(ways.size());
-        size_t blocks = 0, faces = 0, faces_left = 0, changed_drawing = 0;
+        size_t blocks = 0, rigged_blocks = 0, faces = 0, faces_left = 0, changed_drawing = 0;
         std::array<size_t, UNREAD_COUNT> unread{};
 
         real->forEachLOD(
             [&](const CorpusLOD& lod)
             {
                 ++blocks;
+                bool rigged = false;
+                for (size_t f = 0; f < lod.block.size(); ++f)
+                {
+                    rigged |= lod.block[(LLSD::Integer)f].has("Weights");
+                }
+                rigged_blocks += rigged;
                 for (size_t w = 0; w < ways.size(); ++w)
                 {
                     LLSD block = llsd_clone(lod.block);
@@ -561,11 +591,16 @@ namespace
                         if (ways[w].shipped)
                         {
                             LLSD& face = block[(LLSD::Integer)f];
-                            const bool snap = ways[w].normal_bits < 16;
-                            if (ALMeshFacePack::repack(face, snap ? ALMeshFacePack::Normals::SNAP_12_BITS : ALMeshFacePack::Normals::KEEP))
+                            const bool lossy = ways[w].normal_bits < 16 || ways[w].weight_bits < 16;
+                            const ALMeshFacePack::Normals normals = ways[w].normal_bits == 12   ? ALMeshFacePack::Normals::SNAP_12_BITS
+                                                                    : ways[w].normal_bits == 10 ? ALMeshFacePack::Normals::SNAP_10_BITS
+                                                                                                : ALMeshFacePack::Normals::KEEP;
+                            const ALMeshFacePack::Weights weights =
+                                ways[w].weight_bits == 8 ? ALMeshFacePack::Weights::ROUND_8_BITS : ALMeshFacePack::Weights::KEEP;
+                            if (ALMeshFacePack::repack(face, normals, weights))
                             {
                                 repacked = *read_face(face);
-                                if (!snap && drawn_triangles(repacked) != drawn_triangles(*q))
+                                if (!lossy && drawn_triangles(repacked) != drawn_triangles(*q))
                                 {
                                     ++changed_drawing;
                                 }
@@ -573,7 +608,7 @@ namespace
                         }
                         else if (w > 0 && repack(repacked, ways[w]))
                         {
-                            if (ways[w].normal_bits == 16 && drawn_triangles(repacked) != drawn_triangles(*q))
+                            if (ways[w].normal_bits == 16 && ways[w].weight_bits == 16 && drawn_triangles(repacked) != drawn_triangles(*q))
                             {
                                 ++changed_drawing;
                             }
@@ -590,6 +625,7 @@ namespace
                     REQUIRE_FALSE(zipped.empty());
                     const S64 bytes = (S64)zipped.size();
                     totals[w].bytes[lod.lod] += bytes;
+                    totals[w].rigged_bytes += rigged ? bytes : 0;
                     totals[w].tris[lod.lod] += repack_charged_tris(bytes);
                 }
             });
@@ -608,21 +644,23 @@ namespace
         std::printf("repacked LOD blocks over the real mesh corpus: %s\n", real->describe().c_str());
         std::printf("  %zu blocks, %zu faces, %zu left as they are; zipped by zip_llsd_model; change against \"as written\"\n", blocks, faces,
                     faces_left);
-        std::printf("  %-30s %9s %9s %9s %9s %9s | %9s | %9s %9s\n", "way", "lowest", "low", "medium", "high", "all B", "charge", "vertices",
-                    "triangles");
+        std::printf("  %-34s %9s %9s %9s %9s %9s | %9s | %9s %9s | %9s\n", "way", "lowest", "low", "medium", "high", "all B", "charge",
+                    "vertices", "triangles", "rigged B");
         const Totals& base = totals[0];
         for (size_t w = 0; w < ways.size(); ++w)
         {
             const Totals& t = totals[w];
-            std::printf("  %-30s", ways[w].name);
+            std::printf("  %-34s", ways[w].name);
             for (S32 l = 0; l < REPACK_LODS; ++l)
             {
                 std::printf(" %8.2f%%", pct((F64)t.bytes[l], (F64)base.bytes[l]));
             }
-            std::printf(" %8.2f%% | %8.2f%% | %8.2f%% %8.2f%%\n", pct(sum(t.bytes), sum(base.bytes)), pct(sum(t.tris), sum(base.tris)),
-                        pct((F64)t.vertices, (F64)base.vertices), pct((F64)t.triangles, (F64)base.triangles));
+            std::printf(" %8.2f%% | %8.2f%% | %8.2f%% %8.2f%% | %8.2f%%\n", pct(sum(t.bytes), sum(base.bytes)),
+                        pct(sum(t.tris), sum(base.tris)), pct((F64)t.vertices, (F64)base.vertices),
+                        pct((F64)t.triangles, (F64)base.triangles), pct((F64)t.rigged_bytes, (F64)base.rigged_bytes));
         }
-        std::printf("  bytes as written: %.0f\n  faces left as they are:", sum(base.bytes));
+        std::printf("  bytes as written: %.0f, %lld of them in the %zu blocks with a rigged face\n  faces left as they are:",
+                    sum(base.bytes), (long long)base.rigged_bytes, rigged_blocks);
         for (size_t u = 0; u < UNREAD_COUNT; ++u)
         {
             std::printf(" %s %zu%s", UNREAD_NAMES[u], unread[u], u + 1 < UNREAD_COUNT ? "," : "\n");
@@ -631,6 +669,8 @@ namespace
 
         CHECK(changed_drawing == 0);
         CHECK(totals[shipped].bytes == totals[strip_lowest].bytes);
-        CHECK(totals[shipped_snapped].bytes == totals[snapped_12].bytes);
+        CHECK(totals[shipped_12].bytes == totals[snapped_12].bytes);
+        CHECK(totals[shipped_10].bytes == totals[snapped_10].bytes);
+        CHECK(totals[shipped_8].bytes == totals[rounded_8].bytes);
     }
 }

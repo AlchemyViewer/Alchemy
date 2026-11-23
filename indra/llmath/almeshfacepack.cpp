@@ -201,15 +201,17 @@ namespace
                (face.weights.empty() || face.weights[a] == face.weights[b]);
     }
 
-    // A normal component on the 12-bit grid: the nearest multiple of 16, the
-    // step past 65520 held at 65535, which is +1.
-    U16 snapped_normal_component(U16 value)
+    // A sixteen-bit value on a grid of the given bits: the nearest multiple of
+    // the step, the top step held at 65535, which is a normal's +1 and a
+    // weight's whole.
+    U16 rounded_to_bits(U16 value, U32 bits)
     {
-        return (U16)std::min<U32>(65535u, ((U32)value + 8u) & ~15u);
+        const U32 step = 1u << (16u - bits);
+        return (U16)std::min<U32>(65535u, ((U32)value + step / 2u) & ~(step - 1u));
     }
 }
 
-bool ALMeshFacePack::repack(LLSD& sd, Normals normals)
+bool ALMeshFacePack::repack(LLSD& sd, Normals normals, Weights weights)
 {
     std::optional<Face> read = read_face(sd);
     if (!read)
@@ -218,11 +220,26 @@ bool ALMeshFacePack::repack(LLSD& sd, Normals normals)
     }
     Face& face = *read;
 
-    if (normals == Normals::SNAP_12_BITS)
+    if (normals != Normals::KEEP)
     {
+        const U32 bits = normals == Normals::SNAP_12_BITS ? 12u : 10u;
         for (U16& component : face.normals)
         {
-            component = snapped_normal_component(component);
+            component = rounded_to_bits(component, bits);
+        }
+    }
+
+    if (weights == Weights::ROUND_8_BITS)
+    {
+        for (Influences& vertex : face.weights)
+        {
+            // Each influence is its joint and its weight, low byte first.
+            for (size_t slot = 1; slot < 1 + (size_t)vertex[0] * 3; slot += 3)
+            {
+                const U16 weight = rounded_to_bits((U16)(vertex[slot + 1] | (vertex[slot + 2] << 8)), 8);
+                vertex[slot + 1] = (U8)(weight & 0xFF);
+                vertex[slot + 2] = (U8)(weight >> 8);
+            }
         }
     }
 
