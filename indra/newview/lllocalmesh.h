@@ -92,6 +92,7 @@ struct LLLocalMeshPart
     LLVector3                 mScale;         // object scale (decomposed instance scale; rigged: authored size)
     LLQuaternion              mRotation;      // object rotation (decomposed instance rotation; rigged: identity)
     LLVector3                 mOffset;        // scene-space position of the part (static); zero for rigged
+    LLVector3                 mPivotOffset;   // normalized-space pivot shift applied to geometry (for hot-swap compensation)
     S32                       mNumFaces = 0;
     std::vector<LLLocalMeshFaceMaterial> mFaceMaterials; // parallel to the volume's faces
 };
