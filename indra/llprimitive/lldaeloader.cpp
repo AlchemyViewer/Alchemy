@@ -2131,7 +2131,14 @@ void LLDAELoader::processElement( daeElement* element, bool& badElement, DAE* da
 
                         if (model->mLabel.empty())
                         {
-                            label = mLod == LLModel::LOD_HIGH ? getElementLabel(instance_geo) : getLodlessLabel(instance_geo); // <SK:Nexii> Mesh uploader LODs by name
+                            // <SK:Nexii> Mesh uploader LODs by name
+                            label = mLod == LLModel::LOD_HIGH ? getElementLabel(instance_geo) : getLodlessLabel(instance_geo);
+                            if (mLod == LLModel::LOD_HIGH && label.size() > 5
+                                && label.compare(label.size() - 5, 5, "_LOD3") == 0)
+                            {
+                                label.erase(label.size() - 5);
+                            }
+                            // </SK:Nexii>
 
                             llassert(!label.empty());
 
@@ -2421,11 +2428,18 @@ std::string LLDAELoader::getElementLabel(daeElement *element)
 // static
 size_t LLDAELoader::getSuffixPosition(const std::string &label)
 {
-    if ((label.find("_LOD") != std::string::npos) || (label.find("_PHYS") != std::string::npos))
+    // <SK:Nexii> Mesh uploader LODs by name: match only recognized trailing suffixes so literal names like Wall_LODGE stay intact
+    static const std::string suffixes[] = { "_LOD0", "_LOD1", "_LOD2", "_LOD3", "_PHYS" };
+    for (const std::string& suffix : suffixes)
     {
-        return label.rfind('_');
+        if (label.size() > suffix.size()
+            && label.compare(label.size() - suffix.size(), suffix.size(), suffix) == 0)
+        {
+            return label.size() - suffix.size();
+        }
     }
     return std::string::npos;
+    // </SK:Nexii>
 }
 
 // static
@@ -2516,8 +2530,15 @@ bool LLDAELoader::loadModelsFromDomMesh(domMesh* mesh, std::vector<LLModel*>& mo
 
     LLModel* ret = new LLModel(volume_params, 0.f);
 
-    // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps its suffixes for the preview to sort out
+    // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps lower/physics suffixes for the preview to sort out,
+    // while stripping a trailing _LOD3 so High-suffixed meshes still match separate LOD files and embedded LODs
     std::string model_name = mLod == LLModel::LOD_HIGH ? getElementLabel(mesh) : getLodlessLabel(mesh);
+    if (mLod == LLModel::LOD_HIGH && model_name.size() > 5
+        && model_name.compare(model_name.size() - 5, 5, "_LOD3") == 0)
+    {
+        model_name.erase(model_name.size() - 5);
+    }
+    // </SK:Nexii>
     ret->mLabel = model_name + lod_suffix[mLod];
 
     llassert(!ret->mLabel.empty());

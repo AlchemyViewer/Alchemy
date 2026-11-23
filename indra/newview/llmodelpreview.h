@@ -173,7 +173,8 @@ public:
     void setModelPivot(const LLVector3& pivot) { mModelPivot = pivot; }
 
     // <SK:Nexii> Mesh uploader LODs by name: a file's NAME_LOD0-2 and NAME_PHYS models fill those slots of NAME
-    void splitSuffixedModels(const std::string& filename);
+    // Returns a bitmask of non-physics LODs released back to generation so a high-file reload regenerates them.
+    U32 splitSuffixedModels(const std::string& filename);
     // </SK:Nexii>
 
     // <SK:Nexii> Mesh uploader pivot: each model's origin within its bounding box, -1 to 1 per axis
