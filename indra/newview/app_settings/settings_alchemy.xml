@@ -843,6 +843,17 @@
             <key>Value</key>
             <integer>1</integer>
         </map>
+        <key>ALScriptConvertCommentCode</key>
+        <map>
+            <key>Comment</key>
+            <string>With ALScriptConvertKeepComments, Convert to SLua writes the code a comment switched off as SLua, still commented, where it stood: each comment that, uncommented where it stands, parses and changes nothing else the script is written as. One that does not stays as the LSL had it.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
         <key>ALScriptStudioAutoClose</key>
         <map>
             <key>Comment</key>
@@ -908,6 +919,17 @@
             <string>U32</string>
             <key>Value</key>
             <integer>0</integer>
+        </map>
+        <key>ALScriptDefinitionsFolder</key>
+        <map>
+            <key>Comment</key>
+            <string>A folder of language definitions for Script Studio, newer than the region's: each file in it -- secondlife.d.luau, secondlife.docs.json, builtins.txt, lsl_keywords.xml, lua_keywords.xml -- is read in place of the region's of the same name, for the editor's checks, hovers, completions and colours. The region compiles with its own whatever this says. Empty: the region's alone.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>String</string>
+            <key>Value</key>
+            <string />
         </map>
         <key>ALScriptStudioVimClipboard</key>
         <map>
@@ -1448,6 +1470,17 @@
             <key>Value</key>
             <integer>0</integer>
         </map>
+        <key>AlchemyBulkRenameMaxItems</key>
+        <map>
+            <key>Comment</key>
+            <string>The most inventory items Bulk Rename takes at once. Choosing Bulk Rename with more selected says so instead of opening.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>100</integer>
+        </map>
         <key>AlchemyCameraFloaterExpanded</key>
         <map>
             <key>Comment</key>
@@ -1914,6 +1947,28 @@
             <string>Boolean</string>
             <key>Value</key>
             <integer>1</integer>
+        </map>
+        <key>AlchemyMeshUploadPacking</key>
+        <map>
+            <key>Comment</key>
+            <string>How a mesh upload's blocks are packed. 0: as other viewers pack them. 1: as small as they go and drawn the same, each LOD face's vertices welded and its triangles reordered and every block compressed at libdeflate's strongest level, for smaller LOD blocks and so a lower download weight, at more time to write them. 2: that with each normal component of the LOD faces rounded to 12 bits, turning a normal by 0.024 degrees at most, about 4% smaller again. 3: that rounded to 10 bits, turning a normal by 0.096 degrees at most, about 7% smaller again. Read when the upload or fee request starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>U32</string>
+            <key>Value</key>
+            <integer>1</integer>
+        </map>
+        <key>AlchemyMeshUploadRoundWeights</key>
+        <map>
+            <key>Comment</key>
+            <string>With AlchemyMeshUploadPacking above 0, round each skin weight of a mesh upload's LOD faces to 8 bits rather than 16, as glTF's unsigned-byte weights hold them. Viewers normalize a vertex's weights as they skin it, so a skinned vertex moves by at most 0.5% (0.1% on average) of how far apart its joints would each carry it; clothing fitted closely over another mesh may show it where a joint bends far. Rigged LOD blocks come out about 11% smaller. Read when the upload or fee request starts.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>Boolean</string>
+            <key>Value</key>
+            <integer>0</integer>
         </map>
         <key>AlchemyMinimapChatRings</key>
         <map>
@@ -2886,7 +2941,7 @@
         <key>AlchemyRetireDepartedRegions</key>
         <map>
             <key>Comment</key>
-            <string>Once a teleport's arrival has settled, remove the regions it left behind that are neither the agent's, a neighbour of it, nor within draw distance plus a region width, instead of keeping them until their simulators disconnect them about a minute later. Their objects are killed a few each frame first.</string>
+            <string>Once a teleport's arrival has settled, kill the objects of the regions it left behind that are neither the agent's, a neighbour of it, nor within draw distance plus a region width, a few each frame, instead of keeping them until their simulators disconnect the regions about a minute later. The regions themselves stay until then, and one the agent comes back to meanwhile gets its objects back.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>
@@ -2897,7 +2952,7 @@
         <key>AlchemyRetireDepartedRegionsCloseCircuit</key>
         <map>
             <key>Comment</key>
-            <string>Close a retired region's circuit at once, telling its simulator with CloseCircuit, instead of leaving it for the simulator to close when it disconnects the region.</string>
+            <string>Remove a retired region and close its circuit at once, telling its simulator with CloseCircuit, instead of keeping the region until the simulator disconnects it.</string>
             <key>Persist</key>
             <integer>1</integer>
             <key>Type</key>

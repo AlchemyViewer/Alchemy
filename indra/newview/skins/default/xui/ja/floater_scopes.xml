@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="floater_scopes" title="スコープ">
+	<floater.string name="waiting">
+		計測しています…
+	</floater.string>
+	<floater.string name="clipping">
+		黒つぶれ [LOW]%　白飛び [HIGH]%　（[SAMPLES]サンプル）
+	</floater.string>
+	<floater.string name="clipping_pixel">
+		黒つぶれ [LOW]%　白飛び [HIGH]%　　R [R]　G [G]　B [B]
+	</floater.string>
+	<floater.string name="mode_luma">輝度</floater.string>
+	<floater.string name="mode_red">赤</floater.string>
+	<floater.string name="mode_green">緑</floater.string>
+	<floater.string name="mode_blue">青</floater.string>
+	<floater.string name="mode_vector">ベクトルスコープ</floater.string>
+	<floater.string name="mode_wave_luma">波形</floater.string>
+	<floater.string name="mode_wave_rgb">波形（RGB）</floater.string>
+	<floater.string name="mode_parade">パレード</floater.string>
+	<text name="scope_layout_label" value="レイアウト"/>
+	<combo_box name="scope_layout" tool_tip="同時に表示するスコープの数です。各ペインを右クリックすると、表示するスコープを選択できます。ヒストグラムはフレームの各明るさにどれだけの量があるかを、波形やパレードはそれがフレームのどこにあるかを、ベクトルスコープはどんな色かを、カラーホイールで編集するのと同じ平面上に示します。複数表示しても計測のコストは増えません。すべてのスコープは、画面に表示されているかどうかにかかわらず、同じサンプルから計算されます。">
+		<combo_box.item name="single" label="1つ"/>
+		<combo_box.item name="columns" label="横に並べる"/>
+		<combo_box.item name="rows" label="縦に並べる"/>
+		<combo_box.item name="quad" label="4つ"/>
+	</combo_box>
+	<check_box name="scope_log" label="対数スケール" tool_tip="高いビンを圧縮して、分布の残りの部分を読みやすくします。ヒストグラムは尖りやすく、線形スケールでは1つの支配的なトーンが他のすべてを軸上に押しつぶしてしまいます。"/>
+	<panel name="scope_plot" tool_tip="スコープを右クリックすると、表示する内容（ヒストグラム、波形、パレード、ベクトルスコープ）を選択できます。"/>
+	<text name="scope_clipping" tool_tip="サンプリングしたピクセルのうち、最も不利なチャンネルで完全な黒または完全な白になっている割合です。フレームの点サンプルから計測するため、すべてのピクセルを数えるのではなく実際の割合を推定します。ワールドにカーソルを向けると、代わりにカーソル位置の値を表示します。"/>
+</floater>

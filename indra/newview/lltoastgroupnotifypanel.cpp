@@ -35,6 +35,7 @@
 #include "llinventoryfunctions.h"
 #include "llinventoryicon.h"
 #include "llnotifications.h"
+#include "llslurl.h"
 #include "llviewertexteditor.h"
 
 #include "llavatarnamecache.h"
@@ -76,7 +77,12 @@ LLToastGroupNotifyPanel::LLToastGroupNotifyPanel(const LLNotificationPtr& notifi
     std::stringstream from;
     from << from_name << "/" << groupData.mName;
     LLTextBox* pTitleText = getChild<LLTextBox>("title");
-    pTitleText->setValue(from.str());
+    pTitleText->setValue(from_name + "/");
+    LLStyle::Params group_style;
+    group_style.color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+    group_style.readonly_color = LLUIColorTable::instance().getColor("HTMLLinkColor");
+    group_style.link_href = LLSLURL("group", payload["group_id"].asUUID(), "about").getSLURLString();
+    pTitleText->appendText(groupData.mName, false, group_style);
     pTitleText->setToolTip(from.str());
 
     //message subject

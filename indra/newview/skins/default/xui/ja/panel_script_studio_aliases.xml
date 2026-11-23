@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="aliases_panel">
+	<panel.string name="NoAlias">エイリアスはありません。「追加…」でフォルダーに名前を付けるか、インベントリからドロップしてください。</panel.string>
+	<panel.string name="NoAliasWorldOff">エイリアスはありません。「追加…」でフォルダーに名前を付けてください。</panel.string>
+	<panel.string name="InventoryFolder">インベントリ：[NAME]</panel.string>
+	<panel.string name="InventoryFolderGone">インベントリのフォルダーが見つかりません</panel.string>
+	<panel.string name="InventoryFolderTip">インベントリのフォルダー。ワールドからのインクルードがオンの間、requireはここから読み込みます。</panel.string>
+	<panel.string name="InventoryFolderOffTip">インベントリのフォルダー。requireはワールドからのインクルードがオンの間だけここから読み込みますが、現在はオフです。</panel.string>
+	<panel.string name="DiskFolderGone">見つかりません：[FOLDER]</panel.string>
+	<panel.string name="DiskFolderGoneTip">[FOLDER]はありません：存在するようになるまで、このエイリアスを通したrequireは何も見つけられません。</panel.string>
+	<panel.string name="DiskFolderOffTip">[FOLDER]。requireはディスク上のファイルの読み込みが許可されている間だけここから読み込みますが、現在は許可されていません。</panel.string>
+	<panel.string name="DropFolder">このインベントリのフォルダーをエイリアスにする</panel.string>
+	<panel.string name="DropFolderWorldOff">インベントリのフォルダーは、ワールドからのインクルードがオンの間だけエイリアスとして読み込まれますが、現在はオフです。</panel.string>
+	<panel.string name="NameTaken">「[NAME]」はすでにエイリアスです。</panel.string>
+	<panel.string name="NameBad">エイリアスの名前には英字、数字、- _ . を使えます。selfや、sl-で始まる名前は使えません。</panel.string>
+	<text name="aliases_label" tool_tip="SLuaスクリプトは、エイリアスを通じてディスク上のライブラリにアクセスします：.luaurcがエイリアスを指定していない場合、require(&quot;@name/module&quot;)はエイリアスのフォルダーからmoduleを読み込みます。オブジェクト内のスクリプトがディスク上のライブラリにアクセスできるのはこの方法だけです。">
+		SLuaのエイリアス：require("@name/x")はフォルダーからxを読み込みます
+	</text>
+	<pane_list name="aliases" tool_tip="各エイリアスの名前とそのフォルダー：ディスク上のもの、またはここにドロップしたインベントリのもの"/>
+	<button name="add_alias" label="追加…" tool_tip="フォルダー自身の名前でフォルダーをエイリアスにします"/>
+	<button name="remove_alias" label="削除" tool_tip="選択したフォルダーのエイリアスを解除します"/>
+	<text name="name_label">
+		名前：
+	</text>
+	<line_editor name="alias_name" tool_tip="選択したエイリアスの名前：別の名前を入力してEnterを押してください"/>
+</panel>

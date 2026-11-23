@@ -70,6 +70,11 @@ void ALScriptStudioDiskMasters::wrote(const std::string& path)
     ALScriptDiskMasters::instance().wrote(path);
 }
 
+void ALScriptStudioDiskMasters::tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text)
+{
+    ALScriptDiskMasters::instance().tookWorld(path, from, asset, text);
+}
+
 boost::signals2::connection ALScriptStudioDiskMasters::onOutcome(std::function<void(const Outcome& outcome)> heard)
 {
     return ALScriptDiskMasters::instance().onOutcome(std::move(heard));

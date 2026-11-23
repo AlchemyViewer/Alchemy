@@ -35,6 +35,7 @@
 #include "alscriptstudioservices.h"
 #include "llbutton.h"
 #include "llfloater.h"
+#include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "lllineeditor.h"
 #include "llpanel.h"
@@ -46,6 +47,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <map>
 
 namespace
 {
@@ -65,6 +67,7 @@ bool ALScriptSearchPane::postBuild()
     mResults     = getChild<ALPaneList>("search_results");
     mReplacement = getChild<LLLineEditor>("search_replacement");
     mReplace     = getChild<LLButton>("search_replace");
+    mReplaceSome = getChild<LLButton>("search_replace_selected");
     // The window this is a tab of, found through the view tree, as what
     // the tab asks of it.
     if (!ALScriptStudioPane::findWindow(*this, "The Search tab", mServices, mWindow))
@@ -85,16 +88,22 @@ bool ALScriptSearchPane::postBuild()
     // Asked about first, on the button or return in the box -- and never on
     // the keyboard leaving the box, which the skin says.
     mReplace->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
+    mReplaceSome->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceSelected(); });
     mReplacement->setCommitCallback([this](LLUICtrl*, const LLSD&) { askReplaceAll(); });
-    // Replace All as wide as its words, where the skin's are longer, and
-    // the box beside it the rest: both follow the edges from here.
+    // Replace All at the right end and Replace beside it, each as wide as
+    // its words where the skin's are longer, and the box the rest: all
+    // follow the edges from here.
     {
         const LLRect button = mReplace->getRect();
         const LLRect box    = mReplacement->getRect();
-        const S32    gap    = button.mLeft - box.mRight;
-        const S32    width  = llmax(button.getWidth(), LLFontGL::getFontSansSerifSmall()->getWidth(mReplace->getLabelUnselected()) + 20);
-        mReplace->setShape(LLRect(button.mRight - width, button.mTop, button.mRight, button.mBottom));
-        mReplacement->setShape(LLRect(box.mLeft, box.mTop, llmax(box.mLeft + 60, button.mRight - width - gap), box.mBottom));
+        const S32    gap    = llmax(2, mReplaceSome->getRect().mLeft - box.mRight);
+        const auto   width  = [](const LLButton* b) { return llmax(b->getRect().getWidth(), LLFontGL::getFontSansSerifSmall()->getWidth(b->getLabelUnselected()) + 20); };
+        const S32    all    = width(mReplace);
+        const S32    some   = width(mReplaceSome);
+        const S32    right  = button.mRight - all - gap;
+        mReplace->setShape(LLRect(button.mRight - all, button.mTop, button.mRight, button.mBottom));
+        mReplaceSome->setShape(LLRect(right - some, button.mTop, right, button.mBottom));
+        mReplacement->setShape(LLRect(box.mLeft, box.mTop, llmax(box.mLeft + 60, right - some - gap), box.mBottom));
     }
     mBar->onChanged([this]() { onChanged(); });
     mResults->setCommitCallback([this](LLUICtrl*, const LLSD&) { choose(false); });
@@ -131,6 +140,59 @@ bool ALScriptSearchPane::postBuild()
 }
 
 
+
+std::vector<LLUICtrl*> ALScriptSearchPane::tabOrder() const
+{
+    std::vector<LLUICtrl*> order;
+    if (!mBar || !mReplacement || !mReplace || !mReplaceSome || !mResults)
+    {
+        return order;
+    }
+    const std::vector<LLUICtrl*> parts = mBar->tabStops();
+    // The field first in the sentence, its dropdowns after.
+    auto field = std::find_if(parts.begin(), parts.end(), [](LLUICtrl* part) { return part->as<LLLineEditor>() != nullptr; });
+    if (field != parts.end())
+    {
+        order.push_back(*field);
+    }
+    order.push_back(mReplacement);
+    order.push_back(mReplaceSome);
+    order.push_back(mReplace);
+    for (LLUICtrl* part : parts)
+    {
+        if (field == parts.end() || part != *field)
+        {
+            order.push_back(part);
+        }
+    }
+    order.push_back(mResults);
+    return order;
+}
+
+bool ALScriptSearchPane::handleKeyHere(KEY key, MASK mask)
+{
+    if (key == KEY_TAB && (mask == MASK_NONE || mask == MASK_SHIFT))
+    {
+        const std::vector<LLUICtrl*> order = tabOrder();
+        LLUICtrl* const              focus = gFocusMgr.getKeyboardFocusCtrl();
+        const auto at = std::find_if(order.begin(), order.end(), [focus](LLUICtrl* ctrl) { return focus && (ctrl == focus || focus->hasAncestor(ctrl)); });
+        if (at != order.end())
+        {
+            const ptrdiff_t step = mask == MASK_SHIFT ? -1 : 1;
+            for (ptrdiff_t i = (at - order.begin()) + step; i >= 0 && i < static_cast<ptrdiff_t>(order.size()); i += step)
+            {
+                LLUICtrl* next = order[static_cast<size_t>(i)];
+                if (next->hasTabStop() && next->isInVisibleChain() && next->isInEnabledChain())
+                {
+                    next->setFocus(true);
+                    return true;
+                }
+            }
+            // Past either end: on through the window as it would go.
+        }
+    }
+    return LLPanel::handleKeyHere(key, mask);
+}
 
 // Said as a sentence rather than as a form:
 //
@@ -786,6 +848,71 @@ void ALScriptSearchPane::askReplaceAll()
     mWindow->confirmReplaceAll(args, [this]() { replaceAll(); });
 }
 
+void ALScriptSearchPane::askReplaceSelected()
+{
+    // The places picked, by the script each was found in, in the order
+    // they stand in it.
+    std::map<size_t, std::vector<size_t>> picked;
+    for (const LLScrollListItem* item : mResults->getAllSelected())
+    {
+        const LLSD&  value = item->getValue();
+        const size_t found = static_cast<size_t>(value["found"].asInteger());
+        const size_t place = static_cast<size_t>(value["place"].asInteger());
+        if (found < mSearch.found().size() && place < mSearch.found()[found].places.size())
+        {
+            picked[found].push_back(place);
+        }
+    }
+    std::vector<ALScriptSearch::Found> some;
+    S32                                places = 0;
+    bool                               opens  = false;
+    for (auto& [found, at] : picked)
+    {
+        const ALScriptSearch::Found& one = mSearch.found()[found];
+        if (!replaceable(one))
+        {
+            continue;
+        }
+        std::sort(at.begin(), at.end());
+        at.erase(std::unique(at.begin(), at.end()), at.end());
+        // The script as it was found, with only the places picked in it.
+        ALScriptSearch::Found part = one;
+        part.places.clear();
+        part.lines.clear();
+        part.at.clear();
+        for (const size_t i : at)
+        {
+            part.places.push_back(one.places[i]);
+            if (i < one.lines.size())
+            {
+                part.lines.push_back(one.lines[i]);
+            }
+            if (i < one.at.size())
+            {
+                part.at.push_back(one.at[i]);
+            }
+        }
+        places += static_cast<S32>(part.places.size());
+        opens   = opens || !tabOf(one);
+        some.push_back(std::move(part));
+    }
+    if (mSearch.query().empty() || some.empty())
+    {
+        mServices->setStatus(mServices->words(picked.empty() ? "SearchReplaceNonePicked" : "SearchReplaceNothing"), true);
+        return;
+    }
+    if (!opens)
+    {
+        replaceIn(some);
+        return;
+    }
+    LLSD args;
+    args["PLACES"]  = mServices->counted("Places", places);
+    args["SCRIPTS"] = mServices->counted("ScriptsNotecards", static_cast<S32>(some.size()));
+    args["WITH"]    = mReplacement->getText();
+    mWindow->confirmReplaceAll(args, [this, some]() { replaceIn(some); });
+}
+
 void ALScriptSearchPane::replaceAll()
 {
     if (mSearch.found().empty() || mSearch.query().empty())
@@ -793,6 +920,13 @@ void ALScriptSearchPane::replaceAll()
         mServices->setStatus(mServices->words("SearchReplaceNothing"), true);
         return;
     }
+    // A copy: replacing searches again.
+    const std::vector<ALScriptSearch::Found> found = mSearch.found();
+    replaceIn(found);
+}
+
+void ALScriptSearchPane::replaceIn(const std::vector<ALScriptSearch::Found>& found)
+{
     const std::string with = mReplacement->getText();
 
     // The scripts as they were found, every place in each replaced as one
@@ -800,8 +934,7 @@ void ALScriptSearchPane::replaceAll()
     // was searched; in a tab opened for it, once its text is in, where it
     // was not open, the change left unsaved. One that has been typed in
     // since the search is left alone, and said so.
-    const std::vector<ALScriptSearch::Found> found = mSearch.found();
-    S32                                      places = 0, scripts = 0, opened = 0, left = 0;
+    S32 places = 0, scripts = 0, opened = 0, left = 0;
     // The tabs it opens made once, as the last is opened.
     ALScriptStudioServices::TabsHeld held(*mServices);
     for (const ALScriptSearch::Found& one : found)

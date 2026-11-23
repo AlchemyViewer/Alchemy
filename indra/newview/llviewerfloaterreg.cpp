@@ -36,6 +36,7 @@
 #include "alchatbar.h"
 // [SL:KB] - Patch: World-Derender | Checked: Catznip-3.2
 #include "alfloaterblocked.h"
+#include "alfloaterbulkrename.h"
 // [/SL:KB]
 #include "alfloaterdirectory.h"
 #include "alfloaterevent.h"
@@ -119,6 +120,7 @@
 #include "alfloatersceneexplorerfilters.h"
 #include "llfloaterinventorysettings.h"
 #include "llfloaterinventorythumbnailshelper.h"
+#include "llfloaterjoin.h"
 #include "llfloaterjoystick.h"
 #include "llfloaterlagmeter.h"
 #include "llfloaterland.h"
@@ -186,6 +188,7 @@
 #include "alfloaterxuistudio.h"
 #include "alfloaterxuilibrary.h"
 #include "llfloaterwebcontent.h"
+#include "llfloaterwebmodal.h"
 #include "llfloatervoicevolume.h"
 #include "llfloaterwhitelistentry.h"
 #include "llfloaterwindowsize.h"
@@ -240,6 +243,7 @@ public:
             || nav_type == NAV_TYPE_EXTERNAL)
         {
             const std::list<std::string> blacklist_clicked = {
+                "bulk_rename",
                 "camera_presets",
                 "delete_pref_preset",
                 "feedback", // A link must not say what a report is about.
@@ -272,6 +276,7 @@ public:
                 "appearance",
                 "associate_listing",
                 "avatar_picker",
+                "bulk_rename",
                 "camera",
                 "camera_presets",
                 "change_item_thumbnail",
@@ -440,6 +445,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("item_properties", "floater_item_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);
     LLFloaterReg::add("task_properties", "floater_task_properties.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterItemProperties>);
     LLFloaterReg::add("inventory_settings", "floater_inventory_settings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterInventorySettings>);
+    LLFloaterReg::add("join", "floater_join.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterJoin>);
     LLInspectAvatarUtil::registerFloater();
     LLInspectGroupUtil::registerFloater();
     LLInspectObjectUtil::registerFloater();
@@ -451,6 +457,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("lagmeter", "floater_lagmeter.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLagMeter>);
     LLFloaterReg::add("land_holdings", "floater_land_holdings.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLandHoldings>);
     LLFloaterReg::add("linkreplace", "floater_linkreplace.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLinkReplace>);
+    LLFloaterReg::add("bulk_rename", "floater_al_bulk_rename.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<ALFloaterBulkRename>);
     LLFloaterReg::add("load_pref_preset", "floater_load_pref_preset.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterLoadPrefPreset>);
 
     LLFloaterReg::add("mem_leaking", "floater_mem_leaking.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterMemLeak>);
@@ -574,6 +581,7 @@ void LLViewerFloaterReg::registerFloaters()
     LLFloaterReg::add("upload_sound", "floater_sound_preview.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterSoundPreview>, "upload");
 
     LLFloaterReg::add("web_content", "floater_web_content.xml", (LLFloaterBuildFunc)&LLFloaterWebContent::create);
+    LLFloaterReg::add("web_modal", "floater_web_modal.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWebModal>);
     LLFloaterReg::add("whitelist_entry", "floater_whitelist_entry.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWhiteListEntry>);
     LLFloaterReg::add("window_size", "floater_window_size.xml", &LLFloaterReg::build<LLFloaterWindowSize>);
     LLFloaterReg::add("world_map", "floater_world_map.xml", (LLFloaterBuildFunc)&LLFloaterReg::build<LLFloaterWorldMap>);

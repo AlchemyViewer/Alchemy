@@ -170,7 +170,7 @@ namespace
         {
             return lua ? LLSyntaxDefCache::instance().getLuaKeywords() : LLSyntaxDefCache::instance().getLSLKeywords();
         }
-        std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getSyntaxID().asString(); }
+        std::string definitionsVersion() override { return LLSyntaxDefCache::instance().getDefinitionsVersion(); }
         // The region's, where it delivered them, as the keywords are; else
         // those shipped.
         std::string definitionsYaml() override { return LLSyntaxDefCache::instance().loadCacheFile("lsl_definitions.yaml"); }
@@ -1509,6 +1509,20 @@ void ALFloaterScriptStudio::askLinkUnsaved(const Doc& doc, const std::string& pa
     });
 }
 
+void ALFloaterScriptStudio::askTakeWorldUnsaved(const Doc& doc, const std::string& name, std::function<void()> yes)
+{
+    LLSD question;
+    question["NAME"]                 = name;
+    question["FILE"]                 = doc.file;
+    const LLHandle<LLFloater> handle = getHandle();
+    LLNotificationsUtil::add("ScriptStudioTakeWorldUnsaved", question, LLSD(), [handle, yes](const LLSD& notification, const LLSD& response) {
+        if (handle.get() && LLNotificationsUtil::getSelectedOption(notification, response) == 0)
+        {
+            yes();
+        }
+    });
+}
+
 void ALFloaterScriptStudio::editMasterFile(const std::string& path, bool lua)
 {
     // Its tab, here or in the window that has it, given to the editor from
@@ -2831,8 +2845,17 @@ void ALFloaterScriptStudio::dropExpanded(Doc& doc)
 void ALFloaterScriptStudio::toggleExpanded()
 {
     Doc* doc = active();
-    if (!doc || !doc->expandedEditor)
+    if (!doc || (!doc->expandedEditor && !expandsOnAsking(*doc)))
     {
+        return;
+    }
+    if (!doc->expandedEditor)
+    {
+        // A file of a script, which nothing preprocesses until asked: run
+        // now, and shown when it lands (showExpanded), numbered as a send
+        // of it is, which a runtime error's line counts.
+        doc->view = Doc::View::Expanded;
+        mSaving.preprocess(*doc);
         return;
     }
     const bool to_expanded = doc->shownView() != Doc::View::Expanded;
@@ -2843,6 +2866,15 @@ void ALFloaterScriptStudio::toggleExpanded()
     {
         mSaving.preprocess(*doc);
     }
+}
+
+// static
+bool ALFloaterScriptStudio::expandsOnAsking(const Doc& doc)
+{
+    // A file of LSL or SLua on disk: what a send of it to a script it masters
+    // goes up as is the preprocessor's, though no load or save of the file
+    // runs it here.
+    return !doc.file.empty() && !doc.notecard && doc.loaded && doc.editor && !doc.preprocessing;
 }
 
 void ALFloaterScriptStudio::showView(Doc& doc, Doc::View view, bool focus)
@@ -3947,7 +3979,7 @@ void ALFloaterScriptStudio::refreshToolbar()
     mRedoButton->setEnabled(doc && doc->undoText()->canRedo());
     mFindButton->setEnabled(doc != nullptr);
     mFormatButton->setEnabled(have && doc->modifiable && !doc->notecard && doc->shownView() == Doc::View::Source);
-    mExpandedButton->setEnabled(doc && doc->expandedEditor != nullptr);
+    mExpandedButton->setEnabled(doc && (doc->expandedEditor != nullptr || expandsOnAsking(*doc)));
     mExpandedButton->setToggleState(doc && doc->shownView() == Doc::View::Expanded);
     mRunning->setVisible(task);
     mResetButton->setVisible(task);
@@ -5028,11 +5060,21 @@ void ALFloaterScriptStudio::fileSettled(Doc& doc)
     };
     for (std::unique_ptr<Doc>& each : mDocs)
     {
-        if (each.get() != &doc && each->file.empty() && preprocessed(*each) && reads(*each))
+        if (each.get() == &doc || !reads(*each))
+        {
+            continue;
+        }
+        if (each->file.empty() && preprocessed(*each))
         {
             each->expanded.valid = false;
             mSaving.preprocess(*each);
             scheduleAnalysis(*each);
+        }
+        else if (!each->file.empty() && each->expandedEditor)
+        {
+            // A file's Preprocessed View, made on asking (expandsOnAsking):
+            // made again, so that it shows what the file saved now makes.
+            mSaving.preprocess(*each);
         }
     }
     fillTabs();
@@ -8107,9 +8149,12 @@ void ALFloaterScriptStudio::heardRunning(Doc& doc, const ALScriptRunningState& s
 {
     // What it compiles for, as the region knows it, but for one picked
     // here and not saved yet, which is what the next save sends; for a
-    // file standing in, of the file's language only.
+    // file standing in, of the file's language only. SLua compiles only for
+    // Luau: a script that did not compile is said to run on no VM, which
+    // reads as LSO, and is not taken for one (ALScriptWorkspace::targetFor).
     if (!state.compileTarget.empty() && !doc.targetChosen && state.compileTarget != doc.language.compileTarget &&
-        (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua))
+        (doc.file.empty() || (state.compileTarget == "luau") == doc.language.lua) &&
+        ALScriptWorkspace::targetFor(doc.language.lua, state.compileTarget) == state.compileTarget)
     {
         doc.language.compileTarget = state.compileTarget;
         targetChanged(doc);
@@ -8260,6 +8305,7 @@ void ALFloaterScriptStudio::convertToSLua(Doc& doc)
     options.keyTextAny    = gSavedSettings.getBOOL("ALScriptConvertKeyTextAny");
     options.comments      = gSavedSettings.getBOOL("ALScriptConvertComments");
     options.keepComments  = gSavedSettings.getBOOL("ALScriptConvertKeepComments");
+    options.commentCode   = gSavedSettings.getBOOL("ALScriptConvertCommentCode");
     // Its tables' braces as the formatter writes them.
     options.braceSpaces   = gSavedSettings.getBOOL("ALScriptFormatBraceSpaces");
     // Its notes, and its comments, in the skin's words, read where it is
@@ -8405,7 +8451,19 @@ void ALFloaterScriptStudio::convertedToSLua(Doc& doc, const std::string& lsl, bo
     }
     args["[NEW]"]   = name;
     args["[NOTES]"] = counted("ConvertNotes", static_cast<S32>(converted.notes.size()));
-    report(getString(expanded ? "ConvertedExpanded" : "Converted", args), false, &doc);
+    std::string said = getString(expanded ? "ConvertedExpanded" : "Converted", args);
+    // How many comments holding code were written as SLua, and how many
+    // were left as the LSL had them.
+    if (converted.commentsConverted > 0 || converted.commentsLeft > 0)
+    {
+        args["[CONVERTED]"] = counted("ConvertComments", converted.commentsConverted);
+        args["[LEFT]"]      = counted("ConvertComments", converted.commentsLeft);
+        said += " " + getString(converted.commentsLeft == 0       ? "ConvertCommentCodeAll"
+                                : converted.commentsConverted == 0 ? "ConvertCommentCodeNone"
+                                                                   : "ConvertCommentCode",
+                                args);
+    }
+    report(said, false, &doc);
 }
 
 void ALFloaterScriptStudio::convertedMade(const ALScriptCreated& made, ConvertedWaiting waiting)
@@ -9719,7 +9777,7 @@ void ALFloaterScriptStudio::addViewCommands()
         "expanded", [this]() { toggleExpanded(); },
         [this]() {
             Doc* doc = active();
-            return doc && doc->expandedEditor != nullptr;
+            return doc && (doc->expandedEditor != nullptr || expandsOnAsking(*doc));
         },
         [this]() {
             const Doc* doc = active();

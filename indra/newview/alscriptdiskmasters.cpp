@@ -36,8 +36,10 @@
 #include "alscriptmodules.h"
 #include "alscriptpreprocessor.h"
 #include "alscriptworkspace.h"
+#include "alwatchedfile.h"
 #include "lldir.h"
 #include "llfloaterreg.h"
+#include "lltimer.h"
 #include "llinventorymodel.h"
 #include "llviewercontrol.h"
 #include "llviewerinventory.h"
@@ -285,6 +287,32 @@ void ALScriptDiskMasters::wrote(const std::string& path)
     for (const ALMasterLink& one : mastering(file))
     {
         send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Direct);
+    }
+    mFanOut->changed({ file }, { file });
+}
+
+void ALScriptDiskMasters::tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text)
+{
+    ALMasterIndex* index = links();
+    if (!index)
+    {
+        return;
+    }
+    const std::string file = canonical(path);
+    if (mWatch)
+    {
+        mWatch->seen(file);
+    }
+    // The file as the world has it: the link starts from it, as from a send
+    // of it, so that nothing marks the file as changed since, and a save of
+    // the same text from elsewhere is what the link is of.
+    index->inStep(from.object, from.item, file, asset, text, ALFileStamp::of(file).time);
+    for (const ALMasterLink& one : mastering(file))
+    {
+        if (one.object != from.object || one.item != from.item)
+        {
+            send(ALScriptRef(one.object, one.item), ALMasterPlan::Send::Direct);
+        }
     }
     mFanOut->changed({ file }, { file });
 }
@@ -539,6 +567,71 @@ std::string ALScriptDiskMasters::fileLabel(const std::string& master, const ALDi
 bool ALScriptDiskMasters::holdsLinked(const LLUUID& prim)
 {
     return instanceExists() && getInstance()->mHolding.contains(prim);
+}
+
+// static
+void ALScriptDiskMasters::deleting(const std::vector<LLUUID>& prims)
+{
+    if (!instanceExists())
+    {
+        return;
+    }
+    ALScriptDiskMasters&  self = instance();
+    std::vector<LLUUID> linked;
+    for (const LLUUID& prim : prims)
+    {
+        if (self.mHolding.contains(prim))
+        {
+            linked.push_back(prim);
+        }
+    }
+    if (!linked.empty())
+    {
+        self.mDeletes.asked(linked, LLTimer::getTotalSeconds());
+    }
+}
+
+// static
+void ALScriptDiskMasters::killed(const LLViewerObject& object)
+{
+    if (!instanceExists() || instance().mDeletes.empty())
+    {
+        return;
+    }
+    ALScriptDiskMasters& self  = instance();
+    ALMasterIndex*       index = self.links();
+    if (!index)
+    {
+        return;
+    }
+    // The prim and those linked to it, which go with it whether or not the
+    // region says so of each.
+    std::vector<LLUUID> prims{ object.getID() };
+    for (const LLViewerObject* child : object.getChildren())
+    {
+        if (child)
+        {
+            prims.push_back(child->getID());
+        }
+    }
+    const F64 now      = LLTimer::getTotalSeconds();
+    size_t    unlinked = 0;
+    for (const LLUUID& prim : prims)
+    {
+        if (!self.mDeletes.killed(prim, now))
+        {
+            continue;
+        }
+        for (const ALMasterLink& link : index->linksIn(prim))
+        {
+            self.unlink(ALScriptRef(link.object, link.item));
+            ++unlinked;
+        }
+    }
+    if (unlinked > 0)
+    {
+        LL_INFOS("ScriptMasters") << "Unlinked " << unlinked << " item(s) of a deleted object from their files" << LL_ENDL;
+    }
 }
 
 // static

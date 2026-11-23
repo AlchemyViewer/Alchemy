@@ -29,6 +29,7 @@
 #include "linden_common.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include "altestmatchers.h"
 #include "m4math.h"
 #include "v2math.h"
 #include "v2math.h"
@@ -41,6 +42,7 @@
 #include "llsdutil.h"
 #include "llsdutil_math.h"
 #include <set>
+#include <vector>
 #include <boost/range.hpp>
 
 namespace
@@ -396,6 +398,176 @@ namespace
         CHECK(target["made"][0].asInteger() == 5);
         llsd::drill_ref(target, llsd::array("made", 2)) = 6;
         CHECK(target["made"].size() == 1);
+    }
+
+    // The defaults the llsd_diff_from_default() and llsd_overlay_on_default()
+    // tests diff against.
+    LLSD diff_test_defaults()
+    {
+        return llsd::map(
+            "name",    "default",
+            "count",   3,
+            "enabled", true,
+            "list",    llsd::array(1, 2, 3),
+            "nested",  llsd::map(
+                "a", "alpha",
+                "b", "beta",
+                "deep", llsd::map("x", 1.5, "y", 2.5)));
+    }
+
+    TEST_CASE("llsdutil: llsd_diff_from_default keeps only what differs from the defaults", "[llsdutil]")
+    {
+        const LLSD defaults = diff_test_defaults();
+
+        UNSCOPED_INFO("a value equal to the defaults has an empty map for its diff");
+        LLSD diff = llsd_diff_from_default(defaults, defaults);
+        CHECK(diff.isMap());
+        CHECK(diff.size() == 0);
+
+        // Changes, additions and removals, nested ones included.
+        LLSD value = llsd_clone(defaults);
+        value["count"] = 4;                              // changed scalar
+        value["extra"] = "added";                        // key not in the defaults
+        value.erase("enabled");                          // removed default
+        value["nested"]["deep"]["y"] = 9.0;              // changed deep entry
+        value["nested"].erase("b");                      // removed nested default
+        value["nested"]["more"] = llsd::map("k", "v");   // added nested map
+
+        diff = llsd_diff_from_default(value, defaults);
+        CHECK_THAT(diff, ll_test::LLSDEquals(llsd::map(
+                             "count",   4,
+                             "extra",   "added",
+                             "enabled", LLSD(),
+                             "nested",  llsd::map(
+                                 "b",    LLSD(),
+                                 "more", llsd::map("k", "v"),
+                                 "deep", llsd::map("y", 9.0)))));
+        UNSCOPED_INFO("a removed default is there, undefined");
+        REQUIRE(diff.has("enabled"));
+        CHECK(diff["enabled"].isUndefined());
+        UNSCOPED_INFO("unchanged entries are left out");
+        CHECK_FALSE(diff.has("name"));
+        CHECK_FALSE(diff.has("list"));
+        CHECK_FALSE(diff["nested"].has("a"));
+        CHECK_FALSE(diff["nested"]["deep"].has("x"));
+
+        UNSCOPED_INFO("an array is compared whole, so one changed element stores all of it");
+        value = llsd_clone(defaults);
+        value["list"][1] = 20;
+        CHECK_THAT(llsd_diff_from_default(value, defaults),
+                   ll_test::LLSDEquals(llsd::map("list", llsd::array(1, 20, 3))));
+
+        UNSCOPED_INFO("the same number as another type is a difference");
+        value = llsd_clone(defaults);
+        value["count"] = 3.0;
+        diff = llsd_diff_from_default(value, defaults);
+        REQUIRE(diff.has("count"));
+        CHECK(diff["count"].isReal());
+
+        UNSCOPED_INFO("a map in place of a scalar default and a scalar in place of a map are stored whole");
+        value = llsd_clone(defaults);
+        value["name"] = llsd::map("first", "Ann");
+        value["nested"] = "flat";
+        CHECK_THAT(llsd_diff_from_default(value, defaults),
+                   ll_test::LLSDEquals(llsd::map("name", llsd::map("first", "Ann"), "nested", "flat")));
+
+        // Where either is not a map, the two are compared whole.
+        UNSCOPED_INFO("equal scalars diff to undefined");
+        CHECK(llsd_diff_from_default(LLSD(5), LLSD(5)).isUndefined());
+        CHECK_THAT(llsd_diff_from_default(LLSD("new"), LLSD("old")), ll_test::LLSDEquals(LLSD("new")));
+        CHECK_THAT(llsd_diff_from_default(llsd::map("k", 1), LLSD(5)), ll_test::LLSDEquals(llsd::map("k", 1)));
+    }
+
+    TEST_CASE("llsdutil: llsd_overlay_on_default lays a diff over the defaults", "[llsdutil]")
+    {
+        const LLSD defaults = diff_test_defaults();
+
+        UNSCOPED_INFO("an empty or undefined diff gives the defaults");
+        CHECK_THAT(llsd_overlay_on_default(LLSD::emptyMap(), defaults), ll_test::LLSDEquals(defaults));
+        CHECK_THAT(llsd_overlay_on_default(LLSD(), defaults), ll_test::LLSDEquals(defaults));
+
+        UNSCOPED_INFO("a whole value overlays to itself");
+        LLSD verbose = llsd_clone(defaults);
+        verbose["count"] = 7;
+        CHECK_THAT(llsd_overlay_on_default(verbose, defaults), ll_test::LLSDEquals(verbose));
+
+        UNSCOPED_INFO("a compact diff fills in the defaults and applies its changes and removals");
+        const LLSD diff = llsd::map(
+            "count",   4,
+            "enabled", LLSD(),
+            "nested",  llsd::map("b", LLSD(), "deep", llsd::map("y", 9.0)));
+        LLSD expected = llsd_clone(defaults);
+        expected["count"] = 4;
+        expected.erase("enabled");
+        expected["nested"].erase("b");
+        expected["nested"]["deep"]["y"] = 9.0;
+        CHECK_THAT(llsd_overlay_on_default(diff, defaults), ll_test::LLSDEquals(expected));
+
+        UNSCOPED_INFO("removing a key the defaults do not have changes nothing");
+        CHECK_THAT(llsd_overlay_on_default(llsd::map("nope", LLSD()), defaults), ll_test::LLSDEquals(defaults));
+
+        UNSCOPED_INFO("the result shares nothing with the defaults");
+        const LLSD defaults_copy = llsd_clone(defaults);
+        LLSD result = llsd_overlay_on_default(diff, defaults_copy);
+        result["nested"]["deep"]["x"] = 100;
+        CHECK_THAT(defaults_copy, ll_test::LLSDEquals(defaults));
+
+        UNSCOPED_INFO("a diff that is not a map replaces the defaults");
+        CHECK_THAT(llsd_overlay_on_default(LLSD("flat"), defaults), ll_test::LLSDEquals(LLSD("flat")));
+    }
+
+    TEST_CASE("llsdutil: a value's diff from the defaults overlays back to the value", "[llsdutil]")
+    {
+        const LLSD defaults = diff_test_defaults();
+
+        std::vector<LLSD> values;
+        values.push_back(llsd_clone(defaults));          // all defaults
+        {
+            LLSD v = llsd_clone(defaults);               // assorted edits
+            v["count"] = 4;
+            v["extra"] = llsd::array("a", "b");
+            v.erase("enabled");
+            v["nested"]["deep"]["y"] = 9.0;
+            v["nested"].erase("b");
+            v["nested"]["more"] = llsd::map("k", "v");
+            values.push_back(v);
+        }
+        {
+            LLSD v = llsd_clone(defaults);               // everything removed
+            v.erase("name");
+            v.erase("count");
+            v.erase("enabled");
+            v.erase("list");
+            v.erase("nested");
+            values.push_back(v);
+        }
+        {
+            LLSD v = llsd_clone(defaults);               // nested map emptied
+            v["nested"] = LLSD::emptyMap();
+            values.push_back(v);
+        }
+        {
+            LLSD v = llsd_clone(defaults);               // types swapped
+            v["name"] = llsd::map("first", "Ann");
+            v["nested"] = "flat";
+            v["list"] = LLSD::emptyArray();
+            values.push_back(v);
+        }
+
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            INFO("value " << i);
+            const LLSD diff = llsd_diff_from_default(values[i], defaults);
+            CHECK_THAT(llsd_overlay_on_default(diff, defaults), ll_test::LLSDEquals(values[i]));
+        }
+
+        // A whole value saved before a default existed, and so without its
+        // key, reads back with the default filled in: only an undefined entry
+        // removes a default.
+        LLSD old_verbose = llsd_clone(defaults);
+        old_verbose.erase("enabled");
+        old_verbose["nested"].erase("b");
+        CHECK_THAT(llsd_overlay_on_default(old_verbose, defaults), ll_test::LLSDEquals(defaults));
     }
 
 }

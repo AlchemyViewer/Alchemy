@@ -36,9 +36,13 @@
 #include "llfloater.h"
 #include "llavatarpropertiesprocessor.h"
 #include "llconversationlog.h"
+#include "llgamecontrol.h"
+#include "llkeyconflict.h"
+#include "llscrolllistcell.h"
+#include "llscrolllistctrl.h"
 #include "llsearcheditor.h"
 #include "llsetkeybinddialog.h"
-#include "llkeyconflict.h"
+#include "llspinctrl.h"
 
 #include <boost/signals2/connection.hpp>
 
@@ -94,6 +98,8 @@ public:
     /*virtual*/ void onClose(bool app_quitting) override;
     /*virtual*/ void changed() override;
     /*virtual*/ void changed(const LLUUID& session_id, U32 mask) override {};
+
+    static void refreshInstance();
 
     // static data update, called from message handler
     static void updateUserInfo(const std::string& visibility);
@@ -213,6 +219,7 @@ public:
     void buildPopupLists();
     static void refreshSkin(void* data);
     void selectPanel(const LLSD& name);
+    void setPanelVisibility(const LLSD& name, bool visible);
     void saveGraphicsPreset(std::string& preset);
 
     void setRecommendedSettings();
@@ -278,6 +285,9 @@ private:
     LLScrollListCtrl* mEnabledPopups = nullptr;
     LLScrollListCtrl* mDisabledPopups = nullptr;
     LLButton*       mDeleteTranscriptsBtn = nullptr;
+
+    // Prevent duplicate account-wide deletion requests while the durable sweep runs.
+    bool            mDeleteTranscriptsPending = false;
     LLButton*       mEnablePopupBtn = nullptr;
     LLButton*       mDisablePopupBtn = nullptr;
     LLComboBox*     mTimeFormatCombobox = nullptr;
@@ -444,6 +454,8 @@ public:
 
     bool postBuild() override;
 
+    void refresh() override;
+
     void apply() override;
     void cancel(const std::vector<std::string> settings_to_skip = {}) override;
     void saveSettings() override;
@@ -466,6 +478,9 @@ public:
     /*virtual*/ void onDefaultKeyBind(bool all_modes) override;
     /*virtual*/ void onCancelKeyBind() override;
 
+    // Cleans content and then adds content from xml files according to current mEditingMode
+    void populateControlTable();
+
 private:
     // reloads settings, discards current changes, updates table
     void regenerateControls();
@@ -474,9 +489,6 @@ private:
     bool addControlTableColumns(const std::string &filename);
     bool addControlTableRows(const std::string &filename);
     void addControlTableSeparator();
-
-    // Cleans content and then adds content from xml files according to current mEditingMode
-    void populateControlTable();
 
     // Updates keybindings from storage to table
     void updateTable();

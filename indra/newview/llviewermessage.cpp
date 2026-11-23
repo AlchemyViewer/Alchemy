@@ -27,10 +27,12 @@
 #include "llviewerprecompiledheaders.h"
 #include "llviewermessage.h"
 
+#include "alscriptdiskmasters.h"
 #include "alscriptstudio.h"
 #include "alscripttypes.h"
 #include "alnotecarditems.h"
 #include "alobjectupdate.h"
+#include "alteleportprogress.h"
 
 // Linden libraries
 #include "llanimationstates.h"
@@ -75,6 +77,7 @@
 #include "llfloaterpreference.h"
 #include "llfloatersidepanelcontainer.h"
 #include "llfloatersnapshot.h"
+#include "llgamecontrol.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
 #include "llimprocessing.h"
@@ -172,19 +175,23 @@ const U8 AU_FLAGS_NONE              = 0x00;
 const U8 AU_FLAGS_HIDETITLE         = 0x01;
 const U8 AU_FLAGS_CLIENT_AUTOPILOT  = 0x02;
 
+// The resident whose offer the agent accepted is a friend once the server says so: the capability answers success,
+// or the simulator acknowledges AcceptFriendship.
 void accept_friendship_coro(std::string url, LLSD notification)
 {
     LLCore::HttpRequest::policy_t httpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID);
     LLCoreHttpUtil::HttpCoroutineAdapter::ptr_t
         httpAdapter = std::make_shared<LLCoreHttpUtil::HttpCoroutineAdapter>("friendshipResponceErrorProcessing", httpPolicy);
     LLCore::HttpRequest::ptr_t httpRequest = std::make_shared<LLCore::HttpRequest>();
+    LLSD payload = notification["payload"];
+    const LLUUID from_id = payload["from_id"].asUUID();
     if (url.empty())
     {
         LL_WARNS("Friendship") << "Empty capability!" << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(from_id);
         return;
     }
 
-    LLSD payload = notification["payload"];
     url += "?from=" + payload["from_id"].asString();
     url += "&agent_name=\"" + LLURI::escape(gAgentAvatarp->getFullname()) + "\"";
 
@@ -198,22 +205,40 @@ void accept_friendship_coro(std::string url, LLSD notification)
     {
         LL_WARNS("Friendship") << "HTTP status, " << status.toTerseString() <<
             ". friendship offer accept failed." << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(from_id);
     }
     else
     {
         if (!result.has("success") || !result["success"].asBoolean())
         {
             LL_WARNS("Friendship") << "Server failed to process accepted friendship. " << httpResults << LL_ENDL;
+            LLAvatarTracker::instance().friendshipRefused(from_id);
         }
         else
         {
             LL_DEBUGS("Friendship") << "Adding friend to list" << httpResults << LL_ENDL;
+            LLAvatarTracker::formFriendship(from_id);
             // add friend to recent people list
             LLRecentPeople::instance().add(payload["from_id"]);
 
             LLNotificationsUtil::add("FriendshipAcceptedByMe",
                 notification["substitutions"], payload);
         }
+    }
+}
+
+// The simulator acknowledged AcceptFriendship, or the circuit gave it up.
+static void on_accept_friendship_acked(void** user_data, S32 result)
+{
+    const std::unique_ptr<LLUUID> from_id(reinterpret_cast<LLUUID*>(user_data));
+    if (result == LL_ERR_NOERR)
+    {
+        LLAvatarTracker::formFriendship(*from_id);
+    }
+    else
+    {
+        LL_WARNS("Friendship") << "AcceptFriendship was not acknowledged, error " << result << LL_ENDL;
+        LLAvatarTracker::instance().friendshipRefused(*from_id);
     }
 }
 
@@ -280,8 +305,7 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
         case 0:
         {
             // accept
-            LLAvatarTracker::formFriendship(payload["from_id"]);
-
+            const LLUUID from_id = payload["from_id"].asUUID();
             const LLUUID fid = gInventory.findCategoryUUIDForType(LLFolderType::FT_CALLINGCARD);
 
             // This will also trigger an onlinenotification if the user is online
@@ -290,12 +314,14 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
             if (!url.empty() && payload.has("online") && !payload["online"].asBoolean())
             {
                 LL_DEBUGS("Friendship") << "Accepting friendship via capability" << LL_ENDL;
+                LLAvatarTracker::instance().expectFriendship(from_id);
                 LLCoros::instance().launch("LLMessageSystem::acceptFriendshipOffer",
                     boost::bind(accept_friendship_coro, url, notification));
             }
             else if (payload.has("session_id") && payload["session_id"].asUUID().notNull())
             {
                 LL_DEBUGS("Friendship") << "Accepting friendship via viewer message" << LL_ENDL;
+                LLAvatarTracker::instance().expectFriendship(from_id);
                 msg->newMessageFast(_PREHASH_AcceptFriendship);
                 msg->nextBlockFast(_PREHASH_AgentData);
                 msg->addUUIDFast(_PREHASH_AgentID, gAgent.getID());
@@ -304,7 +330,16 @@ bool friendship_offer_callback(const LLSD& notification, const LLSD& response)
                 msg->addUUIDFast(_PREHASH_TransactionID, payload["session_id"]);
                 msg->nextBlockFast(_PREHASH_FolderData);
                 msg->addUUIDFast(_PREHASH_FolderID, fid);
-                msg->sendReliable(LLHost(payload["sender"].asString()));
+                // The callback owns the id once the message is queued; a message that isn't never calls it.
+                LLUUID* acked_id = new LLUUID(from_id);
+                if (!msg->sendReliable(LLHost(payload["sender"].asString()), LL_DEFAULT_RELIABLE_RETRIES, true,
+                                       LL_PING_BASED_TIMEOUT_DUMMY, on_accept_friendship_acked,
+                                       reinterpret_cast<void**>(acked_id)))
+                {
+                    LL_WARNS("Friendship") << "AcceptFriendship could not be sent" << LL_ENDL;
+                    delete acked_id;
+                    LLAvatarTracker::instance().friendshipRefused(from_id);
+                }
 
                 // add friend to recent people list
                 LLRecentPeople::instance().add(payload["from_id"]);
@@ -515,7 +550,7 @@ void process_layer_data(LLMessageSystem *mesgsys, void **user_data)
 
     if(!regionp)
     {
-        // Once for each simulator: a retired region's simulator sends on until it disables the circuit.
+        // Once for each simulator: one can still send for a region removed before its circuit closed.
         LL_WARNS_ONCE() << "Invalid region for layer data from " << mesgsys->getSender() << LL_ENDL;
         return;
     }
@@ -696,9 +731,11 @@ void send_join_group_response(LLUUID group_id, LLUUID transaction_id, bool accep
 
         EInstantMessage type = accept_invite ? IM_GROUP_INVITATION_ACCEPT : IM_GROUP_INVITATION_DECLINE;
 
+        std::string my_name;
+        LLAgentUI::buildFullname(my_name);
         send_improved_im(group_id,
-            std::string("name"),
-            std::string("message"),
+            my_name,
+            LLStringUtil::null,
             IM_ONLINE,
             type,
             transaction_id);
@@ -770,10 +807,7 @@ bool join_group_response(const LLSD& notification, const LLSD& response)
     if(option == 0 && !group_id.isNull())
     {
         // check for promotion or demotion.
-        S32 max_groups = LLAgentBenefitsMgr::current().getGroupMembershipLimit();
-        if(gAgent.isInGroup(group_id)) ++max_groups;
-
-        if(gAgent.mGroups.size() < max_groups)
+        if (LLAgentBenefitsMgr::current().hasRoomForGroup(gAgent.mGroups.size(), gAgent.isInGroup(group_id)))
         {
             accept_invite = true;
         }
@@ -2264,7 +2298,9 @@ void process_improved_im(LLMessageSystem *msg, void **user_data)
     msg->getUUIDFast(_PREHASH_MessageBlock, _PREHASH_RegionID, region_id);
     msg->getVector3Fast(_PREHASH_MessageBlock, _PREHASH_Position, position);
     msg->getBinaryDataFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket, binary_bucket, 0, 0, MTUBYTES);
-    binary_bucket_size = msg->getSizeFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket);
+    // A zero-coded bucket can expand past the buffer, which holds only what
+    // fit in it.
+    binary_bucket_size = llmin(msg->getSizeFast(_PREHASH_MessageBlock, _PREHASH_BinaryBucket), MTUBYTES);
     EInstantMessage dialog = (EInstantMessage)d;
     LLHost sender = msg->getSender();
 
@@ -3018,17 +3054,7 @@ void process_teleport_progress(LLMessageSystem* msg, void**)
     msg->getStringFast(_PREHASH_Info, _PREHASH_Message, buffer);
     LL_DEBUGS("Messaging") << "teleport progress: " << buffer << " flags: " << teleport_flags << LL_ENDL;
 
-    //Sorta hacky...default to using simulator raw messages
-    //if we don't find the coresponding mapping in our progress mappings
-    std::string message = buffer;
-
-    if (LLAgent::sTeleportProgressMessages.find(buffer) !=
-        LLAgent::sTeleportProgressMessages.end() )
-    {
-        message = LLAgent::sTeleportProgressMessages[buffer];
-    }
-
-    gAgent.setTeleportMessage(LLAgent::sTeleportProgressMessages[message]);
+    gAgent.setTeleportMessage(ALTeleportProgress::text(LLAgent::sTeleportProgressMessages, buffer));
 }
 
 class LLFetchInWelcomeArea : public LLInventoryFetchDescendentsObserver
@@ -3511,8 +3537,8 @@ void process_crossed_region(LLMessageSystem* msg, void**)
 }
 
 
-// sends an AgentUpdate message to the server... or not:
-// only when force_send is 'true' OR
+// sends an AgentUpdate message to the server... or not
+// e.g. only when force_send is 'true' OR
 // something changed AND the update is not being throttled
 void send_agent_update(bool force_send, bool send_reliable)
 {
@@ -3581,8 +3607,6 @@ void send_agent_update(bool force_send, bool send_reliable)
         return;
     }
 
-    bool send_update = force_send || sec_since_last_send > MAX_AGENT_UPDATE_PERIOD;
-
     LLVector3 camera_pos_agent = gAgentCamera.getCameraPositionAgent(); // local to avatar's region
     LLVector3 camera_at = LLViewerCamera::getInstance()->getAtAxis();
     LLQuaternion body_rotation = gAgent.getFrameAgent().getQuaternion();
@@ -3599,6 +3623,7 @@ void send_agent_update(bool force_send, bool send_reliable)
         flags |= AU_FLAGS_CLIENT_AUTOPILOT;
     }
 
+    bool send_update = force_send || sec_since_last_send > MAX_AGENT_UPDATE_PERIOD;
     if (!send_update)
     {
         // check to see if anything changed
@@ -4007,6 +4032,12 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
         U32 local_id;
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
 
+        if (regionp && regionp->isRetiring())
+        {
+            // gone from its simulator too: a revival has nothing to ask for
+            regionp->retiredObjects().killed(local_id);
+        }
+
         gObjectList.getUUIDFromLocal(id, local_id, ip, port);
         if (id == LLUUID::null)
         {
@@ -4041,6 +4072,10 @@ void process_kill_object(LLMessageSystem *mesgsys, void **user_data)
                 gPipeline.addDebugBlip(objectp->getPositionAgent(), color);
                 LL_DEBUGS("MessageBlip") << "Kill blip for local " << local_id << " at " << objectp->getPositionAgent() << LL_ENDL;
             }
+
+            // A prim deleted from here: its scripts' links to files go
+            // with it (QK3); gone any other way, they stay.
+            ALScriptDiskMasters::killed(*objectp);
 
             // Do the kill
             gObjectList.killObject(objectp);
@@ -4306,6 +4341,11 @@ void process_sim_stats(LLMessageSystem *msg, void **user_data)
         if (measurementp )
         {
             measurementp->sample(stat_value);
+            if (stat_id == LL_SIM_STAT_FPS)
+            {
+                // let GameControlData's outgoing throttle track the sim's actual rate
+                LLGameControl::setServerFrameRate(stat_value);
+            }
         }
         else
         {
@@ -4618,6 +4658,10 @@ void process_clear_follow_cam_properties(LLMessageSystem *mesgsys, void **user_d
     mesgsys->getUUIDFast(_PREHASH_ObjectData, _PREHASH_ObjectID, source_id);
 
     LLFollowCamMgr::getInstance()->removeFollowCamParams(source_id);
+    if (!LLFollowCamMgr::getInstance()->getActiveFollowCamParams())
+    {
+        gAgentCamera.notifyFollowCamParamsCleared();
+    }
 }
 
 void process_set_follow_cam_properties(LLMessageSystem *mesgsys, void **user_data)
@@ -4687,6 +4731,10 @@ void process_set_follow_cam_properties(LLMessageSystem *mesgsys, void **user_dat
         case FOLLOWCAM_ACTIVE:
             //if 1, set using followcam,.
             LLFollowCamMgr::getInstance()->setCameraActive(source_id, value != 0.f);
+            if (value == 0.f && !LLFollowCamMgr::getInstance()->getActiveFollowCamParams())
+            {
+                gAgentCamera.notifyFollowCamParamsCleared();
+            }
             break;
         case FOLLOWCAM_POSITION_X:
             settingPosition = true;
@@ -6610,7 +6658,7 @@ void process_teleport_local(LLMessageSystem *msg,void**)
     gAgent.setPositionAgent(pos);
     gAgentCamera.slamLookAt(look_at);
 
-    if ( !(gAgent.getTeleportKeepsLookAt() && LLViewerJoystick::getInstance()->getOverrideCamera()) )
+    if ( !(gAgent.getTeleportKeepsLookAt() && gAgent.isCameraExternallyDriven()) )
     {
         gAgentCamera.resetView(true, true);
     }

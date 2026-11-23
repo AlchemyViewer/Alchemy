@@ -1459,7 +1459,7 @@ U32 LLViewerObject::processUpdateMessage(LLMessageSystem *mesgsys,
                     setAcceleration(motion.mAcceleration);
                     new_rot = motion.mRotation;
                     new_angv = motion.mAngularVelocity;
-                    if (new_angv.isExactlyZero())
+                    if (ALObjectUpdate::resetsSpin(new_angv, stale_update))
                     {
                         // reset rotation time
                         resetRot();
@@ -4794,7 +4794,7 @@ const LLVector3 LLViewerObject::getRenderPosition() const
         }
     }
 
-    if (mDrawable.isNull() || mDrawable->getGeneration() < 0)
+    if (mDrawable.isNull())
     {
         return getPositionAgent();
     }
@@ -5247,8 +5247,9 @@ void LLViewerObject::setNumTEs(const U8 num_tes)
         {
             // The faces gained took their values from the texture entry last
             // unpacked. Each takes the render material the parameter block
-            // names for it, and the override the region holds for it, rather
-            // than the last face's.
+            // gives it and the override the region's record gives it: the
+            // face's own, or, past the faces the region counts, the last
+            // counted face's (getRegionFaceCount).
             if (original_tes < getNumTEs())
             {
                 for (int i = original_tes; i < getNumTEs(); ++i)
@@ -5950,6 +5951,9 @@ void LLViewerObject::onRenderMaterialFetched(U8 te)
         return;
     }
 
+    // The face could take no override while its material fetched: it takes the region's now, or lets go of one the
+    // region has since removed, before its render material is built from it.
+    gGLTFMaterialList.applyQueuedOverrides(this, te);
     initRenderMaterial(te);
     // The material named no bake when the face took it and has filled in its textures since, so
     // initRenderMaterial saw none of them change: look from nothing
@@ -7802,12 +7806,38 @@ void LLViewerObject::setHasRenderMaterialParams(bool has_materials)
     }
 }
 
+U8 LLViewerObject::getRegionFaceCount() const
+{
+    // The shape stands in for a mesh until its asset loads, and its faces are the ones the region counts. The asset
+    // can have more: the uploader splits a material too large for 16-bit indices into faces of its own.
+    const LLVolume* volume = getVolume();
+    if (volume && volume->getParams().isMeshSculpt())
+    {
+        return (U8)llmin(volume->getProfile().mFaces.size(), (size_t)U8_MAX);
+    }
+    return getNumTEs();
+}
+
+std::pair<S32, S32> LLViewerObject::getFaceGroup(S32 te) const
+{
+    return LLPrimitive::faceGroup(te, getNumTEs(), getRegionFaceCount());
+}
+
+void LLViewerObject::setTESelected(const U8 te, bool sel)
+{
+    const auto [first, last] = getFaceGroup(te);
+    for (S32 face = first; face < last; ++face)
+    {
+        LLPrimitive::setTESelected((U8)face, sel);
+    }
+}
+
 const LLUUID& LLViewerObject::getRenderMaterialID(U8 te) const
 {
     const LLRenderMaterialParams* param_block = getRenderMaterialParams();
     if (param_block)
     {
-        return param_block->getMaterial(te);
+        return param_block->getMaterialFor(te, getRegionFaceCount());
     }
 
     return LLUUID::null;
@@ -7849,14 +7879,23 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     if (!param_block && id.notNull())
     { // block doesn't exist, but it will need to
         param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;
-    }
 
+        // A block out of use names no material for any face (getRenderMaterialParams), so the next rebuild takes the
+        // material off the face again (updateTEMaterialTextures). A region's echo of the change puts the block in use;
+        // a client-only object has no region to echo it, so it is put in use here, before any face's id is written.
+        if (isLocalOnly())
+        {
+            setHasRenderMaterialParams(true);
+        }
+    }
 
     LLFetchedGLTFMaterial* new_material = nullptr;
     if (id.notNull())
     {
         new_material = gGLTFMaterialList.getMaterial(id);
     }
+
+    const U8 region_faces = getRegionFaceCount();
 
     // update local state
     for (S32 te = start_idx; te < end_idx; ++te)
@@ -7870,7 +7909,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
         // checked for equality on unpacking. In that case, checking the
         // material ID for inequality won't work, because the material ID has
         // already been set.
-        bool material_changed = !local_origin || !param_block || id != param_block->getMaterial(te);
+        bool material_changed = !local_origin || !param_block || id != param_block->getMaterialFor(te, region_faces);
 
         if (update_server)
         {
@@ -7905,7 +7944,7 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
             // Also, sometimes, the material has baked textures, which requires
             // a copy unique to this object.
             // Currently, we do not deduplicate render materials.
-            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching()]()
+            new_material->onMaterialComplete([obj_id = getID(), te, fetching = new_material->isFetching(), local_origin]()
             {
                 LLViewerObject* obj = gObjectList.findObject(obj_id);
                 if (!obj) { return; }
@@ -7915,6 +7954,12 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
                 }
                 else
                 {
+                    // A material the region gave the face takes the override the region gave it, which may have come
+                    // before the material and found the face with none to take it on.
+                    if (!local_origin)
+                    {
+                        gGLTFMaterialList.applyQueuedOverrides(obj, te);
+                    }
                     obj->initRenderMaterial(te);
                 }
             });
@@ -7943,11 +7988,45 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     { // update existing parameter block
         for (S32 te = start_idx; te < end_idx; ++te)
         {
-            // Only where the block names another material: a face given no
-            // material where it names none takes no entry for it.
-            if (param_block->getMaterial(te) != id)
+            // Only where the block gives the face another material: a face
+            // given no material where it names none takes no entry for it,
+            // nor one past the faces the region counts given the last
+            // counted face's.
+            if (param_block->getMaterialFor(te, region_faces) != id)
             {
                 param_block->setMaterial(te, id);
+            }
+        }
+
+        // A face past the faces the region counts, which the block names no
+        // material for, takes the last counted face's: it follows that face
+        // here, since the region's echo of the change is the block as it now
+        // stands and applies nothing. An edit of the viewer's own clears the
+        // override it takes from that face but the transforms, as the edited
+        // face's, and holds the region's override for it until the answer, as
+        // queueApply holds the edited face's, so that the reconcile the follow
+        // brings does not put back what the edit cleared. One the region sent
+        // an override for itself keeps it.
+        if (region_faces > 0 && start_idx < region_faces && region_faces <= end_idx)
+        {
+            LLViewerRegion* regionp = update_server && !isLocalOnly() ? getRegion() : nullptr;
+            for (S32 te = llmax(end_idx, (S32)region_faces); te < (S32)getNumTEs(); ++te)
+            {
+                if (param_block->getMaterial(te).notNull())
+                {
+                    continue;
+                }
+                LLTextureEntry* follower = getTE(te);
+                const bool inherits = update_server && !(regionp && regionp->namesGLTFOverride(getLocalID(), te));
+                if (inherits && regionp)
+                {
+                    regionp->holdGLTFOverride(getLocalID(), te);
+                }
+                const bool reset = inherits && follower->setBaseMaterial();
+                if (reset || follower->getGLTFMaterial() != new_material)
+                {
+                    setRenderMaterialID(te, id, false, false);
+                }
             }
         }
     }
@@ -7982,9 +8061,10 @@ void LLViewerObject::setRenderMaterialIDs(const LLRenderMaterialParams* material
 {
     if (!local_origin)
     {
+        const U8 region_faces = getRegionFaceCount();
         for (S32 te = 0; te < getNumTEs(); ++te)
         {
-            const LLUUID& id = material_params ? material_params->getMaterial(te) : LLUUID::null;
+            const LLUUID& id = material_params ? material_params->getMaterialFor((U8)te, region_faces) : LLUUID::null;
             // We know material_params has updated or been created, because
             // extra params are checked for equality on unpacking.
             setRenderMaterialID(te, id, false, false);
@@ -8183,4 +8263,3 @@ public:
 
 LLHTTPRegistration<ObjectPhysicsProperties>
     gHTTPRegistrationObjectPhysicsProperties("/message/ObjectPhysicsProperties");
-

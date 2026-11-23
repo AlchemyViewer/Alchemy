@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="gesture_context">
+	<menu_item_call name="share" label="Partager"/>
+	<menu_item_call name="open" label="Ouvrir"/>
+	<menu_item_call name="reveal" label="Afficher l'article d'inventaire"/>
+	<menu_item_call name="rename" label="Renommer"/>
+	<menu_item_call name="copy_gesture" label="Copier"/>
+	<menu_item_call name="paste" label="Coller"/>
+	<menu_item_call name="copy_uuid" label="Copier l'UUID"/>
+	<menu_item_call name="play" label="Lire"/>
+	<menu_item_call name="activate" label="Activer"/>
+	<menu_item_call name="save_to_outfit" label="Enregistrer dans la tenue actuelle"/>
+	<menu_item_call name="delete" label="Supprimer"/>
+</context_menu>

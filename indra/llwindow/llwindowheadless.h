@@ -46,32 +46,26 @@ public:
     /*virtual*/ void show() override { mVisible = true; }
     /*virtual*/ void hide() override { mVisible = false; }
     /*virtual*/ void close() override { mVisible = false; }
-    /*virtual*/ bool getVisible() override { return mVisible; }
-    /*virtual*/ bool getMinimized() override { return mMinimized; }
-    /*virtual*/ bool getMaximized() override { return mMaximized; }
+    /*virtual*/ bool getVisible() const override { return mVisible; }
+    /*virtual*/ bool getMinimized() const override { return mMinimized; }
+    /*virtual*/ bool getMaximized() const override { return mMaximized; }
     /*virtual*/ bool maximize() override { mMaximized = true; return true; }
     /*virtual*/ void minimize() override { mMinimized = true; }
     /*virtual*/ void restore() override { mMinimized = false; mMaximized = false; }
-    // TODO: LLWindow::getFullscreen() is (intentionally?) NOT virtual.
-    // Apparently the coder of LLWindowHeadless didn't realize that. Is it a
-    // mistake to shadow the base-class method with an LLWindowHeadless
-    // override when called on the subclass, yet call the base-class method
-    // when indirecting through a polymorphic pointer or reference?
-    bool getFullscreen() {return false;}
-    /*virtual*/ bool getPosition(LLCoordScreen *position) override
+    /*virtual*/ bool getPosition(LLCoordScreen *position) const override
     {
         if (!position) return false;
         *position = mPosition;
         return true;
     }
-    /*virtual*/ bool getSize(LLCoordScreen *size) override
+    /*virtual*/ bool getSize(LLCoordScreen *size) const override
     {
         if (!size) return false;
         size->mX = mSize.mX;
         size->mY = mSize.mY;
         return true;
     }
-    /*virtual*/ bool getSize(LLCoordWindow *size) override
+    /*virtual*/ bool getSize(LLCoordWindow *size) const override
     {
         if (!size) return false;
         *size = mSize;
@@ -148,13 +142,13 @@ public:
     /*virtual*/ bool pasteTextFromClipboard(std::string &dst) override {return false; }
     /*virtual*/ bool copyTextToClipboard(const std::string &src) override {return false; }
     /*virtual*/ void flashIcon(F32 seconds) override {}
-    /*virtual*/ F32 getGamma() override {return 1.0f; }
+    /*virtual*/ F32 getGamma() const override {return 1.0f; }
     /*virtual*/ bool setGamma(const F32 gamma) override {return false; } // Set the gamma
     /*virtual*/ void setFSAASamples(const U32 fsaa_samples) override { mFSAASamples = fsaa_samples; }
-    /*virtual*/ U32 getFSAASamples() override { return mFSAASamples; }
+    /*virtual*/ U32 getFSAASamples() const override { return mFSAASamples; }
     /*virtual*/ bool restoreGamma() override {return false; }   // Restore original gamma table (before updating gamma)
     //virtual ESwapMethod getSwapMethod() override { return mSwapMethod; }
-    /*virtual*/ void gatherInput() override {}
+    /*virtual*/ void gatherInput(bool app_has_focus) override {}
     /*virtual*/ void delayInputProcessing() override {}
     /*virtual*/ void swapBuffers() override;
 
@@ -164,42 +158,42 @@ public:
     // virtual "window" fills the virtual "screen"). Window↔GL is the
     // standard Y-flip on a [0, height-1] range, matching what the real
     // Win32 and SDL3 backends do.
-    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordWindow *to) override
+    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordWindow *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
         to->mY = from.mY;
         return true;
     }
-    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordScreen *to) override
+    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordScreen *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
         to->mY = from.mY;
         return true;
     }
-    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordGL *to) override
+    /*virtual*/ bool convertCoords(LLCoordWindow from, LLCoordGL *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
         to->mY = mSize.mY - from.mY - 1;
         return true;
     }
-    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordWindow *to) override
+    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordWindow *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
         to->mY = mSize.mY - from.mY - 1;
         return true;
     }
-    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordGL *to) override
+    /*virtual*/ bool convertCoords(LLCoordScreen from, LLCoordGL *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
         to->mY = mSize.mY - from.mY - 1;
         return true;
     }
-    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordScreen *to) override
+    /*virtual*/ bool convertCoords(LLCoordGL from, LLCoordScreen *to) const override
     {
         if (!to) return false;
         to->mX = from.mX;
@@ -215,7 +209,7 @@ public:
     /*virtual*/ F32 getPixelAspectRatio() override { return 1.0f; }
     /*virtual*/ void setNativeAspectRatio(F32 ratio) override {}
 
-    /*virtual*/ void *getPlatformWindow() override { return 0; }
+    /*virtual*/ void *getPlatformWindow() const override { return 0; }
     /*virtual*/ void bringToFront() override {}
 
     LLWindowHeadless(LLWindowCallbacks* callbacks,

@@ -869,6 +869,33 @@ void LLSD::clear()
     mType = TypeUndefined;
 }
 
+bool LLSD::isEmpty() const
+{
+    switch (type())
+    {
+    case TypeUndefined:
+        return true; // Always empty
+    case TypeBoolean:
+        return !asBoolean(); // Empty when default
+    case TypeBinary:
+        return asBinary().empty(); // Empty natively
+    case TypeInteger:
+        return !asInteger(); // Empty when default
+    case TypeReal:
+        return !asReal(); // Empty when default
+    case TypeString:
+    case TypeURI:
+        return asString().empty(); // Empty natively
+    case TypeArray:
+    case TypeMap:
+        return !size(); // Empty natively
+    default:;
+    }
+    // All other value types (TypeDate) don't have default values so can't be empty
+    return false;
+}
+
+
 // Scalar Constructors
 LLSD::LLSD(Boolean v) : mType(TypeBoolean)  { mData.b = v; ALLOC_LLSD_OBJECT; }
 LLSD::LLSD(Integer v) : mType(TypeInteger)  { mData.i = v; ALLOC_LLSD_OBJECT; }

@@ -49,6 +49,10 @@ public:
     S32 getAttachmentLimit() const;
     S32 getCreateGroupCost() const;
     S32 getGroupMembershipLimit() const;
+    // Whether an agent in group_count groups has room for one more. A group the agent is in already takes no new
+    // room, as when an invitation changes the agent's role in it. Benefits that set no limit, as none read from the
+    // login leave them, have room for any number.
+    bool hasRoomForGroup(size_t group_count, bool already_member = false) const;
     S32 getPicksLimit() const;
     S32 getSoundUploadCost() const;
     S32 getTextureUploadCost() const;

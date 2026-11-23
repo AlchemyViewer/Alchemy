@@ -364,6 +364,19 @@ void LLImageJ2C::setReversible(const bool reversible)
     mReversible = reversible;
 }
 
+bool LLImageJ2C::scaleForEncode(LLImageRaw& raw_image, S32 new_width, S32 new_height)
+{
+    if (raw_image.getWidth() == new_width && raw_image.getHeight() == new_height)
+    {
+        return true;
+    }
+    if (mImpl && mImpl->resizeImpl(*this, raw_image, new_width, new_height))
+    {
+        return true;
+    }
+    return raw_image.scale(new_width, new_height);
+}
+
 
 bool LLImageJ2C::loadAndValidate(const std::string &filename)
 {

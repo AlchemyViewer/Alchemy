@@ -273,6 +273,25 @@ foreach(tier baseline v2 v3 v4)
   )
 endforeach()
 
+# MSVC 19.52 for x64, under /arch:AVX2, tests 16 bytes against zero with an
+# aligned load (vmovaps) of memory that need not be aligned, which faults when
+# it is not: a defaulted operator== comparing a struct of U32s with T{} is
+# enough. The late pattern pass on lowered code makes the load out of a vpxor
+# that reads memory, which has no alignment requirement; turning that pass off
+# leaves the vpxor. LTCG takes the option from the compile. The ports get the
+# same option from the triplets.
+if(
+  COMPILER_IS_MSVC
+  AND BUILD_TARGET_IS_X86_64
+  AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 19.52
+  AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.53
+)
+  target_compile_options(
+    al_flags
+    INTERFACE $<$<CONFIG:${AL_OPTIMIZED_CONFIGS}>:/d2pattern-opt-lowered-post-color->
+  )
+endif()
+
 # Hardening, in the optimised configurations: a stack canary in every
 # function with a local array or an address-taken local; probes that keep a
 # large stack allocation from stepping over the guard page; and each

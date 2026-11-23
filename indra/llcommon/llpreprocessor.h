@@ -190,11 +190,4 @@
 #   define LL_UBSAN_SUPRESS_VPTR
 #endif
 
-#if LL_ARM64
-#define KDU_NEON_INTRINSICS 1
-#else
-#define KDU_X86_INTRINSICS 1
-
-#endif
-
 #endif  //  not LL_LINDEN_PREPROCESSOR_H

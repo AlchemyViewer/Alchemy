@@ -166,7 +166,9 @@ namespace
         tags.emplace_back("ref", ALFeedback::reference(event_id));
         tags.emplace_back("gpu_vendor", gGLManager.mGLVendorShort);
         tags.emplace_back("render_quality", std::to_string(gSavedSettings.getU32("RenderQualityPerformance")));
-        tags.emplace_back("crash_reports", ALCrashReporter::isEngaged() ? "on" : "off");
+        tags.emplace_back("crash_reports", ALCrashReporter::isSending()   ? "on"
+                                           : ALCrashReporter::isEngaged() ? "kept"
+                                                                          : "off");
         if (!report.linked.empty())
         {
             tags.emplace_back("linked", report.linked);

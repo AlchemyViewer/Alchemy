@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu layout="topleft" name="gesture_context">
+    <menu_item_call name="share" label="Share">
+        <on_click function="Gesture.Action.Share" />
+        <on_enable function="Gesture.EnableAction" parameter="share" />
+    </menu_item_call>
+    <menu_item_call name="open" label="Open">
+        <on_click function="Gesture.Action.ShowPreview" />
+        <on_enable function="Gesture.EnableAction" parameter="edit_gesture" />
+    </menu_item_call>
+    <menu_item_call name="reveal" label="Reveal in Inventory">
+        <on_click function="Gesture.Action.Reveal" />
+        <on_enable function="Gesture.EnableAction" parameter="reveal" />
+    </menu_item_call>
+    <menu_item_separator name="separator_3" />
+    <menu_item_call name="rename" label="Rename">
+        <on_click function="Gesture.Action.Rename" />
+        <on_enable function="Gesture.EnableAction" parameter="rename_gesture" />
+    </menu_item_call>
+    <menu_item_call name="copy_gesture" label="Copy">
+        <on_click function="Gesture.Action.CopyPaste" parameter="copy_gesture" />
+        <on_enable function="Gesture.EnableAction" parameter="copy_gesture" />
+    </menu_item_call>
+    <menu_item_call name="paste" label="Paste">
+        <on_click function="Gesture.Action.CopyPaste" parameter="paste" />
+        <on_enable function="Gesture.EnableAction" parameter="paste" />
+    </menu_item_call>
+    <menu_item_call name="copy_uuid" label="Copy UUID">
+        <on_click function="Gesture.Action.CopyPaste" parameter="copy_uuid" />
+        <on_enable function="Gesture.EnableAction" parameter="copy_uuid" />
+    </menu_item_call>
+    <menu_item_separator name="separator_8" />
+    <menu_item_call name="play" label="Play">
+        <on_click function="Gesture.Action.Play" />
+        <on_enable function="Gesture.EnableAction" parameter="play" />
+    </menu_item_call>
+    <menu_item_call name="activate" label="Activate">
+        <on_click function="Gesture.Action.ToggleActiveState" />
+        <on_enable function="Gesture.EnableAction" parameter="activate" />
+    </menu_item_call>
+    <menu_item_call name="save_to_outfit" label="Save to Current Outfit">
+        <on_click function="Gesture.Action.SaveToCOF" />
+        <on_enable function="Gesture.EnableAction" parameter="save_to_outfit" />
+    </menu_item_call>
+    <menu_item_separator name="separator_12" />
+    <menu_item_call name="delete" label="Delete">
+        <on_click function="Gesture.Action.Delete" />
+        <on_enable function="Gesture.EnableAction" parameter="delete" />
+    </menu_item_call>
+</context_menu>

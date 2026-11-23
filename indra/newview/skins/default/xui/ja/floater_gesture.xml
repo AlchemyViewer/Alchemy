@@ -9,10 +9,23 @@
 	<floater.string name="copy_name">
 		[COPY_NAME]のコピー
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]秒</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]分</floater.string>
+	<floater.string name="last_used_hours">[COUNT]時間</floater.string>
+	<floater.string name="last_used_days">[COUNT]日</floater.string>
+	<floater.string name="no_gestures">ジェスチャーがありません</floater.string>
+	<floater.string name="no_matching_gestures">一致するジェスチャーがありません</floater.string>
+	<floater.string name="menu_activate">有効化</floater.string>
+	<floater.string name="menu_deactivate">無効化</floater.string>
+	<floater.string name="menu_play">再生</floater.string>
+	<floater.string name="menu_stop">停止</floater.string>
+	<filter_editor label="名前、チャット、キーで絞り込み" name="gesture_filter" tool_tip="名前、チャットのトリガー、ショートカットキーでジェスチャーを絞り込みます"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="名前" name="name"/>
 		<scroll_list.columns label="チャット" name="trigger"/>
 		<scroll_list.columns label="キー" name="shortcut"/>
+		<scroll_list.columns label="最終" name="last_used" tool_tip="このセッションで最後に使用してからの経過時間です。最近使用した1,024件のジェスチャーを記憶します。クリックして並べ替えます。"/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="詳細オプションを表示します。"/>
@@ -20,7 +33,7 @@
 		<button name="activate_btn" tool_tip="選択したジェスチャーの有効化／無効化します。"/>
 		<button name="del_btn" tool_tip="このジェスチャーを削除します。"/>
 	</panel>
-	<button label="編集" name="edit_btn" tool_tip="選択したジェスチャーの編集ウィンドウを開きます。"/>
+	<button label="開く" name="edit_btn" tool_tip="選択したジェスチャーの編集ウィンドウを開きます。"/>
 	<button label="再生" name="play_btn" tool_tip="インワールドで選択したジェスチャーを実行します。"/>
 	<button label="停止" name="stop_btn"/>
 </floater>

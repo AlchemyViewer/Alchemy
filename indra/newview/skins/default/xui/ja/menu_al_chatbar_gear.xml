@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_chatbar_gear">
+	<menu_item_check name="CloseChatBarOnReturn" label="Enterでチャットバーを閉じる"/>
+	<menu_item_check name="LetterKeysFocusChatBar" label="文字キーでチャットを開く"/>
+	<menu_item_check name="EnableMUPoseChat" label="「:」を「/me」と同じ意味で使う"/>
+	<menu_item_check name="EnableAutoCloseOOC" label="((OOC))の括弧を自動で閉じる"/>
+	<menu_item_call name="shout" label="叫ぶ（Ctrl）"/>
+	<menu_item_call name="whisper" label="ささやく（Ctrl+Shift）"/>
+</toggleable_menu>

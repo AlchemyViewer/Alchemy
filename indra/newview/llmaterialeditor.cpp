@@ -2008,13 +2008,13 @@ static void pack_textures(
     if (normal_img)
     {
         // create a losslessly compressed version of the normal map
-        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, 2048, false, true);
+        normal_j2c = LLViewerTextureList::convertToUploadFile(normal_img, EJ2CContent::Normal, 2048, false, true);
         LL_DEBUGS("MaterialEditor") << "Normal: " << normal_j2c->getDataSize() << LL_ENDL;
     }
 
     if (mr_img)
     {
-        mr_j2c = LLViewerTextureList::convertToUploadFile(mr_img);
+        mr_j2c = LLViewerTextureList::convertToUploadFile(mr_img, EJ2CContent::Data);
         LL_DEBUGS("MaterialEditor") << "Metallic/Roughness: " << mr_j2c->getDataSize() << LL_ENDL;
     }
 
@@ -2963,38 +2963,39 @@ void LLMaterialEditor::setFromGltfMetaData(const std::string& filename, const ti
         // note: unlike the other textures, base color doesn't have its own entry
         // in the tinyGLTF Material struct. Rather, it is taken from a
         // sub-texture in the pbrMetallicRoughness member
-        int index = first_material.pbrMetallicRoughness.baseColorTexture.index;
-        if (index > -1 && index < model.images.size())
+        // a material refers to textures, and each texture to its image by its source
+        const tinygltf::Image* image = LLTinyGLTFHelper::getImageFromTextureIndex(model, first_material.pbrMetallicRoughness.baseColorTexture.index);
+        if (image)
         {
             // sanitize the name we decide to use for each texture
-            std::string texture_name = getImageNameFromUri(model.images[index].uri, MATERIAL_BASE_COLOR_DEFAULT_NAME);
+            std::string texture_name = getImageNameFromUri(image->uri, MATERIAL_BASE_COLOR_DEFAULT_NAME);
             LLInventoryObject::correctInventoryName(texture_name);
             mBaseColorName = texture_name;
         }
 
         mEmissiveName = MATERIAL_EMISSIVE_DEFAULT_NAME;
-        index = first_material.emissiveTexture.index;
-        if (index > -1 && index < model.images.size())
+        image = LLTinyGLTFHelper::getImageFromTextureIndex(model, first_material.emissiveTexture.index);
+        if (image)
         {
-            std::string texture_name = getImageNameFromUri(model.images[index].uri, MATERIAL_EMISSIVE_DEFAULT_NAME);
+            std::string texture_name = getImageNameFromUri(image->uri, MATERIAL_EMISSIVE_DEFAULT_NAME);
             LLInventoryObject::correctInventoryName(texture_name);
             mEmissiveName = texture_name;
         }
 
         mMetallicRoughnessName = MATERIAL_METALLIC_DEFAULT_NAME;
-        index = first_material.pbrMetallicRoughness.metallicRoughnessTexture.index;
-        if (index > -1 && index < model.images.size())
+        image = LLTinyGLTFHelper::getImageFromTextureIndex(model, first_material.pbrMetallicRoughness.metallicRoughnessTexture.index);
+        if (image)
         {
-            std::string texture_name = getImageNameFromUri(model.images[index].uri, MATERIAL_METALLIC_DEFAULT_NAME);
+            std::string texture_name = getImageNameFromUri(image->uri, MATERIAL_METALLIC_DEFAULT_NAME);
             LLInventoryObject::correctInventoryName(texture_name);
             mMetallicRoughnessName = texture_name;
         }
 
         mNormalName = MATERIAL_NORMAL_DEFAULT_NAME;
-        index = first_material.normalTexture.index;
-        if (index > -1 && index < model.images.size())
+        image = LLTinyGLTFHelper::getImageFromTextureIndex(model, first_material.normalTexture.index);
+        if (image)
         {
-            std::string texture_name = getImageNameFromUri(model.images[index].uri, MATERIAL_NORMAL_DEFAULT_NAME);
+            std::string texture_name = getImageNameFromUri(image->uri, MATERIAL_NORMAL_DEFAULT_NAME);
             LLInventoryObject::correctInventoryName(texture_name);
             mNormalName = texture_name;
         }

@@ -534,9 +534,13 @@ void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str,
 
     std::string::size_type lenMsg = utf8str.length(), lenIt = 0;
 
-    const char* pstrIt = utf8str.data(); std::string strTemp;
+    std::string strTemp;
     while (lenIt < lenMsg)
     {
+        // The window starts where this piece does, past the separator the
+        // last piece stopped at, so that separator is neither the first byte
+        // searched nor the last byte taken.
+        const char* pstrIt = utf8str.data() + lenIt;
         if (lenIt + maxlen < lenMsg)
         {
             // Find the last split character
@@ -570,11 +574,10 @@ void utf8str_split(std::list<std::string>& split_list, std::string_view utf8str,
         split_list.push_back(strTemp);
 
         lenIt += strTemp.length();
-        pstrIt = utf8str.data() + lenIt;
         // A view carries no terminator, so the end has to be checked before
         // the byte is read. c_str() used to make the one-past-the-end read
         // land on the NUL.
-        if (lenIt < lenMsg && *pstrIt == split_token)
+        if (lenIt < lenMsg && utf8str[lenIt] == split_token)
             lenIt++;
     }
 }
@@ -2212,10 +2215,77 @@ bool LLStringOps::isPunctAboveAscii(llwchar elem)
 
 namespace
 {
-    // Root-locale collation, so a list sorts the same way for everyone. What
-    // this replaces did not: wcscmp on Windows is codepoint order, in which
-    // every accented letter sorts past z, while wcscoll elsewhere follows
-    // whatever locale the process happens to be in.
+    // Root-locale collation, so a list sorts the same way for everyone, with
+    // ASCII's punctuation and symbols in ASCII order: space through '/' before
+    // the digits, ':' through '`' between the digits and the letters, and
+    // '{' through '~' after the letters. Names in an inventory carry a leading
+    // "!", "~", "[" or "::" to place them, and Second Life's viewers place
+    // them by that order. Root collation puts every mark before every digit,
+    // hyphen first and '!' after ':', which scatters them.
+    //
+    // Everything else keeps its root order. Spaces, symbols, currency signs
+    // and punctuation beyond ASCII come before ASCII space, as they do in
+    // those viewers; letters sort as root collation has them, an accented
+    // letter beside the letter it decorates. '≮', '≠' and '≯' are '<', '='
+    // and '>' with a slash laid over them, which root collation sorts beside
+    // those marks; they keep their root place among the symbols, between '×'
+    // and '¬', rather than follow the marks past the digits. The Greek question
+    // mark (U+037E) and varia (U+1FEF) are ';' and '`' by canonical
+    // equivalence, and sort as those marks.
+    //
+    // The first run is anchored at the end of the punctuation group rather
+    // than just before '0': numeric collation gives a run of digits primaries
+    // of its own, below every digit's root primary, so a weight just under
+    // '0' would sort after every number.
+    constexpr UChar ascii_order_rules[] =
+        u"[reorder space symbol currency punct digit]"
+        u"&[last variable]"
+        u" < ' ' < '!' < '\"' < '#' < '$' < '%' < '&' < '' < '(' < ')' < '*' < '+' < ',' < '-' < '.' < '/'"
+        u"&[before 1]a"
+        u" < ':' < ';' < '<' < '=' < '>' < '?' < '@' < '[' < '\\' < ']' < '^' < '_' < '`'"
+        u"&z"
+        u" < '{' < '|' < '}' < '~'"
+        u"&× < ≮ < ≠ < ≯";
+
+    // Built once; each thread clones it.
+    const UCollator* ascii_order_collator()
+    {
+        struct Tailoring
+        {
+            UCollator* coll = nullptr;
+
+            Tailoring()
+            {
+                UErrorCode status = U_ZERO_ERROR;
+                UParseError parse_error {};
+                coll = ucol_openRules(ascii_order_rules, -1, UCOL_DEFAULT, UCOL_DEFAULT_STRENGTH,
+                                      &parse_error, &status);
+                if (U_FAILURE(status))
+                {
+                    LL_WARNS("Unicode") << "ICU rejected the collation rules at offset "
+                                        << parse_error.offset << ": " << u_errorName(status) << LL_ENDL;
+                    if (coll)
+                    {
+                        ucol_close(coll);
+                    }
+                    coll = nullptr;
+                }
+            }
+            Tailoring(const Tailoring&) = delete;
+            Tailoring& operator=(const Tailoring&) = delete;
+            ~Tailoring()
+            {
+                if (coll)
+                {
+                    ucol_close(coll);
+                }
+            }
+        };
+
+        static const Tailoring tailoring;
+        return tailoring.coll;
+    }
+
     enum class CollatorKind
     {
         Plain,                // Unicode default order
@@ -2250,8 +2320,13 @@ namespace
         UCollator*& slot = holder.colls[(size_t)kind];
         if (!slot)
         {
+            const UCollator* tailoring = ascii_order_collator();
+            if (!tailoring)
+            {
+                return nullptr;
+            }
             UErrorCode status = U_ZERO_ERROR;
-            UCollator* coll = ucol_open("", &status);
+            UCollator* coll = ucol_clone(tailoring, &status);
             if (U_SUCCESS(status))
             {
                 // Uppercase before lowercase, which is the order the viewer's

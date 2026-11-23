@@ -52,6 +52,12 @@ bool get_is_item_worn(const LLViewerInventoryItem* item);
 // Could this item be worn (correct type + not already being worn)
 bool get_can_item_be_worn(const LLUUID& id);
 
+// Whether wearing an item by opening it (double-click, Enter) replaces what is
+// worn at its attachment point or layer, as InventoryAddAttachmentBehavior
+// chooses. Body parts, and clothing of a type worn one layer at a time, replace
+// whatever it chooses.
+bool get_open_item_replaces_worn(const LLViewerInventoryItem* item);
+
 bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool check_worn);
 
 // Performs the appropiate edit action (if one exists) for this item
@@ -62,6 +68,12 @@ bool get_is_category_removable(const LLInventoryModel* model, const LLUUID& id);
 bool get_is_category_and_children_removable(LLInventoryModel* model, const LLUUID& folder_id, bool check_worn);
 
 bool get_is_category_renameable(const LLInventoryModel* model, const LLUUID& id);
+bool get_is_item_renameable(const LLInventoryModel* model, const LLUUID& id);
+
+class LLViewerObject;
+// An item inside an object's contents, with the object's own permission checks.
+bool get_is_task_item_renameable(LLViewerObject* object, const LLUUID& item_id);
+void rename_task_item(LLViewerObject* object, const LLUUID& item_id, const std::string& new_name);
 
 void show_item_profile(const LLUUID& item_uuid);
 void show_task_item_profile(const LLUUID& item_uuid, const LLUUID& object_id);

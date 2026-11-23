@@ -2083,6 +2083,29 @@ Replace [PLACES] in [SCRIPTS] with &quot;[WITH]&quot;? You can undo each one's c
 
   <notification
    icon="alertmodal.tga"
+   name="BulkRenameConfirm"
+   type="alertmodal">
+You are about to rename [COUNT] items. Continue?
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Rename"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="BulkRenameTooMany"
+   type="alertmodal">
+You cannot rename more than [MAX] items at once. You selected [COUNT].
+    <tag>fail</tag>
+    <usetemplate
+     name="okbutton"
+     yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
    name="ScriptStudioFixAll"
    type="alertmodal">
 Apply [FIXES] in &quot;[NAME]&quot;, one per problem, such as &quot;[EXAMPLE]&quot;? You can undo them in one step, or preview them first.[LEFT]
@@ -2186,6 +2209,18 @@ Stop [COUNT] scripts? They stay stopped until you start them again.
      name="yesnocancelbuttons"
      notext="Discard Changes"
      yestext="Write to File"/>
+  </notification>
+
+  <notification
+   icon="alertmodal.tga"
+   name="ScriptStudioTakeWorldUnsaved"
+   type="alertmodal">
+[FILE] has changes that are not saved. Update File writes what &quot;[NAME]&quot; holds in-world to the file, replacing everything in it. Undo in the file's tab brings your changes back, unsaved.
+    <tag>confirm</tag>
+    <usetemplate
+     name="okcancelbuttons"
+     notext="Cancel"
+     yestext="Update File"/>
   </notification>
 
   <notification
@@ -12907,13 +12942,20 @@ Changes won't take effect until after you restart [APP_NAME].
    icon="alertmodal.tga"
    name="PreferenceChatDeleteTranscripts"
    type="alertmodal">
-    This will delete the transcripts for all previous conversations. The list of past conversations will not be affected. All files with the suffixes .txt and txt.backup in the folder [FOLDER] will be deleted.
+    This removes local transcript files and downloaded Chat Service history. Remote records are retained, but service rows at or below the recorded deletion boundary remain hidden locally. The list of past conversations is not affected.
     <tag>confirm</tag>
     <usetemplate
      ignoretext="Confirm before I delete transcripts."
      name="okcancelignore"
      notext="Cancel"
      yestext="OK"/>
+  </notification>
+
+  <notification
+   icon="alert.tga"
+   name="ChatServiceHistoryDeleteFailed"
+   type="alert">
+    Some local history could not be deleted safely. History remains hidden until Delete Transcripts succeeds.
   </notification>
 
   <notification
@@ -13820,7 +13862,6 @@ Your privilege to find [NAME]&apos;s map location has been revoked.
   <notification
    icon="notifytip.tga"
    name="AlwaysRunEnabled"
-   persist="true"
    log_to_chat="true"
    type="notifytip">
 Always Run enabled.
@@ -13828,7 +13869,6 @@ Always Run enabled.
   <notification
     icon="notifytip.tga"
     name="AlwaysRunDisabled"
-    persist="true"
     log_to_chat="true"
     type="notifytip">
 Always Run disabled.
@@ -13867,7 +13907,7 @@ Always Run disabled.
   type="alertmodal">
 Send crash reports to the Alchemy developers?
 
-A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Preferences can change the answer later.
+A report carries where the viewer crashed, its log, your settings and your avatar name. It goes to Sentry, where only the Alchemy developers can see it, and never without this permission. Until you answer, reports of crashes stay on this computer: sending sends them too, and not sending deletes them. Preferences can change the answer later.
     <tag>confirm</tag>
     <usetemplate
      name="okcancelbuttons"

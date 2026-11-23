@@ -3,4 +3,36 @@
 	<text name="Camera Presets">
 		カメラのプリセット
 	</text>
+	<text name="camera_offset_lbl">
+		カメラのオフセット：
+	</text>
+	<button name="reset_offset_rear" tool_tip="カメラのオフセットをデフォルト値にリセットします"/>
+	<text name="focus_offset_lbl">
+		焦点のオフセット：
+	</text>
+	<button name="reset_focus_offset" tool_tip="焦点のオフセットをデフォルト値にリセットします"/>
+	<text name="offset_scale_lbl">
+		カメラのオフセットの倍率：
+	</text>
+	<button name="reset_offset_scale" tool_tip="オフセットの倍率をデフォルト値にリセットします"/>
+	<text name="camera_angle_lbl">
+		カメラの角度：
+	</text>
+	<button name="reset_angle" tool_tip="カメラの角度をデフォルト値にリセットします"/>
+	<text name="zoom_speed_lbl">
+		ズームの速さ：
+	</text>
+	<button name="reset_zoom_time" tool_tip="カメラのズームの速さをデフォルト値にリセットします"/>
+	<text name="position_smoothing_lbl">
+		位置の平滑化：
+	</text>
+	<button name="cam_pos_reset" tool_tip="カメラの位置の平滑化をデフォルト値にリセットします"/>
+	<button name="save_cam_pos_btn" tool_tip="現在のカメラの位置と焦点を保存します"/>
+	<button name="restore_cam_pos_btn" tool_tip="保存したカメラの位置と焦点を復元します"/>
+	<panel_camera_item name="front_view" tool_tip="正面"/>
+	<panel_camera_item name="group_view" tool_tip="側面"/>
+	<panel_camera_item name="rear_view" tool_tip="背面"/>
+	<panel_camera_item name="object_view" tool_tip="オブジェクト"/>
+	<panel_camera_item name="mouselook_view" tool_tip="マウスルック"/>
+	<button name="save_preset_btn" label="プリセットとして保存…" tool_tip="現在のカメラ設定をプリセットとして保存します"/>
 </panel>

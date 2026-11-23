@@ -275,7 +275,7 @@ void AISAPI::CopyLibraryCategory(const LLUUID& sourceId, const LLUUID& destId, b
     std::string url = cap + std::string("/category/") + sourceId.asString() + "?tid=" + tid.asString();
     if (!copySubfolders)
     {
-        url += ",depth=0";
+        url += "&depth=0";
     }
     LL_INFOS() << url << LL_ENDL;
 

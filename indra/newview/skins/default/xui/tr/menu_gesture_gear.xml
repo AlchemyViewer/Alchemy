@@ -5,5 +5,5 @@
 	<menu_item_call label="Yapıştır" name="paste"/>
 	<menu_item_call label="UUID&apos;yi Kopyala" name="copy_uuid"/>
 	<menu_item_call label="Mevcut dış görünüme kaydet" name="save_to_outfit"/>
-	<menu_item_call label="Düzenle" name="edit_gesture"/>
+	<menu_item_call label="Aç" name="edit_gesture"/>
 </toggleable_menu>

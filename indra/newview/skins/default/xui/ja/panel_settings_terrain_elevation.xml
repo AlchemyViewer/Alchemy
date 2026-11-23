@@ -3,7 +3,6 @@
 	<spinner label="水面の高さ" name="water_height_spin"/>
 	<spinner label="地形の最大標高" name="terrain_raise_spin"/>
 	<spinner label="地形の最低標高" name="terrain_lower_spin"/>
-	<view_border/>
 	<text name="height_text_lbl5">
 		テクスチャの標高範囲
 	</text>
@@ -42,13 +41,13 @@
 	<text name="height_text_lbl9">
 		南西
 	</text>
-	<!--  southwest low-->
+	<!-- southwest low-->
 	<spinner label="最低" name="height_start_spin_0"/>
-	<!--  southeast low-->
+	<!-- southeast low-->
 	<spinner label="最低" name="height_start_spin_2"/>
-	<!--southwest high-->
+	<!-- southwest high-->
 	<spinner label="最高" name="height_range_spin_0"/>
-	<!--  southeast high-->
+	<!-- southeast high-->
 	<spinner label="最高" name="height_range_spin_2"/>
 	<!-- Terrain Download/Upload/Bake buttons -->
 	<button label="ＲＡＷ地形のダウンロード…" name="download_raw_btn" tool_tip="不動産所有者のみが利用可能であり、マネージャーは利用できません。"/>

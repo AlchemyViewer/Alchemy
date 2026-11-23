@@ -34,6 +34,7 @@
 #include "llagent.h"
 #include "llagentwearables.h"
 #include "llcallingcard.h"
+#include "alfloaterbulkrename.h"
 #include "llfloaterreg.h"
 #include "llinventorydefines.h"
 #include "llsdserialize.h"
@@ -75,6 +76,7 @@
 #include "llpreviewsound.h"
 #include "llpreviewtexture.h"
 #include "llresmgr.h"
+#include "roles_constants.h"
 #include "llscrollbar.h"
 #include "llscrollcontainer.h"
 #include "llselectmgr.h"
@@ -745,6 +747,25 @@ bool get_can_item_be_worn(const LLUUID& id)
     return false;
 }
 
+bool get_open_item_replaces_worn(const LLViewerInventoryItem* item)
+{
+    static LLCachedControl<U32> add_behavior(gSavedSettings, "InventoryAddAttachmentBehavior", 0);
+    if (!item || add_behavior() == 1)
+    {
+        return true;
+    }
+
+    switch (item->getType())
+    {
+        case LLAssetType::AT_OBJECT:
+            return false;
+        case LLAssetType::AT_CLOTHING:
+            return !LLWearableType::getAllowMultiwear(item->getWearableType());
+        default:
+            return true;
+    }
+}
+
 bool get_is_item_removable(const LLInventoryModel* model, const LLUUID& id, bool check_worn)
 {
     if (!model)
@@ -971,6 +992,96 @@ bool get_is_category_renameable(const LLInventoryModel* model, const LLUUID& id)
         return true;
     }
     return false;
+}
+
+bool get_is_item_renameable(const LLInventoryModel* model, const LLUUID& id)
+{
+    if (!model)
+    {
+        return false;
+    }
+
+    const LLViewerInventoryItem* item = model->getItem(id);
+    if (!item)
+    {
+        return false;
+    }
+
+    // (For now) Don't allow calling card rename since that may confuse users as to
+    // what the calling card points to.
+    if (item->getInventoryType() == LLInventoryType::IT_CALLINGCARD)
+    {
+        return false;
+    }
+
+    if (!item->isFinished()) // EXT-8662
+    {
+        return false;
+    }
+
+    const LLUUID inbox_id = model->findCategoryUUIDForType(LLFolderType::FT_INBOX);
+    if (inbox_id.notNull() && model->isObjectDescendentOf(id, inbox_id))
+    {
+        return false;
+    }
+
+// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
+    if ( (rlv_handler_t::isEnabled()) && (!RlvFolderLocks::instance().canRenameItem(id)) )
+    {
+        return false;
+    }
+// [/RLVa:KB]
+
+    return item->getPermissions().allowModifyBy(gAgent.getID());
+}
+
+bool get_is_task_item_renameable(LLViewerObject* object, const LLUUID& item_id)
+{
+// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
+    if ( (rlv_handler_t::isEnabled()) && (object) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
+    {
+        return false;
+    }
+// [/RLVa:KB]
+
+    if (gAgent.isGodlike())
+        return true;
+
+    if (object)
+    {
+        if (LLInventoryItem* item = (LLInventoryItem*)(object->getInventoryObject(item_id)))
+        {
+            if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE, GOD_LIKE))
+            {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void rename_task_item(LLViewerObject* object, const LLUUID& item_id, const std::string& new_name)
+{
+// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
+    if ( (rlv_handler_t::isEnabled()) && (object) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
+    {
+        return;
+    }
+
+    if (object)
+// [/RLVa:KB]
+    {
+        if (LLViewerInventoryItem* item = (LLViewerInventoryItem*)object->getInventoryObject(item_id))
+        {
+            if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE, GOD_LIKE))
+            {
+                LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
+                new_item->rename(new_name);
+                object->updateInventory(new_item, TASK_INVENTORY_ITEM_KEY, false);
+            }
+        }
+    }
 }
 
 void show_task_item_profile(const LLUUID& item_uuid, const LLUUID& object_id)
@@ -3382,7 +3493,7 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
     }
 
     // Prompt the user and check for authorization for some marketplace active listing edits
-    if (user_confirm && (("delete" == action) || ("cut" == action) || ("rename" == action) || ("properties" == action) || ("task_properties" == action) || ("open" == action)))
+    if (user_confirm && (("delete" == action) || ("cut" == action) || ("rename" == action) || ("bulk_rename" == action) || ("properties" == action) || ("task_properties" == action) || ("open" == action)))
     {
         std::set<LLFolderViewItem*>::iterator set_iter = selected_items.begin();
         LLFolderViewModelItemInventory * viewModel = NULL;
@@ -3448,6 +3559,20 @@ void LLInventoryAction::doToSelected(LLInventoryModel* model, LLFolderView* root
         root->startRenamingSelectedItem();
         // Update the marketplace listings that have been affected by the operation
         updateMarketplaceFolders();
+        return;
+    }
+
+    if ("bulk_rename" == action)
+    {
+        LLSD ids = LLSD::emptyArray();
+        for (LLFolderViewItem* folder_item : root->getSelectedItems())
+        {
+            if (auto view_model = dynamic_cast<LLFolderViewModelItemInventory*>(folder_item->getViewModelItem()))
+            {
+                ids.append(view_model->getUUID());
+            }
+        }
+        ALFloaterBulkRename::show(LLSD().with("ids", ids));
         return;
     }
 

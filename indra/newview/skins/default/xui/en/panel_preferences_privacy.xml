@@ -10,7 +10,7 @@
     top="1"
     width="517">
 
-  <!-- The full height: the General tab's page only just fits under the tab row. -->
+  <!-- The full height: under the tab row the General tab's page is 414 px tall, and its last row, the block list, ends at 406. -->
   <tab_container
     top_pad="0"
     enabled="true"
@@ -78,7 +78,7 @@
       layout="topleft"
       left="30"
       name="online_visibility"
-      top_pad="15"
+      top_pad="5"
       width="350" />
 
     <check_box

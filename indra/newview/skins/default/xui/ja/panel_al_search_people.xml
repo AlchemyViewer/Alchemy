@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_search_people">
+	<panel.string name="SeachFilteredOnShortWordsEmpty">
+		検索語が短すぎるため、検索は実行されませんでした。
+	</panel.string>
+	<text name="search_title" value="検索語を入力："/>
+	<search_editor name="search_bar" label="検索" tool_tip="検索語を入力してください"/>
+</panel>

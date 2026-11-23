@@ -788,6 +788,49 @@ end</floater.string>
              top_pad="4"
              width="370"
              wrap="true" />
+            <text
+             follows="left|top"
+             font="SansSerifBold"
+             height="16"
+             layout="topleft"
+             left="412"
+             name="definitions_heading"
+             top_pad="12"
+             width="370">
+                Language definitions
+            </text>
+            <line_editor
+             commit_on_focus_lost="true"
+             control_name="ALScriptDefinitionsFolder"
+             follows="left|top"
+             height="22"
+             label="The region's"
+             layout="topleft"
+             left="412"
+             name="definitions_folder"
+             tool_tip="A folder of newer definitions than the region's: each file in it (secondlife.d.luau, secondlife.docs.json, builtins.txt, lsl_keywords.xml, lua_keywords.xml) is read in place of the region's of the same name, for checks, hovers, completions and colours. The region still compiles with its own. Empty: the region's alone."
+             top_pad="4"
+             width="230" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Browse..."
+             layout="topleft"
+             left_pad="6"
+             name="definitions_browse"
+             tool_tip="Choose the folder of definitions"
+             top_delta="0"
+             width="64" />
+            <button
+             follows="left|top"
+             height="22"
+             label="Clear"
+             layout="topleft"
+             left_pad="4"
+             name="definitions_clear"
+             tool_tip="Use the region's definitions alone"
+             top_delta="0"
+             width="64" />
         </panel>
         <panel
          follows="all"
@@ -1804,6 +1847,17 @@ end</floater.string>
              tool_tip="// as --, and /* */ as --[[ ]], each over the global, function, handler or statement it stood over, after it where it was after it on its line, or at the end of what held it; rules of stars or slashes as dashes, and //* ... //*/ as ---[[ ... --]]. Off: the SLua has none of them."
              top_pad="4"
              width="700" />
+            <check_box
+             control_name="ALScriptConvertCommentCode"
+             follows="left|top"
+             height="20"
+             label="Their code as SLua, still commented"
+             layout="topleft"
+             left="32"
+             name="convert_comment_code"
+             tool_tip="//llOwnerSay((string)n); as --print(tostring(n)), where it stood: each comment that, uncommented, parses and changes nothing else the script is written as, with the script's names, types and detected table. A block stays a block, and /* ... //*/ is --[[ ... --]], which one dash turns on. A comment that does not convert cleanly stays as the LSL had it. Off: every comment as the LSL had it."
+             top_pad="4"
+             width="680" />
         </panel>
         <panel
          class="al_panel_script_keymap"

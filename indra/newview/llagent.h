@@ -28,11 +28,14 @@
 #define LL_LLAGENT_H
 
 #include "indra_constants.h"
+#include "almaturitypreference.h"
 #include "llevent.h"                // LLObservable base class
 #include "llagentdata.h"            // gAgentID, gAgentSessionID
 #include "llcharacter.h"
 #include "llcoordframe.h"           // for mFrameAgent
 #include "llavatarappearancedefines.h"
+#include "llgamecontrol.h"
+#include "llkeyboard.h"
 #include "llpermissionsflags.h"
 #include "llevents.h"
 #include "v3dmath.h"
@@ -73,14 +76,15 @@ enum EAnimRequest
     ANIM_REQUEST_STOP
 };
 
+// A field a message about the group leaves out reads as nothing: AgentGroupDataUpdate has no ListInProfile.
 struct LLGroupData
 {
     LLUUID mID;
     LLUUID mInsigniaID;
-    U64 mPowers;
-    bool mAcceptNotices;
-    bool mListInProfile;
-    S32 mContribution;
+    U64 mPowers = 0;
+    bool mAcceptNotices = false;
+    bool mListInProfile = false;
+    S32 mContribution = 0;
     std::string mName;
 };
 
@@ -485,6 +489,8 @@ public:
     void            standUp();
     /// @brief ground-sit at agent's current position
     void            sitDown();
+    // game-control ground-sit
+    void            sitDownNearby();
 
     //--------------------------------------------------------------------
     // Do Not Disturb
@@ -517,6 +523,25 @@ public:
     void            resetControlFlags();
     bool            anyControlGrabbed() const;      // True iff a script has taken over a control
     bool            isControlGrabbed(S32 control_index) const;
+    // Flycam's state now lives on LLAgentCamera (shared with LLViewerJoystick,
+    // which also drives it); these forward there so existing callers don't
+    // need to change.
+    bool            isUsingFlycam() const;
+    void            toggleFlycam();
+    // True while any flycam-like system (this one, or the legacy NDOF
+    // joystick's own) is driving LLViewerCamera directly, for code that
+    // needs to know the camera isn't under its usual control (e.g. tool
+    // selection, teleport look-at, camera-follow rendering).
+    bool            isCameraExternallyDriven() const;
+    bool            isUsingMouseCursor() const { return mUsingMouseCursor; }
+    void            toggleMouseCursorMode();
+
+    // Drops straight back to plain Avatar mode, unwinding whichever of
+    // Mouselook/FlyCam/Cursor mode is currently active (any combination --
+    // see updateGameControlMode()). Bound to the game-control "ESC" action
+    // in those modes (see AVATAR_ACTION_ESCAPE/FLYCAM_ACTION_ESCAPE).
+    void            resetToAvatarMode();
+
     // Send message to simulator to force grabbed controls to be
     // released, in case of a poorly written script.
     void            forceReleaseControls();
@@ -524,10 +549,58 @@ public:
 private:
     S32             mControlsTakenCount[TOTAL_CONTROLS];
     S32             mControlsTakenPassedOnCount[TOTAL_CONTROLS];
-    U32             mControlFlags;                  // Replacement for the mFooKey's
+    // mControlFlags is a bitmask of behavior instructions for compact
+    // transmission to the server.  It does NOT represent "input", rather
+    // the consequences of it, which will sometimes depend on "state".
+    U32             mControlFlags;
     F64             mLastJumpInputTime;             // Time of last jump input (key-down) in seconds from LLTimer::getTotalSeconds()
 
     bool            mIgnorePrejump;
+    //--------------------------------------------------------------------
+    // GameControls
+    //--------------------------------------------------------------------
+public:
+    // ActionFlags are similar to, but not the same as, ControlFlags!
+    // An 'ActionFlags' bitmask stores 'simplified input' from key/button
+    // presses that correspond to avatar/camera movement actions
+    // whereas 'mControlFlags' are a more complicated set of behavior bits
+    // computed as a function of input and state, and are sent to the server
+    // to steer its character controller for the avatar.
+    //
+    void applyExternalActions(const LLGameControl::AgentActions& actions);
+    void updateFlycam();
+
+    // Auto-derive the active game-control AgentControlMode from current avatar
+    // state (flycam active -> FlyCam, else mouse-cursor mode active -> Mouse, else
+    // mouselook camera -> Mouselook, else sitting -> Captive, else Avatar) and push
+    // it to LLGameControl.  Called once per frame before game-control input is
+    // processed so the runtime mapping/gating tracks avatar state automatically.
+    void updateGameControlMode();
+
+    void pressGameControlButton(U8 button);
+    void releaseGameControlButton(U8 button);
+    U32 getGameControlButtonsFromKeys() const { return mGameControlButtonsFromKeys; }
+
+    void setFlycamKeyInput(U8 channel, F32 value);
+    void setFlycamKeyUnroll(bool unroll);
+
+private:
+
+    U32 mExternalActionFlags { 0 };
+    U32 mGameControlButtonsFromKeys { 0 };
+    // Previous frame's LLGameControl::AgentActions::mMouseButtonBits, used by
+    // applyExternalActions() to find the press/release edges of the
+    // level-triggered simulated mouse buttons.
+    U32 mPrevMouseButtonBits { 0 };
+    bool mToggleRun { true };
+
+    // CONTROL_MODE_CURSOR: toggled by AVATAR_ACTION_TOGGLE_MOUSE_CURSOR, same pattern
+    // as LLAgentCamera's flycam toggle. mLastMouseCursorUpdate is the previous frame's
+    // timestamp used to compute the cursor's per-frame movement delta; reset to 0
+    // whenever the mode isn't active so re-entering doesn't jump the cursor.
+    bool mUsingMouseCursor { false };
+    U64 mLastMouseCursorUpdate { 0 };
+
     //--------------------------------------------------------------------
     // Animations
     //--------------------------------------------------------------------
@@ -841,11 +914,8 @@ public:
 
 private:
     bool                            mIsDoSendMaturityPreferenceToServer;
-    unsigned int                    mMaturityPreferenceRequestId;
-    unsigned int                    mMaturityPreferenceResponseId;
-    unsigned int                    mMaturityPreferenceNumRetries;
-    U8                              mLastKnownRequestMaturity;
-    U8                              mLastKnownResponseMaturity;
+    // the preference as asked of the server and as it answered
+    ALMaturityPreference            mMaturityPreference;
     LLCore::HttpRequest::policy_t   mHttpPolicy;
 
     bool            isMaturityPreferenceSyncedWithServer() const;
@@ -854,6 +924,7 @@ private:
 
     void            handlePreferredMaturityResult(U8 pServerMaturity);
     void            handlePreferredMaturityError();
+    void            handleMaturityPreferenceOutcome(ALMaturityPreference::Outcome outcome);
     void            reportPreferredMaturitySuccess();
     void            reportPreferredMaturityError();
 

@@ -572,7 +572,7 @@ void ALScriptStudioMasters::offer(Doc& doc, const std::string& action)
 }
 
 void ALScriptStudioMasters::loadWorld(Doc& doc, const ALScriptRef& ref,
-                                      std::function<void(Doc& tab, const std::string& theirs, const std::string& name)> then)
+                                      std::function<void(Doc& tab, const std::string& theirs, const ALScriptLoaded& loaded)> then)
 {
     // Answered later, the tab found again by its id: the window may have
     // closed meanwhile, or the tab.
@@ -599,15 +599,15 @@ void ALScriptStudioMasters::loadWorld(Doc& doc, const ALScriptRef& ref,
         {
             theirs = envelope->source;
         }
-        then(*found, theirs, loaded.name);
+        then(*found, theirs, loaded);
     });
 }
 
 void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
 {
-    loadWorld(doc, ref, [this](Doc& tab, const std::string& theirs, const std::string& name) {
+    loadWorld(doc, ref, [this](Doc& tab, const std::string& theirs, const ALScriptLoaded& loaded) {
         LLStringUtil::format_map_t args;
-        args["[NAME]"] = name;
+        args["[NAME]"] = loaded.name;
         mWindow.compare(tab, tab.editor->wholeText(), theirs, mServices.words("CompareMasterFile", args),
                         mServices.words("CompareMasterWorld", args));
     });
@@ -615,22 +615,68 @@ void ALScriptStudioMasters::compareWithWorld(Doc& doc, const ALScriptRef& ref)
 
 void ALScriptStudioMasters::takeWorld(Doc& doc, const ALScriptRef& ref)
 {
-    loadWorld(doc, ref, [this](Doc& tab, const std::string& theirs, const std::string& name) {
+    loadWorld(doc, ref, [this, ref](Doc& tab, const std::string& theirs, const ALScriptLoaded& loaded) {
         LLStringUtil::format_map_t args;
-        args["[NAME]"] = name;
+        args["[NAME]"] = loaded.name;
         args["[FILE]"] = fileNameOf(tab.file);
-        if (theirs == tab.editor->wholeText())
+        std::string on_disk;
+        const bool  read = ALFileRead::whole(tab.file, on_disk, ALDiskIncludes::MAX_BYTES);
+        if (theirs == tab.editor->wholeText() && !tab.editor->isDirty() && read && on_disk == theirs)
         {
+            // In step already, the link put so too.
+            mDiskMasters.tookWorld(tab.file, ref, loaded.assetId, loaded.text);
             mServices.report(mServices.words("MasterTookSame", args), false, &tab);
             return;
         }
-        // The file's text a step back, as an edit would leave it; the file
-        // on disk written only by a save of it, which then sends what the
-        // script already holds.
+        // Tapple's (QK5): the file on disk written at once, as the button
+        // says; what was typed in the tab and not saved asked about first.
+        if (!tab.editor->isDirty())
+        {
+            writeWorld(tab, ref, theirs, loaded);
+            return;
+        }
+        // Read again once answered: the script may have been saved while
+        // the question stood, and the file takes what it holds then.
+        const std::string         id    = tab.id;
+        const std::weak_ptr<bool> alive = mAlive;
+        mWindow.askTakeWorldUnsaved(tab, loaded.name, [this, alive, id, ref]() {
+            if (Doc* found = alive.lock() ? mServices.findDoc(id) : nullptr)
+            {
+                loadWorld(*found, ref, [this, ref](Doc& again, const std::string& now, const ALScriptLoaded& read_again) {
+                    writeWorld(again, ref, now, read_again);
+                });
+            }
+        });
+    });
+}
+
+void ALScriptStudioMasters::writeWorld(Doc& tab, const ALScriptRef& ref, const std::string& theirs, const ALScriptLoaded& loaded)
+{
+    LLStringUtil::format_map_t args;
+    args["[NAME]"] = loaded.name;
+    args["[FILE]"] = fileNameOf(tab.file);
+    if (!ALFileWrite::whole(tab.file, theirs))
+    {
+        mServices.report(mServices.words("MasterTakeNotWritten", args), true, &tab);
+        return;
+    }
+    if (tab.watch)
+    {
+        // The watcher on the file: this write is not an outside change.
+        tab.watch->seen();
+    }
+    // The tab's text a step back, as an edit would leave it, and clean,
+    // since it is what the file is; undone, what it held, not saved.
+    if (theirs != tab.editor->wholeText())
+    {
         tab.editor->setSelection(ALTextRange(tab.editor->document().start(), tab.editor->document().end()));
         tab.editor->insertText(theirs);
-        mServices.report(mServices.words("MasterTookWorld", args), false, &tab);
-    });
+    }
+    tab.editor->resetDirty();
+    // The script it came from left as it is, in step with the file; the
+    // file's others sent.
+    mDiskMasters.tookWorld(tab.file, ref, loaded.assetId, loaded.text);
+    mServices.report(mServices.words("MasterTookWorld", args), false, &tab);
 }
 
 void ALScriptStudioMasters::compareWithFile(Doc& doc, const ALScriptRef& ref)

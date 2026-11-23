@@ -264,11 +264,11 @@ namespace
         }
 
         // A negative zero as its bits, in and out: /fp:fast lets the compiler
-        // take -0.f for 0.f, and MSVC for arm64 does.
-        const f32x4 sign = set1_bits(0x80000000u);
-        require_lanes_bits("neg", neg(or_(set(1.f, -2.f, 0.f, 0.f), and_(sign, mask_lane<3>()))),
+        // take a float-typed -0.f for 0.f, and MSVC for arm64 and MSVC 14.52
+        // for x64 do, so the inputs' negative zeros are made as neg makes one.
+        require_lanes_bits("neg", neg(flip_signs<false, false, false, true>(set(1.f, -2.f, 0.f, 0.f))),
                           bits_of(-1.f), bits_of(2.f), 0x80000000u, 0u);
-        require_lanes_bits("abs", abs(or_(set(1.f, -2.f, 0.f, -INF), and_(sign, mask_lane<2>()))),
+        require_lanes_bits("abs", abs(flip_signs<false, false, true, false>(set(1.f, -2.f, 0.f, -INF))),
                           bits_of(1.f), bits_of(2.f), 0u, bits_of(INF));
         UNSCOPED_INFO("neg keeps a NaN payload");
         CHECK(bits_of(lane<2>(neg(a()))) == (pa[2] ^ 0x80000000u));
@@ -278,6 +278,19 @@ namespace
         // Denormals pass through: the ops do not rely on flush-to-zero.
         require_lanes("denormal mul", mul(set(DENORMAL, DENORMAL_BIG, 0.f, 0.f), set1(1.f)), DENORMAL, DENORMAL_BIG, 0.f, 0.f);
         require_lanes("denormal add", add(set(DENORMAL, 0.f, 0.f, 0.f), set(DENORMAL, 0.f, 0.f, 0.f)), 2 * DENORMAL, 0.f, 0.f, 0.f);
+    }
+
+    TEST_CASE_METHOD(alsimd_data, "alsimd: flip_signs flips the sign bits of the lanes it names and no others", "[alsimd]")
+    {
+        const f32x4 v = set(1.f, -2.f, 0.f, 3.f);
+        require_lanes_bits("x y z", flip_signs<true, true, true, false>(v), bits_of(-1.f), bits_of(2.f), 0x80000000u, bits_of(3.f));
+        require_lanes_bits("w", flip_signs<false, false, false, true>(v), bits_of(1.f), bits_of(-2.f), 0u, bits_of(-3.f));
+        require_lanes_bits("none", flip_signs<false, false, false, false>(v), bits_of(1.f), bits_of(-2.f), 0u, bits_of(3.f));
+        require_lanes_bits("all as neg", flip_signs<true, true, true, true>(a()), pa[0] ^ 0x80000000u, pa[1] ^ 0x80000000u,
+                           pa[2] ^ 0x80000000u, pa[3] ^ 0x80000000u);
+        UNSCOPED_INFO("twice is none");
+        require_lanes_bits("twice", flip_signs<true, false, true, false>(flip_signs<true, false, true, false>(a())), pa[0], pa[1],
+                           pa[2], pa[3]);
     }
 
     // Fused multiply-add: exact against fma where the machine fuses, exact

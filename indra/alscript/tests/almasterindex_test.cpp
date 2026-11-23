@@ -358,6 +358,43 @@ namespace
         CHECK(made.heardSaved(almasterindex_data::key(2), almasterindex_data::key(4), almasterindex_data::key(300), ours) == ALMasterIndex::Heard::Differing);
     }
 
+    // Update File (QK5), from its review: the file made to hold what the world does, the link is of
+    // that, so a save of the same text from elsewhere is nothing to say.
+    TEST_CASE_METHOD(almasterindex_data, "almasterindex: a link put in step with the world takes a later save of its text as the same", "[almasterindex]")
+    {
+        ALMasterIndex& made = open();
+        ALMasterLink   door = almasterindex_data::link(1, 2, "/s/door.lsl");
+        door.base           = almasterindex_data::key(100);
+        door.hash           = ALUploadHeader::hashOfPlain(door.target, "default {}");
+        made.link(door);
+        made.flush();
+        const std::string world = "default { touch_start(integer n) {} }";
+        UNSCOPED_INFO("changed in-world: differing");
+        REQUIRE(made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(2), almasterindex_data::key(101), world) ==
+                ALMasterIndex::Heard::Differing);
+        told = 0;
+
+        REQUIRE(made.inStep(almasterindex_data::key(1), almasterindex_data::key(2), "/s/door.lsl", almasterindex_data::key(101), world, 42));
+        const std::optional<ALMasterLink> stepped = made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2));
+        REQUIRE(stepped.has_value());
+        {
+            INFO("of the world's asset and text, at the file's stamp, active, and told");
+            CHECK(stepped->base == almasterindex_data::key(101));
+            CHECK(stepped->stamp == 42);
+            CHECK(stepped->state == ALMasterLink::State::Active);
+            CHECK(told == 1);
+        }
+        UNSCOPED_INFO("the same text saved again elsewhere: the same, still active");
+        CHECK(made.heardSaved(almasterindex_data::key(1), almasterindex_data::key(2), almasterindex_data::key(102), world) ==
+              ALMasterIndex::Heard::Same);
+        CHECK(made.linkOf(almasterindex_data::key(1), almasterindex_data::key(2))->state == ALMasterLink::State::Active);
+        {
+            INFO("another master, or no link: nothing");
+            CHECK_FALSE(made.inStep(almasterindex_data::key(1), almasterindex_data::key(2), "/s/other.lsl", almasterindex_data::key(103), world, 43));
+            CHECK_FALSE(made.inStep(almasterindex_data::key(9), almasterindex_data::key(9), "/s/door.lsl", almasterindex_data::key(103), world, 43));
+        }
+    }
+
     TEST_CASE_METHOD(almasterindex_data, "almasterindex: a send's link is put back if still linked and moves to the item it saved as", "[almasterindex]")
     {
         ALMasterIndex& made = open();

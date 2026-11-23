@@ -891,7 +891,7 @@ LLImageJ2COJ::~LLImageJ2COJ()
 
 bool LLImageJ2COJ::initDecode(LLImageJ2C &base, LLImageRaw &raw_image, int discard_level, int* region)
 {
-    base.mDiscardLevel = discard_level;
+    // LLImageJ2C has set the discard level; nothing to set up.
     return false;
 }
 

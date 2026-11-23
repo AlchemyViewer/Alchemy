@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<floater name="xui_library" title="XUIライブラリ">
+	<floater.string name="GroupChrome">装飾</floater.string>
+	<floater.string name="GroupContainers">コンテナ</floater.string>
+	<floater.string name="GroupControls">コントロール</floater.string>
+	<floater.string name="GroupLists">リスト</floater.string>
+	<floater.string name="GroupText">テキスト</floater.string>
+	<floater.string name="LibraryUnknownTag">[TAG]はスキーマにないタグです。</floater.string>
+	<floater.string name="LibraryTakesText">タグの間にある内容は値として読み込まれます。</floater.string>
+	<floater.string name="LibraryAttributes">属性（[VALUE]）</floater.string>
+	<floater.string name="LibraryRequired">必須</floater.string>
+	<floater.string name="LibraryIgnored">読み込まれるが破棄される</floater.string>
+	<floater.string name="LibraryDeprecated">非推奨</floater.string>
+	<floater.string name="LibraryDeprecatedFor">非推奨、[VALUE]と書く</floater.string>
+	<floater.string name="LibraryAlias">別表記：[VALUE]</floater.string>
+	<floater.string name="LibraryOneOf">次のいずれか：</floater.string>
+	<floater.string name="LibraryElements">パラメーター要素（[VALUE]）</floater.string>
+	<floater.string name="LibraryAnyNumber">任意の数</floater.string>
+	<floater.string name="LibraryMayContain">含められるもの（[VALUE]）</floater.string>
+	<floater.string name="LibraryNothing">なし</floater.string>
+	<floater.string name="LibraryMayGoInside">入れられる場所（[VALUE]）</floater.string>
+	<floater.string name="LibraryRoot">なし（ルート要素）</floater.string>
+	<floater.string name="LibraryUsedInOne">[VALUE]個のファイルで使用</floater.string>
+	<floater.string name="LibraryUsedIn">[VALUE]個のファイルで使用</floater.string>
+	<floater.string name="LibraryToWrite">書き方</floater.string>
+	<layout_stack name="library_stack">
+		<layout_panel name="library_list">
+			<layout_stack name="library_list_stack">
+				<layout_panel name="library_tags_area">
+					<scroll_list name="library_tags" tool_tip="ファイルに書けるすべてのタグを、種類ごとにまとめて表示します">
+						<scroll_list.columns name="tag" label="タグ"/>
+					</scroll_list>
+				</layout_panel>
+				<layout_panel name="library_filter_row">
+					<filter_editor name="library_filter" label="タグを絞り込む" tool_tip="名前にこれを含むタグに一覧を絞り込みます"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+		<layout_panel name="library_doc">
+			<layout_stack name="library_doc_stack">
+				<layout_panel name="library_specimen" tool_tip="選択したタグの見本で、名前とサイズだけから作られ、名前の横にウィジェットを表示します。それ以上の情報がないと作れないタグの場合は空になります"/>
+				<layout_panel name="library_about_area">
+					<text_editor name="library_about" tool_tip="選択したタグについてスキーマが把握していること：何を作るか、何を受け取るか、何を入れられるか、何に入れられるか、いくつのファイルで使われているか"/>
+				</layout_panel>
+			</layout_stack>
+		</layout_panel>
+	</layout_stack>
+</floater>

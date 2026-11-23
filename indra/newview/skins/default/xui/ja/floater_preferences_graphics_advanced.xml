@@ -169,4 +169,8 @@
 	<button label="推奨設定値にリセット" name="Defaults"/>
 	<button label="ＯＫ" label_selected="ＯＫ" name="OK"/>
 	<button label="キャンセル" label_selected="キャンセル" name="Cancel"/>
+	<text name="GlowResolutionText">
+		低
+	</text>
+	<slider name="GlowResolution" label="グローの品質："/>
 </floater>

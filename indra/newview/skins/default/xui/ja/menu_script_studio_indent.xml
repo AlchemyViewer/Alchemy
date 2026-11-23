@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="Script studio indentation menu">
+	<menu_item_check name="spaces" label="スペースでインデント"/>
+	<menu_item_check name="tabs" label="タブでインデント"/>
+	<menu_item_check name="width_2" label="幅 2"/>
+	<menu_item_check name="width_3" label="幅 3"/>
+	<menu_item_check name="width_4" label="幅 4"/>
+	<menu_item_check name="width_8" label="幅 8"/>
+	<menu_item_call name="read" label="スクリプトからインデントを検出"/>
+	<menu_item_call name="convert_spaces" label="インデントをスペースに変換"/>
+	<menu_item_call name="convert_tabs" label="インデントをタブに変換"/>
+</context_menu>

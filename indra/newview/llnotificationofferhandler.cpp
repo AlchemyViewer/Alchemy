@@ -164,6 +164,8 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
         {
             // log only to file if notif panel can be embedded to IM and IM is opened
             bool file_only = add_notif_to_im && LLHandlerUtil::isIMFloaterOpened(notification);
+            // Only a log paired with an inline offer may be hidden during replay.
+            const LLUUID notification_id = add_notif_to_im ? notification->getID() : LLUUID::null;
             if ((notification->getName() == "TeleportOffered"
                 || notification->getName() == "TeleportOffered_MaturityExceeded"
                 || notification->getName() == "TeleportOffered_MaturityBlocked"))
@@ -171,11 +173,11 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
                 static const ALRegex icon("<icon\\s*>\\s*([^<]*)?\\s*</icon\\s*>( - )?", ALRegex::ICASE);
                 std::string stripped_msg = notification->getMessage();
                 icon.replaceAll(stripped_msg, "");
-                LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg,file_only);
+                LLHandlerUtil::logToIMP2P(notification->getPayload()["from_id"], stripped_msg, file_only, notification_id);
             }
             else
             {
-                LLHandlerUtil::logToIMP2P(notification, file_only);
+                LLHandlerUtil::logToIMP2P(notification, file_only, notification_id);
             }
         }
     }
@@ -185,23 +187,22 @@ bool LLOfferHandler::processNotification(const LLNotificationPtr& notification, 
 
 /*virtual*/ void LLOfferHandler::onChange(LLNotificationPtr p)
 {
-    auto panelp = LLToastNotifyPanel::getInstance(p->getID());
-    if (panelp)
+    // An IM projection and a toast can coexist for one notification; refresh the former and still close the latter.
+    for (LLToastNotifyPanel& panel : LLToastNotifyPanel::instance_snapshot())
     {
-        //
-        // HACK: if we're dealing with a notification embedded in IM, update it
-        // otherwise remove its toast
-        //
-        if (ALViewType::as<LLIMToastNotifyPanel>(panelp.get()))
+        if (panel.isDead() || panel.getID() != p->getID())
         {
-            panelp->updateNotification();
+            continue;
         }
-        else
+
+        if (LLIMToastNotifyPanel* im_panel = ALViewType::as<LLIMToastNotifyPanel>(&panel))
         {
-            // if notification has changed, hide it
-            mChannel.get()->removeToastByNotificationID(p->getID());
+            im_panel->updateNotification();
         }
     }
+
+    // A toast whose panel is already on its way out is still the channel's to close.
+    mChannel.get()->removeToastByNotificationID(p->getID());
 }
 
 

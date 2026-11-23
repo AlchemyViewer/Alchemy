@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="menu_diff_copy">
+	<menu_item_call name="copy_change" label="この変更をコピー"/>
+	<menu_item_call name="copy_diff" label="unified diff形式でコピー"/>
+</context_menu>

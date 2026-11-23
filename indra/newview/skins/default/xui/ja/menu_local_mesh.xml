@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="menu_local_mesh">
+	<menu_item_call name="spawn" label="ワールドにRez"/>
+	<menu_item_call name="derez" label="すべてDerez"/>
+	<menu_item_call name="select" label="ワールドで選択"/>
+	<menu name="attach_to" label="装着先"/>
+	<menu_item_call name="detach" label="取り外す"/>
+	<menu_item_call name="unload" label="アンロード"/>
+	<menu_item_call name="remove" label="削除"/>
+</context_menu>

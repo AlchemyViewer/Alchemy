@@ -53,19 +53,19 @@ public:
 
     void close() override;
 
-    bool getVisible() override;
+    bool getVisible() const override;
 
-    bool getMinimized() override;
+    bool getMinimized() const override;
 
-    bool getMaximized() override;
+    bool getMaximized() const override;
 
     bool maximize() override;
     void minimize() override;
 
-    bool getPosition(LLCoordScreen *position) override;
+    bool getPosition(LLCoordScreen *position) const override;
 
-    bool getSize(LLCoordScreen *size) override;
-    bool getSize(LLCoordWindow *size) override;
+    bool getSize(LLCoordScreen *size) const override;
+    bool getSize(LLCoordWindow *size) const override;
 
     bool setPosition(LLCoordScreen position) override;
 
@@ -146,31 +146,31 @@ public:
     void flashIcon(F32 seconds) override;
     void maybeStopFlashIcon();
 
-    F32 getGamma() override;
+    F32 getGamma() const override;
     bool setGamma(const F32 gamma) override; // Set the gamma
     bool restoreGamma() override;            // Restore original gamma table (before updating gamma)
 
-    U32 getFSAASamples() override;
+    U32 getFSAASamples() const override;
     void setFSAASamples(const U32 samples) override;
 
     void processMiscNativeEvents() override;
 
-    void gatherInput() override;
+    void gatherInput(bool app_has_focus) override;
 
-    SDL_AppResult handleEvent(const SDL_Event& event);
-    static SDL_AppResult handleEvents(const SDL_Event& event);
+    SDL_AppResult handleEvent(const SDL_Event& event, bool app_has_focus);
+    static SDL_AppResult handleEvents(const SDL_Event& event, bool app_has_focus);
 
     void swapBuffers() override;
 
     void delayInputProcessing()  override {};
 
     // handy coordinate space conversion routines
-    bool convertCoords(LLCoordScreen from, LLCoordWindow *to) override;
-    bool convertCoords(LLCoordWindow from, LLCoordScreen *to) override;
-    bool convertCoords(LLCoordWindow from, LLCoordGL *to) override;
-    bool convertCoords(LLCoordGL from, LLCoordWindow *to) override;
-    bool convertCoords(LLCoordScreen from, LLCoordGL *to) override;
-    bool convertCoords(LLCoordGL from, LLCoordScreen *to) override;
+    bool convertCoords(LLCoordScreen from, LLCoordWindow *to) const override;
+    bool convertCoords(LLCoordWindow from, LLCoordScreen *to) const override;
+    bool convertCoords(LLCoordWindow from, LLCoordGL *to) const override;
+    bool convertCoords(LLCoordGL from, LLCoordWindow *to) const override;
+    bool convertCoords(LLCoordScreen from, LLCoordGL *to) const override;
+    bool convertCoords(LLCoordGL from, LLCoordScreen *to) const override;
 
     LLWindowResolution *getSupportedResolutions(S32 &num_resolutions) override;
 
@@ -183,7 +183,7 @@ public:
 
     bool dialogColorPicker(F32 *r, F32 *g, F32 *b) override;
 
-    void *getPlatformWindow() override;
+    void *getPlatformWindow() const override;
 
     // "wayland" / "x11" / "" - reports the SDL video driver this window is on.
     std::string getDisplayServer() const override;
@@ -210,7 +210,7 @@ public:
     void destroySharedContext(void *context) override;
     void toggleVSync(bool enable_vsync) override;
 
-    F32 getSystemUISize() override;
+    F32 getSystemUISize() const override;
 
     static std::vector<std::string> getDisplaysResolutionList();
 
@@ -264,7 +264,7 @@ protected:
 
     bool isValid() override;
 
-    LLSD getNativeKeyData() override;
+    LLSD getNativeKeyData() const override;
 
     void initCursors();
     void quitCursors();

@@ -491,7 +491,9 @@ void ALScriptCrumbsBar::views(Doc& doc, std::vector<Part>& parts) const
         const ALPreprocessor::Wanted why = mWindow->preprocessedWhy(doc);
         if (why != ALPreprocessor::Wanted::No)
         {
-            tip += " " + mServices->words(why == ALPreprocessor::Wanted::Directives ? "TrailerPreprocessedDirectives" : "TrailerPreprocessedSetting");
+            tip += " " + mServices->words(why == ALPreprocessor::Wanted::Directives ? "TrailerPreprocessedDirectives"
+                                          : why == ALPreprocessor::Wanted::Requires ? "TrailerPreprocessedRequires"
+                                                                                    : "TrailerPreprocessedSetting");
         }
         parts.push_back({ mServices->words(expanded ? "TrailerExpanded" : "TrailerSource"), "expanded", tip });
         parts.back().drop = DROP_VIEW;

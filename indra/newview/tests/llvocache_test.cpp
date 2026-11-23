@@ -88,7 +88,7 @@ namespace
     // see each other's files nor the user's.
     struct vocacheTest
     {
-        static constexpr U32 CACHE_VERSION = 20;          // LLAppViewer::getObjectCacheVersion()
+        static constexpr U32 CACHE_VERSION = 21;          // LLAppViewer::getObjectCacheVersion()
         static constexpr U32 CACHE_NUMBER_OF_REGIONS = 128;
 
         std::filesystem::path mRoot;
@@ -188,24 +188,68 @@ namespace
             return data;
         }
 
-        static LLGLTFOverrideCacheEntry requireOverride(U32 local_id, U64 handle, int sides)
+        static LLGLTFOverrideCacheEntry requireOverride(U32 local_id, U64 handle, int sides, const LLUUID& object_id)
         {
             LLGLTFOverrideCacheEntry entry;
             UNSCOPED_INFO("override parses");
-            REQUIRE(entry.fromLLSD(makeOverrideLLSD(local_id, handle, LLUUID::generateNewID(), sides)));
+            REQUIRE(entry.fromLLSD(makeOverrideLLSD(local_id, handle, object_id, sides)));
             return entry;
         }
 
-        // An extras file written by hand: the header the reader expects, then
-        // each record as its length and its bytes, whatever they are.
-        void writeExtrasFile(U64 handle, const LLUUID& id, const std::vector<std::string>& records) const
+        // An override for some object the cache does not hold.
+        static LLGLTFOverrideCacheEntry requireOverride(U32 local_id, U64 handle, int sides)
         {
-            std::string data;
-            data += LLGLTFOverrideCacheEntry::VERSION_LABEL;
-            data += ':';
-            data += std::to_string(LLGLTFOverrideCacheEntry::VERSION);
-            data += '\n';
-            data.append(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+            return requireOverride(local_id, handle, sides, LLUUID::generateNewID());
+        }
+
+        // An override for the object an entry holds, named as the region names it.
+        static LLGLTFOverrideCacheEntry requireOverrideOf(const LLVOCacheEntry& object, U64 handle, int sides)
+        {
+            return requireOverride(object.getLocalID(), handle, sides, object.getObjectID());
+        }
+
+        // An entry whose data opens with object_id, as an object update's does.
+        static LLPointer<LLVOCacheEntry> makeObjectEntry(U32 local_id, U32 crc, const LLUUID& object_id)
+        {
+            std::vector<U8> body(object_id.mData, object_id.mData + UUID_BYTES);
+            body.resize(UUID_BYTES + 24, (U8)local_id);
+            LLDataPackerBinaryBuffer dp(body.data(), (S32)body.size());
+            return new LLVOCacheEntry(local_id, crc, dp);
+        }
+
+        // No override, for the saves of the tests about the objects alone.
+        static inline const LLVOCacheEntry::vocache_gltf_overrides_map_t NO_OVERRIDES{};
+        // Where the reads of the tests about the objects alone put the overrides.
+        LLVOCacheEntry::vocache_gltf_overrides_map_t mOverridesRead;
+
+        // An entry's header in the file: its local ID, CRC, hit count and body size.
+        static constexpr size_t ENTRY_HEADER_BYTES = 4 * sizeof(S32);
+
+        // The bytes a file's cache ID, entry count and objects take, as writeToCache lays them out.
+        static size_t objectBytes(const LLVOCacheEntry::vocache_entry_map_t& objects)
+        {
+            size_t size = UUID_BYTES + sizeof(S32);
+            for (const auto& [local_id, entry] : objects)
+            {
+                size += ENTRY_HEADER_BYTES + (size_t)entry->getDP()->getBufferSize();
+            }
+            return size;
+        }
+
+        // An object cache file written by hand: the cache ID and the objects as writeToCache lays them out, then the
+        // overrides' count and each override as its length and its bytes, whatever they are.
+        void writeObjectFile(U64 handle, const LLUUID& id, const LLVOCacheEntry::vocache_entry_map_t& objects,
+                             const std::vector<std::string>& records) const
+        {
+            std::string data(reinterpret_cast<const char*>(id.mData), UUID_BYTES);
+            const S32 num_entries = (S32)objects.size();
+            data.append(reinterpret_cast<const char*>(&num_entries), sizeof(S32));
+            for (const auto& [local_id, entry] : objects)
+            {
+                std::vector<U8> bytes(ENTRY_HEADER_BYTES + (size_t)entry->getDP()->getBufferSize());
+                entry->writeToBuffer(bytes.data());
+                data.append(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+            }
             const U32 count = (U32)records.size();
             data.append(reinterpret_cast<const char*>(&count), sizeof(U32));
             for (const std::string& record : records)
@@ -214,8 +258,29 @@ namespace
                 data.append(reinterpret_cast<const char*>(&length), sizeof(U32));
                 data += record;
             }
-            std::ofstream out(objectFile(handle, "_extras.slec"), std::ios::binary | std::ios::trunc);
-            out.write(data.data(), (std::streamsize)data.size());
+            spit(objectFile(handle, ".slc"), data);
+        }
+
+        // How many overrides a region's file holds after its objects, read the way the file lays them out.
+        U32 overrideRecordCount(U64 handle) const
+        {
+            const std::string bytes = slurp(objectFile(handle, ".slc"));
+            size_t cursor = UUID_BYTES;
+            S32 num_entries = 0;
+            REQUIRE(cursor + sizeof(S32) <= bytes.size());
+            memcpy(&num_entries, bytes.data() + cursor, sizeof(S32));
+            cursor += sizeof(S32);
+            for (S32 i = 0; i < num_entries; ++i)
+            {
+                S32 size = 0;
+                REQUIRE(cursor + ENTRY_HEADER_BYTES <= bytes.size());
+                memcpy(&size, bytes.data() + cursor + 3 * sizeof(S32), sizeof(S32));
+                cursor += ENTRY_HEADER_BYTES + (size_t)size;
+            }
+            U32 count = 0;
+            REQUIRE(cursor + sizeof(U32) <= bytes.size());
+            memcpy(&count, bytes.data() + cursor, sizeof(U32));
+            return count;
         }
 
         static std::string binaryRecord(const LLSD& llsd)
@@ -352,13 +417,13 @@ namespace
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t written = makeEntries(500);
 
-        LLVOCache::instance().writeToCache(handle, id, written, /*dirty=*/true, /*removal_enabled=*/false);
+        LLVOCache::instance().writeToCache(handle, id, written, NO_OVERRIDES, /*dirty=*/true, /*removal_enabled=*/false);
         UNSCOPED_INFO("cache file written");
         CHECK(std::filesystem::exists(objectFile(handle, ".slc")));
 
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("read succeeds");
-        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read, mOverridesRead));
         UNSCOPED_INFO("entry count");
         REQUIRE(read.size() == written.size());
         for (const auto& [local_id, entry] : written)
@@ -372,7 +437,7 @@ namespace
 
         LLVOCacheEntry::vocache_entry_map_t other;
         UNSCOPED_INFO("another region's id is refused");
-        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, LLUUID::generateNewID(), other));
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, LLUUID::generateNewID(), other, mOverridesRead));
         UNSCOPED_INFO("nothing loaded for it");
         CHECK(other.empty());
     }
@@ -391,11 +456,11 @@ namespace
         UNSCOPED_INFO("some entries were invalidated");
         REQUIRE(valid < written.size());
 
-        LLVOCache::instance().writeToCache(handle, id, written, true, /*removal_enabled=*/true);
+        LLVOCache::instance().writeToCache(handle, id, written, NO_OVERRIDES, true, /*removal_enabled=*/true);
 
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("read succeeds against the written count");
-        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read, mOverridesRead));
         UNSCOPED_INFO("only valid entries were written");
         REQUIRE(read.size() == valid);
         for (const auto& [local_id, entry] : read)
@@ -410,7 +475,7 @@ namespace
         const U64 handle = to_region_handle(1002 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t written = makeEntries(100);
-        LLVOCache::instance().writeToCache(handle, id, written, true, false);
+        LLVOCache::instance().writeToCache(handle, id, written, NO_OVERRIDES, true, false);
 
         const std::filesystem::path file = objectFile(handle, ".slc");
         const uintmax_t size = std::filesystem::file_size(file);
@@ -418,9 +483,9 @@ namespace
 
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("truncated file fails the read");
-        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read));
-        UNSCOPED_INFO("fewer entries than written");
-        CHECK(read.size() < written.size());
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read, mOverridesRead));
+        UNSCOPED_INFO("and keeps none of its objects, as the overrides after them are lost");
+        CHECK(read.empty());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: the header survives a restart", "[LLVOCache]")
@@ -428,7 +493,7 @@ namespace
         const U64 handle = to_region_handle(1003 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t written = makeEntries(50);
-        LLVOCache::instance().writeToCache(handle, id, written, true, false);
+        LLVOCache::instance().writeToCache(handle, id, written, NO_OVERRIDES, true, false);
 
         LLVOCache::deleteSingleton();
         LLVOCache::initParamSingleton(false);
@@ -436,36 +501,37 @@ namespace
 
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("region known after restart");
-        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read, mOverridesRead));
         UNSCOPED_INFO("entries after restart");
         CHECK(read.size() == written.size());
     }
 
-    TEST_CASE_METHOD(vocacheTest, "LLVOCache: the override cache round-trips and drops overrides with no object", "[LLVOCache]")
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: overrides round-trip in the object file and one with no object is dropped", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1004 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(20);
-        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
 
         LLVOCacheEntry::vocache_gltf_overrides_map_t written;
         for (U32 local_id = 1; local_id <= 20; local_id += 3)
         {
-            written[local_id] = requireOverride(local_id, handle, 1 + (int)(local_id % 4));
+            written[local_id] = requireOverrideOf(*objects[local_id], handle, 1 + (int)(local_id % 4));
         }
-        // An override for an object the primary cache does not hold is dropped on load.
+        // An override for an object the file does not hold is neither written nor loaded.
         written[999] = requireOverride(999, handle, 2);
 
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, written, true, false);
-        UNSCOPED_INFO("extras file written");
-        CHECK(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+        LLVOCache::instance().writeToCache(handle, id, objects, written, true, false);
+        UNSCOPED_INFO("one file holds the objects and their overrides");
+        CHECK(std::filesystem::exists(objectFile(handle, ".slc")));
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+        CHECK(overrideRecordCount(handle) == written.size() - 1);
 
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
         LLVOCacheEntry::vocache_gltf_overrides_map_t read;
-        UNSCOPED_INFO("read succeeds");
-        REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read_objects.size() == objects.size());
         UNSCOPED_INFO("all overrides with an object came back");
         CHECK(read.size() == written.size() - 1);
-        UNSCOPED_INFO("orphan override dropped");
         CHECK(read.find(999) == read.end());
         for (const auto& [local_id, entry] : read)
         {
@@ -475,93 +541,56 @@ namespace
             REQUIRE(entry.mGLTFMaterial.empty());
         }
 
-        LLVOCacheEntry::vocache_gltf_overrides_map_t none;
-        LLVOCacheEntry::vocache_entry_map_t no_objects;
-        UNSCOPED_INFO("empty primary cache is not a failure");
-        CHECK(LLVOCache::instance().readGenericExtrasFromCache(handle, id, none, no_objects));
-        UNSCOPED_INFO("and loads nothing");
-        CHECK(none.empty());
+        UNSCOPED_INFO("another cache ID loads neither objects nor overrides");
+        LLVOCacheEntry::vocache_entry_map_t other_objects;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t other;
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, LLUUID::generateNewID(), other_objects, other));
+        CHECK(other_objects.empty());
+        CHECK(other.empty());
     }
 
-    TEST_CASE_METHOD(vocacheTest, "LLVOCache: a corrupt override record is skipped and a truncated file refused", "[LLVOCache]")
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: a corrupt override is skipped and a file cut short loads nothing", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1005 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(10);
-        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
+        LLVOCache::instance().writeToCache(handle, id, objects, NO_OVERRIDES, true, false);
 
-        LLVOCacheEntry::vocache_gltf_overrides_map_t written;
+        std::vector<std::string> records;
         for (U32 local_id = 1; local_id <= 10; ++local_id)
         {
-            written[local_id] = requireOverride(local_id, handle, 2);
+            records.push_back(binaryRecord(makeOverrideLLSD(local_id, handle, objects[local_id]->getObjectID(), 2)));
         }
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, written, true, false);
+        // A type tag LLSD binary does not have, so that the second record and only it fails to parse.
+        records[1][0] = (char)0xFF;
+        writeObjectFile(handle, id, objects, records);
 
-        const std::filesystem::path file = objectFile(handle, "_extras.slec");
-        std::string bytes;
-        {
-            std::ifstream in(file, std::ios::binary);
-            bytes.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
-        }
-        // version line, cache id, count, then records of [length][llsd]
-        const size_t line_end = bytes.find('\n');
-        UNSCOPED_INFO("version line present");
-        REQUIRE(line_end != std::string::npos);
-        UNSCOPED_INFO("version line");
-        CHECK(bytes.substr(0, line_end) == LLGLTFOverrideCacheEntry::VERSION_LABEL + ":" + std::to_string(LLGLTFOverrideCacheEntry::VERSION));
-        size_t cursor = line_end + 1 + UUID_BYTES;
-        UNSCOPED_INFO("the cache id, the count and the first record's length inside the file");
-        REQUIRE(cursor + 2 * sizeof(U32) <= bytes.size());
-        U32 count = 0;
-        memcpy(&count, bytes.data() + cursor, sizeof(U32));
-        cursor += sizeof(U32);
-        UNSCOPED_INFO("record count");
-        REQUIRE((size_t)count == written.size());
-
-        // Overwrite the second record's first byte with a type tag LLSD binary
-        // does not have, so that one record and only that one fails to parse.
-        U32 first_length = 0;
-        memcpy(&first_length, bytes.data() + cursor, sizeof(U32));
-        const size_t second_record = cursor + sizeof(U32) + first_length + sizeof(U32);
-        UNSCOPED_INFO("second record inside file");
-        REQUIRE(second_record < bytes.size());
-        std::string corrupted = bytes;
-        corrupted[second_record] = (char)0xFF;
-        {
-            std::ofstream out(file, std::ios::binary | std::ios::trunc);
-            out.write(corrupted.data(), (std::streamsize)corrupted.size());
-        }
-
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
         LLVOCacheEntry::vocache_gltf_overrides_map_t read;
-        UNSCOPED_INFO("corrupt record does not fail the file");
-        REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
-        UNSCOPED_INFO("one record skipped");
-        CHECK(read.size() == written.size() - 1);
-        for (const auto& [local_id, entry] : read)
-        {
-            CAPTURE(local_id);
-            requireSameOverride(written.at(local_id), entry);
-        }
+        UNSCOPED_INFO("a corrupt override does not fail the file");
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read_objects.size() == objects.size());
+        CHECK(read.size() == records.size() - 1);
+        CHECK(read.count(2) == 0u);
 
-        // Cut the last record short.
-        {
-            std::ofstream out(file, std::ios::binary | std::ios::trunc);
-            out.write(bytes.data(), (std::streamsize)(bytes.size() - 3));
-        }
-        LLVOCacheEntry::vocache_gltf_overrides_map_t partial;
-        UNSCOPED_INFO("truncated file is refused");
-        CHECK_FALSE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, partial, objects));
+        const std::string bytes = slurp(objectFile(handle, ".slc"));
+        UNSCOPED_INFO("a file cut short in its overrides loads neither its objects nor its overrides");
+        spit(objectFile(handle, ".slc"), bytes.substr(0, bytes.size() - 3));
+        read_objects.clear();
+        read.clear();
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read_objects.empty());
+        CHECK(read.empty());
 
-        // An earlier format is refused by its version line alone.
-        {
-            std::ofstream out(file, std::ios::binary | std::ios::trunc);
-            out << LLGLTFOverrideCacheEntry::VERSION_LABEL << ":1\n" << id << "\n0000000000\n";
-        }
-        LLVOCacheEntry::vocache_gltf_overrides_map_t old;
-        UNSCOPED_INFO("old version is refused");
-        CHECK_FALSE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, old, objects));
-        UNSCOPED_INFO("old version loads nothing");
-        CHECK(old.empty());
+        UNSCOPED_INFO("nor one with bytes past its overrides");
+        spit(objectFile(handle, ".slc"), bytes + std::string("\x01\x02", 2));
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read_objects.empty());
+
+        UNSCOPED_INFO("nor one that ends at its objects, as a file did before the overrides were kept with them");
+        spit(objectFile(handle, ".slc"), bytes.substr(0, objectBytes(objects)));
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read_objects.empty());
     }
 
     TEST_CASE_METHOD(vocacheTest, "LLVOCache: memoryAdjustFactor bounds follow RAM and stay under the heap cap", "[LLVOCache]")
@@ -627,24 +656,25 @@ namespace
         CHECK(close_to(LLVOCacheEntry::memoryAdjustFactor(16000.f, 65536.f, no_cap, 750.f, 2048.f, false, true), 1.f));
     }
 
-    TEST_CASE_METHOD(vocacheTest, "LLVOCache: hostile extras records meet a depth cap and a budget and lose bad faces", "[LLVOCache]")
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: hostile override records meet a depth cap and a budget and lose bad faces", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1006 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(4);
-        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
+        LLVOCache::instance().writeToCache(handle, id, objects, NO_OVERRIDES, true, false);
 
         // a legitimate record carrying something nested a little loads; one
         // nested past the cap is refused rather than parsed
-        LLSD shallow = makeOverrideLLSD(1, handle, LLUUID::generateNewID(), 1);
+        LLSD shallow = makeOverrideLLSD(1, handle, objects[1]->getObjectID(), 1);
         shallow["deep"] = nestedArrays(8);
-        LLSD deep = makeOverrideLLSD(2, handle, LLUUID::generateNewID(), 1);
+        LLSD deep = makeOverrideLLSD(2, handle, objects[2]->getObjectID(), 1);
         deep["deep"] = nestedArrays(24);
-        writeExtrasFile(handle, id, { binaryRecord(shallow), binaryRecord(deep) });
+        writeObjectFile(handle, id, objects, { binaryRecord(shallow), binaryRecord(deep) });
 
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
         UNSCOPED_INFO("a file with one bad record is still a cache");
-        REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, overrides));
         UNSCOPED_INFO("the shallow record loaded, the deep one did not");
         CHECK(overrides.size() == 1u);
         UNSCOPED_INFO("it is the shallow one");
@@ -652,19 +682,22 @@ namespace
 
         // up to the budget, unreadable records are skipped; past it the file is refused
         std::vector<std::string> garbage(16, std::string("\xff\xfe\xfd\xfc", 4));
-        garbage.push_back(binaryRecord(makeOverrideLLSD(3, handle, LLUUID::generateNewID(), 1)));
-        writeExtrasFile(handle, id, garbage);
+        garbage.push_back(binaryRecord(makeOverrideLLSD(3, handle, objects[3]->getObjectID(), 1)));
+        writeObjectFile(handle, id, objects, garbage);
+        read_objects.clear();
         overrides.clear();
         UNSCOPED_INFO("sixteen unreadable records are within the budget");
-        CHECK(LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+        CHECK(LLVOCache::instance().readFromCache(handle, id, read_objects, overrides));
         UNSCOPED_INFO("and the good record after them loaded");
         CHECK(overrides.size() == 1u);
 
         garbage.insert(garbage.begin(), std::string("\xff\xfe\xfd\xfc", 4));
-        writeExtrasFile(handle, id, garbage);
+        writeObjectFile(handle, id, objects, garbage);
+        read_objects.clear();
         overrides.clear();
-        UNSCOPED_INFO("seventeen is a bad file");
-        CHECK_FALSE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, objects));
+        UNSCOPED_INFO("seventeen is a bad file, and its objects go with it");
+        CHECK_FALSE(LLVOCache::instance().readFromCache(handle, id, read_objects, overrides));
+        CHECK(read_objects.empty());
 
         // a face index no object has is dropped by the record parser
         LLSD faces = makeOverrideLLSD(4, handle, LLUUID::generateNewID(), 2);
@@ -691,9 +724,9 @@ namespace
         const U64 second = to_region_handle(1011 * 256, 1000 * 256);
         const U64 third = to_region_handle(1012 * 256, 1000 * 256);
         const U64 fourth = to_region_handle(1013 * 256, 1000 * 256);
-        LLVOCache::instance().writeToCache(first, id, makeEntries(3), true, false);
-        LLVOCache::instance().writeToCache(second, id, makeEntries(3), true, false);
-        LLVOCache::instance().writeToCache(third, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(first, id, makeEntries(3), NO_OVERRIDES, true, false);
+        LLVOCache::instance().writeToCache(second, id, makeEntries(3), NO_OVERRIDES, true, false);
+        LLVOCache::instance().writeToCache(third, id, makeEntries(3), NO_OVERRIDES, true, false);
 
         // removing the middle region leaves a hole in the header on disk; a
         // crash means nobody closes it up
@@ -703,41 +736,42 @@ namespace
         CHECK(LLVOCache::instance().getCacheEntries() == 2u);
 
         // a new region has to take the hole, not the slot of the one behind it
-        LLVOCache::instance().writeToCache(fourth, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(fourth, id, makeEntries(3), NO_OVERRIDES, true, false);
         restartAsAfterCrash();
         UNSCOPED_INFO("three regions come back");
         CHECK(LLVOCache::instance().getCacheEntries() == 3u);
         LLVOCacheEntry::vocache_entry_map_t read;
         UNSCOPED_INFO("the first region is still there");
-        CHECK(LLVOCache::instance().readFromCache(first, id, read));
+        CHECK(LLVOCache::instance().readFromCache(first, id, read, mOverridesRead));
         read.clear();
         UNSCOPED_INFO("the third region was not overwritten");
-        CHECK(LLVOCache::instance().readFromCache(third, id, read));
+        CHECK(LLVOCache::instance().readFromCache(third, id, read, mOverridesRead));
         read.clear();
         UNSCOPED_INFO("the new region is there");
-        CHECK(LLVOCache::instance().readFromCache(fourth, id, read));
+        CHECK(LLVOCache::instance().readFromCache(fourth, id, read, mOverridesRead));
     }
 
-    TEST_CASE_METHOD(vocacheTest, "LLVOCache: extras are only rewritten when the overrides changed", "[LLVOCache]")
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: a save with nothing dirty leaves the file as it was", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1020 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(4);
-        LLVOCache::instance().writeToCache(handle, id, objects, true, false);
 
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        overrides[1] = requireOverride(1, handle, 2);
-        overrides[2] = requireOverride(2, handle, 3);
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, true, false);
+        overrides[1] = requireOverrideOf(*objects[1], handle, 2);
+        overrides[2] = requireOverrideOf(*objects[2], handle, 3);
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, true, false);
 
-        // a save with nothing dirty leaves the file as it was, whatever it is handed
+        // whatever it is handed
         LLVOCacheEntry::vocache_gltf_overrides_map_t nothing;
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, nothing, false, false);
+        LLVOCache::instance().writeToCache(handle, id, makeEntries(2), nothing, /*dirty=*/false, false);
 
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
         LLVOCacheEntry::vocache_gltf_overrides_map_t read;
         UNSCOPED_INFO("the file still reads");
-        REQUIRE(LLVOCache::instance().readGenericExtrasFromCache(handle, id, read, objects));
-        UNSCOPED_INFO("and still holds both overrides");
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        UNSCOPED_INFO("and still holds every object and both overrides");
+        CHECK(read_objects.size() == objects.size());
         REQUIRE(read.size() == 2u);
         requireSameOverride(overrides[1], read[1]);
         requireSameOverride(overrides[2], read[2]);
@@ -748,64 +782,354 @@ namespace
         const U64 handle = to_region_handle(1021 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
         LLVOCacheEntry::vocache_entry_map_t written = makeEntries(30);
-
-        // The region's save: its objects missed the cache, so they are dirty;
-        // no override ever arrived, so there are none and nothing marked the
-        // overrides dirty.
-        LLVOCache::instance().writeToCache(handle, id, written, /*dirty=*/true, false);
-        LLVOCacheEntry::vocache_gltf_overrides_map_t nothing;
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, nothing, /*dirty=*/false, false);
-        UNSCOPED_INFO("the extras file is written beside the objects");
-        CHECK(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+        LLVOCache::instance().writeToCache(handle, id, written, NO_OVERRIDES, /*dirty=*/true, false);
+        UNSCOPED_INFO("the file holds no override");
+        CHECK(overrideRecordCount(handle) == 0u);
 
         LLVOCache::deleteSingleton();
         LLVOCache::initParamSingleton(false);
         LLVOCache::instance().initCache(LL_PATH_CACHE, CACHE_NUMBER_OF_REGIONS, CACHE_VERSION);
 
-        // The next login loads as LLViewerRegion::loadObjectCache does: extras
-        // it cannot use take the objects with them.
         LLVOCacheEntry::vocache_entry_map_t read;
-        UNSCOPED_INFO("the objects read");
-        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read));
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        const bool extras_read = LLVOCache::instance().readGenericExtrasFromCache(handle, id, overrides, read);
-        if (!extras_read)
-        {
-            LLVOCache::instance().removeGenericExtrasForHandle(handle);
-        }
-        UNSCOPED_INFO("the extras read");
-        CHECK(extras_read);
-        UNSCOPED_INFO("and hold no override");
+        UNSCOPED_INFO("the next login reads the file");
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read, overrides));
+        UNSCOPED_INFO("with every object in it and no override");
+        CHECK(read.size() == written.size());
         CHECK(overrides.empty());
-
-        LLVOCacheEntry::vocache_entry_map_t kept;
-        UNSCOPED_INFO("the object cache is still there after the load");
-        CHECK(LLVOCache::instance().readFromCache(handle, id, kept));
-        UNSCOPED_INFO("with every object in it");
-        CHECK(kept.size() == written.size());
     }
 
-    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an object write that fails leaves no extras file behind", "[LLVOCache]")
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an object write that fails leaves no file behind", "[LLVOCache]")
     {
         const U64 handle = to_region_handle(1022 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
 
-        // A body past the cache's ten-thousand-byte cap on one entry fails the
-        // object write, which drops the region from the header. The save goes
-        // on to the extras, dirty since the objects were.
+        // A body past the cache's ten-thousand-byte cap on one entry fails the write, which drops the region from the
+        // header, overrides and all.
         LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(3);
         objects[4] = makeEntry(4, 4, 10001);
-        LLVOCache::instance().writeToCache(handle, id, objects, /*dirty=*/true, false);
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1] = requireOverrideOf(*objects[1], handle, 2);
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, /*dirty=*/true, false);
         UNSCOPED_INFO("the failed write dropped the region");
-        REQUIRE(LLVOCache::instance().getCacheEntries() == 0u);
+        CHECK(LLVOCache::instance().getCacheEntries() == 0u);
+        UNSCOPED_INFO("and left no file");
+        CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
+    }
+
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an override is written only beside the object it belongs to", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1024 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        LLVOCacheEntry::vocache_entry_map_t objects = makeEntries(4);
+        // Not confirmed by the region this session: the file keeps it only while removal is off.
+        objects[3]->setValid(false);
 
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        overrides[1] = requireOverride(1, handle, 2);
-        LLVOCache::instance().writeGenericExtrasToCache(handle, id, overrides, /*dirty=*/true, false);
-        UNSCOPED_INFO("no object file");
-        CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
-        UNSCOPED_INFO("and no extras file for a region the header does not hold");
-        CHECK_FALSE(std::filesystem::exists(objectFile(handle, "_extras.slec")));
+        for (U32 local_id : { 1u, 3u })
+        {
+            overrides[local_id] = requireOverrideOf(*objects[local_id], handle, 2);
+        }
+        overrides[9] = requireOverride(9, handle, 2);
+        // the region removed this object's overrides
+        overrides[2].mLocalId = 2;
+
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, true, /*removal_enabled=*/true);
+        UNSCOPED_INFO("with removal on, the override of the confirmed object alone");
+        CHECK(overrideRecordCount(handle) == 1u);
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t read;
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read.size() == 1u);
+        CHECK(read.count(1) == 1u);
+
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, true, /*removal_enabled=*/false);
+        UNSCOPED_INFO("with removal off, every override whose object is written");
+        CHECK(overrideRecordCount(handle) == 2u);
+        read_objects.clear();
+        read.clear();
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read.size() == 2u);
+        CHECK(read.count(1) == 1u);
+        CHECK(read.count(3) == 1u);
+        UNSCOPED_INFO("never one without its object, nor a removal");
+        CHECK(read.count(9) == 0u);
+        CHECK(read.count(2) == 0u);
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face takes the region's override for it or none", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1025 * 256, 1000 * 256);
+        LLSD data = vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 2);
+        data["sides"][1] = 2; // faces 0 and 2
+        LLGLTFOverrideCacheEntry entry;
+        REQUIRE(entry.fromLLSD(data));
+        entry.materialize();
+
+        CHECK(entry.overrideFor(0, LLTEContents::MAX_TES) != nullptr);
+        CHECK(entry.overrideFor(2, LLTEContents::MAX_TES) != nullptr);
+        UNSCOPED_INFO("each face its own");
+        CHECK(entry.overrideFor(0, LLTEContents::MAX_TES) != entry.overrideFor(2, LLTEContents::MAX_TES));
+        CHECK(entry.overrideFor(2, LLTEContents::MAX_TES) == entry.mGLTFMaterial.at(2).get());
+        UNSCOPED_INFO("a face the region left out takes none");
+        CHECK(entry.overrideFor(1, LLTEContents::MAX_TES) == nullptr);
+        CHECK(entry.overrideFor(LLTEContents::MAX_TES - 1, LLTEContents::MAX_TES) == nullptr);
+
+        UNSCOPED_INFO("an entry with no sides gives every face none");
+        LLGLTFOverrideCacheEntry removed;
+        removed.mLocalId = 7;
+        removed.materialize();
+        CHECK(removed.overrideFor(0, LLTEContents::MAX_TES) == nullptr);
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face past the faces the region counts takes the last counted face's", "[LLVOCache]")
+    {
+        // A mesh whose asset split one material into three faces, on an object the region counts one face on
+        const U64 handle = to_region_handle(1026 * 256, 1000 * 256);
+        LLGLTFOverrideCacheEntry one;
+        REQUIRE(one.fromLLSD(vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 1))); // face 0
+        one.materialize();
+        REQUIRE(one.overrideFor(0, 1) != nullptr);
+        CHECK(one.overrideFor(1, 1) == one.overrideFor(0, 1));
+        CHECK(one.overrideFor(2, 1) == one.overrideFor(0, 1));
+        UNSCOPED_INFO("a face the region counts and left out still takes none");
+        CHECK(one.overrideFor(1, 3) == nullptr);
+        UNSCOPED_INFO("an object the region counts no faces on takes nothing past them");
+        CHECK(one.overrideFor(1, 0) == nullptr);
+
+        LLSD data = vocacheTest::makeOverrideLLSD(8, handle, LLUUID::generateNewID(), 2);
+        data["sides"][1] = 2; // faces 0 and 2
+        LLGLTFOverrideCacheEntry two;
+        REQUIRE(two.fromLLSD(data));
+        two.materialize();
+        UNSCOPED_INFO("the last counted face's, whether or not the region sent one for the face before it");
+        CHECK(two.overrideFor(3, 3) == two.overrideFor(2, 3));
+        CHECK(two.overrideFor(1, 3) == nullptr);
+        UNSCOPED_INFO("a face past them the region sent one for keeps its own");
+        CHECK(two.overrideFor(2, 1) == two.mGLTFMaterial.at(2).get());
+        CHECK(two.overrideFor(1, 1) == two.overrideFor(0, 1));
+        UNSCOPED_INFO("the entry names the faces the region sent an override for, and no face that takes another's");
+        CHECK(two.names(0));
+        CHECK(two.names(2));
+        CHECK_FALSE(two.names(1));
+        CHECK_FALSE(two.names(3));
+
+        using EFaceState = ALGLTFOverrideFaceState;
+        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*one.overrideFor(0, 1));
+        UNSCOPED_INFO("a face past them showing the last counted face's override matches, and none differs");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&one, 2, 1, same, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&one, 2, 1, nullptr, 0.0) == EFaceState::DIFFERS);
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face showing the override by value takes no change", "[LLVOCache]")
+    {
+        LLPointer<LLGLTFMaterial> held = new LLGLTFMaterial();
+        held->mRoughnessFactor = 0.5f;
+        LLPointer<LLGLTFMaterial> copy = new LLGLTFMaterial(*held);
+        LLPointer<LLGLTFMaterial> other = new LLGLTFMaterial(*held);
+        other->mRoughnessFactor = 0.25f;
+
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(nullptr, nullptr));
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(held, held));
+        UNSCOPED_INFO("a copy is the same override");
+        CHECK(LLGLTFOverrideCacheEntry::sameOverride(held, copy));
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(held, other));
+        UNSCOPED_INFO("an override and none differ either way");
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(held, nullptr));
+        CHECK_FALSE(LLGLTFOverrideCacheEntry::sameOverride(nullptr, held));
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a hold keeps the edited face until the region answers or its time is up", "[LLVOCache]")
+    {
+        constexpr F64 HOLD = LLGLTFOverrideCacheEntry::HOLD_SECONDS;
+        LLGLTFOverrideCacheEntry entry;
+        CHECK_FALSE(entry.isHeld(2, 0.0));
+        entry.hold(2, 100.0);
+        CHECK(entry.isHeld(2, 100.0));
+        CHECK(entry.isHeld(2, 100.0 + HOLD - 0.5));
+        CHECK_FALSE(entry.isHeld(2, 100.0 + HOLD));
+        UNSCOPED_INFO("only the edited face");
+        CHECK_FALSE(entry.isHeld(0, 100.0));
+        CHECK_FALSE(entry.isHeld(3, 100.0));
+
+        UNSCOPED_INFO("a face edited while another is held is held with it for as long");
+        entry.hold(0, 105.0);
+        CHECK(entry.isHeld(0, 105.0 + HOLD - 0.5));
+        CHECK(entry.isHeld(2, 105.0 + HOLD - 0.5));
+
+        UNSCOPED_INFO("a hold that ran out lets its faces go at the next one");
+        entry.hold(5, 300.0);
+        CHECK(entry.isHeld(5, 300.0));
+        CHECK_FALSE(entry.isHeld(0, 300.0));
+        CHECK_FALSE(entry.isHeld(2, 300.0));
+
+        UNSCOPED_INFO("no face outside an object's range is held");
+        entry.hold(-1, 300.0);
+        entry.hold(LLTEContents::MAX_TES, 300.0);
+        CHECK_FALSE(entry.isHeld(-1, 300.0));
+        CHECK_FALSE(entry.isHeld(LLTEContents::MAX_TES, 300.0));
+
+        UNSCOPED_INFO("the region's answer replaces the entry and the hold with it");
+        entry = LLGLTFOverrideCacheEntry();
+        CHECK_FALSE(entry.isHeld(5, 300.0));
+    }
+
+    TEST_CASE("LLGLTFOverrideCacheEntry: a face stands as unsent or held or matching or differing", "[LLVOCache]")
+    {
+        using EFaceState = ALGLTFOverrideFaceState;
+        const U64 handle = to_region_handle(1027 * 256, 1000 * 256);
+        LLGLTFOverrideCacheEntry entry;
+        REQUIRE(entry.fromLLSD(vocacheTest::makeOverrideLLSD(7, handle, LLUUID::generateNewID(), 1))); // face 0
+        entry.materialize();
+        LLPointer<LLGLTFMaterial> same = new LLGLTFMaterial(*entry.overrideFor(0, LLTEContents::MAX_TES));
+        LLPointer<LLGLTFMaterial> other = new LLGLTFMaterial(*same);
+        other->mRoughnessFactor = 0.75f;
+
+        UNSCOPED_INFO("the region sent nothing for the object");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, LLTEContents::MAX_TES, same, 0.0) == EFaceState::UNSENT);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(nullptr, 0, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::UNSENT);
+
+        UNSCOPED_INFO("a face showing the region's override, or none where it sent none");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, same, 0.0) == EFaceState::MATCHES);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::MATCHES);
+
+        UNSCOPED_INFO("a face showing another override, none in place of the region's, or one where it sent none");
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, other, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, nullptr, 0.0) == EFaceState::DIFFERS);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, same, 0.0) == EFaceState::DIFFERS);
+
+        UNSCOPED_INFO("a face waiting on the region's answer to an edit, whatever it shows");
+        entry.hold(0, 100.0);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 0, LLTEContents::MAX_TES, other, 100.0) == EFaceState::HELD);
+        CHECK(LLGLTFOverrideCacheEntry::faceState(&entry, 1, LLTEContents::MAX_TES, same, 100.0) == EFaceState::DIFFERS);
+    }
+
+    TEST_CASE("ALGLTFOverrideCounts: a region with nothing counted logs nothing", "[LLVOCache]")
+    {
+        ALGLTFOverrideCounts counts;
+        CHECK_FALSE(counts.any());
+        CHECK(counts.summary().find("0 messages") == 0u);
+
+        for (U32 ALGLTFOverrideCounts::*count : { &ALGLTFOverrideCounts::mMessages, &ALGLTFOverrideCounts::mFacesSet,
+                                                  &ALGLTFOverrideCounts::mFacesDeferred, &ALGLTFOverrideCounts::mFacesReconciled,
+                                                  &ALGLTFOverrideCounts::mKeptOnUpdate, &ALGLTFOverrideCounts::mTakenWithObject,
+                                                  &ALGLTFOverrideCounts::mDroppedAsOther, &ALGLTFOverrideCounts::mAskedAgain })
+        {
+            ALGLTFOverrideCounts one;
+            ++(one.*count);
+            UNSCOPED_INFO("any one count is something to log");
+            CHECK(one.any());
+        }
+    }
+
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an override is kept only for the object its local ID holds", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1026 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        const LLUUID first("11111111-1111-1111-1111-111111111111");
+        const LLUUID second("22222222-2222-2222-2222-222222222222");
+        const LLUUID third("33333333-3333-3333-3333-333333333333");
+        const LLUUID gone("44444444-4444-4444-4444-444444444444");
+
+        LLVOCacheEntry::vocache_entry_map_t objects;
+        objects[1] = makeObjectEntry(1, 1, first);
+        objects[2] = makeObjectEntry(2, 2, second);
+        objects[3] = makeObjectEntry(3, 3, third);
+
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1] = requireOverride(1, handle, 1, first);
+        // for an object that had local ID 2 before the one the cache holds
+        overrides[2] = requireOverride(2, handle, 1, gone);
+        // sent before the object's update came to light
+        overrides[3] = requireOverride(3, handle, 1, LLUUID::null);
+
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, true, false);
+        UNSCOPED_INFO("the writer leaves out the other object's override");
+        CHECK(overrideRecordCount(handle) == 2u);
+        LLVOCacheEntry::vocache_entry_map_t read_objects;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t read;
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        CHECK(read.size() == 2u);
+        CHECK(read.count(2) == 0u);
+        REQUIRE(read.count(1) == 1u);
+        CHECK(read[1].mObjectId == first);
+        UNSCOPED_INFO("and names the unnamed one for the object it is written beside");
+        REQUIRE(read.count(3) == 1u);
+        CHECK(read[3].mObjectId == third);
+
+        // a file not written that way: the reader holds each record to its object itself
+        writeObjectFile(handle, id, objects, { binaryRecord(makeOverrideLLSD(1, handle, first, 1)),
+                                               binaryRecord(makeOverrideLLSD(2, handle, gone, 1)),
+                                               binaryRecord(makeOverrideLLSD(3, handle, LLUUID::null, 1)) });
+        read_objects.clear();
+        read.clear();
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, read));
+        UNSCOPED_INFO("the reader drops the other object's override");
+        CHECK(read.size() == 2u);
+        CHECK(read.count(2) == 0u);
+        UNSCOPED_INFO("and names the unnamed one for the object the file holds");
+        REQUIRE(read.count(3) == 1u);
+        CHECK(read[3].mObjectId == third);
+
+        UNSCOPED_INFO("an override the region sent since the load began is the newer and stays");
+        read_objects.clear();
+        LLVOCacheEntry::vocache_gltf_overrides_map_t newer;
+        newer[1] = requireOverride(1, handle, 3, first);
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, read_objects, newer));
+        CHECK(newer[1].mSides.size() == 3u);
+    }
+
+    TEST_CASE("LLVOCacheEntry: an entry killed for an update keeps its object's overrides and one killed as gone takes them", "[LLVOCache]")
+    {
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1].mLocalId = 1;
+
+        UNSCOPED_INFO("the object stays in the world, made from the region's update");
+        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/true, overrides));
+        CHECK(overrides.count(1) == 1u);
+
+        UNSCOPED_INFO("the object is gone");
+        CHECK(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
+        CHECK(overrides.empty());
+
+        UNSCOPED_INFO("a local ID with none has none to take");
+        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
+    }
+
+    TEST_CASE("LLVOCacheEntry: overrides kept under a local ID go once it holds another object", "[LLVOCache]")
+    {
+        const LLUUID object_id("55555555-5555-5555-5555-555555555555");
+        const LLUUID other_id("66666666-6666-6666-6666-666666666666");
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        overrides[1].mObjectId = object_id;
+        overrides[2].mObjectId.setNull();
+
+        UNSCOPED_INFO("the same object keeps them");
+        CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(1, object_id, overrides));
+        CHECK(overrides.count(1) == 1u);
+        UNSCOPED_INFO("so does an override naming no object");
+        CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(2, other_id, overrides));
+        CHECK(overrides.count(2) == 1u);
+        UNSCOPED_INFO("another object does not");
+        CHECK(LLVOCacheEntry::dropOverridesOfAnother(1, other_id, overrides));
+        CHECK(overrides.count(1) == 0u);
+        UNSCOPED_INFO("and a local ID with none drops nothing");
+        CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(9, other_id, overrides));
+    }
+
+    // An update that names its object drops the overrides another object left under its local ID, whether the cache
+    // takes it or not (LLViewerObjectList::processObjectUpdate).
+    TEST_CASE("LLViewerObjectList: a full update names its object by UUID and a terse or cached one does not", "[LLVOCache]")
+    {
+        UNSCOPED_INFO("an update sent uncompressed");
+        CHECK(LLViewerObjectList::updateNamesObject(OUT_FULL));
+        UNSCOPED_INFO("a compressed one, a temporary object's among them, which the cache does not take");
+        CHECK(LLViewerObjectList::updateNamesObject(OUT_FULL_COMPRESSED));
+        UNSCOPED_INFO("a terse update finds its object from the local ID");
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_TERSE_IMPROVED));
+        UNSCOPED_INFO("as does the region's word that it holds an object cached");
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_FULL_CACHED));
+        CHECK_FALSE(LLViewerObjectList::updateNamesObject(OUT_UNKNOWN));
     }
 
     // Removing a region's entry lets go of its objects in memory, and an
@@ -814,7 +1138,7 @@ namespace
     {
         const U64 handle = to_region_handle(1023 * 256, 1000 * 256);
         const LLUUID id = LLUUID::generateNewID();
-        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), NO_OVERRIDES, true, false);
         REQUIRE(LLVOCache::instance().getCacheEntries() == 1u);
 
         CHECK_FALSE(LLVOCache::instance().isRemovalRequested(handle));
@@ -832,7 +1156,7 @@ namespace
         CHECK_FALSE(std::filesystem::exists(objectFile(handle, ".slc")));
 
         UNSCOPED_INFO("which leaves none asked for");
-        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), true, false);
+        LLVOCache::instance().writeToCache(handle, id, makeEntries(3), NO_OVERRIDES, true, false);
         LLVOCache::instance().removeRequestedEntries();
         CHECK(LLVOCache::instance().getCacheEntries() == 1u);
     }
@@ -849,6 +1173,7 @@ namespace
         CHECK(entry->isObject(object_id));
         CHECK_FALSE(entry->isObject(other_id));
         CHECK_FALSE(entry->isObject(LLUUID::null));
+        CHECK(entry->getObjectID() == object_id);
 
         UNSCOPED_INFO("and reading it moves nothing that reads the entry after");
         LLDataPackerBinaryBuffer* read_back = entry->getDP();
@@ -862,8 +1187,10 @@ namespace
         LLDataPackerBinaryBuffer short_dp(body.data(), UUID_BYTES - 1);
         LLPointer<LLVOCacheEntry> short_entry = new LLVOCacheEntry(8, 1234, short_dp);
         CHECK_FALSE(short_entry->isObject(object_id));
+        CHECK(short_entry->getObjectID().isNull());
         LLPointer<LLVOCacheEntry> empty_entry = new LLVOCacheEntry();
         CHECK_FALSE(empty_entry->isObject(LLUUID::null));
+        CHECK(empty_entry->getObjectID().isNull());
     }
 
     TEST_CASE("LLVOCacheEntry: a kill takes a local ID's overrides whether or not it has a valid entry", "[LLVOCache]")
@@ -913,6 +1240,151 @@ namespace
         killed.clear();
         CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
         CHECK(killed.empty());
+
+        constexpr U32 REFUSED = 5;
+        entries[REFUSED] = vocacheTest::makeEntry(REFUSED, 5, 16);
+        entries[REFUSED]->refuseUpdate();
+        entries[REFUSED]->setValid(false);
+        UNSCOPED_INFO("an entry invalid for a refused update holds its children, and is killed with them");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(REFUSED, entries, overrides, kill_entry));
+        REQUIRE(killed.size() == 1u);
+        CHECK(killed[0] == entries[REFUSED].get());
+    }
+
+    TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once and then waits for a change", "[LLVOCache]")
+    {
+        constexpr U32 CRC = 0x1234u;
+        LLPointer<LLVOCacheEntry> entry = vocacheTest::makeEntry(7, CRC, 16);
+        CHECK_FALSE(entry->isRefused(CRC));
+        CHECK_FALSE(entry->wasRefused());
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("the first refusal sets the entry's CRC apart from the one the region sends it under");
+        CHECK(entry->getCRC() != CRC);
+        CHECK_FALSE(entry->isRefused(CRC));
+        CHECK(entry->wasRefused());
+        entry->setValid(false);
+        UNSCOPED_INFO("and a kill still reaches the entry, invalid until the region sends its object again");
+        CHECK(entry->isKillable());
+        entry->setValid();
+
+        std::vector<U8> body(32, 0xCD);
+        LLDataPackerBinaryBuffer sent(body.data(), (S32)body.size());
+        entry->updateEntry(CRC, sent);
+        UNSCOPED_INFO("so the region's update replaces the bytes refused");
+        CHECK(entry->getCRC() == CRC);
+        REQUIRE(entry->getDP());
+        CHECK(entry->getDP()->getBufferSize() == 32);
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("a refusal of the bytes the region sent leaves the entry refused at their CRC");
+        CHECK(entry->getCRC() == CRC);
+        CHECK(entry->isRefused(CRC));
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+
+        entry->refuseUpdate();
+        UNSCOPED_INFO("and so does another");
+        CHECK(entry->getCRC() == CRC);
+        CHECK(entry->isRefused(CRC));
+
+        entry->updateEntry(CRC + 1, sent);
+        UNSCOPED_INFO("an object changed starts over");
+        CHECK_FALSE(entry->isRefused(CRC));
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+        entry->refuseUpdate();
+        CHECK(entry->getCRC() != CRC + 1);
+        CHECK_FALSE(entry->isRefused(CRC + 1));
+
+        entry->refuseUpdate();
+        entry->setValid(false);
+        entry->forgetRefusal();
+        UNSCOPED_INFO("a kill lets the refusal go, and the entry with it");
+        CHECK_FALSE(entry->wasRefused());
+        CHECK_FALSE(entry->isKillable());
+        CHECK_FALSE(entry->isRefused(entry->getCRC()));
+    }
+
+    TEST_CASE("LLVOCacheEntry: a child whose parent has no valid entry waits among the orphans unless its parent is made", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+        constexpr U32 OTHER_PARENT = 11;
+
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 1, 16);
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("decoded again naming the same parent, as an entry an update or a probe makes valid again is");
+        CHECK(child->takeParent(PARENT, nullptr, false) == EChildPlace::ORPHAN);
+        CHECK(child->takeParent(PARENT, nullptr, true) == EChildPlace::MADE);
+
+        UNSCOPED_INFO("naming another parent, which is made");
+        CHECK(child->takeParent(OTHER_PARENT, nullptr, true) == EChildPlace::MADE);
+        CHECK(child->getParentID() == OTHER_PARENT);
+
+        UNSCOPED_INFO("and naming none");
+        CHECK(child->takeParent(0, nullptr, false) == EChildPlace::ROOT);
+        CHECK_FALSE(child->isChild());
+    }
+
+    TEST_CASE("LLVOCacheEntry: a child waits on its parent's entry until the parent is made from it", "[LLVOCache]")
+    {
+        using EChildPlace = LLVOCacheEntry::EChildPlace;
+        constexpr U32 PARENT = 10;
+
+        LLPointer<LLVOCacheEntry> parent = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("queued to be made");
+        parent->setState(LLVOCacheEntry::IN_QUEUE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("its object asked for, its drawable not yet made");
+        parent->setState(LLVOCacheEntry::WAITING);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::WITH_PARENT);
+        CHECK(child->takeParent(PARENT, parent, true) == EChildPlace::WITH_PARENT);
+
+        UNSCOPED_INFO("and made");
+        parent->setState(LLVOCacheEntry::ACTIVE);
+        CHECK(child->takeParent(PARENT, parent, false) == EChildPlace::MADE);
+    }
+
+    TEST_CASE("LLVOCacheEntry: a child leaves its parent's entry where it holds its children, valid or refused", "[LLVOCache]")
+    {
+        constexpr U32 PARENT = 10;
+        constexpr U32 NO_ENTRY = 11;
+
+        LLVOCacheEntry::vocache_entry_map_t entries;
+        entries[PARENT] = vocacheTest::makeEntry(PARENT, 1, 16);
+        LLVOCacheEntry* const parent = entries[PARENT].get();
+        LLPointer<LLVOCacheEntry> child = vocacheTest::makeEntry(20, 2, 16);
+
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a parent refused, invalid until the region sends its object again, holds its children");
+        parent->refuseUpdate();
+        parent->setValid(false);
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == parent);
+        CHECK_FALSE(child->isChild());
+
+        UNSCOPED_INFO("a killed one holds none, and the child goes on naming it");
+        parent->forgetRefusal();
+        child->setParentID(PARENT);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == PARENT);
+
+        UNSCOPED_INFO("nor does a parent with no entry");
+        child->setParentID(NO_ENTRY);
+        CHECK(child->leaveParent(entries) == nullptr);
+        CHECK(child->getParentID() == NO_ENTRY);
+
+        UNSCOPED_INFO("and a root has no parent to leave");
+        child->setParentID(0);
+        CHECK(child->leaveParent(entries) == nullptr);
     }
 
     TEST_CASE("LLVOCacheEntry: releaseAll leaves no set holding an entry it let go", "[LLVOCache]")
@@ -1098,5 +1570,416 @@ namespace
             UNSCOPED_INFO("an entry at the load radius is never evicted at the eviction radius");
             REQUIRE(LLVOCacheEntry::staysInMemory(facts));
         }
+    }
+
+    // A cache group as the object cache's front cull sees it, played through
+    // the partition's own cadence and decision with occlusion on: what earlyFail
+    // and doOcclusion do around them is modelled here, with every query answered
+    // RESULT_AGE frames after it was asked.
+    struct CacheGroupModel
+    {
+        static constexpr U32 PERIOD     = 16; // LLVOCachePartition's mLODPeriod
+        static constexpr S32 RESULT_AGE = 3;  // AlchemyRenderQueryResultAge's default
+
+        U32  mHash         = 0;     // the frame of the period it is asked again on
+        bool mHoldsCamera  = false; // its box holds the camera, so a query of it fails early
+        bool mHidden       = false; // what a query of it answers
+        bool mRefuseRetest = false; // the pool refuses its first retest once hidden, as it does while its target is held
+
+        S32  mSeen      = 0;  // the group's last frame in view
+        S32  mAnswerAt  = -1; // the frame its query's answer is read from, -1 with none out
+        S32  mAsked     = 0;  // the frame its last query went out
+        S32  mLastAsk   = -1; // the last frame a query of it was asked for, gone out or refused
+        S32  mRefusedAt = -1; // the frame the pool refused its retest, -1 for none
+        bool mOccluded  = false;
+        S32  mMadeAt    = -1; // the first front cull that added it, -1 for none
+
+        // One front cull at `frame`, `last_front_cull` the one before it.
+        void cull(S32 frame, S32 last_front_cull)
+        {
+            const bool needs_update = (U32)frame % PERIOD == mHash;
+
+            // earlyFail reads an answer come back, then culls a hidden group
+            // that is not due to be asked again and does not hold the camera,
+            // and takes one it lets through for hidden no longer
+            if (mAnswerAt >= 0 && frame >= mAnswerAt)
+            {
+                mAnswerAt = -1;
+                mOccluded = mHidden;
+                if (!mHidden)
+                {
+                    mSeen = frame;
+                }
+            }
+            const bool retest_due = mAnswerAt < 0 && frame - mAsked >= (S32)PERIOD;
+            const bool hidden_retest = mOccluded && retest_due;
+            if (!needs_update && mOccluded)
+            {
+                if (LLVOCachePartition::culledAsHidden(retest_due, mHoldsCamera))
+                {
+                    return;
+                }
+                mOccluded = false;
+            }
+
+            LLVOCachePartition::GroupCullFacts facts;
+            facts.mCurrentFrame   = frame;
+            facts.mLastFrontCull  = last_front_cull;
+            facts.mGroupSeenFrame = mSeen;
+            facts.mPeriod         = PERIOD;
+            facts.mNeedsUpdate    = needs_update;
+            facts.mHoldsCamera    = mHoldsCamera;
+            facts.mAnswerAwaited  = mAnswerAt >= 0;
+            facts.mOccluded       = mOccluded;
+            facts.mRetestDue      = retest_due;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+
+            if (action.mAsk)
+            {   // doOcclusion, later in the frame
+                if (mHoldsCamera)
+                {
+                    mAnswerAt = -1;
+                    mOccluded = false;
+                }
+                else if (mAnswerAt < 0)
+                {
+                    mLastAsk = frame;
+                    if (mRefuseRetest && hidden_retest && mRefusedAt < 0)
+                    {   // nothing is out, and the group keeps its state
+                        mRefusedAt = frame;
+                    }
+                    else
+                    {
+                        mAnswerAt = frame + RESULT_AGE;
+                        mAsked    = frame;
+                    }
+                }
+            }
+            mSeen = frame;
+            if (action.mVisible && mMadeAt < 0)
+            {
+                mMadeAt = frame;
+            }
+        }
+    };
+
+    // The front culls of a quiet partition under a resting camera, from `first`
+    // for `frames` frames.
+    std::vector<S32> quiet_front_culls(U32 first, U32 frames, U32 idle_hash)
+    {
+        std::vector<S32> culls;
+        for (U32 frame = first; frame < first + frames; ++frame)
+        {
+            if (LLVOCachePartition::quietFrontCullDue(frame, CacheGroupModel::PERIOD, idle_hash))
+            {
+                culls.push_back((S32)frame);
+            }
+        }
+        return culls;
+    }
+
+    TEST_CASE("LLVOCachePartition: a quiet partition culls one frame in nine and two together as its hash wraps", "[LLVOCache]")
+    {
+        const std::vector<S32> culls = quiet_front_culls(6400, 128, 0);
+        REQUIRE(culls.size() == 16u);
+        size_t together = 0;
+        for (size_t i = 1; i < culls.size(); ++i)
+        {
+            const S32 gap = culls[i] - culls[i - 1];
+            CAPTURE(culls[i]);
+            UNSCOPED_INFO("the culls fall a block and a frame apart, or together");
+            CHECK((gap == 9 || gap == 1));
+            together += gap == 1;
+        }
+        UNSCOPED_INFO("and together once in each cycle of the hash, 64 frames");
+        CHECK(together == 2u);
+    }
+
+    TEST_CASE("LLVOCachePartition: a cache group in view is made while the camera rests whatever its hash", "[LLVOCache]")
+    {
+        // A resting camera over a group new to the view, for each frame of the
+        // period the group can be asked again on and each phase of the cadence:
+        // a group whose box holds the camera, which no query asks, and one
+        // outside it that its query finds in view. Seen only within the last two
+        // frames, each was asked again at every cull, nine frames apart, and made
+        // only at the culls a frame apart as the hash wraps: the one holding the
+        // camera waited for those, and never came in where its needsUpdate()
+        // frame fell on the second of them.
+        for (U32 phase = 0; phase < 64; ++phase)
+        {
+            const std::vector<S32> culls = quiet_front_culls(6400 + phase, 128, 0);
+            for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+            {
+                for (bool holds_camera : { true, false })
+                {
+                    CAPTURE(phase, hash, holds_camera);
+                    CacheGroupModel group;
+                    group.mHash        = hash;
+                    group.mHoldsCamera = holds_camera;
+
+                    S32 last = culls.front() - 9; // the cull before, which left the group out of view
+                    for (S32 frame : culls)
+                    {
+                        group.cull(frame, last);
+                        last = frame;
+                    }
+
+                    REQUIRE(group.mMadeAt >= 0);
+                    if (holds_camera)
+                    {
+                        UNSCOPED_INFO("a group whose box holds the camera is made at the first cull that sees it");
+                        CHECK(group.mMadeAt == culls[0]);
+                    }
+                    else
+                    {
+                        // asked at the first cull, its answer read at the first
+                        // cull a result's age after it
+                        const S32 answered = *std::find_if(culls.begin(), culls.end(), [&](S32 frame)
+                                                           { return frame >= culls[0] + CacheGroupModel::RESULT_AGE; });
+                        UNSCOPED_INFO("a group outside it is made at the first cull its answer is back by");
+                        CHECK(group.mMadeAt == answered);
+                    }
+                }
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: a moving camera makes a cache group once its answer is read as before", "[LLVOCache]")
+    {
+        for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+        {
+            CAPTURE(hash);
+            CacheGroupModel group;
+            group.mHash = hash;
+            for (S32 frame = 6401; frame < 6401 + 64; ++frame) // a front cull every frame
+            {
+                group.cull(frame, frame - 1);
+            }
+            UNSCOPED_INFO("asked at the first cull and made as its answer is read");
+            CHECK(group.mMadeAt == 6401 + CacheGroupModel::RESULT_AGE);
+        }
+
+        CacheGroupModel hidden;
+        hidden.mHidden = true;
+        for (S32 frame = 6401; frame < 6401 + 256; ++frame)
+        {
+            hidden.cull(frame, frame - 1);
+        }
+        UNSCOPED_INFO("a group its queries find hidden is never made");
+        CHECK(hidden.mMadeAt < 0);
+    }
+
+    TEST_CASE("LLVOCachePartition: a hidden cache group is made at the first cull after the camera steps into its box", "[LLVOCache]")
+    {
+        // A query asked from outside found the group hidden, and the camera then
+        // stepped into its box at one of the culls that followed: with that
+        // answer read or still out, the group was culled as hidden until its
+        // needsUpdate() frame or its retest, up to a period on, before
+        // processGroup saw that its box holds the camera.
+        auto made_at = [](const std::vector<S32>& culls, S32 cull_before, U32 hash, size_t step_in)
+        {
+            CacheGroupModel group;
+            group.mHash   = hash;
+            group.mHidden = true;
+            S32 last      = cull_before;
+            for (size_t i = 0; i < culls.size(); ++i)
+            {
+                if (i == step_in)
+                {
+                    REQUIRE(group.mMadeAt < 0);
+                    group.mHoldsCamera = true;
+                }
+                group.cull(culls[i], last);
+                last = culls[i];
+            }
+            return group.mMadeAt;
+        };
+
+        for (U32 phase = 0; phase < 64; ++phase)
+        {
+            const std::vector<S32> culls = quiet_front_culls(6400 + phase, 128, 0);
+            for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+            {
+                for (size_t step_in = 1; step_in < 8; ++step_in)
+                {
+                    CAPTURE(phase, hash, step_in);
+                    UNSCOPED_INFO("while the camera rests");
+                    CHECK(made_at(culls, culls.front() - 9, hash, step_in) == culls[step_in]);
+                }
+            }
+        }
+
+        std::vector<S32> every_frame;
+        for (S32 frame = 6401; frame < 6401 + 64; ++frame)
+        {
+            every_frame.push_back(frame);
+        }
+        for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+        {
+            for (size_t step_in = 1; step_in < 48; ++step_in)
+            {
+                CAPTURE(hash, step_in);
+                UNSCOPED_INFO("and while it moves");
+                CHECK(made_at(every_frame, every_frame.front() - 1, hash, step_in) == every_frame[step_in]);
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: a hidden cache group whose retest the query pool refuses is made at the next cull", "[LLVOCache]")
+    {
+        // The pool refuses a query while its target is held, by the shader
+        // profiler: nothing is out, and the group earlyFail let through for its
+        // retest is hidden no longer, so the next cull makes it, as an answer
+        // that expired counts for one in view, rather than wait for an answer
+        // that is not coming.
+        for (U32 phase = 0; phase < 64; ++phase)
+        {
+            const std::vector<S32> culls = quiet_front_culls(6400 + phase, 256, 0);
+            for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+            {
+                CAPTURE(phase, hash);
+                CacheGroupModel group;
+                group.mHash         = hash;
+                group.mHidden       = true;
+                group.mRefuseRetest = true;
+
+                S32 last          = culls.front() - 9;
+                S32 after_refusal = -1;
+                for (S32 frame : culls)
+                {
+                    const bool refused = group.mRefusedAt >= 0;
+                    group.cull(frame, last);
+                    last = frame;
+                    if (refused && after_refusal < 0)
+                    {
+                        after_refusal = frame;
+                        UNSCOPED_INFO("the cull after the refusal makes it");
+                        CHECK(group.mMadeAt == frame);
+                    }
+                }
+                REQUIRE(after_refusal >= 0);
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: a hidden cache group taken for hidden no longer at its retest is still not made", "[LLVOCache]")
+    {
+        // earlyFail clears a hidden group's OCCLUDED as it lets it through to
+        // be asked again, so that a group it never asks does not hide the
+        // answers below it. Until its answer is back the group is not seen at
+        // the last cull, so it is asked, and not made, whichever cadence the
+        // cull keeps and wherever its needsUpdate() frame falls.
+        for (U32 hash = 0; hash < CacheGroupModel::PERIOD; ++hash)
+        {
+            CAPTURE(hash);
+            CacheGroupModel moving;
+            moving.mHash   = hash;
+            moving.mHidden = true;
+            for (S32 frame = 6401; frame < 6401 + 256; ++frame)
+            {
+                moving.cull(frame, frame - 1);
+            }
+            UNSCOPED_INFO("under a moving camera");
+            CHECK(moving.mMadeAt < 0);
+
+            for (U32 phase = 0; phase < 64; ++phase)
+            {
+                CAPTURE(phase);
+                const std::vector<S32> culls = quiet_front_culls(6400 + phase, 256, 0);
+                CacheGroupModel resting;
+                resting.mHash   = hash;
+                resting.mHidden = true;
+                S32 last = culls.front() - 9;
+                for (S32 frame : culls)
+                {
+                    resting.cull(frame, last);
+                    last = frame;
+                }
+                UNSCOPED_INFO("under a resting one");
+                CHECK(resting.mMadeAt < 0);
+            }
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: cullGroup asks a group new to the view and makes one seen at the last cull", "[LLVOCache]")
+    {
+        auto seen_last_cull = []()
+        {
+            LLVOCachePartition::GroupCullFacts facts;
+            facts.mCurrentFrame   = 6409;
+            facts.mLastFrontCull  = 6400;
+            facts.mGroupSeenFrame = 6400;
+            facts.mPeriod         = 16;
+            return facts;
+        };
+
+        {
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(seen_last_cull());
+            UNSCOPED_INFO("a group seen at the last cull, nine frames back, is made and not asked");
+            CHECK(action.mVisible);
+            CHECK_FALSE(action.mAsk);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mNeedsUpdate = true;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("its needsUpdate() frame asks it again and still makes it");
+            CHECK(action.mAsk);
+            CHECK(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mAnswerAwaited = true;
+            UNSCOPED_INFO("an answer awaited holds it back");
+            CHECK_FALSE(LLVOCachePartition::cullGroup(facts).mVisible);
+            facts.mHoldsCamera = true;
+            UNSCOPED_INFO("unless its box holds the camera");
+            CHECK(LLVOCachePartition::cullGroup(facts).mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mOccluded = true;
+            UNSCOPED_INFO("a group found hidden is not made");
+            CHECK_FALSE(LLVOCachePartition::cullGroup(facts).mVisible);
+            facts.mRetestDue = true;
+            UNSCOPED_INFO("and one due its retest is asked again though it was seen");
+            CHECK(LLVOCachePartition::cullGroup(facts).mAsk);
+            facts.mOccluded = false;
+            UNSCOPED_INFO("which a group in view is not");
+            CHECK_FALSE(LLVOCachePartition::cullGroup(facts).mAsk);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mGroupSeenFrame = 6399;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("a group not seen at the last cull is new to the view: asked, not made");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mCurrentFrame = facts.mLastFrontCull + 17;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("a last cull more than a period back counts for nothing");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+        {
+            LLVOCachePartition::GroupCullFacts facts = seen_last_cull();
+            facts.mLastFrontCull  = 0;
+            facts.mGroupSeenFrame = 0;
+            const LLVOCachePartition::GroupCullAction action = LLVOCachePartition::cullGroup(facts);
+            UNSCOPED_INFO("nor does the want of one before the first cull");
+            CHECK(action.mAsk);
+            CHECK_FALSE(action.mVisible);
+        }
+    }
+
+    TEST_CASE("LLVOCachePartition: culledAsHidden passes over a hidden group until its retest unless it holds the camera", "[LLVOCache]")
+    {
+        CHECK(LLVOCachePartition::culledAsHidden(false, false));
+        CHECK_FALSE(LLVOCachePartition::culledAsHidden(true, false));
+        CHECK_FALSE(LLVOCachePartition::culledAsHidden(false, true));
+        CHECK_FALSE(LLVOCachePartition::culledAsHidden(true, true));
     }
 }

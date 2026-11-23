@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="link_tab">
+	<pane_list name="link_list" tool_tip="見つかったスクリプトと、それぞれに提案されたファイル。リンクするものにチェックを入れてください。Enterまたはダブルクリックでファイルを選択します。">
+		<pane_list.columns name="script" label="スクリプト"/>
+		<pane_list.columns name="file" label="ファイル"/>
+		<pane_list.columns name="how" label="検出方法"/>
+		<pane_list.columns name="world" label="インワールド"/>
+	</pane_list>
+	<check_box name="link_send_differing" label="異なるファイルを送信する" tool_tip="リンク後、インワールドのスクリプトの内容と異なるファイルを送信します。スクリプトの内容は先に履歴に残します。スクリプトと比較できなかったファイルや、正常に展開できないファイルは送信されません：それらはファイルを保存すると送信されます。"/>
+	<button name="link_choose" label="ファイルを選択…" tool_tip="選択したスクリプトのファイルを選択します：見つかったもののいずれか、またはディスク上の任意のファイル"/>
+	<button name="link_do" label="リンク" tool_tip="チェックした各スクリプトをそのファイルにリンクします：以後はファイルを通じて変更し、ファイルを保存すると送信されます"/>
+	<button name="link_cancel" label="キャンセル" tool_tip="何もリンクせずにこのタブを閉じます"/>
+</panel>

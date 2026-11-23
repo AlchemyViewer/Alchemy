@@ -36,4 +36,9 @@
 	<text name="triangles_shown_label" value="表示される三角形"/>
 	<text name="pixel_area" value="－"/>
 	<text name="pixel_area_label" value="ピクセルエリア"/>
+	<text name="lod_info_text" value="LOD情報"/>
+	<text name="high_lod_tris_label" value="高ポリゴン数"/>
+	<text name="medium_lod_tris_label" value="中ポリゴン数"/>
+	<text name="low_lod_tris_label" value="低ポリゴン数"/>
+	<text name="lowest_lod_tris_label" value="最低ポリゴン数"/>
 </floater>

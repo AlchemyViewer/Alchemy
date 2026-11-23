@@ -57,6 +57,7 @@ LLSpinCtrl::Params::Params()
     allow_text_entry("allow_text_entry", true),
     allow_digits_only("allow_digits_only", false),
     label_wrap("label_wrap", false),
+    reverse_buttons("reverse_buttons", false),
     scrub("scrub", false),
     text_enabled_color("text_enabled_color"),
     text_disabled_color("text_disabled_color"),
@@ -71,6 +72,7 @@ LLSpinCtrl::LLSpinCtrl(const LLSpinCtrl::Params& p)
     mLabelBox(NULL),
     mbHasBeenSet( false ),
     mPrecision(p.decimal_digits),
+    mReverseButtons(p.reverse_buttons),
     mTextEnabledColor(p.text_enabled_color()),
     mTextDisabledColor(p.text_disabled_color()),
     mScrub(p.scrub),
@@ -209,6 +211,8 @@ void LLSpinCtrl::onUpBtn( const LLSD& data )
     // Stepped, dragged or typed: the number is chosen now, whoever had
     // written it before.
     setUnset(false);
+    F32 step = mReverseButtons ? -mIncrement : mIncrement;
+
     if( getEnabled() )
     {
         std::string text = mEditor->getText();
@@ -221,17 +225,16 @@ void LLSpinCtrl::onUpBtn( const LLSD& data )
             // use getValue()/setValue() to force reload from/to control
             F32 val = cur_val;
             if (gKeyboard->getKeyDown(KEY_SHIFT)) {
-                val = cur_val + (mIncrement * 0.01f);
+                val = cur_val + (step * 0.01f);
             } else if (gKeyboard->getKeyDown(KEY_CONTROL)) {
-                val = cur_val + (mIncrement * 0.1f);
+                val = cur_val + (step * 0.1f);
             } else if (gKeyboard->getKeyDown(KEY_ALT)) {
-                val = cur_val + (mIncrement * 10.f);
+                val = cur_val + (step * 10.f);
             } else {
-                val = cur_val + mIncrement;
+                val = cur_val + step;
             }
 
             val = clamp_precision(val, mPrecision);
-            val = llmin( val, mMaxValue );
             if (val < mMinValue) val = mMinValue;
             if (val > mMaxValue) val = mMaxValue;
 
@@ -256,6 +259,8 @@ void LLSpinCtrl::onDownBtn( const LLSD& data )
     // Stepped, dragged or typed: the number is chosen now, whoever had
     // written it before.
     setUnset(false);
+    F32 step = mReverseButtons ? mIncrement : -mIncrement;
+
     if( getEnabled() )
     {
         std::string text = mEditor->getText();
@@ -267,18 +272,16 @@ void LLSpinCtrl::onDownBtn( const LLSD& data )
 
             F32 val = cur_val;
             if (gKeyboard->getKeyDown(KEY_SHIFT)) {
-                val = cur_val - (mIncrement * 0.01f);
+                val = cur_val + (step * 0.01f);
             } else if (gKeyboard->getKeyDown(KEY_CONTROL)) {
-                val = cur_val - (mIncrement * 0.1f);
+                val = cur_val + (step * 0.1f);
             } else if (gKeyboard->getKeyDown(KEY_ALT)) {
-                val = cur_val - (mIncrement * 10.f);
+                val = cur_val + (step * 10.f);
             } else {
-                val = cur_val - mIncrement;
+                val = cur_val + step;
             }
 
             val = clamp_precision(val, mPrecision);
-            val = llmax( val, mMinValue );
-
             if (val < mMinValue) val = mMinValue;
             if (val > mMaxValue) val = mMaxValue;
 

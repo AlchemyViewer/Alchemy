@@ -201,6 +201,15 @@ public:
     bool hasRenderMaterialParams() const;
     void setHasRenderMaterialParams(bool has_params);
 
+    // The faces the region counts on the object. A mesh's are those of the shape its parameters make, which its asset can
+    // outnumber; a face past them takes the render material and glTF override the region gives the last.
+    U8 getRegionFaceCount() const;
+    // The faces that share face `te`'s settings, [first, last), selected and edited as one (LLPrimitive::faceGroup).
+    std::pair<S32, S32> getFaceGroup(S32 te) const;
+    // Selects face `te` with the faces that share its settings.
+    virtual void setTESelected(const U8 te, bool sel);
+
+    // The render material the parameter block gives face `te` (LLRenderMaterialParams::getMaterialFor).
     const LLUUID& getRenderMaterialID(U8 te) const;
 
     // set the RenderMaterialID for the given TextureEntry

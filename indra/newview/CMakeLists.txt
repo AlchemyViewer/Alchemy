@@ -137,6 +137,7 @@ if(AL_BUILD_VIEWER)
     alavataractions.cpp
     alavatargroups.cpp
     albakeproxies.cpp
+    albulkrename.cpp
     alchatautocomplete.cpp
     alchatbar.cpp
     alchatcommand.cpp
@@ -153,6 +154,7 @@ if(AL_BUILD_VIEWER)
     aldroptarget.cpp
     alfarplaneoverlay.cpp
     alfloaterblocked.cpp
+    alfloaterbulkrename.cpp
     alfloaterdirectory.cpp
     alfloaterevent.cpp
     alfloaterexploresounds.cpp
@@ -358,6 +360,8 @@ if(AL_BUILD_VIEWER)
     llchannelmanager.cpp
     #llchatbar.cpp
     llchathistory.cpp
+    llchatservicehistory.cpp
+    llchatservicehistorycore.cpp
     llchatitemscontainerctrl.cpp
     llchatmsgbox.cpp
     llchiclet.cpp
@@ -484,6 +488,7 @@ if(AL_BUILD_VIEWER)
     llfloaterinspect.cpp
     llfloaterinventorysettings.cpp
     llfloaterinventorythumbnailshelper.cpp
+    llfloaterjoin.cpp
     llfloaterjoystick.cpp
     llfloaterlagmeter.cpp
     llfloaterland.cpp
@@ -552,12 +557,14 @@ if(AL_BUILD_VIEWER)
     llfloaterurlentry.cpp
     llfloatervoicevolume.cpp
     llfloaterwebcontent.cpp
+    llfloaterwebmodal.cpp
     llfloaterwhitelistentry.cpp
     llfloaterwindowsize.cpp
     llfloaterworldmap.cpp
     llfolderviewmodelinventory.cpp
     llfollowcam.cpp
     llfriendcard.cpp
+    llflycam.cpp
     llflyoutcombobtn.cpp
     llgesturelistener.cpp
     llgesturemgr.cpp
@@ -736,6 +743,7 @@ if(AL_BUILD_VIEWER)
     llpanelplaceprofile.cpp
     llpanelplaces.cpp
     llpanelplacestab.cpp
+    llpanelpreferencegamecontrol.cpp
     llpanelpresetscamerapulldown.cpp
     llpanelpresetspulldown.cpp
     llpanelprimmediacontrols.cpp
@@ -1012,6 +1020,7 @@ if(AL_BUILD_VIEWER)
     alavataractions.h
     alavatargroups.h
     albakeproxies.h
+    albulkrename.h
     alchatautocomplete.h
     alchatbar.h
     alchatcommand.h
@@ -1027,6 +1036,7 @@ if(AL_BUILD_VIEWER)
     aldroptarget.h
     alfarplaneoverlay.h
     alfloaterblocked.h
+    alfloaterbulkrename.h
     alfloaterdirectory.h
     alfloaterevent.h
     alfloaterexploresounds.h
@@ -1142,19 +1152,29 @@ if(AL_BUILD_VIEWER)
     alfloaterxuilibrary.h
     alfloaterxuistudio.h
     alviewcapture.h
+    algltfmaterialretry.h
+    algltfoverridestate.h
     algradehistory.h
+    algroupchanges.h
+    algroupmembers.h
     alhoverglow.h
     allegacynotificationwellwindow.h
     allightboxdirectory.h
+    almaturitypreference.h
+    almeshuploadassets.h
     almotionpredictor.h
+    almutelookup.h
     alobjectproperties.h
     alobjectroster.h
     alprobereach.h
     alregionretirement.h
+    alagentlistupdates.h
+    alteleportprogress.h
     alagentlocationformat.h
     alcrashreporter.h
     alfeedback.h
     alfeedbackoutbox.h
+    alfriendbacklog.h
     alpanelaomini.h
     alparceliconstrip.h
     alpanelaopulldown.h
@@ -1242,6 +1262,8 @@ if(AL_BUILD_VIEWER)
     llchannelmanager.h
     #llchatbar.h
     llchathistory.h
+    llchatservicehistory.h
+    llchatservicehistorycore.h
     llchatitemscontainerctrl.h
     llchatmsgbox.h
     llchiclet.h
@@ -1372,6 +1394,7 @@ if(AL_BUILD_VIEWER)
     llfloaterinspect.h
     llfloaterinventorysettings.h
     llfloaterinventorythumbnailshelper.h
+    llfloaterjoin.h
     llfloaterjoystick.h
     llfloaterlagmeter.h
     llfloaterland.h
@@ -1441,12 +1464,14 @@ if(AL_BUILD_VIEWER)
     llfloaterurlentry.h
     llfloatervoicevolume.h
     llfloaterwebcontent.h
+    llfloaterwebmodal.h
     llfloaterwhitelistentry.h
     llfloaterwindowsize.h
     llfloaterworldmap.h
     llfolderviewmodelinventory.h
     llfollowcam.h
     llfriendcard.h
+    llflycam.h
     llflyoutcombobtn.h
     llgesturelistener.h
     llgesturemgr.h
@@ -1614,6 +1639,7 @@ if(AL_BUILD_VIEWER)
     llpanelplaceprofile.h
     llpanelplaces.h
     llpanelplacestab.h
+    llpanelpreferencegamecontrol.h
     llpanelpresetscamerapulldown.h
     llpanelpresetspulldown.h
     llpanelprimmediacontrols.h
@@ -2059,6 +2085,7 @@ if(AL_BUILD_VIEWER)
     app_settings/cmd_line.xml
     app_settings/commands.xml
     app_settings/emoji_groups.xml
+    app_settings/gamecontrollerdb.txt
     app_settings/grass.xml
     app_settings/ignorable_dialogs.xml
     app_settings/key_bindings.xml
@@ -2538,9 +2565,11 @@ if(AL_BUILD_TESTS)
     newview_tests
     PROJECT ${test_project}
     SOURCES
+      tests/alagentlistupdates_test.cpp
       tests/alagentlocationformat_test.cpp
       tests/alapplinks_test.cpp
       tests/albakeproxies_test.cpp
+      tests/albulkrename_test.cpp
       tests/alchattimestamp_test.cpp
       tests/alcolorwheelmodel_test.cpp
       tests/alcrashreporter_test.cpp
@@ -2548,8 +2577,14 @@ if(AL_BUILD_TESTS)
       tests/aldaycyclelandmarks_test.cpp
       tests/alfeedback_test.cpp
       tests/alfeedbackoutbox_test.cpp
+      tests/alfriendbacklog_test.cpp
+      tests/algltfmaterialretry_test.cpp
       tests/algradehistory_test.cpp
+      tests/algroupchanges_test.cpp
+      tests/algroupmembers_test.cpp
+      tests/almaturitypreference_test.cpp
       tests/almotionpredictor_test.cpp
+      tests/almutelookup_test.cpp
       tests/alnotecardembedded_test.cpp
       tests/alobjectroster_test.cpp
       tests/alprobereach_test.cpp
@@ -2602,13 +2637,17 @@ if(AL_BUILD_TESTS)
       tests/alscripttheme_test.cpp
       tests/alscripttypes_test.cpp
       tests/alscriptweightspane_test.cpp
+      tests/alteleportprogress_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altextureboost_test.cpp
       tests/altexturetable_test.cpp
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
+      tests/llagentbenefits_test.cpp
       tests/llautoreplace_test.cpp
+      tests/llchatservicehistorycore_test.cpp
+      tests/llgroupdata_test.cpp
       tests/llhttpretrypolicy_test.cpp
       tests/llversioninfo_test.cpp
       tests/llviewerassetstats_test.cpp
@@ -2620,6 +2659,7 @@ if(AL_BUILD_TESTS)
       alagentlocationformat.cpp
       alapplinks.cpp
       albakeproxies.cpp
+      albulkrename.cpp
       alchattimestamp.cpp
       alcolorwheelmodel.cpp
       alcrashreporter.cpp
@@ -2686,7 +2726,9 @@ if(AL_BUILD_TESTS)
       alscriptweightspane.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
+      llagentbenefits.cpp
       llautoreplace.cpp
+      llchatservicehistorycore.cpp
       llhttpretrypolicy.cpp
       llversioninfo.cpp
       llviewerassetstats.cpp
@@ -2763,6 +2805,16 @@ if(AL_BUILD_TESTS)
     UNIT llremoteparcelrequest.cpp
     LIBRARIES llui ${test_libs}
     SUPPORT newview_test_fakes
+  )
+  # The conversation log's rows from the chat service's archives: llui for the
+  # floater and strings it reaches, the IM model and the tracker stubbed.
+  al_add_test_binary(
+    llconversationlog_test
+    PROJECT ${test_project}
+    SOURCES tests/llconversationlog_test.cpp
+    UNIT llconversationlog.cpp
+    LIBRARIES llui llxml ${test_libs}
+    SUPPORT newview_test_fakes newview_test_settings
   )
   al_add_test_binary(
     llsecapi_test

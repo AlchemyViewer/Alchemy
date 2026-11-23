@@ -94,7 +94,25 @@ namespace
         [SentryObjCSDK captureEvent:event withScope:scope];
     }
 
-    bool engage()
+    // How start() went, for attachRun() to log once the log is open.
+    enum class StartState
+    {
+        NotStarted,
+        Disabled,
+        NotAllowed,
+        Failed,
+        Engaged,
+    };
+    StartState sStartState = StartState::NotStarted;
+
+    void log_engaged()
+    {
+        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
+    }
+
+    // What needs only the viewer's directories and its version. The
+    // reporter is running from here.
+    bool start_sdk()
     {
         const ALCrashReporter::Release release = ALCrashReporter::release();
         const std::string cache = gDirUtilp->getExpandedFilename(LL_PATH_LOGS, "sentry");
@@ -147,7 +165,14 @@ namespace
             return false;
         }
         sEngaged = true;
+        ALCrashReporter::setTag("run_id", ALCrashReporter::runId());
+        return true;
+    }
 
+    // What needs the viewer: the tags of the run, and the files a crashed
+    // previous run left, which readLastRun() has read by now.
+    void attach_run()
+    {
         for (const auto& [key, value] : ALCrashReporter::commonTags())
         {
             ALCrashReporter::setTag(key, value);
@@ -157,8 +182,21 @@ namespace
         {
             report_last_run();
         }
+    }
 
-        LL_INFOS("CrashReporter") << "Sentry engaged for " << LLVersionInfo::instance().getChannelAndVersion() << LL_ENDL;
+    // Engaged after start(), when the settings allow what the record did not.
+    // Before the viewer exists, attachRun() attaches the run later.
+    bool engage()
+    {
+        if (!start_sdk())
+        {
+            return false;
+        }
+        if (LLAppViewer::instance())
+        {
+            attach_run();
+            log_engaged();
+        }
         return true;
     }
 
@@ -172,24 +210,64 @@ namespace
     }
 }
 
-bool ALCrashReporter::init()
+// The Cocoa SDK has no way to keep a report until consent is given, so it is
+// engaged only once crash reports are allowed.
+bool ALCrashReporter::start(bool may_run)
 {
 #if !LL_SEND_CRASH_REPORTS
     return false;
 #else
-    if (!consentRecorded(consentSentinel()))
+    if (!may_run)
     {
-        LL_INFOS("CrashReporter") << "No consent to crash reports recorded; none are sent until it is" << LL_ENDL;
+        sStartState = StartState::Disabled;
         return false;
     }
-    return engage();
+    if (recordedConsent(consentDirectory()) != Consent::Allowed)
+    {
+        sStartState = StartState::NotAllowed;
+        return false;
+    }
+    sStartState = start_sdk() ? StartState::Engaged : StartState::Failed;
+    return sStartState == StartState::Engaged;
 #endif
 }
 
-void ALCrashReporter::refreshConsent(bool allowed)
+// Nothing is kept for an answer here, so there is nothing to ask about or
+// to delete.
+void ALCrashReporter::askAfterHeldCrash()
 {
-    recordConsent(consentSentinel(), allowed);
+}
+
+void ALCrashReporter::discardDeclined()
+{
+}
+
+void ALCrashReporter::attachRun()
+{
+    if (sEngaged)
+    {
+        attach_run();
+        log_engaged();
+    }
+    else if (sStartState == StartState::Disabled)
+    {
+        LL_INFOS("CrashReporter") << "Crash logger disabled; Sentry stays off" << LL_ENDL;
+    }
+    else if (sStartState == StartState::NotAllowed)
+    {
+        LL_INFOS("CrashReporter") << "Crash reports not allowed; none are sent until they are" << LL_ENDL;
+    }
+    else if (sStartState == StartState::Failed)
+    {
+        LL_WARNS("CrashReporter") << "Sentry did not start; crashes go unreported" << LL_ENDL;
+    }
+}
+
+void ALCrashReporter::refreshConsent(Consent consent, bool may_run)
+{
+    recordConsent(consentDirectory(), consent);
 #if LL_SEND_CRASH_REPORTS
+    const bool allowed = may_run && consent == Consent::Allowed;
     if (allowed && !sEngaged)
     {
         engage();
@@ -197,7 +275,8 @@ void ALCrashReporter::refreshConsent(bool allowed)
     else if (!allowed && sEngaged)
     {
         close_sdk();
-        LL_INFOS("CrashReporter") << "Consent to crash reports withdrawn; Sentry closed" << LL_ENDL;
+        LL_INFOS("CrashReporter") << (may_run ? "Consent to crash reports withdrawn; Sentry closed"
+                                              : "Crash logger disabled; Sentry closed") << LL_ENDL;
     }
 #endif
 }
@@ -208,6 +287,11 @@ void ALCrashReporter::shutdown()
 }
 
 bool ALCrashReporter::isEngaged()
+{
+    return sEngaged;
+}
+
+bool ALCrashReporter::isSending()
 {
     return sEngaged;
 }

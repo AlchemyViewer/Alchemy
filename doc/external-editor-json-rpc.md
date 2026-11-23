@@ -312,6 +312,8 @@ interface SessionHandshake {
   protocol_version: "1.0";
   viewer_name: string;
   viewer_version: string;
+  agent_id: string;
+  agent_name: string;
   challenge: string;
   languages: string[];
   syntax_id: string;
@@ -325,6 +327,8 @@ interface SessionHandshake {
 - `protocol_version`: Fixed version "1.0" for the communication protocol
 - `viewer_name`: Name of the Second Life viewer application
 - `viewer_version`: Version string of the viewer
+- `agent_id`: Unique identifier for the user/agent logged in, as the official viewer sends it. `session.ok` says it again
+- `agent_name`: Account name of the user/agent logged in
 - `challenge`: Path to a temporary file on the local filesystem containing a UUID, and nothing else. The client must read this file and return its contents as `challenge_response` to authenticate the connection. The file is named at random, readable only by the user running the viewer, and deleted once the handshake is answered or abandoned, so only a client running as that user can answer.
 - `languages`: Array of supported scripting languages (e.g., `["lsl", "luau"]`)
 - `syntax_id`: Current active syntax identifier as a UUID string
@@ -376,9 +380,9 @@ interface SessionHandshakeResponse {
 
 **JSON-RPC Method:** `session.ok` (notification from viewer)
 
-Confirmation notification sent by the viewer after successful handshake completion. It says who
-is logged in, which the handshake does not: anything that connects is sent the handshake, and
-only a client that has answered its challenge is sent this.
+Confirmation notification sent by the viewer after successful handshake completion. It says again
+who is logged in, as the handshake did. The server refuses a connection from a browser's page, so
+only a program on the same machine is sent either.
 
 ```typescript
 interface SessionOk {

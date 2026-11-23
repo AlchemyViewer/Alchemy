@@ -25,4 +25,5 @@
 	<check_box label="開発メニューを表示" name="show_develop_menu_check"/>
 	<button label="記録済みのユーザ名" name="remembered_usernames"/>
 	<button label="デフォルトの作成権限" name="default_creation_permissions"/>
+	<button name="scripting_development" label="スクリプト開発"/>
 </panel>

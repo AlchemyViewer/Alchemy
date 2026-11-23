@@ -83,7 +83,6 @@
 #include "llurlentry.h"
 #include "llviewercontrol.h"
 #include "llviewerdisplay.h"
-#include "llviewerjoystick.h"
 #include "llviewermediafocus.h"
 #include "llviewermenu.h"
 #include "llviewerobjectlist.h"
@@ -117,6 +116,11 @@ const F32 AUTOPILOT_HEIGHT_ADJUST_DISTANCE = 8.f;           // meters
 const F32 AUTOPILOT_MIN_TARGET_HEIGHT_OFF_GROUND = 1.f; // meters
 const F32 AUTOPILOT_MAX_TIME_NO_PROGRESS_WALK = 1.5f;       // seconds
 const F32 AUTOPILOT_MAX_TIME_NO_PROGRESS_FLY = 2.5f;        // seconds. Flying is less presize, needs a bit more time
+
+// Game-control ground-sit requests made while flying have no target position
+// to check against, so refuse them outright when the ground below the agent
+// is farther than this away, rather than snapping the agent down onto distant terrain.
+const F32 MAX_SIT_ON_GROUND_DISTANCE = 30.f;                // meters
 
 const F32 MAX_VELOCITY_AUTO_LAND_SQUARED = 4.f * 4.f;
 const F64 CHAT_AGE_FAST_RATE = 3.0;
@@ -414,11 +418,7 @@ LLAgent::LLAgent() :
     mTPNeedsNeabyChatSeparator(false),
     mMaturityRatingChange(0U),
     mIsDoSendMaturityPreferenceToServer(false),
-    mMaturityPreferenceRequestId(0U),
-    mMaturityPreferenceResponseId(0U),
-    mMaturityPreferenceNumRetries(0U),
-    mLastKnownRequestMaturity(SIM_ACCESS_MIN),
-    mLastKnownResponseMaturity(SIM_ACCESS_MIN),
+    mMaturityPreference(SIM_ACCESS_MIN),
     mHttpPolicy(LLCore::HttpRequest::DEFAULT_POLICY_ID),
     mTeleportState(TELEPORT_NONE),
     mRegionp(NULL),
@@ -515,8 +515,7 @@ void LLAgent::init()
 
     gSavedSettings.getControl("PreferredMaturity")->getValidateSignal()->connect(boost::bind(&LLAgent::validateMaturity, this, _2));
     gSavedSettings.getControl("PreferredMaturity")->getSignal()->connect(boost::bind(&LLAgent::handleMaturity, this, _2));
-    mLastKnownResponseMaturity = static_cast<U8>(gSavedSettings.getU32("PreferredMaturity"));
-    mLastKnownRequestMaturity = mLastKnownResponseMaturity;
+    mMaturityPreference = ALMaturityPreference(static_cast<U8>(gSavedSettings.getU32("PreferredMaturity")));
     mIsDoSendMaturityPreferenceToServer = true;
 
     mIgnorePrejump = gSavedSettings.getBOOL("AlchemyNimble");
@@ -1425,6 +1424,17 @@ LLVector3d LLAgent::getPosGlobalFromAgent(const LLVector3 &pos_agent) const
     return pos_agent_d + mAgentOriginGlobal;
 }
 
+static void finish_sit_on_ground(bool success, void*)
+{
+    // A restriction on sitting may have come during the walk or flight.
+    if (success && RlvActions::canGroundSit())
+    {
+        gAgent.setFlying(false);
+        gAgent.clearControlFlags(AGENT_CONTROL_STAND_UP); // might have been set by autopilot
+        gAgent.setControlFlags(AGENT_CONTROL_SIT_ON_GROUND);
+    }
+}
+
 void LLAgent::sitDown()
 {
 // [RLVa:KB] - Checked: RLVa-1.2.1
@@ -1432,7 +1442,38 @@ void LLAgent::sitDown()
         return;
 // [/RLVa:KB]
 
+    // An autopilot still running would go on steering the avatar once it sits.
+    stopAutoPilot(true);
     setControlFlags(AGENT_CONTROL_SIT_ON_GROUND);
+}
+
+void LLAgent::sitDownNearby()
+{
+    // The walk or flight to the spot ends in the sit itself, past sitDown()'s check.
+    if (!RlvActions::canGroundSit())
+        return;
+
+    // When standing on a surface, send the request immediately.
+    if (!getFlying() && isAgentAvatarValid() && !gAgentAvatarp->mInAir)
+    {
+        sitDown();
+        return;
+    }
+
+    // Sit on the ground directly beneath (or above) the agent's current position.
+    // Refuse if that spot is too far away, and otherwise walk/fly there first,
+    // rather than snapping straight down onto it (e.g. terrain far below a flying
+    // agent) as AGENT_CONTROL_SIT_ON_GROUND would do if sent immediately.
+    LLVector3d pos_global = getPositionGlobal();
+    LLVector3d sit_spot_global = pos_global;
+    sit_spot_global.mdV[VZ] = LLWorld::getInstance()->resolveLandHeightGlobal(pos_global);
+
+    if (dist_vec(pos_global, sit_spot_global) > MAX_SIT_ON_GROUND_DISTANCE)
+    {
+        return;
+    }
+
+    startAutoPilotGlobal(sit_spot_global, "Sit", NULL, finish_sit_on_ground, NULL, 0.7f);
 }
 
 //-----------------------------------------------------------------------------
@@ -1531,7 +1572,7 @@ LLVector3 LLAgent::getReferenceUpVector()
     return up_vector;
 }
 
-// Radians, positive is forward into ground
+// Radians, positive is downward toward ground
 //-----------------------------------------------------------------------------
 // pitch()
 //-----------------------------------------------------------------------------
@@ -2225,7 +2266,7 @@ bool LLAgent::needsRenderAvatar()
 {
 //  if (gAgentCamera.cameraMouselook() && !LLVOAvatar::sVisibleInFirstPerson)
 // [RLVa:KB] - Checked: RLVa-2.0.2
-    if ( (gAgentCamera.cameraMouselook() && !LLVOAvatar::sVisibleInFirstPerson) || (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELF)) )
+    if ( (gAgentCamera.isHidingAvatarForFirstPerson() && !LLVOAvatar::sVisibleInFirstPerson) || (gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELF)) )
 // [/RLVa:KB]
     {
         return false;
@@ -2238,9 +2279,9 @@ bool LLAgent::needsRenderAvatar()
 bool LLAgent::needsRenderHead()
 {
 // [RLVa:KB] - Checked: RLVa-2.0.2
-    return ((mShowAvatar && !gAgentCamera.cameraMouselook())) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD));
+    return ((mShowAvatar && !gAgentCamera.isHidingAvatarForFirstPerson())) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD));
 // [/RLVa:KB]
-//  return (mShowAvatar && !gAgentCamera.cameraMouselook());
+//  return (mShowAvatar && !gAgentCamera.isHidingAvatarForFirstPerson());
 }
 
 //-----------------------------------------------------------------------------
@@ -2603,6 +2644,11 @@ void LLAgent::endAnimationUpdateUI()
         LLFloaterCamera::onAvatarEditingAppearance(true);
     }
 
+    // Sync before updating attachment visibility
+    // Don't let this be called more than once if the camera
+    // mode hasn't changed.  --JC
+    gAgentCamera.updateLastCamera();
+
     if (isAgentAvatarValid())
     {
         gAgentAvatarp->updateAttachmentVisibility(gAgentCamera.getCameraMode());
@@ -2612,10 +2658,6 @@ void LLAgent::endAnimationUpdateUI()
     {
         gFloaterTools->dirty();
     }
-
-    // Don't let this be called more than once if the camera
-    // mode hasn't changed.  --JC
-    gAgentCamera.updateLastCamera();
 }
 
 boost::signals2::connection LLAgent::setMouselookModeInCallback( const camera_signal_t::slot_type& cb )
@@ -2927,66 +2969,47 @@ int LLAgent::convertTextToMaturity(char text)
 
 void LLAgent::handlePreferredMaturityResult(U8 pServerMaturity)
 {
-    // Update the number of responses received
-    ++mMaturityPreferenceResponseId;
-    llassert(mMaturityPreferenceResponseId <= mMaturityPreferenceRequestId);
-
-    // Update the last known server maturity response
-    mLastKnownResponseMaturity = pServerMaturity;
-
-    // Ignore all responses if we know there are more unanswered requests that are expected
-    if (mMaturityPreferenceResponseId == mMaturityPreferenceRequestId)
+    const ALMaturityPreference::Outcome outcome = mMaturityPreference.answered(pServerMaturity);
+    if (outcome == ALMaturityPreference::Outcome::SYNCED)
     {
-        // If we received a response that matches the last known request, then we are good
-        if (mLastKnownRequestMaturity == mLastKnownResponseMaturity)
-        {
-            mMaturityPreferenceNumRetries = 0;
-            reportPreferredMaturitySuccess();
-            llassert(static_cast<U8>(gSavedSettings.getU32("PreferredMaturity")) == mLastKnownResponseMaturity);
-        }
-        // Else, the viewer is out of sync with the server, so let's try to re-sync with the
-        // server by re-sending our last known request.  Cap the re-tries at 3 just to be safe.
-        else if (++mMaturityPreferenceNumRetries <= 3)
-        {
-            LL_INFOS() << "Retrying attempt #" << mMaturityPreferenceNumRetries << " to set viewer preferred maturity to '"
-                << LLViewerRegion::accessToString(mLastKnownRequestMaturity) << "'" << LL_ENDL;
-            sendMaturityPreferenceToServer(mLastKnownRequestMaturity);
-        }
-        // Else, the viewer is style out of sync with the server after 3 retries, so inform the user
-        else
-        {
-            mMaturityPreferenceNumRetries = 0;
-            LL_WARNS() << "Too many retries for maturity preference" << LL_ENDL;
-            reportPreferredMaturityError();
-        }
+        llassert(static_cast<U8>(gSavedSettings.getU32("PreferredMaturity")) == mMaturityPreference.answeredMaturity());
     }
+    else if (outcome == ALMaturityPreference::Outcome::FAILED)
+    {
+        LL_WARNS() << "Too many retries for maturity preference" << LL_ENDL;
+    }
+    handleMaturityPreferenceOutcome(outcome);
 }
 
 void LLAgent::handlePreferredMaturityError()
 {
-    // Update the number of responses received
-    ++mMaturityPreferenceResponseId;
-    llassert(mMaturityPreferenceResponseId <= mMaturityPreferenceRequestId);
-
-    // Ignore all responses if we know there are more unanswered requests that are expected
-    if (mMaturityPreferenceResponseId == mMaturityPreferenceRequestId)
+    const ALMaturityPreference::Outcome outcome = mMaturityPreference.failed();
+    if (outcome == ALMaturityPreference::Outcome::SYNCED)
     {
-        mMaturityPreferenceNumRetries = 0;
+        LL_WARNS() << "Got an error but maturity preference '" << LLViewerRegion::accessToString(mMaturityPreference.requestedMaturity())
+            << "' seems to be in sync with the server" << LL_ENDL;
+    }
+    handleMaturityPreferenceOutcome(outcome);
+}
 
-        // If we received a response that matches the last known request, then we are synced with
-        // the server, but not quite sure why we are
-        if (mLastKnownRequestMaturity == mLastKnownResponseMaturity)
-        {
-            LL_WARNS() << "Got an error but maturity preference '" << LLViewerRegion::accessToString(mLastKnownRequestMaturity)
-                << "' seems to be in sync with the server" << LL_ENDL;
-            reportPreferredMaturitySuccess();
-        }
-        // Else, the more likely case is that the last request does not match the last response,
-        // so inform the user
-        else
-        {
-            reportPreferredMaturityError();
-        }
+void LLAgent::handleMaturityPreferenceOutcome(ALMaturityPreference::Outcome outcome)
+{
+    switch (outcome)
+    {
+    case ALMaturityPreference::Outcome::WAITING:
+        break;
+    case ALMaturityPreference::Outcome::SYNCED:
+        reportPreferredMaturitySuccess();
+        break;
+    case ALMaturityPreference::Outcome::RETRY:
+        // The server answered with another maturity: ask for the last one again.
+        LL_INFOS() << "Retrying attempt #" << mMaturityPreference.retries() << " to set viewer preferred maturity to '"
+            << LLViewerRegion::accessToString(mMaturityPreference.requestedMaturity()) << "'" << LL_ENDL;
+        sendMaturityPreferenceToServer(mMaturityPreference.requestedMaturity());
+        break;
+    case ALMaturityPreference::Outcome::FAILED:
+        reportPreferredMaturityError();
+        break;
     }
 }
 
@@ -3013,11 +3036,12 @@ void LLAgent::reportPreferredMaturityError()
     }
 
     // Get the last known maturity request from the user activity
-    std::string preferredMaturity = LLViewerRegion::accessToString(mLastKnownRequestMaturity);
+    std::string preferredMaturity = LLViewerRegion::accessToString(mMaturityPreference.requestedMaturity());
     LLStringUtil::toLower(preferredMaturity);
 
     // Get the last known maturity response from the server
-    std::string actualMaturity = LLViewerRegion::accessToString(mLastKnownResponseMaturity);
+    const U8 answered_maturity = mMaturityPreference.answeredMaturity();
+    std::string actualMaturity = LLViewerRegion::accessToString(answered_maturity);
     LLStringUtil::toLower(actualMaturity);
 
     // Notify the user
@@ -3029,19 +3053,19 @@ void LLAgent::reportPreferredMaturityError()
     // Check the saved settings to ensure that we are consistent.  If we are not consistent, update
     // the viewer, but do not send anything to server
     U8 localMaturity = static_cast<U8>(gSavedSettings.getU32("PreferredMaturity"));
-    if (localMaturity != mLastKnownResponseMaturity)
+    if (localMaturity != answered_maturity)
     {
         bool tmpIsDoSendMaturityPreferenceToServer = mIsDoSendMaturityPreferenceToServer;
         mIsDoSendMaturityPreferenceToServer = false;
-        LL_INFOS() << "Setting viewer preferred maturity to '" << LLViewerRegion::accessToString(mLastKnownResponseMaturity) << "'" << LL_ENDL;
-        gSavedSettings.setU32("PreferredMaturity", static_cast<U32>(mLastKnownResponseMaturity));
+        LL_INFOS() << "Setting viewer preferred maturity to '" << LLViewerRegion::accessToString(answered_maturity) << "'" << LL_ENDL;
+        gSavedSettings.setU32("PreferredMaturity", static_cast<U32>(answered_maturity));
         mIsDoSendMaturityPreferenceToServer = tmpIsDoSendMaturityPreferenceToServer;
     }
 }
 
 bool LLAgent::isMaturityPreferenceSyncedWithServer() const
 {
-    return (mMaturityPreferenceRequestId == mMaturityPreferenceResponseId);
+    return mMaturityPreference.synced();
 }
 
 void LLAgent::sendMaturityPreferenceToServer(U8 pPreferredMaturity)
@@ -3049,33 +3073,33 @@ void LLAgent::sendMaturityPreferenceToServer(U8 pPreferredMaturity)
     // Only send maturity preference to the server if enabled
     if (mIsDoSendMaturityPreferenceToServer)
     {
-        // Increment the number of requests.  The handlers manage a separate count of responses.
-        ++mMaturityPreferenceRequestId;
-
-        // Update the last know maturity request
-        mLastKnownRequestMaturity = pPreferredMaturity;
-
-        // If we don't have a region, report it as an error
-        if (getRegion() == NULL)
+        // A change that can't be asked, with no region or a region granting no UpdateAgentInformation, has no
+        // answer to wait for: it fails, and the setting goes back to what the server has.
+        handleMaturityPreferenceOutcome(mMaturityPreference.request(pPreferredMaturity, [&]()
         {
-            LL_WARNS("Agent") << "Region is not defined, can not change Maturity setting." << LL_ENDL;
-            return;
-        }
+            if (getRegion() == NULL)
+            {
+                LL_WARNS("Agent") << "Region is not defined, can not change Maturity setting." << LL_ENDL;
+                return false;
+            }
 
-        LLSD access_prefs = LLSD::emptyMap();
-        access_prefs["max"] = LLViewerRegion::accessToShortString(pPreferredMaturity);
+            LLSD access_prefs = LLSD::emptyMap();
+            access_prefs["max"] = LLViewerRegion::accessToShortString(pPreferredMaturity);
 
-        LLSD postData = LLSD::emptyMap();
-        postData["access_prefs"] = access_prefs;
-        LL_INFOS() << "Sending viewer preferred maturity to '" << LLViewerRegion::accessToString(pPreferredMaturity) << LL_ENDL;
+            LLSD postData = LLSD::emptyMap();
+            postData["access_prefs"] = access_prefs;
+            LL_INFOS() << "Sending viewer preferred maturity to '" << LLViewerRegion::accessToString(pPreferredMaturity) << LL_ENDL;
 
-        if (!requestPostCapability("UpdateAgentInformation", postData,
-            static_cast<httpCallback_t>(boost::bind(&LLAgent::processMaturityPreferenceFromServer, this, _1, pPreferredMaturity)),
-            static_cast<httpCallback_t>(boost::bind(&LLAgent::handlePreferredMaturityError, this))
-            ))
-        {
-            LL_WARNS("Agent") << "Maturity request post failed." << LL_ENDL;
-        }
+            if (!requestPostCapability("UpdateAgentInformation", postData,
+                static_cast<httpCallback_t>(boost::bind(&LLAgent::processMaturityPreferenceFromServer, this, _1, pPreferredMaturity)),
+                static_cast<httpCallback_t>(boost::bind(&LLAgent::handlePreferredMaturityError, this))
+                ))
+            {
+                LL_WARNS("Agent") << "Maturity request post failed." << LL_ENDL;
+                return false;
+            }
+            return true;
+        }));
     }
 }
 
@@ -3101,7 +3125,7 @@ void LLAgent::processMaturityPreferenceFromServer(const LLSD &result, U8 perferr
     if (maturity != perferredMaturity)
     {
         LL_WARNS() << "while attempting to change maturity preference from '"
-            << LLViewerRegion::accessToString(mLastKnownResponseMaturity)
+            << LLViewerRegion::accessToString(mMaturityPreference.answeredMaturity())
             << "' to '" << LLViewerRegion::accessToString(perferredMaturity)
             << "', the server responded with '"
             << LLViewerRegion::accessToString(maturity)
@@ -3365,7 +3389,7 @@ bool LLAgent::setUserGroupFlags(const LLUUID& group_id, bool accept_notices, boo
 
 bool LLAgent::canJoinGroups() const
 {
-    return (S32)mGroups.size() < LLAgentBenefitsMgr::current().getGroupMembershipLimit();
+    return LLAgentBenefitsMgr::current().hasRoomForGroup(mGroups.size());
 }
 
 LLQuaternion LLAgent::getHeadRotation()
@@ -5238,6 +5262,447 @@ void LLAgent::renderAutoPilotTarget()
 
         gGL.popMatrix();
     }
+}
+
+static U64 g_lastUpdateTime { 0 };
+static F32 g_deltaTime { 0.0f };
+static S32 g_lastUpdateFrame { 0 };
+static S32 g_deltaFrame { 0 };
+
+void LLAgent::updateGameControlMode()
+{
+    // Auto-derive the active mode from avatar/camera state.  Cursor mode takes
+    // precedence over Flycam: toggling the mouse cursor on while Flycam is engaged
+    // reports CONTROL_MODE_CURSOR (so the left stick drives the on-screen cursor)
+    // while isUsingFlycam() stays true underneath -- LLAgent::updateFlycam() keeps
+    // driving the camera every frame regardless of the reported mode (it is gated
+    // on LLAgentCamera's own flycam state directly, not on AgentControlMode), and
+    // LLGameControl::setFlycamEngaged() below tells the input-mapping lookup to
+    // let Flycam's own axis/button config (Pan/Tilt/Boom/...) keep driving
+    // whatever physical inputs Cursor mode's own mouse-cursor actions don't claim.
+    // This is how a single Cursor mode ends up with two flavors -- "other axes"
+    // control the avatar/camera depending on whether Flycam is concurrently
+    // engaged -- without needing a distinct mode of its own.
+    // Next: mouselook (the camera mode can be entered while sitting too, so it is
+    // checked ahead of Captive), then sitting/controls-taken maps to Captive,
+    // otherwise the normal Avatar mode.
+    LLGameControl::AgentControlMode mode;
+    if (mUsingMouseCursor)
+    {
+        mode = LLGameControl::CONTROL_MODE_CURSOR;
+    }
+    else if (isUsingFlycam())
+    {
+        mode = LLGameControl::CONTROL_MODE_FLYCAM;
+    }
+    else if (gAgentCamera.cameraMouselook())
+    {
+        mode = LLGameControl::CONTROL_MODE_MOUSELOOK;
+    }
+    else if (isSitting())
+    {
+        mode = LLGameControl::CONTROL_MODE_CAPTIVE;
+    }
+    else
+    {
+        mode = LLGameControl::CONTROL_MODE_AVATAR;
+    }
+    LLGameControl::setFlycamEngaged(isUsingFlycam());
+    LLGameControl::setAgentControlMode(mode);
+    gAgentCamera.updateFlycamCursorVisibility(mode);
+}
+
+void LLAgent::applyExternalActions(const LLGameControl::AgentActions& actions)
+{
+    llassert(LLCoros::on_main_thread_main_coro());
+    // Valid whenever game control is driving avatar or flycam: in FlyCam mode this
+    // only services the flycam on/off toggle (movement bits are ignored below).
+    assert(LLGameControl::isEnabled()
+        && (LLGameControl::willControlAvatar() || LLGameControl::willControlFlycam()));
+
+    // Process the non-flag actions first (see AgentActions comment in
+    // llgamecontrol.h).  Each bit in mMiscActionBits is already edge-triggered
+    // by LLGameControllerManager::computeAgentActions() (set only on the
+    // frame the bound button transitions from not-pressed to pressed), so no
+    // further debouncing is needed here -- just react to the bit directly.
+    const U32 misc_actions = actions.mMiscActionBits;
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_FLY)
+    {
+        setFlying(!getFlying());
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_FLYCAM)
+    {
+        toggleFlycam();
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_SIT)
+    {
+        if (isSitting())
+        {
+            standUp();
+        }
+        else if (LLViewerObject* seat = find_nearby_seat())
+        {
+            handle_object_sit(seat, LLVector3::zero);
+        }
+        else
+        {
+            sitDownNearby();
+        }
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_SPEAK)
+    {
+        LLVoiceClient::getInstance()->toggleUserPTTState();
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_MOUSELOOK)
+    {
+        // Mirrors LLViewMouselook's "View.Mouselook" toggle.
+        if (!gAgentCamera.cameraMouselook())
+        {
+            gAgentCamera.changeCameraToMouselook();
+        }
+        else
+        {
+            gAgentCamera.changeCameraToDefault();
+        }
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_TOGGLE_MOUSE_CURSOR)
+    {
+        toggleMouseCursorMode();
+    }
+
+    if (misc_actions & LLGameControl::AVATAR_ACTION_ESCAPE)
+    {
+        resetToAvatarMode();
+    }
+
+    // CONTROL_MODE_CURSOR: drive the actual on-screen cursor from
+    // actions.mMouseCursorDX/DY (the analog deflection of whatever's bound to "Mouse
+    // left/right"/"Mouse up/down") BEFORE the click dispatch below, so a synthesized
+    // click lands wherever the stick just moved the cursor to, in the same frame.
+    if (LLGameControl::getAgentControlMode() == LLGameControl::CONTROL_MODE_CURSOR)
+    {
+        constexpr F32 MOUSE_CURSOR_PIXELS_PER_SEC = 1200.f;
+        U64 mouse_cursor_now = LLFrameTimer::getTotalTime();
+        F32 mouse_cursor_dt = (mLastMouseCursorUpdate == 0)
+            ? 0.f : F32(mouse_cursor_now - mLastMouseCursorUpdate) / (F32)(USEC_PER_SEC);
+        mLastMouseCursorUpdate = mouse_cursor_now;
+
+        if (actions.mMouseCursorDX != 0.f || actions.mMouseCursorDY != 0.f)
+        {
+            LLCoordGL cursor_pos = gViewerWindow->getCurrentMouse();
+            S32 new_x = cursor_pos.mX + ll_round(actions.mMouseCursorDX * MOUSE_CURSOR_PIXELS_PER_SEC * mouse_cursor_dt);
+            // LLCoordGL's Y increases upward, but mMouseCursorDY is in screen-frame
+            // (Y increases downward, same as CURSOR_DY/CURSOR_PY on the wire), so it
+            // subtracts here rather than adds.
+            S32 new_y = cursor_pos.mY - ll_round(actions.mMouseCursorDY * MOUSE_CURSOR_PIXELS_PER_SEC * mouse_cursor_dt);
+            gViewerWindow->moveCursorTo(new_x, new_y);
+        }
+    }
+    else
+    {
+        mLastMouseCursorUpdate = 0;
+    }
+
+    // Simulated mouse buttons (see llgamecontrol.h's AvatarMouseButton) are
+    // level-triggered: actions.mMouseButtonBits reflects which buttons are
+    // currently held, so the press/release edges are found here by diffing
+    // against last frame's value. Each edge is dispatched through
+    // LLViewerWindow exactly like a real mouse click, at the current cursor
+    // position, so it drives hover/pick/pie-menu/tool-manager the same way a
+    // hardware click would (e.g. touching/grabbing objects, walk-to-clicked,
+    // pie menu on right click).
+    U32 mouse_pressed_edges  = actions.mMouseButtonBits & ~mPrevMouseButtonBits;
+    U32 mouse_released_edges = ~actions.mMouseButtonBits & mPrevMouseButtonBits;
+    mPrevMouseButtonBits = actions.mMouseButtonBits;
+
+    if (mouse_pressed_edges || mouse_released_edges)
+    {
+        // getCurrentMouse() is in scaled UI coords, but the click handlers
+        // expect raw window coords (as LLWindow delivers for a hardware click)
+        // and divide by the display scale themselves, so convert back first.
+        const LLVector2& display_scale = gViewerWindow->getDisplayScale();
+        LLCoordGL cursor_pos = gViewerWindow->getCurrentMouse();
+        LLCoordGL raw_pos(ll_round((F32)cursor_pos.mX * display_scale.mV[VX]),
+                          ll_round((F32)cursor_pos.mY * display_scale.mV[VY]));
+
+        if (mouse_pressed_edges & LLGameControl::AVATAR_MOUSE_BUTTON_LEFT)
+        {
+            gViewerWindow->handleMouseDown(gViewerWindow->getWindow(), raw_pos, MASK_NONE);
+        }
+        if (mouse_released_edges & LLGameControl::AVATAR_MOUSE_BUTTON_LEFT)
+        {
+            gViewerWindow->handleMouseUp(gViewerWindow->getWindow(), raw_pos, MASK_NONE);
+        }
+        if (mouse_pressed_edges & LLGameControl::AVATAR_MOUSE_BUTTON_RIGHT)
+        {
+            gViewerWindow->handleRightMouseDown(gViewerWindow->getWindow(), raw_pos, MASK_NONE);
+        }
+        if (mouse_released_edges & LLGameControl::AVATAR_MOUSE_BUTTON_RIGHT)
+        {
+            gViewerWindow->handleRightMouseUp(gViewerWindow->getWindow(), raw_pos, MASK_NONE);
+        }
+    }
+
+    // actions.mIsRunning is derived purely from how hard the controller's own
+    // movement axes are pushed (see computeAgentActions()'s analog hysteresis).
+    // Only let it drive the agent's running state while the controller is
+    // actually supplying movement this frame -- otherwise an idle-but-connected
+    // controller would fight the keyboard (e.g. clobbering double-tap-to-run)
+    // every frame even though the player is moving with the keyboard instead.
+    constexpr U32 CONTROLLER_MOVEMENT_FLAGS = AGENT_CONTROL_AT_POS | AGENT_CONTROL_AT_NEG
+                                             | AGENT_CONTROL_LEFT_POS | AGENT_CONTROL_LEFT_NEG;
+    // The controller only ever starts or stops a temporary run: always-run is
+    // the player's own setting, and each change sends the server a message.
+    if (actions.mControlFlags & CONTROLLER_MOVEMENT_FLAGS)
+    {
+        if (actions.mIsRunning && !getRunning())
+        {
+            setTempRun();
+        }
+        else if (!actions.mIsRunning && getTempRun())
+        {
+            clearTempRun();
+        }
+    }
+
+    mExternalActionFlags = actions.mControlFlags;
+
+    // measure delta time and frame
+    // Note: it is possible for the deltas to be very large
+    // and it is the duty of the code that uses them to clamp as necessary
+    U64 now = LLFrameTimer::getTotalTime();
+    g_deltaTime = F32(now - g_lastUpdateTime) / (F32)(USEC_PER_SEC);
+    g_lastUpdateTime = now;
+
+    S32 frame_count = LLFrameTimer::getFrameCount();
+    g_deltaFrame = frame_count - g_lastUpdateFrame;
+    g_lastUpdateFrame = frame_count;
+
+    if (isUsingFlycam())
+    {
+        // Flycam will be updated later by exernal context
+        return;
+    }
+
+    S32 direction = (S32)(mExternalActionFlags & AGENT_CONTROL_AT_POS)
+        - (S32)((mExternalActionFlags & AGENT_CONTROL_AT_NEG) >> 1);
+    if (direction != 0)
+    {
+        moveAt(direction);
+    }
+
+    static U32 last_non_fly_frame = 0;
+    static U64 last_non_fly_time = 0;
+    direction = (S32)(mExternalActionFlags & AGENT_CONTROL_UP_POS)
+        - (S32)((mExternalActionFlags & AGENT_CONTROL_UP_NEG) >> 1);
+    if (direction != 0)
+    {
+        // HACK: this auto-fly logic based on original code still extant in llviewerinput.cpp::agent_jump()
+        // but has been cleaned up.
+        // TODO?: DRY this logic
+        if (direction > 0)
+        {
+            if (!getFlying()
+                && !upGrabbed()
+                && gSavedSettings.getBOOL("AutomaticFly"))
+            {
+                constexpr F32 FLY_TIME = 0.5f;
+                constexpr U32 FLY_FRAMES = 4;
+                F32 delta_time = (F32)(now - last_non_fly_time) / (F32)(USEC_PER_SEC);
+                U32 delta_frames = frame_count - last_non_fly_frame;
+                if( delta_time > FLY_TIME
+                    && delta_frames > FLY_FRAMES)
+                {
+                    setFlying(TRUE);
+                }
+            }
+        }
+        else
+        {
+            last_non_fly_frame = frame_count;
+            last_non_fly_time = now;
+        }
+
+        moveUp(direction);
+    }
+    else if (!getFlying())
+    {
+        last_non_fly_frame = frame_count;
+        last_non_fly_time = now;
+    }
+
+    direction = (S32)(mExternalActionFlags & AGENT_CONTROL_LEFT_POS)
+        - (S32)((mExternalActionFlags & AGENT_CONTROL_LEFT_NEG) >> 1);
+    if (direction != 0)
+    {
+        moveLeft(direction);
+    }
+
+    direction = (S32)(mExternalActionFlags & AGENT_CONTROL_YAW_POS)
+        - (S32)((mExternalActionFlags & AGENT_CONTROL_YAW_NEG) >> 1);
+    // The "Slow".."Fast" preferences slider scales Mouselook's turn/look speed
+    // and Avatar's turn speed.
+    F32 turn_speed_factor = 1.0f;
+    F32 look_speed_factor = 1.0f;
+    LLGameControl::AgentControlMode control_mode = LLGameControl::getAgentControlMode();
+    if (control_mode == LLGameControl::CONTROL_MODE_MOUSELOOK)
+    {
+        turn_speed_factor = LLGameControl::getSpeedFactor(LLGameControl::getModeName(control_mode));
+        look_speed_factor = turn_speed_factor;
+    }
+    else if (control_mode == LLGameControl::CONTROL_MODE_AVATAR)
+    {
+        turn_speed_factor = LLGameControl::getSpeedFactor(LLGameControl::getModeName(control_mode));
+    }
+
+    if (direction != 0)
+    {
+        F32 sign = (direction < 0 ? -1.0f : 1.0f);
+        // actions.mYawAmplitude is the analog stick deflection ([-1, 1]) that
+        // set this flag; use its magnitude to modulate turn speed instead of
+        // always snapping to full rate
+        moveYaw(sign * fabs(actions.mYawAmplitude) * turn_speed_factor);
+    }
+
+    {
+        F32 pitch_sign = ((mExternalActionFlags & AGENT_CONTROL_PITCH_POS) > 0 ? 1.0f : 0.0f)
+            - ((mExternalActionFlags & AGENT_CONTROL_PITCH_NEG) > 0 ? 1.0f : 0.0f);
+        // Same analog modulation as yaw above, via actions.mPitchAmplitude.
+        movePitch(pitch_sign * fabs(actions.mPitchAmplitude) * look_speed_factor);
+    }
+
+    // actions.mZoomAmplitude ([-1, 1], from "Zoom +/-"/"Zoom +"/"Zoom -") drives the
+    // camera's field-of-view zoom. Positive amplitude zooms in (narrows the FOV);
+    if (actions.mZoomAmplitude != 0.f)
+    {
+        constexpr F32 FOV_ZOOM_RATE = 1.2f;
+        F32 fov_scale = powf(FOV_ZOOM_RATE, -actions.mZoomAmplitude * g_deltaTime);
+        LLViewerCamera* camera = LLViewerCamera::getInstance();
+        camera->setDefaultFOV(camera->getDefaultFOV() * fov_scale);
+        gSavedSettings.setF32("CameraAngle", camera->getView());
+    }
+
+    // actions.mScrollAmplitude ([-1, 1], from "Scroll +/-"/"Scroll +"/"Scroll -")
+    // moves the camera toward/away from the avatar the same way the mousewheel does,
+    // so the third-person/follow-cam distance persists once the avatar moves (unlike
+    // the keyboard's camera in/out keys, which unlock the view from the avatar).
+    // Positive amplitude scrolls in (camera moves closer); scrollCamera()'s clicks
+    // are positive-out like the mousewheel's.
+    if (actions.mScrollAmplitude != 0.f)
+    {
+        constexpr F32 SCROLL_CLICKS_PER_SECOND = 8.f;
+        gAgentCamera.scrollCamera(-actions.mScrollAmplitude * SCROLL_CLICKS_PER_SECOND * g_deltaTime);
+    }
+
+    if (mExternalActionFlags & AGENT_CONTROL_STOP)
+    {
+        setControlFlags(AGENT_CONTROL_STOP);
+    }
+
+    // HACK: AGENT_CONTROL_NUDGE_AT_POS is used to toggle running
+    if ((mExternalActionFlags & AGENT_CONTROL_NUDGE_AT_POS) > 0)
+    {
+        if (mToggleRun)
+        {
+            if (getRunning())
+            {
+                clearTempRun();
+                clearAlwaysRun();
+            }
+            else
+            {
+                setTempRun();
+            }
+        }
+        mToggleRun = false;
+    }
+    else
+    {
+        mToggleRun = true;
+    }
+
+    if ((mExternalActionFlags & AGENT_CONTROL_SIT_ON_GROUND) > 0
+        && isAgentAvatarValid() && !isSitting() && !getFlying() && !gAgentAvatarp->mInAir)
+    {
+        // "Sit": only sit if currently standing; a no-op otherwise
+        // (already sitting, flying, or airborne).
+        sitDownNearby();
+    }
+    else if ((mExternalActionFlags & AGENT_CONTROL_STAND_UP) > 0 && isSitting())
+    {
+        // "Stand up": only stand if currently sitting.
+        standUp();
+    }
+}
+
+bool LLAgent::isUsingFlycam() const
+{
+    return gAgentCamera.isUsingFlycam();
+}
+
+void LLAgent::toggleFlycam()
+{
+    gAgentCamera.toggleFlycam();
+}
+
+void LLAgent::setFlycamKeyInput(U8 channel, F32 value)
+{
+    gAgentCamera.setFlycamKeyInput(channel, value);
+}
+
+void LLAgent::setFlycamKeyUnroll(bool unroll)
+{
+    gAgentCamera.setFlycamKeyUnroll(unroll);
+}
+
+bool LLAgent::isCameraExternallyDriven() const
+{
+    // Both flycam input sources now share one toggle state on LLAgentCamera --
+    // LLViewerJoystick::getOverrideCamera() forwards to the same flag.
+    return gAgentCamera.isUsingFlycam();
+}
+
+void LLAgent::toggleMouseCursorMode()
+{
+    mUsingMouseCursor = !mUsingMouseCursor;
+    mLastMouseCursorUpdate = 0; // avoid a jump from a stale delta-time baseline
+}
+
+void LLAgent::resetToAvatarMode()
+{
+    if (mUsingMouseCursor)
+    {
+        toggleMouseCursorMode();
+    }
+    if (isUsingFlycam())
+    {
+        toggleFlycam();
+    }
+    if (gAgentCamera.cameraMouselook())
+    {
+        gAgentCamera.changeCameraToDefault();
+    }
+}
+
+void LLAgent::pressGameControlButton(U8 button_index)
+{
+    mGameControlButtonsFromKeys |= (1U << button_index);
+}
+
+void LLAgent::releaseGameControlButton(U8 button_index)
+{
+    mGameControlButtonsFromKeys &= ~(1U << button_index);
+}
+
+void LLAgent::updateFlycam()
+{
+    gAgentCamera.updateFlycam(g_deltaTime);
 }
 
 /********************************************************************************/

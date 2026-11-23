@@ -52,6 +52,7 @@
 #include "llagentwearables.h"
 #include "lldirpicker.h"
 #include "llfloaterimcontainer.h"
+#include "llfloaterpreference.h"
 #include "llimprocessing.h"
 #include "llwindow.h"
 #include "llviewerstats.h"
@@ -61,6 +62,7 @@
 #include "llmarketplacenotifications.h"
 #include "llmd5.h"
 #include "llmeshrepository.h"
+#include "llpanelpreferencegamecontrol.h"
 #include "llpumpio.h"
 #include "llmimetypes.h"
 #include "llslurl.h"
@@ -68,6 +70,7 @@
 #include "llfocusmgr.h"
 #include "llurlfloaterdispatchhandler.h"
 #include "llviewerjoystick.h"
+#include "llgamecontrol.h"
 #include "llcalc.h"
 #include "llconversationlog.h"
 #if LL_WINDOWS
@@ -219,6 +222,7 @@
 #include "lldebugview.h"
 #include "llconsole.h"
 #include "llcontainerview.h"
+#include "lltoolfocus.h"
 #include "lltooltip.h"
 
 #include "llsdutil.h"
@@ -244,6 +248,7 @@
 #include "lldrawpoolterrain.h"
 #include "llviewerfloaterreg.h"
 #include "llcommandlineparser.h"
+#include "llfloaterpreference.h"
 #include "llfloatermemleak.h"
 #include "llfloaterreg.h"
 #include "llfloatersimplesnapshot.h"
@@ -263,6 +268,7 @@
 #include "lldrawpoolbump.h"
 #include "llvieweraudio.h"
 #include "llimview.h"
+#include "llchatservicehistory.h"
 #include "llviewerthrottle.h"
 #include "llparcel.h"
 #include "llavatariconctrl.h"
@@ -682,9 +688,8 @@ LLAppViewer::LLAppViewer()
 
     mDumpPath ="";
 
-    // Need to do this initialization before we do anything else, since anything
-    // that touches files should really go through the lldir API
-    gDirUtilp->initAppDirs("AlchemyNext");
+    // The viewer's directories were set by main (initAppDirs()), before the
+    // crash reporter started.
     //
     // IMPORTANT! Do NOT put anything that will write
     // into the log files during normal startup until AFTER
@@ -705,6 +710,14 @@ LLAppViewer::LLAppViewer()
     // OK to write stuff to logs now, we've now crash reported if necessary
     //
 
+    // As soon as it is known whether this is the first instance: crash
+    // reports kept for an answer that was no are deleted, and the marker a
+    // crash leaves for the next launch is composed, for the crash handler to
+    // write without allocating.
+    ALCrashReporter::discardDeclined();
+    prepareCrashMarker();
+    ALCrashReporter::probe("ctor");
+
     LLLoginInstance::instance().setPlatformInfo(gPlatform, LLOSInfo::instance().getOSVersionString(), LLOSInfo::instance().getOSStringSimple());
 
     // Under some circumstances we want to read the static_debug_info.log file
@@ -722,6 +735,18 @@ LLAppViewer::LLAppViewer()
     mDumpPath = logdir;
 
     setDebugFileNames(logdir);
+
+    // What the previous run left, read before this run writes its own over
+    // it; then what the crash reporter, running since main, needed the
+    // viewer for.
+    ALCrashReporter::readLastRun();
+    ALCrashReporter::attachRun();
+}
+
+// static
+void LLAppViewer::initAppDirs()
+{
+    gDirUtilp->initAppDirs("AlchemyNext");
 }
 
 LLAppViewer::~LLAppViewer()
@@ -790,17 +815,8 @@ bool LLAppViewer::init()
 
     setupErrorHandling(mSecondInstance);
 
-    // The marker a crash leaves for the next launch, composed before there
-    // is a crash handler to write it.
-    prepareCrashMarker();
-
-    // What the previous run left, read before this run writes its own over it.
-    ALCrashReporter::readLastRun();
     startDebugInfo();
-
-    // As early as consent can be read: before the settings, on the sentinel
-    // they keep for it.
-    ALCrashReporter::init();
+    ALCrashReporter::probe("init");
 
     //
     // Start of the application
@@ -858,24 +874,27 @@ bool LLAppViewer::init()
     }
 
     // The settings hold the answer on crash reports from here: it refreshes
-    // the sentinel the reporter started on, and follows changes to it.
-    // The setting only reaches disk at a clean exit: a run that crashed
-    // after the answer was given left it unasked, while the sentinel kept
-    // the answer. The sentinel's yes becomes the setting's.
-    if (gSavedSettings.getS32("AlchemyCrashReportConsent") == 0
-        && ALCrashReporter::consentRecorded(ALCrashReporter::consentSentinel()))
+    // the record the reporter started on, and follows changes to it.
+    // The record is written whenever the answer changes and the setting only
+    // at a clean exit, so a run that crashed after the answer was given left
+    // the setting behind the record: an answer the record holds is the newer.
+    const ALCrashReporter::Consent recorded_consent =
+        ALCrashReporter::recordedConsent(ALCrashReporter::consentDirectory());
+    if (recorded_consent != ALCrashReporter::Consent::Unasked)
     {
-        gSavedSettings.setS32("AlchemyCrashReportConsent", 1);
+        gSavedSettings.setS32("AlchemyCrashReportConsent", static_cast<S32>(recorded_consent));
     }
-    auto crash_reports_allowed = []()
+    auto refresh_crash_reports = []()
     {
-        return gSavedSettings.getS32("AlchemyCrashReportConsent") == 1 && !LLApp::isCrashloggerDisabled();
+        ALCrashReporter::refreshConsent(
+            ALCrashReporter::consentFromSetting(gSavedSettings.getS32("AlchemyCrashReportConsent")),
+            !LLApp::isCrashloggerDisabled());
     };
-    ALCrashReporter::refreshConsent(crash_reports_allowed());
+    refresh_crash_reports();
     gSavedSettings.getControl("AlchemyCrashReportConsent")->getSignal()->connect(
-        [crash_reports_allowed](LLControlVariable*, const LLSD&, const LLSD&)
+        [refresh_crash_reports](LLControlVariable*, const LLSD&, const LLSD&)
         {
-            ALCrashReporter::refreshConsent(crash_reports_allowed());
+            refresh_crash_reports();
         });
     gAgent.addRegionChangedCallback([]()
     {
@@ -1233,6 +1252,31 @@ bool LLAppViewer::init()
         LLViewerJoystick::getInstance()->init(false);
     }
 
+    LLGameControl::init(gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "gamecontrollerdb.txt"),
+        [](const std::vector<std::string>& keys) -> LLSD
+        {
+            LLSD result = LLSD::emptyMap();
+            for (const std::string& key : keys)
+            {
+                if (gSavedSettings.controlExists(key))
+                {
+                    result[key] = gSavedSettings.getLLSD(key);
+                }
+            }
+            return result;
+        },
+        [](const LLSD& key_values)
+        {
+            for (auto it = key_values.beginMap(); it != key_values.endMap(); ++it)
+            {
+                if (gSavedSettings.controlExists(it->first))
+                {
+                    gSavedSettings.setLLSD(it->first, it->second);
+                }
+            }
+        },
+        []() { LLPanelPreferenceGameControl::updateDeviceList(); });
+
     try
     {
         initializeSecHandler();
@@ -1342,6 +1386,7 @@ bool LLAppViewer::init()
     LLWorld::createInstance();
     LLViewerStatsRecorder::createInstance();
     LLSelectMgr::createInstance();
+    LLToolCamera::createInstance();
     LLViewerCamera::createInstance();
 
 #ifdef LL_DISCORD
@@ -1431,6 +1476,66 @@ bool LLAppViewer::frame()
     return ret;
 }
 
+void sendGameControlData()
+{
+    LLMessageSystem* msg = gMessageSystem;
+    const LLGameControl::ServerState& state = LLGameControl::getServerState();
+
+    msg->newMessageFast(_PREHASH_GameControlData);
+    msg->nextBlockFast(_PREHASH_AgentData);
+    msg->addUUIDFast(_PREHASH_AgentID, gAgentID);
+    msg->addUUIDFast(_PREHASH_SessionID, gAgentSessionID);
+    msg->addU8Fast(_PREHASH_Packet, LLGameControl::getNextPacketNum());
+    msg->addU8Fast(_PREHASH_ActionMode, state.mActionMode);
+
+    // Non-modal canonical axes/buttons: pack every available value every message,
+    // whether or not it changed since the last one (no per-field diffing). Trailing
+    // zero axes are truncated and the Buttons block is skipped entirely when zero --
+    // the server assumes anything not packed is zero -- to save bytes.
+    size_t num_axes = state.mAxes.size();
+    while (num_axes > 0 && state.mAxes[num_axes - 1] == 0)
+    {
+        --num_axes;
+    }
+    for (size_t i = 0; i < num_axes; ++i)
+    {
+        msg->nextBlockFast(_PREHASH_Axes);
+        msg->addS16Fast(_PREHASH_Value, state.mAxes[i]);
+    }
+    if (state.mButtons != 0)
+    {
+        msg->nextBlockFast(_PREHASH_Buttons);
+        msg->addU32Fast(_PREHASH_Flags, state.mButtons);
+    }
+
+    // Modal semantic axes/buttons: same truncation policy, except the number of
+    // axes considered depends on ActionMode -- see message_template.msg's
+    // GameControlData doc and LLGameControl::numSemanticAxesForMode() -- since the
+    // server computes its own expected axis count from the mode and zeros anything
+    // not packed.
+    size_t num_mode_axes = LLGameControl::numSemanticAxesForMode((LLGameControl::AgentControlMode)state.mActionMode);
+    while (num_mode_axes > 0 && state.mSemanticAxes[num_mode_axes - 1] == 0)
+    {
+        --num_mode_axes;
+    }
+    for (size_t i = 0; i < num_mode_axes; ++i)
+    {
+        msg->nextBlockFast(_PREHASH_ModeAxes);
+        msg->addS16Fast(_PREHASH_Value, state.mSemanticAxes[i]);
+    }
+    if (state.mSemanticButtons != 0)
+    {
+        msg->nextBlockFast(_PREHASH_ModeButtons);
+        msg->addU32Fast(_PREHASH_Flags, state.mSemanticButtons);
+    }
+
+    LLGameControl::updateResendPeriod();
+    gAgent.sendMessage();
+
+    // Mirror the just-sent channel values into the preferences "Data Output" tab.
+    LLPanelPreferenceGameControl::updateDataOutput();
+}
+
 bool LLAppViewer::doFrame()
 {
     LL_PROFILE_ZONE_SCOPED;
@@ -1487,7 +1592,7 @@ bool LLAppViewer::doFrame()
                     LL_WARNS() << " Someone took over my signal/exception handler (post messagehandling)!" << LL_ENDL;
                 }
 
-                gViewerWindow->getWindow()->gatherInput();
+                gViewerWindow->getWindow()->gatherInput(gFocusMgr.getAppHasFocus());
             }
 
             //memory leaking simulation
@@ -1539,8 +1644,11 @@ bool LLAppViewer::doFrame()
                     joystick->scanJoystick();
                     gKeyboard->scanKeyboard();
                     gViewerInput.scanMouse();
+
                     if (gAgent.isCrouching())
+                    {
                         gAgent.moveUp(-1);
+                    }
                 }
             }
 
@@ -2212,6 +2320,8 @@ bool LLAppViewer::cleanup()
         // Turn off Space Navigator and similar devices
         LLViewerJoystick::getInstance()->terminate();
     }
+
+    LLGameControl::terminate();
 
     LL_INFOS() << "Shutting down message system" << LL_ENDL;
     end_messaging_system();
@@ -2896,20 +3006,27 @@ bool LLAppViewer::initConfiguration()
     bool success = LLXMLNode::parseFile(settings_file_list, root, NULL);
     if (!success)
     {
-        LL_WARNS() << "Cannot load default configuration file " << settings_file_list << LL_ENDL;
+        std::string parse_error = LLXMLNode::getLastFileError();
+        const std::string& run_context = gDirUtilp->getRunContextDescription();
+
+        LL_WARNS() << "Cannot load default configuration file " << settings_file_list
+            << (parse_error.empty() ? "" : (" - " + parse_error)) << LL_ENDL;
         LLError::LLUserWarningMsg::showMissingFiles();
         if (gDirUtilp->fileExists(settings_file_list))
         {
             LL_ERRS() << "Cannot load default configuration file settings_files.xml. "
                 << "Please reinstall viewer from https://www.alchemyviewer.org/downloads "
-                << "and contact the Alchemy Viewer team if the issue persists after reinstall."
+                << "and contact the Alchemy Viewer team if the issue persists after reinstall. "
+                << "Reason: " << (parse_error.empty() ? "unknown (file is present but could not be parsed)" : parse_error)
+                << ". Install type: " << run_context
                 << LL_ENDL;
         }
         else
         {
             LL_ERRS() << "Default configuration file settings_files.xml not found. "
                 << "Please reinstall viewer from https://www.alchemyviewer.org/downloads "
-                << "and contact the Alchemy Viewer team if issue persists after reinstall."
+                << "and contact the Alchemy Viewer team if issue persists after reinstall. "
+                << "Install type: " << run_context
                 << LL_ENDL;
         }
     }
@@ -3051,15 +3168,6 @@ bool LLAppViewer::initConfiguration()
         return false;
     }
 
-    // Register the core crash option as soon as we can
-    // if we want gdb post-mortem on cores we need to be up and running
-    // ASAP or we might miss init issue etc.
-    if (gSavedSettings.getBOOL("DisableCrashLogger"))
-    {
-        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
-        disableCrashlogger();
-    }
-
     gNonInteractive = gSavedSettings.getBOOL("NonInteractive");
     // Handle initialization from settings.
     // Start up the debugging console before handling other options.
@@ -3102,6 +3210,16 @@ bool LLAppViewer::initConfiguration()
                 }
             }
         }
+    }
+
+    // The crash logger switch, once every command line value has been
+    // applied: --disablecrashlogger, and --set DisableCrashLogger after it.
+    // The crash reporter read the same from the command line before it
+    // started; this keeps it off when the settings are refreshed.
+    if (gSavedSettings.getBOOL("DisableCrashLogger"))
+    {
+        LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
+        disableCrashlogger();
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));
@@ -5031,7 +5149,7 @@ U32 LLAppViewer::getObjectCacheVersion()
 {
     // Viewer object cache version, change if object update
     // format changes. JC
-    const U32 INDRA_OBJECT_CACHE_VERSION = 20;
+    const U32 INDRA_OBJECT_CACHE_VERSION = 21;
 
     return INDRA_OBJECT_CACHE_VERSION;
 }
@@ -5185,6 +5303,7 @@ void LLAppViewer::loadKeyBindings()
         }
     }
     LLUrlRegistry::instance().setKeybindingHandler(&gViewerInput);
+    LLUrlRegistry::instance().setGameControllerHandler(LLGameControl::getInstance());
 }
 
 // As per GHI #4498, remove old, stale CEF cache folders from previous sessions
@@ -5665,6 +5784,69 @@ void LLAppViewer::idle()
             gAgent.autoPilot(&yaw);
         }
 
+        // Auto-derive the active game-control mode (Avatar/Captive/FlyCam) from
+        // current avatar state so the runtime mappings and gating track it.
+        gAgent.updateGameControlMode();
+
+        // Read the agent's control flags now, before applyExternalActions() below
+        // (which drives the avatar from a real game controller) has a chance to
+        // fold any controller-driven movement into them this frame -- so the
+        // keyboard-derived GameControl state computed here can never be sourced
+        // from the controller's own output.  See LLGameControllerManager::
+        // setExternalInput()/accumulateFinalState() for where the two are
+        // combined (only as fully-independent final ServerStates).
+        U32 control_flags = gAgent.getControlFlags();
+
+        // apply to GameControl
+        LLGameControl::setExternalInput(control_flags, gAgent.getGameControlButtonsFromKeys(), gAgent.getRunning());
+
+        // Feed the actual on-screen cursor position to GameControl
+        // Matches the same whole-window clamp LLViewerWindow::moveCursorTo()
+        // uses to keep a gamepad-driven cursor on-screen.
+        if (LLGameControl::getAgentControlMode() == LLGameControl::CONTROL_MODE_CURSOR)
+        {
+            LLCoordGL cursor_pos = gViewerWindow->getCurrentMouse();
+            S32 rect_width = gViewerWindow->getWindowWidthScaled();
+            S32 rect_height = gViewerWindow->getWindowHeightScaled();
+            S32 pixel_x = llclamp(cursor_pos.mX, 0, rect_width);
+            S32 pixel_y = llclamp(rect_height - cursor_pos.mY, 0, rect_height);
+            LLGameControl::setMouseCursorPosition(pixel_x, pixel_y, rect_width, rect_height);
+            LLGameControl::setMouseCursorButtons(gViewerWindow->getLeftMouseDown(), gViewerWindow->getRightMouseDown());
+        }
+
+        if (LLPanelPreferenceGameControl::isWaitingForInputChannel())
+        {
+            LLPanelPreferenceGameControl::applyGameControlInput();
+        }
+        else
+        {
+            // Recompute canonical controller state (also populates the internal
+            // state consumed below) and send it to the server when it changed,
+            // but only if the agent's region advertises support for it (the
+            // "GameControlEnabled" simulator feature).  While unsupported the
+            // resend deadline is left untouched, so the first frame after the
+            // feature appears sends immediately.
+            if (LLGameControl::computeFinalStateAndCheckForChanges())
+            {
+                LLViewerRegion* regionp = gAgent.getRegion();
+                if (regionp && regionp->gameControlEnabled())
+                {
+                    sendGameControlData();
+                }
+            }
+
+            // Drive the local avatar from the controller.  In Avatar/Captive
+            // modes this moves the avatar; in FlyCam mode applyExternalActions
+            // ignores movement bits (it early-returns while flycam is active) but
+            // still services the flycam on/off toggle, so we run it either way.
+            // Flycam *motion* is driven separately below via gAgent.updateFlycam().
+            if (LLGameControl::willControlAvatar() || LLGameControl::willControlFlycam())
+            {
+                LLGameControl::AgentActions game_control_actions = LLGameControl::computeAgentActions();
+                gAgent.applyExternalActions(game_control_actions);
+            }
+        }
+
         send_agent_update(false);
 
         // After calling send_agent_update() in the mainloop we always clear
@@ -5927,9 +6109,14 @@ void LLAppViewer::idle()
     {
         gAgentPilot.moveCamera();
     }
-    else if (LLViewerJoystick::getInstance()->getOverrideCamera())
+    else if (gAgent.isUsingFlycam())
     {
+        // Flycam is now a single shared state (LLAgentCamera) driven by
+        // whichever input sources are actually present; each is a no-op
+        // when its device/mode isn't active, so it's safe to feed both
+        // every frame rather than picking one exclusively.
         LLViewerJoystick::getInstance()->moveFlycam();
+        gAgent.updateFlycam();
     }
     else
     {
@@ -6060,6 +6247,8 @@ void LLAppViewer::idleShutdown()
     // All floaters are closed.  Tell server we want to quit.
     if (!logoutRequestSent())
     {
+        // Fence outstanding history work before logout tears down its account and capability context.
+        LLChatServiceHistory::stop();
         sendLogoutRequest();
 
         // Wait for a LogoutReply message
@@ -6549,6 +6738,9 @@ void LLAppViewer::idleNetwork()
 
 void LLAppViewer::disconnectViewer()
 {
+    // This is idempotent and also covers disconnect paths that bypass the normal logout request.
+    LLChatServiceHistory::stop();
+
     if (gDisconnected)
     {
         return;
@@ -6978,6 +7170,8 @@ void LLAppViewer::handleLoginComplete()
         ALCrashReporter::attach(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, "settings_per_account.xml"));
     }
 
+    // Start only after login has established the per-account storage and region capability context.
+    LLChatServiceHistory::start();
     mOnLoginCompleted();
     mOnLoginCompleted.disconnect_all_slots(); // No longer needed
 

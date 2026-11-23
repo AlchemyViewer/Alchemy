@@ -13,47 +13,6 @@
 	<global name="implicitclosebutton">
 		閉じる
 	</global>
-	<template name="okbutton">
-		<form>
-			<button name="OK_okbutton" text="$yestext"/>
-		</form>
-	</template>
-	<template name="okignore">
-		<form>
-			<button name="OK_okignore" text="$yestext"/>
-		</form>
-	</template>
-	<template name="okcancelbuttons">
-		<form>
-			<button name="OK_okcancelbuttons" text="$yestext"/>
-			<button name="Cancel_okcancelbuttons" text="$notext"/>
-		</form>
-	</template>
-	<template name="okcancelignore">
-		<form>
-			<button name="OK_okcancelignore" text="$yestext"/>
-			<button name="Cancel_okcancelignore" text="$notext"/>
-		</form>
-	</template>
-	<template name="okhelpbuttons">
-		<form>
-			<button name="OK_okhelpbuttons" text="$yestext"/>
-			<button name="Help" text="$helptext"/>
-		</form>
-	</template>
-	<template name="okhelpignore">
-		<form>
-			<button name="OK_okhelpignore" text="$yestext"/>
-			<button name="Help_okhelpignore" text="$helptext"/>
-		</form>
-	</template>
-	<template name="yesnocancelbuttons">
-		<form>
-			<button name="Yes" text="$yestext"/>
-			<button name="No" text="$notext"/>
-			<button name="Cancel_yesnocancelbuttons" text="$canceltext"/>
-		</form>
-	</template>
 	<notification functor="GenericAcknowledge" label="不明な通知メッセージ" name="MissingAlert">
 		現在使用中の[APP_NAME]のバージョンでは、受け取った通知メッセージを表示することができません。
 最新のビューアがインストールされている事をご確認ください。
@@ -108,7 +67,7 @@
 		<usetemplate canceltext="キャンセル" name="yesnocancelbuttons" notext="保存しない" yestext="保存"/>
 	</notification>
 	<notification name="ConfirmNoCopyToOutbox">
-		これらのアイテムの１つ以上を販売用の送信トレイにコピーする権限がありません。移動したり残したままにすることはできます。
+		これらのアイテムの１つ以上は、複製権限がないため販売用の送信トレイにコピーできません。移動したり残したままにすることはできます。
 		<usetemplate name="okcancelbuttons" notext="アイテムを販売ボックスに移動できなかった" yestext="アイテムを移動"/>
 	</notification>
 	<notification name="OutboxFolderCreated">
@@ -196,8 +155,8 @@
 		<usetemplate ignoretext="マーケットプレイスから出品リストを移動または削除する前の確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmCopyToMarketplace">
-		これらのアイテムの１つまたは複数をマーケットプレイスにコピーする権限がありません。移動するか、残したままにすることはできます。
-		<usetemplate canceltext="キャンセル" ignoretext="マーケットプレイスへコピーする際に、コピー不可のアイテムが選択内容に含まれている場合の確認" name="yesnocancelbuttons" notext="アイテムを移動しない" yestext="アイテムを移動"/>
+		これらのアイテムの１つまたは複数は、複製権限がないためマーケットプレイスにコピーできません。移動するか、残したままにすることはできます。
+		<usetemplate canceltext="キャンセル" ignoretext="マーケットプレイスへコピーする際に、複製不可のアイテムが選択内容に含まれている場合の確認" name="yesnocancelbuttons" notext="アイテムを移動しない" yestext="アイテムを移動"/>
 	</notification>
 	<notification name="ConfirmMerchantUnlist">
 		この操作により、この出品リストが削除されます。続けてもよろしいですか？
@@ -746,7 +705,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		[PARCEL]区画の地形を編集する権限がありません。
 	</notification>
 	<notification name="CannotCopyWarning">
-		以下のアイテムをコピーする権限がありません：
+		以下のアイテムを複製する権限がありません：
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
 他の人に譲ると、そのアイテムはあなたのインベントリから削除されます。本当にこれらのアイテムを譲ってもよろしいですか？
 		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
@@ -764,7 +723,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		選択したアイテムを渡す権限がありません。
 	</notification>
 	<notification name="CannotCopyCountItems">
-		あなたは選択した[COUNT]個のアイテムをコピーする権限がありません。
+		あなたは選択した[COUNT]個のアイテムを複製する権限がありません。
 これらのアイテムはあなたのインベントリから失われます。
 本当にアイテムを渡してもよろしいですか？
 		<usetemplate name="okcancelbuttons" notext="いいえ" yestext="はい"/>
@@ -790,7 +749,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 	</notification>
 	<notification name="EjectAvatarFullnameNoBan">
 		[AVATAR_NAMES]をあなたの土地から追放しますか？
-		<usetemplate name="okcancelbuttons" notext="Cancel" yestext="Eject"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="追放する"/>
 	</notification>
 	<notification name="EjectAvatarMultiple">
 		以下の住民らをあなたの土地から追放しますか？
@@ -814,11 +773,11 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 [AVATAR_NAMES]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification label="Confirm Kick" name="EstateKickSingle">
+	<notification label="キックの確認" name="EstateKickSingle">
 		この不動産から[AVATAR_NAMES]をキックしますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
-	<notification label="Confirm Kick" name="EstateKickMultiple">
+	<notification label="キックの確認" name="EstateKickMultiple">
 		以下の住民らをこの不動産からキックしますか？
 
 [AVATAR_NAMES]
@@ -828,7 +787,7 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		[AVATAR_NAMES]のこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
 		<usetemplate name="yesnocancelbuttons" canceltext="キャンセル" notext="すべての不動産" yestext="この不動産"/>
 	</notification>
-	<notification label="Confirm Ban" name="EstateBanMultiple">
+	<notification label="追放の確認" name="EstateBanMultiple">
 		以下の住民らをこの不動産のみ、または[ALL_ESTATES]へのアクセスを拒否しますか？
 
 [AVATAR_NAMES]
@@ -1006,7 +965,6 @@ Second Lifeに入るにはアカウントが必要です。今すぐアカウン
 		<form name="form">
 			<input name="message" type="text"/>
 			<button name="OK" text="ＯＫ"/>
-			<button text="キャンセル"/>
 		</form>
 	</notification>
 	<notification name="CannotRecompileSelectObjectsNoScripts">
@@ -1350,7 +1308,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification label="アウトフィットの保存" name="SaveOutfitAs">
 		着用中のアウトフィットを新しいアウトフィットとして保存：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -1358,7 +1316,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	<notification label="着用物の保存" name="SaveWearableAs">
 		アイテムを別名でインベントリに保存：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -1443,7 +1401,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmObjectDeleteNoCopy">
-		選択したアイテムのうち、少なくとも１つがコピーできません。
+		選択したアイテムのうち、少なくとも１つが複製不可です。
 
 本当に削除しますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1456,7 +1414,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	</notification>
 	<notification name="ConfirmObjectDeleteLockNoCopy">
 		少なくとも１つのオブジェクトがロックされています。
-少なくとも１つのオブジェクトがコピーできません。
+少なくとも１つのオブジェクトが複製不可です。
 
 本当に削除しますか？
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
@@ -1469,7 +1427,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ConfirmObjectDeleteNoCopyNoOwn">
-		１つ以上のオブジェクトがコピーできません。
+		１つ以上のオブジェクトが複製不可です。
 １つ以上のオブジェクトを所有していません。
 
 これらのアイテムを削除しますか？
@@ -1477,7 +1435,7 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	</notification>
 	<notification name="ConfirmObjectDeleteLockNoCopyNoOwn">
 		１つ以上のオブジェクトがロックされています。
-１つ以上のオブジェクトがコピーできません。
+１つ以上のオブジェクトが複製不可です。
 １つ以上のオブジェクトを所有していません。
 
 これらのアイテムを削除しますか？
@@ -1536,11 +1494,6 @@ https://wiki.secondlife.com/wiki/Adding_Spelling_Dictionaries
 	</notification>
 	<notification name="ErrorMessage">
 [ERROR_MESSAGE]
-		<unique>
-			<context>
-				ERROR_MESSAGE
-			</context>
-		</unique>
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="AvatarMovedDesired">
@@ -1587,7 +1540,7 @@ Second Lifeを使ったことがない場合は、ログインする前にアカ
 	</notification>
 	<notification name="LoginCantRemoveCurUsername">
 		ログインしているユーザーを忘れた場合は、ログアウトする必要があります。
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="Confirm and log out"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="確認しログアウト"/>
 	</notification>
 	<notification name="LoginPacketNeverReceived">
 		接続に時間がかかっております。お使いのインターネット接続か、[SECOND_LIFE_GRID]の問題と考えられます。
@@ -1717,7 +1670,7 @@ Second Lifeを使ったことがない場合は、ログインする前にアカ
 	</notification>
 	<notification name="ConfirmTextureHeights">
 		標高範囲に、最高値よりも大きい値を最低値にしようとしています。このまま続行してもよろしいですか？
-		<usetemplate canceltext="聞かないでください" name="yesnocancelbuttons" notext="キャンセル" yestext="Ok"/>
+		<usetemplate canceltext="聞かないでください" name="yesnocancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="MaxAllowedAgentOnRegion">
 		許可できる住人は、[MAX_AGENTS]人までです。
@@ -1849,7 +1802,7 @@ https://www.alchemyviewer.org/downloads.html
 		<usetemplate ignoretext="ブラウザを起動して、スクリプトガイドを閲覧するとき" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="WebLaunchLSLWiki">
-		LSLポータルでスクリプトに関する情報を確認しますか？
+		ＬＳＬポータルでスクリプトに関する情報を確認しますか？
 		<usetemplate ignoretext="ブラウザを起動してＬＳＬポータルを見るとき" name="okcancelignore" notext="キャンセル" yestext="ページに移動"/>
 	</notification>
 	<notification name="ReturnToOwner">
@@ -2016,7 +1969,6 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<form name="form">
 			<input name="message">こちらに入りませんか？</input>
 			<button name="OK" text="ＯＫ"/>
-			<button iname="Cancel" text="キャンセル"/>
 		</form>
 	</notification>
 	<notification name="TooManyTeleportOffers">
@@ -2357,7 +2309,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		オリジナルのオブジェクトを[OWNER]からL$ [PRICE]で購入しますか？
 購入すると、あなたがオブジェクトの所有者となり、以下の操作が可能になります。
 修正：[MODIFYPERM]
-コピー：[COPYPERM]
+複製：[COPYPERM]
 再販・譲渡：[RESELLPERM]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
@@ -2365,23 +2317,23 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		L$ [PRICE]でオリジナルのオブジェクトを購入しますか？
 購入すると、あなたがオブジェクトの所有者となり、以下の操作が可能になります。
 修正：[MODIFYPERM]
-コピー：[COPYPERM]
+複製：[COPYPERM]
 再販・譲渡：[RESELLPERM]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="BuyCopy">
-		コピーを[OWNER]からL$ [PRICE]で購入しますか？
+		複製を[OWNER]からL$ [PRICE]で購入しますか？
 購入したオブジェクトは、あなたのインベントリにコピーされ、以下の操作が可能になります。
 修正：[MODIFYPERM]
-コピー：[COPYPERM]
+複製：[COPYPERM]
 再販・譲渡：[RESELLPERM]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="BuyCopyNoOwner">
-		L$ [PRICE]でコピーを購入しますか？
+		L$ [PRICE]で複製を購入しますか？
 購入したオブジェクトは、あなたのインベントリにコピーされ、以下の操作が可能になります。
 修正：[MODIFYPERM]
-コピー：[COPYPERM]
+複製：[COPYPERM]
 再販・譲渡：[RESELLPERM]
 		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
@@ -2417,25 +2369,25 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ApplyInventoryToObject">
-		インベントリアイテムを「コピー不可」にしようとしています。
+		インベントリアイテムを「複製不可」にしようとしています。
 このアイテムはオブジェクトのインベントリに移動され、コピーされません。
 
 このままインベントリにアイテムを移動しますか？
-		<usetemplate ignoretext="「コピー不可」にしたアイテムをオブジェクトに移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="「複製不可」にしたアイテムをオブジェクトに移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="MoveInventoryFromObject">
-		「コピー不可」のインベントリアイテムを選択しました。
+		「複製不可」のインベントリアイテムを選択しました。
 これらのアイテムはコピーされないまま、あなたのインベントリに移動されます。
 
 このままインベントリにアイテムを移動しますか？
-		<usetemplate ignoretext="「コピー不可」のアイテムをオブジェクトから移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="「複製不可」のアイテムをオブジェクトから移動する前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="MoveInventoryFromScriptedObject">
-		「コピー不可」のインベントリアイテムを選択しました。
+		「複製不可」のインベントリアイテムを選択しました。
 これらのアイテムはコピーされずに、あなたのインベントリに移動されます。このオブジェクトはスクリプト付きなので、インベントリに移動させると、スクリプトに誤動作が起きる可能性があります。
 
 このままインベントリにアイテムを移動しますか？
-		<usetemplate ignoretext="スクリプト入りのオブジェクトを壊す恐れのある「コピー不可」のアイテムを動かす前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
+		<usetemplate ignoretext="スクリプト入りのオブジェクトを壊す恐れのある「複製不可」のアイテムを動かす前の警告" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ClickActionNotPayable">
 		警告：クリックで「オブジェクトに支払う」を設定しました。スクリプトにmoney()イベントが追加されると動作します。
@@ -2457,7 +2409,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="OpenObjectCannotCopy">
-		このオブジェクトには、あなたがコピーできるアイテムはありません。
+		このオブジェクトには、あなたが複製できるアイテムはありません。
 	</notification>
 	<notification name="WebLaunchAccountHistory">
 		[https://secondlife.com/my/account/?lang=ja-JP マイアカウント]
@@ -2507,7 +2459,7 @@ https://community.secondlife.com/knowledgebase/%E6%97%A5%E6%9C%AC%E8%AA%9E%E3%83
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ThumbnailInsufficientPermissions">
-		サムネイルとして使用できる画像は、コピー可能かつ転送可能な画像のみです。
+		サムネイルとして使用できる画像は、複製と譲渡が可能な画像のみです。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ThumbnailOutfitPhoto">
@@ -2605,9 +2557,11 @@ Second Life
 	</notification>
 	<notification name="PurgeSelectedItems">
 		[COUNT]個のアイテムが完全に削除されます。ごみ箱内の選択した項目を削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="ConfirmEmptyTrash">
 		[COUNT]個のアイテムとフォルダーが完全に削除されます。ごみ箱の項目をすべて削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="TrashIsFull">
 		ゴミ箱があふれています。これはログイン時に問題を引き起こします。
@@ -2868,7 +2822,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 		レベル[LEVEL]のゴッドモードを解除します。
 	</notification>
 	<notification name="CopyFailed">
-		これをコピーする権限がありません。
+		これを複製する権限がありません。
 	</notification>
 	<notification name="InventoryAccepted">
 		[NAME]は、あなたが渡したアイテムを受け取りました。
@@ -3026,6 +2980,7 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 	</notification>
 	<notification name="RegionTPAccessBlocked">
 		訪問しようとしているリージョンには現在の初期設定を超えるコンテンツが含まれています。「私」＞「初期設定」＞「一般」を選択して、初期設定を変更できます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="URBannedFromRegion">
 		あなたは、このリージョンへの立ち入りが禁止されています。
@@ -3337,7 +3292,6 @@ Webページにリンクすると、他人がこの場所に簡単にアクセ�
 			<button name="Grant" text="全権付与"/>
 			<button name="Deny" text="拒否"/>
 		</form>
-		<footer>[FOOTERTEXT]</footer>
 	</notification>
 	<notification name="ScriptDialog">
 		[NAME]の「&lt;nolink&gt;[TITLE]&lt;/nolink&gt;」（チャンネル[CHANNEL]）
@@ -3472,6 +3426,7 @@ Your L$ balance is shown in the upper-right.
 期限を延長・更新するには[[URL] ここ]をクリックしてください。
 
 プレミアム会員の方は、[[PREMIUM_URL] ここ]をクリックしてボイスモーフィング特典をお受け取りください。
+		<usetemplate name="okignore" ignoretext="ボイスモーフィングの有効期限が切れるときの警告" yestext="ＯＫ"/>
 	</notification>
 	<notification name="VoiceEffectsNew">
 		新しいボイスモーフィング効果が登場！
@@ -3611,6 +3566,7 @@ Your L$ balance is shown in the upper-right.
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
 
 次の住人と共有：&lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
+		<usetemplate name="okcancelignore" ignoretext="アイテムを共有する前の警告" yestext="ＯＫ" notext="キャンセル"/>
 	</notification>
 	<notification name="ShareFolderConfirmation">
 		フォルダは一度に１つしか共有できません。
@@ -3620,7 +3576,7 @@ Your L$ balance is shown in the upper-right.
 &lt;nolink&gt;[ITEMS]&lt;/nolink&gt;
 
 次の住人と共有：&lt;nolink&gt;[RESIDENTS]&lt;/nolink&gt;
-		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="Ok"/>
+		<usetemplate name="okcancelbuttons" notext="キャンセル" yestext="ＯＫ"/>
 	</notification>
 	<notification name="ItemsShared">
 		アイテムが共有されました。
@@ -3722,6 +3678,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	</notification>
 	<notification name="CannotUploadMaterial">
 		ファイルアップロード時に問題が発生しました。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification label="マテリアルの保存" name="SaveMaterialAs">
 		このマテリアルに名前をつけてください：
@@ -3744,23 +3701,23 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		</form>
 	</notification>
 	<notification name="LivePreviewUnavailable">
-		コピー禁止／譲渡不可のため、このテクスチャを表示できません。
-		<usetemplate ignoretext="コピー禁止／譲渡不可のテクスチャでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
+		複製不可／譲渡不可のため、このテクスチャを表示できません。
+		<usetemplate ignoretext="複製不可／譲渡不可のテクスチャでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="LivePreviewUnavailablePBR">
-		コピー禁止／譲渡不可のため、このマテリアルを表示できません。
-		<usetemplate ignoretext="コピー禁止／譲渡不可のマテリアルでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
+		複製不可／譲渡不可／修正不可のため、このマテリアルを表示できません。
+		<usetemplate ignoretext="複製不可／譲渡不可／修正不可のマテリアルでライブプレビューモードが使用できないことの警告" name="okignore" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FacePasteFailed">
 		ペーストに失敗しました：[REASON]
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FailedToApplyTextureNoCopyToMultiple">
-		テクスチャの適用に失敗しました。コピー禁止のテクスチャを複数のオブジェクトに適用することはできません。
+		テクスチャの適用に失敗しました。複製不可のテクスチャを複数のオブジェクトに適用することはできません。
 		<usetemplate name="okbutton" yestext="ＯＫ "/>
 	</notification>
 	<notification name="FailedToApplyGLTFNoCopyToMultiple">
-		ＧＬＴＦマテリアルの適用に失敗しました。コピー禁止マテリアルを複数のオブジェクトに適用することはできません。
+		ＧＬＴＦマテリアルの適用に失敗しました。複製不可マテリアルを複数のオブジェクトに適用することはできません。
 		<usetemplate name="okbutton" yestext="ＯＫ"/>
 	</notification>
 	<notification name="FacePasteTexturePermissions">
@@ -3808,14 +3765,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 
 ２，クリック・ドラッグで視界を回転
 任意の場所をクリックしてドラッグすると視界を回転させることができます。
-		<tag>custom_skin</tag>
 	</notification>
 	<notification label="表示名" name="HintDisplayName">
 		表示名（カスタマイズ可能）を設定します。ユーザー名は固有で変更できませんが、ここで追加する表示名は変更可能です。他の住人の名前の表示方法は初期設定で変更してください。
 	</notification>
 	<notification label="表示" name="HintView">
 		カメラの視点を変更するには、水平・垂直コントロールを使います。Escキーを押すか、移動キーを押すると、視点がリセットされます。
-		<tag>custom_skin</tag>
 	</notification>
 	<notification label="インベントリ" name="HintInventory">
 		インベントリには、あなたのアイテムがすべて含まれます。新しく追加されたアイテムは「最新」タブに一覧表示されています。
@@ -4088,22 +4043,22 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		所有していない土地に木や草を植えることはできません。
 	</notification>
 	<notification name="NoCopyPermsNoObject">
-		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」をコピーする権限がないため、コピーに失敗しました。
+		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を複製する権限がないため、複製に失敗しました。
 	</notification>
 	<notification name="NoTransPermsNoObject">
-		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を譲渡する権限がないため、コピーに失敗しました。
+		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を譲渡する権限がないため、複製に失敗しました。
 	</notification>
 	<notification name="AddToNavMeshNoCopy">
-		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は、ナビメッシュに関連付けがあるため、コピーに失敗しました。
+		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は、ナビメッシュに関連付けがあるため、複製に失敗しました。
 	</notification>
 	<notification name="DupeWithNoRootsSelected">
 		ルートオブジェクトを選択せずに複製します。
 	</notification>
 	<notification name="CantDupeCuzRegionIsFull">
-		リージョンが埋まっているため、オブジェクトのコピーを作成することができません。
+		リージョンが埋まっているため、オブジェクトを複製できません。
 	</notification>
 	<notification name="CantDupeCuzParcelNotFound">
-		オブジェクトのコピーを作成できません。オブジェクトのある区画が見つかりません。
+		オブジェクトを複製できません。オブジェクトのある区画が見つかりません。
 	</notification>
 	<notification name="CantCreateCuzParcelFull">
 		区画がいっぱいのため、オブジェクトを作成できません。
@@ -4151,13 +4106,13 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」をインベントリに保存できません。この操作は無効になりました。
 	</notification>
 	<notification name="NoCopyNoSelCopy">
-		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」をコピーする権限がないため、選択内容をコピーできません。
+		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を複製する権限がないため、選択内容を複製できません。
 	</notification>
 	<notification name="NoTransNoSelCopy">
-		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は譲渡できないため、選択内容をコピーできません。
+		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は譲渡できないため、選択内容を複製できません。
 	</notification>
 	<notification name="NoTransNoCopy">
-		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は譲渡できないため、選択内容をコピーできません。
+		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は譲渡できないため、選択内容を複製できません。
 	</notification>
 	<notification name="NoPermsNoRemoval">
 		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」をシミュレーターから削除することは、権限のシステムにより許可されていません。
@@ -4166,7 +4121,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を修正する権限がないため、選択内容を保存できません。
 	</notification>
 	<notification name="NoCopyNoSaveSelection">
-		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」はコピー不可なため、選択内容を保存できません。
+		オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」は複製不可のため、選択内容を保存できません。
 	</notification>
 	<notification name="NoModNoTaking">
 		あなたには、オブジェクト「&lt;nolink&gt;[OBJ_NAME]&lt;/nolink&gt;」を修正する権限がないため、選択内容を選ぶことはできません。
@@ -4208,7 +4163,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 オブジェクト「[O]」をリージョン[R]の[P]に移動できません。
 	</notification>
 	<notification name="NoParcelPermsNoObject">
-		その区画へのアクセス権がないため、コピーが失敗しました。
+		その区画へのアクセス権がないため、複製に失敗しました。
 	</notification>
 	<notification name="CMORegionVersion">
 		オブジェクトの受け取りに対応していない、旧バージョンを実行しているため、
@@ -4255,7 +4210,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		これを編集できる権限がありません。
 	</notification>
 	<notification name="NoPermToCopyInventory">
-		これはインベントリにコピーできません。
+		そのインベントリを複製する権限がありません。
 	</notification>
 	<notification name="CantSaveItemDoesntExist">
 		オブジェクトのコンテンツに保存できません。アイテムが存在していません。
@@ -4327,7 +4282,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		リンクエラー－プリミティブが多すぎます。
 	</notification>
 	<notification name="LinkFailedCantLinkNoCopyNoTrans">
-		リンクエラー－コピー不可と譲渡不可のオブジェクトをリンクできません。
+		リンクエラー－複製不可と譲渡不可のオブジェクトをリンクできません。
 	</notification>
 	<notification name="LinkFailedNothingLinkable">
 		リンクエラー－リンクできるものがありません。
@@ -4419,7 +4374,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		無効なオブジェクトパラメーターです。
 	</notification>
 	<notification name="CantDuplicateObjectNoAcess">
-		現在のアクセス権限では、ここにオブジェクトのコピーを作成できません。
+		現在のアクセス権限では、ここにオブジェクトを複製できません。
 	</notification>
 	<notification name="CantChangeShape">
 		あなたにはこのシェイプを変更する権限がありません。
@@ -4711,7 +4666,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 			<button name="Allow" text="許可"/>
 			<button name="Always Allow" text="常に許可"/>
 			<button name="Deny" text="拒否"/>
-			<ignore text="現在のＲＬＶの制限のリストを誰かに送る前の確認"/>
 		</form>
 	</notification>
 	<notification name="PreferenceChatClearLog">
@@ -4772,7 +4726,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification label="設定を保存" name="SaveSettingAs">
 		現在の設定を以下のように保存します：
 		<form name="form">
-			<input name="message">[DESC] (new)</input>
+			<input name="message">[DESC] (新しい)</input>
 			<button name="OK" text="ＯＫ"/>
 			<button name="Cancel" text="キャンセル"/>
 		</form>
@@ -4919,9 +4873,6 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification name="DumpArchetypeSuccess">
 		容姿は、[FILE_PATH]に正常に保存されました。
 	</notification>
-	<notification name="InvalidGrid">
-		「[GRID]」は有効なグリッド識別子ではありません。
-	</notification>
 	<notification name="ConfirmRemoveSkin">
 		[SKIN]を削除してもよろしいですか？これにより、ハードディスクから完全に消去されます。
 		<usetemplate ignoretext="スキンの削除確認" name="okcancelignore" notext="キャンセル" yestext="ＯＫ"/>
@@ -5019,7 +4970,7 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		オブジェクトを取り消し不能に破壊します。それが必要なかったことを願っています。
 	</notification>
 	<notification name="CantRestoreToWorldNoCopy">
-		コンテンツ損失の可能性を防ぐため、コピーされていないアイテムについては、最後の位置に復元することはできません。
+		コンテンツ損失の可能性を防ぐため、複製不可のアイテムは最後の位置に復元できません。
 	</notification>
 	<notification name="RejectTeleportOffersModeSet">
 		「すべての受け取ったテレポートオファーとリクエストを拒否する」モードがオンになっています。
@@ -5040,5 +4991,431 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 		非フレンドへの自動応答モードがオンになっています。
 フレンド以外の人からインスタントメッセージを受信したときに、設定した自動応答で応答されるようになります。
 		<usetemplate ignoretext="ステータスを非フレンドへの自動応答モードに変えたとき" name="okignore" yestext="ＯＫ"/>
+	</notification>
+	<notification name="FoundLegacyNsisInstallation">
+		[APP_NAME]は旧バージョン[VERSION]のインストールを検出しました。旧バージョンをアンインストールするには、[https://community.secondlife.com/knowledgebase/english/how-to-uninstall-and-reinstall-second-life-r524 こちらの説明]に従ってください。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CannotPasteFolderIntoSelf">
+		フォルダーをそれ自身やそのサブフォルダーの中に貼り付けることはできません。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ModelUploaderMissingPhysicsApple">
+		Apple Siliconでは、まだモデルのアップロードは利用できませんが、今後のリリースでサポートされる予定です。
+
+回避策：FinderでSecond Lifeアプリを右クリックし、「情報を見る」を選択して、「Rosettaを使用して開く」にチェックを入れます。
+	</notification>
+	<notification name="ModelUploaderMissingPhysics">
+		物理ライブラリが存在しないため、モデルアップローダの一部の機能が動作しないか、正しく動作しない可能性があります。
+	</notification>
+	<notification name="LandmarkLocationUnknown">
+		ビューアはリージョンの位置を取得できませんでした。リージョンが一時的に利用できないか、削除されたか、ランドマークの読み込みに失敗した可能性があります。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="DownloadingUpdate">
+		更新[VERSION]をダウンロードしています…
+ビューアは、ダウンロード完了後に再起動します。
+	</notification>
+	<notification name="RegionTPAccessBlocked_NotifyAdultsOnly">
+		訪問しようとしているリージョンのレーティングは[REGIONMATURITY_CAP]で、あなたのアカウントの種類では利用できません。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="DeleteWornItems">
+		削除しようとしているアイテムの一部は、アバターが着用中です。
+これらのアイテムをアバターから外しますか？
+		<usetemplate name="okcancelbuttons" yestext="アイテムを外して削除" notext="キャンセル"/>
+	</notification>
+	<notification name="CantDeleteRequiredClothing">
+		削除しようとしているアイテムの一部は、必須の衣類レイヤー（スキン、シェイプ、髪、目）です。
+削除する前に、それらのレイヤーを置き換える必要があります。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="ThumbnailSelectionTooLarge">
+		一度に変更できるサムネイルは50個までです。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CantLinkNotecard">
+		リンクを作成する前に、ノートカードを保存する必要があります。
+	</notification>
+	<notification name="CantLinkMaterial">
+		リンクを作成する前に、マテリアルを保存する必要があります。
+	</notification>
+	<notification name="InventoryLimitReachedAIS">
+		インベントリに問題が発生しています。お手数ですが、サポートにお問い合わせください。
+	</notification>
+	<notification name="ExternalEditorServerStarted">
+		外部エディターサーバーをポート[PORT]で開始しました。
+	</notification>
+	<notification name="ExternalEditorServerFailed">
+		外部エディターサーバーをポート[PORT]で開始できませんでした。
+	</notification>
+	<notification name="ExternalEditorServerStopped">
+		外部エディターサーバーを停止しました。
+	</notification>
+	<notification name="SnapshotSavedToComputer">
+		スナップショットは以下に保存されました：
+[FILEPATH]
+
+クリックでフォルダを開きます。
+	</notification>
+	<notification name="NearbyVoiceMutedByModerator">
+		モデレーターは、あなたのボイスチャットをミュートしました。
+この場所では、あなたが話しても誰も聞こえません。
+	</notification>
+	<notification name="NearbyVoiceUnmutedByModerator">
+		あなたのボイスチャットは、この場所にいる人々に聞こえるようになりました。
+	</notification>
+	<notification name="ConfirmLeaveAdhoc">
+		この会話から抜けてもよろしいですか？
+		<usetemplate name="okcancelignore" ignoretext="会話から抜ける前の確認" yestext="はい" notext="いいえ"/>
+	</notification>
+	<notification name="NewAOSet">
+		新しいＡＯセットの名前を指定します。
+（名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。）
+		<form name="form">
+			<input name="message">
+				新しいＡＯセット
+			</input>
+		</form>
+	</notification>
+	<notification name="NewAOCantContainNonASCII">
+		「[AO_SET_NAME]」という名前のＡＯセットを作成することができませんでした。
+名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="RenameAOMustBeASCII">
+		ＡＯセット「[AO_SET_NAME]」を名前変更することができませんでした。
+名前には、「:」または「|」を除く任意のアスキー文字を含めることができます。
+		<usetemplate name="okbutton" yestext="ＯＫ"/>
+	</notification>
+	<notification name="RemoveAOSet">
+		リストからＡＯセット「[AO_SET_NAME]」を削除してもよろしいですか？
+		<usetemplate name="okcancelbuttons" yestext="削除する" notext="キャンセル"/>
+	</notification>
+	<notification name="AOForeignItemsFound">
+		アニメーションオーバーライダーは、構成に属さない項目を少なくとも１つ見つけました。
+移動されたアイテムがないか、「遺失物」フォルダを確認してください。
+	</notification>
+	<notification name="AOImportSetAlreadyExists">
+		すでにその名前のアニメーションセットは存在しています。
+	</notification>
+	<notification name="AOImportPermissionDenied">
+		ノートカードを読み取るための十分な権限がありません。
+	</notification>
+	<notification name="AOImportComplete">
+		アニメーションオーバーライダーのノートカードのインポートが完了しました！
+	</notification>
+	<notification name="AOImportCreateSetFailed">
+		インポートセット作成時にエラーが発生しました。
+	</notification>
+	<notification name="AOImportDownloadFailed">
+		ノートカードをダウンロードできませんでした。
+	</notification>
+	<notification name="AOImportNoText">
+		ノートカードが空であるか、読み取り不能です。
+	</notification>
+	<notification name="AOImportNoFolder">
+		アニメーションを読み取るフォルダーが見つかりませんでした。
+	</notification>
+	<notification name="AOImportNoStatePrefix">
+		ノートカードの[LINE]行目には有効な[ステート接頭辞がありません。
+	</notification>
+	<notification name="AOImportNoValidDelimiter">
+		ノートカードの[LINE]行目には有効な]デリミタがありません。
+	</notification>
+	<notification name="AOImportStateNameNotFound">
+		ステート名[NAME]が見つかりません。
+	</notification>
+	<notification name="AOImportAnimationNotFound">
+		アニメーション[NAME]が見つかりませんでした。インポートしたノートカードと同じフォルダーに存在することを確認してください。
+	</notification>
+	<notification name="AOImportInvalid">
+		ノートカードには使用可能なデータが含まれていませんでした。インポートを中止します。
+	</notification>
+	<notification name="AOImportRetryCreateSet">
+		アニメーションセット[NAME]のインポートフォルダを作成できませんでした。再試行しています…。
+	</notification>
+	<notification name="AOImportAbortCreateSet">
+		アニメーションセット[NAME]のインポートフォルダを作成できませんでした。中断します。
+	</notification>
+	<notification name="AOImportLinkFailed">
+		アニメーション「[NAME]」のアニメーションリンクの作成に失敗しました！
+	</notification>
+	<notification name="ScriptStudioSaveChanges">
+		「[NAME]」への変更を保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保存" notext="保存しない" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioSaveChangesMany">
+		[COUNT]個のスクリプトに未保存の変更があります。閉じる前に保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="すべて保存" notext="保存しない" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioNewItem" label="新規アイテム">
+		新しい[KIND]の名前を入力してください：
+	</notification>
+	<notification name="ScriptStudioDescribe" label="説明">
+		[NAME]の説明を入力してください：
+	</notification>
+	<notification name="ScriptStudioSaveTheme" label="テーマを保存">
+		現在の色をテーマとして保存する名前を入力してください：
+	</notification>
+	<notification name="ScriptStudioThemeNotSaved">
+		テーマを[PATH]に保存できませんでした。
+	</notification>
+	<notification name="ScriptStudioThemeNameShipped">
+		「[NAME]」という名前の組み込みテーマがすでにあります。別の名前を選んでください。
+	</notification>
+	<notification name="ScriptStudioSnippetsNone">
+		保存できる自分のスニペットがありません。先に「新規」で作成するか、組み込みのスニペットを「コピー」してください。
+	</notification>
+	<notification name="ScriptStudioSnippetsTooLarge">
+		スニペットは[SIZE]バイトありますが、ノートカードに保持できるのは[LIMIT]バイトです。一部を削除するか、代わりに「XMLとして編集」で保管してください。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotSaved">
+		スニペットをノートカード「[NAME]」に保存できませんでした：[REASON]。
+	</notification>
+	<notification name="ScriptStudioSnippetsSaved">
+		[COUNT]個のスニペットを「ノートカード」フォルダーのノートカード「[NAME]」に保存しました。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotRead">
+		ノートカード「[NAME]」を読み込めませんでした：[REASON]。
+	</notification>
+	<notification name="ScriptStudioSnippetsNotSnippets">
+		ノートカード「[NAME]」にはスニペットが含まれていません。「スニペット」タブの「インベントリに保存」で、スニペットを含むノートカードを作成できます。
+	</notification>
+	<notification name="ScriptStudioSnippetsAdded">
+		「[NAME]」のスニペット：[ADDED]個を追加、[RENAMED]個は名前が使用済みだったため番号付きの名前で追加、[SKIPPED]個はすでに持っていたもの。
+	</notification>
+	<notification name="ScriptStudioQuitUnsaved">
+		「[NAME]」に未保存の変更があります。保存しますか、次回開き直すために保持しますか、それとも破棄しますか？
+	</notification>
+	<notification name="ScriptStudioQuitUnsavedMany">
+		[COUNT]個のスクリプトとノートカードに未保存の変更があります。保存しますか、次回開き直すために保持しますか、それとも破棄しますか？
+	</notification>
+	<notification name="ScriptStudioKeptOne">
+		[NAMES]の未保存の変更を次回用に保持しました。Script Studioを開くと開き直されます。今すぐ開きますか？
+	</notification>
+	<notification name="ScriptStudioKept">
+		[COUNT]個のスクリプトとノートカードの未保存の変更を次回用に保持しました：[NAMES]。Script Studioを開くと開き直されます。今すぐ開きますか？
+	</notification>
+	<notification name="RecoveredUnsavedOne">
+		前回ビューアを閉じたときに、[NAMES]の未保存の変更が保持されました。開いて確認して保存するか、破棄してください。それまでは、Script Studioの「ファイル」＞「未保存の変更を復旧」にあります。
+	</notification>
+	<notification name="RecoveredUnsaved">
+		前回ビューアを閉じたときに、[COUNT]個のスクリプトとノートカードの未保存の変更が保持されました：[NAMES]。開いて確認して保存するか、破棄してください。それまでは、Script Studioの「ファイル」＞「未保存の変更を復旧」にあります。
+	</notification>
+	<notification name="ScriptStudioDeleteItemOpen">
+		オブジェクトから「[NAME]」を削除しますか？　この操作は元に戻せません。未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioDeleteItemsOpen">
+		[COUNT]個のアイテムをそれぞれのオブジェクトから削除しますか？　この操作は元に戻せません。開いているアイテムの未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioReplaceAll">
+		[SCRIPTS]の[PLACES]を「[WITH]」に置換しますか？　各スクリプトの変更は1回で取り消せます。開いていないものは、変更が未保存の状態で開かれます。
+		<usetemplate name="okcancelbuttons" yestext="置換" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioFixAll">
+		「[NAME]」で、「[EXAMPLE]」のような[FIXES]を問題ごとに1つずつ適用しますか？　1回で取り消すことも、先にプレビューすることもできます。[LEFT]
+		<usetemplate name="yesnocancelbuttons" yestext="修正" notext="プレビュー" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioPrefsChanged">
+		Script Studioの設定の変更を保持しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保持" notext="破棄" canceltext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioRevert">
+		「[NAME]」を最後に保存したバージョンに戻しますか？　未保存の変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="okcancelbuttons" yestext="元に戻す" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioResetScripts">
+		[COUNT]個のスクリプトをリセットしますか？　それぞれ変数をクリアし、state_entryから再開します。
+		<usetemplate name="okcancelbuttons" yestext="リセット" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioStopScripts">
+		[COUNT]個のスクリプトを停止しますか？　再度開始するまで停止したままになります。
+		<usetemplate name="okcancelbuttons" yestext="停止" notext="キャンセル"/>
+	</notification>
+	<notification name="ScriptStudioMastersSendUsers">
+		[FILES]がディスク上で変更されました。これにより、ファイルにリンクされたワールド内のスクリプト[COUNT]個（[PLACES]）が変更されます。今すぐ送信しますか？　送信しないスクリプトは「ファイルから送信」を待ちます。
+		<usetemplate name="okcancelbuttons" yestext="すべて送信" notext="送信しない"/>
+	</notification>
+	<notification name="ScriptStudioFileChanged">
+		[NAME]がディスク上で変更されましたが、このタブには未保存の変更があります。ディスクから再読み込みしますか、それとも自分の変更を残しますか？
+		<usetemplate name="okcancelbuttons" yestext="ディスクから読み込む" notext="自分の変更を残す"/>
+	</notification>
+	<notification name="ScriptStudioLinkUnsaved">
+		「[NAME]」には未保存の変更があり、[FILE]にリンクするとファイルの内容がスクリプトの内容になります。変更をファイルに書き込んで、ファイルの内容をすべて置き換えますか？　それとも変更を破棄して、ファイルをそのまま採用しますか？　破棄した変更は「ファイル」＞「未保存の変更を復旧」に1週間保持されます。
+		<usetemplate name="yesnocancelbuttons" yestext="ファイルに書き込む" notext="変更を破棄" canceltext="キャンセル"/>
+	</notification>
+	<notification name="SoftwareRenderer">
+		[APP_NAME]は[RENDERER]で描画しています。これはグラフィックカードではなくCPUで描画するため、非常に遅くなります。
+
+通常、これはグラフィックドライバーが読み込まれなかったことを意味します。よくある原因：
+- NVIDIAのドライバーにEGLプラットフォームライブラリがない（Waylandではegl-wayland、X11ではegl-x11）。
+- グラフィックカード用のMesaドライバーがインストールされていないか、/dev/driを開く権限がない。
+- GPUにアクセスできない仮想マシンやコンテナ、またはd3d12ドライバーのないWSL。
+		<usetemplate name="okignore" ignoretext="グラフィックがCPUで描画されているとき" yestext="ＯＫ"/>
+	</notification>
+	<notification name="CannotDeleteSelectObjectsNoPermission">
+		「削除」を実行できません。
+
+修正権限のあるスクリプト付きオブジェクトを選択してください。
+	</notification>
+	<notification name="preexisting_tport">
+		申し訳ありませんが、システムはテレポートを開始できませんでした。数分後にもう一度お試しください。
+	</notification>
+	<notification name="InvalidTerrainAlphaNotFullyLoaded">
+		リージョンのテクスチャを設定できませんでした：
+地形テクスチャ[TEXTURE_NUM]は完全に読み込まれていませんが、ビット深度が[TEXTURE_BIT_DEPTH]のため透明部分を含むとみなされます。現在、地形テクスチャでは透明はサポートされていません。
+
+テクスチャ[TEXTURE_NUM]が不透明な場合は、完全に読み込まれるのを待ってから、もう一度「適用」をクリックしてください。
+
+アルファは、alphaMode="MASK"かつdoubleSided=falseの地形マテリアル（PBR Metallic Roughness）でのみサポートされています。
+	</notification>
+	<notification name="InvalidTerrainAlpha">
+		リージョンのテクスチャを設定できませんでした：
+地形テクスチャ[TEXTURE_NUM]に透明部分が含まれています。現在、地形テクスチャでは透明はサポートされていません。
+
+テクスチャ[TEXTURE_NUM]を不透明なRGB画像に置き換えてから、もう一度「適用」をクリックしてください。
+
+アルファは、alphaMode="MASK"かつdoubleSided=falseの地形マテリアル（PBR Metallic Roughness）でのみサポートされています。
+	</notification>
+	<notification name="InvalidTerrainMaterialNotLoaded">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]が読み込まれていません。
+
+マテリアルが読み込まれるのを待つか、マテリアル[MATERIAL_NUM]を有効なマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialLoadFailed">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]の読み込みに失敗しました。
+
+マテリアル[MATERIAL_NUM]を有効なマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialDoubleSided">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]は両面です。現在、PBR地形では両面マテリアルはサポートされていません。
+
+マテリアル[MATERIAL_NUM]をdoubleSided=falseのマテリアルに置き換えてください。
+	</notification>
+	<notification name="InvalidTerrainMaterialAlphaMode">
+		リージョンのマテリアルを設定できませんでした：
+地形マテリアル[MATERIAL_NUM]はサポートされていないalphaMode="[MATERIAL_ALPHA_MODE]"を使用しています。
+
+マテリアル[MATERIAL_NUM]をalphaMode="OPAQUE"またはalphaMode="MASK"のマテリアルに置き換えてください。
+	</notification>
+	<notification name="RegionAboutToShutdown">
+		入ろうとしているリージョンはまもなくシャットダウンします。
+	</notification>
+	<notification name="CutoutSnapshotSaved">
+		このスナップショットは切り抜きでした：切り抜きの対象だけが描画されました。スナップショットウィンドウで「切り抜き」のチェックを外すまで、オンのままです。
+	</notification>
+	<notification name="CutoutTargetMissing">
+		スナップショットは保存されませんでした：切り抜きの対象が視界にありません。カメラをそちらに向けるか、もう一度選択するか、スナップショットウィンドウで「切り抜き」のチェックを外してください。
+	</notification>
+	<notification name="LightBoxWhiteBalanceTooDark">
+		その場所は暗すぎて色を読み取れません。白またはグレーに見えるはずの、十分に明るいものを選んでください。
+	</notification>
+	<notification name="LightBoxWhiteBalanceUnreachable">
+		色温度と色合いではそれを中和できません。色付きの光の下にある無彩色の面ではなく、色の付いた面のようです。
+	</notification>
+	<notification name="LightBoxLookOverwrite">
+		「[NAME]」という名前のルックはすでに存在します。置き換えますか？
+
+この操作は元に戻せません。
+		<usetemplate name="okcancelbuttons" yestext="置き換える" notext="キャンセル"/>
+	</notification>
+	<notification name="LocalMeshNoUVs">
+		[FNAME]にはUV座標がないため、テクスチャやマテリアルをプレビューできません（テクスチャなし／白で描画されます）。UVマップ付きでメッシュを再エクスポートしてください。
+	</notification>
+	<notification name="NowOwnObjectInv">
+		オブジェクト[OBJECT_NAME]の所有者になり、インベントリに入れられました。
+	</notification>
+	<notification name="YouDiedAndGotTPLanding">
+		死亡したため、区画の着地点にテレポートされました
+	</notification>
+	<notification name="YouDiedAndGotTPTelehub">
+		死亡したため、リージョンのテレハブにテレポートされました
+	</notification>
+	<notification name="NoTransNoSaveToContents">
+		オブジェクトの所有権を譲渡する権限がないため、&lt;nolink&gt;「[OBJ_NAME]」&lt;/nolink&gt;をオブジェクトの中身に保存できません。
+	</notification>
+	<notification name="CantAttachObjectBeingRemoved">
+		オブジェクトはすでに取り外し中のため、装着できません。
+	</notification>
+	<notification name="ChatCommandCalc">
+		計算：[EXPRESSION] = [RESULT]
+	</notification>
+	<notification name="ChatCommandCalcFailed">
+		計算に失敗しました。
+	</notification>
+	<notification name="ChatCommandDiceRoll">
+		サイコロ：[RESULT]
+	</notification>
+	<notification name="AutoAcceptedInventory">
+		[NAME]からの[ITEM]を自動的に受け取り、インベントリに入れました。
+	</notification>
+	<notification name="AlchemyCrashReportConsent">
+		Alchemyの開発者にクラッシュレポートを送信しますか？
+
+レポートには、ビューアがクラッシュした場所、ログ、設定、アバター名が含まれます。レポートはAlchemyの開発者だけが閲覧できるSentryに送られ、この許可なしに送られることはありません。この設定は後で初期設定から変更できます。
+		<usetemplate name="okcancelbuttons" yestext="送信する" notext="送信しない"/>
+	</notification>
+	<notification name="AlchemyFeedbackAfterCrash">
+		[WHAT]何をしていたか覚えていれば、開発者に伝えることで原因の特定に役立ちます。
+	</notification>
+	<notification name="AlchemyFeedbackSent">
+		ありがとうございます。フィードバックはAlchemyの開発者に届きました。
+参照番号：[REF]
+	</notification>
+	<notification name="AlchemyFeedbackQueued">
+		フィードバックをまだサーバーに送信できませんでした。自動的に送信されます。
+	</notification>
+	<notification name="AlchemyFeedbackQueuedDisconnected">
+		切断されているため、フィードバックは次回Alchemyを起動したときに送信されます。
+	</notification>
+	<notification name="AlchemyFeedbackKeptSent">
+		以前送信したフィードバックがAlchemyの開発者に届きました。
+参照番号：[REF]
+	</notification>
+	<notification name="AlchemyFeedbackFailed">
+		フィードバックは送信されませんでした。[REASON]
+
+メッセージは「フィードバックを送信」に保存されています。
+	</notification>
+	<notification name="AlchemyFeedbackGivenUpRestored">
+		[DATE]に書いたフィードバックをAlchemyの開発者に送信できなかったため、Alchemyは再試行を中止しました。メッセージは「フィードバックを送信」に戻されています。
+	</notification>
+	<notification name="AlchemyFeedbackGivenUp">
+		[DATE]に書いたフィードバックをAlchemyの開発者に送信できなかったため、Alchemyは再試行を中止しました。
+	</notification>
+	<notification name="AlchemyFeedbackSendTest">
+		Alchemyの開発者にテストレポートを送信しますか？　システム情報と今回のセッションのログ、さらに「フィードバックを送信」で含める設定にしている場合はアバター名が含まれます。
+		<usetemplate name="okcancelbuttons" yestext="送信" notext="キャンセル"/>
+	</notification>
+	<notification name="SceneExplorerFullRegion">
+		リージョン全体を対象にすると、カメラに見える範囲だけでなく、リージョン内のすべてのオブジェクトをビューアに送信するようシミュレーターに要求します。混雑したリージョンでは大量のデータになり、落ち着くまで時間がかかる場合があります。
+
+これをオフにするか、シーンエクスプローラーを閉じると、シミュレーターは通常の状態に戻ります。
+		<usetemplate name="okignore" ignoretext="シーンエクスプローラーでリージョン全体を対象にするとき" yestext="ＯＫ"/>
+	</notification>
+	<notification name="LoadCameraPositionNoneSaved">
+		カメラの視点はまだ保存されていません。
+	</notification>
+	<notification name="LoadCameraPositionOutsideDrawDistance">
+		カメラの位置が描画距離より遠いため、カメラの視点を復元できません。
+	</notification>
+	<notification name="XUIStudioRemoveOrphans">
+		[LANG]のすべてのファイルから、すべての孤立した値を削除しますか？
+
+孤立した値とは、ベースにもう存在しないもの（名前がなくなった要素、名前のない要素、ベースの要素が持たない属性）に対して言語が書いている値です。マージはどれも適用しません。
+
+ファイルに書き込むため、ここから元に戻すことはできません。
+		<usetemplate name="okcancelbuttons" yestext="削除" notext="キャンセル"/>
+	</notification>
+	<notification name="XUIStudioCloseDocument">
+		[FILE]には保存されていない編集があります。
+解放する前に保存しますか？
+		<usetemplate name="yesnocancelbuttons" yestext="保存" notext="保存しない" canceltext="キャンセル"/>
 	</notification>
 </notifications>

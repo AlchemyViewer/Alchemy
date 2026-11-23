@@ -24,4 +24,7 @@
 	<rows name="script_trigger_lbutton">
 		<columns name="lst_action" value="インタラクト（左クリックスクリプト）"/>
 	</rows>
+	<rows name="grade_bypass_key">
+		<columns name="lst_action" value="押している間比較（カラーグレーディングをバイパス）"/>
+	</rows>
 </contents>

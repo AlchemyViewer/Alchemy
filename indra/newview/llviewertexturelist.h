@@ -50,6 +50,7 @@ const bool IMMEDIATE_YES = true;
 const bool IMMEDIATE_NO = false;
 
 class LLImageJ2C;
+enum class EJ2CContent : U8;
 class LLMessageSystem;
 class LLTextureView;
 
@@ -119,6 +120,13 @@ public:
                                  const S32 min_image_dimentions = 0,
                                  bool force_square = false);
     static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image,
+                                                     const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT,
+                                                     bool force_square = false,
+                                                     bool force_lossless = false);
+    // As above, for an image holding `content`, which the encoder may code
+    // and resize it by.
+    static LLPointer<LLImageJ2C> convertToUploadFile(LLPointer<LLImageRaw> raw_image,
+                                                     EJ2CContent content,
                                                      const S32 max_image_dimentions = LLViewerFetchedTexture::MAX_IMAGE_SIZE_DEFAULT,
                                                      bool force_square = false,
                                                      bool force_lossless = false);

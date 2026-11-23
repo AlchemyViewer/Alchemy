@@ -9,10 +9,23 @@
 	<floater.string name="copy_name">
 		Copia de [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]s</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]min</floater.string>
+	<floater.string name="last_used_hours">[COUNT]h</floater.string>
+	<floater.string name="last_used_days">[COUNT]d</floater.string>
+	<floater.string name="no_gestures">No hay gestos</floater.string>
+	<floater.string name="no_matching_gestures">No hay gestos coincidentes</floater.string>
+	<floater.string name="menu_activate">Activar</floater.string>
+	<floater.string name="menu_deactivate">Desactivar</floater.string>
+	<floater.string name="menu_play">Reproducir</floater.string>
+	<floater.string name="menu_stop">Parar</floater.string>
+	<filter_editor label="Filtrar por nombre, chat o tecla" name="gesture_filter" tool_tip="Filtrar gestos por nombre, palabra clave de chat o tecla de acceso directo"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nombre" name="name"/>
 		<scroll_list.columns label="Chat" name="trigger"/>
 		<scroll_list.columns label="Tecla" name="shortcut"/>
+		<scroll_list.columns label="Último" name="last_used" tool_tip="Tiempo desde el último uso en esta sesión. Se recuerdan los 1.024 gestos usados más recientemente. Haz clic para ordenar."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Más opciones"/>
@@ -20,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Activar/Desactivar el gesto elegido"/>
 		<button name="del_btn" tool_tip="Borrar este gesto"/>
 	</panel>
-	<button label="Editar" name="edit_btn" tool_tip="Abrir la ventana para editar el gesto seleccionado."/>
+	<button label="Abrir" name="edit_btn" tool_tip="Abrir la ventana para editar el gesto seleccionado."/>
 	<button label="Reproducir" name="play_btn" tool_tip="Realizar gesto seleccionado en el mundo."/>
 	<button label="Parar" name="stop_btn"/>
 </floater>

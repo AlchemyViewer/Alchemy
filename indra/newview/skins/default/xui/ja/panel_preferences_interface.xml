@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="Interface panel" label="インターフェース">
+	<text name="float_text_label">
+		浮遊テキスト：
+	</text>
+	<text name="fade_dist_label">
+		フェード距離
+	</text>
+	<text name="fade_range_label">
+		フェード範囲
+	</text>
+	<check_box name="HideHoverTextInCinematicMode" label="シネマティックモードでは隠す"/>
+	<text name="InventoryText">
+		インベントリ：
+	</text>
+	<check_box name="DoubleClickAttachmentAddCheck" label="ダブルクリックでアタッチメントを追加する"/>
+	<check_box name="DoubleClickWearableAddCheck" label="ダブルクリックで着用物を追加する"/>
+	<text name="Appearance Editor">
+		容姿の編集：
+	</text>
+	<check_box name="AlchemyAppearanceShowHints" label="着用物の編集画面に視覚的なヒントを表示する" tool_tip="変更中のアバターの部位を示す視覚的なヒントの表示を切り替えます。"/>
+	<text name="SecurityText">
+		セキュリティ：
+	</text>
+	<check_box name="AlchemyDisableClickToSit" label="左クリックでオブジェクトに座れないようにする"/>
+	<check_box name="ScriptsCanShowUI" label="スクリプトによるマップUIの表示を許可（llMapDestination）"/>
+	<text name="inworld_typing_rg_label" value="オブジェクトの権限を取り消すタイミング："/>
+	<radio_group name="revoke_perms_radio">
+		<radio_item name="None" label="しない"/>
+		<radio_item name="Sitting" label="座ったとき"/>
+		<radio_item name="Standing" label="立ったとき"/>
+		<radio_item name="Both" label="両方"/>
+	</radio_group>
+	<text name="World Effects">
+		ワールド：
+	</text>
+	<check_box name="EnvironmentPersistAcrossLogin" label="自然環境の設定をセッション間で維持する" tool_tip="現在の自然環境の設定を次回のログイン後に復元します。"/>
+	<check_box name="EffectScriptChatParticles" label="スクリプトの通信時にパーティクル効果を表示する" tool_tip="有効にすると、スクリプト付きオブジェクトがスクリプトで通信するときに渦巻く光のパーティクルを表示します"/>
+</panel>

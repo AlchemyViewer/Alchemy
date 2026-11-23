@@ -3,4 +3,10 @@
 	<floater.string name="title_for_frequently_used" value="よく使用する"/>
 	<floater.string name="text_no_emoji_for_filter" value="「[FILTER]」に合致する絵文字が見つかりませんでした。"/>
 	<text name="Dummy">絵文字が選択されていません。</text>
+	<floater.string name="tooltip_tone_none" value="肌の色の指定なし"/>
+	<floater.string name="tooltip_tone_1" value="明るい肌の色"/>
+	<floater.string name="tooltip_tone_2" value="やや明るい肌の色"/>
+	<floater.string name="tooltip_tone_3" value="中間の肌の色"/>
+	<floater.string name="tooltip_tone_4" value="やや濃い肌の色"/>
+	<floater.string name="tooltip_tone_5" value="濃い肌の色"/>
 </floater>

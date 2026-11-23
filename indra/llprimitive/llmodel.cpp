@@ -27,6 +27,7 @@
 #include "linden_common.h"
 
 #include "llmodel.h"
+#include "almeshfacepack.h"
 #include "llmemory.h"
 #include "llconvexdecomposition.h"
 #include "llsdserialize.h"
@@ -628,6 +629,8 @@ LLSD LLModel::writeModel(
     EWriteModelMode write_mode,
     bool as_slm,
     int submodel_id,
+    EBlockPacking packing,
+    ALMeshFacePack::Weights weights,
     const LLVector3& position_offset) // <SK:Nexii> Mesh uploader pivot
 {
     LLSD mdl;
@@ -681,6 +684,10 @@ LLSD LLModel::writeModel(
         {
             mdl["material_list"][i] = high->mMaterialList[i];
         }
+        // The box the model was normalized from, which places the file's
+        // origin within it for the uploader's pivot
+        mdl["normalized_scale"] = high->mNormalizedScale.getValue();
+        mdl["normalized_translation"] = high->mNormalizedTranslation.getValue();
     }
 
     for (U32 idx = 0; idx < MODEL_NAMES_LENGTH; ++idx)
@@ -922,11 +929,14 @@ LLSD LLModel::writeModel(
         }
     }
 
-    return writeModelToStream(ostr, mdl, write_mode, as_slm);
+    return writeModelToStream(ostr, mdl, write_mode, as_slm, packing, weights);
 }
 
-LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm)
+LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode write_mode, bool as_slm, EBlockPacking packing,
+                                 ALMeshFacePack::Weights weights)
 {
+    auto zip = [packing](LLSD& block) { return packing == PACK_PLAIN ? zip_llsd(block) : zip_llsd_model(block); };
+
     std::string::size_type cur_offset = 0;
 
     LLSD header;
@@ -936,11 +946,17 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
         header["material_list"] = mdl["material_list"];
     }
 
+    if (as_slm && mdl.has("normalized_scale") && mdl.has("normalized_translation"))
+    {
+        header["normalized_scale"] = mdl["normalized_scale"];
+        header["normalized_translation"] = mdl["normalized_translation"];
+    }
+
     std::string skin;
 
     if (mdl.has("skin"))
     { //write out skin block
-        skin = zip_llsd(mdl["skin"]);
+        skin = zip(mdl["skin"]);
 
         U32 size = static_cast<U32>(skin.size());
         if (size > 0)
@@ -955,7 +971,7 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
 
     if (mdl.has("physics_convex"))
     { //write out convex decomposition
-        decomposition = zip_llsd(mdl["physics_convex"]);
+        decomposition = zip(mdl["physics_convex"]);
 
         U32 size = static_cast<U32>(decomposition.size());
         if (size > 0)
@@ -977,7 +993,18 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
     {
         if (mdl.has(model_names[i]))
         {
-            out[i] = zip_llsd(mdl[model_names[i]]);
+            LLSD& block = mdl[model_names[i]];
+            if (packing != PACK_PLAIN)
+            {
+                const ALMeshFacePack::Normals normals = packing == PACK_SMALL_NORMALS_12 ? ALMeshFacePack::Normals::SNAP_12_BITS
+                                                        : packing == PACK_SMALL_NORMALS_10 ? ALMeshFacePack::Normals::SNAP_10_BITS
+                                                                                           : ALMeshFacePack::Normals::KEEP;
+                for (LLSD::array_iterator face = block.beginArray(); face != block.endArray(); ++face)
+                {
+                    ALMeshFacePack::repack(*face, normals, weights);
+                }
+            }
+            out[i] = zip(block);
 
             U32 size = static_cast<U32>(out[i].size());
 
@@ -1229,6 +1256,17 @@ bool LLModel::loadModel(std::istream& is)
         for (U32 i = 0; i < header["material_list"].size(); ++i)
         {
             mMaterialList.push_back(header["material_list"][i].asString());
+        }
+    }
+
+    if (header.has("normalized_scale") && header.has("normalized_translation"))
+    { // an .slm's: the box the model was normalized from
+        const LLVector3 scale(header["normalized_scale"]);
+        const LLVector3 translation(header["normalized_translation"]);
+        if (scale.isFinite() && translation.isFinite())
+        {
+            mNormalizedScale = scale;
+            mNormalizedTranslation = translation;
         }
     }
 
@@ -1682,12 +1720,14 @@ void LLMeshSkinInfo::updateHash()
     hash.update((const void*)mJointNums.data(), sizeof(S32) * mJointNums.size());
 
     //mInvBindMatrix
-    F32* src = mInvBindMatrix[0].getF32ptr();
-
-    for (size_t i = 0, count = mInvBindMatrix.size() * 16; i < count; ++i)
+    for (const LLMatrix4a& matrix : mInvBindMatrix)
     {
-        S32 t = ll_round(src[i] * 10000.f);
-        hash.update((const void*)&t, sizeof(S32));
+        const F32* src = matrix.getF32ptr();
+        for (size_t i = 0; i < 16; ++i)
+        {
+            S32 t = ll_round(src[i] * 10000.f);
+            hash.update((const void*)&t, sizeof(S32));
+        }
     }
     //hash.update((const void*)mInvBindMatrix.data(), sizeof(LLMatrix4a) * mInvBindMatrix.size());
 

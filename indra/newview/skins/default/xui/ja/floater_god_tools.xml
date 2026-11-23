@@ -61,9 +61,9 @@
 			<button label="適用" label_selected="適用" name="Apply" tool_tip="上記の変更を適用するには、ここをクリックします。"/>
 			<button label="対象の設定" label_selected="対象の設定" name="Set Target" tool_tip="オブジェクト削除の対象となるアバターを設定してください。"/>
 			<text name="target_avatar_name">（対象なし）</text>
-			<button label="他の土地における対象のスクリプト・オブジェクトを削除" label_selected="他の土地における対象のスクリプト・オブジェクトを削除" name="Delete Target's Scripted Objects On Others Land" tool_tip="このリージョンにおいて対象が所有していないスクリプト・オブジェクトをすべて削除します。（コピー禁止）オブジェクトは返却されます。"/>
-			<button label="「すべての」土地における対象のスクリプト・オブジェクトを削除" label_selected="「すべての」土地における対象のスクリプト・オブジェクトを削除" name="Delete Target's Scripted Objects On *Any* Land" tool_tip="このリージョンにおいて対象が所有しているスクリプト・オブジェクトをすべて削除します。（コピー禁止）オブジェクトは返却されます。"/>
-			<button label="対象のオブジェクトを「すべて」削除" label_selected="対象のオブジェクトを「すべて」削除" name="Delete *ALL* Of Target's Objects" tool_tip="このリージョンにおいて対象が所有しているオブジェクトをすべて削除します。（コピー禁止）オブジェクトは返却されます。"/>
+			<button label="他の土地における対象のスクリプト・オブジェクトを削除" label_selected="他の土地における対象のスクリプト・オブジェクトを削除" name="Delete Target's Scripted Objects On Others Land" tool_tip="このリージョンにおいて対象が所有していない土地にある、対象のスクリプト・オブジェクトをすべて削除します。（複製不可）オブジェクトは返却されます。"/>
+			<button label="「すべての」土地における対象のスクリプト・オブジェクトを削除" label_selected="「すべての」土地における対象のスクリプト・オブジェクトを削除" name="Delete Target's Scripted Objects On *Any* Land" tool_tip="このリージョンにおいて対象が所有しているスクリプト・オブジェクトをすべて削除します。（複製不可）オブジェクトは返却されます。"/>
+			<button label="対象のオブジェクトを「すべて」削除" label_selected="対象のオブジェクトを「すべて」削除" name="Delete *ALL* Of Target's Objects" tool_tip="このリージョンにおいて対象が所有しているオブジェクトをすべて削除します。（複製不可）オブジェクトは返却されます。"/>
 			<button label="トップ・コライダーを取得" label_selected="トップ・コライダーを取得" name="Get Top Colliders" tool_tip="最も段階の狭いコールバックが発生したオブジェクトのリストを取得します。"/>
 			<button label="トップ・スクリプトを取得" label_selected="トップ・スクリプトを取得" name="Get Top Scripts" tool_tip="スクリプトの起動に最も時間を費やしているオブジェクトのリストを取得します。"/>
 			<button label="スクリプト・ダイジェスト" label_selected="スクリプト・ダイジェスト" name="Scripts digest" tool_tip="すべてのスクリプトとそれらの使用回数のリストを取得します。"/>

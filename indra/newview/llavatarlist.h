@@ -92,7 +92,7 @@ public:
     void setShowIcons(std::string param_name);
     bool getIconsVisible() const { return mShowIcons; }
     const std::string getIconParamName() const{return mIconParamName;}
-    std::string getAvatarName(LLAvatarName av_name);
+    std::string getAvatarName(const LLUUID& id, LLAvatarName av_name);
     virtual bool handleRightMouseDown(S32 x, S32 y, MASK mask) override;
     /*virtual*/ bool handleMouseDown( S32 x, S32 y, MASK mask ) override;
     /*virtual*/ bool handleMouseUp(S32 x, S32 y, MASK mask) override;
@@ -100,6 +100,9 @@ public:
 
     // Return true if filter has at least one match.
     bool filterHasMatches();
+
+    // Return how many ids the filter matches: the rows refresh() builds, built yet or not.
+    size_t filterMatchCount();
 
 // [RLVa:KB] - Checked: RLVa-1.2.0
     void setRlvCheckShowNames(bool fRlvCheckShowNames) { mRlvCheckShowNames = fRlvCheckShowNames; }

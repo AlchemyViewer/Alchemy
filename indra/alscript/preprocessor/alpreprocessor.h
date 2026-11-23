@@ -345,17 +345,21 @@ public:
 
     // Why a script is preprocessed as it goes up, or No, in this order: it
     // holds a directive, which the grid could compile no other way,
-    // whatever the setting; Preprocess on Save is on, for every script.
-    // That it went up in the preprocessor's envelope before is no reason:
-    // a script with neither goes up as written, the envelope let go of.
-    // `directives` is asked only where it decides.
+    // whatever the setting; it is SLua calling `require` with a name
+    // (requiresIn), which the grid has no `require` to answer, so its
+    // modules go up with it, whatever the setting; Preprocess on Save is
+    // on, for every script. That it went up in the preprocessor's envelope
+    // before is no reason: a script with none of these goes up as written,
+    // the envelope let go of. `directives` and `modules` are asked only
+    // where they decide; `modules` may be empty, for none.
     enum class Wanted : U8
     {
         No,
         Directives,
+        Requires,
         Setting
     };
-    static Wanted wanted(const std::function<bool()>& directives, bool setting);
+    static Wanted wanted(const std::function<bool()>& directives, bool setting, const std::function<bool()>& modules = {});
     static Wanted wanted(std::string_view text, bool lua, bool setting);
 
     // The transform a line of LSL is written for, by the shape of its
@@ -385,6 +389,11 @@ public:
     {
         std::string name;
     };
+    // A call to a require of the script's own is none of these, and no run
+    // puts a module in its place: one the script binds -- a local, a
+    // function's parameter, a loop's variable -- in scope at the call, or a
+    // global it defines or assigns anywhere. `local require = require`
+    // keeps the global, and binds nothing of its own.
     static std::vector<Required> requiresIn(std::string_view text);
 
 private:

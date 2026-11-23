@@ -346,6 +346,25 @@ bool ALMasterIndex::renamed(const LLUUID& object, const LLUUID& item, const std:
     return true;
 }
 
+bool ALMasterIndex::inStep(const LLUUID& object, const LLUUID& item, const std::string& master, const LLUUID& asset, const std::string& text,
+                           S64 stamp)
+{
+    ALMasterLink* link = mLinks.find(object, item);
+    if (!link || ALMasterLinks::keyOf(link->master) != ALMasterLinks::keyOf(master))
+    {
+        return false;
+    }
+    if (asset.notNull())
+    {
+        link->base = asset;
+    }
+    link->hash  = link->notecard ? ALUploadHeader::hashOfPlain(NOTECARD, text) : hashOfWorld(text, link->target);
+    link->stamp = stamp;
+    link->state = ALMasterLink::State::Active;
+    changed(Write::Now, Tell::Now);
+    return true;
+}
+
 bool ALMasterIndex::chosen(const LLUUID& object, const LLUUID& item, const std::optional<std::string>& target,
                            const std::optional<std::optional<LLUUID>>& experience)
 {

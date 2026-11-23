@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="avatar_notes_tab" label="メモ">
+	<text name="notes_label">
+		個人的なメモ：
+	</text>
+</panel>

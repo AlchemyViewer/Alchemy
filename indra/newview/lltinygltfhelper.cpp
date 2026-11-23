@@ -147,10 +147,10 @@ LLColor4 LLTinyGLTFHelper::getColor(const std::vector<double>& in)
 
 const tinygltf::Image * LLTinyGLTFHelper::getImageFromTextureIndex(const tinygltf::Model & model, S32 texture_index)
 {
-    if (texture_index >= 0)
+    if (texture_index >= 0 && texture_index < (S32)model.textures.size())
     {
         S32 source_idx = model.textures[texture_index].source;
-        if (source_idx >= 0)
+        if (source_idx >= 0 && source_idx < (S32)model.images.size())
         {
             return &(model.images[source_idx]);
         }

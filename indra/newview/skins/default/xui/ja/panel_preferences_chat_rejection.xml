@@ -21,4 +21,5 @@
 		<item label="全て" name="adhoc_preference_allow_all"/>
 	</combo_box>
 	<check_box name="AlchemyReportIgnoredAdHocSession" label="無視された会話チャットを報告する"/>
+	<check_box name="ALDontRejectTeleportOffersFromFriends" label="フレンドリストの人からのテレポートの誘いは拒否しない（応答も送る）"/>
 </panel>

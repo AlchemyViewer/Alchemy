@@ -5,5 +5,5 @@
 	<menu_item_call label="Pegar" name="paste"/>
 	<menu_item_call label="Copiar la UUID" name="copy_uuid"/>
 	<menu_item_call label="Añadir al vestuario actual" name="save_to_outfit"/>
-	<menu_item_call label="Editar" name="edit_gesture"/>
+	<menu_item_call label="Abrir" name="edit_gesture"/>
 </menu>

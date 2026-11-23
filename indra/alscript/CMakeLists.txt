@@ -36,6 +36,8 @@ target_sources(
     lint/alscriptfixes.cpp
     lint/alscriptlintpass.cpp
     lint/alselenefilters.cpp
+    lsl/allslcommentcode.cpp
+    lsl/allslcomments.cpp
     lsl/allslconsts.cpp
     lsl/allsldepth.cpp
     lsl/allsleffects.cpp
@@ -74,6 +76,7 @@ target_sources(
     luau/alluautypes.cpp
     masters/almasterburst.cpp
     masters/almasterclock.cpp
+    masters/almasterdeletes.cpp
     masters/almasterindex.cpp
     masters/almasterlinks.cpp
     masters/almastermatch.cpp
@@ -118,6 +121,8 @@ target_sources(
         lint/alscriptfixes.h
         lint/alscriptlintpass.h
         lint/alselenefilters.h
+        lsl/allslcommentcode.h
+        lsl/allslcomments.h
         lsl/allslconsts.h
         lsl/allsldepth.h
         lsl/allsleffects.h
@@ -160,6 +165,7 @@ target_sources(
         luau/alluautypes.h
         masters/almasterburst.h
         masters/almasterclock.h
+        masters/almasterdeletes.h
         masters/almasterindex.h
         masters/almasterlinks.h
         masters/almastermatch.h
@@ -265,6 +271,8 @@ if(AL_BUILD_TESTS)
       tests/alincludeidentity_test.cpp
       tests/alincludesearch_test.cpp
       tests/allinelabel_test.cpp
+      tests/allslcommentcode_test.cpp
+      tests/allslcomments_test.cpp
       tests/allslconsts_test.cpp
       tests/allslcosts_test.cpp
       tests/allsleffects_test.cpp
@@ -276,6 +284,7 @@ if(AL_BUILD_TESTS)
       tests/alluaunavigation_test.cpp
       tests/alluauservice_test.cpp
       tests/almasterburst_test.cpp
+      tests/almasterdeletes_test.cpp
       tests/almasterindex_test.cpp
       tests/almasterlinks_test.cpp
       tests/almastermatch_test.cpp
@@ -316,6 +325,7 @@ if(AL_BUILD_TESTS)
       "AL_LSCRIPT_REGRESSION_DIR=\"${INDRA_SOURCE_DIR}/lscript/tests/regressions\""
     RERUN newsolver
     RERUN_SOURCES
+      tests/allslcommentcode_test.cpp
       tests/alluaufragment_test.cpp
       tests/alluaunavigation_test.cpp
       tests/alluauservice_test.cpp

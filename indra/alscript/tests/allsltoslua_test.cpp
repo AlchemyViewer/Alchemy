@@ -1813,8 +1813,8 @@ namespace
         CHECK(has(r, "-- How far it swings, in degrees\nlocal SWING = 90.0 -- a right angle\n"));
         UNSCOPED_INFO("those inside a list, on their lines");
         CHECK(has(r, "local NAMES = {\n    \"open\", -- when it is open\n    \"closed\" -- when it is shut\n}\n"));
-        UNSCOPED_INFO("a block comment as Luau's");
-        CHECK(has(r, "--[[ old code:\ninteger unused() { return 1; }\n]]\n"));
+        UNSCOPED_INFO("a block comment as Luau's, its code after its label SLua (ALLSLCommentCode)");
+        CHECK(has(r, "--[[ old code:\nlocal function unused()\n    return 1\nend\n]]\n"));
         {
             INFO("over the function it stood over");
             CHECK(at("--[[ old code:") > at("local NAMES"));
@@ -2097,8 +2097,8 @@ namespace
             CHECK(has(r, "---[[\nlocal function get("));
             CHECK(has(r, "end\n--]]\n"));
         }
-        UNSCOPED_INFO("the toggle the other way");
-        CHECK(has(r, "--[[\nstring old() { return \"\"; }\n--]]"));
+        UNSCOPED_INFO("the toggle the other way, its code SLua (ALLSLCommentCode)");
+        CHECK(has(r, "--[[\nlocal function old(): string\n    return \"\"\nend\n--]]"));
         UNSCOPED_INFO("an if on one line on one");
         CHECK(has(r, "    if bit32.btest(parcelFlags, PARCEL_FLAG_ALLOW_CREATE_OBJECTS) then return 1 end -- may build\n"));
         UNSCOPED_INFO("one on two lines on three");
@@ -3289,7 +3289,7 @@ namespace
         require_checks_clean(r);
     }
 
-    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a media rule list as MediaParams with booleans and whitelist pieces", "[ALLSLToSLua]")
+    TEST_CASE_METHOD(allsltoslua_data, "ALLSLToSLua: a media rule list as PrimMediaParams with booleans and whitelist pieces", "[ALLSLToSLua]")
     {
         const ALLSLToSLua::Result r = require_converted("default { touch_start(integer n) {\n"
                                                         "    integer on = llGetLinkNumber();\n"
@@ -3470,7 +3470,7 @@ namespace
             while (std::getline(in, text))
             {
                 type = text.find("ParticleSystem(") != std::string::npos      ? "ParticleParams"
-                       : text.find("ll.SetLinkMedia(") != std::string::npos   ? "MediaParams"
+                       : text.find("ll.SetLinkMedia(") != std::string::npos   ? "PrimMediaParams"
                        : text.find("ll.HTTPRequest(") != std::string::npos    ? "HttpRequestParams"
                                                                               : type;
                 const size_t equals = text.find(" = ");
@@ -3484,7 +3484,7 @@ namespace
         llifstream        in(std::string(AL_LSL_DEFINITIONS_DIR) + "/secondlife.d.luau", std::ios::binary);
         std::stringstream defs;
         defs << in.rdbuf();
-        for (const char* type : { "ParticleParams", "MediaParams", "HttpRequestParams" })
+        for (const char* type : { "ParticleParams", "PrimMediaParams", "HttpRequestParams" })
         {
             const std::string text  = defs.str();
             const size_t      begin = text.find(std::string("export type ") + type + " = {");
@@ -4034,9 +4034,8 @@ namespace
                                                         "integer y = 2;\n"
                                                         "//*/\n"
                                                         "default { state_entry() { llOwnerSay((string)x); } }\n");
-        UNSCOPED_INFO("one block comment");
-        CHECK(require_comment_at(r.text, "--[[ OVERRIDE") == std::string("--[[ OVERRIDE\ninteger allowAttachedAO;\n--]]"));
-        // What it holds stays LSL: nothing says it is code.
+        UNSCOPED_INFO("one block comment, its code SLua (ALLSLCommentCode)");
+        CHECK(require_comment_at(r.text, "--[[ OVERRIDE") == std::string("--[[ OVERRIDE\nlocal allowAttachedAO = 0\n--]]"));
         std::string on = r.text;
         on.insert(on.find("--[[ OVERRIDE"), "-");
         UNSCOPED_INFO("turned on, the opener a line comment");
@@ -4045,7 +4044,7 @@ namespace
         CHECK(require_comment_at(on, "--]]") == std::string("--]]"));
         UNSCOPED_INFO("the opener over code off, to the closer of the one after it");
         CHECK(require_toggled(r.text, "---[[ A") ==
-              std::string("--[[ A\nlocal x = 1\n\n--[[ B\ninteger y = 2;\n--]]"));
+              std::string("--[[ A\nlocal x = 1\n\n--[[ B\nlocal y = 2\n--]]"));
         require_checks_clean(r);
     }
 
@@ -4071,11 +4070,11 @@ namespace
         {
             INFO("one level for the pair");
             CHECK(has(shared, "\n---[=[ A\nlocal x = 1 --[[ one ]]\n"));
-            CHECK(has(shared, "\n--[=[ B\nstring s = \"]]\";\n--]=]\n"));
+            CHECK(has(shared, "\n--[=[ B\nlocal s = \"]]\"\n--]=]\n"));
         }
         UNSCOPED_INFO("the opener off");
         CHECK(require_toggled(shared.text, "---[=[ A") ==
-              std::string("--[=[ A\nlocal x = 1 --[[ one ]]\n\n--[=[ B\nstring s = \"]]\";\n--]=]"));
+              std::string("--[=[ A\nlocal x = 1 --[[ one ]]\n\n--[=[ B\nlocal s = \"]]\"\n--]=]"));
         require_checks_clean(shared);
 
         std::string every = "// ";

@@ -541,7 +541,7 @@ bool LLPanelOutfitEdit::postBuild()
     mShowAddWearablesBtn->setClickedCallback(boost::bind(&LLPanelOutfitEdit::onAddMoreButtonClicked, this));
 
     mPlusBtn = getChild<LLButton>("plus_btn");
-    mPlusBtn->setClickedCallback(boost::bind(&LLPanelOutfitEdit::onPlusBtnClicked, this));
+    mPlusBtn->setClickedCallback(boost::bind(&LLPanelOutfitEdit::wearSelectedItems, this, false));
 
     childSetAction(REVERT_BTN, boost::bind(&LLAppearanceMgr::wearBaseOutfit, LLAppearanceMgr::getInstance()));
 
@@ -564,7 +564,7 @@ bool LLPanelOutfitEdit::postBuild()
     mWearableItemsList = getChild<LLWearableItemsList>("list_view");
     mWearableItemsList->setCommitOnSelectionChange(true);
     mWearableItemsList->setCommitCallback(boost::bind(&LLPanelOutfitEdit::updatePlusButton, this));
-    mWearableItemsList->setDoubleClickCallback(boost::bind(&LLPanelOutfitEdit::onPlusBtnClicked, this));
+    mWearableItemsList->setDoubleClickCallback(boost::bind(&LLPanelOutfitEdit::wearSelectedItems, this, true));
 
     mWearableItemsList->setComparator(mWearableListViewItemsComparator);
 
@@ -785,20 +785,20 @@ void LLPanelOutfitEdit::onSearchEdit(const std::string& string)
     mWearableItemsList->setFilterSubString(mSearchString, true);
 }
 
-void LLPanelOutfitEdit::onPlusBtnClicked(void)
+void LLPanelOutfitEdit::wearSelectedItems(bool opened)
 {
     uuid_vec_t selected_items;
     getSelectedItemsUUID(selected_items);
 
     LLPointer<LLInventoryCallback> link_waiter = new LLUpdateAppearanceOnDestroy;
 
-    for(uuid_vec_t::iterator iter = selected_items.begin(); iter != selected_items.end(); iter++)
+    for (const LLUUID& selected_id : selected_items)
     {
-        LLUUID selected_id = *iter;
-        if (!selected_id.isNull())
+        if (selected_id.notNull())
         {
-            //replacing instead of adding the item
-            LLAppearanceMgr::getInstance()->wearItemOnAvatar(selected_id, false, true, link_waiter);
+            // "Wear Item" replaces what is worn; opening an item replaces or adds as the inventory settings choose.
+            const bool replace = !opened || get_open_item_replaces_worn(gInventory.getItem(selected_id));
+            LLAppearanceMgr::getInstance()->wearItemOnAvatar(selected_id, false, replace, link_waiter);
         }
     }
 }

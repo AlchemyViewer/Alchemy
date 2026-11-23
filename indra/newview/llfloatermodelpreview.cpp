@@ -182,6 +182,21 @@ bool LLFloaterModelPreview::postBuild()
     childSetCommitCallback("lock_scale_if_joint_position", boost::bind(&LLFloaterModelPreview::onUploadOptionChecked, this, _1), NULL);
     childSetCommitCallback("upload_textures", boost::bind(&LLFloaterModelPreview::onUploadOptionChecked, this, _1), NULL);
 
+    // The packing and the weights' rounding change the LOD blocks the fee is
+    // charged for, so changing either drops the fee, whether the floater or
+    // anything else sets them. Standard packing rounds nothing.
+    auto packing_changed = [this](LLControlVariable*, const LLSD&, const LLSD&)
+    {
+        childSetEnabled("upload_round_weights", gSavedSettings.getU32("AlchemyMeshUploadPacking") != LLModel::PACK_PLAIN);
+        if (mModelPreview)
+        {
+            modelUpdated(true);
+        }
+    };
+    mPackingConnection = gSavedSettings.getControl("AlchemyMeshUploadPacking")->getSignal()->connect(packing_changed);
+    mRoundWeightsConnection = gSavedSettings.getControl("AlchemyMeshUploadRoundWeights")->getSignal()->connect(packing_changed);
+    childSetEnabled("upload_round_weights", gSavedSettings.getU32("AlchemyMeshUploadPacking") != LLModel::PACK_PLAIN);
+
     childSetTextArg("status", "[STATUS]", getString("status_idle"));
 
     childSetAction("ok_btn", onUpload, this);
@@ -200,7 +215,7 @@ bool LLFloaterModelPreview::postBuild()
     }
     childSetValue("pivot_units", "percent");
     getChild<LLUICtrl>("pivot_units")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotUnitsCommit, this));
-    childSetValue("pivot_mode", "file");
+    childSetValue("pivot_mode", "centre");
     getChild<LLUICtrl>("pivot_mode")->setCommitCallback(boost::bind(&LLFloaterModelPreview::onPivotModeCommit, this));
     // </SK:Nexii>
 
@@ -515,6 +530,7 @@ void LLFloaterModelPreview::onClickCalculateBtn()
 
     mUploadModelUrl.clear();
     mModelPhysicsFee.clear();
+    mFeeAssets.reset();
 
     lod_sources_map_t lod_sources;
     fillLODSourceStatistics(lod_sources);
@@ -524,7 +540,8 @@ void LLFloaterModelPreview::onClickCalculateBtn()
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mUploadModelUrl, mDestinationFolderId, false,
                           getWholeModelFeeObserverHandle(),
-                          LLHandle<LLWholeModelUploadObserver>(), mModelPreview->getUploadPositionOffsets()); // <SK:Nexii> Mesh uploader pivot
+                          LLHandle<LLWholeModelUploadObserver>(), nullptr,
+                          mModelPreview->getUploadPositionOffsets()); // <SK:Nexii> Mesh uploader pivot
 
     toggleCalculateButton(false);
     mUploadBtn->setEnabled(false);
@@ -780,7 +797,7 @@ void LLFloaterModelPreview::updatePivotControls()
     {
         if (!single && mModelPreview->getPivotMode() == LLModelPreview::PIVOT_CUSTOM)
         {
-            mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+            mModelPreview->setPivotMode(LLModelPreview::PIVOT_CENTRE);
         }
         modes->setIndexEnabled(2, single);
         const LLModelPreview::EPivotMode mode = mModelPreview->getPivotMode();
@@ -1868,7 +1885,9 @@ void LLFloaterModelPreview::onUpload(void* user_data)
                           upload_skinweights, upload_joint_positions, lock_scale_if_joint_position,
                           mp->mUploadModelUrl, mp->mDestinationFolderId,
                           true, LLHandle<LLWholeModelFeeObserver>(), mp->getWholeModelUploadObserverHandle(),
+                          std::move(mp->mFeeAssets),
                           mp->mModelPreview->getUploadPositionOffsets()); // <SK:Nexii> Mesh uploader pivot
+    mp->mFeeAssets.reset();
 }
 
 
@@ -1924,11 +1943,17 @@ void LLFloaterModelPreview::toggleCalculateButton()
 void LLFloaterModelPreview::modelUpdated(bool calculate_visible)
 {
     mModelPhysicsFee.clear();
+    mFeeAssets.reset();
     toggleCalculateButton(calculate_visible);
 }
 
 void LLFloaterModelPreview::toggleCalculateButton(bool visible)
 {
+    if (visible)
+    {
+        // The fee no longer stands, nor what it was quoted for.
+        mFeeAssets.reset();
+    }
     mCalculateBtn->setVisible(visible);
 
     bool uploadingSkin           = childGetValue("upload_skin").asBoolean();
@@ -2006,7 +2031,7 @@ void LLFloaterModelPreview::resetUploadOptions()
     childSetValue("pivot_units", "percent");
     if (mModelPreview)
     {
-        mModelPreview->setPivotMode(LLModelPreview::PIVOT_FILE);
+        mModelPreview->setPivotMode(LLModelPreview::PIVOT_CENTRE);
         mModelPreview->setCustomPivot(LLVector3::zero);
     }
     updatePivotControls();
@@ -2044,6 +2069,11 @@ void LLFloaterModelPreview::clearLogTab()
     mUploadLogText->clear();
     LLPanel* panel = mTabContainer->getPanelByName("logs_panel");
     mTabContainer->setTabPanelFlashing(panel, false);
+}
+
+void LLFloaterModelPreview::onModelAssetsWritten(const std::shared_ptr<const ALMeshUploadAssets>& assets)
+{
+    mFeeAssets = assets;
 }
 
 void LLFloaterModelPreview::onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url)
@@ -2126,6 +2156,9 @@ bool LLFloaterModelPreview::isModelUploadAllowed()
     if (mModelPreview)
     {
         allow_upload &= mModelPreview->mModelNoErrors;
+        // Levels of detail still being made are not what the fee was quoted
+        // for; their end drops the fee.
+        allow_upload &= !mModelPreview->isGeneratingLODs();
     }
     return allow_upload;
 }

@@ -413,12 +413,22 @@ LLViewerObject* LLViewerObjectList::processObjectUpdateFromCache(LLVOCacheEntry*
         mNumNewObjects++;
     }
 
+    // Nothing is made from the entry for a dead object, nor is the entry held at WAITING for one (addNewObject): an
+    // object killed and not yet let go of is made afresh the next time the entry is listed, and an update that kills its
+    // object was refused, and waits for the region to send it again.
     if (objectp->isDead())
     {
         LL_WARNS() << "Dead object " << objectp->mID << " in UUID map 1!" << LL_ENDL;
+        return NULL;
     }
 
     processUpdateCore(objectp, NULL, 0, OUT_FULL_CACHED, cached_dpp, justCreated, true);
+    if (objectp->isDead())
+    {
+        regionp->refuseCachedUpdate(entry);
+        recorder.objectUpdateFailure();
+        return NULL;
+    }
     objectp->loadFlags(entry->getUpdateFlags()); //just in case, reload update flags from cache.
 
     if(entry->getHitCount() > 0)
@@ -498,16 +508,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
 
     if (!regionp)
     {
-        // Once for each region: a retired region's simulator sends on until it disables the circuit.
+        // Once for each region: a simulator can still send for a region removed before its circuit closed.
         LL_WARNS_ONCE() << "Object update from unknown region! " << region_handle << LL_ENDL;
         return;
     }
 
-    if (regionp->isRetiring())
-    {
-        // its objects are being killed, and nothing new of it is wanted
-        return;
-    }
+    // A retiring region's objects are being killed, and nothing new of it is wanted. Its simulator counts what it sends
+    // as sent all the same, so each object it names is noted, to be asked for again if the region revives.
+    const bool retiring = regionp->isRetiring();
 
     // A variable block can be as large as the packet that carried it, and the
     // message reader never yields a packet larger than MAX_BUFFER_SIZE.
@@ -563,6 +571,11 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
                 }
                 else if ((flags & FLAGS_TEMPORARY_ON_REZ) == 0)
                 {
+                    if (retiring)
+                    {
+                        regionp->retiredObjects().lost(local_id);
+                        continue;
+                    }
                     //send to object cache
                     regionp->cacheFullUpdate(compressed_dp, flags);
                     continue;
@@ -608,6 +621,13 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
             mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, local_id, i);
             LL_DEBUGS("ObjectUpdate") << "Full Update, obj " << local_id << ", global ID " << fullid << " from " << mesgsys->getSender() << LL_ENDL;
         }
+
+        if (retiring)
+        {
+            regionp->retiredObjects().lost(local_id);
+            continue;
+        }
+
         objectp = findObject(fullid);
 
         if (compressed)
@@ -617,6 +637,14 @@ void LLViewerObjectList::processObjectUpdate(LLMessageSystem *mesgsys,
         LL_DEBUGS("ObjectUpdate") << "uuid " << fullid << " objectp " << objectp
                                      << " update_cache " << (S32) update_cache << " compressed " << compressed
                                      << " update_type "  << update_type << LL_ENDL;
+
+        // The local ID may hold another object than the one the region's glTF overrides under it came for. A full
+        // update the cache takes drops them as it is cached (cacheFullUpdate); one it does not take, a temporary
+        // object's or one sent uncompressed, drops them here, before the object is made or updated from it.
+        if (updateNamesObject(update_type))
+        {
+            regionp->dropGLTFOverridesOfAnother(local_id, fullid);
+        }
 
         if(update_cache)
         {
@@ -791,16 +819,13 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
     LLViewerRegion *regionp = LLWorld::getInstance()->getRegionFromHandle(region_handle);
     if (!regionp)
     {
-        // Once for each region: a retired region's simulator sends on until it disables the circuit.
+        // Once for each region: a simulator can still send for a region removed before its circuit closed.
         LL_WARNS_ONCE() << "Object update from unknown region! " << region_handle << LL_ENDL;
         return;
     }
 
-    if (regionp->isRetiring())
-    {
-        // its objects are being killed, and nothing new of it is wanted
-        return;
-    }
+    // what a retiring region's simulator probes is noted, as processObjectUpdate notes what it sends
+    const bool retiring = regionp->isRetiring();
 
     LLViewerStatsRecorder& recorder = LLViewerStatsRecorder::instance();
 
@@ -810,6 +835,11 @@ void LLViewerObjectList::processCachedObjectUpdate(LLMessageSystem *mesgsys,
         U32 crc;
         U32 flags;
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_ID, id, i);
+        if (retiring)
+        {
+            regionp->retiredObjects().lost(id);
+            continue;
+        }
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_CRC, crc, i);
         mesgsys->getU32Fast(_PREHASH_ObjectData, _PREHASH_UpdateFlags, flags, i);
 
@@ -2157,6 +2187,7 @@ LLViewerObject *LLViewerObjectList::createObjectFromCache(const LLPCode pcode, L
     }
 
     objectp->mLocalID = local_id;
+    regionp->addToCreatedList(local_id);
     mUUIDObjectMap[uuid] = objectp;
     mPresenceSignal(uuid, true);
     setUUIDAndLocal(uuid,

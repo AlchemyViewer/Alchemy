@@ -456,7 +456,13 @@ ALScriptLanguage ALScriptWorkspace::resolve(const LLInventoryItem* item, std::st
     std::string target = requested;
     if (target.empty() && item)
     {
+        // An SLua item that did not compile is said to run on no VM, which
+        // reads as LSO: it compiles for Luau still.
         target = item->getRuntime();
+        if (language.lua && !target.empty())
+        {
+            target = targetFor(true, target);
+        }
     }
     // An LSL item run on Luau is LSL on Luau -- or SLua, where its text was
     // converted and saved for Luau (a target of the other language picked

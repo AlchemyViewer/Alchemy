@@ -30,15 +30,6 @@
 			</text>
 		</layout_panel>
 		<layout_panel name="xp_choose_panel">
-			<text>
-				EasySitアニメーター1.2.4
-			</text>
-			<text >
-				カイルのスーパーヒーローＲＰＧ
-			</text>
-			<text>
-				はい
-			</text>
 			<combo_box label="体験を選択…" name="Experiences..."/>
 		</layout_panel>
 	</layout_stack>
