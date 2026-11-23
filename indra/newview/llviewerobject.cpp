@@ -7879,8 +7879,15 @@ void LLViewerObject::setRenderMaterialID(S32 te_in, const LLUUID& id, bool updat
     if (!param_block && id.notNull())
     { // block doesn't exist, but it will need to
         param_block = (LLRenderMaterialParams*)createNewParameterEntry(LLNetworkData::PARAMS_RENDER_MATERIAL)->data;
-    }
 
+        // A block out of use names no material for any face (getRenderMaterialParams), so the next rebuild takes the
+        // material off the face again (updateTEMaterialTextures). A region's echo of the change puts the block in use;
+        // a client-only object has no region to echo it, so it is put in use here, before any face's id is written.
+        if (isLocalOnly())
+        {
+            setHasRenderMaterialParams(true);
+        }
+    }
 
     LLFetchedGLTFMaterial* new_material = nullptr;
     if (id.notNull())
