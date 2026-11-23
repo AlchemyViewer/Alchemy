@@ -804,6 +804,11 @@ public:
     bool            mLockScaleIfJointPosition;
     LLModel::EBlockPacking mBlockPacking;   // AlchemyMeshUploadPacking, read on the main thread
     ALMeshFacePack::Weights mBlockWeights; // AlchemyMeshUploadRoundWeights, read on the main thread
+    // <SK:Nexii> Mesh uploader pivot: added to each base model's stored domains
+    typedef boost::unordered_map<const LLModel*, LLVector3> position_offsets_t;
+    position_offsets_t mPositionOffsets;
+    LLVector3       getPositionOffset(const LLModel* model) const;
+    // </SK:Nexii>
     volatile bool   mDiscarded;
 
     LLHost          mHost;
@@ -819,7 +824,8 @@ public:
                        bool do_upload = true,
                        LLHandle<LLWholeModelFeeObserver> fee_observer = (LLHandle<LLWholeModelFeeObserver>()),
                        LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
-                       std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr);
+                       std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr,
+                       const position_offsets_t& position_offsets = position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
     ~LLMeshUploadThread();
 
     bool finished() const { return mFinished; }
@@ -866,8 +872,9 @@ protected:
 
     // A fingerprint of what the model's asset is written from: each LOD's
     // model and its faces' geometry, and the decomposition the hull is made
-    // from, as packModelIntance takes them from the model's first instance.
-    static size_t assetSource(LLModel* base_model, const instance_list_t& instances);
+    // from, as packModelIntance takes them from the model's first instance,
+    // and the offset its stored domains are shifted by.
+    static size_t assetSource(LLModel* base_model, const instance_list_t& instances, const LLVector3& position_offset);
 
     // Whether the fee request's assets stand for every model this upload
     // writes, written with its options from what it would write them from.
@@ -1028,7 +1035,8 @@ public:
                      bool do_upload = true,
                      LLHandle<LLWholeModelFeeObserver> fee_observer= (LLHandle<LLWholeModelFeeObserver>()),
                      LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
-                     std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr);
+                     std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr,
+                     const LLMeshUploadThread::position_offsets_t& position_offsets = LLMeshUploadThread::position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
 
     S32 getMeshSize(const LLUUID& mesh_id, S32 lod) const;
 

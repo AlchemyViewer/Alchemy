@@ -630,7 +630,8 @@ LLSD LLModel::writeModel(
     bool as_slm,
     int submodel_id,
     EBlockPacking packing,
-    ALMeshFacePack::Weights weights)
+    ALMeshFacePack::Weights weights,
+    const LLVector3& position_offset) // <SK:Nexii> Mesh uploader pivot
 {
     LLSD mdl;
 
@@ -667,6 +668,15 @@ LLSD LLModel::writeModel(
         mdl["physics_convex"] = fake_decomp.asLLSD();
         model[LLModel::LOD_PHYSICS] = NULL;
     }
+
+    // <SK:Nexii> Mesh uploader pivot: the sim keeps analyzed hulls in their domain but fits the bounding hull to the box
+    if (!decomp.mHull.empty() && mdl.has("physics_convex"))
+    {
+        LLSD& convex = mdl["physics_convex"];
+        convex["Min"] = (LLVector3(convex["Min"]) + position_offset).getValue();
+        convex["Max"] = (LLVector3(convex["Max"]) + position_offset).getValue();
+    }
+    // </SK:Nexii>
 
     if (as_slm)
     { //save material list names
@@ -816,8 +826,10 @@ LLSD LLModel::writeModel(
                 }
 
                 //write out face data
-                mdl[model_names[idx]][i]["PositionDomain"]["Min"] = min_pos.getValue();
-                mdl[model_names[idx]][i]["PositionDomain"]["Max"] = max_pos.getValue();
+                // <SK:Nexii> Mesh uploader pivot: the quantized positions stay, only their domain moves
+                mdl[model_names[idx]][i]["PositionDomain"]["Min"] = (min_pos + position_offset).getValue();
+                mdl[model_names[idx]][i]["PositionDomain"]["Max"] = (max_pos + position_offset).getValue();
+                // </SK:Nexii>
                 mdl[model_names[idx]][i]["NormalizedScale"] = face.mNormalizedScale.getValue();
 
                 mdl[model_names[idx]][i]["Position"] = verts;

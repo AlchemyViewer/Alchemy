@@ -205,7 +205,8 @@ public:
         bool as_slm = false,
         int submodel_id = 0,
         EBlockPacking packing = PACK_PLAIN,
-        ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP);
+        ALMeshFacePack::Weights weights = ALMeshFacePack::Weights::KEEP,
+        const LLVector3& position_offset = LLVector3::zero); // <SK:Nexii> Mesh uploader pivot: shifts the stored domains off the prim's origin
 
     static LLSD writeModelToStream(
         std::ostream& ostr,
