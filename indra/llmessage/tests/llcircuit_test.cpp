@@ -41,21 +41,32 @@
 
 // The circuit reads its times from the message system's clock, which here is
 // the test's own, and sends its acks through the message system, which here
-// records the IDs each PacketAck carries.
+// records the IDs each PacketAck carries. The message time is when the
+// frame's message handling began, and takes the real time when a reader asks
+// for it updated.
 namespace
 {
     F64Seconds sMessageTime;
+    F64Seconds sRealTime;
     std::vector<TPACKETID> sAckedIDs;
     std::vector<TPACKETID> sMessageIDs;
 }
 
-F64Seconds LLMessageSystem::getMessageTimeSeconds(const bool)
+F64Seconds LLMessageSystem::getMessageTimeSeconds(const bool update)
 {
+    if (update)
+    {
+        sMessageTime = sRealTime;
+    }
     return sMessageTime;
 }
 
-U64Microseconds LLMessageSystem::getMessageTimeUsecs(const bool)
+U64Microseconds LLMessageSystem::getMessageTimeUsecs(const bool update)
 {
+    if (update)
+    {
+        sMessageTime = sRealTime;
+    }
     return sMessageTime;
 }
 
@@ -267,6 +278,7 @@ namespace
             static LLMessageSystem system("", 0, 0, 0, 0, false, HEARTBEAT.value(), TIMEOUT.value());
             gMessageSystem = &system;
             sMessageTime = CLOCK_START;
+            sRealTime = CLOCK_START;
             sAckedIDs.clear();
         }
 
@@ -294,13 +306,14 @@ namespace
     }
 
     // A ping sent at `sent` and answered `round_trip` later, with no other
-    // ping in flight. The circuit numbers a ping only as it sends one itself,
-    // so the last one sent is still number 0.
+    // ping in flight, each at the start of a frame's message handling. The
+    // circuit numbers a ping only as it sends one itself, so the last one
+    // sent is still number 0.
     void answer_ping(LLCircuitData& circuit, F64Seconds sent, F64Seconds round_trip)
     {
-        sMessageTime = sent;
+        sMessageTime = sRealTime = sent;
         circuit.pingTimerStart();
-        sMessageTime = sent + round_trip;
+        sMessageTime = sRealTime = sent + round_trip;
         circuit.pingTimerStop(0);
     }
 
@@ -351,6 +364,24 @@ namespace
         // and falls back a fifth of the way at the next fast one.
         answer_ping(circuit, CLOCK_START + HEARTBEAT, F64Seconds(0.2));
         CHECK_THAT(circuit.getPingDelayAveraged().value(), WithinRounding(1240.f, 2000.f));
+    }
+
+    TEST_CASE("llcircuit: a ping is timed from when it goes out and not from when message handling began", "[llcircuit]")
+    {
+        StubMessageSystemScope message_system;
+        LLCircuitData circuit(LLHost(), 0, HEARTBEAT, TIMEOUT);
+
+        // The frame's packets took 1/64 s to handle before the ping went out
+        sMessageTime = CLOCK_START;
+        sRealTime = CLOCK_START + F64Seconds(0.015625);
+        circuit.pingTimerStart();
+        CHECK(circuit.getPingsInTransit() == 1);
+
+        // and the answer is handled at the start of a later frame's, 125 ms
+        // after the ping went out.
+        sMessageTime = sRealTime = CLOCK_START + F64Seconds(0.140625);
+        circuit.pingTimerStop(0);
+        CHECK(circuit.getPingDelay() == U32Milliseconds(125));
     }
 
     TEST_CASE("llcircuit: an ack after a packet carried the last ones waits the collect time", "[llcircuit]")

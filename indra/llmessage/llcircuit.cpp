@@ -1363,7 +1363,9 @@ void LLCircuitData::pingTimerStop(const U8 ping_id)
 
 void LLCircuitData::pingTimerStart()
 {
-    mPingTime = LLMessageSystem::getMessageTimeSeconds();
+    // The message time is when this frame's message handling began, and the
+    // ping goes out once the frame's packets are handled: time it from now.
+    mPingTime = LLMessageSystem::getMessageTimeSeconds(true);
     mPingsInTransit++;
 
     if (!mBlocked && (mPingsInTransit > PING_START_BLOCK))
