@@ -684,6 +684,10 @@ LLSD LLModel::writeModel(
         {
             mdl["material_list"][i] = high->mMaterialList[i];
         }
+        // The box the model was normalized from, which places the file's
+        // origin within it for the uploader's pivot
+        mdl["normalized_scale"] = high->mNormalizedScale.getValue();
+        mdl["normalized_translation"] = high->mNormalizedTranslation.getValue();
     }
 
     for (U32 idx = 0; idx < MODEL_NAMES_LENGTH; ++idx)
@@ -940,6 +944,12 @@ LLSD LLModel::writeModelToStream(std::ostream& ostr, LLSD& mdl, EWriteModelMode 
     if (as_slm && mdl.has("material_list"))
     { //save material binding names to header
         header["material_list"] = mdl["material_list"];
+    }
+
+    if (as_slm && mdl.has("normalized_scale") && mdl.has("normalized_translation"))
+    {
+        header["normalized_scale"] = mdl["normalized_scale"];
+        header["normalized_translation"] = mdl["normalized_translation"];
     }
 
     std::string skin;
@@ -1246,6 +1256,17 @@ bool LLModel::loadModel(std::istream& is)
         for (U32 i = 0; i < header["material_list"].size(); ++i)
         {
             mMaterialList.push_back(header["material_list"][i].asString());
+        }
+    }
+
+    if (header.has("normalized_scale") && header.has("normalized_translation"))
+    { // an .slm's: the box the model was normalized from
+        const LLVector3 scale(header["normalized_scale"]);
+        const LLVector3 translation(header["normalized_translation"]);
+        if (scale.isFinite() && translation.isFinite())
+        {
+            mNormalizedScale = scale;
+            mNormalizedTranslation = translation;
         }
     }
 

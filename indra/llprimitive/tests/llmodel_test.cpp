@@ -404,4 +404,33 @@ namespace
         CHECK(read.mLockScaleIfJointPosition);
         CHECK(read.mHash == written.mHash);
     }
+
+    TEST_CASE("llmodel: an slm keeps the box its model was normalized from", "[llmodel]")
+    {
+        // The uploader's pivot finds the file's origin within the model's box
+        // from these two, so a model read back from an .slm needs them too.
+        LLPointer<LLModel> model = riggedSphere(8, 4);
+        model->mNormalizedScale.set(2.5f, 0.75f, 4.f);
+        model->mNormalizedTranslation.set(0.5f, -0.125f, 2.f);
+
+        auto load = [&model](bool as_slm)
+        {
+            std::ostringstream ostr;
+            LLModel::writeModel(ostr, nullptr, model, model, model, model, LLModel::Decomposition(), false, false, false,
+                                LLModel::WRITE_BINARY, as_slm);
+            LLPointer<LLModel> back = new LLModel(meshParams(), (F32)LLModel::LOD_HIGH);
+            std::istringstream is(ostr.str());
+            REQUIRE(back->loadModel(is));
+            return back;
+        };
+
+        LLPointer<LLModel> slm = load(true);
+        CHECK(slm->mNormalizedScale == model->mNormalizedScale);
+        CHECK(slm->mNormalizedTranslation == model->mNormalizedTranslation);
+
+        // An asset written for an upload carries neither.
+        LLPointer<LLModel> asset = load(false);
+        CHECK(asset->mNormalizedScale == LLVector3(1.f, 1.f, 1.f));
+        CHECK(asset->mNormalizedTranslation == LLVector3::zero);
+    }
 }
