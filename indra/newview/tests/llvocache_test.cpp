@@ -88,7 +88,7 @@ namespace
     // see each other's files nor the user's.
     struct vocacheTest
     {
-        static constexpr U32 CACHE_VERSION = 21;          // LLAppViewer::getObjectCacheVersion()
+        static constexpr U32 CACHE_VERSION = 22;          // LLAppViewer::getObjectCacheVersion()
         static constexpr U32 CACHE_NUMBER_OF_REGIONS = 128;
 
         std::filesystem::path mRoot;
