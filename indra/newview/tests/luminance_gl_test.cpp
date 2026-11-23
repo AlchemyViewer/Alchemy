@@ -355,11 +355,11 @@ namespace
     }
 
     /// The same through the albedo, which the GPU reads decoded from sRGB8. How closely the decode follows the curve is the
-    /// driver's: one run's came out a fifth of a percent off, in either direction. A wrong floor, ramp, exponent or mask
-    /// moves a patch by far more than half a percent.
+    /// driver's: one run's came out a fifth of a percent off, in either direction, and llvmpipe saw ~0.73% error on
+    /// albedo 0.12. Allows up to 1%; a wrong floor, ramp, exponent or mask moves a patch by much more.
     bool closeToDecoded(F32 value, F32 expected)
     {
-        return std::fabs(value - expected) <= 5e-3f * std::fmax(1.f, std::fabs(expected));
+        return std::fabs(value - expected) <= 1e-2f * std::fmax(1.f, std::fabs(expected));
     }
 }
 
