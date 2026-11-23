@@ -36,6 +36,15 @@ const F32 DEFAULT_COMPRESSION_RATE = 1.f/8.f;
 
 class LLImageJ2CImpl;
 
+// What an image to encode holds, which an encoder may code it by: its colour
+// transform, how its errors are weighted, how it is resized.
+enum class EJ2CContent : U8
+{
+    Colour, // base colour, emissive, any ordinary image
+    Data,   // channels of packed data: metallic and roughness, masks
+    Normal, // a normal map
+};
+
 class LLImageJ2C : public LLImageFormatted
 {
 protected:
@@ -72,6 +81,13 @@ public:
     void setReversible(const bool reversible); // Use non-lossy?
     void setMaxBytes(S32 max_bytes);
     S32 getMaxBytes() const { return mMaxBytes; }
+    void setEncodeContent(EJ2CContent content) { mEncodeContent = content; }
+    EJ2CContent getEncodeContent() const { return mEncodeContent; }
+
+    // Scales raw_image in place to new_width by new_height for encoding as
+    // this image's content: by the implementation where it resizes by
+    // content, else by LLImageRaw::scale.
+    bool scaleForEncode(LLImageRaw& raw_image, S32 new_width, S32 new_height);
 
     static S32 calcHeaderSizeJ2C();
     static S32 calcDataSizeJ2C(S32 w, S32 h, S32 comp, S32 discard_level, F32 rate = DEFAULT_COMPRESSION_RATE);
@@ -85,7 +101,7 @@ public:
 protected:
     friend class LLImageJ2CImpl;
     friend class LLImageJ2COJ;
-    friend class LLImageJ2CKDU;
+    friend class ALImageJ2CRS;
     void decodeFailed();
     void updateRawDiscardLevel();
 
@@ -101,6 +117,7 @@ protected:
     S8  mRawDiscardLevel;
     F32 mRate;
     bool mReversible;
+    EJ2CContent mEncodeContent = EJ2CContent::Colour;
     std::unique_ptr<LLImageJ2CImpl> mImpl;
     std::string mLastError;
 };
@@ -127,6 +144,12 @@ protected:
                             bool reversible=false) = 0;
     virtual bool initDecode(LLImageJ2C &base, LLImageRaw &raw_image, int discard_level = -1, int* region = NULL) = 0;
     virtual bool initEncode(LLImageJ2C &base, LLImageRaw &raw_image, int blocks_size = -1, int precincts_size = -1, int levels = 0) = 0;
+    // Scales raw_image in place for encoding as base's content. Returns false
+    // where the implementation leaves resizing to LLImageRaw.
+    virtual bool resizeImpl(LLImageJ2C& base, LLImageRaw& raw_image, S32 new_width, S32 new_height)
+    {
+        return false;
+    }
 
     virtual std::string getEngineInfo() const = 0;
 

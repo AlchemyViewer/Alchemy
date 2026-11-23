@@ -83,6 +83,14 @@
       "text": "externals/js/JPEG_ENCODER_BASIC_LICENSE.txt"
     },
     {
+      "name": "pnj2k",
+      "when": "AL_USE_PNJ2K",
+      "holder": "Copyright (c) 2026 Rye",
+      "license": "MIT OR Apache-2.0",
+      "homepage": "https://github.com/AlchemyViewer/pnj2k",
+      "text": "rust/pnj2k_libc/LICENSE-MIT"
+    },
+    {
       "name": "ca-certificates",
       "holder": "Copyright Mozilla Foundation and contributors",
       "license": "MPL-2.0",

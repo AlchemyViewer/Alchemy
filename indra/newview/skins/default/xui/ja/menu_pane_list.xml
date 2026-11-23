@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<context_menu name="menu_pane_list">
+	<menu_item_call name="copy_cell" label="セルをコピー"/>
+	<menu_item_call name="copy" label="行をコピー"/>
+	<menu_item_call name="copy_all" label="すべての行をコピー"/>
+	<menu_item_call name="select_all" label="すべて選択"/>
+</context_menu>

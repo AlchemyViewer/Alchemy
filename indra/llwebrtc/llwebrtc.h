@@ -109,6 +109,9 @@ typedef std::vector<LLWebRTCVoiceDevice> LLWebRTCVoiceDeviceList;
 class LLWebRTCDevicesObserver
 {
   public:
+    // Called on WebRTC's worker thread, under a lock that terminate() waits
+    // a second at most for: return well within that, and don't call back
+    // into the device interface.
     virtual void OnDevicesChanged(const LLWebRTCVoiceDeviceList &render_devices,
                                   const LLWebRTCVoiceDeviceList &capture_devices) = 0;
 };
@@ -154,10 +157,14 @@ class LLWebRTCDeviceInterface
     // Enable/disable the audio devices, set when voice is enabled/disabled.
     // The capture (microphone) and playout (speaker) devices only run while this
     // is enabled, so neither is held open when the user has voice off.  While
-    // enabled, capture stays running across calls and mute/unmute so the AEC
-    // never cold-starts (no unmute hiss); playout still only runs when there's a
-    // connection to render.
+    // enabled, capture normally stays running across calls and mute/unmute so the
+    // AEC never cold-starts (no unmute hiss), unless setStopCaptureOnMute() is on;
+    // playout still only runs when there's a connection to render.
     virtual void setVoiceEnabled(bool enable) = 0;
+    // When true, capture is stopped while muted (or with no connection) and
+    // restarted on unmute, so Bluetooth headsets aren't held in call mode.
+    // May cause a brief hiss on unmute.
+    virtual void setStopCaptureOnMute(bool stop) = 0;
 
     // Device observers for device change callbacks.
     virtual void setDevicesObserver(LLWebRTCDevicesObserver *observer) = 0;

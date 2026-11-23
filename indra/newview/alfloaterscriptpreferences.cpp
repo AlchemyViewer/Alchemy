@@ -90,12 +90,12 @@ namespace
         "ALScriptStudioAutoComplete", "ALScriptStudioCompleteAfter", "ALScriptStudioAcceptOnEnter", "ALScriptFragmentCompletion",
         "ALScriptStudioAutoClose",
         "ALScriptStudioCaretStyle",  "ALScriptStudioCaretBlink",   "ALScriptStudioHoverCards",  "ALScriptStudioHoverDelay",
-        "ALScriptStudioVimClipboard",
+        "ALScriptStudioVimClipboard", "ALScriptDefinitionsFolder",
         "ALScriptFormatBlankLines",  "ALScriptFormatSpacing",      "ALScriptFormatBraceSpaces", "ALScriptFormatWidth",       "ALScriptFormatOnSave",      "ALScriptTrimOnSave",        "ALScriptFixOnSave",
         "ALScriptTemplateLSL",       "ALScriptTemplateSLua",       "ALScriptPreprocDefines",    "ExternalEditor",
         "ALScriptConvertLLTimers",   "ALScriptConvertDetectedTable", "ALScriptConvertSLuaCalls", "ALScriptConvertIdioms",
         "ALScriptConvertHandlerFields", "ALScriptConvertTypes",    "ALScriptConvertComments",   "ALScriptConvertKeepComments",
-        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",
+        "ALScriptConvertKeyTextAny", "ALScriptConvertUuidKeys",  "ALScriptConvertCommentCode",
     };
 
     // What each preset of Convert to SLua sets: SLua's own ways, or as
@@ -168,6 +168,8 @@ bool ALFloaterScriptPreferences::postBuild()
     getChild<LLButton>("add_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onAddIncludeFolder(); });
     getChild<LLButton>("remove_folder")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onRemoveIncludeFolder(); });
     getChild<LLButton>("external_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseExternalEditor(); });
+    getChild<LLButton>("definitions_browse")->setCommitCallback([this](LLUICtrl*, const LLSD&) { onBrowseDefinitions(); });
+    getChild<LLButton>("definitions_clear")->setCommitCallback([](LLUICtrl*, const LLSD&) { gSavedSettings.setString("ALScriptDefinitionsFolder", std::string()); });
     mVimrcNotecard = getChild<LLLineEditor>("vimrc_notecard");
     getChild<LLButton>("vimrc_edit")->setCommitCallback([](LLUICtrl*, const LLSD&) { ALScriptStudio::openVimrc(); });
     getChild<LLButton>("vimrc_clear")->setCommitCallback(
@@ -262,7 +264,8 @@ bool ALFloaterScriptPreferences::postBuild()
         mEnableWatches.emplace_back(control->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { refreshIncludeOrder(); }));
     }
     for (const char* setting : { "ALScriptPreprocOptimizer", "ALScriptUploadHeader", "ALScriptPreprocDiskIncludes", "ALScriptStudioAutoComplete", "ALScriptStudioHoverCards",
-                                 "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines" })
+                                 "ALScriptPreprocDiskIncludeFolder", "ALScriptTemplateLSL", "ALScriptTemplateSLua", "ALScriptPreprocDefines",
+                                 "ALScriptConvertKeepComments" })
     {
         if (LLControlVariable* control = gSavedSettings.getControl(setting))
         {
@@ -404,6 +407,8 @@ void ALFloaterScriptPreferences::refreshEnabled()
     {
         getChildView(name)->setEnabled(hover);
     }
+    // Comments' code is written only where the comments are.
+    getChildView("convert_comment_code")->setEnabled(gSavedSettings.getBOOL("ALScriptConvertKeepComments"));
     // What the settings hold, where something other than these fields
     // changed them: the menu adding a folder, a Cancel.
     refreshIncludeFolder();
@@ -1004,6 +1009,20 @@ void ALFloaterScriptPreferences::onBrowseExternalEditor()
             gSavedSettings.setString("ExternalEditor", "\"" + files.front() + "\" \"%s\"");
         },
         LLFilePicker::FFLOAD_EXE, false);
+}
+
+void ALFloaterScriptPreferences::onBrowseDefinitions()
+{
+    const std::string now = gSavedSettings.getString("ALScriptDefinitionsFolder");
+    (new LLDirPickerThread(
+         [](const std::vector<std::string>& folders, std::string) {
+             if (!folders.empty())
+             {
+                 gSavedSettings.setString("ALScriptDefinitionsFolder", folders.front());
+             }
+         },
+         now))
+        ->getFile();
 }
 
 void ALFloaterScriptPreferences::refreshTemplates()

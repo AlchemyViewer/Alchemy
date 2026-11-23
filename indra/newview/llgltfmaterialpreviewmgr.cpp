@@ -239,6 +239,8 @@ bool LLGLTFPreviewTexture::needsRender()
     }
 
     if (!mShouldRender && mBestLoad.isFullyLoaded()) { return false; }
+    // A material fetched again after a failure (LLGLTFMaterialList::retryFailedMaterials) waits for its asset
+    if (mGLTFMaterial->isFetching()) { return false; }
     MaterialLoadLevels current_load = get_material_load_levels(*mGLTFMaterial.get());
     if (current_load < mBestLoad)
     {

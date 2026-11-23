@@ -393,6 +393,9 @@ namespace
 
     void object_texture_refresh()
     {
+        // A full update brings an object's glTF overrides, where a cache hit brings none, so the regions are asked again
+        // for the selected objects with a glTF material on a selected face, as the derender list asks for what it lets go.
+        std::map<LLViewerRegion*, std::vector<U32>> ask_again;
         for (LLObjectSelection::valid_iterator iter = LLSelectMgr::getInstance()->getSelection()->valid_begin();
              iter != LLSelectMgr::getInstance()->getSelection()->valid_end();
              ++iter)
@@ -400,6 +403,18 @@ namespace
             LLSelectNode* node = *iter;
             if (!node)
                 continue;
+            LLViewerObject* objectp = node->getObject();
+            if (objectp && objectp->getRegion() && !objectp->isLocalOnly() && !objectp->isAvatar())
+            {
+                for (U8 i = 0; i < objectp->getNumTEs(); ++i)
+                {
+                    if (node->isTESelected(i) && objectp->getRenderMaterialID(i).notNull())
+                    {
+                        ask_again[objectp->getRegion()].push_back(objectp->getLocalID());
+                        break;
+                    }
+                }
+            }
             std::map<LLUUID, std::vector<U8>> faces_per_tex;
             for (U8 i = 0; i < node->getObject()->getNumTEs(); ++i)
             {
@@ -455,6 +470,17 @@ namespace
                 }
                 }
             }
+        }
+
+        for (const auto& [regionp, local_ids] : ask_again)
+        {
+            for (U32 local_id : local_ids)
+            {
+                regionp->addCacheMissFull(local_id);
+            }
+            regionp->requestCacheMisses();
+            regionp->gltfOverrideCounts().mAskedAgain += (U32)local_ids.size();
+            LL_DEBUGS("GLTF") << "Asked " << regionp->getName() << " again for " << local_ids.size() << " objects for their overrides" << LL_ENDL;
         }
     }
 

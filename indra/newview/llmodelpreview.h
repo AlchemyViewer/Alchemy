@@ -176,6 +176,27 @@ public:
     void splitSuffixedModels(const std::string& filename);
     // </SK:Nexii>
 
+    // <SK:Nexii> Mesh uploader pivot: each model's origin within its bounding box, -1 to 1 per axis
+    enum EPivotMode { PIVOT_FILE, PIVOT_CENTRE, PIVOT_CUSTOM };
+    // Custom starts from the pivot the last mode gave a single model.
+    void setPivotMode(EPivotMode mode);
+    EPivotMode getPivotMode() const { return mPivotMode; }
+    void setCustomPivot(const LLVector3& pivot) { mCustomPivot = pivot; }
+    // The origin the file gave the model, where its vertices' origin sits in its box.
+    static LLVector3 getFileOriginPivot(const LLModel* model);
+    // The pivot the mode asks for, and the one in effect: centred while the physics or rigging rules it out.
+    LLVector3 getWantedPivot(const LLModel* model) const;
+    LLVector3 getUploadPivot(const LLModel* model) const { return mPivotHeld.count(model) ? LLVector3::zero : getWantedPivot(model); }
+    // What each model's stored domains are shifted by so that its origin lands on its pivot.
+    LLMeshUploadThread::position_offsets_t getUploadPositionOffsets() const;
+    // One model to upload, counting a root and its submodels once: what Custom and metres are for.
+    bool isSingleModel() const;
+    // Whether this instance uploads skinned, from its base or its High model: such mesh takes no pivot.
+    bool uploadsRigged(const LLModelInstance& instance) const;
+    // Which parts are held at the centre, settled from the upload data rather than by a UI refresh.
+    void updatePivotHold();
+    // </SK:Nexii>
+
     //Is a rig valid so that it can be used as a criteria for allowing for uploading of joint positions
     //Accessors for joint position upload friendly rigs
     const bool isRigValidForJointPositionUpload(void) const { return mRigValidJointUpload; }
@@ -195,6 +216,10 @@ public:
 
     void setLoadState(U32 state) { mLoadState = state; }
     U32 getLoadState() { return mLoadState; }
+
+    // Whether levels of detail are still being made on idle: until they are,
+    // the models are not the ones a fee or an upload should be written from.
+    bool isGeneratingLODs() const { return !mLodsQuery.empty(); }
 
     static bool         sIgnoreLoadedCallback;
     std::vector<S32> mLodsQuery;
@@ -276,6 +301,16 @@ protected:
     bool        mModelNoErrors;
     bool        mLookUpLodFiles;
     bool        mLODFromHighFile[LLModel::NUM_LODS]{}; // <SK:Nexii> Mesh uploader LODs by name
+    // <SK:Nexii> Mesh uploader pivot
+    EPivotMode  mPivotMode{PIVOT_CENTRE};
+    LLVector3   mCustomPivot;
+    bool        mUploadPivotAllowed{true};   // some part may take a pivot
+    std::set<const LLModel*> mPivotHeld; // parts held at the centre: rigged, or with physics not yet analyzed
+    bool        mPivotAnyRigged{false};
+    bool        mPivotAnyUnanalyzed{false};
+    bool        mPivotWithoutPhysics{false}; // a pivoted part that collides with a default hull centred on itself
+    F32         mPivotScale{1.f};        // the import scale the upload data was last built with
+    // </SK:Nexii>
 
     std::map<std::string, bool> mViewOption;
 

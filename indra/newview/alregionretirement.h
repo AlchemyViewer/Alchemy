@@ -27,6 +27,8 @@
 #include "llpointer.h"
 #include "v3dmath.h"
 
+#include <boost/unordered/unordered_flat_set.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <deque>
@@ -35,12 +37,40 @@
 class LLViewerObject;
 class LLViewerRegion;
 
+// The objects a retiring region lost, by local ID: those killed that its object cache will not make again, and those
+// its simulator sent while it retired, dropped. The simulator holds all of them as sent for as long as it holds the
+// agent there, so a revival asks for each again.
+class ALRetiredObjects
+{
+public:
+    void lost(U32 local_id) { mIds.insert(local_id); }
+    // Its simulator killed it: there is nothing left to ask for.
+    void killed(U32 local_id) { mIds.erase(local_id); }
+    bool empty() const { return mIds.empty(); }
+    size_t size() const { return mIds.size(); }
+
+    // Every local ID lost, once, in ascending order, leaving none.
+    std::vector<U32> take()
+    {
+        std::vector<U32> ids(mIds.begin(), mIds.end());
+        mIds.clear();
+        std::sort(ids.begin(), ids.end());
+        return ids;
+    }
+
+private:
+    boost::unordered_flat_set<U32> mIds;
+};
+
 // After a teleport the region left behind stays until its simulator sends DisableSimulator, about a minute later,
 // with its objects, avatars, terrain and probes. Once the arrival has settled, every region the agent is neither in
-// nor near is retired: marked so that its simulator creates no new objects, its objects killed a frame's budget at a
-// time, then removed. Its circuit is left for its simulator to close with DisableSimulator, unless
-// AlchemyRetireDepartedRegionsCloseCircuit asks for it to be closed at once, the simulator told so with CloseCircuit.
-// One that comes near the view again meanwhile is kept, and what was killed of it is asked for again.
+// nor near is retired: marked so that its simulator creates no new objects, and its objects killed a frame's budget at
+// a time. The region itself stays, with its land, handshake and object cache, until its simulator closes the circuit
+// with DisableSimulator: until then the simulator holds the agent there, counts everything it sent the viewer as sent,
+// and sends none of it again. One that comes near the view again, or that a teleport arrives at, is revived: what its
+// object cache holds is made again from it, and every other object it lost is asked for again.
+// AlchemyRetireDepartedRegionsCloseCircuit instead removes a retired region at once and closes its circuit, the
+// simulator told so with CloseCircuit.
 class ALRegionRetirement
 {
 public:
@@ -78,6 +108,23 @@ public:
             || (fetch_requests <= CALM_FETCH_REQUESTS && create_queue <= CALM_CREATE_QUEUE);
     }
 
+    // What LLWorld::addRegion does with the region it already has for the handle a simulator arrives at.
+    enum class EArrival
+    {
+        REUSE,   // the region as it stands
+        REVIVE,  // a retiring region whose simulator still holds the agent there, revived
+        REPLACE, // a new region in its place
+    };
+
+    static EArrival arrivalAt(bool same_host, bool alive, bool retiring)
+    {
+        if (!same_host || !alive)
+        {
+            return EArrival::REPLACE;
+        }
+        return retiring ? EArrival::REVIVE : EArrival::REUSE;
+    }
+
     ALRegionRetirement();
     ~ALRegionRetirement();
     ALRegionRetirement(const ALRegionRetirement&) = delete;
@@ -89,12 +136,20 @@ public:
     // regionp is about to be deleted, by whatever path.
     void forget(LLViewerRegion* regionp);
 
+    // regionp, retiring, is wanted again: its object cache makes again what it holds as the region's idle update
+    // resumes, and every other object it lost is asked of its simulator. why ends the log line.
+    void revive(LLViewerRegion* regionp, const char* why);
+
 private:
     void watchArrival();
+    // Revives the retiring regions the agent or the camera came near again.
+    void reviveNear();
+    // Leaves the region being retired as it stands, still retiring, for a teleport that may lead back to it.
+    void pause();
     void chooseRegions();
     void startNext();
     void killSome();
-    // Removes the region being retired now, whatever is left of it.
+    // Ends the retirement of the region being retired, once nothing of it is left to kill.
     void finish();
 
     bool mTeleporting = false;
@@ -107,8 +162,6 @@ private:
     // the region being retired, and what of it is left to kill
     LLViewerRegion* mRegionp = nullptr;
     std::vector<LLPointer<LLViewerObject>> mObjects;
-    // the local ids of every object killed so far, asked of the simulator again if the retirement is called off
-    std::vector<U32> mKilledIds;
     size_t mObjectCount = 0;
     F64 mStartTime = 0.0;
     F64 mKilledTime = 0.0;

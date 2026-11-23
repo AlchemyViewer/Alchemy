@@ -214,9 +214,7 @@ namespace al_sky_test
             return 1.f / 255.f;
         }
         const S32 mantissa = channel == 2 ? 5 : 6;
-        S32 exponent = 0;
-        std::frexp(llmax(fabsf(value), 0x1p-14f), &exponent);
-        return std::ldexp(1.f, exponent - 1 - mantissa);
+        return std::ldexp(1.f, std::ilogb(llmax(fabsf(value), 0x1p-14f)) - mantissa);
     }
 
     // The raster sky's ditherEmissive (skyraster/deferred/ditherEmissiveF.glsl): how far it moves a value written to

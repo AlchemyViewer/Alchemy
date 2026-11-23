@@ -42,6 +42,7 @@
 //#include <locale>
 #include <iomanip>
 #include <algorithm>
+#include <functional>
 #include <vector>
 #include <map>
 #include "llformat.h"
@@ -186,9 +187,10 @@ public:
     // so the two never disagree on what belongs in a cluster.
     static bool isEmojiClusterExtender(llwchar a);
 
-    // Sort order. Root-locale Unicode collation on both forms, so a list comes
-    // out the same on every platform and an accented letter sorts beside the
-    // letter it decorates rather than past the end of the alphabet.
+    // Sort order. Root-locale Unicode collation, so a list comes out the same
+    // on every platform and an accented letter sorts beside the letter it
+    // decorates rather than past the end of the alphabet, with ASCII's
+    // punctuation and symbols in ASCII order around the digits and letters.
     static S32  collate(const char* a, const char* b);
 
     static void setupDatetimeInfo(bool pacific_daylight_time);
@@ -457,9 +459,12 @@ public:
 
     // Sort order for lists people read: Unicode collation with digit runs
     // compared as numbers, so item2 comes before item10 and an accented letter
-    // sorts beside the letter it decorates. Case is a tertiary difference, so
-    // "abc" and "ABC" differ but sort next to each other, lowercase first.
-    // Root locale, so a list looks the same to everyone.
+    // sorts beside the letter it decorates. ASCII's punctuation and symbols
+    // keep ASCII order around the digits and letters, so "!a" < "-a" < "1a" <
+    // ":a" < "[a" < "a" < "~a", the order inventory names are written for.
+    // Case is a tertiary difference, so "abc" and "ABC" differ but sort next
+    // to each other, uppercase first. Root locale, so a list looks the same to
+    // everyone.
     static S32      compareDict(string_view_type a, string_view_type b);
 
     // The same, with case ignored entirely. Accents still separate.
@@ -475,6 +480,65 @@ public:
 
     // Copies src into dst at a given offset.
     static void     copyInto(string_type& dst, string_view_type src, size_type offset);
+
+    // Join non-empty strings from values using value itself and delimiter
+    template<class C>
+    static std::string join(const C& values, T delimiter = ',')
+    {
+        std::string result;
+        for (const std::string& value : values)
+        {
+            if (!value.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += value;
+            }
+        }
+        return result;
+    }
+
+    // Join non-empty strings from values using stringify(value) and delimiter
+    template<class C, class V>
+    static std::string join(const C& values, std::function<std::string(const V&)> stringify, T delimiter = ',')
+    {
+        std::string result;
+        for (const V& value : values)
+        {
+            std::string string = stringify(value);
+            if (!string.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += string;
+            }
+        }
+        return result;
+    }
+
+    // Join non-empty strings from values using stringify(index, value) and delimiter
+    template<class C, class V>
+    static std::string join(const C& values, std::function<std::string(size_t index, const V&)> stringify, T delimiter = ',')
+    {
+        std::string result;
+        for (size_t i = 0; i < values.size(); ++i)
+        {
+            std::string string = stringify(i, values[i]);
+            if (!string.empty())
+            {
+                if (!result.empty())
+                {
+                    result += delimiter;
+                }
+                result += string;
+            }
+        }
+        return result;
+    }
 
 
 #ifdef _DEBUG
@@ -1713,20 +1777,7 @@ template<class T>
 void LLStringUtilBase<T>::removeCRLF(string_type& string)
 {
     const T CR = 13;
-
-    size_type cr_count = 0;
-    size_type len = string.size();
-    size_type i;
-    for( i = 0; i < len - cr_count; i++ )
-    {
-        if( string[i+cr_count] == CR )
-        {
-            cr_count++;
-        }
-
-        string[i] = string[i+cr_count];
-    }
-    string.erase(i, cr_count);
+    std::erase(string, CR);
 }
 
 //static
@@ -1771,6 +1822,13 @@ void LLStringUtilBase<T>::replaceChar( string_type& string, T target, T replacem
 template<class T>
 void LLStringUtilBase<T>::replaceString( string_type& string, string_view_type target, string_view_type replacement )
 {
+    // An empty target is found at every position, the one just past each
+    // replacement included, so the loop below would never end.
+    if (target.empty())
+    {
+        return;
+    }
+
     // Either view is allowed to point into `string` itself, and both are read
     // after a replace that can have moved the buffer they point into -- target
     // on every turn of the loop below, not only the first. Copy in that one

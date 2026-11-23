@@ -76,6 +76,7 @@
 #include "llfloaterreg.h"
 #include "llvoavatarself.h"
 #include "llskinningutil.h"
+#include "hbxxh.h"
 
 #include "boost/iostreams/device/array.hpp"
 #include "boost/iostreams/stream.hpp"
@@ -1218,7 +1219,17 @@ void LLMeshRepoThread::run()
                     }
                     else
                     {
-                        LL_DEBUGS() << "mHeaderReqQ failed: " << req.mMeshParams << LL_ENDL;
+                        // too many fails -- can't get the header so none of the LODs will
+                        // be available either.  Without this, objects waiting on this
+                        // header never learn it's gone and stay at their placeholder
+                        // shape forever (mirrors LLMeshHeaderHandler::processFailure).
+                        LL_WARNS() << "mHeaderReqQ failed too many times: " << req.mMeshParams << " , skip" << LL_ENDL;
+
+                        LLMutexLock lock(mLoadedMutex);
+                        for (int i = 0; i < LLVolumeLODGroup::NUM_LODS; ++i)
+                        {
+                            mUnavailableQ.push_back(LODRequest(req.mMeshParams, i));
+                        }
                     }
                 }
             }
@@ -2699,7 +2710,9 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
                                        bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                                        const std::string & upload_url, LLUUID destination_folder_id, bool do_upload,
                                        LLHandle<LLWholeModelFeeObserver> fee_observer,
-                                       LLHandle<LLWholeModelUploadObserver> upload_observer)
+                                       LLHandle<LLWholeModelUploadObserver> upload_observer,
+                                       std::shared_ptr<const ALMeshUploadAssets> fee_assets,
+                                       const position_offsets_t& position_offsets) // <SK:Nexii> Mesh uploader pivot
   : LLThread("mesh upload"),
     LLCore::HttpHandler(),
     mDiscarded(false),
@@ -2707,7 +2720,8 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mWholeModelUploadURL(upload_url),
     mDestinationFolderId(destination_folder_id),
     mFeeObserverHandle(fee_observer),
-    mUploadObserverHandle(upload_observer)
+    mUploadObserverHandle(upload_observer),
+    mFeeAssets(do_upload ? std::move(fee_assets) : nullptr)
 {
     mInstanceList = data;
     mLodSources = sources_list;
@@ -2715,6 +2729,7 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mUploadSkin = upload_skin;
     mUploadJoints = upload_joints;
     mLockScaleIfJointPosition = lock_scale_if_joint_position;
+    mPositionOffsets = position_offsets; // <SK:Nexii> Mesh uploader pivot
     mMutex = new LLMutex();
     mPendingUploads = 0;
     mFinished = false;
@@ -2726,6 +2741,16 @@ LLMeshUploadThread::LLMeshUploadThread(LLMeshUploadThread::instance_list_t& data
     mOrigin += gAgent.getAtAxis() * scale.magVec();
 
     mMeshUploadTimeOut = gSavedSettings.getS32("MeshUploadTimeOut");
+    const U32 packing = gSavedSettings.getU32("AlchemyMeshUploadPacking");
+    mBlockPacking = packing < LLModel::PACK_COUNT ? (LLModel::EBlockPacking)packing : LLModel::PACK_SMALL;
+    mBlockWeights = mBlockPacking != LLModel::PACK_PLAIN && gSavedSettings.getBOOL("AlchemyMeshUploadRoundWeights")
+                        ? ALMeshFacePack::Weights::ROUND_8_BITS
+                        : ALMeshFacePack::Weights::KEEP;
+    if (!do_upload)
+    {
+        mWrittenAssets = std::make_shared<ALMeshUploadAssets>();
+        mWrittenAssets->mOptions = { mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking, mBlockWeights };
+    }
 
     mHttpRequest = new LLCore::HttpRequest;
     mHttpOptions = std::make_shared<LLCore::HttpOptions>();
@@ -2825,6 +2850,87 @@ LLSD llsd_from_file(std::string filename)
     return result;
 }
 
+// <SK:Nexii> Mesh uploader pivot
+LLVector3 LLMeshUploadThread::getPositionOffset(const LLModel* model) const
+{
+    auto it = mPositionOffsets.find(model);
+    return it != mPositionOffsets.end() ? it->second : LLVector3::zero;
+}
+// </SK:Nexii>
+
+//static
+size_t LLMeshUploadThread::assetSource(LLModel* base_model, const instance_list_t& instances, const LLVector3& position_offset)
+{
+    // Each LOD's faces are hashed whole, so that a model whose geometry
+    // changed in place, its counts kept, is not taken for the one the asset
+    // was written from.
+    HBXXH64 hash;
+    auto add = [&hash](const void* data, size_t bytes)
+    {
+        if (data && bytes)
+        {
+            hash.update(data, bytes);
+        }
+    };
+    auto add_value = [&add](const auto& value) { add(&value, sizeof(value)); };
+
+    add_value(base_model);
+    const LLModelInstance& first_instance = instances.front();
+    for (const LLPointer<LLModel>& model : first_instance.mLOD)
+    {
+        const LLModel* lod = model.get();
+        add_value(lod);
+        if (!lod)
+        {
+            continue;
+        }
+        const S32 faces = lod->getNumVolumeFaces();
+        add_value(faces);
+        for (S32 f = 0; f < faces; ++f)
+        {
+            const LLVolumeFace& face = lod->getVolumeFace(f);
+            const size_t vertices = face.mNumVertices > 0 ? (size_t)face.mNumVertices : 0;
+            const size_t indices = face.mNumIndices > 0 ? (size_t)face.mNumIndices : 0;
+            add_value(vertices);
+            add_value(indices);
+            add(face.mPositions, vertices * sizeof(LLVector4a));
+            add(face.mNormals, vertices * sizeof(LLVector4a));
+            add(face.mTexCoords, vertices * sizeof(LLVector2));
+            add(face.mWeights, vertices * sizeof(LLVector4a));
+            add(face.mIndices, indices * sizeof(U16));
+        }
+        add_value(lod->mSkinWeights.size());
+    }
+    const LLModel* physics = first_instance.mLOD[LLModel::LOD_PHYSICS].notNull() ? first_instance.mLOD[LLModel::LOD_PHYSICS].get() : base_model;
+    add_value(physics->mPhysics.mHull.size());
+    for (const auto& hull : physics->mPhysics.mHull)
+    {
+        add_value(hull.size());
+        add(hull.data(), hull.size() * sizeof(hull[0]));
+    }
+    add(position_offset.mV, sizeof(position_offset.mV));
+    return (size_t)hash.digest();
+}
+
+bool LLMeshUploadThread::feeAssetsServe() const
+{
+    const ALMeshUploadAssets::Options options{ mUploadSkin, mUploadJoints, mLockScaleIfJointPosition, mBlockPacking, mBlockWeights };
+    if (!mFeeAssets || !(mFeeAssets->mOptions == options) || mFeeAssets->mAssets.size() != mInstance.size())
+    {
+        return false;
+    }
+    for (const auto& [model, instances] : mInstance)
+    {
+        const auto found = mFeeAssets->mAssets.find(model.get());
+        if (instances.empty() || found == mFeeAssets->mAssets.end() ||
+            found->second.source != assetSource(model, instances, getPositionOffset(model)))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 void LLMeshUploadThread::packModelIntance(
     LLModel* model,
     LLMeshUploadThread::instance_list_t& instance_list,
@@ -2857,34 +2963,48 @@ void LLMeshUploadThread::packModelIntance(
             model_name = data.mBaseModel->getName();
         }
 
-        std::stringstream ostr;
+        if (mSendFeeAssets)
+        {
+            // feeAssetsServe() found the model's asset
+            data.mAssetData = mFeeAssets->mAssets.at(model).bytes;
+        }
+        else
+        {
+            std::stringstream ostr;
 
-        LLModel::Decomposition& decomp =
-            data.mModel[LLModel::LOD_PHYSICS].notNull() ?
-            data.mModel[LLModel::LOD_PHYSICS]->mPhysics :
-            data.mBaseModel->mPhysics;
+            LLModel::Decomposition& decomp =
+                data.mModel[LLModel::LOD_PHYSICS].notNull() ?
+                data.mModel[LLModel::LOD_PHYSICS]->mPhysics :
+                data.mBaseModel->mPhysics;
 
-        decomp.mBaseHull = mHullMap[data.mBaseModel];
+            decomp.mBaseHull = mHullMap[data.mBaseModel];
 
-        LLSD mesh_header = LLModel::writeModel(
-            ostr,
-            data.mModel[LLModel::LOD_PHYSICS],
-            data.mModel[LLModel::LOD_HIGH],
-            data.mModel[LLModel::LOD_MEDIUM],
-            data.mModel[LLModel::LOD_LOW],
-            data.mModel[LLModel::LOD_IMPOSTOR],
-            decomp,
-            mUploadSkin,
-            mUploadJoints,
-            mLockScaleIfJointPosition,
-            LLModel::WRITE_BINARY,
-            false,
-            data.mBaseModel->mSubmodelID);
+            LLModel::writeModel(
+                ostr,
+                data.mModel[LLModel::LOD_PHYSICS],
+                data.mModel[LLModel::LOD_HIGH],
+                data.mModel[LLModel::LOD_MEDIUM],
+                data.mModel[LLModel::LOD_LOW],
+                data.mModel[LLModel::LOD_IMPOSTOR],
+                decomp,
+                mUploadSkin,
+                mUploadJoints,
+                mLockScaleIfJointPosition,
+                LLModel::WRITE_BINARY,
+                false,
+                data.mBaseModel->mSubmodelID,
+                mBlockPacking,
+                mBlockWeights,
+                getPositionOffset(data.mBaseModel)); // <SK:Nexii> Mesh uploader pivot
 
-        data.mAssetData = ostr.str();
-        std::string str = ostr.str();
+            data.mAssetData = ostr.str();
+        }
+        if (mWrittenAssets)
+        {
+            mWrittenAssets->mAssets[model] = { assetSource(model, instance_list, getPositionOffset(model)), data.mAssetData };
+        }
 
-        res["mesh_list"][mesh_num] = LLSD::Binary(str.begin(), str.end());
+        res["mesh_list"][mesh_num] = LLSD::Binary(data.mAssetData.begin(), data.mAssetData.end());
         mesh_index[data.mBaseModel] = mesh_num;
         mesh_num++;
     }
@@ -2907,6 +3027,9 @@ void LLMeshUploadThread::packModelIntance(
         LLQuaternion rot;
         LLMatrix4 transformation = instance.mTransform;
         decomposeMeshMatrix(transformation, pos, rot, scale);
+        // <SK:Nexii> Mesh uploader pivot: the prim stands on its pivot, so the mesh stays where it was placed
+        pos = (-getPositionOffset(data.mBaseModel)) * transformation + mOrigin;
+        // </SK:Nexii>
         instance_entry["position"] = ll_sd_from_vector3(pos);
         instance_entry["rotation"] = ll_sd_from_quaternion(rot);
         instance_entry["scale"] = ll_sd_from_vector3(scale);
@@ -3240,8 +3363,18 @@ void LLMeshUploadThread::doWholeModelUpload()
     }
     else
     {
-        generateHulls();
-        LL_DEBUGS(LOG_MESH) << "Hull generation completed." << LL_ENDL;
+        // What the fee was quoted for, where it still stands for what this
+        // upload would write.
+        mSendFeeAssets = feeAssetsServe();
+        if (mSendFeeAssets)
+        {
+            LL_INFOS(LOG_MESH) << "Sending the " << mFeeAssets->mAssets.size() << " assets the fee request wrote." << LL_ENDL;
+        }
+        else
+        {
+            generateHulls();
+            LL_DEBUGS(LOG_MESH) << "Hull generation completed." << LL_ENDL;
+        }
 
         mModelData = LLSD::emptyMap();
         mTextureFiles.clear();
@@ -3472,8 +3605,12 @@ void LLMeshUploadThread::onCompleted(LLCore::HttpHandle handle, LLCore::HttpResp
                 body["data"]["upload_price"] = body["upload_price"];
                 const LLSD fee_data = body["data"];
                 const std::string upload_url = mWholeModelUploadURL;
-                notify_upload_observer(observer, [fee_data, upload_url](LLWholeModelFeeObserver* o)
-                    { o->onModelPhysicsFeeReceived(fee_data, upload_url); });
+                std::shared_ptr<const ALMeshUploadAssets> assets = mWrittenAssets;
+                notify_upload_observer(observer, [fee_data, upload_url, assets](LLWholeModelFeeObserver* o)
+                    {
+                        o->onModelAssetsWritten(assets);
+                        o->onModelPhysicsFeeReceived(fee_data, upload_url);
+                    });
             }
             else
             {
@@ -5556,11 +5693,15 @@ void LLMeshRepository::uploadModel(std::vector<LLModelInstance>& data, const std
                                    LLVector3& scale, bool upload_textures,
                                    bool upload_skin, bool upload_joints, bool lock_scale_if_joint_position,
                                    std::string upload_url, const LLUUID& destination_folder_id, bool do_upload,
-                                   LLHandle<LLWholeModelFeeObserver> fee_observer, LLHandle<LLWholeModelUploadObserver> upload_observer)
+                                   LLHandle<LLWholeModelFeeObserver> fee_observer, LLHandle<LLWholeModelUploadObserver> upload_observer,
+                                   std::shared_ptr<const ALMeshUploadAssets> fee_assets,
+                                   const LLMeshUploadThread::position_offsets_t& position_offsets) // <SK:Nexii> Mesh uploader pivot
 {
     LLMeshUploadThread* thread = new LLMeshUploadThread(data, lod_sources, scale, upload_textures,
                                                         upload_skin, upload_joints, lock_scale_if_joint_position,
-                                                        upload_url, destination_folder_id, do_upload, fee_observer, upload_observer);
+                                                        upload_url, destination_folder_id, do_upload, fee_observer, upload_observer,
+                                                        std::move(fee_assets),
+                                                        position_offsets); // <SK:Nexii> Mesh uploader pivot
     mUploadWaitList.push_back(thread);
 }
 

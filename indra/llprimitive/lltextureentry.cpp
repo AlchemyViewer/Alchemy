@@ -578,8 +578,12 @@ S32 LLTextureEntry::setBaseMaterial()
 
     if (mGLTFMaterialOverrides)
     {
-        if (mGLTFMaterialOverrides->setBaseMaterial())
+        // The override may be held elsewhere too, as the record of what the region sent, so the face changes a copy
+        // of its own.
+        LLPointer<LLGLTFMaterial> own = new LLGLTFMaterial(*mGLTFMaterialOverrides);
+        if (own->setBaseMaterial())
         {
+            mGLTFMaterialOverrides = own;
             changed = TEM_CHANGE_TEXTURE;
         }
 

@@ -33,6 +33,8 @@
 #include <vector>
 
 #include "llfloater.h"
+#include "almenuslot.h"
+#include "llframetimer.h"
 #include "llinventoryobserver.h"
 
 class LLScrollContainer;
@@ -59,6 +61,7 @@ public:
     virtual ~LLFloaterGesture();
 
     virtual bool postBuild() override;
+    void draw() override;
     virtual void done () override;
     void refreshAll();
     /**
@@ -92,18 +95,26 @@ private:
      */
     void onActivateBtnClick();
     void onClickEdit();
+    void onContextMenu(S32 x, S32 y);
+    void onShare();
+    void onRevealInInventory();
     void onClickPlay();
     void onClickNew();
     void onCommitList();
+    void onFilterEdit(const std::string& filter);
+    std::string getLastUsedText(const LLUUID& item_id) const;
     void onCopyPasteAction(const LLSD& command);
     void onDeleteSelected();
     void onRenameSelected();
 
     static void onGestureRename(const LLSD& notification, const LLSD& response);
 
-    LLUUID mSelectedID;
     LLUUID mGestureFolderID;
-    LLScrollListCtrl* mGestureList;
+    LLScrollListCtrl* mGestureList = nullptr;
+    std::string mFilter;
+    std::vector<std::string> mFilterTerms;
+    LLFrameTimer mLastUsedRefreshTimer;
+    ALMenuSlot mContextMenu;
 
     LLFloaterGestureObserver* mObserver;
 };

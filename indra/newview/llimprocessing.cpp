@@ -86,6 +86,19 @@ std::string replace_wildcards(std::string input, const LLUUID& id, const std::st
 
 extern void on_new_message(const LLSD& msg);
 
+// The text a binary bucket holds, up to its first NUL or to its end. Nothing
+// says a bucket ends in a NUL, and one sent over HTTP is no longer than its
+// bytes, so the NUL is looked for only within it.
+static std::string bucket_text(const U8* bucket, S32 size)
+{
+    if (!bucket || size <= 0)
+    {
+        return std::string();
+    }
+    const char* text = reinterpret_cast<const char*>(bucket);
+    return std::string(text, std::find(text, text + size, '\0'));
+}
+
 // Strip out "Resident" for display, but only if the message came from a user
 // (rather than a script)
 static std::string clean_name_from_im(const std::string& name, EInstantMessage type)
@@ -620,6 +633,10 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             break;
 
         case IM_NOTHING_SPECIAL:    // p2p IM
+            // Record delivery metadata so live transport can be distinguished from history retrieval.
+            LL_INFOS("ChatServiceHistory") << "Direct IM received: sender_id=" << from_id
+                << ", offline=" << (offline == IM_OFFLINE)
+                << ", timestamp=" << timestamp << ", bytes=" << message.size() << LL_ENDL;
             // Don't show dialog, just do IM
             if (!gAgent.isGodlike()
                 && gAgent.inPrelude()
@@ -790,6 +807,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         real_name = SYSTEM_FROM;
                     }
 
+                    // Keep the undecorated body for matching against service history.
                     gIMMgr->addMessage(session_id,
                         from_id,
                         name,
@@ -803,7 +821,8 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                         region_message,
                         timestamp,
                         LLUUID::null,
-                        real_name);
+                        real_name,
+                        notice_name.empty() ? LLSD(message) : LLSD());
                 }
                 else
                 {
@@ -883,10 +902,12 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     boost::char_separator<char> sep("|", "", boost::keep_empty_tokens);
                     tokenizer tokens(str_bucket, sep);
                     tokenizer::iterator iter = tokens.begin();
+                    // A part the bucket leaves out is empty.
+                    const auto next_part = [&]() { return iter != tokens.end() ? *iter++ : std::string(); };
 
-                    asset_type = (LLAssetType::EType)(atoi((*(iter++)).c_str()));
-                    iter++; // wearable type if applicable, otherwise asset type
-                    item_name = std::string((*(iter++)).c_str());
+                    asset_type = (LLAssetType::EType)(atoi(next_part().c_str()));
+                    next_part(); // wearable type if applicable, otherwise asset type
+                    item_name = std::string(next_part().c_str());
                 }
             }
             else
@@ -971,17 +992,11 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                 info->mHost = sender;
             }
 
-            std::string str(message);
-
-            // Tokenize the string.
-            // TODO: Support escaped tokens ("||" -> "|")
-            typedef boost::tokenizer<boost::char_separator<char> > tokenizer;
-            boost::char_separator<char> sep("|", "", boost::keep_empty_tokens);
-            tokenizer tokens(str, sep);
-            tokenizer::iterator iter = tokens.begin();
-
-            std::string subj(*iter++);
-            std::string mes(*iter++);
+            // The message is the subject, a bar and the body, which may hold
+            // bars of its own. A message with no bar is all subject.
+            const size_t bar = message.find('|');
+            std::string subj = message.substr(0, bar);
+            std::string mes = bar == std::string::npos ? std::string() : message.substr(bar + 1);
 
             // Send the notification down the new path.
             // For requested notices, we don't want to send the popups.
@@ -1104,7 +1119,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     // still might be able to figure out the type... even though the offer is not retrievable.
 
                     // Should be safe to remove once DRTSIM-451 fully deploys
-                    std::string str_bucket(reinterpret_cast<char *>(binary_bucket));
+                    std::string str_bucket = bucket_text(binary_bucket, binary_bucket_size);
                     std::string str_type(str_bucket.substr(0, str_bucket.find('|')));
 
                     std::stringstream type_convert(str_type);
@@ -1378,7 +1393,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     name,
                     buffer,
                     IM_OFFLINE == offline,
-                    ll_safe_string((char*)binary_bucket),
+                    bucket_text(binary_bucket, binary_bucket_size),
                     IM_SESSION_INVITE,
                     parent_estate_id,
                     region_id,
@@ -1405,7 +1420,7 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
                     name,
                     buffer,
                     (IM_OFFLINE == offline),
-                    ll_safe_string((char*)binary_bucket),   // session name
+                    bucket_text(binary_bucket, binary_bucket_size),   // session name
                     IM_SESSION_INVITE,
                     parent_estate_id,
                     region_id,
@@ -1749,10 +1764,22 @@ void LLIMProcessing::processNewMessage(LLUUID from_id,
             for (auto& panel : LLToastNotifyPanel::instance_snapshot())
             {
                 const std::string& notification_name = panel.getNotificationName();
-                if (notification_name == "OfferFriendship" && panel.isControlPanelEnabled())
+                LLNotificationPtr panel_notification = LLNotificationsUtil::find(panel.getID());
+                // Only a live actionable offer from this sender makes the packet a duplicate.
+                if (!panel.isDead()
+                    && notification_name == "OfferFriendship"
+                    && panel_notification
+                    && panel_notification->getPayload()["from_id"].asUUID() == from_id
+                    && panel.isControlPanelEnabled())
                 {
-                    add_notification = false;
-                    break;
+                    // Only an offer still open from this sender stands for this
+                    // one; another resident's says nothing of it.
+                    LLNotificationPtr open_offer = LLNotifications::instance().find(panel.getID());
+                    if (open_offer && open_offer->getPayload()["from_id"].asUUID() == from_id)
+                    {
+                        add_notification = false;
+                        break;
+                    }
                 }
             }
 

@@ -1,5 +1,5 @@
 {
-  "builtin-baseline": "0e5030f583a5427123cd3b714255e5ae62faa3ba",
+  "builtin-baseline": "93ad765c7b66ab9ce97469ec23a90b15c3a14ee5",
   "dependencies": [
     "alchemy-branding",
     "alchemy-dictionaries",
@@ -63,6 +63,14 @@
       ]
     },
     {
+      "name": "libdeflate",
+      "default-features": false,
+      "features": [
+        "compression",
+        "zlib"
+      ]
+    },
+    {
       "name": "libjpeg-turbo",
       "features": [
         "jpeg8"
@@ -87,7 +95,6 @@
       "platform": "linux"
     },
     "opengl-registry",
-    "openjpeg",
     {
       "name": "openssl",
       "features": [
@@ -157,13 +164,6 @@
     "xxhash",
     "zlib"
   ],
-  "overrides": [
-    {
-      "$comment": "HarfBuzz 14.5 is Unicode 18 and ICU 78 is Unicode 17; alfontshaping test 35 holds the two to one Unicode. Lift this with ICU's move to Unicode 18.",
-      "name": "harfbuzz",
-      "version": "14.4.0"
-    }
-  ],
   "features": {
     "discord": {
       "description": "Enable Discord rich presence through the Discord Social SDK",
@@ -211,12 +211,6 @@
         "hunspell"
       ]
     },
-    "kdu": {
-      "description": "Build with support for Kakadu JPEG2000",
-      "dependencies": [
-        "kdu"
-      ]
-    },
     "openal": {
       "description": "Build with support for the OpenAL Soft audio engine",
       "dependencies": [
@@ -235,10 +229,22 @@
         }
       ]
     },
+    "openjpeg": {
+      "description": "Build with OpenJPEG as the JPEG 2000 codec",
+      "dependencies": [
+        "openjpeg"
+      ]
+    },
     "openxr": {
       "description": "Build with support for OpenXR(experimental)",
       "dependencies": [
         "openxr-loader"
+      ]
+    },
+    "pnj2k": {
+      "description": "Build with pnj2k, the Rust JPEG 2000 codec",
+      "dependencies": [
+        "corrosion"
       ]
     },
     "sentry": {

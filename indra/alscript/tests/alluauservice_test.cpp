@@ -678,7 +678,7 @@ namespace
             hover = service.hover(script, 2, 18);  // touch_start, read
             REQUIRE(hover.found);
             UNSCOPED_INFO("and read: " + hover.label);
-            CHECK(hover.label.find("detected: {DetectedEvent}") != std::string::npos);
+            CHECK(hover.label.find("events: {DetectedEvent}") != std::string::npos);
         }
         std::string why;
         CHECK(service.setNewSolver(newSolver, why));
@@ -1787,7 +1787,7 @@ namespace
         UNSCOPED_INFO("the event's handler offered");
         REQUIRE(handler != nullptr);
         UNSCOPED_INFO("taking what the event gives");
-        CHECK(handler->text == std::string("function(detected: {DetectedEvent})"));
+        CHECK(handler->text == std::string("function(events: {DetectedEvent})"));
         UNSCOPED_INFO("a body to fill: " + handler->snippet);
         REQUIRE(handler->snippet.find("\n    $0\nend") != std::string::npos);
     }

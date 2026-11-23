@@ -756,6 +756,18 @@
    left="20"
    top_pad="5"
    width="200"/>
+  <check_box
+   control_name="StopMicCaptureWhenMuted"
+   enabled_control="EnableVoiceChat"
+   height="15"
+   follows="top|left"
+   tool_tip="Stops the microphone while you are muted, so a Bluetooth headset is not held in its call mode and in-world audio stays at full quality. Unmuting may then start with a brief hiss."
+   label="Stop microphone while muted"
+   layout="topleft"
+   name="stop_mic_capture_when_muted"
+   left="275"
+   top_pad="-15"
+   width="200"/>
   <button
    control_name="ShowDeviceSettings"
    enabled_control="EnableVoiceChat"

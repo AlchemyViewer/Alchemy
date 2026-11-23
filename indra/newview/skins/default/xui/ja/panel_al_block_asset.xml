@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel label="アセット一覧">
+	<scroll_list name="asset_list" tool_tip="現在ブロックしているアセットの一覧です。">
+		<scroll_list.columns name="name" label="名前"/>
+		<scroll_list.columns name="location" label="場所"/>
+		<scroll_list.columns name="asset_type" label="アセットの種類"/>
+		<scroll_list.columns name="date" label="日付"/>
+		<scroll_list.columns name="persist" label="種類"/>
+	</scroll_list>
+	<panel name="bottom_panel">
+		<button name="asset_trash_btn" label="復元" tool_tip="選択したアセットを復元します。"/>
+	</panel>
+</panel>

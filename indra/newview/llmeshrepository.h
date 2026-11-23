@@ -29,6 +29,7 @@
 
 #include <boost/unordered_map.hpp>
 #include <boost/unordered_set.hpp>
+#include "almeshuploadassets.h"
 #include "llassettype.h"
 #include "llmodel.h"
 #include "lluuid.h"
@@ -801,6 +802,13 @@ public:
     bool            mUploadSkin;
     bool            mUploadJoints;
     bool            mLockScaleIfJointPosition;
+    LLModel::EBlockPacking mBlockPacking;   // AlchemyMeshUploadPacking, read on the main thread
+    ALMeshFacePack::Weights mBlockWeights; // AlchemyMeshUploadRoundWeights, read on the main thread
+    // <SK:Nexii> Mesh uploader pivot: added to each base model's stored domains
+    typedef boost::unordered_map<const LLModel*, LLVector3> position_offsets_t;
+    position_offsets_t mPositionOffsets;
+    LLVector3       getPositionOffset(const LLModel* model) const;
+    // </SK:Nexii>
     volatile bool   mDiscarded;
 
     LLHost          mHost;
@@ -815,7 +823,9 @@ public:
                        const LLUUID destination_folder_id = LLUUID::null,
                        bool do_upload = true,
                        LLHandle<LLWholeModelFeeObserver> fee_observer = (LLHandle<LLWholeModelFeeObserver>()),
-                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                       LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                       std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr,
+                       const position_offsets_t& position_offsets = position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
     ~LLMeshUploadThread();
 
     bool finished() const { return mFinished; }
@@ -860,9 +870,25 @@ protected:
         bool include_textures
         );
 
+    // A fingerprint of what the model's asset is written from: each LOD's
+    // model and its faces' geometry, and the decomposition the hull is made
+    // from, as packModelIntance takes them from the model's first instance,
+    // and the offset its stored domains are shifted by.
+    static size_t assetSource(LLModel* base_model, const instance_list_t& instances, const LLVector3& position_offset);
+
+    // Whether the fee request's assets stand for every model this upload
+    // writes, written with its options from what it would write them from.
+    bool feeAssetsServe() const;
+
 private:
     LLHandle<LLWholeModelFeeObserver> mFeeObserverHandle;
     LLHandle<LLWholeModelUploadObserver> mUploadObserverHandle;
+
+    // A fee request's assets as it writes them; an upload's, from the fee
+    // request before it, and whether it sends them.
+    std::shared_ptr<ALMeshUploadAssets> mWrittenAssets;
+    std::shared_ptr<const ALMeshUploadAssets> mFeeAssets;
+    bool mSendFeeAssets = false;
 
     bool mDoUpload; // if false only model data will be requested, otherwise the model will be uploaded
     LLSD mModelData;
@@ -1008,7 +1034,9 @@ public:
                      const LLUUID& destination_folder_id = LLUUID::null,
                      bool do_upload = true,
                      LLHandle<LLWholeModelFeeObserver> fee_observer= (LLHandle<LLWholeModelFeeObserver>()),
-                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()));
+                     LLHandle<LLWholeModelUploadObserver> upload_observer = (LLHandle<LLWholeModelUploadObserver>()),
+                     std::shared_ptr<const ALMeshUploadAssets> fee_assets = nullptr,
+                     const LLMeshUploadThread::position_offsets_t& position_offsets = LLMeshUploadThread::position_offsets_t()); // <SK:Nexii> Mesh uploader pivot
 
     S32 getMeshSize(const LLUUID& mesh_id, S32 lod) const;
 

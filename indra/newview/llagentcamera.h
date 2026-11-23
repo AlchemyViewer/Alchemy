@@ -27,7 +27,11 @@
 #ifndef LL_LLAGENTCAMERA_H
 #define LL_LLAGENTCAMERA_H
 
+#include <array>
+
+#include "llflycam.h"
 #include "llfollowcam.h"            // Ventrella
+#include "llgamecontrol.h"          // LLGameControl::FLYCAM_NUM_CHANNELS
 #include "llhudeffectlookat.h"      // EPointAtType
 #include "llhudeffectpointat.h"     // ELookAtType
 
@@ -157,6 +161,7 @@ public:
     const LLVector3& getCameraUpVector() const { return mCameraUpVector; }
 private:
     LLVector3       getAvatarRootPosition();
+    void            setCameraSmoothingLastPositionGlobal(const LLVector3d& camera_position_global);
 
     F32             mCurrentCameraDistance;         // Current camera offset from avatar
     F32             mTargetCameraDistance;          // Target camera offset from avatar
@@ -167,6 +172,8 @@ private:
     LLVector3       mCameraVirtualPositionAgent;    // Camera virtual position (target) before performing FOV zoom
     LLVector3d      mCameraSmoothingLastPositionGlobal;
     LLVector3d      mCameraSmoothingLastPositionAgent;
+    LLVector3d      mCameraSmoothingLastFocusGlobal;
+    bool            mCameraSmoothingLastFocusValid;
     bool            mCameraSmoothingStop;
     LLVector3       mCameraLag;                     // Third person camera lag
     LLVector3       mCameraUpVector;                // Camera's up direction in world coordinates (determines the 'roll' of the view)
@@ -176,8 +183,94 @@ private:
     //--------------------------------------------------------------------
 public:
     bool            isfollowCamLocked();
+    void            notifyFollowCamParamsCleared();
 private:
     LLFollowCam     mFollowCam;             // Ventrella
+
+    //--------------------------------------------------------------------
+    // Flycam
+    //--------------------------------------------------------------------
+    // Free-flying camera engine (mFlycam + toggle state below), shared by two
+    // independent input sources that each feed it differently:
+    //   - game-control/keyboard: updateFlycam() + mFlycamKeyboard* state here.
+    //   - legacy NDOF joystick: applyNdofFlycamFrameDelta() below, called
+    //     from LLViewerJoystick, whose OWN per-axis tuning state
+    //     (mJoystickFlycamDelta/mJoystickFlycamLastDelta) lives over there,
+    //     not on this class.
+    // Orthogonal to mCameraMode above: while active it preempts
+    // updateCamera() entirely (driven by updateFlycam()/
+    // applyNdofFlycamFrameDelta() instead, called directly from the main
+    // loop), rather than being a peer state in that mode's own
+    // animated-transition machinery.
+public:
+    bool            isUsingFlycam() const { return mUsingFlycam; }
+    void            toggleFlycam();
+
+    // Game-control/keyboard-driven update -- see LLViewerJoystick::moveFlycam()
+    // for the other (legacy NDOF joystick) input source, below.
+    void            updateFlycam(F32 delta_time);
+    void            setFlycamKeyInput(U8 channel, F32 value) { mFlycamKeyboardInput[channel] = value; }
+    void            setFlycamKeyUnroll(bool unroll) { mFlycamKeyboardUnrollRequested = unroll; }
+    // Snapshots the live LLViewerCamera transform into the flycam. Used both
+    // when entering flycam (see toggleFlycam()) and whenever an input source
+    // (e.g. the NDOF joystick regaining focus) needs to recalibrate its own
+    // axis-delta state against the camera's current position/orientation.
+    void            resetFlycamToCurrentView();
+
+    // Entry point for input sources (the legacy NDOF joystick) that compute
+    // their own per-axis dead-zone/scale/feathering deltas and only need this
+    // class to own the resulting transform update + push to LLViewerCamera --
+    // see LLFlycam::applyFrameDelta() for the delta format.
+    void            applyNdofFlycamFrameDelta(const F32 local_delta[7],
+                                               bool auto_level, F32 auto_level_fraction,
+                                               bool direct_view, F32 direct_view_value);
+
+    // True when the self avatar should be hidden for a first-person view: in
+    // mouselook, unless flycam has since taken the camera out of the head (see
+    // mFlycamHidingAvatar). Use this rather than cameraMouselook() when deciding
+    // whether to render the self avatar.
+    bool            isHidingAvatarForFirstPerson() const;
+
+    // Hides the mouse cursor while in CONTROL_MODE_FLYCAM (when enabled by
+    // LLGameControl::isFlycamHideCursorEnabled()).  The cursor reappears while
+    // the mouse itself moves and hides again when its timeout expires: the
+    // timeout is reset to 5 seconds whenever the mouse moves and cut to at most
+    // 1 second whenever the flycam camera moves.  Restored on leaving the mode.
+    void            updateFlycamCursorVisibility(LLGameControl::AgentControlMode mode);
+private:
+    // Clears mFlycamHidingAvatar once the self avatar is completely out of the
+    // flycam's view, so it doesn't pop into existence on screen. Called after
+    // each flycam transform update.
+    void            updateFlycamAvatarVisibility();
+
+    LLFlycam        mFlycam;
+    bool            mUsingFlycam { false };
+    // Set when flycam is entered from mouselook: the camera starts inside the
+    // avatar's head, so the avatar stays hidden (as in mouselook) until
+    // updateFlycamAvatarVisibility() finds it out of view.
+    bool            mFlycamHidingAvatar { false };
+
+    // Keyboard's contribution to the shared/game-control flycam channels
+    // (blended with LLGameControl::getFlycamInputs() each frame in
+    // updateFlycam()) -- unrelated to the legacy joystick's own tuning state,
+    // which lives on LLViewerJoystick (mJoystickFlycamDelta/LastDelta).
+    std::array<F32, LLGameControl::FLYCAM_NUM_CHANNELS> mFlycamKeyboardInput {};
+    bool            mFlycamKeyboardUnrollRequested { false };
+
+    // updateFlycamCursorVisibility() state: mFlycamCursorHiding is true while
+    // FlyCam cursor hiding is in effect, mFlycamCursorHidden while the cursor is
+    // actually hidden by it.  Times are LLFrameTimer::getElapsedSeconds():
+    // mFlycamCursorMouseMoveTime is the last mouse move seen, and
+    // mFlycamCursorHideTime is when a visible cursor hides again.  The
+    // mFlycamCursorLast* values are the previous frame's flycam transform and
+    // view angle, used to detect flycam motion.
+    bool            mFlycamCursorHiding { false };
+    bool            mFlycamCursorHidden { false };
+    F64             mFlycamCursorMouseMoveTime { 0.0 };
+    F64             mFlycamCursorHideTime { 0.0 };
+    LLVector3d      mFlycamCursorLastPosition;
+    LLQuaternion    mFlycamCursorLastRotation;
+    F32             mFlycamCursorLastView { 0.f };
 
     //--------------------------------------------------------------------
     // Sit
@@ -235,6 +328,7 @@ private:
     LLVector3d      mCameraFocusOffsetTarget;       // Target towards which we are lerping the camera's focus offset
     bool            mFocusOnAvatar;
     bool            mAllowChangeToFollow;
+    F64             mLastValidFollowCamParamsTime;
     LLVector3d      mFocusGlobal;
     LLVector3d      mFocusTargetGlobal;
     LLPointer<LLViewerObject> mFocusObject;
@@ -282,6 +376,10 @@ public:
     //--------------------------------------------------------------------
 public:
     void            handleScrollWheel(F32 clicks);                          // Mousewheel driven zoom
+    // Mousewheel-equivalent camera distance change, minus the wheel-only Shift/Ctrl
+    // offset tweaks; 'clicks' may be fractional (e.g. per-frame gamepad "Scroll"
+    // input). Positive moves the camera out, same sign as handleScrollWheel().
+    void            scrollCamera(F32 clicks);
     void            cameraZoomIn(const F32 factor);                         // Zoom in by fraction of current distance
     F32             getCameraZoomFraction(bool get_third_person = false);   // Get camera zoom as fraction of minimum and maximum zoom
     void            setCameraZoomFraction(F32 fraction);                    // Set camera zoom as fraction of minimum and maximum zoom

@@ -33,7 +33,8 @@
 // every machine. AL_MESH_CORPUS_SHARD, as k/n, keeps the k-th of every n
 // files of that order, so that n runs share a corpus between them. Each LOD
 // a mesh's file holds is handed over with its faces as they are decoded,
-// before cacheOptimize, and whether the mesh is rigged. The assets are
+// before cacheOptimize, whether the mesh is rigged, and its block as it
+// unzipped and the compressed bytes the file stores it in. The assets are
 // other people's: nothing from them goes into the tree, and what a case
 // prints of them is counts and places in the sample.
 
@@ -75,6 +76,8 @@ namespace
         S32 lod = 0;     // 0 for the lowest, 3 for the high
         bool rigged = false;
         LLPointer<LLVolume> volume;
+        LLSD block;             // the LOD's block as it unzipped
+        S64 stored_bytes = 0;   // the block's size as the file stores it, compressed
     };
 
     struct CorpusCounts
@@ -262,6 +265,8 @@ namespace
                     continue;
                 }
                 ++mCounts.lods;
+                found.block = mdl;
+                found.stored_bytes = size;
                 visit(found);
             }
         }

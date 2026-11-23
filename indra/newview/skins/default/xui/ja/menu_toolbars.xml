@@ -12,4 +12,8 @@
 	<menu_item_check label="ボタンを右に寄せる　⭲" name="right_align"/>
 	<menu_item_check label="ボタンを上に寄せる　⭱" name="top_align"/>
 	<menu_item_check label="ボタンを下に寄せる　⭳" name="bottom_align"/>
+	<menu_item_check name="auto_hide_left" label="左のツールバーを自動的に隠す"/>
+	<menu_item_check name="auto_hide_right" label="右のツールバーを自動的に隠す"/>
+	<menu_item_check name="auto_hide_bottom" label="下のツールバーを自動的に隠す"/>
+	<menu_item_check name="auto_hide_top" label="上のツールバーを自動的に隠す"/>
 </context_menu>

@@ -372,6 +372,9 @@ private:
     // script is now, and the source shown in its place.
     void                      dropExpanded(Doc& doc) override;
     void                      toggleExpanded();
+    // Whether the tab has no expansion until asked for one, and can have
+    // one: a file of a script (QK6).
+    static bool               expandsOnAsking(const Doc& doc);
     // A view of the tab put in front, and the pane, the bars and the
     // toolbar shown as it now is; the keyboard with it where asked, or
     // where the view it replaces had it.
@@ -815,6 +818,7 @@ private:
     void openMasterFile(const std::string& path, bool lua) override;
     void closeTab(Doc& doc) override;
     void askLinkUnsaved(const Doc& doc, const std::string& path, std::function<void(ALScriptStudioMasters::Unsaved answer)> answered) override;
+    void askTakeWorldUnsaved(const Doc& doc, const std::string& name, std::function<void()> yes) override;
     void editMasterFile(const std::string& path, bool lua) override;
     bool heldByBridge(const ALScriptRef& ref) override;
     void loadWorldText(const ALScriptRef& ref, std::function<void(const ALScriptLoaded& loaded)> loaded) override;

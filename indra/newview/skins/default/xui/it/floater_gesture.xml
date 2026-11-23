@@ -9,10 +9,23 @@
 	<floater.string name="copy_name">
 		Copia di [COPY_NAME]
 	</floater.string>
+	<floater.string name="never_used">---</floater.string>
+	<floater.string name="last_used_seconds">[COUNT]s</floater.string>
+	<floater.string name="last_used_minutes">[COUNT]min</floater.string>
+	<floater.string name="last_used_hours">[COUNT]h</floater.string>
+	<floater.string name="last_used_days">[COUNT]g</floater.string>
+	<floater.string name="no_gestures">Nessuna gesture</floater.string>
+	<floater.string name="no_matching_gestures">Nessuna gesture corrispondente</floater.string>
+	<floater.string name="menu_activate">Attiva</floater.string>
+	<floater.string name="menu_deactivate">Disattiva</floater.string>
+	<floater.string name="menu_play">Play</floater.string>
+	<floater.string name="menu_stop">Stop</floater.string>
+	<filter_editor label="Filtra per nome, chat o tasto" name="gesture_filter" tool_tip="Filtra le gesture per nome, parole chiave in chat o tasto di scelta rapida"/>
 	<scroll_list name="gesture_list">
 		<scroll_list.columns label="Nome" name="name"/>
 		<scroll_list.columns label="Chat" name="trigger"/>
 		<scroll_list.columns label="Pulsante" name="shortcut"/>
+		<scroll_list.columns label="Ultimo" name="last_used" tool_tip="Tempo trascorso dall&apos;ultimo utilizzo in questa sessione. Memorizza le 1.024 gesture usate più di recente. Fai clic per ordinare."/>
 	</scroll_list>
 	<panel label="bottom_panel" name="bottom_panel">
 		<menu_button name="gear_btn" tool_tip="Altre opzioni"/>
@@ -20,7 +33,7 @@
 		<button name="activate_btn" tool_tip="Attiva/Disattiva gesture selezionata"/>
 		<button name="del_btn" tool_tip="Elimina questa gesture"/>
 	</panel>
-	<button label="Modifica" name="edit_btn" tool_tip="Apri la finestra per modificare il movimento selezionato."/>
+	<button label="Apri" name="edit_btn" tool_tip="Apri la finestra per modificare il movimento selezionato."/>
 	<button label="Play" name="play_btn" tool_tip="Esegui il movimento selezionato nel mondo virtuale."/>
 	<button label="Stop" name="stop_btn"/>
 </floater>

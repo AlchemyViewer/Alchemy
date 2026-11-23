@@ -41,15 +41,26 @@
  * All replace the old fixed 5-tap-with-4x-centre-plus-Y-jitter kernel, which was really a
  * box with dithered snapping (hence the characteristic blocky edge).
  *
- * BIAS. Receiver-plane depth bias (SHADOW_RPDB): the per-pixel depth slope in shadow space,
- * solved from the screen-space derivatives of the receiver position, so a tap offset by N
- * texels compares against the depth the receiver plane actually has there. This is what lets
- * the constant depth bias stay small without acne, and removes the acne/peter-panning
- * tradeoff a single global bias forces. The derivatives are taken ONCE at the top of the
- * public samplers, in uniform control flow -- dFdx/dFdy inside the divergent cascade `if`s
- * would be undefined -- then transformed into each cascade's light space by plain matrix
- * math (legal in a branch; it is not a derivative). The normal-offset push and constant bias
- * are retained; with RPDB active the constant (RenderShadowBias) can be tuned down.
+ * BIAS. The fixed kernels (the gather and compare-tap paths) push the receiver out along its
+ * normal before they look it up (shadowMapPosition): by their reach in texels of the map it is
+ * looked up in, there, times the sine between the normal and the map's ray. That is how far a
+ * texel the kernel reads can lie behind the receiver's own surface at that slant, so a surface at
+ * any slant to the light compares lit against itself, and the push follows the surface's normal
+ * as its vertices interpolate it, smooth across the facets of a curved one. They take no
+ * receiver-plane slope: a
+ * slope is constant across each facet, so carried over a kernel it shadows a curved surface of
+ * flat facets a facet at a time, falling short of the facet's plane where it is bounded and
+ * running past a near occluder where it is not, both the more where the map's texels are long.
+ *
+ * PCSS, whose penumbra reaches SHADOW_PCSS_MAX_RADIUS texels, a push that far would lift every
+ * receiver off its contact shadow, takes the receiver-plane depth bias instead (SHADOW_RPDB): the
+ * per-pixel depth slope in shadow space, solved from the screen-space derivatives of the receiver
+ * position, so a tap offset by N texels compares against the depth the receiver plane has there.
+ * The derivatives are taken ONCE at the top of the public samplers, in uniform control flow --
+ * dFdx/dFdy inside the divergent cascade `if`s would be undefined -- then transformed into each
+ * cascade's light space by plain matrix math (legal in a branch; it is not a derivative). Every
+ * tier keeps the constant bias (RenderShadowBias) and the offsets RenderShadowOffset and
+ * RenderSpotShadowOffset set.
  *
  * DEPTH CONVENTION. The hardware-compare paths (gather and SampleCmp) are byte-identical
  * across conventions: under reverse-Z the C++ side (a) sets the shadow sampler compare func
@@ -60,9 +71,7 @@
  * shadow_clip) is view-space and convention-independent, and RPDB's dz_texel is measured in
  * whichever z space shadow_matrix produced, so it follows automatically. Only PCSS, which
  * reads raw depth and does its own comparisons, has to branch: see compareDepth4,
- * findBlockerDepth and the penumbra-radius gap below. The hardware-compare paths branch once,
- * for the half texel of slope a compare shares between texels it does not centre on, which they
- * move toward lit by SHADOW_TOWARD_LIT.
+ * findBlockerDepth and the penumbra-radius gap below.
  */
 
 // ---- filter configuration (override from the global defines to retune without editing) ----
@@ -74,10 +83,7 @@
                                 // Compare-tap fallback: 3 or 5.
 #endif
 #ifndef SHADOW_RPDB
-#define SHADOW_RPDB 1           // receiver-plane depth bias
-#endif
-#ifndef SHADOW_RPDB_MAXBIAS
-#define SHADOW_RPDB_MAXBIAS 0.01 // cap on |per-texel z bias| (normalized depth) -- silhouette guard
+#define SHADOW_RPDB 1           // receiver-plane depth bias, under PCSS
 #endif
 
 // ---- PCSS (contact-hardening) configuration ----
@@ -107,11 +113,13 @@
 #define AL_SHADOW_SAMPLER sampler2DShadow  // hardware depth compare
 #endif
 
-// The way a compare reference moves toward lit: to smaller depths forward, larger under reverse-Z.
-#ifdef REVERSE_Z
-#define SHADOW_TOWARD_LIT 1.0
+// How far from the receiver a texel the fixed kernels compare reaches, in texels: half their width, and the half texel
+// a texel's centre lies from its edge.
+#if SHADOW_PCF_GATHER
+#define SHADOW_KERNEL_REACH (float(SHADOW_PCF_KERNEL) * 0.5 + 0.5)
 #else
-#define SHADOW_TOWARD_LIT -1.0
+// The compare taps' bilinear footprints: a texel past the 3x3 or 5x5 window on each side.
+#define SHADOW_KERNEL_REACH (SHADOW_PCF_KERNEL <= 3 ? 2.0 : 3.0)
 #endif
 
 uniform sampler2D   normalMap;
@@ -158,8 +166,15 @@ bool shadowMapBuilt(int map)
 }
 
 // Solve the shadow-space depth gradient from the receiver's screen-space derivatives and
-// return it as a per-texel (du,dv) depth step, clamped so a runaway gradient at a depth
-// discontinuity cannot punch a light-leak hole. duv*/dz* are already post-perspective-divide.
+// return it as a per-texel (du,dv) depth step. duv*/dz* are already post-perspective-divide.
+//
+// The step is the receiver's own however steep, and is not bounded: the derivatives lie along
+// one surface, a forward pass's across one triangle and the sun pass's where they keep to the
+// surface the pixel shows (surfaceDerivatives), so no depth discontinuity reaches the solve. A
+// texel's depth step has no fixed scale either. The sun's perspective fits lengthen a texel along
+// their axis with the square of its distance from their origin, so a surface a few metres out at
+// a slant to the light steps several hundredths of the depth range a texel, and a bound on it
+// would carry the taps short of the plane, the shortfall shadowing the surface by itself.
 vec2 receiverPlaneDepthBias(vec2 duvdx, vec2 duvdy, float dzdx, float dzdy, vec2 texel)
 {
     // [ du/dx  dv/dx ] (dz/du)   (dz/dx)
@@ -175,8 +190,7 @@ vec2 receiverPlaneDepthBias(vec2 duvdx, vec2 duvdy, float dzdx, float dzdy, vec2
         dz_duv.x = ( duvdy.y * dzdx - duvdx.y * dzdy) * inv;
         dz_duv.y = (-duvdy.x * dzdx + duvdx.x * dzdy) * inv;
     }
-    vec2 dz_texel = dz_duv * texel;
-    return clamp(dz_texel, vec2(-SHADOW_RPDB_MAXBIAS), vec2(SHADOW_RPDB_MAXBIAS));
+    return dz_duv * texel;
 }
 
 #if SHADOW_PCSS
@@ -240,14 +254,28 @@ vec4 compareDepth4(vec4 depth, float ref)
     return compareDepth4(depth, vec4(ref));
 }
 
-// The compare reference of each texel textureGather reads at `at`: the receiver's depth carried along its plane to the
-// texel's centre, in the gather's order (.x (0,1), .y (1,1), .z (1,0), .w (0,0) from the lower-left texel). Those
-// centres lie up to a texel from `at` on each axis, so one reference for all four would leave a texel a texel's slope
-// off its plane, and a slope steeper than the constant bias shadow the receiver by itself.
-vec4 gatherRefs(vec3 uvz, vec2 res, vec2 at, vec2 dz_texel)
+// The texels a gather about `at` reads, as the index of the lower-left one: floor(at * res - 0.5). Gather them at
+// gatherCentre's point, not at `at`. The hardware takes that floor in fixed point, a few bits under the texel, so a
+// point within a fraction of a texel centre of where it steps can read the block beside the one the shader took, every
+// compare then a texel's slope off its plane; at the block's centre it is half a texel from either step.
+vec2 gatherLowerLeft(vec2 at, vec2 res)
 {
-    vec2  lower_left = floor(at * res - 0.5) + 0.5 - uvz.xy * res;
-    float ref        = uvz.z + dot(lower_left, dz_texel);
+    return floor(at * res - 0.5);
+}
+
+vec2 gatherCentre(vec2 lower_left, vec2 res)
+{
+    return (lower_left + 1.0) / res;
+}
+
+// The compare reference of each texel of the gather whose lower-left texel is `lower_left`: the receiver's depth
+// carried along its plane to the texel's centre, in the gather's order (.x (0,1), .y (1,1), .z (1,0), .w (0,0) from
+// the lower-left texel). Those centres lie up to a texel from the gather's point on each axis, so one reference for
+// all four would leave a texel a texel's slope off its plane, and a slope steeper than the constant bias shadow the
+// receiver by itself.
+vec4 gatherRefs(vec3 uvz, vec2 res, vec2 lower_left, vec2 dz_texel)
+{
+    float ref = uvz.z + dot(lower_left + 0.5 - uvz.xy * res, dz_texel);
     return vec4(ref + dz_texel.y, ref + dz_texel.x + dz_texel.y, ref + dz_texel.x, ref);
 }
 
@@ -268,11 +296,11 @@ float findBlockerDepth(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     for (int i = 0; i < 8; ++i)
     {
         vec2 off = pcssRotate(kPCSSBlockerDisc[i], cs) * SHADOW_PCSS_SEARCH;
-        vec2 at  = uvz.xy + off / res;
-        vec4 d   = textureGather(shadowMap, at, 0);
+        vec2 ll  = gatherLowerLeft(uvz.xy + off / res, res);
+        vec4 d   = textureGather(shadowMap, gatherCentre(ll, res), 0);
         // Follow the receiver plane out to each texel, exactly as the filter does, so a sloped
         // receiver is not mistaken for its own blocker.
-        vec4 ref = gatherRefs(uvz, res, at, dz_texel);
+        vec4 ref = gatherRefs(uvz, res, ll, dz_texel);
 
         // 1 where the texel is closer to the light: smaller depth forward, larger under
         // reverse-Z (near=1, far=0).
@@ -323,9 +351,9 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
     {
         vec2 unit = kPCSSFilterDisc[i];
         vec2 off  = pcssRotate(unit, cs) * radius;
-        vec2 at   = uvz.xy + off * texel;
-        vec4 d    = textureGather(shadowMap, at, 0);
-        vec4 ref  = gatherRefs(uvz, res, at, dz_texel);
+        vec2 ll   = gatherLowerLeft(uvz.xy + off * texel, res);
+        vec4 d    = textureGather(shadowMap, gatherCentre(ll, res), 0);
+        vec4 ref  = gatherRefs(uvz, res, ll, dz_texel);
 
         // Smooth radial falloff, zero at the disc edge. The Vogel points are area-uniform, so
         // this is the whole kernel shape -- and because it reaches zero, a tap does not pop in
@@ -343,9 +371,8 @@ float filterShadowPCSS(sampler2D shadowMap, vec3 uvz, vec2 res, vec2 dz_texel, v
 
 #if SHADOW_PCF_GATHER
 
-// Gather-compare Gaussian PCF. uvz = post-divide (u, v, z); res = shadow map resolution;
-// dz_texel = receiver-plane depth step per texel (0 when RPDB is off).
-float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_texel)
+// Gather-compare Gaussian PCF. uvz = post-divide (u, v, z); res = shadow map resolution.
+float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res)
 {
     const int K = SHADOW_PCF_KERNEL;
     vec2 texel = 1.0 / res;
@@ -372,11 +399,6 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
         wy[i] = max(0.0, exp(-dy * dy * inv2s2) - pedestal);
     }
 
-    // The hardware compares a block's four texels against one ref, the plane's depth at the block's centre, which each
-    // texel's centre lies half a texel off on both axes: moved toward lit by the most that leaves one, so a slope steeper
-    // than the constant bias does not shadow half of every block.
-    float block_slope = SHADOW_TOWARD_LIT * 0.5 * (abs(dz_texel.x) + abs(dz_texel.y));
-
     float shadow = 0.0;
     float wsum   = 0.0;
     for (int by = 0; by < K; by += 2)
@@ -386,10 +408,7 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
             // Gather the 2x2 block whose lower-left texel index is (base+bx, base+by): the
             // gather point is that block's centre, so floor(P*res - 0.5) lands on it.
             vec2 P = (base + vec2(float(bx), float(by)) + 1.0) * texel;
-            // One compare ref per block, RPDB-shifted by the block centre's texel offset.
-            vec2 blockOff = (base + vec2(float(bx), float(by)) + 1.0) - c;
-            float ref = uvz.z + dot(blockOff, dz_texel) + block_slope;
-            vec4 g = textureGather(shadowMap, P, ref);
+            vec4 g = textureGather(shadowMap, P, uvz.z);
             // textureGather order: .x=(0,1) .y=(1,1) .z=(1,0) .w=(0,0), relative to the block.
             shadow += g.w * (wx[bx]     * wy[by]);
             shadow += g.z * (wx[bx + 1] * wy[by]);
@@ -403,19 +422,15 @@ float filterShadowGather(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_
 
 #else // !SHADOW_PCF_GATHER
 
-// Depth-compare tap with the receiver-plane bias folded into the compare ref. off is the
-// tap's texel offset from the receiver. The hardware filters the four texels about the tap
-// against that one ref, each up to a texel off it on both axes, so the ref moves toward lit
-// by that texel's slope.
-float cmpTap(sampler2DShadow shadowMap, vec2 uv, float z, vec2 off, vec2 dz_texel)
+// Depth-compare tap at the receiver's depth.
+float cmpTap(sampler2DShadow shadowMap, vec2 uv, float z)
 {
-    float slope = SHADOW_TOWARD_LIT * (abs(dz_texel.x) + abs(dz_texel.y));
-    return texture(shadowMap, vec3(uv, z + dot(off, dz_texel) + slope));
+    return texture(shadowMap, vec3(uv, z));
 }
 
 // Optimized bilinear PCF (Castano/MJP): fixed compare taps whose hardware 2x2 footprints
 // reconstruct a KxK tent. Fallback for SHADOW_PCF_GATHER == 0.
-float filterShadowSampleCmp(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 dz_texel)
+float filterShadowSampleCmp(sampler2DShadow shadowMap, vec3 uvz, vec2 res)
 {
     vec2  texel   = 1.0 / res;
     vec2  uv      = uvz.xy * res;
@@ -433,10 +448,10 @@ float filterShadowSampleCmp(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 
     float v0  = (2.0 - t) / vw0 - 1.0, v1 = t / vw1 + 1.0;
 
     float sum = 0.0;
-    sum += uw0 * vw0 * cmpTap(shadowMap, base_uv + vec2(u0, v0) * texel, z, vec2(u0 - s, v0 - t), dz_texel);
-    sum += uw1 * vw0 * cmpTap(shadowMap, base_uv + vec2(u1, v0) * texel, z, vec2(u1 - s, v0 - t), dz_texel);
-    sum += uw0 * vw1 * cmpTap(shadowMap, base_uv + vec2(u0, v1) * texel, z, vec2(u0 - s, v1 - t), dz_texel);
-    sum += uw1 * vw1 * cmpTap(shadowMap, base_uv + vec2(u1, v1) * texel, z, vec2(u1 - s, v1 - t), dz_texel);
+    sum += uw0 * vw0 * cmpTap(shadowMap, base_uv + vec2(u0, v0) * texel, z);
+    sum += uw1 * vw0 * cmpTap(shadowMap, base_uv + vec2(u1, v0) * texel, z);
+    sum += uw0 * vw1 * cmpTap(shadowMap, base_uv + vec2(u0, v1) * texel, z);
+    sum += uw1 * vw1 * cmpTap(shadowMap, base_uv + vec2(u1, v1) * texel, z);
     return sum * (1.0 / 16.0);
 #else
     // 5x5, nine weighted taps.
@@ -446,15 +461,15 @@ float filterShadowSampleCmp(sampler2DShadow shadowMap, vec3 uvz, vec2 res, vec2 
     float v0  = (3.0 - 2.0 * t) / vw0 - 2.0, v1 = (3.0 + t) / vw1, v2 = t / vw2 + 2.0;
 
     float sum = 0.0;
-    sum += uw0 * vw0 * cmpTap(shadowMap, base_uv + vec2(u0, v0) * texel, z, vec2(u0 - s, v0 - t), dz_texel);
-    sum += uw1 * vw0 * cmpTap(shadowMap, base_uv + vec2(u1, v0) * texel, z, vec2(u1 - s, v0 - t), dz_texel);
-    sum += uw2 * vw0 * cmpTap(shadowMap, base_uv + vec2(u2, v0) * texel, z, vec2(u2 - s, v0 - t), dz_texel);
-    sum += uw0 * vw1 * cmpTap(shadowMap, base_uv + vec2(u0, v1) * texel, z, vec2(u0 - s, v1 - t), dz_texel);
-    sum += uw1 * vw1 * cmpTap(shadowMap, base_uv + vec2(u1, v1) * texel, z, vec2(u1 - s, v1 - t), dz_texel);
-    sum += uw2 * vw1 * cmpTap(shadowMap, base_uv + vec2(u2, v1) * texel, z, vec2(u2 - s, v1 - t), dz_texel);
-    sum += uw0 * vw2 * cmpTap(shadowMap, base_uv + vec2(u0, v2) * texel, z, vec2(u0 - s, v2 - t), dz_texel);
-    sum += uw1 * vw2 * cmpTap(shadowMap, base_uv + vec2(u1, v2) * texel, z, vec2(u1 - s, v2 - t), dz_texel);
-    sum += uw2 * vw2 * cmpTap(shadowMap, base_uv + vec2(u2, v2) * texel, z, vec2(u2 - s, v2 - t), dz_texel);
+    sum += uw0 * vw0 * cmpTap(shadowMap, base_uv + vec2(u0, v0) * texel, z);
+    sum += uw1 * vw0 * cmpTap(shadowMap, base_uv + vec2(u1, v0) * texel, z);
+    sum += uw2 * vw0 * cmpTap(shadowMap, base_uv + vec2(u2, v0) * texel, z);
+    sum += uw0 * vw1 * cmpTap(shadowMap, base_uv + vec2(u0, v1) * texel, z);
+    sum += uw1 * vw1 * cmpTap(shadowMap, base_uv + vec2(u1, v1) * texel, z);
+    sum += uw2 * vw1 * cmpTap(shadowMap, base_uv + vec2(u2, v1) * texel, z);
+    sum += uw0 * vw2 * cmpTap(shadowMap, base_uv + vec2(u0, v2) * texel, z);
+    sum += uw1 * vw2 * cmpTap(shadowMap, base_uv + vec2(u1, v2) * texel, z);
+    sum += uw2 * vw2 * cmpTap(shadowMap, base_uv + vec2(u2, v2) * texel, z);
     return sum * (1.0 / 144.0);
 #endif
 }
@@ -478,6 +493,41 @@ float filterShadowSingleTap(AL_SHADOW_SAMPLER shadowMap, vec3 uvz)
     return compareDepth4(vec4(texture(shadowMap, uvz.xy).r), uvz.z).x;
 #else
     return texture(shadowMap, uvz);
+#endif
+}
+
+// Where the receiver at `pos` is looked up in the map `m` takes to texture space, and the derivatives' images the
+// receiver-plane bias solves from (shadowUtil's BIAS note). The fixed kernels push it out along `norm` and take no
+// slope; PCSS takes it where it is and its derivatives as they are.
+//
+// The push is what a kernel reaching SHADOW_KERNEL_REACH texels about the receiver needs. A receiver whose normal
+// leans by angle t from the map's ray rises toward the light by tan t a unit along `side`, the normal's part across
+// the map, so the farthest texel the kernel reads, R along `side` from the receiver, holds its surface R tan t nearer
+// the light than the receiver; moved R sin t out along the normal, the receiver lies past that, and past every texel
+// nearer. R is the kernel's reach along `side`: its reach in texels times a texel's length along it, which a
+// perspective fit makes many times the length across. The map's own gradients give all of it, whatever its
+// projection: u and v change at gu and gv an eye-space unit at `pos`, square to the ray.
+void shadowMapPosition(mat4 m, vec3 pos, vec3 norm, vec2 res, vec3 dpos_dx, vec3 dpos_dy,
+                       out vec4 lpos, out vec4 dLdx, out vec4 dLdy)
+{
+#if SHADOW_PCSS
+    lpos = m * vec4(pos, 1.0);
+    dLdx = m * vec4(dpos_dx, 0.0);
+    dLdy = m * vec4(dpos_dy, 0.0);
+#else
+    vec4 at   = m * vec4(pos, 1.0);
+    vec3 gw   = vec3(m[0][3], m[1][3], m[2][3]);
+    vec3 gu   = (vec3(m[0][0], m[1][0], m[2][0]) - gw * (at.x / at.w)) / at.w;
+    vec3 gv   = (vec3(m[0][1], m[1][1], m[2][1]) - gw * (at.y / at.w)) / at.w;
+    vec3 ray  = normalize(cross(gu, gv));
+    vec3 n    = norm * inversesqrt(max(dot(norm, norm), 1e-20));
+    // Of length sin t: R sin t is then each axis's texel along it, |g . side| / (|g|^2 res), times the reach.
+    vec3 side = n - ray * dot(n, ray);
+    float push = SHADOW_KERNEL_REACH * (abs(dot(gu, side)) / (dot(gu, gu) * res.x) +
+                                        abs(dot(gv, side)) / (dot(gv, gv) * res.y));
+    lpos = m * vec4(pos + n * push, 1.0);
+    dLdx = vec4(0.0);
+    dLdy = vec4(0.0);
 #endif
 }
 
@@ -505,6 +555,7 @@ float filterShadow(AL_SHADOW_SAMPLER shadowMap, vec4 lpos, vec4 dLdx, vec4 dLdy,
         return filterShadowSingleTap(shadowMap, uvz);
     }
 
+#if SHADOW_PCSS
     vec2 dz_texel = vec2(0.0, 0.0);
 #if SHADOW_RPDB
     // post-perspective-divide derivatives of (u, v, z)
@@ -514,22 +565,21 @@ float filterShadow(AL_SHADOW_SAMPLER shadowMap, vec4 lpos, vec4 dLdx, vec4 dLdy,
     float dzdy  = (dLdy.z  - uvz.z  * dLdy.w) / w;
     dz_texel = receiverPlaneDepthBias(duvdx, duvdy, dzdx, dzdy, 1.0 / res);
 #endif
-
-#if SHADOW_PCSS
     return filterShadowPCSS(shadowMap, uvz, res, dz_texel, pos_screen);
 #elif SHADOW_PCF_GATHER
-    return filterShadowGather(shadowMap, uvz, res, dz_texel);
+    return filterShadowGather(shadowMap, uvz, res);
 #else
-    return filterShadowSampleCmp(shadowMap, uvz, res, dz_texel);
+    return filterShadowSampleCmp(shadowMap, uvz, res);
 #endif
 }
 
 #endif // SUN_SHADOW || SPOT_SHADOW
 
 #if defined(SUN_SHADOW)
-// The sun's cascades for a receiver whose screen-space derivatives the caller took in uniform
-// control flow, before anything it branches on, so the per-cascade receiver-plane bias is
-// well-defined.
+// The sun's cascades for a receiver of normal `norm`, whose screen-space derivatives the caller
+// took in uniform control flow, before anything it branches on, so the per-cascade
+// receiver-plane bias is well-defined. Each cascade looks the receiver up where
+// shadowMapPosition puts it for that cascade's map.
 float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3 dpos_dy)
 {
     float shadow = 0.0;
@@ -543,8 +593,6 @@ float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3
     shadow_pos += offset * shadow_offset * 2.0;
 
     vec4 spos = vec4(shadow_pos.xyz, 1.0);
-    vec4 ddx4 = vec4(dpos_dx, 0.0);
-    vec4 ddy4 = vec4(dpos_dy, 0.0);
     float const_bias = shadow_bias * 2.0;
 
     if (spos.z > -shadow_clip.w)
@@ -567,9 +615,9 @@ float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3
 
         if (!two_cascades && spos.z < near_split.z)
         {
-            lpos = shadow_matrix[3] * spos;
-            vec4 dLdx = shadow_matrix[3] * ddx4;
-            vec4 dLdy = shadow_matrix[3] * ddy4;
+            vec4 dLdx;
+            vec4 dLdy;
+            shadowMapPosition(shadow_matrix[3], spos.xyz, norm, shadow_res, dpos_dx, dpos_dy, lpos, dLdx, dLdy);
 
             float w = 1.0;
             w -= max(spos.z - far_split.z, 0.0) / transition_domain.z;
@@ -580,9 +628,9 @@ float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3
 
         if (!two_cascades && spos.z < near_split.y && spos.z > far_split.z)
         {
-            lpos = shadow_matrix[2] * spos;
-            vec4 dLdx = shadow_matrix[2] * ddx4;
-            vec4 dLdy = shadow_matrix[2] * ddy4;
+            vec4 dLdx;
+            vec4 dLdy;
+            shadowMapPosition(shadow_matrix[2], spos.xyz, norm, shadow_res, dpos_dx, dpos_dy, lpos, dLdx, dLdy);
 
             float w = 1.0;
             w -= max(spos.z - far_split.y, 0.0) / transition_domain.y;
@@ -593,9 +641,9 @@ float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3
 
         if (spos.z < near_split.x && spos.z > far_split.y)
         {
-            lpos = shadow_matrix[1] * spos;
-            vec4 dLdx = shadow_matrix[1] * ddx4;
-            vec4 dLdy = shadow_matrix[1] * ddy4;
+            vec4 dLdx;
+            vec4 dLdy;
+            shadowMapPosition(shadow_matrix[1], spos.xyz, norm, shadow_res, dpos_dx, dpos_dy, lpos, dLdx, dLdy);
 
             float w = 1.0;
             w -= max(spos.z - far_split.x, 0.0) / transition_domain.x;
@@ -607,9 +655,9 @@ float directionalShadow(vec3 pos, vec3 norm, vec2 pos_screen, vec3 dpos_dx, vec3
 
         if (spos.z > far_split.x)
         {
-            lpos = shadow_matrix[0] * spos;
-            vec4 dLdx = shadow_matrix[0] * ddx4;
-            vec4 dLdy = shadow_matrix[0] * ddy4;
+            vec4 dLdx;
+            vec4 dLdy;
+            shadowMapPosition(shadow_matrix[0], spos.xyz, norm, shadow_res, dpos_dx, dpos_dy, lpos, dLdx, dLdy);
 
             float w = 1.0;
             w -= max(near_split.x - spos.z, 0.0) / transition_domain.x;
@@ -675,15 +723,14 @@ float spotShadow(vec3 pos, vec3 norm, int index, vec2 pos_screen, vec3 dpos_dx, 
     pos += norm * spot_shadow_offset;
 
     vec4 spos = vec4(pos, 1.0);
-    vec4 ddx4 = vec4(dpos_dx, 0.0);
-    vec4 ddy4 = vec4(dpos_dy, 0.0);
     float const_bias = spot_shadow_bias * 0.8;
 
     if (spos.z > -shadow_clip.w)
     {
-        vec4 lpos = shadow_matrix[4 + index] * spos;
-        vec4 dLdx = shadow_matrix[4 + index] * ddx4;
-        vec4 dLdy = shadow_matrix[4 + index] * ddy4;
+        vec4 lpos;
+        vec4 dLdx;
+        vec4 dLdy;
+        shadowMapPosition(shadow_matrix[4 + index], spos.xyz, norm, proj_shadow_res, dpos_dx, dpos_dy, lpos, dLdx, dLdy);
 
         // A sampler2DShadow cannot live in a local or a ternary (GLSL opaque type), so pick
         // the map by branch and pass it straight in.
@@ -752,7 +799,8 @@ void surfaceDerivatives(vec3 pos, vec3 geo_norm, out vec3 dpos_dx, out vec3 dpos
 }
 
 // A surface turned from the light (by the shading normal softenLightF lights it with) receives
-// none of it there whatever its shadow, so it takes 0 unfiltered.
+// none of it there whatever its shadow, so it takes 0 unfiltered. The shadow is looked up off
+// geo_norm, the surface's own normal, which a normal map has not moved.
 float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos_screen)
 {
 #if defined(SUN_SHADOW)
@@ -765,7 +813,7 @@ float sampleDirectionalShadowFacing(vec3 pos, vec3 norm, vec3 geo_norm, vec2 pos
     {
         return 0.0;
     }
-    return directionalShadow(pos, norm, pos_screen, dpos_dx, dpos_dy);
+    return directionalShadow(pos, geo_norm, pos_screen, dpos_dx, dpos_dy);
 #else
     return 1.0;
 #endif
@@ -785,7 +833,7 @@ float sampleSpotShadowInFrustum(vec3 pos, vec3 norm, vec3 geo_norm, int index, v
     vec3 dpos_dx;
     vec3 dpos_dy;
     surfaceDerivatives(pos, geo_norm, dpos_dx, dpos_dy);
-    return spotShadow(pos, norm, index, pos_screen, dpos_dx, dpos_dy, true);
+    return spotShadow(pos, geo_norm, index, pos_screen, dpos_dx, dpos_dy, true);
 #else
     return 1.0;
 #endif

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="menu_scene_explorer_view">
+	<menu_item_check name="sort_distance" label="距離で並べ替え"/>
+	<menu_item_check name="sort_region_origin" label="リージョンの原点からの距離で並べ替え" tool_tip="リージョンの&lt;0,0,0>の角からの距離で並べ替えます（移動しても順序が変わりません）"/>
+	<menu_item_check name="sort_name" label="名前で並べ替え"/>
+	<menu_item_check name="sort_land_impact" label="ランドインパクトで並べ替え"/>
+	<menu_item_check name="sort_triangles" label="三角形の数で並べ替え"/>
+	<menu_item_check name="sort_type" label="種類で並べ替え"/>
+	<menu_item_check name="selection_sync" label="選択をワールドと同期" tool_tip="ツリーとワールドの選択を連動させます：ビルドや調査を開いている間はツリーの行がワールドで選択され、ワールドで選択するとその行が強調表示されます"/>
+	<menu_item_call name="show_filters" label="フィルター…" tool_tip="すべてのフィルター（種類、機能、販売、範囲、重さ）を開きます"/>
+	<menu_item_call name="select_all_results" label="すべての結果を選択" tool_tip="現在のフィルターに一致するすべての行を選択し、返却や非表示などの一括操作に使えるようにします"/>
+	<menu_item_call name="reset_filters" label="フィルターをリセット"/>
+	<menu_item_call name="refresh" label="更新"/>
+	<menu_item_call name="copy_results" label="結果をクリップボードにコピー" tool_tip="絞り込んだ一覧をCSV（名前、所有者、LI、三角形、距離、UUID）としてコピーします"/>
+</toggleable_menu>

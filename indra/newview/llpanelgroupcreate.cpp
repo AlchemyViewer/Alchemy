@@ -110,8 +110,11 @@ void LLPanelGroupCreate::onOpen(const LLSD& key)
     addMembershipRow("Premium_Plus");
     addMembershipRow("Internal");// Present only if you are already in one, needed for testing
 
+    // Benefits the login never sent set no price, and a group is not offered at a price unknown.
     S32 cost = LLAgentBenefitsMgr::current().getCreateGroupCost();
-    mCreateButton->setLabelArg("[COST]", llformat("%d", cost));
+    const bool cost_known = cost >= 0;
+    mCreateButton->setLabelArg("[COST]", cost_known ? llformat("%d", cost) : LLTrans::getString("Unknown"));
+    mCreateButton->setEnabled(cost_known);
 }
 
 //static

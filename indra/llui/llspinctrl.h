@@ -48,6 +48,7 @@ public:
         Optional<bool> allow_text_entry;
         Optional<bool> allow_digits_only;
         Optional<bool> label_wrap;
+        Optional<bool> reverse_buttons;
 
         Optional<bool> scrub;
 
@@ -156,6 +157,7 @@ private:
     void            endScrub();
 
     S32             mPrecision;
+    bool            mReverseButtons;
     class LLTextBox*    mLabelBox;
 
     class LLLineEditor* mEditor;

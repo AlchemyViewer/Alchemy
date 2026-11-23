@@ -84,6 +84,13 @@ void ALFloaterProgressView::setShowProgress(bool visible)
     else
     {
         setVisible(false);
+        // Hiding the UI mid-teleport, or the camera reset on arrival hiding
+        // it again, remembers this floater as visible; showing the UI must
+        // not bring it back once the teleport is over.
+        if (gFloaterView)
+        {
+            gFloaterView->hiddenFloaterClosed(this);
+        }
     }
 }
 

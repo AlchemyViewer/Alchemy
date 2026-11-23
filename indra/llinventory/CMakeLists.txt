@@ -5,6 +5,7 @@ add_library(llinventory STATIC)
 target_sources(
   llinventory
   PRIVATE
+    alparcelupdate.cpp
     llcategory.cpp
     llfoldertype.cpp
     llinventory.cpp
@@ -29,6 +30,7 @@ target_sources(
   PUBLIC
     FILE_SET HEADERS
       FILES
+        alparcelupdate.h
         llcategory.h
         llfoldertype.h
         llinventory.h
@@ -61,7 +63,9 @@ if(AL_BUILD_TESTS)
     llinventory_tests
     PROJECT llinventory
     SOURCES
+      tests/alparcelupdate_test.cpp
       tests/inventorymisc_test.cpp
+      tests/llnotecard_test.cpp
       tests/llparcel_test.cpp
       tests/llpermissions_test.cpp
       tests/llsaleinfo_test.cpp

@@ -33,6 +33,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
+#include <fstream>
 
 namespace
 {
@@ -91,29 +92,134 @@ namespace
         CHECK(run.agentName.empty());
     }
 
-    TEST_CASE("alcrashreporter: consent is a sentinel file that allowing makes and withdrawing removes", "[alcrashreporter]")
+    // A directory of this run's own, since another run of the tests may be at
+    // it, removed with whatever the case left in it.
+    struct ConsentDirectory
     {
-        // A name of this run's own: another run of the tests may be at it.
-        const std::string sentinel =
-            (std::filesystem::temp_directory_path() / ("alcrashreporter_test_consent_" + LLUUID::generateNewID().asString())).string();
+        ConsentDirectory()
+            : path(std::filesystem::temp_directory_path() /
+                   ("alcrashreporter_test_consent_" + LLUUID::generateNewID().asString()))
+        {
+            std::filesystem::create_directories(path);
+        }
+        ~ConsentDirectory()
+        {
+            std::error_code ec;
+            std::filesystem::remove_all(path, ec);
+        }
+        bool has(const char* name) const { return std::filesystem::exists(path / name); }
+        void make(const char* name) const { std::ofstream(path / name) << "x\n"; }
+        std::string string() const { return path.string(); }
 
-        ALCrashReporter::recordConsent(sentinel, false);
-        UNSCOPED_INFO("absent to begin with");
-        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
+        std::filesystem::path path;
+    };
 
-        ALCrashReporter::recordConsent(sentinel, true);
-        UNSCOPED_INFO("present once allowed");
-        CHECK(ALCrashReporter::consentRecorded(sentinel));
-        ALCrashReporter::recordConsent(sentinel, true);
+    using Consent = ALCrashReporter::Consent;
+
+    TEST_CASE("alcrashreporter: the consent setting reads as its three answers and anything else as unasked", "[alcrashreporter]")
+    {
+        CHECK(ALCrashReporter::consentFromSetting(0) == Consent::Unasked);
+        CHECK(ALCrashReporter::consentFromSetting(1) == Consent::Allowed);
+        CHECK(ALCrashReporter::consentFromSetting(2) == Consent::Declined);
+        CHECK(ALCrashReporter::consentFromSetting(3) == Consent::Unasked);
+        CHECK(ALCrashReporter::consentFromSetting(-1) == Consent::Unasked);
+    }
+
+    TEST_CASE("alcrashreporter: consent is recorded as one file per answer and neither until asked", "[alcrashreporter]")
+    {
+        const ConsentDirectory directory;
+        UNSCOPED_INFO("unasked to begin with");
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Unasked);
+
+        ALCrashReporter::recordConsent(directory.string(), Consent::Allowed);
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Allowed);
+        CHECK(directory.has("crash_reports_allowed"));
+        CHECK_FALSE(directory.has("crash_reports_declined"));
         UNSCOPED_INFO("allowing twice keeps it");
-        CHECK(ALCrashReporter::consentRecorded(sentinel));
+        ALCrashReporter::recordConsent(directory.string(), Consent::Allowed);
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Allowed);
 
-        ALCrashReporter::recordConsent(sentinel, false);
-        UNSCOPED_INFO("gone once withdrawn");
-        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
-        ALCrashReporter::recordConsent(sentinel, false);
-        UNSCOPED_INFO("withdrawing twice is quiet");
-        CHECK_FALSE(ALCrashReporter::consentRecorded(sentinel));
+        ALCrashReporter::recordConsent(directory.string(), Consent::Declined);
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Declined);
+        UNSCOPED_INFO("declining removes the yes a build that knows only it would read");
+        CHECK_FALSE(directory.has("crash_reports_allowed"));
+        CHECK(directory.has("crash_reports_declined"));
+        UNSCOPED_INFO("declining twice keeps it");
+        ALCrashReporter::recordConsent(directory.string(), Consent::Declined);
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Declined);
+
+        ALCrashReporter::recordConsent(directory.string(), Consent::Allowed);
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Allowed);
+        CHECK_FALSE(directory.has("crash_reports_declined"));
+
+        ALCrashReporter::recordConsent(directory.string(), Consent::Unasked);
+        UNSCOPED_INFO("unasked again leaves neither");
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Unasked);
+        CHECK_FALSE(directory.has("crash_reports_allowed"));
+        CHECK_FALSE(directory.has("crash_reports_declined"));
+    }
+
+    TEST_CASE("alcrashreporter: a recorded yes from a build that knows one file reads as it did", "[alcrashreporter]")
+    {
+        const ConsentDirectory directory;
+        directory.make("crash_reports_allowed");
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Allowed);
+    }
+
+    TEST_CASE("alcrashreporter: both answers recorded at once read as unasked", "[alcrashreporter]")
+    {
+        // What a build that knows only the yes leaves when it allows over a
+        // recorded no: which came last is not knowable, and unasked sends
+        // nothing while keeping what it makes.
+        const ConsentDirectory directory;
+        directory.make("crash_reports_declined");
+        directory.make("crash_reports_allowed");
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Unasked);
+
+        ALCrashReporter::recordConsent(directory.string(), Consent::Declined);
+        UNSCOPED_INFO("a new answer leaves one file");
+        CHECK(ALCrashReporter::recordedConsent(directory.string()) == Consent::Declined);
+        CHECK_FALSE(directory.has("crash_reports_allowed"));
+    }
+
+    TEST_CASE("alcrashreporter: the crash logger switch is read from the command line as the settings apply it", "[alcrashreporter]")
+    {
+        using Arguments = std::vector<std::string>;
+        auto disabled = [](const Arguments& arguments) { return ALCrashReporter::crashLoggerDisabledBy(arguments); };
+
+        CHECK_FALSE(disabled({}));
+        CHECK(disabled({ "--disablecrashlogger" }));
+        CHECK(disabled({ "-disablecrashlogger" }));
+        CHECK(disabled({ "--grid", "agni", "--disablecrashlogger" }));
+
+        UNSCOPED_INFO("an option's value that only contains the name is no switch");
+        CHECK_FALSE(disabled({ "--logfile", "C:\\logs\\viewer-disablecrashlogger.log" }));
+        CHECK_FALSE(disabled({ "--disablecrashloggers" }));
+
+        UNSCOPED_INFO("--set takes the value as the setting reads a string");
+        CHECK(disabled({ "--set", "DisableCrashLogger", "1" }));
+        CHECK(disabled({ "--set", "DisableCrashLogger", "true" }));
+        CHECK(disabled({ "-set", "DisableCrashLogger", "TRUE" }));
+        CHECK(disabled({ "--set", "Global.DisableCrashLogger", "T" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "yes" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger" }));
+        CHECK_FALSE(disabled({ "--set", "OtherSetting", "1" }));
+
+        UNSCOPED_INFO("--set comes after the switch, the last one winning");
+        CHECK_FALSE(disabled({ "--disablecrashlogger", "--set", "DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "0", "--disablecrashlogger" }));
+        CHECK(disabled({ "--set", "DisableCrashLogger", "0", "--set", "DisableCrashLogger", "1" }));
+
+        UNSCOPED_INFO("--set=name takes the name from the option and the value from the next argument");
+        CHECK(disabled({ "--set=DisableCrashLogger", "1" }));
+        CHECK(disabled({ "-set=DisableCrashLogger", "true" }));
+        CHECK(disabled({ "--set=Global.DisableCrashLogger", "T" }));
+        CHECK_FALSE(disabled({ "--set=DisableCrashLogger", "0" }));
+        CHECK_FALSE(disabled({ "--set=DisableCrashLogger" }));
+        CHECK_FALSE(disabled({ "--set=OtherSetting", "1" }));
+        CHECK_FALSE(disabled({ "--set", "DisableCrashLogger", "1", "--set=DisableCrashLogger", "0" }));
+        CHECK(disabled({ "--set=DisableCrashLogger", "0", "--set", "DisableCrashLogger", "1" }));
     }
 
     TEST_CASE("alcrashreporter: a location written into a buffer is the same or cut to fit", "[alcrashreporter]")

@@ -48,6 +48,7 @@ public:
     void addMaterial(const LLUUID& id, LLFetchedGLTFMaterial* material);
     void removeMaterial(const LLUUID& id);
 
+    // Lets go of the materials nothing has used for a while, and fetches again the failed ones whose retry is due
     void flushMaterials();
 
     // Queue an modification of a material that we want to send to the simulator.  Call "flushUpdates" to flush pending updates.
@@ -97,8 +98,9 @@ public:
     static void queueUpdate(const LLSD& data);
 
     // Called by batch builder to give LLGLTMaterialList an opportunity to apply
-    // any override data that arrived before the object was ready to receive it
-    void applyQueuedOverrides(LLViewerObject* obj);
+    // any override data that arrived before the object was ready to receive it,
+    // and when a face's material completes, for that face (te).
+    void applyQueuedOverrides(LLViewerObject* obj, S32 te = -1);
 
     // Apply an override update with the given data
     void applyOverrideMessage(LLMessageSystem* msg, const std::string& data);
@@ -134,8 +136,28 @@ protected:
         S32 status,
         LLExtStat ext_status);
 
+    // Asks the asset storage for the material's asset; onAssetLoadComplete completes the fetch, at once where the
+    // storage answers at once
+    static void fetchAsset(const LLUUID& id, LLFetchedGLTFMaterial* material);
+
+    // Completes a fetch of the material listed under id. A failure is fetched again on ALGLTFMaterialRetry's schedule
+    // while the list holds the material under id; a success, or the last failure, ends it.
+    void onFetchComplete(const LLUUID& id, LLFetchedGLTFMaterial* material, bool success);
+
+    // Fetches again each failed material whose retry is due and that something besides the list uses
+    void retryFailedMaterials();
+
     typedef boost::unordered_map<LLUUID, LLPointer<LLFetchedGLTFMaterial>> uuid_mat_map_t;
     uuid_mat_map_t mList;
+
+    // The failed materials awaiting a retry, by ID, and when each is due. An entry holds no reference: a material the
+    // list lets go of meanwhile is let go of as it would be, and its entry, finding nothing when due, goes with it.
+    struct PendingRetry
+    {
+        LLUUID mID;
+        F64 mDue = 0.0;
+    };
+    std::vector<PendingRetry> mPendingRetries;
 
     typedef std::vector<LLPointer<LLGLTFMaterial> > override_list_t;
     typedef boost::unordered_map<LLUUID, override_list_t> queued_override_map_t;

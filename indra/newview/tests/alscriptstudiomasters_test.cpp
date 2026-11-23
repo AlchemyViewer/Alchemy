@@ -84,6 +84,12 @@ namespace
         }
         void send(const ALScriptRef& ref, ALMasterPlan::Send kind) override { sent.emplace_back(ref, kind); }
         void wrote(const std::string& path) override { written.push_back(path); }
+        void tookWorld(const std::string& path, const ALScriptRef& from, const LLUUID& asset, const std::string& text) override
+        {
+            took.emplace_back(path, from);
+            tookAssets.push_back(asset);
+            tookTexts.push_back(text);
+        }
         boost::signals2::connection onOutcome(std::function<void(const Outcome& outcome)> heard) override { return told.connect(std::move(heard)); }
         boost::signals2::connection onChanged(std::function<void()> heard) override { return changed.connect(std::move(heard)); }
         std::vector<Outcome>        takeUnheard() override
@@ -98,6 +104,9 @@ namespace
         ALMasterLinks                                           links;
         // What the masters asked beyond the links.
         std::vector<std::string>                                written;
+        std::vector<std::pair<std::string, ALScriptRef>>        took;
+        std::vector<LLUUID>                                     tookAssets;
+        std::vector<std::string>                                tookTexts;
         std::vector<std::pair<ALScriptRef, ALMasterPlan::Send>> sent;
         std::vector<Outcome>                                    unheard;
         boost::signals2::signal<void(const Outcome&)>           told;
@@ -172,6 +181,14 @@ namespace
                 answered(*answer);
             }
         }
+        void askTakeWorldUnsaved(const Doc& doc, const std::string& name, std::function<void()> yes) override
+        {
+            askedTake.push_back(doc.id + " " + name);
+            if (takeAnswer)
+            {
+                yes();
+            }
+        }
         void editMasterFile(const std::string& path, bool) override { edited.push_back(path); }
         void compare(Doc& doc, const std::string& left, const std::string& right, const std::string& left_title,
                      const std::string& right_title) override
@@ -204,6 +221,8 @@ namespace
         LLView&                                             parent;
         std::optional<std::string>                          picked;
         std::optional<Unsaved>                              answer;
+        bool                                                takeAnswer = true;
+        std::vector<std::string>                            askedTake;
         S32                                                 picks   = 0;
         S32                                                 notices = 0;
         S32                                                 made  = 0;
@@ -579,9 +598,10 @@ namespace
         }
         unit->offer(*lamp, "master_compare");
         ALScriptLoaded read;
-        read.ref  = other_ref;
-        read.name = "lamp";
-        read.text = "default { state_entry() {} }\n";
+        read.ref     = other_ref;
+        read.name    = "lamp";
+        read.text    = "default { state_entry() {} }\n";
+        read.assetId = LLUUID::generateNewID();
         studio->toLoad(read);
         {
             INFO("read: the file's tab beside what the world holds");
@@ -591,31 +611,86 @@ namespace
             CHECK(studio->compared.back().right == "default { state_entry() {} }\n");
         }
 
-        // Tapple's: Update File, the other way: what the world holds put in the file's tab, a step
-        // to undo, the file on disk written only by a save.
+        // Tapple's (QJ4, QK5): Update File, the other way: what the world holds written to the
+        // file at once and put in its tab, a step to undo, the script left as it is.
         unit->offer(*lamp, "master_take_world");
         studio->toLoad(read);
         {
-            INFO("the file's tab holds the world's text, not saved");
-            CHECK(lamp->editor->wholeText() == "default { state_entry() {} }\n");
-            CHECK(lamp->editor->isDirty());
-            CHECK(says(said().text, "MasterTookWorld"));
-            CHECK_FALSE(said().failure);
+            INFO("the file on disk holds the world's text");
             std::string on_disk;
             REQUIRE(ALFileRead::whole(in("lamp.lsl"), on_disk, ALDiskIncludes::MAX_BYTES));
-            CHECK(on_disk == "default {}\n");
+            CHECK(on_disk == "default { state_entry() {} }\n");
+        }
+        {
+            INFO("and its tab, clean, nothing asked");
+            CHECK(lamp->editor->wholeText() == "default { state_entry() {} }\n");
+            CHECK_FALSE(lamp->editor->isDirty());
+            CHECK(studio->askedTake.empty());
+            CHECK(says(said().text, "MasterTookWorld"));
+            CHECK_FALSE(said().failure);
+        }
+        {
+            INFO("the masters told of it, from the script, and nothing sent or written as a save");
+            REQUIRE(disk.took.size() == size_t(1));
+            CHECK(disk.took.back().first == in("lamp.lsl"));
+            CHECK(disk.took.back().second == other_ref);
+            INFO("with the world's asset and text, for the link to be of");
+            CHECK(disk.tookAssets.back() == read.assetId);
+            CHECK(disk.tookTexts.back() == read.text);
+            CHECK(disk.sent.empty());
+            CHECK(disk.written.empty());
         }
         lamp->editor->undo();
         {
-            INFO("undone: the file's text again");
+            INFO("undone: the file's text again in the tab, unsaved");
             CHECK(lamp->editor->wholeText() == "default {}\n");
+            CHECK(lamp->editor->isDirty());
         }
-        lamp->editor->redo();
+        unit->offer(*lamp, "master_take_world");
+        {
+            // Answered through a copy: the answer asks for the script again,
+            // which puts a new callback where this one was.
+            const auto answer = studio->toLoad;
+            answer(read);
+        }
+        {
+            INFO("typed in and not saved: asked first, naming the script, and read again once answered");
+            REQUIRE(studio->askedTake.size() == size_t(1));
+            CHECK(studio->askedTake.back() == lamp->id + " lamp");
+            CHECK(lamp->editor->wholeText() == "default {}\n");
+            CHECK(studio->loads.back() == other_ref);
+        }
+        ALScriptLoaded saved_meanwhile = read;
+        saved_meanwhile.text           = "default { touch_start(integer n) {} }\n";
+        saved_meanwhile.assetId        = LLUUID::generateNewID();
+        studio->toLoad(saved_meanwhile);
+        {
+            INFO("what the script holds as it is read again is what the file takes");
+            CHECK(lamp->editor->wholeText() == "default { touch_start(integer n) {} }\n");
+            CHECK_FALSE(lamp->editor->isDirty());
+            std::string on_disk;
+            REQUIRE(ALFileRead::whole(in("lamp.lsl"), on_disk, ALDiskIncludes::MAX_BYTES));
+            CHECK(on_disk == saved_meanwhile.text);
+            CHECK(disk.tookAssets.back() == saved_meanwhile.assetId);
+        }
+        lamp->editor->undo();
+        studio->takeAnswer = false;
         unit->offer(*lamp, "master_take_world");
         studio->toLoad(read);
         {
-            INFO("already the same: said, nothing more to undo");
+            INFO("cancelled: the tab as typed, nothing more told");
+            CHECK(lamp->editor->wholeText() == "default {}\n");
+            CHECK(disk.took.size() == size_t(2));
+        }
+        studio->takeAnswer = true;
+        lamp->editor->redo();
+        lamp->editor->resetDirty();
+        unit->offer(*lamp, "master_take_world");
+        studio->toLoad(saved_meanwhile);
+        {
+            INFO("already the same: said, the link put in step, nothing more to undo");
             CHECK(says(said().text, "MasterTookSame"));
+            CHECK(disk.took.size() == size_t(3));
             lamp->editor->undo();
             CHECK(lamp->editor->wholeText() == "default {}\n");
         }

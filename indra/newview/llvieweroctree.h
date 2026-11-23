@@ -272,9 +272,8 @@ public:
     typedef enum
     {
         OCCLUDED                = 0x00010000,
-        QUERY_PENDING           = 0x00020000,
+        QUERY_PENDING           = 0x00020000, ///< a query is out: set exactly while mOcclusionQuery holds its ticket
         ACTIVE_OCCLUSION        = 0x00040000,
-        DISCARD_QUERY           = 0x00080000,
         EARLY_FAIL              = 0x00100000,
     } eOcclusionState;
 
@@ -298,8 +297,20 @@ public:
 
     void setOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
     void clearOcclusionState(U32 state, S32 mode = STATE_MODE_SINGLE);
+    /// Lets the current camera's query of the group go unread: none is out after it, so nothing waits for its answer,
+    /// and the next doOcclusion() asks afresh.
+    void discardQuery() { endQuery(LLViewerCamera::sCurCameraID); }
+    /// discardQuery() for every camera.
+    void discardAllQueries();
     /// Reads back the last occlusion query, if any has come back. True where one has and found the group in view.
     bool checkOcclusion();
+    /// Whether the camera stands in the group's box, widened as a query's is, `shift` taking the box to the camera's
+    /// space: such a group is asked nothing, and taken as seen (doOcclusion).
+    bool holdsCamera(LLCamera* camera, const LLVector4a* shift = NULL);
+    /// Takes the group for seen with the groups below it, as doOcclusion takes a box it asks nothing of: drops its query
+    /// and the stale ones below, and clears OCCLUDED here and below, which the walks below stop doing at a group no
+    /// longer hidden.
+    void takeForSeen();
     void doOcclusion(LLCamera* camera, const LLVector4a* shift = NULL); //issue occlusion query
     bool isOcclusionState(U32 state) const { return mOcclusionState[LLViewerCamera::sCurCameraID] & state; }
     U32  getOcclusionState() const { return mOcclusionState[LLViewerCamera::sCurCameraID];}
@@ -327,6 +338,10 @@ private:
     ALQueryKind queryKind() const;
     /// Discards the pending queries of the groups below this one that its occlusion hid, as it is found visible.
     void discardStaleQueriesBelow();
+    /// Drops `camera`'s ticket, read or not, and QUERY_PENDING with it.
+    void endQuery(U32 camera);
+    /// Whether QUERY_PENDING and the ticket agree for the current camera, as they must.
+    bool queryStateAgrees() const;
 
 protected:
     U32         mOcclusionState[LLViewerCamera::NUM_CAMERAS];
@@ -335,7 +350,7 @@ protected:
     S32         mLODHash;
 
     LLViewerOctreePartition* mSpatialPartition;
-    ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, while QUERY_PENDING
+    ALQueryTicket            mOcclusionQuery[LLViewerCamera::NUM_CAMERAS]; ///< from gGL's pool, valid while QUERY_PENDING
 
 private:
     static U32 sOcclusionForgotten[LLViewerCamera::NUM_CAMERAS]; ///< the frame of each camera's forgetOcclusion()

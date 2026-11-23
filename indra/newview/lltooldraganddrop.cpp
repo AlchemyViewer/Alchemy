@@ -1282,17 +1282,23 @@ void LLToolDragAndDrop::dropMaterial(LLViewerObject* hit_obj,
     }
     else
     {
-        dropMaterialOneFace(hit_obj, hit_face, item, source, src_id);
+        // A face past the faces the region counts takes the drop through the last counted face, whose settings it
+        // takes (LLViewerObject::getFaceGroup)
+        const auto [first, last] = hit_obj->getFaceGroup(hit_face);
+        dropMaterialOneFace(hit_obj, first, item, source, src_id);
 
         // If user dropped a material onto face it implies
-        // applying texture now without cancel, save to selection
+        // applying texture now without cancel, save to selection,
+        // for every face the drop reached
         if (nodep
             && gFloaterTools
-            && gFloaterTools->getVisible()
-            && nodep->mSavedGLTFMaterialIds.size() > hit_face)
+            && gFloaterTools->getVisible())
         {
-            nodep->mSavedGLTFMaterialIds[hit_face] = hit_obj->getRenderMaterialID(hit_face);
-            nodep->mSavedGLTFOverrideMaterials[hit_face] = nullptr;
+            for (S32 face = first; face >= 0 && face < last && nodep->mSavedGLTFMaterialIds.size() > (size_t)face; ++face)
+            {
+                nodep->mSavedGLTFMaterialIds[face] = hit_obj->getRenderMaterialID(face);
+                nodep->mSavedGLTFOverrideMaterials[face] = nullptr;
+            }
         }
     }
 }
@@ -1669,37 +1675,33 @@ void LLToolDragAndDrop::dropTexture(LLViewerObject* hit_obj,
     }
     else
     {
-        dropTextureOneFace(hit_obj, hit_face, item, source, src_id, remove_pbr, tex_channel);
+        // A face past the faces the region counts takes the drop through the last counted face, whose settings it
+        // takes (LLViewerObject::getFaceGroup)
+        const auto [first, last] = hit_obj->getFaceGroup(hit_face);
+        dropTextureOneFace(hit_obj, first, item, source, src_id, remove_pbr, tex_channel);
 
         // If user dropped a texture onto face it implies
-        // applying texture now without cancel, save to selection
+        // applying texture now without cancel, save to selection,
+        // for every face the drop reaches: the faces past the last
+        // counted face take what it now has with the region's answer
         LLPanelFace* panel_face = gFloaterTools ? gFloaterTools->getPanelFace() : nullptr;
         if (nodep
             && panel_face
             && gFloaterTools->getVisible()
             && panel_face->getTextureDropChannel() == 0 /*texture*/
-            && nodep->mSavedTextures.size() > hit_face)
+            && first >= 0
+            && nodep->mSavedTextures.size() > (size_t)first)
         {
-            LLViewerTexture* tex = hit_obj->getTEImage(hit_face);
-            if (tex != nullptr)
-            {
-                nodep->mSavedTextures[hit_face] = tex->getID();
-            }
-            else
-            {
-                nodep->mSavedTextures[hit_face] = LLUUID::null;
-            }
+            LLViewerTexture* tex = hit_obj->getTEImage(first);
+            const LLUUID tex_id = tex ? tex->getID() : LLUUID::null;
 
-            LLTextureEntry* te = hit_obj->getTE(hit_face);
-            LLGLTFMaterial * override_mat = nullptr;
-            if (te && !remove_pbr && (override_mat = te->getGLTFMaterialOverride()))
+            LLTextureEntry* te = hit_obj->getTE(first);
+            const LLGLTFMaterial* override_mat = te && !remove_pbr ? te->getGLTFMaterialOverride() : nullptr;
+
+            for (S32 face = first; face < last && nodep->mSavedTextures.size() > (size_t)face; ++face)
             {
-                LLGLTFMaterial* copy = new LLGLTFMaterial(*override_mat);
-                nodep->mSavedGLTFOverrideMaterials[hit_face] = copy;
-            }
-            else
-            {
-                nodep->mSavedGLTFOverrideMaterials[hit_face] = nullptr;
+                nodep->mSavedTextures[face] = tex_id;
+                nodep->mSavedGLTFOverrideMaterials[face] = override_mat ? new LLGLTFMaterial(*override_mat) : nullptr;
             }
         }
     }

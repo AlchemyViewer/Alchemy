@@ -84,6 +84,30 @@ std::optional<LLVector3> ALObjectUpdate::positionOnCrossing(const LLVector3& pos
 }
 
 // static
+bool ALObjectUpdate::resetsSpin(const LLVector3& angular_velocity, bool stale)
+{
+    return !stale && angular_velocity.isExactlyZero();
+}
+
+// static
+ALObjectUpdate::Place ALObjectUpdate::placeOnStanding(const LLXform& avatar, const std::optional<Place>& drawn,
+                                                      const LLVector3& region_origin)
+{
+    if (drawn)
+    {
+        return { drawn->mPosition - region_origin, drawn->mRotation };
+    }
+
+    Place place{ avatar.getPosition(), avatar.getRotation() };
+    for (const LLXform* above = avatar.getParent(); above; above = above->getParent())
+    {
+        place.mPosition = above->getPosition() + place.mPosition * above->getRotation();
+        place.mRotation = place.mRotation * above->getRotation();
+    }
+    return place;
+}
+
+// static
 bool ALObjectUpdate::handshakeEndsCache(bool cache_loaded, const LLUUID& loaded_id, const LLUUID& handshake_id)
 {
     return cache_loaded && loaded_id != handshake_id;

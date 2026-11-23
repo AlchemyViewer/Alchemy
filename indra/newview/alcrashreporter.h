@@ -38,10 +38,11 @@ class LLSD;
 class LLUUID;
 class LLVector3;
 
-// Engaged from the top of the viewer's init, on a consent it can read before
-// the settings exist, and closed last thing in cleanup. Where no reporter is
-// built in, every entry point is a no-op, so the call sites carry no
-// conditions.
+// Started from main before the viewer is constructed, unless the user turned
+// crash reports down, and closed last thing in cleanup. Until the user allows
+// them, the reports it makes are kept on disk and nothing is sent. Where no
+// reporter is built in, every entry point is a no-op, so the call sites carry
+// no conditions.
 namespace ALCrashReporter
 {
     // Whether this build has a reporter and sends.
@@ -76,12 +77,28 @@ namespace ALCrashReporter
     // file, so a report filed on the next launch can be joined to the crash.
     const std::string& runId();
 
-    // Consent is a sentinel file in the user's settings directory: present
-    // means reports may be sent. It is what lets the reporter start before
-    // the settings are readable; once they are, they refresh it.
-    std::string consentSentinel();
-    bool consentRecorded(const std::string& sentinel);
-    void recordConsent(const std::string& sentinel, bool allowed);
+    // What the user said about crash reports, as AlchemyCrashReportConsent
+    // holds it.
+    enum class Consent : S32
+    {
+        Unasked = 0,
+        Allowed = 1,
+        Declined = 2,
+    };
+    // A value the setting cannot hold reads as unasked, so the user is asked.
+    Consent consentFromSetting(S32 value);
+
+    // The answer is also kept as files in the user's settings directory,
+    // which is what lets the reporter start before the settings are
+    // readable: crash_reports_allowed or crash_reports_declined, neither
+    // until the user is asked. Two files rather than one holding the answer,
+    // since a build that knows only the first takes it for a yes whatever it
+    // says. Both at once, which only such a build leaves, read as unasked.
+    // The record is written whenever the answer changes; the setting only
+    // reaches disk at a clean exit.
+    std::string consentDirectory();
+    Consent recordedConsent(const std::string& directory);
+    void recordConsent(const std::string& directory, Consent consent);
 
     // What the previous run's static debug file says, for a reporter that
     // only notices a crash on the next launch.
@@ -119,19 +136,25 @@ namespace ALCrashReporter
     std::optional<PreviousReport> previousRunCrash(std::string_view event_id, std::string_view crashed_run_id,
                                                    std::string_view previous_run_id);
 
-    // What the previous run left, read once from the top of init, before
-    // this run writes its own static debug file over that run's: the file,
-    // and the freeze report the run recorded. A second instance reads
-    // nothing, since the files are the running first instance's.
+    // What the previous run left, read once at the end of the viewer's
+    // constructor, before this run writes its own static debug file over
+    // that run's: the file, and the freeze report the run recorded. A second
+    // instance reads nothing, since the files are the running first
+    // instance's.
     void readLastRun();
     // What the previous run's static debug file says, and its text.
     const PreviousRun& lastRun();
     const std::string& lastRunDebugInfo();
     // A crash report the reporter found as it started, which becomes the
-    // previous report when it is the previous run's.
+    // previous report when it is the previous run's. The reporter starts
+    // before the previous run is read, so what it finds first waits for
+    // readLastRun().
     void foundCrashReport(std::string_view event_id, std::string_view crashed_run_id);
     // The report the previous run ended with, when one was filed and is known.
     std::optional<PreviousReport> previousReport();
+    // The reports kept for a yes that did not come are deleted, and with
+    // them the one the previous run ended with.
+    void forgetPreviousReport();
 
     // How the previous run ended, when it crashed or froze.
     struct LastRunEnd
@@ -152,14 +175,61 @@ namespace ALCrashReporter
     [[noreturn]] void fatal(std::string_view kind, const std::string& message);
     inline constexpr U32 FATAL_APP_EXIT = 0x40000015; // STATUS_FATAL_APP_EXIT
 
+    // Crashes on purpose where AL_CRASH_PROBE names the point it is called
+    // at, so a test can see what the reporter does with a crash there:
+    // "<point>" writes through a null pointer, "<point>:throw" throws. The
+    // points are "main", "ctor" (the viewer's constructor, once it knows
+    // which instance it is) and "init". Not in a build for download.
+#ifdef LL_RELEASE_FOR_DOWNLOAD
+    inline void probe(std::string_view) {}
+#else
+    void probe(std::string_view point);
+#endif
+
+    // Whether a command line (its arguments, without the program) turns the
+    // crash logger off, read before the settings are, as initConfiguration()
+    // applies it: --disablecrashlogger, then each --set DisableCrashLogger
+    // or --set=DisableCrashLogger (or Global.DisableCrashLogger), the last
+    // one winning, with the value read as the setting reads it. Every option
+    // may also have one dash.
+    bool crashLoggerDisabledBy(const std::vector<std::string>& arguments);
+
 #if AL_SENTRY
-    // Engages if the sentinel allows it.
-    bool init();
+    // From main, once the viewer's directories are set and before anything
+    // else: engages unless the record says crash reports were declined, and
+    // sends only when the record allows them. It needs nothing of the viewer.
+    // A run that may not run the reporter (crashLoggerDisabledBy() the
+    // command line, the settings coming later) does not engage, and keeps the
+    // recorded answer.
+    bool start(bool may_run);
+    // From main straight after start(), but not in the GPU benchmark child:
+    // when the last run crashed while its reports were kept for an answer,
+    // the user is asked with the system's own dialog, before anything else
+    // can crash and keep them from ever being asked, and the answer is
+    // recorded. A dialog that cannot be shown leaves the question to the
+    // login screen.
+    void askAfterHeldCrash();
+    // From the viewer's constructor as soon as it knows whether it is the
+    // first instance: when crash reports are declined, the first instance
+    // deletes what was kept for an answer, before anything after it can crash
+    // and keep it. A second instance deletes nothing, the database being the
+    // running first instance's.
+    void discardDeclined();
+    // From the end of the viewer's constructor, once the log is open and the
+    // previous run is read: what start() could not know yet. The log, the
+    // static debug file and the tags of the run go on its reports, and what
+    // the SDK said as it started is written to the log.
+    void attachRun();
     // The settings' answer, once readable and whenever it changes: recorded,
-    // and the reporter engaged or closed to match.
-    void refreshConsent(bool allowed);
+    // and the reporter engaged, holding, sending or closed to match. A run
+    // that may not run the reporter (DisableCrashLogger) closes it and keeps
+    // the answer. Declining deletes what was kept.
+    void refreshConsent(Consent consent, bool may_run);
     void shutdown();
+    // Running, whether it sends or keeps its reports.
     bool isEngaged();
+    // Running, and allowed to send.
+    bool isSending();
     void setUser(const LLUUID& id, const std::string& name);
     void setTag(std::string_view key, std::string_view value);
     // A named group of values shown together on every report from here on.
@@ -169,10 +239,14 @@ namespace ALCrashReporter
     bool reportFreeze(const std::string& description);
     bool handleException(void* exception_pointers);
 #else
-    inline bool init() { return false; }
-    inline void refreshConsent(bool allowed) { recordConsent(consentSentinel(), allowed); }
+    inline bool start(bool) { return false; }
+    inline void askAfterHeldCrash() {}
+    inline void discardDeclined() {}
+    inline void attachRun() {}
+    inline void refreshConsent(Consent consent, bool) { recordConsent(consentDirectory(), consent); }
     inline void shutdown() {}
     inline bool isEngaged() { return false; }
+    inline bool isSending() { return false; }
     inline void setUser(const LLUUID&, const std::string&) {}
     inline void setTag(std::string_view, std::string_view) {}
     inline void setContext(std::string_view,

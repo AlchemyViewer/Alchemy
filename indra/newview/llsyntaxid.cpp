@@ -35,6 +35,8 @@
 #include "lluri.h"
 #include "llviewerregion.h"
 #include "llcorehttputil.h"
+#include "llfile.h"
+#include "llviewercontrol.h"
 
 #include <boost/iostreams/device/array.hpp>
 #include <boost/iostreams/stream.hpp>
@@ -91,12 +93,17 @@ void LLSyntaxDefCache::initSingleton()
 {
     buildDefaultCache();
     loadKeywordsIntoLLSD();
+    if (LLControlVariable* folder = gSavedSettings.getControl("ALScriptDefinitionsFolder"))
+    {
+        mOverridesConnection = folder->getSignal()->connect([this](LLControlVariable*, const LLSD&, const LLSD&) { overridesChanged(); });
+    }
     mRegionChangedCallback = gAgent.addRegionChangedCallback(boost::bind(&LLSyntaxDefCache::handleRegionChanged, this));
     handleRegionChanged(); // Kick off an initial caps query and fetch
 }
 
 void LLSyntaxDefCache::cleanupSingleton()
 {
+    mOverridesConnection.disconnect();
     gAgent.removeRegionChangedCallback(mRegionChangedCallback);
     mLSLKeywords   = LLSD();
     mLuaKeywords = LLSD();
@@ -278,11 +285,15 @@ void LLSyntaxDefCache::fetchKeywordsFileCoro(std::string url, LLUUID syntax_id)
         {
             mFileCachePaths.addNamePath(FILENAME_INTERNAL_LSL, full_path);
         }
+        // The scripter's own over the region's.
+        applyOverrides();
         // We need to manually load the Lua keywords
         full_path     = mFileCachePaths.getPath(FILENAME_INTERNAL_LUA);
         LLSD lua_defs = loadDeserializedCacheFile(full_path);
 
-        setKeywords(result, lua_defs);
+        LLSD lsl_defs = result;
+        overrideKeywords(lsl_defs, lua_defs);
+        setKeywords(lsl_defs, lua_defs);
 
         // Shuttle this task to the main coro/worker.
         LLAppViewer::instance()->postToMainCoro([this]() {
@@ -393,6 +404,9 @@ void LLSyntaxDefCache::fetchKeywordsDefsCoro(std::string url, LLUUID syntax_id)
 
     result.erase(LLCoreHttpUtil::HttpCoroutineAdapter::HTTP_RESULTS);
 
+    // The scripter's own over the region's.
+    applyOverrides();
+    overrideKeywords(lsl_keywords, lua_keywords);
     setKeywords(lsl_keywords, lua_keywords);
     LLAppViewer::instance()->postToMainCoro(
         [this]()
@@ -433,6 +447,7 @@ void LLSyntaxDefCache::buildCachePaths(const LLUUID &syntax_id)
         mFileCachePaths.addNamePath(
             FILENAME_INTERNAL_LUA,
             gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, FILENAME_DEFAULT_LUA));
+        applyOverrides();
         return;
     }
 
@@ -448,6 +463,83 @@ void LLSyntaxDefCache::buildCachePaths(const LLUUID &syntax_id)
     {
         mFileCachePaths.addNamePath(file, gDirUtilp->add(cache_dir, file));
     }
+    applyOverrides();
+}
+
+// static
+std::string LLSyntaxDefCache::overridesFolder()
+{
+    static LLCachedControl<std::string> folder(gSavedSettings, "ALScriptDefinitionsFolder", "");
+    const std::string dir = folder();
+    return !dir.empty() && LLFile::isdir(dir) ? dir : std::string();
+}
+
+void LLSyntaxDefCache::applyOverrides()
+{
+    const std::string dir = overridesFolder();
+    if (dir.empty())
+    {
+        return;
+    }
+    for (const std::string& file : gDirUtilp->getFilesInDir(dir))
+    {
+        if (file.empty() || file.front() == '.' || file.size() > MAX_DEFINITION_NAME_LENGTH)
+        {
+            continue;
+        }
+        const std::string path = gDirUtilp->add(dir, file);
+        // A keyword file that does not read as definitions this viewer
+        // knows leaves the region's or the shipped one in its place, which
+        // the keywords are read from.
+        if (MEMCACHED_LLSD.contains(file) && !isSupportedVersion(loadDeserializedCacheFile(path)))
+        {
+            LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file " << path << ", not used." << LL_ENDL;
+            continue;
+        }
+        mFileCachePaths.addNamePath(file, path);
+    }
+    ++mOverridesLaid;
+}
+
+// static
+void LLSyntaxDefCache::overrideKeywords(LLSD& lsl, LLSD& lua)
+{
+    const std::string dir = overridesFolder();
+    if (dir.empty())
+    {
+        return;
+    }
+    for (const std::string& name : { FILENAME_INTERNAL_LSL, FILENAME_INTERNAL_LUA })
+    {
+        const std::string path = gDirUtilp->add(dir, name);
+        if (!LLFile::isfile(path))
+        {
+            continue;
+        }
+        const LLSD content = loadDeserializedCacheFile(path);
+        if (isSupportedVersion(content))
+        {
+            (name == FILENAME_INTERNAL_LSL ? lsl : lua) = content;
+        }
+        else
+        {
+            LL_WARNS("SyntaxLSL") << "Unknown or unsupported version of syntax file " << path << "." << LL_ENDL;
+        }
+    }
+}
+
+void LLSyntaxDefCache::overridesChanged()
+{
+    // Laid out again from what is kept, the folder over it, or not, and
+    // whoever listens told.
+    buildCachePaths(checkLocalCache(mSyntaxId) ? mSyntaxId : LLUUID::null);
+    loadKeywordsIntoLLSD();
+}
+
+std::string LLSyntaxDefCache::getDefinitionsVersion() const
+{
+    const std::string id = mSyntaxId.asString();
+    return overridesFolder().empty() ? id : id + "+" + std::to_string(mOverridesLaid);
 }
 
 bool LLSyntaxDefCache::writeCacheFile(const std::string &fileSpec, const LLSD& content_ref)

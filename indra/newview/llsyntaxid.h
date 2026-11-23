@@ -90,6 +90,11 @@ public:
     LLSD                        getLSLKeywords() const { return mLSLKeywords; };
     LLSD                        getLuaKeywords() const { return mLuaKeywords; };
     LLUUID                      getSyntaxID() const { return mSyntaxId; }
+    // What the definitions are, for those that keep what they made of
+    // them: the region's syntax id, and, where a folder of the scripter's
+    // own stands over some of its files (ALScriptDefinitionsFolder), how
+    // many times it has been laid over them.
+    std::string                 getDefinitionsVersion() const;
     syntax_id_changed_h         addSyntaxIDCallback(const syntax_id_changed_signal_t::slot_type& cb);
 
     bool                        checkCacheAndLoad(const LLUUID& syntax_id);
@@ -148,6 +153,17 @@ private:
     bool        writeCacheFile(const std::string &fileSpec, const LLSD& content_ref);
 
     static LLSD loadDeserializedCacheFile(const std::string& file_path);
+    // The scripter's own definitions (ALScriptDefinitionsFolder, Tapple's,
+    // QK7): each file of the folder read in place of the region's or the
+    // shipped one of the same name, for the editor alone; the region
+    // compiles with its own. The folder, where it is set and is one; its
+    // files over the paths; and its keyword files, where they read as
+    // definitions this viewer knows, over `lsl` and `lua`.
+    static std::string overridesFolder();
+    void        applyOverrides();
+    static void overrideKeywords(LLSD& lsl, LLSD& lua);
+    // The folder set to another: laid over the definitions there are.
+    void        overridesChanged();
 
     std::set<LLUUID>            mInflightFetches;
     syntax_id_changed_signal_t  mSyntaxIDChangedSignal;
@@ -158,5 +174,7 @@ private:
     LLUUID                      mSyntaxId;
     LLSD                        mLSLKeywords;
     LLSD                        mLuaKeywords;
+    U32                         mOverridesLaid = 0;
+    boost::signals2::scoped_connection mOverridesConnection;
     bool                        mUseDefsCap{ false };
 };

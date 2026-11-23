@@ -58,7 +58,6 @@ extern const std::string WEBRTC_VOICE_SERVER_TYPE;
 
 class LLWebRTCVoiceClient : public LLSingleton<LLWebRTCVoiceClient>,
                             virtual public LLVoiceModuleInterface,
-                            public llwebrtc::LLWebRTCDevicesObserver,
                             public LLMuteListObserver,
                             public llwebrtc::LLWebRTCLogCallback
 {
@@ -234,13 +233,11 @@ public:
 
     //////////////////////////////
     /// @name Devices change notification
-    //  LLWebRTCDevicesObserver
+    //  Delivered by DevicesObserver, through the voice work queue.
     //@{
-    void OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
-                          const llwebrtc::LLWebRTCVoiceDeviceList &capture_devices) override;
-    //@}
     void OnDevicesChangedImpl(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
                               const llwebrtc::LLWebRTCVoiceDeviceList &capture_devices);
+    //@}
 
     struct participantState
     {
@@ -450,6 +447,7 @@ public:
     static void predAvatarNameResolution(const LLWebRTCVoiceClient::sessionStatePtr_t &session, LLUUID id, std::string name);
 
     boost::signals2::connection mAvatarNameCacheConnection;
+    boost::signals2::connection mStopMicCaptureOnMuteConnection;
 
 private:
     // init or restart the WebRTC device interface.
@@ -469,6 +467,14 @@ private:
 
     LL::WorkQueue::ptr_t mVoiceWorkQueue;
 
+    // Receives llwebrtc's device notifications on its worker thread.  Never
+    // freed: llwebrtc's shutdown can give up on that thread with a
+    // notification under way, and this client may be gone when it lands.  It
+    // reaches the client only through work posted to mVoiceWorkQueue, which
+    // the client outlives.
+    class DevicesObserver;
+    DevicesObserver* mDevicesObserver = nullptr;
+
     F32 mTuningMicGain;
     int mTuningSpeakerVolume;
     bool mDevicesListUpdated;            // set to true when the device list has been updated
@@ -482,6 +488,11 @@ private:
     sessionStatePtr_t mNextSession;    // Session state for the session we're trying to join
 
     llwebrtc::LLWebRTCDeviceInterface *mWebRTCDeviceInterface;
+
+    // Config + interface it was last applied to, used by updateSettings() to
+    // detect real changes and to reapply after the interface is recreated.
+    llwebrtc::LLWebRTCDeviceInterface::AudioConfig mAudioConfig;
+    llwebrtc::LLWebRTCDeviceInterface *mAudioConfigInterface;
 
     LLVoiceDeviceList mCaptureDevices;
     LLVoiceDeviceList mRenderDevices;

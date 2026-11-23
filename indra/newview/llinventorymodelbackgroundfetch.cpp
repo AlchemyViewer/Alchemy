@@ -1415,12 +1415,12 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             LLUUID owner_id(folder_sd["owner_id"].asUUID());
             S32    version(folder_sd["version"].asInteger());
             S32    descendents(folder_sd["descendents"].asInteger());
-            LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
 
+            // Each entry below is read into a folder or an item of its own,
+            // so a key one leaves out is not the last one's.
             if (parent_id.isNull())
             {
                 LLSD items(folder_sd["items"]);
-                LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
 
                 for (LLSD::array_const_iterator item_it = items.beginArray();
                     item_it != items.endArray();
@@ -1432,6 +1432,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                     {
                         LLSD item(*item_it);
 
+                        LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
                         titem->unpackMessage(item);
 
                         LLInventoryModel::update_list_t update;
@@ -1458,6 +1459,7 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
                 ++category_it)
             {
                 LLSD category(*category_it);
+                LLPointer<LLViewerInventoryCategory> tcategory = new LLViewerInventoryCategory(owner_id);
                 tcategory->fromLLSD(category);
 
                 const bool recursive(getIsRecursive(tcategory->getUUID()));
@@ -1472,12 +1474,12 @@ void BGFolderHttpHandler::processData(LLSD& content, LLCore::HttpResponse* respo
             }
 
             LLSD items(folder_sd["items"]);
-            LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
             for (LLSD::array_const_iterator item_it = items.beginArray();
                  item_it != items.endArray();
                  ++item_it)
             {
                 LLSD item(*item_it);
+                LLPointer<LLViewerInventoryItem> titem = new LLViewerInventoryItem;
                 titem->unpackMessage(item);
 
                 gInventory.updateItem(titem);

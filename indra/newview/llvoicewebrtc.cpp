@@ -90,6 +90,7 @@ namespace {
     const uint32_t SET_HIDDEN_RESTORE_DELAY_MS = 200;  // 200 ms to unmute again after hiding during teleport
     const uint32_t MUTE_FADE_DELAY_MS       = 500;   // 20ms fade followed by 480ms silence gets rid of the click just after unmuting.
                                                      // This is because the buffers and processing is cleared by the silence.
+                                                     // With StopMicCaptureWhenMuted, this is also the delay before capture is actually stopped.
 
     const F32 SPEAKING_AUDIO_LEVEL = 0.30f;
 
@@ -264,7 +265,8 @@ LLWebRTCVoiceClient::LLWebRTCVoiceClient() :
     mIsProcessingChannels(false),
     mIsCoroutineActive(false),
     mWebRTCPump("WebRTCClientPump"),
-    mWebRTCDeviceInterface(nullptr)
+    mWebRTCDeviceInterface(nullptr),
+    mAudioConfigInterface(nullptr)
 {
     sShuttingDown = false;
     sWebRTCTerminated = false;
@@ -292,6 +294,11 @@ void LLWebRTCVoiceClient::cleanupSingleton()
         mAvatarNameCacheConnection.disconnect();
     }
 
+    if (mStopMicCaptureOnMuteConnection.connected())
+    {
+        mStopMicCaptureOnMuteConnection.disconnect();
+    }
+
     sShuttingDown = true;
     if (mSession)
     {
@@ -309,6 +316,40 @@ void LLWebRTCVoiceClient::cleanupSingleton()
 
 //---------------------------------------------------
 
+class LLWebRTCVoiceClient::DevicesObserver : public llwebrtc::LLWebRTCDevicesObserver
+{
+  public:
+    DevicesObserver(LLWebRTCVoiceClient* client, LL::WorkQueue::weak_t queue) :
+        mClient(client),
+        mQueue(std::move(queue))
+    {
+    }
+
+    // On WebRTC's worker thread, under a lock llwebrtc::terminate() waits a
+    // second at most for, so this never blocks on a full queue, nor asks the
+    // queue anything without a timeout once the post has given up.
+    void OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
+                          const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices) override
+    {
+        constexpr std::chrono::milliseconds POST_TIMEOUT(100);
+        LL::WorkQueue::ptr_t queue = mQueue.lock();
+        if (queue &&
+            !queue->tryPostFor(POST_TIMEOUT,
+                               [client = mClient, render_devices, capture_devices]
+                               {
+                                   client->OnDevicesChangedImpl(render_devices, capture_devices);
+                               }))
+        {
+            LL_WARNS("Voice") << "Dropped a device list update: the voice work queue is full or closed" << LL_ENDL;
+        }
+    }
+
+  private:
+    // Reached only by work run from mQueue, which the client outlives.
+    LLWebRTCVoiceClient* const  mClient;
+    const LL::WorkQueue::weak_t mQueue;
+};
+
 void LLWebRTCVoiceClient::init(LLPumpIO* pump)
 {
     // constructor will set up LLVoiceClient::getInstance()
@@ -317,11 +358,6 @@ void LLWebRTCVoiceClient::init(LLPumpIO* pump)
 
 void LLWebRTCVoiceClient::initWebRTC()
 {
-    llwebrtc::init(this);
-
-    mWebRTCDeviceInterface = llwebrtc::getDeviceInterface();
-    mWebRTCDeviceInterface->setDevicesObserver(this);
-
     if (!mVoiceWorkQueue)
     {
         mVoiceWorkQueue = std::make_shared<LL::WorkQueue>("VoiceWebRTC");
@@ -340,6 +376,30 @@ void LLWebRTCVoiceClient::initWebRTC()
             return false;
         });
     }
+    if (!mDevicesObserver)
+    {
+        mDevicesObserver = new DevicesObserver(this, mVoiceWorkQueue);
+    }
+
+    llwebrtc::init(this);
+
+    mWebRTCDeviceInterface = llwebrtc::getDeviceInterface();
+    mWebRTCDeviceInterface->setDevicesObserver(mDevicesObserver);
+
+    // Connect StopMicCaptureWhenMuted control so the changes apply instantly
+    if (!mStopMicCaptureOnMuteConnection.connected())
+    {
+        mStopMicCaptureOnMuteConnection =
+            gSavedSettings.getControl("StopMicCaptureWhenMuted")->getSignal()->connect(
+                [this](LLControlVariable*, const LLSD& new_val, const LLSD&)
+                {
+                    if (mWebRTCDeviceInterface)
+                    {
+                        mWebRTCDeviceInterface->setStopCaptureOnMute(new_val.asInteger());
+                    }
+                });
+    }
+    mWebRTCDeviceInterface->setStopCaptureOnMute(gSavedSettings.getS32("StopMicCaptureWhenMuted"));
 
     refreshDeviceLists();
 }
@@ -535,9 +595,13 @@ void LLWebRTCVoiceClient::updateSettings()
         static LLCachedControl<F32> sMicLevel(gSavedSettings, "AudioLevelMic");
         setMicGain(sMicLevel);
 
-        llwebrtc::LLWebRTCDeviceInterface::AudioConfig config;
+        // Diff against the last-applied config, not a fresh AudioConfig, so
+        // prefs matching the struct's defaults are still detected as changes.
+        llwebrtc::LLWebRTCDeviceInterface::AudioConfig config = mAudioConfig;
 
-        bool audioConfigChanged = false;
+        // Also reapply if the interface was (re)created, since a new one's
+        // audio processing starts back at hardcoded defaults.
+        bool audioConfigChanged = (mWebRTCDeviceInterface != mAudioConfigInterface);
 
         static LLCachedControl<bool> sEchoCancellation(gSavedSettings, "VoiceEchoCancellation", true);
         if (sEchoCancellation != config.mEchoCancellation)
@@ -567,6 +631,8 @@ void LLWebRTCVoiceClient::updateSettings()
         if (audioConfigChanged && mWebRTCDeviceInterface)
         {
             mWebRTCDeviceInterface->setAudioConfig(config);
+            mAudioConfig          = config;
+            mAudioConfigInterface = mWebRTCDeviceInterface;
         }
     }
 }
@@ -874,18 +940,6 @@ void LLWebRTCVoiceClient::setCaptureDevice(const std::string& name)
 void LLWebRTCVoiceClient::setDevicesListUpdated(bool state)
 {
     mDevicesListUpdated = state;
-}
-
-// the singleton 'this' pointer will outlive the work queue.
-void LLWebRTCVoiceClient::OnDevicesChanged(const llwebrtc::LLWebRTCVoiceDeviceList& render_devices,
-                                           const llwebrtc::LLWebRTCVoiceDeviceList& capture_devices)
-{
-
-    LL::WorkQueue::postMaybe(mVoiceWorkQueue,
-                             [=, this]
-        {
-            OnDevicesChangedImpl(render_devices, capture_devices);
-        });
 }
 
 void LLWebRTCVoiceClient::OnDevicesChangedImpl(const llwebrtc::LLWebRTCVoiceDeviceList &render_devices,
@@ -1766,14 +1820,20 @@ void LLWebRTCVoiceClient::setMuteMic(bool muted)
 
     mMuteMic = muted;
 
-    if (mIsInTuningMode)
+    if (mIsInTuningMode &&!gSavedSettings.getS32("StopMicCaptureWhenMuted"))
     {
         return;
     }
 
     if (mWebRTCDeviceInterface)
     {
-        mWebRTCDeviceInterface->setMute(muted, muted ? MUTE_FADE_DELAY_MS : 0);  // delay for 40ms on mute to allow buffers to empty
+        // Delay on mute to let the fade and silence flush buffers (and, if enabled, before capture stops)
+        mWebRTCDeviceInterface->setMute(muted, muted ? MUTE_FADE_DELAY_MS : 0);
+    }
+
+    if (mIsInTuningMode)
+    {
+        return;
     }
 
     // when you're hidden, your mic is always muted.
@@ -2636,6 +2696,12 @@ void LLVoiceWebRTCConnection::OnIceCandidate(const llwebrtc::LLWebRTCIceCandidat
 
 void LLVoiceWebRTCConnection::processIceUpdates()
 {
+    // Don't launch a coroutine on every tick; only do so when there's actually ice data to send and we're not shutting down.
+    if (LLWebRTCVoiceClient::isShuttingDown() || (mIceCandidates.empty() && !mIceCompleted))
+    {
+        return;
+    }
+
     mOutstandingRequests++;
 
     LLCoros::getInstance()->launch("LLVoiceWebRTCConnection::processIceUpdatesCoro",

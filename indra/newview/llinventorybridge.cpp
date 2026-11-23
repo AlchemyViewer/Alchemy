@@ -901,6 +901,11 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
             }
         }
 
+        if ((flags & ITEM_IN_MULTI_SELECTION) && !is_inbox && !single_folder_root)
+        {
+            items.push_back(std::string("Bulk Rename"));
+        }
+
         if (obj->getIsLinkType())
         {
             items.push_back(std::string("Find Original"));
@@ -923,7 +928,7 @@ void LLInvFVBridge::getClipboardEntries(bool show_asset_id,
                 items.push_back(std::string("Find Links"));
             }
 
-            if (!is_inbox && !single_folder_root)
+            if (!is_inbox && !single_folder_root && (flags & ITEM_IN_MULTI_SELECTION) == 0)
             {
                 items.push_back(std::string("Rename"));
                 if (!isItemRenameable() || ((flags & FIRST_SELECTED_ITEM) == 0))
@@ -2243,36 +2248,7 @@ time_t LLItemBridge::getCreationDate() const
 // virtual
 bool LLItemBridge::isItemRenameable() const
 {
-    if (LLViewerInventoryItem* item = getItem())
-    {
-        // (For now) Don't allow calling card rename since that may confuse users as to
-        // what the calling card points to.
-        if (item->getInventoryType() == LLInventoryType::IT_CALLINGCARD)
-        {
-            return false;
-        }
-
-        if (!item->isFinished()) // EXT-8662
-        {
-            return false;
-        }
-
-        if (isInboxFolder())
-        {
-            return false;
-        }
-
-// [RLVa:KB] - Checked: 2011-03-29 (RLVa-1.3.0g) | Modified: RLVa-1.3.0g
-        if ( (rlv_handler_t::isEnabled()) && (!RlvFolderLocks::instance().canRenameItem(mUUID)) )
-        {
-            return false;
-        }
-// [/RLVa:KB]
-
-        return item->getPermissions().allowModifyBy(gAgent.getID());
-    }
-
-    return false;
+    return get_is_item_renameable(getInventoryModel(), mUUID);
 }
 
 // virtual
@@ -2392,7 +2368,9 @@ bool LLItemBridge::isItemCopyable(bool can_copy_as_link) const
     // Can't copy worn objects.
     // Worn objects are tied to their inworld conterparts
     // Copy of modified worn object will return object with obsolete asset and inventory
-    if (get_is_item_worn(mUUID))
+    // Alchemy - Allow copy of worn object, if user is powerful wizard
+    static LLCachedControl<bool> sPowerfulWizard(gSavedSettings, "AlchemyPowerfulWizard", false);
+    if (get_is_item_worn(mUUID) && !sPowerfulWizard)
     {
         return false;
     }
@@ -4714,7 +4692,14 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
             if (cat->getPreferredType() == LLFolderType::FT_OUTFIT)
             {
                 // Want some but not all of the items from getClipboardEntries for outfits.
-                items.push_back(std::string("Rename"));
+                if (flags & ITEM_IN_MULTI_SELECTION)
+                {
+                    items.push_back(std::string("Bulk Rename"));
+                }
+                else
+                {
+                    items.push_back(std::string("Rename"));
+                }
                 items.push_back(std::string("thumbnail"));
 
                 addInventoryFavoritesMenuOptions(items);
@@ -4742,7 +4727,14 @@ void LLFolderBridge::buildContextMenuOptions(U32 flags, menuentry_vec_t&   items
                         items.push_back(std::string("New Outfit"));
                         items.push_back(std::string("New Outfit Folder"));
                     }
-                    items.push_back(std::string("Rename"));
+                    if (flags & ITEM_IN_MULTI_SELECTION)
+                    {
+                        items.push_back(std::string("Bulk Rename"));
+                    }
+                    else
+                    {
+                        items.push_back(std::string("Rename"));
+                    }
                     items.push_back(std::string("thumbnail"));
 
                     addInventoryFavoritesMenuOptions(items);
@@ -7393,8 +7385,7 @@ void LLObjectBridge::performAction(LLInventoryModel* model, std::string action)
         item = (LLViewerInventoryItem*)gInventory.getItem(object_id);
         if(item && gInventory.isObjectDescendentOf(object_id, gInventory.getRootFolderID()))
         {
-            static LLCachedControl<U32> add_attachment_behavior(gSavedSettings, "InventoryAddAttachmentBehavior", 0);
-            rez_attachment(item, NULL, ("attach" == action) ? (add_attachment_behavior() == 1) : true); // Replace if "Wear"ing.
+            rez_attachment(item, NULL, ("attach" == action) ? get_open_item_replaces_worn(item) : true); // Replace if "Wear"ing.
         }
         else if(item && item->isFinished())
         {
@@ -7825,8 +7816,14 @@ void LLWearableBridge::performAction(LLInventoryModel* model, std::string action
 
 void LLWearableBridge::openItem()
 {
-    performAction(getInventoryModel(),
-                  get_is_item_worn(mUUID) ? "take_off" : "wear");
+    if (get_is_item_worn(mUUID))
+    {
+        performAction(getInventoryModel(), "take_off");
+    }
+    else
+    {
+        performAction(getInventoryModel(), get_open_item_replaces_worn(getItem()) ? "wear" : "wear_add");
+    }
 }
 
 void LLWearableBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
@@ -8620,8 +8617,7 @@ void LLObjectBridgeAction::attachOrDetach()
     }
     else
     {
-        static LLCachedControl<U32> add_attachment_behavior(gSavedSettings, "InventoryAddAttachmentBehavior", 0);
-        LLAppearanceMgr::instance().wearItemOnAvatar(mUUID, true, add_attachment_behavior() == 1); // Don't replace if adding.
+        LLAppearanceMgr::instance().wearItemOnAvatar(mUUID, true, get_open_item_replaces_worn(getItem()));
     }
 }
 
@@ -8692,7 +8688,7 @@ void LLWearableBridgeAction::wearOnAvatar()
         }
         else
         {
-            LLAppearanceMgr::instance().wearItemOnAvatar(item->getUUID(), true, true);
+            LLAppearanceMgr::instance().wearItemOnAvatar(item->getUUID(), true, get_open_item_replaces_worn(item));
         }
     }
 }

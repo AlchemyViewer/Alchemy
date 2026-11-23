@@ -5,4 +5,7 @@
 	</text>
 	<button label="保存" name="save"/>
 	<button label="キャンセル" name="cancel"/>
+	<string name="title_graphic">グラフィックプリセットを保存</string>
+	<string name="title_camera">カメラプリセットを保存</string>
+	<string name="title_looks">ルックを保存</string>
 </floater>

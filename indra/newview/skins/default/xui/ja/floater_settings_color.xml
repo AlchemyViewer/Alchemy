@@ -1,2 +1,4 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
-<floater name="settings_color" title="色の設定"/>
+<floater name="settings_color" title="色の設定">
+	<color_table_panel name="colors" tool_tip="スキンの名前付きカラーで、テキスト、ボタン、ウィンドウの描画に使われます。1つ変更すると、それを使うすべてのウィジェットに反映されます。行を元に戻すと、スキンの色に戻ります。"/>
+</floater>

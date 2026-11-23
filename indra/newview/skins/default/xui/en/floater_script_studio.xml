@@ -150,6 +150,7 @@
     <floater.string name="SearchReplacedOpened">[SCRIPTS] opened with unsaved changes</floater.string>
     <floater.string name="SearchReplacedLeft">[SCRIPTS] skipped (changed since the search)</floater.string>
     <floater.string name="SearchReplaceNothing">Nothing to replace.</floater.string>
+    <floater.string name="SearchReplaceNonePicked">Select the matches to replace in the list first: Ctrl-click or Shift-click selects several.</floater.string>
     <floater.string name="SearchNoObject">no object selected</floater.string>
     <floater.string name="SearchNoObjectTip">Open a script from an object, or select an object in the Explorer, to search its contents</floater.string>
     <floater.string name="SearchObjectTip">[OBJECT]: [HITS] in [FILES]</floater.string>
@@ -384,9 +385,10 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="TrailerExpandedTip">Showing the preprocessed code the server compiles; read-only. Click for the source ([KEYS])</floater.string>
     <floater.string name="TrailerExpandedTipNoKeys">Showing the preprocessed code the server compiles; read-only. Click for the source</floater.string>
     <floater.string name="TrailerPreprocessedDirectives">A save preprocesses it: it has directives, which the server could compile no other way.</floater.string>
+    <floater.string name="TrailerPreprocessedRequires">A save preprocesses it: it calls require, which only the preprocessor answers, putting the modules in with it.</floater.string>
     <floater.string name="TrailerPreprocessedSetting">A save preprocesses it: Build &gt; Preprocess on Save is on.</floater.string>
     <floater.string name="TrailerNotPreprocessed">Not preprocessed on save</floater.string>
-    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written, without the preprocessor's envelope: it has no directive, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
+    <floater.string name="TrailerNotPreprocessedTip">A save sends this script as written, without the preprocessor's envelope: it has no directive or require, and Build &gt; Preprocess on Save is off. The Preprocessed view shows what the preprocessor would make of it, not what goes up.</floater.string>
     <floater.string name="ReferenceDeclaration">declaration</floater.string>
     <floater.string name="ReferenceDeclarationTip">Where [NAME] is declared</floater.string>
     <floater.string name="OutlineNoMatch">No symbol names match what you typed.</floater.string>
@@ -470,6 +472,11 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ConvertSLuaTitle">Written in SLua</floater.string>
     <floater.string name="ConvertNotesA">1 place noted</floater.string>
     <floater.string name="ConvertNotesB">[COUNT] places noted</floater.string>
+    <floater.string name="ConvertCommentsA">1 comment</floater.string>
+    <floater.string name="ConvertCommentsB">[COUNT] comments</floater.string>
+    <floater.string name="ConvertCommentCode">Commented-out code: [CONVERTED] written as SLua, still commented, and [LEFT] left as LSL, which would not convert cleanly.</floater.string>
+    <floater.string name="ConvertCommentCodeAll">Commented-out code: [CONVERTED] written as SLua, still commented.</floater.string>
+    <floater.string name="ConvertCommentCodeNone">Commented-out code: [LEFT] left as LSL, which would not convert cleanly.</floater.string>
     <floater.string name="Converted">Wrote [NAME] as SLua in the new script [NEW], unsaved, beside the LSL: [NOTES] with "-- LSL:" comments. The LSL script is as it was. How it is written: Preferences, LSL to SLua.</floater.string>
     <floater.string name="ConvertedExpanded">Wrote [NAME] as SLua in the new script [NEW] from what the preprocessor made of it, unsaved, beside that: [NOTES] with "-- LSL:" comments. The LSL script is as it was.</floater.string>
     <floater.string name="ConvertFailed">Could not write [NAME] as SLua: line [LINE], [ERROR].</floater.string>
@@ -674,7 +681,8 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="MasterExperienceCleared">From [NAME]'s next save, its script runs under no experience.</floater.string>
     <floater.string name="MasterNotRead">[FILE] could not be read to compare with [NAME].</floater.string>
     <floater.string name="MasterWorldNotRead">[NAME] could not be read in-world: [WHY]</floater.string>
-    <floater.string name="MasterTookWorld">[FILE] now holds what [NAME] holds in-world, not saved yet: undo takes it back.</floater.string>
+    <floater.string name="MasterTookWorld">[FILE] now holds what [NAME] holds in-world, written to disk: undo in its tab takes it back, unsaved.</floater.string>
+    <floater.string name="MasterTakeNotWritten">[FILE] could not be written, so it does not hold what [NAME] holds in-world.</floater.string>
     <floater.string name="MasterTookSame">[FILE] already holds what [NAME] holds in-world.</floater.string>
     <floater.string name="LinkHeadListing">Asking what [OBJECTS] holds...</floater.string>
     <floater.string name="LinkHeadReading">Reading the scripts of [OBJECTS]: [DONE] of [COUNT]...</floater.string>
@@ -755,7 +763,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoticeMasterSend">Send File</floater.string>
     <floater.string name="NoticeMasterSendTip">Send the file on disk to the script now, keeping what the script holds in History</floater.string>
     <floater.string name="NoticeMasterTakeWorld">Update File</floater.string>
-    <floater.string name="NoticeMasterTakeWorldTip">Put what the script holds in-world in the file's tab, as one step to undo; saving writes the file</floater.string>
+    <floater.string name="NoticeMasterTakeWorldTip">Write what the script holds in-world to the file on disk, and to its tab as one step to undo. That script is left as it is; any other script linked to the file is sent it</floater.string>
     <floater.string name="NoticeMasterUnlink">Unlink</floater.string>
     <floater.string name="NoticeMasterUnlinkTip">Let the script go from this file; neither is changed</floater.string>
     <floater.string name="NoticeMasterGiveWay">Switch to File</floater.string>
@@ -771,7 +779,7 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="ActionMasterSend">Send file</floater.string>
     <floater.string name="ActionMasterSendTip">Send the file on disk to the script now</floater.string>
     <floater.string name="ActionMasterTakeWorld">Update file</floater.string>
-    <floater.string name="ActionMasterTakeWorldTip">Put what the script holds in-world in [NAME]'s tab</floater.string>
+    <floater.string name="ActionMasterTakeWorldTip">Write what the script holds in-world to [NAME] on disk; any other script linked to it is sent it</floater.string>
     <floater.string name="ActionMasterCompare">Compare</floater.string>
     <floater.string name="ActionMasterCompareTip">Compare [NAME] with what the script holds in-world</floater.string>
     <floater.string name="ActionMasterGiveWay">Switch to file</floater.string>
@@ -816,7 +824,6 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
     <floater.string name="NoRecentFiles">No Recent Files</floater.string>
     <floater.string name="OutputSourceVim">vim</floater.string>
     <floater.string name="PreprocHintSwitch">([WORD] is a Firestorm extension: turn on Build &gt; Preprocess on Save and Build &gt; Firestorm &gt; Switch Statements)</floater.string>
-    <floater.string name="RequireNotPreprocessed">require("[NAME]") is saved as written, but the grid does not support require: turn on Build &gt; Preprocess on Save to include the module</floater.string>
     <floater.string name="PreprocHintExtensions">([WORD] is an extension: turn on Build > Preprocess on Save and Build > Extensions)</floater.string>
     <floater.string name="PreprocHintConst">([WORD] declares a constant, and lets a global be computed from other globals: turn on Build &gt; Preprocess on Save)</floater.string>
     <floater.string name="PreprocHintDirective">(lines starting with # are the preprocessor's: turn on Build &gt; Preprocess on Save)</floater.string>
@@ -2774,6 +2781,16 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              tool_tip="Replace all matches after you confirm. Scripts that are not open are opened, changes unsaved."
                              top="28"
                              width="90" />
+                            <button
+                             follows="top|right"
+                             height="22"
+                             label="Replace"
+                             layout="topleft"
+                             name="search_replace_selected"
+                             right="-96"
+                             tool_tip="Replace only the matches selected in the list: Ctrl-click or Shift-click selects several. Asks first if that opens scripts that are not open, with the changes unsaved."
+                             top="28"
+                             width="70" />
                             <line_editor
                              commit_on_focus_lost="false"
                              follows="top|left|right"
@@ -2782,9 +2799,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              layout="topleft"
                              left="0"
                              name="search_replacement"
-                             tool_tip="Replacement text; Return or Replace All asks before replacing"
+                             tool_tip="Replacement text; Return or Replace All asks before replacing all matches, Replace replaces those selected"
                              top_delta="0"
-                             width="478" />
+                             width="404" />
                             <pane_list
                              draw_heading="true"
                              heading_height="18"
@@ -2792,8 +2809,9 @@ A notecard dropped on the vimrc box in Script Studio Preferences (Editor tab) is
                              height="116"
                              layout="topleft"
                              left="0"
+                             multi_select="true"
                              name="search_results"
-                             tool_tip="Matches, kept up to date as open scripts change. Return or double-click goes there."
+                             tool_tip="Matches, kept up to date as open scripts change. Return or double-click goes there; Ctrl-click or Shift-click selects several for Replace."
                              top_pad="2"
                              width="574">
                                 <pane_list.columns label="Where" name="where" width="200" />

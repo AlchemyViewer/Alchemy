@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<toggleable_menu name="messagelog_filter_menu">
+	<menu_item_call name="no_filter" label="フィルターなし"/>
+	<menu_item_call name="less_spam" label="スパム的なメッセージを減らす"/>
+	<menu_item_call name="less_spam_no_sound" label="スパム的なメッセージを減らす（サウンドを除く）"/>
+	<menu_item_call name="less_spam_no_sound_no_map" label="スパム的なメッセージを減らす（サウンドとマップを除く）"/>
+	<menu_item_call name="obj_update" label="オブジェクトの更新"/>
+	<menu_item_call name="abnormal" label="異常"/>
+</toggleable_menu>

@@ -1,0 +1,3143 @@
+/**
+ * @file llchatservicehistorycore_test.cpp
+ * @brief Strict ChatService wire, TimeUUID, and archive tests.
+ *
+ * $LicenseInfo:firstyear=2026&license=viewerlgpl$
+ * Second Life Viewer Source Code
+ * Copyright (C) 2026, Linden Research, Inc.
+ * $/LicenseInfo$
+ */
+
+#include "linden_common.h"
+
+#include "llsingleton.h"
+#include "../llchatservicehistorycore.h"
+#include "../llmutelist.h"
+
+#include "fsyspath.h"
+#include "lldate.h"
+#include "llsdutil.h"
+#include "lluuid.h"
+#include "namedtempfile.h"
+
+#include <catch2/catch_test_macros.hpp>
+
+#include <algorithm>
+#include <array>
+#include <cstdlib>
+#include <list>
+#include <map>
+#include <random>
+#include <set>
+#include <sstream>
+#include <string>
+#include <vector>
+
+// LLMuteList befriends this name, at global scope, for its private load sources.
+struct LLMuteListTestAccess
+{
+    static bool server()
+    {
+        return LLMuteList::isServerAuthoritativeSource(LLMuteList::MLS_SERVER);
+    }
+    static bool serverEmpty()
+    {
+        return LLMuteList::isServerAuthoritativeSource(LLMuteList::MLS_SERVER_EMPTY);
+    }
+    static bool serverCache()
+    {
+        return LLMuteList::isServerAuthoritativeSource(LLMuteList::MLS_SERVER_CACHE);
+    }
+    static bool fallbackCache()
+    {
+        return LLMuteList::isServerAuthoritativeSource(LLMuteList::MLS_FALLBACK_CACHE);
+    }
+};
+
+namespace
+{
+using namespace LLChatServiceHistoryCore;
+
+// The archive functions take a path as UTF-8, which path::string() is not on Windows.
+std::string utf8Path(const NamedTempFile& file)
+{
+    return fsyspath(file.getPath()).string();
+}
+
+const LLUUID AGENT("00000000-0000-0000-0000-000000000001");
+const LLUUID RESIDENT("00000000-0000-0000-0000-000000000002");
+const char* const FIRST = "00000001-0000-1000-8000-000000000000";
+const char* const SECOND = "00000002-0000-1000-8000-000000000000";
+
+LLSD wireRow(const std::string& id, const LLUUID& from = RESIDENT)
+{
+    LLSD row;
+    row["conversation_id"] = directConversationId(AGENT, RESIDENT);
+    row["msg_id"] = id;
+    row["from_id"] = from.asString();
+    row["from_name"] = "Resident";
+    row["message"] = "hello";
+    row["dialog"] = 0;
+    row["created_at"] = "2026-08-12T12:34:56.123Z";
+
+    return row;
+}
+
+LLSD wirePage(const LLSD& rows, const std::string& cursor = std::string())
+{
+    LLSD page;
+    page["conversation_id"] = directConversationId(AGENT, RESIDENT);
+    page["limit"] = 100;
+    page["messages"] = rows;
+    if (!cursor.empty())
+    {
+        page["before_msg_id"] = cursor;
+    }
+
+    return page;
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a direct conversation id orders its two participants the same either way", "[LLChatServiceHistoryCore]")
+{
+    UNSCOPED_INFO("deterministic direct id");
+    CHECK(directConversationId(RESIDENT, AGENT) == AGENT.asString() + "_" + RESIDENT.asString());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: only canonical version 1 UUIDs parse as TimeUUIDs and keep timestamp order", "[LLChatServiceHistoryCore]")
+{
+    // UUID parsing accepts only canonical version-1 identifiers and preserves their
+    // timestamp order.
+    TimeUuidKey first;
+    TimeUuidKey second;
+    UNSCOPED_INFO("UUIDv1 parses");
+    CHECK(parseTimeUuid(FIRST, first));
+    UNSCOPED_INFO("timestamp ordering");
+    CHECK((parseTimeUuid(SECOND, second) && first < second));
+
+    UNSCOPED_INFO("UUIDv4 rejected");
+    CHECK_FALSE(parseTimeUuid(
+        "00000001-0000-4000-8000-000000000000", first));
+    UNSCOPED_INFO("noncanonical UUID rejected");
+    CHECK_FALSE(parseTimeUuid(
+        "00000001-0000-1000-8000-00000000000A", first));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: equal timestamps order by Cassandra's signed tail bytes", "[LLChatServiceHistoryCore]")
+{
+    // Equal-timestamp tails follow Cassandra's signed-byte comparison.
+    TimeUuidKey low;
+    TimeUuidKey high;
+    parseTimeUuid(FIRST, low);
+    parseTimeUuid("00000001-0000-1000-bfff-000000000000", high);
+    UNSCOPED_INFO("Cassandra signed tail ordering");
+    CHECK(low < high);
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a descending page validates with its oldest row as cursor and stops at the deletion cutoff", "[LLChatServiceHistoryCore]")
+{
+    // A valid page is strictly descending and exposes its oldest row as the cursor.
+    LLSD rows = LLSD::emptyArray();
+    rows.append(wireRow(SECOND));
+    rows.append(wireRow(FIRST, AGENT));
+
+    Page page;
+    UNSCOPED_INFO("strict descending page");
+    CHECK(validateHistoryPage(
+        wirePage(rows), AGENT, RESIDENT,
+        "", 0, page));
+    UNSCOPED_INFO("all rows retained");
+    CHECK(page.rows.size() == size_t(2));
+    UNSCOPED_INFO("oldest cursor");
+    CHECK(page.next_cursor == std::string(FIRST));
+
+    // The deletion boundary is inclusive and ends paging, but not validation.
+    UNSCOPED_INFO("cutoff page accepted");
+    CHECK(validateHistoryPage(
+        wirePage(rows), AGENT, RESIDENT, "", 1, page));
+    UNSCOPED_INFO("only newer rows retained");
+    REQUIRE(page.rows.size() == size_t(1));
+    UNSCOPED_INFO("newer row retained");
+    CHECK(page.rows.front().msg_id == std::string(SECOND));
+    UNSCOPED_INFO("cutoff ends paging");
+    CHECK((page.terminal && page.next_cursor.empty()));
+    rows.append(wireRow("00000000-0000-1000-8000-000000000000"));
+    rows[2]["dialog"] = 99;
+    UNSCOPED_INFO("invalid row below cutoff rejected");
+    CHECK_FALSE(validateHistoryPage(
+        wirePage(rows), AGENT, RESIDENT, "", 1, page));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a page is rejected for ascending or duplicate rows or another conversation or a coercible type", "[LLChatServiceHistoryCore]")
+{
+    // Ordering and exact LLSD types are page-wide validation requirements.
+    LLSD rows = LLSD::emptyArray();
+    rows.append(wireRow(FIRST));
+    rows.append(wireRow(SECOND));
+
+    Page page;
+    UNSCOPED_INFO("ascending page rejected");
+    CHECK_FALSE(validateHistoryPage(
+        wirePage(rows), AGENT, RESIDENT,
+        "", 0, page));
+
+    // Ordering alone rejects duplicates, including replay of the preceding page's cursor.
+    rows[1] = rows[0];
+    UNSCOPED_INFO("duplicate row rejected");
+    CHECK_FALSE(validateHistoryPage(
+        wirePage(rows), AGENT, RESIDENT, "", 0, page));
+    rows.erase(1);
+    UNSCOPED_INFO("cursor row cannot repeat on the next page");
+    CHECK_FALSE(validateHistoryPage(
+        wirePage(rows, FIRST), AGENT, RESIDENT, FIRST, 0, page));
+
+    LLSD wrong = wirePage(LLSD::emptyArray());
+    wrong["conversation_id"] = directConversationId(AGENT, LLUUID::null);
+    UNSCOPED_INFO("another conversation rejected");
+    CHECK_FALSE(validateHistoryPage(
+        wrong, AGENT, RESIDENT, "", 0, page));
+    wrong = wirePage(LLSD::emptyArray());
+    wrong["limit"] = "100";
+    UNSCOPED_INFO("coercible type rejected");
+    CHECK_FALSE(validateHistoryPage(
+        wrong, AGENT, RESIDENT, "", 0, page));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: discovery rejects a duplicate peer and ignores the null system participant", "[LLChatServiceHistoryCore]")
+{
+    // Discovery rejects duplicate peers and ignores the null system participant.
+    LLSD list = LLSD::emptyArray();
+    LLSD entry;
+    entry["conversation_type"] = "direct";
+    entry["conversation_id"] = directConversationId(AGENT, RESIDENT);
+    entry["other_participant_id"] = RESIDENT.asString();
+    entry["last_msg_id"] = SECOND;
+    list.append(entry);
+
+    std::vector<ListEntry> entries;
+    UNSCOPED_INFO("strict list accepted");
+    CHECK(validateConversationList(list, AGENT, entries));
+
+    list.append(entry);
+    UNSCOPED_INFO("duplicate resident rejected");
+    CHECK_FALSE(validateConversationList(list, AGENT, entries));
+
+    LLSD null_list = LLSD::emptyArray();
+    entry["other_participant_id"] = LLUUID::null.asString();
+    entry["conversation_id"] = directConversationId(AGENT, LLUUID::null);
+    null_list.append(entry);
+    UNSCOPED_INFO("null system participant ignored");
+    CHECK(validateConversationList(null_list, AGENT, entries));
+    UNSCOPED_INFO("system conversation has no resident history");
+    CHECK(entries.empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: created_at accepts only well formed in-range timestamps and persisted dialogs follow an allowlist", "[LLChatServiceHistoryCore]")
+{
+    std::string normalized;
+
+    // Accept the supported UTC, explicit-offset, offset-less, and fractional forms.
+    UNSCOPED_INFO("UTC timestamp");
+    CHECK(parseCreatedAt("2026-08-12T12:34:56Z", normalized));
+    UNSCOPED_INFO("offset timestamp");
+    CHECK(parseCreatedAt("2026-08-12T12:34:56+02:30", normalized));
+    UNSCOPED_INFO("offset-less timestamp");
+    CHECK(parseCreatedAt("2026-08-12T12:34:56", normalized));
+    UNSCOPED_INFO("fractional timestamp");
+    CHECK(parseCreatedAt("2026-08-12T12:34:56.123Z", normalized));
+
+    // Reject malformed suffixes and noncanonical field shapes.
+    UNSCOPED_INFO("reject trailing timestamp data");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T12:34:56Z123", normalized));
+    UNSCOPED_INFO("reject invalid offset");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T12:34:56+99:99", normalized));
+    UNSCOPED_INFO("reject signed date field");
+    CHECK_FALSE(parseCreatedAt("2026-+1-12T12:34:56Z", normalized));
+    UNSCOPED_INFO("reject empty fraction");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T12:34:56.Z", normalized));
+
+    // Enforce calendar and clock ranges after the fixed-width shape validates.
+    UNSCOPED_INFO("reject month");
+    CHECK_FALSE(parseCreatedAt("2026-13-12T12:34:56Z", normalized));
+    UNSCOPED_INFO("reject day");
+    CHECK_FALSE(parseCreatedAt("2026-08-35T12:34:56Z", normalized));
+    UNSCOPED_INFO("reject nonleap day");
+    CHECK_FALSE(parseCreatedAt("2026-02-29T12:34:56Z", normalized));
+    UNSCOPED_INFO("accept leap day");
+    CHECK(parseCreatedAt("2024-02-29T12:34:56Z", normalized));
+    UNSCOPED_INFO("reject hour");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T24:34:56Z", normalized));
+    UNSCOPED_INFO("reject minute");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T12:60:56Z", normalized));
+    UNSCOPED_INFO("reject second");
+    CHECK_FALSE(parseCreatedAt("2026-08-12T12:34:60Z", normalized));
+    UNSCOPED_INFO("bad width");
+    CHECK_FALSE(parseCreatedAt("2026-8-12T12:34:56Z", normalized));
+
+    // Persisted history uses an explicit IM-dialog allowlist.
+    UNSCOPED_INFO("dialog allowlist");
+    CHECK((persistedDirectDialog(38) && !persistedDirectDialog(99)));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: CSV quoting follows RFC 4180", "[LLChatServiceHistoryCore]")
+{
+    UNSCOPED_INFO("RFC4180 quoting");
+    CHECK(quoteCsv("comma, quote \" and\nnewline") == "\"comma, quote \"\" and\nnewline\"");
+}
+
+std::string validArchive()
+{
+    // Build a minimal ascending archive used by valid, torn, and corrupt scan cases.
+    Row first;
+    Row second;
+    first.conversation_id = directConversationId(AGENT, RESIDENT);
+    second.conversation_id = first.conversation_id;
+    first.msg_id = FIRST;
+    second.msg_id = SECOND;
+    first.from_id = AGENT;
+    second.from_id = RESIDENT;
+    first.from_name = "Resident";
+    second.from_name = first.from_name;
+    first.message = "first";
+    second.message = "second, quoted";
+    first.created_at = "2026-08-12T12:34:56Z";
+    second.created_at = first.created_at;
+    parseTimeUuid(first.msg_id, first.key);
+    parseTimeUuid(second.msg_id, second.key);
+
+    std::ostringstream output;
+    output << CSV_HEADER;
+    writeCsvRow(output, first);
+    writeCsvRow(output, second);
+
+    return output.str();
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an archive scan caps the display rows but keeps the durable oldest key", "[LLChatServiceHistoryCore]")
+{
+    NamedTempFile file("chatservice", validArchive());
+    ArchiveScan scan;
+    TimeUuidKey oldest;
+    parseTimeUuid(FIRST, oldest);
+
+    UNSCOPED_INFO("valid archive");
+    CHECK(scanArchive(utf8Path(file), AGENT, RESIDENT, 0, 1, scan));
+    UNSCOPED_INFO("two summarized");
+    CHECK(scan.row_count == U32(2));
+    UNSCOPED_INFO("display cap preserves durable oldest");
+    CHECK(scan.oldest == oldest);
+    UNSCOPED_INFO("newest display cap");
+    REQUIRE(scan.display_rows.size() == size_t(1));
+    UNSCOPED_INFO("newest retained");
+    CHECK(scan.display_rows.front().msg_id == std::string(SECOND));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an unterminated final record scans as a torn archive", "[LLChatServiceHistoryCore]")
+{
+    // An incomplete final quoted record is repairable torn-tail state.
+    NamedTempFile file("chatservice", validArchive() + "\"unterminated");
+    ArchiveScan scan;
+
+    UNSCOPED_INFO("torn EOF rejected");
+    CHECK_FALSE(scanArchive(
+        utf8Path(file), AGENT, RESIDENT, 0, 0, scan));
+    UNSCOPED_INFO("torn distinguished");
+    CHECK(scan.state == ARCHIVE_TORN);
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a complete row with an unsupported dialog scans as a corrupt archive", "[LLChatServiceHistoryCore]")
+{
+    // A newline-terminated row with an unsupported dialog is complete corruption,
+    // not a repairable EOF fragment.
+    std::string content = validArchive();
+    const std::string needle = ",0,2026-08-12T12:34:56Z\n";
+    const size_t last = content.rfind(needle);
+    content.replace(last, needle.size(), ",99,2026-08-12T12:34:56Z\n");
+
+    NamedTempFile file("chatservice", content);
+    ArchiveScan scan;
+
+    UNSCOPED_INFO("complete malformed row rejected");
+    CHECK_FALSE(scanArchive(
+        utf8Path(file), AGENT, RESIDENT, 0, 0, scan));
+    UNSCOPED_INFO("corrupt distinguished");
+    CHECK(scan.state == ARCHIVE_CORRUPT);
+}
+
+TEST_CASE("LLChatServiceHistoryCore: server and server cache mute lists are authoritative and the fallback cache is not", "[LLChatServiceHistoryCore]")
+{
+    // A full server response on the first login and a server-validated cache on
+    // the next login must satisfy the same ChatService network prerequisite.
+    UNSCOPED_INFO("full server response is authoritative");
+    CHECK(LLMuteListTestAccess::server());
+    UNSCOPED_INFO("empty server response is authoritative");
+    CHECK(LLMuteListTestAccess::serverEmpty());
+    UNSCOPED_INFO("warm-cache relog remains authoritative");
+    CHECK(LLMuteListTestAccess::serverCache());
+
+    // A timeout fallback has not been validated by the server and remains closed.
+    UNSCOPED_INFO("fallback cache remains degraded");
+    CHECK_FALSE(LLMuteListTestAccess::fallbackCache());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: legacy and resident sender names match for one resident only", "[LLChatServiceHistoryCore]")
+{
+    // Chat service legacy names and viewer resident names identify the same direct sender.
+    UNSCOPED_INFO("legacy and resident names match");
+    CHECK(sameDirectSenderName("Bridie Linden", "bridie.linden"));
+    UNSCOPED_INFO("different residents stay distinct");
+    CHECK_FALSE(sameDirectSenderName("bridie.linden", "beanie.tester"));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a legacy wall time may precede the service boundary only under its earliest offset", "[LLChatServiceHistoryCore]")
+{
+    const F64 wall = 1000.0;
+    const F64 daylight_utc = wall + 7.0 * 3600.0;
+
+    // The earlier UTC-7 interpretation controls conservative seam admission.
+    UNSCOPED_INFO("possible pre-boundary row retained");
+    CHECK(legacyWallMayPrecedeService(wall, daylight_utc + 1.0));
+    UNSCOPED_INFO("row at boundary excluded");
+    CHECK_FALSE(legacyWallMayPrecedeService(wall, daylight_utc));
+    UNSCOPED_INFO("post-boundary row excluded");
+    CHECK_FALSE(legacyWallMayPrecedeService(wall, daylight_utc - 1.0));
+
+    // A boundary between the UTC-7 and UTC-8 interpretations remains ambiguous.
+    UNSCOPED_INFO("ambiguous DST row retained");
+    CHECK(legacyWallMayPrecedeService(wall, daylight_utc + 30.0 * 60.0));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: complete names compare by the resident name in parentheses", "[LLChatServiceHistoryCore]")
+{
+    // Complete transcript names carry the resident identity inside parentheses.
+    UNSCOPED_INFO("complete name matches legacy resident name");
+    CHECK(sameDirectSenderName("Bridie (bridie.linden)", "Bridie Linden"));
+    UNSCOPED_INFO("complete name matches dotted resident name");
+    CHECK(sameDirectSenderName("Bridie (bridie.linden)", "bridie.linden"));
+    UNSCOPED_INFO("single-name resident matches Resident suffix");
+    CHECK(sameDirectSenderName("beanie lin alt (danyanka)", "danyanka Resident"));
+    UNSCOPED_INFO("resident names compare without case");
+    CHECK(sameDirectSenderName("BRIDIE.LINDEN", "Bridie Linden"));
+
+    // Display-name changes and collisions must not change the compared identity.
+    UNSCOPED_INFO("different display names for one resident match");
+    CHECK(sameDirectSenderName("Old Name (bridie.linden)", "New Name (bridie.linden)"));
+    UNSCOPED_INFO("same display name for different residents stays distinct");
+    CHECK_FALSE(sameDirectSenderName("Bridie (bridie.linden)", "Bridie (danyanka)"));
+    UNSCOPED_INFO("display name alone does not identify the resident");
+    CHECK_FALSE(sameDirectSenderName("Bridie", "Bridie (bridie.linden)"));
+    UNSCOPED_INFO("missing names do not identify a resident");
+    CHECK_FALSE(sameDirectSenderName("", ""));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an offline delivery matches its service row by its original body only", "[LLChatServiceHistoryCore]")
+{
+    LLSD history;
+    history["from_id"] = RESIDENT;
+    history["message"] = "hello 1";
+    history["timestamp"] = 1789005928;
+    history["chat_service_msg_id"] = FIRST;
+
+    // Offline delivery carries its original body independently of the localized notice.
+    LLSD delivered = history;
+    delivered.erase("chat_service_msg_id");
+    delivered["message"] = "(Saved Wed Sep 09 22:05:28 2026)hello 1";
+    delivered["chat_service_original_text"] = "hello 1";
+    UNSCOPED_INFO("offline service copy matches delivered original");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+    delivered["message"] = "(Enregistre le mercredi)hello 1";
+    UNSCOPED_INFO("offline notice localization does not affect identity");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+    delivered["message"] = "hello 1 (bonjour 1)";
+    UNSCOPED_INFO("translation does not affect identity");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+
+    // Never infer original text by stripping something the sender may have typed.
+    delivered["message"] = "(Saved Wed Sep 09 22:05:28 2026)hello 1";
+    delivered["chat_service_original_text"] = delivered["message"];
+    UNSCOPED_INFO("literal saved prefix remains message content");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered.erase("chat_service_original_text");
+    UNSCOPED_INFO("unidentified decorated text is not guessed");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["message"] = "hello 1";
+    UNSCOPED_INFO("plain live delivery still matches");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+    delivered["from_id"] = AGENT;
+    UNSCOPED_INFO("another sender stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["from_id"] = RESIDENT;
+    delivered["timestamp"] = 1789005988;
+    UNSCOPED_INFO("another send minute stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: plaintext matches an offline delivery by its logged body and receipt minute", "[LLChatServiceHistoryCore]")
+{
+    LLSD delivered;
+    delivered["from_id"] = RESIDENT;
+    delivered["from"] = "peppertest Resident";
+    delivered["message"] = "(Saved Wed Sep 09 22:05:28 2026)hello 1";
+    delivered["chat_service_original_text"] = "hello 1";
+    delivered["timestamp"] = 1789005928;
+    delivered["chat_service_log_timestamp"] = 1789092365;
+
+    // An offline message delivered the next day has a plaintext receipt minute
+    // that differs from its service send minute; both copies identify the same delivery.
+    LLSD legacy;
+    legacy["from"] = "peppertest";
+    legacy["message"] = delivered["message"];
+    const F64 logged_minute = (1789092365 / 60) * 60;
+    legacy["chat_service_legacy_wall_time"] = logged_minute - 7.0 * 3600.0;
+    UNSCOPED_INFO("plaintext matches the delivery minute");
+    CHECK(sameDirectHistoryOccurrence(legacy, delivered));
+    legacy["chat_service_legacy_wall_time"] = logged_minute - 8.0 * 3600.0;
+    UNSCOPED_INFO("plaintext accepts the standard-time SLT offset");
+    CHECK(sameDirectHistoryOccurrence(legacy, delivered));
+    legacy["message"] = "hello 1";
+    UNSCOPED_INFO("plaintext matches its logged body exactly");
+    CHECK_FALSE(sameDirectHistoryOccurrence(legacy, delivered));
+    legacy["message"] = delivered["message"];
+    legacy.erase("chat_service_legacy_wall_time");
+    UNSCOPED_INFO("undated plaintext is not guessed");
+    CHECK_FALSE(sameDirectHistoryOccurrence(legacy, delivered));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: interleaving places timed history around live rows without reordering them", "[LLChatServiceHistoryCore]")
+{
+    auto row = [](const std::string& text, S32 timestamp)
+    {
+        return LLSD().with("message", text).with("timestamp", timestamp);
+    };
+    const std::list<LLSD> live{
+        row("hello 3", 1789005932), row("hello 2", 1789005930), row("hello 1", 1789005928)
+    };
+    const std::list<LLSD> history{row("hello", 1789005955), row("older", 1789005800)};
+    auto merged = interleaveDirectHistory(history, live);
+    REQUIRE(merged.size() >= size_t(5));
+    auto it = merged.begin();
+    UNSCOPED_INFO("fourth message follows the offline deliveries");
+    CHECK((*it++)["message"].asString() == "hello");
+    UNSCOPED_INFO("third delivery keeps its place");
+    CHECK((*it++)["message"].asString() == "hello 3");
+    UNSCOPED_INFO("second delivery keeps its place");
+    CHECK((*it++)["message"].asString() == "hello 2");
+    UNSCOPED_INFO("first delivery keeps its place");
+    CHECK((*it++)["message"].asString() == "hello 1");
+    UNSCOPED_INFO("older history precedes the live conversation");
+    CHECK((*it++)["message"].asString() == "older");
+    UNSCOPED_INFO("all occurrences retained");
+    CHECK(it == merged.end());
+
+    // Timestamp ties keep the existing live row later; undated history stays at the start.
+    merged = interleaveDirectHistory({row("tie", 1789005930), row("undated", 0)}, live);
+    REQUIRE(merged.size() >= size_t(5));
+    it = merged.begin();
+    UNSCOPED_INFO("newest live stays newest");
+    CHECK((*it++)["message"].asString() == "hello 3");
+    UNSCOPED_INFO("live wins timestamp tie");
+    CHECK((*it++)["message"].asString() == "hello 2");
+    UNSCOPED_INFO("equal-time history retains its occurrence");
+    CHECK((*it++)["message"].asString() == "tie");
+    UNSCOPED_INFO("oldest live stays in delivery order");
+    CHECK((*it++)["message"].asString() == "hello 1");
+    UNSCOPED_INFO("undated history remains before live rows");
+    CHECK((*it++)["message"].asString() == "undated");
+    UNSCOPED_INFO("interleaving leaves source lists unchanged");
+    CHECK((live.size() == 3 && history.size() == 2));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a supplied send second must match the service second exactly", "[LLChatServiceHistoryCore]")
+{
+    // A retained service row at :05 is a different occurrence from a new send at
+    // :35, even when its sender, text, and minute are identical.
+    LLSD history;
+    history["from_id"] = RESIDENT;
+    history["message"] = "ok";
+    history["timestamp"] = 1789005905;
+    history["chat_service_msg_id"] = FIRST;
+
+    LLSD delivered = history;
+    delivered.erase("chat_service_msg_id");
+    delivered["timestamp"] = 1789005935;
+    UNSCOPED_INFO("a later repeat in the same minute stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["timestamp"] = 1789005904;
+    UNSCOPED_INFO("a preceding send in the same minute stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["timestamp"] = 1789005905;
+    UNSCOPED_INFO("the matching service second reconciles");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+
+    // Missing precision provides no evidence for consuming a service occurrence.
+    delivered["timestamp"] = 0;
+    UNSCOPED_INFO("an untimed delivery stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a local echo reconciles within a minute of clock skew by sender and original body", "[LLChatServiceHistoryCore]")
+{
+    LLSD history;
+    history["from_id"] = AGENT;
+    history["message"] = "hello";
+    history["timestamp"] = 1789005905;
+    history["chat_service_msg_id"] = FIRST;
+
+    // Outgoing echoes use a local clock; server persistence may occur in another second.
+    LLSD echo = history;
+    echo.erase("chat_service_msg_id");
+    echo["chat_service_time_source"] = "local";
+    echo["timestamp"] = 1789005904;
+    UNSCOPED_INFO("local send before persistence reconciles");
+    CHECK(sameDirectHistoryOccurrence(history, echo));
+    echo["timestamp"] = 1789005906;
+    UNSCOPED_INFO("local clock ahead of the server reconciles");
+    CHECK(sameDirectHistoryOccurrence(history, echo));
+
+    // Timestamp tolerance keeps sender/body identity and rejects a full minute of skew.
+    echo["message"] = "hello (bonjour)";
+    echo["chat_service_original_text"] = "hello";
+    UNSCOPED_INFO("translated local echo reconciles its original body");
+    CHECK(sameDirectHistoryOccurrence(history, echo));
+    echo["chat_service_original_text"] = "another message";
+    UNSCOPED_INFO("different local body stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, echo));
+    echo["chat_service_original_text"] = "hello";
+    echo["from_id"] = RESIDENT;
+    UNSCOPED_INFO("another sender stays distinct for local time");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, echo));
+    echo["from_id"] = AGENT;
+    echo["timestamp"] = 1789005965;
+    UNSCOPED_INFO("local time a full minute away stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, echo));
+
+    // Supplied timestamps use exact seconds even for the current agent's messages.
+    echo["timestamp"] = 1789005906;
+    echo["chat_service_time_source"] = "sent";
+    UNSCOPED_INFO("supplied outgoing timestamp requires exact seconds");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, echo));
+    echo["timestamp"] = 1789005905;
+    UNSCOPED_INFO("supplied outgoing timestamp matches its service second");
+    CHECK(sameDirectHistoryOccurrence(history, echo));
+    echo["chat_service_time_source"] = "local";
+    history["timestamp"] = 0;
+    UNSCOPED_INFO("local provenance does not make an untimed service row match");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, echo));
+}
+
+// Repeated incoming bodies share a plaintext minute but have distinct supplied seconds.
+LLSD repeatedDelivery(S32 second)
+{
+    LLSD message;
+    message["from_id"] = RESIDENT;
+    message["from"] = "Example Resident";
+    message["message"] = "ok";
+    message["timestamp"] = 1789005900 + second;
+    message["chat_service_log_timestamp"] = message["timestamp"];
+    return message;
+}
+
+LLSD serviceCopy(const LLSD& delivery, const std::string& id)
+{
+    LLSD message = delivery;
+    message["chat_service_msg_id"] = id;
+    return message;
+}
+
+LLSD plaintextCopy(const LLSD& delivery)
+{
+    LLSD message;
+    message["from"] = delivery["from"];
+    message["message"] = delivery["message"];
+    message["chat_service_legacy_wall_time"] =
+        F64(delivery["timestamp"].asInteger() / 60 * 60) - 7.0 * 3600.0;
+    return message;
+}
+
+TEST_CASE("LLChatServiceHistoryCore: partial service coverage reserves the exact delivery before the plaintext minute", "[LLChatServiceHistoryCore]")
+{
+    const LLSD earlier = repeatedDelivery(5);
+    const LLSD later = repeatedDelivery(35);
+    const LLSD legacy = plaintextCopy(earlier);
+    const LLSD service = serviceCopy(later, FIRST);
+
+    // Partial coverage leaves plaintext before the only service row, which must
+    // reserve the :35 delivery before the plaintext minute can consume it.
+    for (bool history_reversed : {false, true})
+    {
+        for (bool live_reversed : {false, true})
+        {
+            std::list<LLSD> history{legacy, service};
+            std::list<LLSD> live{later, earlier};
+            if (history_reversed) history.reverse();
+            if (live_reversed) live.reverse();
+            UNSCOPED_INFO("partial service coverage reconciles both deliveries in either order");
+            CHECK(filterDirectHistoryDuplicates(history, live).empty());
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: each live occurrence consumes one history row and unmatched rows keep their places", "[LLChatServiceHistoryCore]")
+{
+    const LLSD earlier = repeatedDelivery(5);
+    const LLSD later = repeatedDelivery(35);
+    const LLSD legacy = plaintextCopy(earlier);
+    LLSD keep_before = legacy;
+    keep_before["message"] = "before";
+    LLSD keep_after = legacy;
+    keep_after["message"] = "after";
+    const std::list<LLSD> history{legacy, keep_before, serviceCopy(later, FIRST), legacy, keep_after};
+    const std::list<LLSD> live{later, earlier};
+
+    // One exact reservation leaves only one occurrence for plaintext. Extra
+    // identical history and unrelated rows remain in their original positions.
+    const auto filtered = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("each live occurrence is consumed once");
+    REQUIRE(filtered.size() == size_t(3));
+    auto row = filtered.begin();
+    UNSCOPED_INFO("first unmatched row keeps its position");
+    CHECK((*row++)["message"].asString() == "before");
+    UNSCOPED_INFO("extra repeated occurrence retains its plaintext source");
+    CHECK_FALSE(row->has("chat_service_msg_id"));
+    UNSCOPED_INFO("extra repeated occurrence remains");
+    CHECK((*row++)["message"].asString() == "ok");
+    UNSCOPED_INFO("last unmatched row keeps its position");
+    CHECK((*row++)["message"].asString() == "after");
+    UNSCOPED_INFO("history input is unchanged");
+    CHECK(history.size() == size_t(5));
+    UNSCOPED_INFO("live input is unchanged");
+    CHECK(live.size() == size_t(2));
+    UNSCOPED_INFO("no live rows leaves history intact");
+    CHECK(filterDirectHistoryDuplicates(history, {}).size() == history.size());
+    UNSCOPED_INFO("no history leaves an empty result");
+    CHECK(filterDirectHistoryDuplicates({}, live).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: exact supplied matches take precedence over the local clock fallback", "[LLChatServiceHistoryCore]")
+{
+    const LLSD supplied = repeatedDelivery(5);
+    LLSD local = repeatedDelivery(34);
+    local["chat_service_time_source"] = "local";
+    const LLSD service_earlier = serviceCopy(supplied, FIRST);
+    const LLSD service_later = serviceCopy(repeatedDelivery(35), SECOND);
+
+    // A local-clock fallback must not take an exact supplied match's place,
+    // regardless of the order of the service rows or live deliveries.
+    for (bool history_reversed : {false, true})
+    {
+        for (bool live_reversed : {false, true})
+        {
+            std::list<LLSD> history{service_earlier, service_later};
+            std::list<LLSD> live{local, supplied};
+            if (history_reversed) history.reverse();
+            if (live_reversed) live.reverse();
+            UNSCOPED_INFO("exact service matches precede local-clock fallback");
+            CHECK(filterDirectHistoryDuplicates(history, live).empty());
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a translated delivery consumes one decorated plaintext and one raw service copy", "[LLChatServiceHistoryCore]")
+{
+    LLSD earlier = repeatedDelivery(5);
+    LLSD later = repeatedDelivery(35);
+    const LLSD service_earlier = serviceCopy(earlier, FIRST);
+    const LLSD service_later = serviceCopy(later, SECOND);
+    for (LLSD* delivery : {&earlier, &later})
+    {
+        (*delivery)["chat_service_original_text"] = "ok";
+        (*delivery)["message"] = "ok (d'accord)";
+    }
+    const LLSD legacy = plaintextCopy(earlier);
+    std::list<LLSD> history{legacy, service_later, legacy, service_earlier};
+    const std::list<LLSD> live{later, earlier};
+
+    // Translated or saved delivery can cover both its decorated plaintext and
+    // raw service representation, with separate one-for-one consumption.
+    UNSCOPED_INFO("decorated plaintext and raw service copies both reconcile");
+    CHECK(filterDirectHistoryDuplicates(history, live).empty());
+    history.push_front(legacy);
+    history.push_back(service_earlier);
+    const auto filtered = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("extra occurrences in each representation remain");
+    REQUIRE(filtered.size() == size_t(2));
+    UNSCOPED_INFO("extra decorated plaintext retains its source");
+    CHECK_FALSE(filtered.front().has("chat_service_msg_id"));
+    UNSCOPED_INFO("extra service retains its source");
+    CHECK(filtered.back()["chat_service_msg_id"].asString() == std::string(FIRST));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an online receipt may trail the service record within a rolling window", "[LLChatServiceHistoryCore]")
+{
+    // Service creation can precede online delivery across a second boundary.
+    LLSD history = serviceCopy(repeatedDelivery(0), FIRST);
+    history["message"] = "123";
+    history["datetime"] = "2026-09-10T17:17:00.904000Z";
+    history["timestamp"] = S32(LLDate(history["datetime"].asString()).secondsSinceEpoch());
+    LLSD delivered = history;
+    delivered.erase("chat_service_msg_id");
+    delivered["timestamp"] = 1789060621;
+    delivered["chat_service_time_source"] = "receipt";
+    UNSCOPED_INFO("online delivery reconciles the preceding service second");
+    CHECK(filterDirectHistoryDuplicates({history}, {delivered}).empty());
+
+    // Only online delivery admits this delay; offline send times retain their precision.
+    delivered["chat_service_time_source"] = "sent";
+    UNSCOPED_INFO("offline send time stays exact");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["timestamp"] = 1789060619;
+    UNSCOPED_INFO("offline send time rejects later service recording");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["chat_service_time_source"] = "receipt";
+    UNSCOPED_INFO("online receipt can precede service recording");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+    delivered["timestamp"] = 1789060681;
+    UNSCOPED_INFO("delivery outside the rolling window stays distinct");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+
+    // Elapsed delay crosses minute boundaries, with exact sender and body checks.
+    history["timestamp"] = 1789060619;
+    delivered["timestamp"] = 1789060620;
+    UNSCOPED_INFO("delivery delay crosses a minute boundary");
+    CHECK(sameDirectHistoryOccurrence(history, delivered));
+    delivered["from_id"] = AGENT;
+    UNSCOPED_INFO("delivery tolerance retains sender identity");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+    delivered["from_id"] = RESIDENT;
+    delivered["message"] = "1234";
+    UNSCOPED_INFO("delivery tolerance retains body identity");
+    CHECK_FALSE(sameDirectHistoryOccurrence(history, delivered));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a receipt consumes the most recent eligible repeated send", "[LLChatServiceHistoryCore]")
+{
+    const LLSD earlier = serviceCopy(repeatedDelivery(0), FIRST);
+    const LLSD later = serviceCopy(repeatedDelivery(1), SECOND);
+    LLSD delivered = repeatedDelivery(1);
+    delivered["chat_service_time_source"] = "receipt";
+
+    // Prefer the most recent eligible occurrence when a receipt can match repeated
+    // sends, preserving the earlier occurrence in history.
+    for (bool reversed : {false, true})
+    {
+        std::list<LLSD> history{earlier, later};
+        if (reversed) history.reverse();
+        const auto filtered = filterDirectHistoryDuplicates(history, {delivered});
+        UNSCOPED_INFO("one live delivery consumes one service occurrence");
+        REQUIRE(filtered.size() == size_t(1));
+        UNSCOPED_INFO("the earlier repeated send survives");
+        CHECK(filtered.front()["chat_service_msg_id"].asString() == std::string(FIRST));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: deliveries in one second stay separate and reserve before local and plaintext matches", "[LLChatServiceHistoryCore]")
+{
+    const LLSD earlier = serviceCopy(repeatedDelivery(0), FIRST);
+    const LLSD later = serviceCopy(repeatedDelivery(1), SECOND);
+    LLSD first_delivery = repeatedDelivery(1);
+    first_delivery["chat_service_time_source"] = "receipt";
+    LLSD second_delivery = first_delivery;
+
+    // Two deliveries in one second remain separate occurrences even when one
+    // service creation crossed the boundary.
+    for (bool reversed : {false, true})
+    {
+        std::list<LLSD> history{earlier, later};
+        if (reversed) history.reverse();
+        UNSCOPED_INFO("both adjacent service occurrences reconcile one-for-one");
+        CHECK(filterDirectHistoryDuplicates(history, {first_delivery, second_delivery}).empty());
+    }
+
+    // Delivery matches reserve their occurrence before local clocks and plaintext minutes.
+    LLSD local = repeatedDelivery(0);
+    local["chat_service_time_source"] = "local";
+    const LLSD much_later = serviceCopy(repeatedDelivery(35), SECOND);
+    UNSCOPED_INFO("delivery matching precedes local-clock matching");
+    CHECK(filterDirectHistoryDuplicates({earlier, much_later}, {local, first_delivery}).empty());
+    const LLSD legacy = plaintextCopy(first_delivery);
+    UNSCOPED_INFO("delivery matching precedes plaintext matching");
+    CHECK(filterDirectHistoryDuplicates({legacy, earlier}, {first_delivery, repeatedDelivery(35)}).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: the receipt window counts elapsed seconds across minute hour and day boundaries", "[LLChatServiceHistoryCore]")
+{
+    // Service lead and delivery delay use elapsed seconds across minute, hour,
+    // and day boundaries instead of comparing calendar minutes.
+    for (const char* created : {"2026-09-10T12:34:01Z", "2026-09-10T12:59:59Z",
+                               "2026-09-10T13:00:01Z", "2026-09-10T23:59:59Z",
+                               "2026-09-11T00:00:01Z"})
+    {
+        LLSD history = serviceCopy(repeatedDelivery(0), FIRST);
+        const S32 timestamp = S32(LLDate(created).secondsSinceEpoch());
+        history["timestamp"] = timestamp;
+        LLSD delivered = repeatedDelivery(0);
+        delivered["chat_service_time_source"] = "receipt";
+        for (S32 delay : {-5, -4, -2, -1, 0, 2, 5, 30, 60})
+        {
+            delivered["timestamp"] = timestamp + delay;
+            UNSCOPED_INFO("receipt inside the rolling window reconciles");
+            CHECK(filterDirectHistoryDuplicates({history}, {delivered}).empty());
+        }
+        for (S32 delay : {-6, 61})
+        {
+            delivered["timestamp"] = timestamp + delay;
+            UNSCOPED_INFO("receipt outside the rolling window remains");
+            CHECK(filterDirectHistoryDuplicates({history}, {delivered}).size() == size_t(1));
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: delayed repeats pair newest first whatever the source order", "[LLChatServiceHistoryCore]")
+{
+    // Both sides can contain repeated bodies with different delays or service
+    // lead. Newest-first pairing keeps a newer receipt from consuming an older
+    // receipt's only candidate, even when their timestamps match exactly.
+    for (const auto times : {std::array<S32, 4>{0, 15, 5, 30}, {0, 15, 30, 75},
+                            {0, 10, 10, 65}, {65, 70, 60, 65}, {0, 6, -4, 2}})
+    {
+        const LLSD first = serviceCopy(repeatedDelivery(times[0]), FIRST);
+        const LLSD second = serviceCopy(repeatedDelivery(times[1]), SECOND);
+        LLSD first_delivery = repeatedDelivery(times[2]);
+        LLSD second_delivery = repeatedDelivery(times[3]);
+        first_delivery["chat_service_time_source"] = "receipt";
+        second_delivery["chat_service_time_source"] = "receipt";
+        for (bool history_reversed : {false, true})
+        {
+            for (bool live_reversed : {false, true})
+            {
+                std::list<LLSD> history{first, second};
+                std::list<LLSD> live{first_delivery, second_delivery};
+                if (history_reversed) history.reverse();
+                if (live_reversed) live.reverse();
+                UNSCOPED_INFO("delayed repeats reconcile independently of source order");
+                CHECK(filterDirectHistoryDuplicates(history, live).empty());
+            }
+        }
+    }
+}
+
+// Stable service IDs let the view retain context without guessing plaintext identity.
+LLSD contextRow(U8 ordinal)
+{
+    LLUUID id(FIRST);
+    id.mData[3] = ordinal;
+    LLSD row = serviceCopy(repeatedDelivery(ordinal * 10), id.asString().c_str());
+    row["message"] = std::to_string(ordinal);
+    return row;
+}
+
+LLSD liveCopy(LLSD row)
+{
+    row.erase("chat_service_msg_id");
+    row["is_history"] = false;
+    return row;
+}
+
+TEST_CASE("LLChatServiceHistoryCore: reapplying a preview is idempotent and canonical ids win over a stale preview", "[LLChatServiceHistoryCore]")
+{
+    const LLSD first = serviceCopy(repeatedDelivery(5), FIRST);
+    const LLSD second = serviceCopy(repeatedDelivery(35), SECOND);
+    const LLSD legacy = plaintextCopy(first);
+    History history;
+    history.setLoaded(mergeDirectHistory({legacy, legacy, legacy}, {first}));
+
+    // Reapplying a preview must not consume the next identical plaintext occurrence.
+    const Messages expected{legacy, first, second};
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto result = history.compose({second, first}, {}, 10);
+        UNSCOPED_INFO("preview keeps all three occurrences");
+        REQUIRE(result.size() == expected.size());
+        UNSCOPED_INFO("preview is idempotent and chronological");
+        CHECK(std::equal(result.begin(), result.end(), expected.begin(),
+            [](const LLSD& a, const LLSD& b) { return llsd_equals(a, b); }));
+    }
+
+    // Canonical ID identity wins over a stale preview, and limits follow reconciliation.
+    LLSD stale = first;
+    stale["message"] = "stale preview";
+    const auto limited = history.compose({second, stale, second}, {}, 2);
+    UNSCOPED_INFO("duplicate IDs do not evict other history");
+    REQUIRE(limited.size() == size_t(2));
+    UNSCOPED_INFO("canonical value wins");
+    CHECK(limited.front()["message"].asString() == std::string("ok"));
+    UNSCOPED_INFO("service tail stays in TimeUUID order");
+    CHECK(limited.back()["chat_service_msg_id"].asString() == std::string(SECOND));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: retained context survives rollover and live replacement until released or cleared", "[LLChatServiceHistoryCore]")
+{
+    const Messages initial{contextRow(1), contextRow(2), contextRow(3)};
+    const Messages bounded{contextRow(2), contextRow(3), contextRow(4)};
+    const LLSD delivered = liveCopy(contextRow(4));
+    History history;
+    history.setLoaded(initial);
+    history.compose({}, {}, 3, true);
+    history.setLoaded(bounded);
+    auto result = history.compose({}, {delivered}, 3, true);
+    UNSCOPED_INFO("live copy does not evict older visible context");
+    REQUIRE(result.size() == size_t(3));
+    UNSCOPED_INFO("oldest context survives rollover");
+    CHECK(result.front()["message"].asString() == std::string("1"));
+
+    // A late delivery may replace any retained row, including the newest one.
+    for (U8 ordinal : {2, 3})
+    {
+        history.clear();
+        history.setLoaded(initial);
+        history.compose({}, {}, 3, true);
+        history.setLoaded(bounded);
+        history.compose({}, {delivered}, 3, true);
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            result = history.compose({}, {liveCopy(contextRow(ordinal)), delivered}, 3, true);
+            UNSCOPED_INFO("late live delivery replaces one retained occurrence");
+            REQUIRE(result.size() == size_t(2));
+            UNSCOPED_INFO("unrelated context remains");
+            CHECK(result.front()["message"].asString() == std::string("1"));
+        }
+    }
+
+    history.clear();
+    history.setLoaded(initial);
+    history.compose({}, {}, 3, true);
+    history.setLoaded({contextRow(4), contextRow(5), contextRow(6)});
+    const Messages live{liveCopy(contextRow(6)), liveCopy(contextRow(5)), delivered};
+    UNSCOPED_INFO("an all-live source retains open history");
+    CHECK(history.compose({}, live, 3, true).size() == size_t(3));
+    UNSCOPED_INFO("repeated all-live publication is stable");
+    CHECK(history.compose({}, live, 3, true).size() == size_t(3));
+    UNSCOPED_INFO("hidden view releases old context");
+    CHECK(history.compose({}, live, 3).empty());
+    history.setLoaded(initial);
+    history.compose({}, {}, 3, true);
+    history.setLoaded({});
+    UNSCOPED_INFO("empty load clears retained context");
+    CHECK(history.compose({}, {}, 3, true).empty());
+
+    // Revoking service consent leaves plaintext, while deletion clears both sources.
+    const LLSD legacy = plaintextCopy(repeatedDelivery(5));
+    history.setLoaded({legacy, contextRow(1)});
+    history.compose({}, {}, 3, true);
+    history.clearService();
+    UNSCOPED_INFO("service revocation keeps legacy");
+    CHECK(history.compose({}, {}, 3, true).size() == size_t(1));
+    history.clear();
+    UNSCOPED_INFO("clear removes every historical source");
+    CHECK(history.compose({}, {}, 3, true).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: replacing history keeps live rows and offers and reindexes only on change", "[LLChatServiceHistoryCore]")
+{
+    LLSD offer;
+    offer["notification_id"] = AGENT;
+    offer["timestamp"] = 0;
+    offer["is_history"] = false;
+    LLSD first = liveCopy(contextRow(4));
+    LLSD second = first;
+    first["message"] = "test";
+    second["message"] = "test";
+    second["timestamp"] = first["timestamp"].asInteger() + 1;
+    Messages current{second, first, offer};
+    UNSCOPED_INFO("initial history changes the model");
+    CHECK(replaceHistory(current, {contextRow(1)}, true));
+    UNSCOPED_INFO("two live tests and the offer survive");
+    REQUIRE(current.size() == size_t(4));
+    auto row = current.begin();
+    UNSCOPED_INFO("latest test stays live");
+    CHECK((*row++)["message"].asString() == std::string("test"));
+    UNSCOPED_INFO("first test stays live");
+    CHECK((*row++)["message"].asString() == std::string("test"));
+    UNSCOPED_INFO("inline offer identity survives");
+    CHECK((*row)["notification_id"].asUUID() == AGENT);
+    UNSCOPED_INFO("identical publication avoids replay");
+    CHECK_FALSE(replaceHistory(current, {contextRow(1)}, true));
+    UNSCOPED_INFO("clearing history changes the model");
+    CHECK(replaceHistory(current, {}, true));
+    UNSCOPED_INFO("clearing history retains both live sends and offer");
+    CHECK(current.size() == size_t(3));
+    S32 index = 3;
+    for (const LLSD& message : current)
+    {
+        --index;
+        UNSCOPED_INFO("indexes remain contiguous");
+        CHECK(message["index"].asInteger() == index);
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: live capture keeps time provenance and the original body through translation", "[LLChatServiceHistoryCore]")
+{
+    constexpr U32 received = 1789060621;
+    for (bool supplied : {false, true})
+    {
+        U32 timestamp = supplied ? received : 0;
+        LLSD captured = captureLiveMessage("123", timestamp, incomingContext("123", true), received);
+        UNSCOPED_INFO("supplied and synthesized receipt times agree");
+        CHECK(timestamp == received);
+        captured = captureLiveMessage("123 (translated)", timestamp, captured, received + 90);
+        LLSD row = repeatedDelivery(0);
+        row["timestamp"] = static_cast<S32>(timestamp);
+        row["message"] = "123 (translated)";
+        recordLiveMessage(row, captured, received + 90);
+        UNSCOPED_INFO("translation preserves original body");
+        CHECK(row["chat_service_original_text"].asString() == std::string("123"));
+        UNSCOPED_INFO("translation preserves receipt provenance");
+        CHECK(row["chat_service_time_source"].asString() == std::string("receipt"));
+        UNSCOPED_INFO("logging time follows translation completion");
+        CHECK(row["chat_service_log_timestamp"].asInteger() == S32(received + 90));
+        LLSD service = serviceCopy(repeatedDelivery(0), FIRST);
+        service["message"] = "123";
+        service["timestamp"] = S32(received - 1);
+        UNSCOPED_INFO("translation delay does not affect service matching");
+        CHECK(sameDirectHistoryOccurrence(service, row));
+        service["timestamp"] = S32(received + 1);
+        UNSCOPED_INFO("later service recording matches the captured receipt");
+        CHECK(sameDirectHistoryOccurrence(service, row));
+    }
+
+    U32 timestamp = received - 86400;
+    LLSD offline = captureLiveMessage("(Saved yesterday)123", timestamp, incomingContext("123", false), received);
+    UNSCOPED_INFO("offline delivery keeps the send time");
+    CHECK(timestamp == received - 86400);
+    UNSCOPED_INFO("offline time is authoritative");
+    CHECK(offline["chat_service_time_source"].asString() == std::string("sent"));
+    timestamp = 0;
+    offline = captureLiveMessage("(Saved)123", timestamp, incomingContext("123", false), received);
+    UNSCOPED_INFO("missing send time cannot become authoritative");
+    CHECK(offline["chat_service_time_source"].asString() == std::string("local"));
+    timestamp = 0;
+    LLSD echo = captureLiveMessage("123", timestamp, LLSD(), received);
+    UNSCOPED_INFO("outgoing echo captures its local clock");
+    CHECK(echo["chat_service_time_source"].asString() == std::string("local"));
+    UNSCOPED_INFO("outgoing echo captures before translation");
+    CHECK(timestamp == received);
+}
+
+TEST_CASE("LLChatServiceHistoryCore: capped rollover retains older plaintext and overlapping windows keep occurrence counts", "[LLChatServiceHistoryCore]")
+{
+    const LLSD old = contextRow(1);
+    const LLSD legacy = plaintextCopy(old);
+    const LLSD live = liveCopy(contextRow(4));
+    History history;
+    history.setLoaded({legacy, contextRow(2), contextRow(3)});
+    history.compose({}, {}, 3, true);
+    history.setLoaded({contextRow(2), contextRow(3), contextRow(4)});
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto result = history.compose({}, {live}, 3, true);
+        UNSCOPED_INFO("capped service rollover retains older plaintext");
+        REQUIRE(result.size() == size_t(3));
+        UNSCOPED_INFO("retained plaintext keeps its source");
+        CHECK_FALSE(result.front().has("chat_service_msg_id"));
+    }
+    history.setLoaded({old, contextRow(2), contextRow(3)});
+    auto result = history.compose({}, {live}, 3, true);
+    UNSCOPED_INFO("new archive row replaces retained plaintext");
+    REQUIRE(result.size() == size_t(3));
+    UNSCOPED_INFO("replaced plaintext acquires the canonical ID");
+    CHECK(result.front()["chat_service_msg_id"].asString() == old["chat_service_msg_id"].asString());
+
+    // Each window may already have consumed a different member of repeated plaintext.
+    const LLSD first = serviceCopy(repeatedDelivery(5), FIRST);
+    const LLSD second = serviceCopy(repeatedDelivery(35), SECOND);
+    const LLSD repeat = plaintextCopy(first);
+    const Messages left = mergeDirectHistory({repeat, repeat, repeat}, {first});
+    const Messages right = mergeDirectHistory({repeat, repeat, repeat}, {second});
+    result = mergeDirectHistory(left, right);
+    UNSCOPED_INFO("overlapping windows preserve three original occurrences");
+    CHECK(result.size() == size_t(3));
+    UNSCOPED_INFO("repeated seam publication is stable");
+    CHECK(mergeDirectHistory(result, right).size() == size_t(3));
+    UNSCOPED_INFO("source window order preserves counts");
+    CHECK(mergeDirectHistory(right, left).size() == size_t(3));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an offline repeat within the receipt window keeps its earlier place", "[LLChatServiceHistoryCore]")
+{
+    // Recreating a session leaves only the latest delivery live. An offline repeat
+    // within its receipt window must retain its earlier place in the transcript.
+    LLSD earlier = contextRow(1);
+    earlier["message"] = "hello";
+    earlier["timestamp"] = 1789092403;
+    LLSD between = contextRow(2);
+    between["message"] = "6";
+    between["timestamp"] = 1789092414;
+    LLSD later = contextRow(3);
+    later["message"] = "hello";
+    later["timestamp"] = 1789092446;
+    const Messages archive{earlier, between, later};
+
+    for (S32 delay : {-5, -1, 0, 2, 15})
+    {
+        History history;
+        history.setLoaded({earlier, between});
+        LLSD delivery = liveCopy(later);
+        delivery["chat_service_time_source"] = "receipt";
+        delivery["timestamp"] = later["timestamp"].asInteger() + delay;
+        Messages current{delivery};
+
+        // The archive read can complete before the latest service head arrives.
+        replaceHistory(current, history.compose({}, {delivery}, 10, true), true);
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose(archive, {delivery}, 10, true);
+            UNSCOPED_INFO("one delivery replaces only one historical occurrence");
+            REQUIRE(composed.size() == size_t(2));
+            UNSCOPED_INFO("the earlier hello retains its identity and position");
+            CHECK(composed.front()["chat_service_msg_id"].asString() == earlier["chat_service_msg_id"].asString());
+            const bool changed = replaceHistory(current, composed, true);
+            UNSCOPED_INFO("unchanged publications do not replay the transcript");
+            CHECK(changed == (publication == 0));
+            UNSCOPED_INFO("both hellos and the intervening message remain");
+            CHECK(current.size() == size_t(3));
+        }
+
+        // Reopening with all rows historical preserves the same message order.
+        Messages reopened;
+        replaceHistory(reopened, archive, true);
+        auto expected = reopened.begin();
+        for (const LLSD& row : current)
+        {
+            REQUIRE(expected != reopened.end());
+            UNSCOPED_INFO("reopening preserves message order");
+            CHECK(row["message"].asString() == (*expected++)["message"].asString());
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a system entry in discovery does not block the resident entry", "[LLChatServiceHistoryCore]")
+{
+    // System traffic may share a discovery response with ordinary resident history.
+    LLSD peer;
+    peer["conversation_type"] = "direct";
+    peer["conversation_id"] = directConversationId(AGENT, RESIDENT);
+    peer["other_participant_id"] = RESIDENT.asString();
+    peer["last_msg_id"] = SECOND;
+    LLSD system = peer;
+    system["conversation_id"] = directConversationId(AGENT, LLUUID::null);
+    system["other_participant_id"] = LLUUID::null.asString();
+
+    for (bool system_first : {true, false})
+    {
+        LLSD list = LLSD::emptyArray();
+        list.append(system_first ? system : peer);
+        list.append(system_first ? peer : system);
+        std::vector<ListEntry> entries;
+        UNSCOPED_INFO("system entry does not block resident discovery");
+        CHECK(validateConversationList(list, AGENT, entries));
+        UNSCOPED_INFO("only the resident is scheduled");
+        REQUIRE(entries.size() == size_t(1));
+        UNSCOPED_INFO("resident identity preserved");
+        CHECK(entries.front().resident_id == RESIDENT);
+        UNSCOPED_INFO("history token preserved");
+        CHECK(entries.front().last_msg_id == std::string(SECOND));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: replies captured before their service rows are recorded are not duplicated", "[LLChatServiceHistoryCore]")
+{
+    // Missing online wire timestamps are captured before the corresponding
+    // service rows are recorded. The two representations describe one reply.
+    Messages archive;
+    Messages live;
+    U8 ordinal = 0;
+    for (const char* body : {"30", "thnk you"})
+    {
+        const U32 received = ordinal ? 1789489070 : 1789489012;
+        LLSD service = contextRow(++ordinal);
+        service["message"] = body;
+        service["timestamp"] = static_cast<S32>(received + 1);
+        archive.push_back(service);
+
+        U32 timestamp = 0;
+        const LLSD context = captureLiveMessage(body, timestamp, incomingContext(body, true), received);
+        LLSD delivery = liveCopy(service);
+        delivery["timestamp"] = static_cast<S32>(timestamp);
+        recordLiveMessage(delivery, context, received);
+        live.push_front(delivery);
+    }
+
+    // Preview and durable reads can arrive in either order. Repeated publication
+    // must keep both live replies without adding historical copies or replaying them.
+    for (bool loaded_first : {false, true})
+    {
+        History history;
+        if (loaded_first) history.setLoaded(archive);
+        Messages current = live;
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose(archive, live, 200, true);
+            UNSCOPED_INFO("recording after receipt does not add history copies");
+            CHECK(composed.empty());
+            UNSCOPED_INFO("unchanged live replies do not need replay");
+            CHECK_FALSE(replaceHistory(current, composed, true));
+            UNSCOPED_INFO("both replies remain visible once");
+            CHECK(current.size() == size_t(2));
+            history.setLoaded(archive);
+        }
+
+        const auto durable = history.compose({}, live, 200, true);
+        UNSCOPED_INFO("durable read reconciles after preview expires");
+        CHECK(durable.empty());
+        UNSCOPED_INFO("durable publication does not replay replies");
+        CHECK_FALSE(replaceHistory(current, durable, true));
+        REQUIRE_FALSE(current.empty());
+        UNSCOPED_INFO("newest reply retains delivery order");
+        CHECK(current.front()["message"].asString() == std::string("thnk you"));
+        UNSCOPED_INFO("earliest reply retains delivery order");
+        CHECK(current.back()["message"].asString() == std::string("30"));
+        UNSCOPED_INFO("newest reply stays live");
+        CHECK_FALSE(current.front()["is_history"].asBoolean());
+        UNSCOPED_INFO("earliest reply stays live");
+        CHECK_FALSE(current.back()["is_history"].asBoolean());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a later identical service message stays a separate occurrence", "[LLChatServiceHistoryCore]")
+{
+    // With only the first delivery live, a later identical service message is a
+    // separate occurrence. Preserve its ID and the intervening message's position.
+    LLSD earlier = contextRow(1);
+    earlier["message"] = "hello";
+    LLSD between = contextRow(2);
+    between["message"] = "6";
+    between["timestamp"] = earlier["timestamp"].asInteger() + 15;
+    LLSD later = contextRow(3);
+    later["message"] = "hello";
+    later["timestamp"] = earlier["timestamp"].asInteger() + 30;
+    LLSD delivery = liveCopy(earlier);
+    delivery["chat_service_time_source"] = "receipt";
+    History history;
+    history.setLoaded({earlier, between, later});
+
+    const auto composed = history.compose({}, {delivery}, 200, true);
+    UNSCOPED_INFO("one receipt consumes one occurrence");
+    REQUIRE(composed.size() == size_t(2));
+    UNSCOPED_INFO("later repeat keeps its service ID");
+    CHECK(composed.back()["chat_service_msg_id"].asString() == later["chat_service_msg_id"].asString());
+    Messages current{delivery};
+    UNSCOPED_INFO("unseen service messages enter the transcript");
+    CHECK(replaceHistory(current, composed, true));
+    UNSCOPED_INFO("three real occurrences remain");
+    REQUIRE(current.size() == size_t(3));
+    auto row = current.begin();
+    UNSCOPED_INFO("later repeat follows intervening message");
+    CHECK((*row++)["chat_service_msg_id"].asString() == later["chat_service_msg_id"].asString());
+    UNSCOPED_INFO("intervening message keeps its position");
+    CHECK((*row++)["message"].asString() == std::string("6"));
+    UNSCOPED_INFO("earliest occurrence keeps its live delivery");
+    CHECK_FALSE((*row)["is_history"].asBoolean());
+}
+
+// These regressions repeat one outgoing body under distinct service IDs.
+LLSD outgoingRepeat(U8 ordinal, S32 timestamp)
+{
+    LLSD row = contextRow(ordinal);
+    row["from_id"] = AGENT;
+    row["message"] = "linden bear castle";
+    row["timestamp"] = timestamp;
+    row.erase("chat_service_log_timestamp");
+    return row;
+}
+
+// Exercise the real outgoing capture path, including original text and log time.
+LLSD localEcho(const LLSD& service, S32 skew = 0)
+{
+    U32 timestamp = 0;
+    const U32 now = U32(service["timestamp"].asInteger() + skew);
+    const LLSD context = captureLiveMessage(service["message"].asString(), timestamp, LLSD(), now);
+    LLSD echo = liveCopy(service);
+    echo["timestamp"] = S32(timestamp);
+    recordLiveMessage(echo, context, now);
+    return echo;
+}
+
+TEST_CASE("LLChatServiceHistoryCore: local echoes reconcile within a rolling minute across calendar boundaries", "[LLChatServiceHistoryCore]")
+{
+    // Local echoes and service records may straddle a minute, hour, or day in
+    // either direction while still describing the same outgoing message.
+    for (const char* created : {"2026-10-30T17:28:59Z", "2026-10-30T17:29:00Z",
+                               "2026-10-30T17:59:59Z", "2026-10-30T18:00:00Z",
+                               "2026-10-30T23:59:59Z", "2026-10-31T00:00:00Z"})
+    {
+        const S32 timestamp = S32(LLDate(created).secondsSinceEpoch());
+        const LLSD service = outgoingRepeat(1, timestamp);
+
+        // Preserve the previous maximum clock difference without requiring
+        // both clocks to show the same calendar minute.
+        for (S32 skew : {-59, -1, 0, 1, 59})
+        {
+            UNSCOPED_INFO("local echo inside the rolling window reconciles");
+            CHECK(filterDirectHistoryDuplicates({service}, {localEcho(service, skew)}).empty());
+        }
+
+        // A full minute of separation remains outside the local-clock tolerance.
+        for (S32 skew : {-61, -60, 60, 61})
+        {
+            UNSCOPED_INFO("local echo outside the rolling window stays distinct");
+            CHECK(filterDirectHistoryDuplicates({service}, {localEcho(service, skew)}).size() == size_t(1));
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: outgoing repeats across a minute boundary each consume one history copy", "[LLChatServiceHistoryCore]")
+{
+    // Two outgoing repeats cross 10:28/10:29 SLT with their service clock one
+    // second behind. An earlier identical message must remain in history.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD earlier = outgoingRepeat(1, boundary - 30);
+    LLSD between = contextRow(2);
+    between["timestamp"] = S32(boundary - 15);
+    Messages archive{earlier, between};
+    Messages live;
+    for (U8 ordinal : {3, 4})
+    {
+        const LLSD service = outgoingRepeat(ordinal, boundary - 5 + ordinal);
+        archive.push_back(service);
+        live.push_front(localEcho(service, 1));
+    }
+
+    // Preview and archive publications may arrive in either order. Each live
+    // echo replaces one service occurrence without replaying unchanged messages.
+    for (bool loaded_first : {false, true})
+    {
+        History history;
+        if (loaded_first) history.setLoaded(archive);
+        Messages current = live;
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose(archive, live, 200, true);
+            UNSCOPED_INFO("each outgoing echo consumes one history copy");
+            REQUIRE(composed.size() == size_t(2));
+            UNSCOPED_INFO("earlier repeat retains its service ID");
+            CHECK(composed.front()["chat_service_msg_id"].asString() == earlier["chat_service_msg_id"].asString());
+            UNSCOPED_INFO("intervening message retains its position");
+            CHECK(composed.back()["chat_service_msg_id"].asString() == between["chat_service_msg_id"].asString());
+            UNSCOPED_INFO("unchanged publications do not replay the transcript");
+            CHECK(replaceHistory(current, composed, true) == (publication == 0));
+            UNSCOPED_INFO("all four original messages remain");
+            CHECK(current.size() == size_t(4));
+            history.setLoaded(archive);
+        }
+
+        // Expiring the preview must not reintroduce copies from the durable read.
+        const auto durable = history.compose({}, live, 200, true);
+        UNSCOPED_INFO("durable publication does not replay the transcript");
+        CHECK_FALSE(replaceHistory(current, durable, true));
+        REQUIRE_FALSE(current.empty());
+        UNSCOPED_INFO("outgoing message remains live");
+        CHECK_FALSE(current.front()["is_history"].asBoolean());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a plaintext read and a service preview across a minute both belong to one echo", "[LLChatServiceHistoryCore]")
+{
+    // A plaintext-only initial read can precede a service preview across a minute.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD service = outgoingRepeat(1, boundary - 1);
+    const LLSD echo = localEcho(service, 1);
+
+    // Both stored representations belong to the one live echo.
+    History history;
+    history.setLoaded({plaintextCopy(echo)});
+    const auto composed = history.compose({service}, {echo}, 200, true);
+    UNSCOPED_INFO("cross-minute service and plaintext copies both reconcile");
+    CHECK(composed.size() == size_t(0));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a later repeat in the preview keeps its own position after an earlier echo", "[LLChatServiceHistoryCore]")
+{
+    // A later repeat can arrive in the service preview before its translation
+    // completes, leaving only the earlier outgoing echo in the live set.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD earlier = outgoingRepeat(1, boundary - 1);
+    LLSD between = contextRow(2);
+    between["timestamp"] = boundary + 5;
+    const LLSD later = outgoingRepeat(3, boundary + 20);
+    const LLSD echo = localEcho(earlier);
+
+    // The later repeat should keep its own position after the intervening row.
+    History history;
+    history.setLoaded({earlier, between, later});
+    const auto composed = history.compose({}, {echo}, 200, true);
+    UNSCOPED_INFO("one local echo consumes one service occurrence");
+    REQUIRE(composed.size() == size_t(2));
+    UNSCOPED_INFO("later repeat keeps its service ID and position");
+    CHECK(composed.back()["chat_service_msg_id"].asString() == later["chat_service_msg_id"].asString());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: archive rollover does not let an old echo consume an earlier repeat again", "[LLChatServiceHistoryCore]")
+{
+    // A retained earlier repeat is distinct from the newer live occurrence.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD earlier = outgoingRepeat(1, boundary + 5);
+    const LLSD later = outgoingRepeat(2, boundary + 35);
+    const LLSD echo = localEcho(later);
+    History history;
+    history.setLoaded({earlier, later});
+    UNSCOPED_INFO("earlier occurrence is initially retained");
+    CHECK(history.compose({}, {echo}, 2, true).size() == size_t(1));
+
+    // New live traffic rolls the matched service ID out of the capped archive.
+    // The old live echo must not consume the earlier repeat a second time.
+    LLSD third = contextRow(3);
+    third["timestamp"] = boundary + 3600;
+    LLSD fourth = contextRow(4);
+    fourth["timestamp"] = boundary + 3601;
+    history.setLoaded({third, fourth});
+    const auto composed = history.compose({}, {liveCopy(fourth), liveCopy(third), echo}, 2, true);
+    UNSCOPED_INFO("archive rollover preserves the earlier distinct repeat");
+    REQUIRE(composed.size() == size_t(1));
+    UNSCOPED_INFO("retained repeat keeps its service ID");
+    CHECK(composed.front()["chat_service_msg_id"].asString() == earlier["chat_service_msg_id"].asString());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: clock skew does not strand a repeated local echo", "[LLChatServiceHistoryCore]")
+{
+    // An exact local timestamp is still a separate clock: reserving it first
+    // can strand another echo whose only candidate is that service occurrence.
+    for (const auto times : {std::array<S32, 4>{0, 59, 59, 118}, {59, 118, 0, 59},
+                            {0, 60, 59, 60}, {0, 30, 29, 59}})
+    {
+        const LLSD first = serviceCopy(repeatedDelivery(times[0]), FIRST);
+        const LLSD second = serviceCopy(repeatedDelivery(times[1]), SECOND);
+        const LLSD first_echo = localEcho(repeatedDelivery(times[2]));
+        const LLSD second_echo = localEcho(repeatedDelivery(times[3]));
+
+        // Pair both occurrences regardless of the input list ordering.
+        for (bool history_reversed : {false, true})
+        {
+            for (bool live_reversed : {false, true})
+            {
+                Messages history{first, second};
+                Messages live{first_echo, second_echo};
+                if (history_reversed) history.reverse();
+                if (live_reversed) live.reverse();
+                UNSCOPED_INFO("clock skew does not strand a repeated local echo");
+                CHECK(filterDirectHistoryDuplicates(history, live).empty());
+            }
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a rollover anchor does not consume distinct earlier plaintext again", "[LLChatServiceHistoryCore]")
+{
+    // This seam already replaced one of two identical plaintext occurrences
+    // with service B. The remaining plaintext A is a distinct earlier message.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD legacy = plaintextCopy(outgoingRepeat(1, boundary + 5));
+    const LLSD later = outgoingRepeat(2, boundary + 35);
+    const LLSD echo = localEcho(later);
+    History history;
+    history.setLoaded({legacy, later});
+    UNSCOPED_INFO("distinct plaintext is initially retained");
+    CHECK(history.compose({}, {echo}, 2, true).size() == size_t(1));
+
+    // Keeping B as a rollover anchor must not make the seam consume plaintext
+    // A again. Further publications retain the same original occurrence.
+    LLSD third = contextRow(3);
+    third["timestamp"] = later["timestamp"].asInteger() + 3600;
+    LLSD fourth = contextRow(4);
+    fourth["timestamp"] = third["timestamp"].asInteger() + 1;
+    history.setLoaded({third, fourth});
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto composed = history.compose({}, {liveCopy(fourth), liveCopy(third), echo}, 2, true);
+        UNSCOPED_INFO("rollover keeps the extra plaintext occurrence");
+        REQUIRE(composed.size() == size_t(1));
+        UNSCOPED_INFO("the retained plaintext is unchanged");
+        CHECK(llsd_equals(composed.front(), legacy));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: the closest complete pairing keeps the undelivered later repeat", "[LLChatServiceHistoryCore]")
+{
+    // The third repeat is still awaiting live delivery. Choose the closest
+    // complete pairing instead of displacing the second echo's exact match.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    const LLSD first = outgoingRepeat(1, boundary);
+    const LLSD second = outgoingRepeat(2, boundary + 2);
+    const LLSD third = outgoingRepeat(3, boundary + 3);
+    const LLSD first_echo = localEcho(first, 1);
+    const LLSD second_echo = localEcho(second);
+
+    // Retain the later occurrence and its place after the two existing echoes.
+    const auto composed = filterDirectHistoryDuplicates({first, second, third}, {second_echo, first_echo});
+    UNSCOPED_INFO("two local echoes consume two service occurrences");
+    REQUIRE(composed.size() == size_t(1));
+    UNSCOPED_INFO("closest pairing retains the undelivered later repeat");
+    CHECK(composed.front()["chat_service_msg_id"].asString() == third["chat_service_msg_id"].asString());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: independent senders or bodies pair independently of their clock order", "[LLChatServiceHistoryCore]")
+{
+    // Different senders or bodies can have opposite clock offsets. Their pairs
+    // must remain independent even when their timestamp order crosses.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    for (bool different_sender : {false, true})
+    {
+        const LLSD first = outgoingRepeat(1, boundary);
+        LLSD second = outgoingRepeat(2, boundary + 59);
+        if (different_sender) second["from_id"] = RESIDENT;
+        else second["message"] = "another place";
+        const LLSD first_echo = localEcho(first, 59);
+        LLSD second_echo = localEcho(second, -59);
+        second_echo["message"] = second["message"].asString() + " (translation)";
+
+        // Matching uses the original body and works in either input order.
+        for (bool history_reversed : {false, true})
+        {
+            for (bool live_reversed : {false, true})
+            {
+                Messages history{first, second};
+                Messages live{first_echo, second_echo};
+                if (history_reversed) history.reverse();
+                if (live_reversed) live.reverse();
+                UNSCOPED_INFO("independent identities do not compete for chronological order");
+                CHECK(filterDirectHistoryDuplicates(history, live).empty());
+            }
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: local matching agrees with an exhaustive oracle on random groups", "[LLChatServiceHistoryCore]")
+{
+    // Exhaustive matching on small randomized groups permits every assignment,
+    // including crossing ones, independently of the production ordered DP.
+    std::mt19937 random(0x51e7c4u);
+    for (U32 trial = 0; trial < 4000; ++trial)
+    {
+        const size_t service_count = random() % 7;
+        const size_t local_count = random() % 7;
+        std::vector<S32> service_times;
+        std::vector<S32> local_times;
+        std::vector<LLSD> service_rows;
+        std::vector<LLSD> local_rows;
+        std::map<std::string, U32> service_bits;
+        for (size_t i = 0; i < service_count; ++i)
+        {
+            LLSD row = contextRow(U8(i + 1));
+            row["from_id"] = AGENT;
+            row["message"] = "oracle repeat";
+            const S32 timestamp = 1789005900 + S32(random() % 181) - 90;
+            row["timestamp"] = timestamp;
+            service_times.push_back(timestamp);
+            service_bits[row["chat_service_msg_id"].asString()] = U32(1) << i;
+            service_rows.push_back(row);
+        }
+        for (size_t i = 0; i < local_count; ++i)
+        {
+            LLSD row = repeatedDelivery(0);
+            row["from_id"] = AGENT;
+            row["message"] = "oracle repeat";
+            row["chat_service_time_source"] = "local";
+            const S32 timestamp = 1789005900 + S32(random() % 181) - 90;
+            row["timestamp"] = timestamp;
+            local_times.push_back(timestamp);
+            if (random() % 2)
+            {
+                row["chat_service_original_text"] = row["message"];
+                row["message"] = "oracle repeat (translated)";
+            }
+            local_rows.push_back(row);
+        }
+
+        // Record every retained subset achieving maximum cardinality and then
+        // minimum total clock difference, so equally good tie choices are valid.
+        S32 best_count = -1;
+        S64 best_distance = 0;
+        std::set<U32> optimal_retained;
+        auto explore = [&](auto&& self, size_t index, U32 used, U32 retained,
+                           S32 count, S64 distance) -> void
+        {
+            if (index == service_count)
+            {
+                if (count > best_count || (count == best_count && distance < best_distance))
+                {
+                    best_count = count;
+                    best_distance = distance;
+                    optimal_retained.clear();
+                }
+                if (count == best_count && distance == best_distance)
+                {
+                    optimal_retained.insert(retained);
+                }
+                return;
+            }
+
+            // Leave this service occurrence historical, or consume it with each
+            // unused eligible live occurrence; no production matching is reused.
+            self(self, index + 1, used, retained | (U32(1) << index), count, distance);
+            for (size_t local = 0; local < local_count; ++local)
+            {
+                const S64 delta = std::abs(S64(service_times[index]) - local_times[local]);
+                if (!(used & (U32(1) << local)) && delta <= 59)
+                {
+                    self(self, index + 1, used | (U32(1) << local), retained, count + 1, distance + delta);
+                }
+            }
+        };
+        explore(explore, 0, 0, 0, 0, 0);
+
+        // The public filter sorts input itself; varying source order also checks
+        // that it preserves an optimal identity subset regardless of input order.
+        std::shuffle(service_rows.begin(), service_rows.end(), random);
+        std::shuffle(local_rows.begin(), local_rows.end(), random);
+        const Messages history(service_rows.begin(), service_rows.end());
+        const Messages live(local_rows.begin(), local_rows.end());
+        const Messages retained = filterDirectHistoryDuplicates(history, live);
+        U32 retained_mask = 0;
+        for (const LLSD& row : retained)
+        {
+            retained_mask |= service_bits.at(row["chat_service_msg_id"].asString());
+        }
+        UNSCOPED_INFO("oracle maximum matched count at trial " << trial);
+        CHECK(retained.size() == service_count - size_t(best_count));
+        UNSCOPED_INFO("oracle optimal retained identities at trial " << trial);
+        CHECK(optimal_retained.count(retained_mask) != 0);
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: ten thousand sparse echoes leave the oldest service row through rollover", "[LLChatServiceHistoryCore]")
+{
+    // A 10,000-message history has sparsely spaced repeats and distinct send
+    // boundaries. The oldest message has no live copy and must remain historical.
+    const S32 base = 1789005900;
+    constexpr U32 count = 10000;
+    auto service = [&](U32 ordinal, S32 timestamp)
+    {
+        LLSD row = outgoingRepeat(1, timestamp);
+        LLUUID id(FIRST);
+        id.mData[0] = U8(ordinal >> 24);
+        id.mData[1] = U8(ordinal >> 16);
+        id.mData[2] = U8(ordinal >> 8);
+        id.mData[3] = U8(ordinal);
+        row["chat_service_msg_id"] = id.asString();
+        return row;
+    };
+    const LLSD earliest = service(1, base);
+    Messages archive{earliest}, live;
+    std::string previous_id = earliest["chat_service_msg_id"].asString();
+    for (U32 ordinal = 2; ordinal <= count; ++ordinal)
+    {
+        const LLSD row = service(ordinal, base + S32(ordinal - 1) * 59);
+        LLSD echo = localEcho(row);
+        echo["chat_service_after_msg_id"] = ordinal == 2 ? std::string() : previous_id;
+        archive.push_back(row);
+        live.push_front(echo);
+        previous_id = row["chat_service_msg_id"].asString();
+    }
+
+    // The initial publication consumes one service occurrence per live echo.
+    History history;
+    history.setLoaded(archive);
+    const auto initial = history.compose({}, live, 200, true);
+    UNSCOPED_INFO("sparse captures leave one historical occurrence");
+    REQUIRE(initial.size() == size_t(1));
+    UNSCOPED_INFO("the oldest service ID remains historical");
+    CHECK(llsd_equals(initial.front(), earliest));
+
+    // The first unbounded echo still needs its consumed service anchor after
+    // archive rollover. Later explicit publications must keep the original row.
+    LLSD unrelated = service(count + 1, base + S32(count) * 59 + 3600);
+    unrelated["message"] = "later unrelated traffic";
+    history.setLoaded({unrelated});
+    live.push_front(liveCopy(unrelated));
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto result = history.compose({}, live, 200, true);
+        UNSCOPED_INFO("sparse capture anchors survive archive rollover");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("explicit publication preserves the oldest service ID");
+        CHECK(llsd_equals(result.front(), earliest));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an echo captured before history can be reassigned to free the earlier row", "[LLChatServiceHistoryCore]")
+{
+    // These unmarked echoes were captured before history arrived. A publication
+    // after the second delivery can reassign the first and replace the earlier row.
+    const S32 timestamp = 1789005900;
+    const LLSD earlier = outgoingRepeat(1, timestamp);
+    const LLSD later = outgoingRepeat(2, timestamp + 59);
+    const LLSD old_echo = localEcho(later);
+    const LLSD new_echo = localEcho(later, 59);
+    for (bool visible : {false, true})
+    {
+        History history;
+        history.setLoaded({earlier, later});
+        const auto initial = history.compose({}, {old_echo}, 200, visible);
+        UNSCOPED_INFO("one earlier historical occurrence remains");
+        REQUIRE(initial.size() == size_t(1));
+        UNSCOPED_INFO("new echo cannot directly match that visible occurrence");
+        CHECK_FALSE(sameDirectHistoryOccurrence(initial.front(), new_echo));
+        UNSCOPED_INFO("both occurrences become live after reassignment");
+        CHECK(history.compose({}, {new_echo, old_echo}, 200, visible).empty());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a late receipt reserves its row first and exposes extra plaintext", "[LLChatServiceHistoryCore]")
+{
+    // On the next history publication, a late receipt reserves a service occurrence
+    // before local-clock matching and can expose an extra plaintext repeat.
+    const S32 timestamp = 1789005900;
+    const LLSD first = outgoingRepeat(1, timestamp + 119);
+    const LLSD second = outgoingRepeat(2, timestamp + 178);
+    const LLSD legacy = plaintextCopy(second);
+    const LLSD old_echo = localEcho(second);
+    const LLSD later_echo = localEcho(second, 59);
+    LLSD receipt = localEcho(first);
+    receipt["chat_service_time_source"] = "receipt";
+    receipt["chat_service_log_timestamp"] = timestamp + 237;
+    for (bool visible : {false, true})
+    {
+        History history;
+        history.setLoaded({legacy, first, second});
+        UNSCOPED_INFO("initial live echoes represent the entire source seam");
+        CHECK(history.compose({}, {later_echo, old_echo}, 200, visible).empty());
+        const auto result = history.compose({}, {receipt, later_echo, old_echo}, 200, visible);
+        UNSCOPED_INFO("receipt reassignment exposes distinct plaintext");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the remaining occurrence is the original plaintext");
+        CHECK(llsd_equals(result.front(), legacy));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: protecting the oldest repeat keeps the whole chain of anchors", "[LLChatServiceHistoryCore]")
+{
+    // Each old echo can shift to the previous service occurrence. Protecting
+    // the oldest visible repeat therefore requires the entire chain of anchors.
+    const S32 timestamp = 1789005900;
+    for (U8 count : {2, 8})
+    {
+        const LLSD earlier = outgoingRepeat(1, timestamp);
+        Messages archive{earlier};
+        Messages live;
+        for (U8 ordinal = 1; ordinal <= count; ++ordinal)
+        {
+            const LLSD row = outgoingRepeat(ordinal + 1, timestamp + ordinal * 59);
+            archive.push_back(row);
+            live.push_front(localEcho(row));
+        }
+        History history;
+        history.setLoaded(archive);
+        UNSCOPED_INFO("all but the oldest occurrence are live");
+        CHECK(history.compose({}, live, 2, true).size() == size_t(1));
+
+        // The archive advances past every repeat while the conversation stays
+        // open. Republishing must preserve the same historical service identity.
+        LLSD later = contextRow(100);
+        later["timestamp"] = timestamp + 3600;
+        history.setLoaded({later});
+        live.push_front(liveCopy(later));
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto result = history.compose({}, live, 2, true);
+            UNSCOPED_INFO("rollover preserves the oldest repeat through the chain");
+            REQUIRE(result.size() == size_t(1));
+            UNSCOPED_INFO("the original occurrence remains");
+            CHECK(llsd_equals(result.front(), earlier));
+        }
+
+        // This unmarked fixture represents an earlier-captured echo delivered late.
+        // The next publication can consume the last occurrence through the far-end anchor.
+        const LLSD next = localEcho(archive.back(), 59);
+        live.push_front(next);
+        UNSCOPED_INFO("new echo consumes the final historical occurrence");
+        CHECK(history.compose({}, live, 2, true).empty());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: replacing history ignores only the top level index and keeps untimed offers", "[LLChatServiceHistoryCore]")
+{
+    // Interleaving must preserve inline offers that have no timestamp field.
+    LLSD stored = contextRow(1);
+    stored["timestamp"] = 100;
+    LLSD delivery = liveCopy(contextRow(2));
+    delivery["timestamp"] = 90;
+    LLSD offer;
+    offer["notification_id"] = AGENT;
+    Messages current{offer, delivery};
+    UNSCOPED_INFO("initial interleaved history changes the model");
+    CHECK(replaceHistory(current, {stored}, true));
+    UNSCOPED_INFO("interleaving does not add a timestamp to an untimed offer");
+    CHECK_FALSE(current.front().has("timestamp"));
+
+    // Index-only differences never replay notification widgets or rewrite indices.
+    current.front()["index"] = 1234;
+    stored["index"] = -9;
+    const LLSD* offer_node = &current.front();
+    UNSCOPED_INFO("identical overlay leaves the model in place");
+    CHECK_FALSE(replaceHistory(current, {stored}, true));
+    UNSCOPED_INFO("notification keeps its existing list node");
+    CHECK(&current.front() == offer_node);
+    UNSCOPED_INFO("notification index remains untouched");
+    CHECK(current.front()["index"].asInteger() == 1234);
+
+    // Editing a live timestamp can move unchanged history relative to live rows.
+    current.back()["timestamp"] = 110;
+    current.back()["notification_log_id"] = RESIDENT;
+    UNSCOPED_INFO("live timestamp edits recheck interleaving");
+    CHECK(replaceHistory(current, {stored}, true));
+    REQUIRE(current.size() >= size_t(3));
+    auto row = current.begin();
+    UNSCOPED_INFO("untimed offer remains first");
+    CHECK((*row++)["notification_id"].asUUID() == AGENT);
+    UNSCOPED_INFO("edited live row precedes older history");
+    CHECK((*row++)["notification_log_id"].asUUID() == RESIDENT);
+    UNSCOPED_INFO("historical row now follows the edited live row");
+    CHECK((*row)["is_history"].asBoolean());
+
+    // Only the top-level presentation index is ignored; nested data and key
+    // presence remain meaningful even when a new value is undefined.
+    stored["details"]["index"] = 7;
+    UNSCOPED_INFO("nested history values are compared");
+    CHECK(replaceHistory(current, {stored}, true));
+    stored["details"]["index"] = 8;
+    UNSCOPED_INFO("nested index changes are not ignored");
+    CHECK(replaceHistory(current, {stored}, true));
+    stored["extra"] = LLSD();
+    UNSCOPED_INFO("an undefined-valued key is still a change");
+    CHECK(replaceHistory(current, {stored}, true));
+    stored.erase("extra");
+    UNSCOPED_INFO("removing an undefined-valued key is a change");
+    CHECK(replaceHistory(current, {stored}, true));
+    UNSCOPED_INFO("clearing history keeps live and notification rows");
+    CHECK(replaceHistory(current, {}, true));
+    UNSCOPED_INFO("two live rows remain");
+    CHECK(current.size() == size_t(2));
+    UNSCOPED_INFO("empty overlay is stable");
+    CHECK_FALSE(replaceHistory(current, {}, true));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an empty overlay keeps the service to plaintext seam", "[LLChatServiceHistoryCore]")
+{
+    // A visible service row covers a later plaintext load. Its delayed live
+    // copy has a different logging minute, so only the service anchor covers it.
+    const S32 timestamp = 1789005900;
+    const LLSD service = outgoingRepeat(1, timestamp + 125);
+    const LLSD legacy = plaintextCopy(service);
+    LLSD echo = localEcho(service, 3);
+    echo["chat_service_log_timestamp"] = timestamp + 296;
+    History history;
+    history.setLoaded({service});
+    history.compose({}, {}, 200, true);
+    history.setLoaded({legacy});
+    history.compose({}, {}, 200, true);
+    UNSCOPED_INFO("delayed live copy replaces the service representation");
+    CHECK(history.compose({}, {echo}, 200, true).empty());
+
+    // Repeated history publications must not resurrect the loaded plaintext after the
+    // visible overlay becomes empty and its service row leaves the archive.
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        UNSCOPED_INFO("empty overlay preserves the service-to-plaintext seam");
+        CHECK(history.compose({}, {echo}, 200, true).empty());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: repeated publications are stable between mixed source deliveries", "[LLChatServiceHistoryCore]")
+{
+    // Repeated explicit history publications stay stable between mixed-source
+    // deliveries. Keep the source seam fixed to isolate publication idempotence.
+    std::mt19937 random(0x59A17F);
+    const S32 timestamp = 1789005900;
+    const char* sources[] = {"local", "receipt", "sent", ""};
+    for (bool visible : {false, true})
+    {
+        for (int trial = 0; trial < 250; ++trial)
+        {
+            Messages archive, legacy;
+            std::vector<LLSD> service;
+            for (U8 ordinal = 1; ordinal <= 6; ++ordinal)
+            {
+                LLSD row = outgoingRepeat(ordinal, timestamp + ordinal * 30);
+                row["from_id"] = ordinal % 2 ? AGENT : RESIDENT;
+                row["from"] = ordinal % 2 ? "Alpha Resident" : "Beta Resident";
+                row["message"] = "repeat" + std::to_string(random() % 3);
+                service.push_back(row);
+                archive.push_back(row);
+                if (random() % 2)
+                {
+                    LLSD logged = plaintextCopy(row);
+                    if (random() % 2)
+                    {
+                        logged["message"] = logged["message"].asString() + " translated";
+                        logged["chat_service_legacy_wall_time"] = F64(timestamp + 240) - 7.0 * 3600.0;
+                    }
+                    legacy.push_back(logged);
+                }
+            }
+            archive = mergeDirectHistory(legacy, archive);
+            History history;
+            history.setLoaded(archive);
+            Messages live, model;
+            replaceHistory(model, history.compose({}, live, 5, visible), true);
+
+            // Include delayed/translated bodies, missing identities, and unrelated
+            // traffic before each explicit history publication.
+            for (int step = 0; step < 12; ++step)
+            {
+                LLSD arrival = localEcho(service[random() % service.size()], S32(random() % 151) - 75);
+                arrival["chat_service_time_source"] = sources[random() % 4];
+                arrival["chat_service_log_timestamp"] = timestamp + 240 + step;
+                if (random() % 4 == 0) arrival["message"] = arrival["message"].asString() + " translated";
+                if (random() % 5 == 0) arrival.erase("from_id");
+                if (random() % 10 == 0) arrival.erase("from");
+                if (random() % 4 == 0)
+                {
+                    arrival["timestamp"] = timestamp + 600 + step;
+                    arrival["message"] = "unrelated";
+                    arrival["chat_service_original_text"] = "unrelated";
+                }
+
+                // An identical publication before the append must be stable;
+                // the new row is then the only possible cause of a changed view.
+                History repeated = history;
+                Messages before = model;
+                UNSCOPED_INFO("fixed-source publication is stable");
+                CHECK_FALSE(replaceHistory(before,
+                    repeated.compose({}, live, 5, visible), true));
+                live.push_front(arrival);
+                model.push_front(arrival);
+
+                // A subsequent history publication composes all current deliveries.
+                replaceHistory(model, history.compose({}, live, 5, visible), true);
+            }
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a long shifted anchor chain keeps one older repeat", "[LLChatServiceHistoryCore]")
+{
+    // A long shifted anchor chain has only one unpaired historical occurrence.
+    // Its alignment should therefore need a two-column band, regardless of age.
+    Messages history, live;
+    for (U32 index = 0; index <= 10000; ++index)
+    {
+        LLSD row = outgoingRepeat(1, 1789005900 + S32(index) * 10);
+        LLUUID id(FIRST);
+        id.mData[0] = U8((index + 1) >> 24);
+        id.mData[1] = U8((index + 1) >> 16);
+        id.mData[2] = U8((index + 1) >> 8);
+        id.mData[3] = U8(index + 1);
+        row["chat_service_msg_id"] = id.asString();
+        history.push_back(row);
+        if (index) live.push_front(localEcho(row, 1));
+    }
+    const auto retained = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("a shifted anchor chain keeps one older repeat");
+    REQUIRE(retained.size() == size_t(1));
+    UNSCOPED_INFO("the oldest repeat retains its identity");
+    CHECK(retained.front()["chat_service_msg_id"].asString() == std::string(FIRST));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: dense skewed groups all reconcile through the optimal matching", "[LLChatServiceHistoryCore]")
+{
+    // Dense unequal groups with no exact timestamps must still use the optimal
+    // DP, rather than a count cap or a greedy fallback after a fast-path miss.
+    Messages history, live;
+    for (U32 index = 0; index < 10000; ++index)
+    {
+        LLSD row = outgoingRepeat(1, 1789005900);
+        live.push_front(localEcho(row, 1));
+        if (index < 200)
+        {
+            LLUUID id(FIRST);
+            id.mData[3] = U8(index + 1);
+            row["chat_service_msg_id"] = id.asString();
+            history.push_back(row);
+        }
+    }
+    UNSCOPED_INFO("dense skewed rows all reconcile");
+    CHECK(filterDirectHistoryDuplicates(history, live).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: unmatched locals in another component do not change a tied identity", "[LLChatServiceHistoryCore]")
+{
+    // Unmatched locals in an unrelated earlier component must not change which
+    // tied service occurrence this independent component keeps.
+    Messages history{outgoingRepeat(1, 1789005900), outgoingRepeat(2, 1789005900),
+                     outgoingRepeat(3, 1789005900)};
+    Messages live{localEcho(outgoingRepeat(20, 1789005920)), localEcho(history.front())};
+    const auto original = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("the isolated component retains one occurrence");
+    REQUIRE(original.size() == size_t(1));
+    history.push_front(outgoingRepeat(4, 1789005980));
+    history.push_front(outgoingRepeat(5, 1789006020));
+    for (S32 timestamp : {1789005980, 1789005980, 1789006019, 1789006040})
+        live.push_front(localEcho(outgoingRepeat(20, timestamp)));
+    const auto extended = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("the disconnected component adds no retained service");
+    REQUIRE(extended.size() == size_t(1));
+    UNSCOPED_INFO("unrelated traffic cannot change the tied identity");
+    CHECK(extended.front()["chat_service_msg_id"].asString() == original.front()["chat_service_msg_id"].asString());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a disconnected component does not change which echo protects plaintext", "[LLChatServiceHistoryCore]")
+{
+    // Equal-skew live echoes can have different log minutes. A disconnected
+    // source component must not change which echo protects extra plaintext.
+    const S32 base = 1789005900;
+    const LLSD service = outgoingRepeat(1, base + 120);
+    const LLSD legacy = plaintextCopy(service);
+    Messages history{legacy, service};
+    Messages live{localEcho(service, 20), localEcho(service, -20)};
+    const auto isolated = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("isolated extra same-minute plaintext remains");
+    REQUIRE(isolated.size() == size_t(1));
+    UNSCOPED_INFO("the remaining occurrence is plaintext");
+    CHECK_FALSE(isolated.front().has("chat_service_msg_id"));
+
+    // The newer component leaves one service row unmatched. Without separation,
+    // a skip-local tie can assign the target service to the other log minute.
+    const LLSD prefix = outgoingRepeat(2, base + 1100);
+    history.push_back(prefix);
+    history.push_back(outgoingRepeat(3, base + 1100));
+    live.push_front(localEcho(prefix));
+    const auto extended = filterDirectHistoryDuplicates(history, live);
+    UNSCOPED_INFO("only the independent extra service row is added");
+    CHECK(extended.size() == size_t(2));
+    UNSCOPED_INFO("unrelated history leaves the protected plaintext intact");
+    CHECK(std::any_of(extended.begin(), extended.end(), [&](const LLSD& row) { return llsd_equals(row, legacy); }));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: one echo covers its service row and one log copy and other log lines stay", "[LLChatServiceHistoryCore]")
+{
+    // One live occurrence covers its service row and a next-minute log copy.
+    // Other identical log lines are distinct messages, including translated ones.
+    const S32 base = 1789005900;
+    for (bool translated : {false, true})
+    {
+        const LLSD service = outgoingRepeat(1, base + 59);
+        LLSD echo = localEcho(service);
+        echo["chat_service_log_timestamp"] = base + 60;
+        if (translated) echo["message"] = "translated castle";
+        LLSD logged = echo;
+        logged["timestamp"] = base + 60;
+        const LLSD legacy = plaintextCopy(logged);
+        for (size_t remaining : {size_t(1), size_t(3)})
+        {
+            Messages loaded(remaining + 1, legacy);
+            loaded.front()["time"] = "12:01";
+            loaded.push_back(service);
+            History history;
+            history.setLoaded(loaded);
+            const auto initial = history.compose({}, {echo}, 200, true);
+            UNSCOPED_INFO("one live echo consumes one plaintext occurrence");
+            CHECK(initial.size() == remaining);
+            Messages model{echo};
+            replaceHistory(model, initial, true);
+
+            // Reloading only the service row must not let the same echo consume
+            // another retained plaintext occurrence on each publication.
+            history.setLoaded({service});
+            for (int publication = 0; publication < 3; ++publication)
+            {
+                const auto result = history.compose({}, {echo}, 200, true);
+                UNSCOPED_INFO("reload preserves distinct plaintext repeats");
+                CHECK(result.size() == remaining);
+                UNSCOPED_INFO("retained plaintext stays unchanged");
+                CHECK(std::all_of(result.begin(), result.end(),
+                    [&](const LLSD& row) { return llsd_equals(row, legacy); }));
+                UNSCOPED_INFO("unchanged reload does not replay the model");
+                CHECK_FALSE(replaceHistory(model, result, true));
+            }
+
+            // Counts also survive loss of the service row from the archive.
+            // An earlier-captured repeat delivered late can still consume one occurrence.
+            LLSD later = contextRow(3);
+            later["timestamp"] = base + 600;
+            const LLSD later_live = liveCopy(later);
+            history.setLoaded({later});
+            UNSCOPED_INFO("complete archive rollover preserves plaintext counts");
+            CHECK(history.compose({}, {later_live, echo}, 200, true).size() == remaining);
+            LLSD next = echo;
+            next["timestamp"] = base + 61;
+            next["chat_service_log_timestamp"] = base + 61;
+            UNSCOPED_INFO("a new live repeat consumes one more occurrence");
+            CHECK(history.compose({}, {next, later_live, echo}, 200, true).size() == remaining - 1);
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: legacy minute matching chains survive rollover", "[LLChatServiceHistoryCore]")
+{
+    // Legacy minutes admit UTC-7 and UTC-8. X can consume P or Q, and Y can
+    // consume Q or R; retaining Q therefore also requires the earlier match P.
+    const S32 base = 1789005900;
+    LLSD first_live = localEcho(outgoingRepeat(1, base + 8 * 3600));
+    first_live["chat_service_time_source"] = "sent";
+    const LLSD second_live = localEcho(outgoingRepeat(2, base + 9 * 3600));
+    LLSD first = plaintextCopy(first_live);
+    first["chat_service_legacy_wall_time"] = F64(base);
+    LLSD second = first;
+    second["chat_service_legacy_wall_time"] = F64(base + 3600);
+    LLSD third = first;
+    third["chat_service_legacy_wall_time"] = F64(base + 2 * 3600);
+    History history;
+    history.setLoaded({first, second, third});
+    UNSCOPED_INFO("two live messages leave one plaintext occurrence");
+    CHECK(history.compose({}, {second_live, first_live}, 200, true).size() == size_t(1));
+
+    // Both consumed plaintext occurrences protect the retained third one after
+    // the loaded window advances; repeated publications must remain stable.
+    LLSD later = contextRow(4);
+    later["timestamp"] = base + 10 * 3600;
+    history.setLoaded({later});
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto result = history.compose({}, {liveCopy(later), second_live, first_live}, 200, true);
+        UNSCOPED_INFO("plaintext matching chains survive rollover");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the third occurrence is still historical");
+        CHECK(llsd_equals(result.front(), third));
+    }
+
+    // An earlier exact service match must keep protecting the restored plaintext
+    // anchors, even though its live row cannot consume the visible third line.
+    history.clear();
+    first_live["chat_service_time_source"] = "receipt";
+    const LLSD service = outgoingRepeat(5, base + 8 * 3600);
+    LLSD service_live = localEcho(service);
+    service_live["chat_service_time_source"] = "sent";
+    history.setLoaded({first, second, third, service});
+    UNSCOPED_INFO("service matching preserves the extra plaintext counts");
+    CHECK(history.compose({}, {second_live, first_live, service_live}, 200, true).size() == size_t(1));
+    history.setLoaded({later});
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        const auto result = history.compose({}, {liveCopy(later), second_live, first_live, service_live}, 200, true);
+        UNSCOPED_INFO("service anchors still protect retained plaintext anchors");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the protected occurrence remains unchanged");
+        CHECK(llsd_equals(result.front(), third));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: receipts revisit rows skipped by exact sends before local matching", "[LLChatServiceHistoryCore]")
+{
+    // An exact send skips newer service rows that a later receipt can still
+    // consume. Local echoes use the occurrences left by both stronger sources.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base);
+    const LLSD second = outgoingRepeat(2, base + 30);
+    const LLSD third = outgoingRepeat(3, base + 60);
+    for (const char* source : {"sent", ""})
+    {
+        LLSD sent = localEcho(first);
+        sent["chat_service_time_source"] = source;
+        LLSD receipt = localEcho(second, -5);
+        receipt["chat_service_time_source"] = "receipt";
+        receipt["message"] = "translated castle";
+        for (bool reversed : {false, true})
+        {
+            Messages history{first, second, third};
+            Messages live{localEcho(third), receipt, sent};
+            if (reversed)
+            {
+                history.reverse();
+                live.reverse();
+            }
+            UNSCOPED_INFO("receipts revisit rows skipped by exact sends before local matching");
+            CHECK(filterDirectHistoryDuplicates(history, live).empty());
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: indexed and name fallback receipts admit the same clock window", "[LLChatServiceHistoryCore]")
+{
+    // Indexed receipts and the name fallback admit the same service lead and
+    // delivery delay, including exact boundaries and translated display text.
+    const S32 base = 1789005900;
+    const LLSD service = outgoingRepeat(1, base);
+    for (bool named_only : {false, true})
+    {
+        for (S32 delay : {-6, -5, 0, 60, 61})
+        {
+            LLSD receipt = localEcho(service, delay);
+            receipt["chat_service_time_source"] = "receipt";
+            receipt["message"] = "translated castle";
+            if (named_only) receipt.erase("from_id");
+            UNSCOPED_INFO("receipt window includes only the permitted clock difference");
+            CHECK(filterDirectHistoryDuplicates({service}, {receipt}).empty() == (delay >= -5 && delay <= 60));
+        }
+    }
+
+    // Unrelated newer history keeps both receipts inside the broad clock filter.
+    // A row too old for the newest receipt must remain available to the next one.
+    LLSD unrelated = outgoingRepeat(2, base + 120);
+    unrelated["message"] = "another place";
+    LLSD newer = localEcho(service, 61);
+    newer["chat_service_time_source"] = "receipt";
+    LLSD older = localEcho(service, 60);
+    older["chat_service_time_source"] = "receipt";
+    const auto result = filterDirectHistoryDuplicates({service, unrelated}, {newer, older});
+    UNSCOPED_INFO("the older receipt still consumes its occurrence");
+    REQUIRE(result.size() == size_t(1));
+    UNSCOPED_INFO("unrelated history retains its identity");
+    CHECK(llsd_equals(result.front(), unrelated));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: name fallback and UUID lookup share occurrence reservations", "[LLChatServiceHistoryCore]")
+{
+    // Name fallback and UUID lookup share the same occurrence reservations.
+    // Equal timestamps preserve input order across sends, receipts, and locals.
+    const S32 base = 1789005900;
+    for (bool missing_service_sender : {false, true})
+    {
+        Messages history;
+        for (U8 ordinal : {1, 2, 3, 4}) history.push_back(outgoingRepeat(ordinal, base));
+        LLSD named = localEcho(history.front());
+        named.erase("from_id");
+        named["chat_service_time_source"] = "sent";
+        LLSD receipt = localEcho(history.front());
+        receipt["chat_service_time_source"] = "receipt";
+        receipt["message"] = "translated castle";
+        const LLSD local = localEcho(history.front());
+        if (missing_service_sender) history.front().erase("from_id");
+
+        const auto result = filterDirectHistoryDuplicates(history, {named, receipt, local});
+        UNSCOPED_INFO("three deliveries consume three distinct occurrences");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the fourth tied service occurrence remains");
+        CHECK(llsd_equals(result.front(), history.back()));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a repeat chain survives rolling 200 row windows and unrelated receipts", "[LLChatServiceHistoryCore]")
+{
+    // Repeated messages retain a chain beyond successive 200-row archive windows.
+    // Use distinct service IDs while keeping the body and sender identical.
+    const S32 base = 1789005900;
+    auto service = [&](U32 ordinal, S32 timestamp)
+    {
+        LLSD row = outgoingRepeat(1, timestamp);
+        LLUUID id(FIRST);
+        id.mData[0] = U8(ordinal >> 24);
+        id.mData[1] = U8(ordinal >> 16);
+        id.mData[2] = U8(ordinal >> 8);
+        id.mData[3] = U8(ordinal);
+        row["chat_service_msg_id"] = id.asString();
+        return row;
+    };
+    const LLSD earliest = service(1, base);
+    History history;
+    Messages archive{earliest}, live;
+    for (U32 index = 1; index <= 1000; ++index)
+    {
+        const LLSD row = service(index + 1, base + S32(index) * 59);
+        archive.push_back(row);
+        live.push_front(localEcho(row));
+        while (archive.size() > 200) archive.pop_front();
+        if (index % 199 == 0 || index == 1000)
+        {
+            history.setLoaded(archive);
+            const auto result = history.compose({}, live, 200, true);
+            UNSCOPED_INFO("rolling windows preserve the old repeat");
+            REQUIRE(result.size() == size_t(1));
+            UNSCOPED_INFO("the old repeat retains its identity");
+            CHECK(llsd_equals(result.front(), earliest));
+        }
+    }
+
+    // These receipts fall inside the retained time range but have another body.
+    // They must not consume any repeat or disturb subsequent publications.
+    for (U32 index = 0; index < 5000; ++index)
+    {
+        LLSD row = service(index + 1002, base + S32(index) * 10);
+        row["message"] = "unrelated received traffic";
+        LLSD receipt = localEcho(row);
+        receipt["chat_service_time_source"] = "receipt";
+        live.push_front(receipt);
+    }
+    for (int publication = 0; publication < 2; ++publication)
+    {
+        const auto result = history.compose({}, live, 200, true);
+        UNSCOPED_INFO("received traffic preserves the distinct historical repeat");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("refresh preserves the original occurrence");
+        CHECK(llsd_equals(result.front(), earliest));
+    }
+
+    // This unmarked fixture represents an earlier-captured echo delivered late.
+    // The next publication can consume the oldest row through the retained chain.
+    const LLSD next = localEcho(archive.back(), 59);
+    live.push_front(next);
+    UNSCOPED_INFO("the additional echo consumes the final historical repeat");
+    CHECK(history.compose({}, live, 200, true).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: grouped matching agrees with a full scan oracle", "[LLChatServiceHistoryCore]")
+{
+    // Compare grouped lookup with a simple full scan for exact sends and
+    // receipts. This oracle has no group cursors or timestamp-window shortcuts.
+    std::mt19937 random(0x621a557u);
+    const S32 base = 1789005900;
+    const char* sources[] = {"sent", "receipt", ""};
+    for (int trial = 0; trial < 2000; ++trial)
+    {
+        std::vector<LLSD> service, deliveries;
+        std::vector<size_t> order;
+        for (U8 ordinal = 1; ordinal <= 8; ++ordinal)
+        {
+            LLSD row = outgoingRepeat(ordinal, base + S32(random() % 12) * 10);
+            row["from_id"] = ordinal % 2 ? AGENT : RESIDENT;
+            row["from"] = ordinal % 2 ? "Alpha Resident" : "Beta Resident";
+            row["message"] = "repeat " + std::to_string(random() % 3);
+            if (random() % 7 == 0) row.erase("from_id");
+            order.push_back(service.size());
+            service.push_back(row);
+        }
+        for (int arrival = 0; arrival < 12; ++arrival)
+        {
+            LLSD delivery = localEcho(service[random() % service.size()], S32(random() % 81) - 10);
+            delivery["chat_service_time_source"] = sources[random() % 3];
+            if (random() % 4 == 0) delivery.erase("from_id");
+            if (random() % 4 == 0) delivery["message"] = "translated text";
+            if (random() % 20 == 0) delivery["timestamp"] = 0;
+            deliveries.push_back(delivery);
+        }
+        const Messages input(service.begin(), service.end());
+        const Messages live(deliveries.begin(), deliveries.end());
+
+        // Reserve exact timestamps first, then newest receipts. Stable ordering
+        // determines which service ID survives when several timestamps tie.
+        std::stable_sort(order.begin(), order.end(), [&](size_t left, size_t right)
+        {
+            return service[left]["timestamp"].asInteger() > service[right]["timestamp"].asInteger();
+        });
+        std::stable_sort(deliveries.begin(), deliveries.end(), [](const LLSD& left, const LLSD& right)
+        {
+            const bool left_receipt = left["chat_service_time_source"].asString() == "receipt";
+            const bool right_receipt = right["chat_service_time_source"].asString() == "receipt";
+            return left_receipt != right_receipt ? !left_receipt
+                : left["timestamp"].asInteger() > right["timestamp"].asInteger();
+        });
+        std::vector<bool> consumed(service.size(), false);
+        for (const LLSD& delivery : deliveries)
+        {
+            for (size_t row : order)
+            {
+                if (!consumed[row] && sameDirectHistoryOccurrence(service[row], delivery))
+                {
+                    consumed[row] = true;
+                    break;
+                }
+            }
+        }
+
+        // Compare complete surviving rows in their original historical order.
+        Messages expected;
+        for (size_t row = 0; row < service.size(); ++row)
+        {
+            if (!consumed[row]) expected.push_back(service[row]);
+        }
+        const auto actual = filterDirectHistoryDuplicates(input, live);
+        UNSCOPED_INFO("grouped matching preserves the reference occurrence count");
+        REQUIRE(actual.size() == expected.size());
+        UNSCOPED_INFO("grouped matching preserves reference identities and order");
+        CHECK(std::equal(actual.begin(), actual.end(), expected.begin(),
+            [](const LLSD& left, const LLSD& right) { return llsd_equals(left, right); }));
+    }
+}
+
+// Capture the known service boundary before an outgoing message can be delayed.
+LLSD capturedOutgoing(const LLSD& service, const History& history, S32 skew = 0)
+{
+    LLSD context;
+    context["chat_service_after_msg_id"] = formatTimeUuid(history.latestServiceKey());
+    U32 timestamp = 0;
+    const U32 now = U32(service["timestamp"].asInteger() + skew);
+    context = captureLiveMessage(service["message"].asString(), timestamp, context, now);
+    LLSD echo = liveCopy(service);
+    echo["timestamp"] = S32(timestamp);
+    recordLiveMessage(echo, context, now);
+    return echo;
+}
+
+TEST_CASE("LLChatServiceHistoryCore: sends captured before their service rows cross a minute without a duplicate", "[LLChatServiceHistoryCore]")
+{
+    // The screenshot shows adjacent 10:28/10:29 SLT minutes, not seconds.
+    // These fixture seconds reproduce one send crossing that minute boundary.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    LLSD castle = outgoingRepeat(1, boundary - 1);
+    castle["message"] = "one of my fav places if ya'll need ideas for next time, is the linden bear castle";
+    LLSD bears = outgoingRepeat(2, boundary + 8);
+    bears["message"] = "which has 1000+ linden bears from over the years";
+    LLSD reply = contextRow(3);
+    reply["timestamp"] = boundary + 14;
+    reply["message"] = "Oh, that is a fun spot";
+    const Messages archive{castle, bears, reply};
+
+    // Both outgoing messages were captured before their service rows appeared.
+    // Preview and durable history must preserve each live message exactly once.
+    for (bool loaded_first : {false, true})
+    {
+        History history;
+        const LLSD castle_echo = capturedOutgoing(castle, history, 1);
+        const LLSD bears_echo = capturedOutgoing(bears, history, 1);
+        LLSD received = localEcho(reply);
+        received["chat_service_time_source"] = "receipt";
+        const Messages live{received, bears_echo, castle_echo};
+        Messages current = live;
+        if (loaded_first) history.setLoaded(archive);
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose(archive, live, 200, true);
+            UNSCOPED_INFO("the minute-boundary send has no historical duplicate");
+            CHECK(composed.empty());
+            UNSCOPED_INFO("unchanged screenshot messages are not replayed");
+            CHECK_FALSE(replaceHistory(current, composed, true));
+            UNSCOPED_INFO("all three screenshot messages remain");
+            REQUIRE(current.size() == size_t(3));
+            auto row = current.begin();
+            UNSCOPED_INFO("the reply remains newest");
+            CHECK((*row++)["message"].asString() == reply["message"].asString());
+            UNSCOPED_INFO("the bear description keeps its position");
+            CHECK((*row++)["message"].asString() == bears["message"].asString());
+            UNSCOPED_INFO("the castle suggestion appears once");
+            CHECK((*row)["message"].asString() == castle["message"].asString());
+            history.setLoaded(archive);
+        }
+        UNSCOPED_INFO("expiring the preview does not restore the duplicate");
+        CHECK(history.compose({}, live, 200, true).empty());
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a fresh identical send keeps the visible older occurrence", "[LLChatServiceHistoryCore]")
+{
+    // Unlike the screenshot duplicate, this identical send happens after the old
+    // occurrence is visible. Its service row has not reached the cache yet.
+    const S32 boundary = S32(LLDate("2026-10-30T17:29:00Z").secondsSinceEpoch());
+    LLSD old = outgoingRepeat(1, boundary - 1);
+    old["message"] = "one of my fav places if ya'll need ideas for next time, is the linden bear castle";
+    for (bool visible : {false, true})
+    {
+        History history;
+        history.setLoaded({old});
+        Messages current;
+        replaceHistory(current, history.compose({}, {}, 200, visible), true);
+        const LLSD fresh = capturedOutgoing(old, history, 2);
+        current.push_front(fresh);
+
+        // Explicit history publications must retain the earlier identity while
+        // the service record for the fresh send is still missing.
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose({}, {fresh}, 200, visible);
+            UNSCOPED_INFO("a fresh repeat keeps the old occurrence");
+            REQUIRE(composed.size() == size_t(1));
+            UNSCOPED_INFO("the old service ID survives");
+            CHECK(composed.front()["chat_service_msg_id"].asString() == old["chat_service_msg_id"].asString());
+            UNSCOPED_INFO("stale history does not rewrite the transcript");
+            CHECK_FALSE(replaceHistory(current, composed, true));
+            UNSCOPED_INFO("both real messages remain displayed");
+            CHECK(current.size() == size_t(2));
+        }
+
+        // New history can now supply the fresh send's own service occurrence.
+        LLSD own = outgoingRepeat(2, boundary + 1);
+        own["message"] = old["message"];
+        history.setLoaded({old, own});
+        const auto composed = history.compose({own}, {fresh}, 200, visible);
+        UNSCOPED_INFO("the fresh service copy is consumed once");
+        REQUIRE(composed.size() == size_t(1));
+        UNSCOPED_INFO("new history still preserves the old ID");
+        CHECK(composed.front()["chat_service_msg_id"].asString() == old["chat_service_msg_id"].asString());
+        UNSCOPED_INFO("the fresh service copy does not replay either message");
+        CHECK_FALSE(replaceHistory(current, composed, true));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: an empty captured boundary survives translation and recording", "[LLChatServiceHistoryCore]")
+{
+    // An explicit empty boundary is still captured evidence. Translation must
+    // preserve it just as it preserves a nonempty boundary from an earlier row.
+    const S32 base = 1789005900;
+    const LLSD before = contextRow(1);
+    const LLSD service = outgoingRepeat(2, base + 59);
+    for (bool has_before : {false, true})
+    {
+        History history;
+        if (has_before) history.setLoaded({before});
+        history.compose({}, {}, 200, true);
+        LLSD context;
+        const std::string boundary = formatTimeUuid(history.latestServiceKey());
+        context["chat_service_after_msg_id"] = boundary;
+        U32 timestamp = 0;
+        context = captureLiveMessage(service["message"].asString(), timestamp, context, base + 60);
+
+        // The service row becomes visible while the original echo is translating.
+        Messages archive{service};
+        if (has_before) archive.push_front(before);
+        history.setLoaded(archive);
+        history.compose({}, {}, 200, true);
+        context = captureLiveMessage("translated castle", timestamp, context, base + 180);
+        UNSCOPED_INFO("the captured boundary remains a string");
+        CHECK(context["chat_service_after_msg_id"].isString());
+        UNSCOPED_INFO("a second capture preserves the original boundary");
+        CHECK(context["chat_service_after_msg_id"].asString() == boundary);
+        UNSCOPED_INFO("translation preserves the original send clock");
+        CHECK(timestamp == U32(base + 60));
+
+        // The next history publication replaces the visible service copy with
+        // this delayed echo while preserving its original capture boundary.
+        LLSD echo = liveCopy(service);
+        echo["message"] = "translated castle";
+        echo["timestamp"] = S32(timestamp);
+        recordLiveMessage(echo, context, base + 180);
+        UNSCOPED_INFO("the live row retains the captured boundary");
+        CHECK(echo["chat_service_after_msg_id"].isString());
+        UNSCOPED_INFO("recording preserves the boundary value");
+        CHECK(echo["chat_service_after_msg_id"].asString() == boundary);
+        for (int publication = 0; publication < 3; ++publication)
+        {
+            const auto composed = history.compose({}, {echo}, 200, true);
+            UNSCOPED_INFO("only unrelated earlier history remains");
+            REQUIRE(composed.size() == (has_before ? size_t(1) : size_t(0)));
+            if (has_before)
+            {
+                UNSCOPED_INFO("the earlier row keeps its identity");
+                CHECK(llsd_equals(composed.front(), before));
+            }
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a fresh echo cannot consume an old chain that a delayed echo can complete", "[LLChatServiceHistoryCore]")
+{
+    // All old echoes were captured before history arrived. A later publication
+    // can include another such delayed echo or a genuinely fresh send.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base);
+    const LLSD second = outgoingRepeat(2, base + 59);
+    const LLSD third = outgoingRepeat(3, base + 118);
+    History history;
+    const Messages old_live{capturedOutgoing(third, history), capturedOutgoing(second, history)};
+    const LLSD delayed = capturedOutgoing(third, history, 59);
+    history.setLoaded({first, second, third});
+    UNSCOPED_INFO("the old echoes leave one historical repeat");
+    CHECK(history.compose({}, old_live, 200, true).size() == size_t(1));
+
+    // Reassignment is still valid for a pre-captured echo, but the same timestamp
+    // on a fresh send must not shift consumed candidates into the oldest repeat.
+    History delayed_history = history;
+    Messages delayed_live = old_live;
+    delayed_live.push_front(delayed);
+    UNSCOPED_INFO("a delayed echo can complete the old occurrence chain");
+    CHECK(delayed_history.compose({}, delayed_live, 200, true).empty());
+    Messages fresh_live = old_live;
+    fresh_live.push_front(capturedOutgoing(third, history, 59));
+    auto result = history.compose({}, fresh_live, 200, true);
+    UNSCOPED_INFO("a fresh echo cannot consume the old chain");
+    REQUIRE(result.size() == size_t(1));
+    UNSCOPED_INFO("the first occurrence keeps its identity");
+    CHECK(llsd_equals(result.front(), first));
+
+    // Consumed anchors must preserve that distinction after the archive advances.
+    LLSD unrelated = contextRow(4);
+    unrelated["timestamp"] = base + 3600;
+    history.setLoaded({unrelated});
+    fresh_live.push_front(liveCopy(unrelated));
+    for (int publication = 0; publication < 3; ++publication)
+    {
+        result = history.compose({}, fresh_live, 200, true);
+        UNSCOPED_INFO("rollover retains the distinct old occurrence");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("rollover retains the original ID");
+        CHECK(llsd_equals(result.front(), first));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: same second sends reconcile after reversed callbacks", "[LLChatServiceHistoryCore]")
+{
+    // Two sends can share one clock second even though the first service row was
+    // already known when the second was dispatched. Deliver callbacks in reverse.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base);
+    const LLSD second = outgoingRepeat(2, base);
+    History history;
+    const LLSD first_echo = capturedOutgoing(first, history);
+    history.setLoaded({first});
+    history.compose({}, {}, 200, true);
+    const LLSD second_echo = capturedOutgoing(second, history);
+    history.setLoaded({first, second});
+    const auto waiting = history.compose({}, {second_echo}, 200, true);
+    UNSCOPED_INFO("the later callback consumes only its own row");
+    REQUIRE(waiting.size() == size_t(1));
+    UNSCOPED_INFO("the earlier callback's row remains");
+    CHECK(llsd_equals(waiting.front(), first));
+    const Messages live{first_echo, second_echo};
+    UNSCOPED_INFO("both same-second sends reconcile after reversed callbacks");
+    CHECK(history.compose({}, live, 200, true).empty());
+    UNSCOPED_INFO("the completed publication is stable");
+    CHECK(history.compose({}, live, 200, true).empty());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: causal bounds allow crossed clock assignments", "[LLChatServiceHistoryCore]")
+{
+    // Clock values need not follow dispatch or service-ID order. The later send
+    // can consume only ID 2, so the legal complete assignment crosses clock order.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base + 50);
+    const LLSD second = outgoingRepeat(2, base + 100);
+    History history;
+    const LLSD earlier_echo = capturedOutgoing(second, history);
+    history.setLoaded({first});
+    history.compose({}, {}, 200, true);
+    const LLSD later_echo = capturedOutgoing(second, history, -10);
+    for (bool history_reversed : {false, true})
+    {
+        for (bool live_reversed : {false, true})
+        {
+            Messages archive{first, second};
+            Messages live{earlier_echo, later_echo};
+            if (history_reversed) archive.reverse();
+            if (live_reversed) live.reverse();
+            UNSCOPED_INFO("causal bounds allow crossed clock assignments");
+            CHECK(filterDirectHistoryDuplicates(archive, live).empty());
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: reserving the fresh send's only row leaves the closest pairing", "[LLChatServiceHistoryCore]")
+{
+    // The fresh send has only one eligible service row. Reserving it first
+    // leaves the earlier capture free to choose its closest remaining copy.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base);
+    const LLSD second = outgoingRepeat(2, base + 1);
+    const LLSD third = outgoingRepeat(3, base + 5);
+    History history;
+    const LLSD older_echo = capturedOutgoing(second, history);
+    history.setLoaded({first, second});
+    history.compose({}, {}, 200, true);
+    const LLSD fresh_echo = capturedOutgoing(second, history, 1);
+    for (bool reversed : {false, true})
+    {
+        Messages archive{first, second, third};
+        Messages live{fresh_echo, older_echo};
+        if (reversed)
+        {
+            archive.reverse();
+            live.reverse();
+        }
+        const auto result = filterDirectHistoryDuplicates(archive, live);
+        UNSCOPED_INFO("both eligible echoes consume an occurrence");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the closest legal complete pairing retains ID 1");
+        CHECK(llsd_equals(result.front(), first));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: causal matching agrees with a legal and maximal oracle", "[LLChatServiceHistoryCore]")
+{
+    // Generate service-ID ranks, clocks, and captured bounds independently. The
+    // oracle checks legal, maximal assignments without production match helpers.
+    std::mt19937 random(0xc4a57e11u);
+    const S32 base = 1789005900;
+    for (int trial = 0; trial < 2000; ++trial)
+    {
+        const size_t service_count = random() % 7;
+        const size_t live_count = random() % 7;
+        std::array<U8, 6> ranks{1, 2, 3, 4, 5, 6};
+        std::shuffle(ranks.begin(), ranks.end(), random);
+        std::vector<S32> service_times, live_times;
+        std::vector<U8> floors;
+        std::vector<LLSD> service_rows, live_rows;
+        std::map<std::string, U32> bits;
+
+        // Service identity order deliberately supplies no information about clocks.
+        for (size_t index = 0; index < service_count; ++index)
+        {
+            const S32 timestamp = base + S32(random() % 181) - 90;
+            LLSD row = outgoingRepeat(ranks[index], timestamp);
+            service_times.push_back(timestamp);
+            bits[row["chat_service_msg_id"].asString()] = U32(1) << index;
+            service_rows.push_back(row);
+        }
+
+        // Each echo has an independent boundary, including empty and past all IDs.
+        for (size_t index = 0; index < live_count; ++index)
+        {
+            const S32 timestamp = base + S32(random() % 181) - 90;
+            const U8 floor = U8(random() % 8);
+            LLSD row = localEcho(outgoingRepeat(20, timestamp));
+            row["chat_service_after_msg_id"] = floor
+                ? contextRow(floor)["chat_service_msg_id"].asString() : std::string();
+            if (random() % 2) row["message"] = "translated castle";
+            live_times.push_back(timestamp);
+            floors.push_back(floor);
+            live_rows.push_back(row);
+        }
+
+        // Every removed row needs its own eligible echo. Keep assignments with
+        // no direct pair left unused; improving them by reassigning other captures
+        // is deliberately outside the simpler policy's guarantee.
+        std::set<U32> retained_sets;
+        auto eligible = [&](size_t row, size_t echo)
+        {
+            return ranks[row] > floors[echo] &&
+                std::abs(S64(service_times[row]) - live_times[echo]) <= 59;
+        };
+        auto explore = [&](auto&& self, size_t row, U32 used, U32 retained) -> void
+        {
+            if (row == service_count)
+            {
+                for (size_t remaining = 0; remaining < service_count; ++remaining)
+                {
+                    if (!(retained & (U32(1) << remaining))) continue;
+                    for (size_t echo = 0; echo < live_count; ++echo)
+                    {
+                        if (!(used & (U32(1) << echo)) && eligible(remaining, echo)) return;
+                    }
+                }
+                retained_sets.insert(retained);
+                return;
+            }
+            self(self, row + 1, used, retained | (U32(1) << row));
+            for (size_t echo = 0; echo < live_count; ++echo)
+            {
+                if (!(used & (U32(1) << echo)) && eligible(row, echo))
+                {
+                    self(self, row + 1, used | (U32(1) << echo), retained);
+                }
+            }
+        };
+        explore(explore, 0, 0, 0);
+
+        // Input permutations must preserve eligibility, one-to-one consumption,
+        // and the source order of every historical row left on screen.
+        std::shuffle(service_rows.begin(), service_rows.end(), random);
+        std::shuffle(live_rows.begin(), live_rows.end(), random);
+        const Messages archive(service_rows.begin(), service_rows.end());
+        const Messages live(live_rows.begin(), live_rows.end());
+        const auto actual = filterDirectHistoryDuplicates(archive, live);
+        U32 retained = 0;
+        for (const LLSD& row : actual) retained |= bits.at(row["chat_service_msg_id"].asString());
+        const std::string label = " at trial " + std::to_string(trial);
+        UNSCOPED_INFO("causal oracle legal and maximal matching" << label);
+        CHECK(retained_sets.count(retained) != 0);
+        auto previous = archive.begin();
+        for (const LLSD& row : actual)
+        {
+            previous = std::find_if(previous, archive.end(), [&](const LLSD& source) { return llsd_equals(source, row); });
+            UNSCOPED_INFO("retained rows preserve source order" << label);
+            REQUIRE(previous != archive.end());
+            ++previous;
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: formatting a TimeUUID boundary keeps every timestamp and tail bit", "[LLChatServiceHistoryCore]")
+{
+    // Boundaries preserve the complete TimeUUID, including signed tail bytes and
+    // timestamp fields that roll over before the UUID's textual prefix does.
+    UNSCOPED_INFO("the default service key formats as empty");
+    CHECK(formatTimeUuid(TimeUuidKey()) == std::string());
+    for (const char* id : {FIRST, SECOND, "00000000-0000-1000-8000-000000000000",
+                          "ffffffff-0000-1000-80ff-7f0080ff7f00",
+                          "00000000-0001-1000-80ff-7f0080ff7f00",
+                          "ffffffff-ffff-1fff-bfff-ffffffffffff"})
+    {
+        TimeUuidKey key;
+        UNSCOPED_INFO("boundary fixture parses");
+        CHECK(parseTimeUuid(id, key));
+        UNSCOPED_INFO("formatting preserves the canonical boundary");
+        CHECK(formatTimeUuid(key) == std::string(id));
+        TimeUuidKey restored;
+        UNSCOPED_INFO("formatted boundary parses again");
+        CHECK(parseTimeUuid(formatTimeUuid(key), restored));
+        UNSCOPED_INFO("all timestamp and tail bits survive");
+        CHECK(restored == key);
+    }
+    TimeUuidKey before, after;
+    parseTimeUuid("ffffffff-0000-1000-8000-000000000000", before);
+    parseTimeUuid("00000000-0001-1000-8000-000000000000", after);
+    UNSCOPED_INFO("the timestamp rollover keeps UUID ordering");
+    CHECK(before < after);
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a dispatch boundary excludes known rows only for local echoes in TimeUUID order", "[LLChatServiceHistoryCore]")
+{
+    // A dispatch boundary excludes known service rows only for local echoes.
+    // Exact sends, receipts, and the name fallback keep their established rules.
+    const LLSD first = outgoingRepeat(1, 1789005900);
+    const LLSD second = outgoingRepeat(2, 1789005900);
+    for (bool named_only : {false, true})
+    {
+        LLSD echo = localEcho(first);
+        echo["chat_service_after_msg_id"] = first["chat_service_msg_id"];
+        if (named_only) echo.erase("from_id");
+        UNSCOPED_INFO("a local echo cannot consume its captured boundary");
+        CHECK_FALSE(sameDirectHistoryOccurrence(first, echo));
+        UNSCOPED_INFO("a later ID remains eligible");
+        CHECK(sameDirectHistoryOccurrence(second, echo));
+        const auto local = filterDirectHistoryDuplicates({first, second}, {echo});
+        UNSCOPED_INFO("the boundary reserves the earlier occurrence");
+        REQUIRE(local.size() == size_t(1));
+        UNSCOPED_INFO("UUID and name lookup preserve the same old ID");
+        CHECK(llsd_equals(local.front(), first));
+        for (const char* source : {"sent", "receipt", ""})
+        {
+            echo["chat_service_time_source"] = source;
+            UNSCOPED_INFO("nonlocal provenance ignores an outgoing boundary");
+            CHECK(sameDirectHistoryOccurrence(first, echo));
+            UNSCOPED_INFO("nonlocal matching still consumes its eligible copy");
+            CHECK(filterDirectHistoryDuplicates({first}, {echo}).empty());
+        }
+    }
+
+    // UUID text order differs from time order at rollover and from Cassandra's
+    // signed tail order. Both occurrence checks and grouped lookup use that order.
+    for (const auto ids : {
+        std::array<const char*, 2>{"ffffffff-0000-1000-8000-000000000000", "00000000-0001-1000-8000-000000000000"},
+        {"00000001-0000-1000-8080-000000000000", "00000001-0000-1000-8000-000000000000"}})
+    {
+        LLSD older = first;
+        older["chat_service_msg_id"] = ids[0];
+        LLSD newer = second;
+        newer["chat_service_msg_id"] = ids[1];
+        LLSD echo = localEcho(older);
+        echo["chat_service_after_msg_id"] = ids[0];
+        UNSCOPED_INFO("a later TimeUUID remains eligible despite text order");
+        CHECK(sameDirectHistoryOccurrence(newer, echo));
+        const auto result = filterDirectHistoryDuplicates({older, newer}, {echo});
+        UNSCOPED_INFO("a TimeUUID boundary consumes one later occurrence");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the earlier TimeUUID stays historical");
+        CHECK(llsd_equals(result.front(), older));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: the latest service key covers loaded and consumed and retained ids", "[LLChatServiceHistoryCore]")
+{
+    // Outgoing capture must see consumed and retained service IDs as well as the
+    // currently loaded window, even when timestamps run in the opposite order.
+    const LLSD second = outgoingRepeat(2, 1789005960);
+    const LLSD third = outgoingRepeat(3, 1789005930);
+    History history;
+    UNSCOPED_INFO("empty history has no service boundary");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == std::string());
+    history.setLoaded({second});
+    UNSCOPED_INFO("loaded history contributes before publication");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == second["chat_service_msg_id"].asString());
+    const LLSD echo = localEcho(third);
+    const auto initial = history.compose({third}, {echo}, 200, true);
+    UNSCOPED_INFO("the newest ID is already consumed");
+    CHECK(initial.size() == size_t(1));
+    UNSCOPED_INFO("consumed preview candidates contribute their ID");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == third["chat_service_msg_id"].asString());
+
+    // A later plaintext load must not hide service IDs retained as context.
+    history.setLoaded({plaintextCopy(second)});
+    history.compose({}, {echo}, 200, true);
+    UNSCOPED_INFO("retained anchors contribute after source rollover");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == third["chat_service_msg_id"].asString());
+    history.clearService();
+    UNSCOPED_INFO("service revocation releases the boundary");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == std::string());
+    history.setLoaded({second});
+    history.clear();
+    UNSCOPED_INFO("deletion releases the boundary");
+    CHECK(formatTimeUuid(history.latestServiceKey()) == std::string());
+}
+
+TEST_CASE("LLChatServiceHistoryCore: ineligible fresh sends preserve an older tie", "[LLChatServiceHistoryCore]")
+{
+    // One older echo lies equally close to two service rows. Fresh sends in the
+    // same local second have already observed both IDs and cannot consume either.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base + 59);
+    const LLSD second = outgoingRepeat(2, base + 61);
+    History history;
+    Messages live{capturedOutgoing(first, history, 1)};
+    history.setLoaded({first, second});
+    const auto initial = history.compose({}, live, 200, true);
+    UNSCOPED_INFO("one tied historical occurrence remains");
+    REQUIRE(initial.size() == size_t(1));
+    UNSCOPED_INFO("the initial pairing retains the first ID");
+    CHECK(llsd_equals(initial.front(), first));
+    Messages current = live;
+    replaceHistory(current, initial, true);
+
+    // Explicit history publications after fresh sends with no eligible service
+    // copy must preserve the older tie and leave the displayed history unchanged.
+    for (int send = 0; send < 2; ++send)
+    {
+        const LLSD fresh = capturedOutgoing(first, history, 1);
+        live.push_front(fresh);
+        current.push_front(fresh);
+        const auto result = history.compose({}, live, 200, true);
+        UNSCOPED_INFO("ineligible fresh sends retain one old occurrence");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("ineligible fresh sends preserve its original ID");
+        CHECK(llsd_equals(result.front(), first));
+        UNSCOPED_INFO("the history publication leaves the model unchanged");
+        CHECK_FALSE(replaceHistory(current, result, true));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: each same second echo consumes its own service and log copy", "[LLChatServiceHistoryCore]")
+{
+    // Two echoes share a capture second, but the first service ID was already
+    // known before the second send. Translation logs them in different minutes.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base + 59);
+    const LLSD second = outgoingRepeat(2, base + 59);
+    History history;
+    const LLSD first_echo = capturedOutgoing(first, history, 1);
+    history.setLoaded({first});
+    history.compose({}, {}, 200, true);
+    LLSD second_echo = capturedOutgoing(second, history, 1);
+    second_echo["chat_service_log_timestamp"] = base + 120;
+    const LLSD first_log = plaintextCopy(first_echo);
+    LLSD logged_second = second_echo;
+    logged_second["timestamp"] = base + 120;
+    const LLSD second_log = plaintextCopy(logged_second);
+
+    // Each live occurrence replaces its service copy and its actual log copy.
+    // A second identical line in the first logging minute remains a distinct row.
+    const Messages archive{first_log, first_log, second_log, first, second};
+    for (bool reversed : {false, true})
+    {
+        Messages live{first_echo, second_echo};
+        if (reversed) live.reverse();
+        const auto result = filterDirectHistoryDuplicates(archive, live);
+        UNSCOPED_INFO("each echo consumes exactly one logged occurrence");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the extra plaintext occurrence remains");
+        CHECK(llsd_equals(result.front(), first_log));
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a later independent problem does not change an older tied replacement", "[LLChatServiceHistoryCore]")
+{
+    // Nearby timestamps can still form independent matching problems when a
+    // later capture excludes every earlier service ID. Adding that problem
+    // must not change which historical occurrence an older tied echo replaces.
+    const S32 base = 1789005900;
+    const LLSD first = outgoingRepeat(1, base + 59);
+    const LLSD second = outgoingRepeat(2, base + 61);
+    const LLSD later = outgoingRepeat(3, base + 178);
+    History history;
+    Messages live{capturedOutgoing(first, history, 1)};
+    history.setLoaded({first, second});
+    const auto initial = history.compose({}, live, 200, true);
+    REQUIRE_FALSE(initial.empty());
+    UNSCOPED_INFO("the earlier tied occurrence starts historical");
+    CHECK(llsd_equals(initial.front(), first));
+
+    // Every fresh echo has a legal edge to the later record, so removing nodes
+    // without candidates alone cannot preserve independence of the earlier tie.
+    for (int repeat = 0; repeat < 3; ++repeat)
+    {
+        live.push_front(capturedOutgoing(first, history, 60));
+    }
+    history.setLoaded({first, second, later});
+    const auto result = history.compose({}, live, 200, true);
+    UNSCOPED_INFO("the later repeats replace only their own service occurrence");
+    REQUIRE(result.size() == size_t(1));
+    UNSCOPED_INFO("the unrelated occurrence keeps its original service ID");
+    CHECK(llsd_equals(result.front(), first));
+}
+
+TEST_CASE("LLChatServiceHistoryCore: a separate eligible component preserves every retained identity", "[LLChatServiceHistoryCore]")
+{
+    // Older repeats have competing equally close copies. Fresh sends share
+    // nearby timestamps but their boundary excludes every earlier service ID.
+    std::mt19937 random(0x51ab1eu);
+    const S32 base = 1789005900;
+    for (int trial = 0; trial < 250; ++trial)
+    {
+        Messages archive, live;
+        for (U8 id = 1; id <= 3; ++id)
+        {
+            archive.push_back(outgoingRepeat(id, base + (trial ? 8 + S32(random() % 3) : id == 1 ? 8 : 9)));
+        }
+        live.push_back(localEcho(outgoingRepeat(1, base + (trial ? S32(random() % 3) : 0))));
+        live.push_back(localEcho(outgoingRepeat(2, base + (trial ? S32(random() % 3) : 2))));
+        const auto before = filterDirectHistoryDuplicates(archive, live);
+
+        // Old captures cannot reach time 126; new captures exclude IDs 1-3.
+        // The 59/58-second timestamp gaps nevertheless join the old time split.
+        archive.push_back(outgoingRepeat(4, base + 126));
+        for (int repeat = 0; repeat < 3; ++repeat)
+        {
+            LLSD echo = localEcho(outgoingRepeat(4, base + 67));
+            echo["chat_service_after_msg_id"] = contextRow(3)["chat_service_msg_id"];
+            live.push_front(echo);
+        }
+        const auto after = filterDirectHistoryDuplicates(archive, live);
+        UNSCOPED_INFO("a separate eligible component preserves retained count");
+        REQUIRE(after.size() == before.size());
+        auto original = before.begin();
+        for (const LLSD& row : after)
+        {
+            UNSCOPED_INFO("a separate eligible component preserves every historical identity");
+            CHECK(llsd_equals(row, *original++));
+        }
+    }
+}
+
+TEST_CASE("LLChatServiceHistoryCore: capture priority leaves deterministic choices for ambiguous repeats", "[LLChatServiceHistoryCore]")
+{
+    const S32 base = 1789005900;
+
+    // Newer captures get first claim on their nearest eligible record. Here
+    // that leaves the older echo without a copy, even though reassigning both
+    // echoes could remove the remaining duplicate at the 59-second skew limit.
+    const LLSD first = outgoingRepeat(2, base + 59);
+    const LLSD second = outgoingRepeat(3, base + 118);
+    History history;
+    const LLSD earlier_echo = capturedOutgoing(first, history, -59);
+    history.setLoaded({contextRow(1)});
+    const LLSD fresh_echo = capturedOutgoing(first, history);
+    UNSCOPED_INFO("a wider reassignment could cover the earlier echo");
+    CHECK(sameDirectHistoryOccurrence(first, earlier_echo));
+    UNSCOPED_INFO("a wider reassignment could cover the fresh echo");
+    CHECK(sameDirectHistoryOccurrence(second, fresh_echo));
+    for (bool reversed : {false, true})
+    {
+        Messages archive{first, second}, live{fresh_echo, earlier_echo};
+        if (reversed)
+        {
+            archive.reverse();
+            live.reverse();
+        }
+        const auto result = filterDirectHistoryDuplicates(archive, live);
+        UNSCOPED_INFO("capture priority deliberately leaves one ambiguous duplicate");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("the unmatched service occurrence stays historical");
+        CHECK(llsd_equals(result.front(), second));
+    }
+
+    // With three nearby repeats, the same priority can retain a different ID
+    // from a global minimum-skew assignment. It still consumes each row once,
+    // and the fresh send cannot claim the history known before its capture.
+    const LLSD oldest = outgoingRepeat(1, base - 4);
+    const LLSD middle = outgoingRepeat(2, base);
+    const LLSD newest = outgoingRepeat(3, base + 5);
+    history.clear();
+    const LLSD older = capturedOutgoing(middle, history);
+    history.setLoaded({oldest});
+    const LLSD fresh = capturedOutgoing(middle, history, 2);
+    UNSCOPED_INFO("known history stays ineligible for the fresh send");
+    CHECK_FALSE(sameDirectHistoryOccurrence(oldest, fresh));
+    for (bool reversed : {false, true})
+    {
+        Messages archive{oldest, middle, newest}, live{fresh, older};
+        if (reversed)
+        {
+            archive.reverse();
+            live.reverse();
+        }
+        const auto result = filterDirectHistoryDuplicates(archive, live);
+        UNSCOPED_INFO("capture priority preserves the repeated-message count");
+        REQUIRE(result.size() == size_t(1));
+        UNSCOPED_INFO("capture priority keeps its deterministic historical choice");
+        CHECK(llsd_equals(result.front(), newest));
+    }
+}
+
+} // namespace

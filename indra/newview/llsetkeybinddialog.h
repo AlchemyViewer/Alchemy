@@ -76,7 +76,7 @@ public:
     static void onCancel(void* user_data);
     static void onBlank(void* user_data);
     static void onDefault(void* user_data);
-    static void onClickTimeout(void* user_data, MASK mask);
+    static void onClickTimeout(void* user_data, EMouseClickType clicktype, MASK mask);
 
     static bool isRecording() { return sRecordKeys; }
 
@@ -92,6 +92,7 @@ private:
     U32 mKeyFilterMask;
     Updater *pUpdater;
     KEY mLastMaskKey;
+    EMouseClickType mPendingMouseClick;
 
     static bool sRecordKeys; // for convinience and not to check instance each time
 

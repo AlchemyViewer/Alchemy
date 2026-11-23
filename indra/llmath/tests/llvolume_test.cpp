@@ -5144,6 +5144,43 @@ namespace
         return decodeFaces(mdl, decoded);
     }
 
+    // The region counts a mesh's faces by the shape its parameters make, which
+    // stands in until the asset loads, and LLViewerObject::getRegionFaceCount
+    // reads them off the profile afterwards. An asset can have more faces:
+    // the uploader splits a material too large for 16-bit indices into faces
+    // of its own. The profile keeps the shape's.
+    TEST_CASE("llvolume: a mesh's profile keeps its shape's faces once the asset's are decoded", "[llvolume]")
+    {
+        struct Shape
+        {
+            U8 profile;
+            U8 path;
+            size_t faces;
+        };
+        for (const Shape shape : { Shape{ LL_PCODE_PROFILE_CIRCLE_HALF, LL_PCODE_PATH_CIRCLE, 1 },
+                                   Shape{ LL_PCODE_PROFILE_CIRCLE, LL_PCODE_PATH_LINE, 3 } })
+        {
+            CAPTURE((int)shape.profile, (int)shape.path);
+            LLVolumeParams params;
+            params.setType(shape.profile, shape.path);
+            params.setSculptID(LLUUID("00000000-0000-0000-0000-00000000000d"), LL_SCULPT_TYPE_MESH);
+            LLPointer<LLVolume> volume = new LLVolume(params, LLVolumeLODGroup::getVolumeScaleFromDetail(3));
+            REQUIRE(volume->getProfile().mFaces.size() == shape.faces);
+            CHECK(volume->getNumFaces() == (S32)shape.faces);
+
+            LLSD mdl = LLSD::emptyArray();
+            for (S32 face = 0; face < 4; ++face)
+            {
+                mdl.append(wireTriangle());
+            }
+            REQUIRE(ll_test::VolumeProbe::decode(*volume, mdl));
+            volume->setMeshAssetLoaded(true);
+            REQUIRE(volume->getNumVolumeFaces() == 4);
+            CHECK(volume->getNumFaces() == 4);
+            CHECK(volume->getProfile().mFaces.size() == shape.faces);
+        }
+    }
+
     // A face's TriangleList of zeros deflates to almost nothing, so that one
     // the unzip cap lets through could hold a hundred million indices, and
     // cost every viewer that decodes it seconds and gigabytes. A LOD with a

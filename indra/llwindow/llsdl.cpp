@@ -236,11 +236,10 @@ void init_sdl(const std::string& app_name, bool hidden_window)
     // once-guard inside makes a second call here a no-op.
     set_sdl_hints();
 
-    // SDL_INIT_VIDEO is the only subsystem the viewer actually uses through
-    // SDL3. Joystick / gamepad input goes through libndof (llviewerjoystick),
-    // not SDL3 — initialising those subsystems would only add surface area
-    // (hotplug events, device enumeration, shutdown ordering) for no caller.
-    // If/when an SDL3 gamepad code path is added it can re-init at that time.
+    // SDL_INIT_VIDEO is the only subsystem brought up here. Game controllers
+    // are LLGameControl's, which brings the gamepad subsystem up later in
+    // startup, the more likely to catch the first devices' added events; 3D
+    // mice go through libndof (llviewerjoystick).
     std::initializer_list<std::tuple<uint32_t, char const*, bool>> initList=
             {
                 {SDL_INIT_VIDEO,"SDL_INIT_VIDEO", true},

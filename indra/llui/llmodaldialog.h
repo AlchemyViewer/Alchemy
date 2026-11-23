@@ -41,7 +41,7 @@ class LLModalDialog : public LLFloater
 public:
     AL_VIEW_TYPE(LLModalDialog, LLFloater);
 
-    LLModalDialog( const LLSD& key, bool modal = true );
+    LLModalDialog( const LLSD& key, bool modal = true, bool hide_others = true );
     virtual     ~LLModalDialog();
 
     /*virtual*/ bool    postBuild() override;
@@ -79,6 +79,7 @@ private:
 
     LLFrameTimer    mVisibleTime;
     const bool      mModal;
+    const bool      mHideOthers;
 
     static std::list<LLModalDialog*> sModalStack;  // Top of stack is currently being displayed
 };

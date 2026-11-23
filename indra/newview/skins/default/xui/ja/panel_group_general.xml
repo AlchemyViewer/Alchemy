@@ -16,11 +16,11 @@
 		<text name="prepend_founded_by">
 			創設者：
 		</text>
-		<name_box name="founder_name"/>
 		<text name="join_cost_text">
 			入会費はかかりません。
 		</text>
 		<button label="加入する" name="btn_join"/>
+		<button name="btn_activate" label="アクティブ化"/>
 	</panel>
 	<text_editor name="charter">
 		グループの理念、指針を記入してください。
@@ -50,4 +50,5 @@
 		</combo_box>
 		<check_box label="検索に表示" name="show_in_group_list" tool_tip="このグループを検索結果に表示させます。"/>
 	</panel>
+	<check_box name="receive_chat" label="グループＩＭを受信" tool_tip="このグループのグループチャットに参加するかどうかの設定を行います。"/>
 </panel>

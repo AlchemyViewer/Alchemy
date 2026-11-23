@@ -49,9 +49,12 @@ typedef U32 uint32_t;
 #include <catch2/catch_test_macros.hpp>
 #include "altestmatchers.h"
 #include "wrapllerrs.h"
+#include <algorithm>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <limits>
+#include <numbers>
 
 typedef std::function<void(const LLSD& data, std::ostream& str)> FormatterFunction;
 typedef std::function<bool(std::istream& istr, LLSD& data, llssize max_bytes)> ParserFunction;
@@ -2322,6 +2325,146 @@ namespace
         CHECK(LLUZipHelper::unzip_llsd(out2,
                                       (const U8*)corrupt.data(),
                                       (S32)corrupt.size()) != LLUZipHelper::ZR_OK);
+    }
+
+    // A LOD block as LLModel::writeModel lays one out: one face's positions,
+    // normals and texture coordinates as little-endian U16s over their
+    // domains, and its triangles as U16 indices, over a rippled ellipsoid.
+    LLSD mesh_like_block()
+    {
+        constexpr S32 ROWS = 64;
+        constexpr S32 COLS = 64;
+        constexpr F32 PI = std::numbers::pi_v<F32>;
+        LLSD::Binary positions, normals, texcoords, triangles;
+        auto put_u16 = [](LLSD::Binary& out, U32 value)
+        {
+            out.push_back((U8)(value & 0xFF));
+            out.push_back((U8)((value >> 8) & 0xFF));
+        };
+        auto put = [&put_u16](LLSD::Binary& out, F32 value) // over [-1, 1]
+        {
+            put_u16(out, (U32)std::clamp((value + 1.f) * 0.5f * 65535.f + 0.5f, 0.f, 65535.f));
+        };
+        for (S32 r = 0; r < ROWS; ++r)
+        {
+            const F32 theta = PI * (F32)r / (F32)(ROWS - 1);
+            for (S32 c = 0; c < COLS; ++c)
+            {
+                const F32 phi = 2.f * PI * (F32)c / (F32)(COLS - 1);
+                const F32 nx = std::sin(theta) * std::cos(phi);
+                const F32 ny = std::sin(theta) * std::sin(phi);
+                const F32 nz = std::cos(theta);
+                const F32 ripple = 1.f + 0.05f * std::sin(7.f * theta) * std::cos(5.f * phi);
+                put(positions, 0.9f * ripple * nx);
+                put(positions, 0.5f * ripple * ny);
+                put(positions, 0.7f * ripple * nz);
+                put(normals, nx);
+                put(normals, ny);
+                put(normals, nz);
+                put(texcoords, 2.f * (F32)c / (F32)(COLS - 1) - 1.f);
+                put(texcoords, 2.f * (F32)r / (F32)(ROWS - 1) - 1.f);
+            }
+        }
+        for (S32 r = 0; r + 1 < ROWS; ++r)
+        {
+            for (S32 c = 0; c + 1 < COLS; ++c)
+            {
+                const U32 i = (U32)(r * COLS + c);
+                for (U32 index : { i, i + COLS, i + 1, i + 1, i + COLS, i + COLS + 1 })
+                {
+                    put_u16(triangles, index);
+                }
+            }
+        }
+
+        LLSD face;
+        face["Position"] = positions;
+        face["Normal"] = normals;
+        face["TexCoord0"] = texcoords;
+        face["TriangleList"] = triangles;
+        face["PositionDomain"]["Min"] = llsd::array(-0.95, -0.55, -0.75);
+        face["PositionDomain"]["Max"] = llsd::array(0.95, 0.55, 0.75);
+        face["TexCoord0Domain"]["Min"] = llsd::array(0.0, 0.0);
+        face["TexCoord0Domain"]["Max"] = llsd::array(1.0, 1.0);
+        LLSD block = LLSD::emptyArray();
+        block.append(face);
+        return block;
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: zip_llsd_model round-trips through unzip_llsd", "[llsd_serialization]")
+    {
+        LLSD nested;
+        nested["message"] = "destination unknown";
+        nested["mode"] = 7;
+        nested["list"] = llsd::array(1, 2.5, "three", LLUUID("c96f9b1e-f589-4100-9774-d98643ce0bed"));
+        nested["map"]["inner"] = llsd::array(LLSD::emptyArray(), LLSD::emptyMap());
+
+        LLSD big;
+        LLSD::Binary bytes(256 * 1024);
+        U32 state = 2463534242u; // xorshift32: incompressible but for its structure
+        for (U8& b : bytes)
+        {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            b = (U8)state;
+        }
+        big["bytes"] = bytes;
+
+        for (const LLSD& sd : { LLSD::emptyMap(), nested, big, mesh_like_block() })
+        {
+            const std::string compressed = zip_llsd_model(sd);
+            REQUIRE_FALSE(compressed.empty());
+            LLSD out;
+            REQUIRE(LLUZipHelper::unzip_llsd(out, (const U8*)compressed.data(), (S32)compressed.size()) ==
+                    LLUZipHelper::ZR_OK);
+            CHECK_THAT(out, ll_test::LLSDEquals(sd));
+        }
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: zip_llsd_model writes a zlib stream of the value in LLSD binary", "[llsd_serialization]")
+    {
+        // What every viewer and the grid inflate a mesh block with: a zlib
+        // header, deflate and an Adler-32, over LLSD binary with no header line.
+        const LLSD sd = mesh_like_block();
+        std::ostringstream binary;
+        LLSDSerialize::toBinary(sd, binary);
+        const std::string expected = binary.str();
+
+        const std::string compressed = zip_llsd_model(sd);
+        REQUIRE(compressed.size() > 2);
+        const U32 cmf = (U8)compressed[0];
+        const U32 flg = (U8)compressed[1];
+        CHECK(cmf == 0x78); // deflate with a 32 KB window
+        CHECK((cmf * 256 + flg) % 31 == 0);
+        CHECK((flg & 0x20) == 0); // no preset dictionary
+
+        uLongf size = (uLongf)expected.size();
+        std::string inflated(expected.size(), '\0');
+        REQUIRE(uncompress((Bytef*)inflated.data(), &size, (const Bytef*)compressed.data(), (uLong)compressed.size()) ==
+                Z_OK);
+        REQUIRE(size == expected.size());
+        CHECK(inflated == expected);
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: zip_llsd_model gives the same bytes every time", "[llsd_serialization]")
+    {
+        // a mesh upload's fee request and the upload each zip every block
+        const LLSD sd = mesh_like_block();
+        const std::string first = zip_llsd_model(sd);
+        REQUIRE_FALSE(first.empty());
+        CHECK(zip_llsd_model(sd) == first);
+    }
+
+    TEST_CASE_METHOD(TestLLSDSerializeData, "llsd serialization: zip_llsd_model is no larger than zip_llsd on a mesh block", "[llsd_serialization]")
+    {
+        LLSD sd = mesh_like_block();
+        const std::string model = zip_llsd_model(sd);
+        const std::string zlib = zip_llsd(sd);
+        REQUIRE_FALSE(model.empty());
+        REQUIRE_FALSE(zlib.empty());
+        INFO("zip_llsd_model " << model.size() << " bytes, zip_llsd " << zlib.size());
+        CHECK(model.size() <= zlib.size());
     }
 
     // unzip_llsdNavMesh() hands back a realloc()ed buffer, for free() to let go.

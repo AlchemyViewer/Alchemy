@@ -126,6 +126,7 @@ public:
     // called when error occurs during permissions request
     /*virtual*/ void setPermissonsErrorStatus(S32 status, const std::string& reason) override;
 
+    void onModelAssetsWritten(const std::shared_ptr<const ALMeshUploadAssets>& assets) override;
     /*virtual*/ void onModelPhysicsFeeReceived(const LLSD& result, std::string upload_url) override;
                 void handleModelPhysicsFeeReceived();
     /*virtual*/ void setModelPhysicsFeeErrorStatus(S32 status, const std::string& reason, const LLSD& result) override;
@@ -144,6 +145,13 @@ protected:
     void        onDescriptionKeystroke(LLUICtrl*);
 
     static void     onImportScaleCommit(LLUICtrl*, void*);
+    // <SK:Nexii> Mesh uploader pivot: shown in percent of the half-extent or in metres from the centre
+    void            onPivotCommit();
+    void            onPivotUnitsCommit();
+    void            onPivotModeCommit();
+    void            updatePivotControls();
+    LLVector3       getPivotHalfExtents() const;
+    // </SK:Nexii>
     static void     onPelvisOffsetCommit(LLUICtrl*, void*);
 
     static void     onPreviewLODCommit(LLUICtrl*,void*);
@@ -202,6 +210,12 @@ protected:
     LLMutex* mStatusLock;
 
     LLSD mModelPhysicsFee;
+
+    // The assets the fee shown was quoted for, while it stands.
+    std::shared_ptr<const ALMeshUploadAssets> mFeeAssets;
+
+    boost::signals2::scoped_connection mPackingConnection;
+    boost::signals2::scoped_connection mRoundWeightsConnection;
 
 private:
     void onClickCalculateBtn();

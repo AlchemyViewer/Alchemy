@@ -67,6 +67,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewermessage.h"
 // [RLVa:KB] - Checked: 2011-05-22 (RLVa-1.3.1a)
+#include "alfloaterbulkrename.h"
 #include "alscriptstudio.h"
 #include "rlvactions.h"
 #include "rlvhandler.h"
@@ -293,56 +294,12 @@ void LLTaskInvFVBridge::openItem()
 
 bool LLTaskInvFVBridge::isItemRenameable() const
 {
-// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
-    LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
-    if ( (rlv_handler_t::isEnabled()) && (object) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
-    {
-        return false;
-    }
-// [/RLVa:KB]
-
-    if (gAgent.isGodlike())
-        return true;
-
-//  if (LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID()))
-    if(object)
-    {
-        if (LLInventoryItem* item = (LLInventoryItem*)(object->getInventoryObject(mUUID)))
-        {
-            if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE, GOD_LIKE))
-            {
-                return true;
-            }
-        }
-    }
-
-    return false;
+    return get_is_task_item_renameable(gObjectList.findObject(mPanel->getTaskUUID()), mUUID);
 }
 
 bool LLTaskInvFVBridge::renameItem(const std::string& new_name)
 {
-//  if (LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID()))
-// [RLVa:KB] - Checked: 2010-09-28 (RLVa-1.2.1f) | Modified: RLVa-1.0.5a
-    LLViewerObject* object = gObjectList.findObject(mPanel->getTaskUUID());
-    if ( (rlv_handler_t::isEnabled()) && (object) && (gRlvAttachmentLocks.isLockedAttachment(object->getRootEdit())) )
-    {
-        return false;
-    }
-
-    if(object)
-// [/RLVa:KB]
-    {
-        if (LLViewerInventoryItem* item = (LLViewerInventoryItem*)object->getInventoryObject(mUUID))
-        {
-            if (gAgent.allowOperation(PERM_MODIFY, item->getPermissions(), GP_OBJECT_MANIPULATE, GOD_LIKE))
-            {
-                LLPointer<LLViewerInventoryItem> new_item = new LLViewerInventoryItem(item);
-                new_item->rename(new_name);
-                object->updateInventory(new_item, TASK_INVENTORY_ITEM_KEY, false);
-            }
-        }
-    }
-
+    rename_task_item(gObjectList.findObject(mPanel->getTaskUUID()), mUUID, new_name);
     return true;
 }
 
@@ -616,7 +573,12 @@ void LLTaskInvFVBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     {
         disabled_items.push_back(std::string("Task Properties"));
     }
-    if (isItemRenameable())
+
+    if (flags & ITEM_IN_MULTI_SELECTION)
+    {
+        items.push_back(std::string("Task Bulk Rename"));
+    }
+    else if (isItemRenameable())
     {
         items.push_back(std::string("Task Rename"));
 //      if ((flags & FIRST_SELECTED_ITEM) == 0)
@@ -869,7 +831,11 @@ void LLTaskSoundBridge::buildContextMenu(LLMenuGL& menu, U32 flags)
     {
         disabled_items.push_back(std::string("Task Properties"));
     }
-    if (isItemRenameable())
+    if (flags & ITEM_IN_MULTI_SELECTION)
+    {
+        items.push_back(std::string("Task Bulk Rename"));
+    }
+    else if (isItemRenameable())
     {
         items.push_back(std::string("Task Rename"));
     }
@@ -1380,6 +1346,14 @@ LLPanelObjectInventory::LLPanelObjectInventory(const LLPanelObjectInventory::Par
 // Destroys the object
 LLPanelObjectInventory::~LLPanelObjectInventory()
 {
+    if (mFolders)
+    {
+        mFolders->cancelRenaming();
+        if (LLEditMenuHandler::gEditMenuHandler == mFolders)
+        {
+            LLEditMenuHandler::gEditMenuHandler = NULL;
+        }
+    }
     if (!gIdleCallbacks.deleteFunction(idle, this))
     {
         LL_WARNS() << "LLPanelObjectInventory::~LLPanelObjectInventory() failed to delete callback" << LL_ENDL;
@@ -1400,12 +1374,24 @@ bool LLPanelObjectInventory::postBuild()
 void LLPanelObjectInventory::doToSelected(const LLSD& userdata)
 {
     std::string action = userdata.asString();
-    if ("rename" == action || "delete" == action)
+    if ("rename" == action || "delete" == action || "task_bulk_rename" == action)
     {
         LLViewerObject* objectp = gObjectList.findObject(mTaskUUID);
         if (objectp && !objectp->permModify())
         {
             LLNotificationsUtil::add("CantModifyContentInNoModTask");
+        }
+        else if ("task_bulk_rename" == action)
+        {
+            LLSD ids = LLSD::emptyArray();
+            for (LLFolderViewItem* folder_item : mFolders->getSelectedItems())
+            {
+                if (auto view_model = dynamic_cast<LLFolderViewModelItemInventory*>(folder_item->getViewModelItem()))
+                {
+                    ids.append(view_model->getUUID());
+                }
+            }
+            ALFloaterBulkRename::show(LLSD().with("ids", ids).with("task_id", mTaskUUID));
         }
         else
         {
@@ -1429,6 +1415,15 @@ void LLPanelObjectInventory::clearContents()
     }
 
     clearItemIDs();
+
+    if (mFolders)
+    {
+        mFolders->cancelRenaming();
+        if (LLEditMenuHandler::gEditMenuHandler == mFolders)
+        {
+            LLEditMenuHandler::gEditMenuHandler = NULL;
+        }
+    }
 
     if( mScroller )
     {
@@ -1820,6 +1815,14 @@ void LLPanelObjectInventory::draw()
 
 void LLPanelObjectInventory::deleteAllChildren()
 {
+    if (mFolders)
+    {
+        mFolders->cancelRenaming();
+        if (LLEditMenuHandler::gEditMenuHandler == mFolders)
+        {
+            LLEditMenuHandler::gEditMenuHandler = NULL;
+        }
+    }
     mScroller = NULL;
     mFolders = NULL;
     LLView::deleteAllChildren();

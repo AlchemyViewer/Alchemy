@@ -26,9 +26,13 @@
 
 #pragma once
 
+#include "algltfmaterialretry.h"
 #include "llgltfmaterial.h"
 #include "llpointer.h"
 #include "llviewertexture.h"
+
+#include <functional>
+#include <vector>
 
 class LLGLSLShader;
 class LLGLTFMaterialList;
@@ -47,7 +51,8 @@ public:
     // LLGLTFMaterial::operator== is defined, but LLFetchedGLTFMaterial::operator== is not.
     bool operator==(const LLGLTFMaterial& rhs) const = delete;
 
-    // If this material is loaded, fire the given function
+    // If this material is loaded, fire the given function. A material whose fetch failed and is to be fetched again
+    // fires it at once and keeps it, to fire it again when the retry completes.
     void onMaterialComplete(std::function<void()> material_complete);
 
     // bind this material for rendering
@@ -105,12 +110,26 @@ protected:
     // Lifetime management
 
     void materialBegin();
+    // Fires the callbacks waiting on the fetch. A failure whose retry is pending (mFetchCompletion.mRetry, set by
+    // LLGLTFMaterialList before this) keeps them for the retry; any other end lets them go.
     void materialComplete(bool success);
 
     F64 mExpectedFlusTime; // since epoch in seconds
     bool mActive = true;
     bool mFetching = false;
     bool mFetchSuccess = false;
-    std::vector<std::function<void()>> materialCompleteCallbacks;
+
+    // The callbacks waiting on the fetch, and when a failed fetch is fetched again. A copy of the material, such as a
+    // face's render material, is fetched by no one and takes neither.
+    struct FetchCompletion
+    {
+        FetchCompletion() = default;
+        FetchCompletion(const FetchCompletion&) {}
+        FetchCompletion& operator=(const FetchCompletion&) { return *this; }
+
+        std::vector<std::function<void()>> mCallbacks;
+        ALGLTFMaterialRetry mRetry;
+    };
+    FetchCompletion mFetchCompletion;
 };
 

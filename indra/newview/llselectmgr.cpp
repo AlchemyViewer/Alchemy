@@ -53,6 +53,7 @@
 // viewer includes
 #include "alhoverglow.h"
 #include "alobjectproperties.h"
+#include "alscriptdiskmasters.h"
 #include "alselectionoutline.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -3331,11 +3332,15 @@ void LLSelectMgr::adjustTexturesByScale(bool send_to_sim, bool stretch)
 
                 if (tep->getGLTFMaterial())
                 {
-                    LLPointer<LLGLTFMaterial> material = tep->getGLTFMaterialOverride();
-                    if (!material)
+                    // The face changes a copy of its own, as the override it holds may be the region's record of it,
+                    // and the region's overrides wait for the edit, sent or still being dragged, so that a rebuild
+                    // meanwhile does not put the region's back.
+                    const LLGLTFMaterial* held = tep->getGLTFMaterialOverride();
+                    LLPointer<LLGLTFMaterial> material = held ? new LLGLTFMaterial(*held) : new LLGLTFMaterial();
+                    tep->setGLTFMaterialOverride(material);
+                    if (LLViewerRegion* regionp = object->getRegion())
                     {
-                        material = new LLGLTFMaterial();
-                        tep->setGLTFMaterialOverride(material);
+                        regionp->holdGLTFOverride(object->getLocalID(), te_num);
                     }
 
                     F32 scale_x = 1;
@@ -4390,6 +4395,37 @@ void LLSelectMgr::selectDelete()
 }
 
 // static
+namespace
+{
+    // The prims a delete of the selection takes, told to the disk masters,
+    // whose links to files go with them (QK3): every prim of each linkset
+    // the delete is sent for, which is the selection's roots alone
+    // (SEND_ONLY_ROOTS, applyToRootNodes): a child picked on its own sends
+    // nothing, and takes nothing.
+    void deletingLinksets(LLObjectSelectionHandle selection)
+    {
+        std::vector<LLUUID> prims;
+        boost::unordered_flat_set<LLUUID> seen;
+        for (LLObjectSelection::root_iterator iter = selection->root_begin(); iter != selection->root_end(); ++iter)
+        {
+            LLViewerObject* root = (*iter)->getObject();
+            if (!root || !seen.insert(root->getID()).second)
+            {
+                continue;
+            }
+            prims.push_back(root->getID());
+            for (const LLViewerObject* child : root->getChildren())
+            {
+                if (child && !child->isAvatar())
+                {
+                    prims.push_back(child->getID());
+                }
+            }
+        }
+        ALScriptDiskMasters::deleting(prims);
+    }
+}
+
 bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, LLObjectSelectionHandle handle)
 {
     S32 option = LLNotification::getSelectedOption(notification, response);
@@ -4406,6 +4442,7 @@ bool LLSelectMgr::confirmDelete(const LLSD& notification, const LLSD& response, 
             // TODO: Make sure you have delete permissions on all of them.
             const LLUUID trash_id = gInventory.findCategoryUUIDForType(LLFolderType::FT_TRASH);
             // attempt to derez into the trash.
+            deletingLinksets(LLSelectMgr::getInstance()->mSelectedObjects);
             LLDeRezInfo info(DRD_TRASH, trash_id);
             LLSelectMgr::getInstance()->sendListToRegions("DeRezObject",
                                                           packDeRezHeader,
@@ -4447,6 +4484,7 @@ void LLSelectMgr::selectForceDelete()
         return;
     }
 
+    deletingLinksets(mSelectedObjects);
     sendListToRegions(
         "ObjectDelete",
         packDeleteHeader,
@@ -6965,14 +7003,19 @@ void LLSelectNode::selectTE(S32 te_index, bool selected)
     {
         return;
     }
-    S32 mask = 0x1 << te_index;
-    if(selected)
+    // The faces that share the face's settings go with it (LLViewerObject::getFaceGroup)
+    const auto [first, last] = mObject ? mObject->getFaceGroup(te_index) : std::make_pair(te_index, te_index + 1);
+    for (S32 te = first; te < llmin(last, (S32)SELECT_MAX_TES); ++te)
     {
-        mTESelectMask |= mask;
-    }
-    else
-    {
-        mTESelectMask &= ~mask;
+        S32 mask = 0x1 << te;
+        if (selected)
+        {
+            mTESelectMask |= mask;
+        }
+        else
+        {
+            mTESelectMask &= ~mask;
+        }
     }
     mLastTESelected = te_index;
 }

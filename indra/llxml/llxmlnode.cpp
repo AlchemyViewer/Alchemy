@@ -36,6 +36,8 @@
 #include <string_view>
 #include <vector>
 
+#include <fmt/format.h>
+
 #include "llxmlnode.h"
 
 #include "alxmldocument.h"
@@ -55,6 +57,7 @@
 // static
 bool LLXMLNode::sStripEscapedStrings = true;
 bool LLXMLNode::sStripWhitespaceValues = false;
+thread_local std::string LLXMLNode::sLastXMLFileError;
 
 // Most members are initialized from default member initializers in the header.
 LLXMLNode::LLXMLNode()
@@ -526,16 +529,45 @@ void buildNodeTree(const ALXmlDocument& document, LLXMLNode* file_node)
 } // namespace
 
 // static
+std::string LLXMLNode::getLastFileError()
+{
+    return sLastXMLFileError;
+}
+
+// static
 bool LLXMLNode::parseFile(const std::string& filename, LLXMLNodePtr& node, LLXMLNode* defaults_tree)
 {
-    std::string xml = LLFile::getContents(filename);
+    sLastXMLFileError.clear();
+
+    std::error_code ec;
+    std::string xml = LLFile::getContents(filename, ec);
     if (xml.empty())
     {
-        LL_WARNS("XMLNode") << "no XML file: " << filename << LL_ENDL;
+        if (ec)
+        {
+            // File exists but could not be read: permissions, I/O error,
+            // translocated/quarantined bundle on macOS, truncated download,
+            // read-only or vanished volume, etc. ec carries the OS-level
+            // reason.
+            sLastXMLFileError = fmt::format("Unable to read XML file: {} ({}, code {}, category {})",
+                                            filename, ec.message(), ec.value(), ec.category().name());
+        }
+        else
+        {
+            sLastXMLFileError = fmt::format("no XML file: {}", filename);
+        }
+        LL_WARNS("XMLNode") << sLastXMLFileError << LL_ENDL;
     }
     else if (parseBuffer(xml.data(), xml.size(), node, defaults_tree))
     {
         return true;
+    }
+    else
+    {
+        // parseBuffer() already populated sLastXMLFileError with the
+        // specific XML parse failure; just annotate it with the filename.
+        sLastXMLFileError = "Error parsing XML file: " + filename +
+            " (" + sLastXMLFileError + ")";
     }
 
     node = nullptr;
@@ -549,14 +581,14 @@ bool LLXMLNode::parseBuffer(
     LLXMLNodePtr& node,
     LLXMLNode* defaults)
 {
+    sLastXMLFileError.clear();
+
     ALXmlDocument document;
     if (!document.loadBuffer(buffer, static_cast<size_t>(length)))
     {
-        LL_WARNS() << "Error parsing xml error code: "
-                << document.errorDescription()
-                << " on line " << document.errorLine()
-                << ", column " << document.errorColumn()
-                << LL_ENDL;
+        sLastXMLFileError = fmt::format("Error parsing xml error code: {} on line {}, column {}",
+                                        document.errorDescription(), document.errorLine(), document.errorColumn());
+        LL_WARNS() << sLastXMLFileError << LL_ENDL;
         return false;
     }
 
@@ -568,9 +600,9 @@ bool LLXMLNode::parseBuffer(
 
     if (!file_node->mChildren || file_node->mChildren->map.size() != 1)
     {
-        LL_WARNS() << "Parse failure - wrong number of top-level nodes xml."
-                << LL_ENDL;
-        node = nullptr ;
+        sLastXMLFileError = "Parse failure - wrong number of top-level nodes xml.";
+        LL_WARNS() << sLastXMLFileError << LL_ENDL;
+        node = nullptr;
         return false;
     }
 
@@ -589,15 +621,16 @@ bool LLXMLNode::parseStream(
     LLXMLNodePtr& node,
     LLXMLNode* defaults)
 {
+    sLastXMLFileError.clear();
+
     // A failed parse still leaves whatever was read before the error, and this
     // has always returned that when it amounts to a single top-level node.
     ALXmlDocument document;
     if (!document.loadStream(str))
     {
-        LL_WARNS() << "Error parsing xml error code: "
-                << document.errorDescription()
-                << " on line " << document.errorLine()
-                << LL_ENDL;
+        sLastXMLFileError = fmt::format("Error parsing xml error code: {} on line {}",
+                                        document.errorDescription(), document.errorLine());
+        LL_WARNS() << sLastXMLFileError << LL_ENDL;
     }
 
     // Create a root node
@@ -608,8 +641,8 @@ bool LLXMLNode::parseStream(
 
     if (!file_node->mChildren || file_node->mChildren->map.size() != 1)
     {
-        LL_WARNS() << "Parse failure - wrong number of top-level nodes xml."
-                << LL_ENDL;
+        sLastXMLFileError = "Parse failure - wrong number of top-level nodes xml.";
+        LL_WARNS() << sLastXMLFileError << LL_ENDL;
         node = nullptr;
         return false;
     }

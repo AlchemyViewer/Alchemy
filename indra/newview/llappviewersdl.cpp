@@ -28,6 +28,7 @@
 
 #include "llappviewersdl.h"
 
+#include "alcrashreporter.h"
 #include "llcommandlineparser.h"
 
 #include "lldiriterator.h"
@@ -37,6 +38,7 @@
 #include "llviewercontrol.h"
 #include "llmd5.h"
 #include "llfindlocale.h"
+#include "llfocusmgr.h"
 #include "llversioninfo.h"
 
 #include <exception>
@@ -422,6 +424,33 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     LL_PROFILER_FRAME_END;
     LL_PROFILER_SET_THREAD_NAME("App");
 
+    // The crash reporter next, so that whatever crashes from here on is
+    // reported: it needs only the viewer's directories. After Velopack, which
+    // may be replacing the crash handler's executable. Whether the command
+    // line turns it off is read here, the settings that hold it coming later.
+    {
+        std::vector<std::string> arguments;
+        for (int i = 1; i < argc; ++i)
+        {
+            if (argv[i])
+            {
+                arguments.emplace_back(argv[i]);
+            }
+        }
+        LLAppViewer::initAppDirs();
+        ALCrashReporter::start(!ALCrashReporter::crashLoggerDisabledBy(arguments));
+    }
+    LLAppViewer::installTerminateHandler();
+
+    // A crash of the last run waiting for an answer is asked about before
+    // anything else can crash. The benchmark child asks nothing: its parent
+    // does.
+    if (!gGPUBenchmarkMode)
+    {
+        ALCrashReporter::askAfterHeldCrash();
+    }
+    ALCrashReporter::probe("main");
+
     gSDLMainHandled = true;
 
     gArgC = argc;
@@ -456,8 +485,6 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     << SDL_VERSIONNUM_MAJOR(r_sdl_version) << "."
     << SDL_VERSIONNUM_MINOR(r_sdl_version) << "."
     << SDL_VERSIONNUM_MICRO(r_sdl_version) << LL_ENDL;
-
-    LLAppViewer::installTerminateHandler();
 
 #if LL_WINDOWS
     // Set a debug info flag to indicate if multiple instances are running.
@@ -550,7 +577,7 @@ SDL_AppResult SDL_AppEvent(void *appstate, SDL_Event *event)
         return SDL_APP_CONTINUE;
     }
 #endif
-    return LLWindowSDL::handleEvents(*event);
+    return LLWindowSDL::handleEvents(*event, gFocusMgr.getAppHasFocus());
 }
 
 void SDL_AppQuit(void *appstate, SDL_AppResult result)

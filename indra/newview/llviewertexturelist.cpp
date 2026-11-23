@@ -1598,21 +1598,31 @@ bool LLViewerTextureList::createUploadFile(const std::string& filename,
 // note: modifies the argument raw_image!!!!
 LLPointer<LLImageJ2C> LLViewerTextureList::convertToUploadFile(LLPointer<LLImageRaw> raw_image, const S32 max_image_dimentions, bool force_square, bool force_lossless)
 {
+    return convertToUploadFile(raw_image, EJ2CContent::Colour, max_image_dimentions, force_square, force_lossless);
+}
+
+// note: modifies the argument raw_image!!!!
+LLPointer<LLImageJ2C> LLViewerTextureList::convertToUploadFile(LLPointer<LLImageRaw> raw_image, EJ2CContent content, const S32 max_image_dimentions, bool force_square, bool force_lossless)
+{
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     LLImageDataLock lock(raw_image);
+
+    LLPointer<LLImageJ2C> compressedImage = new LLImageJ2C();
+    compressedImage->setEncodeContent(content);
 
     if (force_square)
     {
         S32 biggest_side = llmax(raw_image->getWidth(), raw_image->getHeight());
         S32 square_size = raw_image->biasedDimToPowerOfTwo(biggest_side, max_image_dimentions);
 
-        raw_image->scale(square_size, square_size);
+        compressedImage->scaleForEncode(*raw_image, square_size, square_size);
     }
     else
     {
-        raw_image->biasedScaleToPowerOfTwo(max_image_dimentions);
+        compressedImage->scaleForEncode(*raw_image,
+                                        LLImageRaw::biasedDimToPowerOfTwo(raw_image->getWidth(), max_image_dimentions),
+                                        LLImageRaw::biasedDimToPowerOfTwo(raw_image->getHeight(), max_image_dimentions));
     }
-    LLPointer<LLImageJ2C> compressedImage = new LLImageJ2C();
 
     if (force_lossless ||
         (gSavedSettings.getBOOL("LosslessJ2CUpload") &&

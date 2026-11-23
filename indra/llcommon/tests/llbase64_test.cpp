@@ -62,4 +62,19 @@ namespace
         CHECK(result == "c9+s/4xGMX3smy3HZRGkg+YTUEBwNYdi7QwaSH4OkY92xAuxhKnDhg==");
     }
 
+    TEST_CASE("LLBase64: decodeAsString keeps embedded zero bytes", "[LLBase64]")
+    {
+        std::string result;
+
+        LLUUID nothing;
+        result = LLBase64::decodeAsString("AAAAAAAAAAAAAAAAAAAAAA==");
+        REQUIRE(result.size() == (size_t)UUID_BYTES);
+        CHECK(memcmp(result.data(), &nothing.mData[0], UUID_BYTES) == 0);
+
+        LLUUID id("526a1e07-a19d-baed-84c4-ff08a488d15e");
+        result = LLBase64::decodeAsString("UmoeB6Gduu2ExP8IpIjRXg==");
+        REQUIRE(result.size() == (size_t)UUID_BYTES);
+        CHECK(memcmp(result.data(), &id.mData[0], UUID_BYTES) == 0);
+    }
+
 }

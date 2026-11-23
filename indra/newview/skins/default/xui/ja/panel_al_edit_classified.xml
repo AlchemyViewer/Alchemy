@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<panel name="panel_edit_classified" label="クラシファイド広告の編集">
+	<panel.string name="location_notice">
+		（保存後に更新されます）
+	</panel.string>
+	<string name="publish_label">
+		掲載
+	</string>
+	<string name="save_label">
+		保存
+	</string>
+	<text name="title">
+		クラシファイド広告の編集
+	</text>
+	<scroll_container name="profile_scroll">
+		<panel name="scroll_content_panel">
+			<panel name="snapshot_panel">
+				<icon name="edit_icon" tool_tip="クリックして画像を選択します"/>
+			</panel>
+			<text name="Name:">
+				タイトル：
+			</text>
+			<text name="description_label">
+				説明：
+			</text>
+			<text name="location_label">
+				場所：
+			</text>
+			<text name="classified_location">
+				読み込んでいます…
+			</text>
+			<button name="set_to_curr_location_btn" label="現在地に設定"/>
+			<text name="category_label" value="カテゴリ："/>
+			<text name="content_type_label" value="コンテンツの種類："/>
+			<icons_combo_box name="content_type" label="Generalコンテンツ">
+				<icons_combo_box.item name="mature_ci" label="Moderateコンテンツ"/>
+				<icons_combo_box.item name="pg_ci" label="Generalコンテンツ"/>
+			</icons_combo_box>
+			<text name="price_for_listing_label" value="掲載料："/>
+			<spinner name="price_for_listing" tool_tip="掲載料"/>
+			<check_box name="auto_renew" label="毎週自動更新する"/>
+		</panel>
+	</scroll_container>
+	<panel name="bottom_panel">
+		<button name="cancel_btn" label="キャンセル"/>
+	</panel>
+</panel>

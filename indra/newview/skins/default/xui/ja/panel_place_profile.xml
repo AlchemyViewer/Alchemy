@@ -118,4 +118,7 @@
 			</accordion>
 		</panel>
 	</scroll_container>
+	<string name="acquired_date_ampm">
+		[year,datetime,local]年[mth,datetime,local]月[day,datetime,local]日（[wkday,datetime,local]）[ampm,datetime,local][hour12,datetime,local]：[min,datetime,local]：[second,datetime,local]
+	</string>
 </panel>

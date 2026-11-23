@@ -35,9 +35,11 @@
 #include "llclipboard.h"
 
 #include "llagent.h"
+#include "llavataractions.h"
 #include "llappearancemgr.h"
 #include "llclipboard.h"
 #include "llgesturemgr.h"
+#include "llfiltereditor.h"
 #include "llkeyboard.h"
 #include "llmenugl.h"
 #include "llmultigesture.h"
@@ -50,6 +52,19 @@
 #include "llviewerinventory.h"
 #include "llviewercontrol.h"
 #include "llfloaterperms.h"
+
+namespace
+{
+enum GestureColumn
+{
+    ACTIVE_COLUMN,
+    NAME_COLUMN,
+    CHAT_COLUMN,
+    KEY_SORT_COLUMN,
+    KEY_COLUMN,
+    LAST_USED_COLUMN
+};
+}
 
 bool item_name_precedes( LLInventoryItem* a, LLInventoryItem* b )
 {
@@ -128,6 +143,11 @@ LLFloaterGesture::LLFloaterGesture(const LLSD& key)
     mCommitCallbackRegistrar.add("Gesture.Action.SaveToCOF", boost::bind(&LLFloaterGesture::addToCurrentOutFit, this));
     mCommitCallbackRegistrar.add("Gesture.Action.Rename", boost::bind(&LLFloaterGesture::onRenameSelected, this));
 
+    mCommitCallbackRegistrar.add("Gesture.Action.Play", boost::bind(&LLFloaterGesture::onClickPlay, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Delete", boost::bind(&LLFloaterGesture::onDeleteSelected, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Share", boost::bind(&LLFloaterGesture::onShare, this));
+    mCommitCallbackRegistrar.add("Gesture.Action.Reveal", boost::bind(&LLFloaterGesture::onRevealInInventory, this));
+
     mEnableCallbackRegistrar.add("Gesture.EnableAction", boost::bind(&LLFloaterGesture::isActionEnabled, this, _2));
 }
 
@@ -197,7 +217,25 @@ bool LLFloaterGesture::postBuild()
     setTitle(label);
     mGestureList = getChild<LLScrollListCtrl>("gesture_list");
     mGestureList->setCommitCallback(boost::bind(&LLFloaterGesture::onCommitList, this));
+    mContextMenu.make("menu_gesture_context.xml");
+    mGestureList->setRightMouseDownCallback(
+        [this](LLUICtrl*, S32 x, S32 y, MASK) { onContextMenu(x, y); });
     mGestureList->setDoubleClickCallback(boost::bind(&LLFloaterGesture::onClickPlay, this));
+    mGestureList->setSortCallback([](S32 column, const LLScrollListItem* lhs, const LLScrollListItem* rhs)
+    {
+        if (column == LAST_USED_COLUMN)
+        {
+            const auto lhs_time = LLGestureMgr::instance().getLastUsedTime(lhs->getUUID());
+            const auto rhs_time = LLGestureMgr::instance().getLastUsedTime(rhs->getUUID());
+            // Ascending elapsed time puts the most recently used first and
+            // gestures without retained history last.
+            return (lhs_time < rhs_time) - (lhs_time > rhs_time);
+        }
+        return LLStringUtil::compareDict(lhs->getColumn(column)->getValue().asString(),
+                                        rhs->getColumn(column)->getValue().asString());
+    });
+    getChild<LLFilterEditor>("gesture_filter")->setCommitCallback(
+        [this](LLUICtrl* ctrl, const LLSD&) { onFilterEdit(ctrl->getValue().asString()); });
 
     getChild<LLUICtrl>("edit_btn")->setCommitCallback(boost::bind(&LLFloaterGesture::onClickEdit, this));
 
@@ -244,20 +282,72 @@ void LLFloaterGesture::refreshAll()
 
     buildGestureList();
 
-    if (mSelectedID.isNull())
+    if (!mGestureList->getFirstSelected())
     {
         mGestureList->selectFirstItem();
-    }
-    else
-    {
-        if (! mGestureList->setCurrentByID(mSelectedID))
-        {
-            mGestureList->selectFirstItem();
-        }
     }
 
     // Update button labels
     onCommitList();
+}
+
+void LLFloaterGesture::onFilterEdit(const std::string& filter)
+{
+    std::string normalized = utf8str_tolower(filter);
+    LLStringUtil::trim(normalized);
+    if (normalized == mFilter)
+        return;
+
+    mFilter = std::move(normalized);
+
+    // As in the inventory, "clap+fast" matches gestures holding every term, in any order.
+    mFilterTerms = LLStringUtil::getTokens(mFilter, "+");
+    std::erase(mFilterTerms, std::string());
+
+    refreshAll();
+    mGestureList->setScrollPos(0);
+}
+
+std::string LLFloaterGesture::getLastUsedText(const LLUUID& item_id) const
+{
+    const auto last_used = LLGestureMgr::instance().getLastUsedTime(item_id);
+    if (!last_used)
+        return getString("never_used");
+
+    auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
+        LLGestureMgr::usage_clock::now() - *last_used).count();
+    std::string unit = "last_used_seconds";
+    if (elapsed >= 86400)
+    {
+        elapsed /= 86400;
+        unit = "last_used_days";
+    }
+    else if (elapsed >= 3600)
+    {
+        elapsed /= 3600;
+        unit = "last_used_hours";
+    }
+    else if (elapsed >= 60)
+    {
+        elapsed /= 60;
+        unit = "last_used_minutes";
+    }
+    LLStringUtil::format_map_t args;
+    args["[COUNT]"] = std::to_string(elapsed);
+    return getString(unit, args);
+}
+
+void LLFloaterGesture::draw()
+{
+    if (mLastUsedRefreshTimer.checkExpirationAndReset(1.f))
+    {
+        // Refresh labels in place without rebuilding rows or disturbing selection.
+        for (LLScrollListItem* item : mGestureList->getAllData())
+        {
+            item->getColumn(LAST_USED_COLUMN)->setValue(getLastUsedText(item->getUUID()));
+        }
+    }
+    LLFloater::draw();
 }
 
 void LLFloaterGesture::buildGestureList()
@@ -295,121 +385,68 @@ void LLFloaterGesture::buildGestureList()
 
     // attempt to preserve scroll position through re-builds
     // since we do re-build whenever something gets dirty
-    for(uuid_vec_t::iterator it = selected_items.begin(); it != selected_items.end(); it++)
-    {
-        mGestureList->selectByID(*it);
-    }
+    mGestureList->selectMultiple(selected_items);
     mGestureList->setScrollPos(scroll_pos);
+    mGestureList->setCommentText(getString(mFilterTerms.empty() ? "no_gestures" : "no_matching_gestures"));
 }
 
-void LLFloaterGesture::addGesture(const LLUUID& item_id , LLMultiGesture* gesture,LLCtrlListInterface * list )
+void LLFloaterGesture::addGesture(const LLUUID& item_id, LLMultiGesture* gesture, LLCtrlListInterface* list)
 {
-    // Note: Can have NULL item if inventory hasn't arrived yet.
-    static std::string item_name = getString("loading");
-    LLInventoryItem* item = gInventory.getItem(item_id);
-    if (item)
+    // Unloaded gestures expose only their inventory name.
+    const LLInventoryItem* item = gInventory.getItem(item_id);
+    std::string item_name = item ? item->getName() : gesture ? gesture->mName : getString("loading");
+    const std::string trigger = gesture ? gesture->mTrigger : std::string();
+    const bool has_key = gesture && gesture->mKey != KEY_NONE;
+    const std::string shortcut = has_key ? LLKeyboard::stringFromAccelerator(gesture->mMask, gesture->mKey) : "---";
+
+    if (!mFilterTerms.empty())
     {
-        item_name = item->getName();
+        const std::string name_lower = utf8str_tolower(item_name);
+        const std::string trigger_lower = utf8str_tolower(trigger);
+        const std::string shortcut_lower = has_key ? utf8str_tolower(shortcut) : std::string();
+
+        const bool matches = std::all_of(mFilterTerms.begin(), mFilterTerms.end(), [&](const std::string& term)
+        {
+            return name_lower.find(term) != std::string::npos
+                || trigger_lower.find(term) != std::string::npos
+                || shortcut_lower.find(term) != std::string::npos;
+        });
+
+        if (!matches)
+            return;
     }
 
-    static std::string font_style = "NORMAL";
-    // If gesture is playing, bold it
+    const bool playing = gesture && gesture->mPlaying;
+    const bool active = LLGestureMgr::instance().isGestureActive(item_id);
+    if (item && playing)
+        item_name += " " + getString("playing");
 
     LLSD element;
     element["id"] = item_id;
-
-    if (gesture)
+    LLSD& columns = element["columns"];
+    columns[ACTIVE_COLUMN]["column"] = "active";
+    columns[ACTIVE_COLUMN]["type"] = "icon";
+    columns[ACTIVE_COLUMN]["value"] = active ? "Activate_Checkmark" : "";
+    columns[NAME_COLUMN]["column"] = "name";
+    columns[NAME_COLUMN]["value"] = item_name;
+    columns[CHAT_COLUMN]["column"] = "trigger";
+    columns[CHAT_COLUMN]["value"] = trigger;
+    columns[KEY_SORT_COLUMN]["column"] = "key";
+    columns[KEY_SORT_COLUMN]["value"] = has_key ? LLKeyboard::stringFromKey(gesture->mKey) : "~~~";
+    columns[KEY_COLUMN]["column"] = "shortcut";
+    columns[KEY_COLUMN]["value"] = shortcut;
+    columns[LAST_USED_COLUMN]["column"] = "last_used";
+    columns[LAST_USED_COLUMN]["value"] = getLastUsedText(item_id);
+    for (S32 column = NAME_COLUMN; column <= LAST_USED_COLUMN; ++column)
     {
-        element["columns"][0]["column"] = "active";
-        element["columns"][0]["type"] = "icon";
-        if (gesture->mPlaying)
-        {
-            font_style = "BOLD";
-            element["columns"][0]["value"] = "Activate_Checkmark";
-        }
-
-        // Only add "playing" if we've got the name, less confusing. JC
-        item_name = gesture->mName;
-        if (item && gesture->mPlaying)
-        {
-            item_name += " " + getString("playing");
-        }
-        element["columns"][1]["column"] = "name";
-        element["columns"][1]["value"] = item_name;
-        element["columns"][1]["font"]["name"] = "SANSSERIF";
-        element["columns"][1]["font"]["style"] = font_style;
-
-        element["columns"][2]["column"] = "trigger";
-        element["columns"][2]["value"] = gesture->mTrigger;
-        element["columns"][2]["font"]["name"] = "SANSSERIF";
-        element["columns"][2]["font"]["style"] = font_style;
-
-        std::string key_string;
-        std::string buffer;
-
-        if (gesture->mKey == KEY_NONE)
-        {
-            buffer = "---";
-            key_string = "~~~"; // alphabetize to end
-        }
-        else
-        {
-            key_string = LLKeyboard::stringFromKey(gesture->mKey);
-            buffer = LLKeyboard::stringFromAccelerator(gesture->mMask,
-                    gesture->mKey);
-        }
-
-        // hidden column for sorting
-        element["columns"][3]["column"] = "key";
-        element["columns"][3]["value"] = key_string;
-        element["columns"][3]["font"]["name"] = "SANSSERIF";
-        element["columns"][3]["font"]["style"] = font_style;
-
-        element["columns"][4]["column"] = "shortcut";
-        element["columns"][4]["value"] = buffer;
-        element["columns"][4]["font"]["name"] = "SANSSERIF";
-        element["columns"][4]["font"]["style"] = font_style;
+        columns[column]["font"]["name"] = "SANSSERIF";
+        columns[column]["font"]["style"] = playing ? "BOLD" : "NORMAL";
     }
-    else
-    {
-        element["columns"][0]["column"] = "active";
-        element["columns"][0]["type"] = "icon";
-        element["columns"][0]["value"] = "";
-        element["columns"][1]["column"] = "name";
-        element["columns"][1]["value"] = item_name;
-        element["columns"][1]["font"]["name"] = "SANSSERIF";
-        element["columns"][1]["font"]["style"] = font_style;
-        element["columns"][2]["column"] = "trigger";
-        element["columns"][2]["value"] = "";
-        element["columns"][2]["font"]["name"] = "SANSSERIF";
-        element["columns"][2]["font"]["style"] = font_style;
-        element["columns"][3]["column"] = "key";
-        element["columns"][3]["value"] = "~~~";
-        element["columns"][3]["font"]["name"] = "SANSSERIF";
-        element["columns"][3]["font"]["style"] = font_style;
-        element["columns"][4]["column"] = "shortcut";
-        element["columns"][4]["value"] = "---";
-        element["columns"][4]["font"]["name"] = "SANSSERIF";
-        element["columns"][4]["font"]["style"] = font_style;
-    }
+    columns[NAME_COLUMN]["font"]["style"] = active ? "BOLD" : "NORMAL";
 
-    LL_DEBUGS("Gesture") << "Added gesture [" << item_name << "]" << LL_ENDL;
-
-    LLScrollListItem* sl_item = list->addElement(element, ADD_BOTTOM);
-    if(sl_item)
+    if (LLScrollListItem* row = list->addElement(element, ADD_BOTTOM))
     {
-        if (LLGestureMgr::getInstance()->isGestureActive(item_id))
-        {
-            // If gesture was not yet loaded, will have to set active state here
-            ((LLScrollListIcon*)sl_item->getColumn(0))->setValue("Activate_Checkmark");
-            ((LLScrollListIcon*)sl_item->getColumn(0))->setIconSize(10);
-            ((LLScrollListText*)sl_item->getColumn(1))->setFontStyle(LLFontGL::BOLD);
-        }
-        else
-        {
-            ((LLScrollListIcon*)sl_item->getColumn(0))->setValue("");
-            ((LLScrollListText*)sl_item->getColumn(1))->setFontStyle(LLFontGL::NORMAL);
-        }
+        static_cast<LLScrollListIcon*>(row->getColumn(ACTIVE_COLUMN))->setIconSize(10);
     }
 }
 
@@ -424,7 +461,6 @@ void LLFloaterGesture::getSelectedIds(uuid_vec_t& ids)
 
 bool LLFloaterGesture::isActionEnabled(const LLSD& command)
 {
-    // paste copy_uuid edit_gesture
     std::string command_name = command.asString();
     if("paste" == command_name)
     {
@@ -444,9 +480,11 @@ bool LLFloaterGesture::isActionEnabled(const LLSD& command)
         }
         return false;
     }
-    else if("copy_uuid" == command_name || "edit_gesture" == command_name)
+    else if (command_name == "copy_uuid" || command_name == "edit_gesture"
+             || command_name == "play" || command_name == "reveal")
     {
-        return  mGestureList->getAllSelected().size() == 1;
+        return mGestureList->getAllSelected().size() == 1
+            && gInventory.getItem(mGestureList->getCurrentID());
     }
     else if ("rename_gesture" == command_name)
     {
@@ -461,7 +499,62 @@ bool LLFloaterGesture::isActionEnabled(const LLSD& command)
         }
         return false;
     }
+    const auto selected = mGestureList->getAllSelected();
+    if (selected.empty())
+        return false;
+
+    for (const LLScrollListItem* row : selected)
+    {
+        const LLViewerInventoryItem* item = gInventory.getItem(row->getUUID());
+        if (!item)
+            return false;
+        if (command_name == "share" && !can_share_item(item->getUUID()))
+            return false;
+        if (command_name == "copy_gesture" && !item->getPermissions().allowCopyBy(gAgentID))
+            return false;
+        if (command_name == "delete" && !gInventory.isObjectDescendentOf(item->getUUID(), gInventory.getRootFolderID()))
+            return false;
+    }
     return true;
+}
+
+void LLFloaterGesture::onContextMenu(S32 x, S32 y)
+{
+    LLScrollListItem* row = mGestureList->hitItem(x, y);
+    if (!row || !row->getEnabled())
+        return;
+
+    if (!row->getSelected())
+        mGestureList->selectItemAt(x, y, MASK_NONE);
+    onCommitList();
+
+    if (LLContextMenu* menu = mContextMenu.get())
+    {
+        const auto selected = mGestureList->getAllSelected();
+        const bool all_active = std::all_of(selected.begin(), selected.end(), [](const LLScrollListItem* item)
+        {
+            return LLGestureMgr::instance().isGestureActive(item->getUUID());
+        });
+        menu->getChild<LLMenuItemGL>("activate")->setLabel(getString(all_active ? "menu_deactivate" : "menu_activate"));
+        menu->getChild<LLMenuItemGL>("play")->setLabel(getString(
+            LLGestureMgr::instance().isGesturePlaying(mGestureList->getCurrentID()) ? "menu_stop" : "menu_play"));
+        mContextMenu.show(mGestureList, x, y);
+    }
+}
+
+void LLFloaterGesture::onShare()
+{
+    if (!isActionEnabled("share"))
+        return;
+    uuid_vec_t ids;
+    getSelectedIds(ids);
+    LLAvatarActions::shareWithAvatars(uuid_set_t(ids.begin(), ids.end()), this);
+}
+
+void LLFloaterGesture::onRevealInInventory()
+{
+    if (isActionEnabled("reveal"))
+        show_item_original(mGestureList->getCurrentID());
 }
 
 void LLFloaterGesture::onClickPlay()
@@ -651,7 +744,12 @@ void LLFloaterGesture::onCommitList()
 {
     const LLUUID& item_id = mGestureList->getCurrentID();
 
-    mSelectedID = item_id;
+    const bool has_selection = item_id.notNull();
+    getChildView("play_btn")->setEnabled(has_selection);
+    getChildView("stop_btn")->setEnabled(has_selection);
+    getChildView("edit_btn")->setEnabled(has_selection);
+    getChildView("del_btn")->setEnabled(has_selection);
+    getChildView("activate_btn")->setEnabled(has_selection);
     if (LLGestureMgr::instance().isGesturePlaying(item_id))
     {
         getChildView("play_btn")->setVisible( false);
