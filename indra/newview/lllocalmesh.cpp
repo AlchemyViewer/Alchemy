@@ -580,9 +580,10 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         importGLTFMaterials(gltf_mat_by_name, new_owned_materials);
     }
 
-    // Each part's own LOD and physics models, by the part's label (NAME, or NAMEb for a submodel):
+    // Each part's own LOD and physics models, keyed by (base label, submodel id) so a split
+    // root's submodel (e.g. Door_PHYSb) cannot collide with a separate part named Doorb:
     // slots 0-2 are LOD0-2, slot 3 the physics shape.
-    std::map<std::string, std::array<LLModel*, 4>, std::less<>> lods_of;
+    std::map<std::pair<std::string, S32>, std::array<LLModel*, 4>> lods_of;
     LLModel* default_physics_mdl = nullptr;
     // How many distinct models (root and submodels) each part has at High, and at each of its own LOD slots:
     // a LOD split differently from High would leave faces out, so it isn't served.
@@ -618,12 +619,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             }
             const std::string_view suffix = core.substr(base.size());
             const size_t slot = suffix == "_PHYS" ? 3 : (size_t)(suffix.back() - '0');
-            std::string key(base);
-            if (mdl->mSubmodelID > 0)
-            {
-                key += mdl->mLabel.back();
-            }
-            LLModel*& dst = lods_of[key][slot];
+            LLModel*& dst = lods_of[{ std::string(base), mdl->mSubmodelID }][slot];
             if (!dst)
             {
                 dst = mdl;
@@ -885,7 +881,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             }
             part.mVolume->setMeshAssetLoaded(true);
 
-            auto own = lods_of.find(mdl->mLabel);
+            auto own = lods_of.find({ std::string(core_label(mdl)), mdl->mSubmodelID });
             const bool part_rigged = !mdl->mSkinInfo.mJointNames.empty();
             if (own != lods_of.end())
             {
@@ -1896,7 +1892,27 @@ LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LL
     return root;
 }
 
-void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
+// Hot-swap diff-restore state: each spawned prim's live face state, captured
+// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
+// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
+// after that would record the reset as if the user had applied it), plus the
+// OLD parts' imported materials to diff user edits against.
+struct LLLocalMeshPreSwapSnapshot
+{
+    struct Face
+    {
+        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
+        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
+    };
+    typedef std::vector<Face> PrimFaces;
+
+    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;        // per copy (instance id), per prim
+    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported;     // per part: the old file's materials
+    std::vector<LLVector3>                            mOldPivotOffsets; // per part: the old file's normalized pivot shift
+    std::string                                       mOldRootName;     // old root part's label, for respawn pivot compensation
+};
+
+void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot* pre_swap)
 {
     // Capture each existing copy's identity, transform and attachment, then re-rez
     // them in place. Used when a reload changes the prim count (hot-swap can't swap
@@ -1916,6 +1932,18 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
     const LLLocalMesh* unit = getUnit(tracking_id);
     const LLQuaternion intrinsic0 = (unit && !unit->getParts().empty())
         ? unit->getParts().front().mRotation : LLQuaternion();
+    LLVector3 root_pivot_delta = LLVector3::zero;
+    if (unit && !unit->getParts().empty() && pre_swap && !pre_swap->mOldPivotOffsets.empty()
+        && !pre_swap->mOldRootName.empty() && unit->getParts().front().mName == pre_swap->mOldRootName)
+    {
+        const LLLocalMeshPart& root_part = unit->getParts().front();
+        const LLVector3 delta = root_part.mPivotOffset - pre_swap->mOldPivotOffsets.front();
+        if (!delta.isExactlyZero())
+        {
+            root_pivot_delta = delta.scaledVec(root_part.mScale);
+        }
+    }
+    const bool compensate_root_pivot = !root_pivot_delta.isExactlyZero();
     std::vector<Saved> saved;
     for (const auto& entry : mSpawnedCopies)
     {
@@ -1931,9 +1959,13 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         }
         Saved s;
         s.mInstanceID = entry.first;
-        s.mBase       = r->getPositionAgent();
-        s.mRot        = ~intrinsic0 * r->getRotation(); // user delta, not full world rotation
         s.mAttached   = r->isAttachment();
+        s.mBase       = r->getPositionAgent();
+        if (compensate_root_pivot && !s.mAttached)
+        {
+            s.mBase -= root_pivot_delta * r->getRotationRegion();
+        }
+        s.mRot        = ~intrinsic0 * r->getRotation(); // user delta, not full world rotation
         s.mPoint      = s.mAttached ? ATTACHMENT_ID_FROM_STATE(r->getAttachmentState()) : 0;
         saved.push_back(s);
     }
@@ -1945,25 +1977,6 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         spawnLinkset(tracking_id, s.mInstanceID, s.mBase, s.mRot, s.mAttached, s.mPoint);
     }
 }
-
-// Hot-swap diff-restore state: each spawned prim's live face state, captured
-// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
-// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
-// after that would record the reset as if the user had applied it), plus the
-// OLD parts' imported materials to diff user edits against.
-struct LLLocalMeshPreSwapSnapshot
-{
-    struct Face
-    {
-        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
-        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
-    };
-    typedef std::vector<Face> PrimFaces;
-
-    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;        // per copy (instance id), per prim
-    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported;     // per part: the old file's materials
-    std::vector<LLVector3>                            mOldPivotOffsets; // per part: the old file's normalized pivot shift
-};
 
 namespace
 {
@@ -2057,6 +2070,10 @@ void restorePreservedFaces(LLVOVolume* vol,
 void LLLocalMeshMgr::capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
                                     LLLocalMeshPreSwapSnapshot& out) const
 {
+    if (!unit.getParts().empty())
+    {
+        out.mOldRootName = unit.getParts().front().mName;
+    }
     for (const LLLocalMeshPart& part : unit.getParts())
     {
         out.mOldImported.push_back(part.mFaceMaterials);
@@ -2496,7 +2513,7 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
             {
                 if (!hotSwapInWorld(tracking_id, pre_swap))
                 {
-                    respawnInstancesInPlace(tracking_id); // prim count changed -> re-rez each copy
+                    respawnInstancesInPlace(tracking_id, &pre_swap); // prim count changed -> re-rez each copy
                 }
                 // The skin may have changed (a live edit, or a Joint Positions
                 // toggle), so recompute joint-position overrides on every affected

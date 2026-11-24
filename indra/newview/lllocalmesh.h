@@ -371,7 +371,7 @@ private:
                         LLLocalMeshPreSwapSnapshot& out) const;
     // Re-rez every existing copy of a unit at its current transform/attachment, used
     // when a reload changes the prim count so hot-swap can't swap 1:1.
-    void respawnInstancesInPlace(const LLUUID& tracking_id);
+    void respawnInstancesInPlace(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot* pre_swap = nullptr);
     // Build one copy's linkset for (tracking_id, instance_id) rooted at `base` with
     // `root_rot`, optionally worn at attach_point. Returns the root.
     LLViewerObject* spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,

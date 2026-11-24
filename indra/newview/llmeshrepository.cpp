@@ -5388,7 +5388,7 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
 
 S32 LLMeshRepository::getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod)
 {
-    // Local mesh has no header/LOD list; the same geometry is valid for every LOD.
+    // Local mesh has no header/LOD list; each LOD resolves from the unit's per-LOD volumes (falling back to High). // <SK:Nexii>
     if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
     {
         return llclamp(lod, 0, LLVolumeLODGroup::NUM_LODS - 1);
