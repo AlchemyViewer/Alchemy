@@ -496,8 +496,9 @@ private:
     LLViewerObject* addNewObject(LLVOCacheEntry* entry);
     void killObject(LLVOCacheEntry* entry, std::vector<LLDrawable*>& delete_list); //adds entry into list if it is safe to move into cache
     void removeFromVOCacheTree(LLVOCacheEntry* entry);
-    // Physically delete the cache entry. One deleted for rendering, its object made from the region's update, keeps
-    // the object's glTF overrides; one deleted because its object is gone takes them.
+    // Takes the entry, and the children waiting on it, out of everything made or drawn, invalid until the region
+    // confirms it or sends its object again; one killed for rendering, its object made from the region's update, is made
+    // first. The objects' glTF overrides stay with their entries.
     void killCacheEntry(LLVOCacheEntry* entry, bool for_rendering = false);
     void killInvisibleObjects(F32 max_time);
     void createVisibleObjects();

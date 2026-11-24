@@ -209,16 +209,16 @@ ALGLTFOverrideFaceState LLGLTFOverrideCacheEntry::faceState(const LLGLTFOverride
 
 bool ALGLTFOverrideCounts::any() const
 {
-    return mMessages || mFacesSet || mFacesDeferred || mFacesReconciled || mKeptOnUpdate || mTakenWithObject || mDroppedAsOther
-           || mAskedAgain;
+    return mMessages || mFacesSet || mFacesDeferred || mFacesReconciled || mKeptOnUpdate || mKeptOnKill || mTakenWithObject
+           || mDroppedAsOther || mAskedAgain;
 }
 
 std::string ALGLTFOverrideCounts::summary() const
 {
     return fmt::format("{} messages, {} faces set at once, {} found waiting on a material, {} set later, {} kept through an update, "
-                       "{} taken with their object, {} dropped as another object's, {} objects asked for again",
-                       mMessages, mFacesSet, mFacesDeferred, mFacesReconciled, mKeptOnUpdate, mTakenWithObject, mDroppedAsOther,
-                       mAskedAgain);
+                       "{} kept through a kill, {} taken with their object, {} dropped as another object's, {} objects asked for again",
+                       mMessages, mFacesSet, mFacesDeferred, mFacesReconciled, mKeptOnUpdate, mKeptOnKill, mTakenWithObject,
+                       mDroppedAsOther, mAskedAgain);
 }
 
 LLSD LLGLTFOverrideCacheEntry::toLLSD() const
@@ -346,25 +346,29 @@ bool LLVOCacheEntry::killLocalID(U32 local_id, vocache_entry_map_t& entries, voc
                                  const std::function<void(LLVOCacheEntry*)>& kill_entry)
 {
     const auto iter = entries.find(local_id);
-    if (iter != entries.end() && iter->second->isKillable())
+    if (iter == entries.end())
+    {
+        return overrides.erase(local_id) > 0;
+    }
+    const LLUUID object_id = iter->second->getObjectID();
+    if (iter->second->isKillable())
     {
         kill_entry(iter->second);
     }
-    return overrides.erase(local_id) > 0;
-}
-
-// static
-bool LLVOCacheEntry::killEntryOverrides(U32 local_id, bool object_stays, vocache_gltf_overrides_map_t& overrides)
-{
-    return !object_stays && overrides.erase(local_id) > 0;
+    return dropOverridesOfAnother(local_id, object_id, overrides);
 }
 
 // static
 bool LLVOCacheEntry::dropOverridesOfAnother(U32 local_id, const LLUUID& object_id, vocache_gltf_overrides_map_t& overrides)
 {
     const auto iter = overrides.find(local_id);
-    if (iter == overrides.end() || iter->second.isFor(object_id))
+    if (iter == overrides.end())
     {
+        return false;
+    }
+    if (iter->second.isFor(object_id))
+    {
+        iter->second.mObjectId = object_id;
         return false;
     }
     overrides.erase(iter);

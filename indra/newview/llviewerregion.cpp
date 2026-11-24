@@ -1236,21 +1236,20 @@ void LLViewerRegion::killCacheEntry(LLVOCacheEntry* entry, bool for_rendering)
         LLVOCacheEntry* child = entry->getChild();
         while(child != NULL)
         {
+            // The root's own is counted where its local ID is killed, and an update's kills are counted below.
+            if (!for_rendering && mImpl->mGLTFOverridesLLSD.count(child->getLocalID()))
+            {
+                ++mGLTFOverrideCounts.mKeptOnKill;
+            }
             killCacheEntry(child, for_rendering);
             child = entry->getChild();
         }
     }
-    // An entry killed for rendering is the cached copy of an object that stays in the world, made from the region's
-    // update: it keeps the object's overrides, which the region sends only with the object's full update and which a
-    // face whose material is still fetching has yet to take. An entry killed because its object is gone takes them.
+    // The object's overrides stay under its local ID: a killed entry stays in the map and the file, where the region
+    // can confirm it with no word of its overrides, and a face whose material is still fetching has yet to take them.
+    // They go with another object under the local ID (dropGLTFOverridesOfAnother).
     const U32 local_id = entry->getLocalID();
-    if (LLVOCacheEntry::killEntryOverrides(local_id, /*object_stays=*/for_rendering, mImpl->mGLTFOverridesLLSD))
-    {
-        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " go with its entry" << LL_ENDL;
-        mGLTFOverridesDirty = true;
-        ++mGLTFOverrideCounts.mTakenWithObject;
-    }
-    else if (for_rendering && mImpl->mGLTFOverridesLLSD.count(local_id))
+    if (for_rendering && mImpl->mGLTFOverridesLLSD.count(local_id))
     {
         LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " kept as its entry leaves for an update" << LL_ENDL;
         ++mGLTFOverrideCounts.mKeptOnUpdate;
@@ -1269,8 +1268,14 @@ void LLViewerRegion::killCacheEntry(U32 local_id)
     if (LLVOCacheEntry::killLocalID(local_id, mImpl->mCacheMap, mImpl->mGLTFOverridesLLSD,
                                     [this](LLVOCacheEntry* entry) { killCacheEntry(entry); }))
     {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " go with its object" << LL_ENDL;
         mGLTFOverridesDirty = true;
         ++mGLTFOverrideCounts.mTakenWithObject;
+    }
+    else if (mImpl->mGLTFOverridesLLSD.count(local_id))
+    {
+        LL_DEBUGS("GLTF") << "Overrides of local ID " << local_id << " in " << getName() << " kept as the region kills its object" << LL_ENDL;
+        ++mGLTFOverrideCounts.mKeptOnKill;
     }
 }
 

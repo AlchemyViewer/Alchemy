@@ -45,6 +45,7 @@ struct ALGLTFOverrideCounts
     U32 mFacesDeferred = 0;   // faces a message found with no material or one still fetching
     U32 mFacesReconciled = 0; // faces the region's record changed later (LLViewerRegion::applyCacheMiscExtras)
     U32 mKeptOnUpdate = 0;    // objects whose cache entry went for an update and whose overrides stayed
+    U32 mKeptOnKill = 0;      // objects the region killed whose overrides stayed with their cache entry
     U32 mTakenWithObject = 0; // objects whose overrides went with the object
     U32 mDroppedAsOther = 0;  // records another object under the local ID made stale
     U32 mAskedAgain = 0;      // objects asked for again so that their full updates bring their overrides

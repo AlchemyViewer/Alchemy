@@ -88,7 +88,7 @@ namespace
     // see each other's files nor the user's.
     struct vocacheTest
     {
-        static constexpr U32 CACHE_VERSION = 21;          // LLAppViewer::getObjectCacheVersion()
+        static constexpr U32 CACHE_VERSION = 22;          // LLAppViewer::getObjectCacheVersion()
         static constexpr U32 CACHE_NUMBER_OF_REGIONS = 128;
 
         std::filesystem::path mRoot;
@@ -1012,8 +1012,9 @@ namespace
 
         for (U32 ALGLTFOverrideCounts::*count : { &ALGLTFOverrideCounts::mMessages, &ALGLTFOverrideCounts::mFacesSet,
                                                   &ALGLTFOverrideCounts::mFacesDeferred, &ALGLTFOverrideCounts::mFacesReconciled,
-                                                  &ALGLTFOverrideCounts::mKeptOnUpdate, &ALGLTFOverrideCounts::mTakenWithObject,
-                                                  &ALGLTFOverrideCounts::mDroppedAsOther, &ALGLTFOverrideCounts::mAskedAgain })
+                                                  &ALGLTFOverrideCounts::mKeptOnUpdate, &ALGLTFOverrideCounts::mKeptOnKill,
+                                                  &ALGLTFOverrideCounts::mTakenWithObject, &ALGLTFOverrideCounts::mDroppedAsOther,
+                                                  &ALGLTFOverrideCounts::mAskedAgain })
         {
             ALGLTFOverrideCounts one;
             ++(one.*count);
@@ -1079,23 +1080,6 @@ namespace
         CHECK(newer[1].mSides.size() == 3u);
     }
 
-    TEST_CASE("LLVOCacheEntry: an entry killed for an update keeps its object's overrides and one killed as gone takes them", "[LLVOCache]")
-    {
-        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        overrides[1].mLocalId = 1;
-
-        UNSCOPED_INFO("the object stays in the world, made from the region's update");
-        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/true, overrides));
-        CHECK(overrides.count(1) == 1u);
-
-        UNSCOPED_INFO("the object is gone");
-        CHECK(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
-        CHECK(overrides.empty());
-
-        UNSCOPED_INFO("a local ID with none has none to take");
-        CHECK_FALSE(LLVOCacheEntry::killEntryOverrides(1, /*object_stays=*/false, overrides));
-    }
-
     TEST_CASE("LLVOCacheEntry: overrides kept under a local ID go once it holds another object", "[LLVOCache]")
     {
         const LLUUID object_id("55555555-5555-5555-5555-555555555555");
@@ -1107,9 +1091,11 @@ namespace
         UNSCOPED_INFO("the same object keeps them");
         CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(1, object_id, overrides));
         CHECK(overrides.count(1) == 1u);
-        UNSCOPED_INFO("so does an override naming no object");
+        UNSCOPED_INFO("so does an override naming no object, which is the object's from then on");
         CHECK_FALSE(LLVOCacheEntry::dropOverridesOfAnother(2, other_id, overrides));
-        CHECK(overrides.count(2) == 1u);
+        REQUIRE(overrides.count(2) == 1u);
+        CHECK(overrides[2].mObjectId == other_id);
+        CHECK(LLVOCacheEntry::dropOverridesOfAnother(2, object_id, overrides));
         UNSCOPED_INFO("another object does not");
         CHECK(LLVOCacheEntry::dropOverridesOfAnother(1, other_id, overrides));
         CHECK(overrides.count(1) == 0u);
@@ -1193,42 +1179,57 @@ namespace
         CHECK(empty_entry->getObjectID().isNull());
     }
 
-    TEST_CASE("LLVOCacheEntry: a kill takes a local ID's overrides whether or not it has a valid entry", "[LLVOCache]")
+    TEST_CASE("LLVOCacheEntry: a kill leaves a local ID's overrides with the entry kept for their object", "[LLVOCache]")
     {
         constexpr U32 VALID = 1;
-        constexpr U32 INVALID = 2;
-        constexpr U32 NO_ENTRY = 3;
-        constexpr U32 NO_OVERRIDES = 4;
+        constexpr U32 UNCONFIRMED = 2;
+        constexpr U32 UNNAMED = 3;
+        constexpr U32 ANOTHERS = 4;
+        constexpr U32 NO_ENTRY = 5;
+        constexpr U32 NO_OVERRIDES = 6;
 
         LLVOCacheEntry::vocache_entry_map_t entries;
-        entries[VALID] = vocacheTest::makeEntry(VALID, 1, 16);
-        entries[INVALID] = vocacheTest::makeEntry(INVALID, 2, 16);
-        entries[INVALID]->setValid(false);
-        entries[NO_OVERRIDES] = vocacheTest::makeEntry(NO_OVERRIDES, 4, 16);
-
         LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
-        for (U32 local_id : { VALID, INVALID, NO_ENTRY })
+        for (U32 local_id : { VALID, UNCONFIRMED, UNNAMED, ANOTHERS })
         {
+            entries[local_id] = vocacheTest::makeObjectEntry(local_id, local_id, LLUUID::generateNewID());
             overrides[local_id].mLocalId = local_id;
+            overrides[local_id].mObjectId = entries[local_id]->getObjectID();
         }
+        entries[UNCONFIRMED]->setValid(false);
+        overrides[UNNAMED].mObjectId.setNull();
+        overrides[ANOTHERS].mObjectId.generate();
+        overrides[NO_ENTRY].mLocalId = NO_ENTRY;
+        entries[NO_OVERRIDES] = vocacheTest::makeEntry(NO_OVERRIDES, 6, 16);
 
         std::vector<LLVOCacheEntry*> killed;
         const auto kill_entry = [&](LLVOCacheEntry* entry) { killed.push_back(entry); };
 
-        CHECK(LLVOCacheEntry::killLocalID(VALID, entries, overrides, kill_entry));
-        CHECK(overrides.count(VALID) == 0);
+        UNSCOPED_INFO("the region can confirm the entry again, and sends no override with the confirmation");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(VALID, entries, overrides, kill_entry));
+        CHECK(overrides.count(VALID) == 1u);
         REQUIRE(killed.size() == 1u);
         CHECK(killed[0] == entries[VALID].get());
 
         killed.clear();
-        UNSCOPED_INFO("an entry already invalid is not killed twice");
-        CHECK(LLVOCacheEntry::killLocalID(INVALID, entries, overrides, kill_entry));
-        CHECK(overrides.count(INVALID) == 0);
+        UNSCOPED_INFO("an entry the region has yet to confirm is not killed, and keeps its object's overrides for when it does");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(UNCONFIRMED, entries, overrides, kill_entry));
+        CHECK(overrides.count(UNCONFIRMED) == 1u);
         CHECK(killed.empty());
 
-        UNSCOPED_INFO("a local ID with no entry at all");
+        UNSCOPED_INFO("overrides naming no object are named for the entry's, so that another under the local ID later drops them");
+        CHECK_FALSE(LLVOCacheEntry::killLocalID(UNNAMED, entries, overrides, kill_entry));
+        REQUIRE(overrides.count(UNNAMED) == 1u);
+        CHECK(overrides[UNNAMED].mObjectId == entries[UNNAMED]->getObjectID());
+
+        UNSCOPED_INFO("overrides of another object than the entry's go");
+        CHECK(LLVOCacheEntry::killLocalID(ANOTHERS, entries, overrides, kill_entry));
+        CHECK(overrides.count(ANOTHERS) == 0u);
+
+        killed.clear();
+        UNSCOPED_INFO("and those of an object the cache holds no entry for, which the region sends whole if it comes back");
         CHECK(LLVOCacheEntry::killLocalID(NO_ENTRY, entries, overrides, kill_entry));
-        CHECK(overrides.empty());
+        CHECK(overrides.count(NO_ENTRY) == 0u);
         CHECK(killed.empty());
 
         UNSCOPED_INFO("an entry with no overrides is killed and says it took none");
@@ -1241,14 +1242,54 @@ namespace
         CHECK_FALSE(LLVOCacheEntry::killLocalID(99, entries, overrides, kill_entry));
         CHECK(killed.empty());
 
-        constexpr U32 REFUSED = 5;
-        entries[REFUSED] = vocacheTest::makeEntry(REFUSED, 5, 16);
+        constexpr U32 REFUSED = 7;
+        entries[REFUSED] = vocacheTest::makeEntry(REFUSED, 7, 16);
         entries[REFUSED]->refuseUpdate();
         entries[REFUSED]->setValid(false);
         UNSCOPED_INFO("an entry invalid for a refused update holds its children, and is killed with them");
         CHECK_FALSE(LLVOCacheEntry::killLocalID(REFUSED, entries, overrides, kill_entry));
         REQUIRE(killed.size() == 1u);
         CHECK(killed[0] == entries[REFUSED].get());
+    }
+
+    // A region kills what leaves the agent's interest, as it does roots as it connects, and confirms it from the cache
+    // when it comes back, in the same session or the next.
+    TEST_CASE_METHOD(vocacheTest, "LLVOCache: an object a region kills goes to the file with its overrides", "[LLVOCache]")
+    {
+        const U64 handle = to_region_handle(1027 * 256, 1000 * 256);
+        const LLUUID id = LLUUID::generateNewID();
+        constexpr U32 BEFORE = 1; // killed before the region confirmed its entry
+        constexpr U32 AFTER = 2;  // and after
+
+        LLVOCacheEntry::vocache_entry_map_t objects;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t overrides;
+        for (U32 local_id : { BEFORE, AFTER })
+        {
+            objects[local_id] = makeObjectEntry(local_id, local_id, LLUUID::generateNewID());
+            overrides[local_id] = requireOverrideOf(*objects[local_id], handle, 2);
+        }
+        LLVOCache::instance().writeToCache(handle, id, objects, overrides, true, false);
+
+        LLVOCacheEntry::vocache_entry_map_t cached;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t kept;
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, cached, kept));
+        cached[AFTER]->setValid();
+        for (U32 local_id : { BEFORE, AFTER })
+        {
+            LLVOCacheEntry::killLocalID(local_id, cached, kept, [](LLVOCacheEntry* entry) { entry->setValid(false); });
+        }
+        LLVOCache::instance().writeToCache(handle, id, cached, kept, true, false);
+
+        LLVOCacheEntry::vocache_entry_map_t next;
+        LLVOCacheEntry::vocache_gltf_overrides_map_t read;
+        REQUIRE(LLVOCache::instance().readFromCache(handle, id, next, read));
+        for (U32 local_id : { BEFORE, AFTER })
+        {
+            UNSCOPED_INFO("local ID " << local_id);
+            CHECK(next.count(local_id) == 1u);
+            REQUIRE(read.count(local_id) == 1u);
+            CHECK(read[local_id].mSides.size() == 2u);
+        }
     }
 
     TEST_CASE("LLVOCacheEntry: a refused update lets the region's replace the bytes once and then waits for a change", "[LLVOCache]")
