@@ -46,6 +46,7 @@
 #include "llavatarnamecache.h"
 #include "llhudrender.h"
 #include "llviewercontrol.h"
+#include "skcombatlockout.h" // <SK:Nexii> combat render lockout
 
 // packet layout
 const S32 SOURCE_AVATAR = 0;
@@ -564,7 +565,7 @@ void LLHUDEffectLookAt::setSourceObject(LLViewerObject* objectp)
 void LLHUDEffectLookAt::render()
 {
     static LLCachedControl<bool> show_lookat(gSavedSettings, "AlchemyLookAtShow", false);
-    if (show_lookat && mSourceObject.notNull())
+    if (show_lookat && !SKCombatLockout::active() && mSourceObject.notNull()) // <SK:Nexii/> combat render lockout
     {
         static LLCachedControl<bool> isOwnHidden(gSavedSettings, "AlchemyLookAtHideSelf", true);
         static LLCachedControl<bool> isPrivate(gSavedSettings, "EnableLookAtTarget", false);

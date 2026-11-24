@@ -57,6 +57,7 @@
 #include "llrendertarget.h"
 #include "llreflectionmapmanager.h"
 #include "llheroprobemanager.h"
+#include "skcombatlockout.h" // <SK:Nexii> combat render lockout
 #include "alscopedata.h"
 
 #include <array>
@@ -712,13 +713,14 @@ public:
     void recordTrianglesDrawn();
 
     bool hasRenderDebugFeatureMask(const U32 mask) const    { return bool(mRenderDebugFeatureMask & mask); }
-    bool hasRenderDebugMask(const U64 mask) const           { return bool(mRenderDebugMask & mask); }
+    bool hasRenderDebugMask(const U64 mask) const           { return bool(mRenderDebugMask & ~SKCombatLockout::debugMask() & mask); } // <SK:Nexii/> combat render lockout hides its bits from every reader but the menu
     void setAllRenderDebugFeatures() { mRenderDebugFeatureMask = 0xffffffff; }
     void clearAllRenderDebugFeatures() { mRenderDebugFeatureMask = 0x0; }
     void setAllRenderDebugDisplays() { mRenderDebugMask = 0xffffffffffffffff; }
     void clearAllRenderDebugDisplays() { mRenderDebugMask = 0x0; }
 
     bool hasRenderType(const U32 type) const;
+    bool isRenderTypeEnabled(const U32 type) const { return mRenderTypeEnabled[type]; } // <SK:Nexii/> the user's toggle, for the combat render lockout
     bool hasAnyRenderType(const U32 type, ...) const;
 
     static bool isWaterClip();

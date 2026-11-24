@@ -96,6 +96,7 @@
 #include "llvisualeffect.h"
 #include "rlvactions.h"
 #include "rlvlocks.h"
+#include "skcombatlockout.h" // <SK:Nexii> combat render lockout
 // [/RLVa:KB]
 
 
@@ -758,6 +759,9 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         LLViewerCamera::getInstance()->setZoomParameters(zoom_factor, subfield);
         LLViewerCamera::getInstance()->setNear(MIN_NEAR_PLANE);
     }
+
+    // <SK:Nexii/> Combat render lockout: after the camera settles, before any pass and outside every render type push and pop
+    SKCombatLockout::update();
 
     //////////////////////////
     //

@@ -158,6 +158,7 @@
 #include "rlvactions.h"
 #include "rlvhandler.h"
 #include "rlvlocks.h"
+#include "skcombatlockout.h" // <SK:Nexii> combat render lockout
 // [/RLVa:KB]
 
 using namespace LLAvatarAppearanceDefines;
@@ -1431,9 +1432,10 @@ class LLAdvancedToggleWireframe : public view_listener_t
     {
 // [RLVa:KB] - @detach and @viewwireframe
         const bool fRlvCanViewWireframe = RlvActions::canViewWireframe();
-        if ( (!gUseWireframe) && (!fRlvCanViewWireframe) )
+        const bool wireframe = SKCombatLockout::getWireframe(); // <SK:Nexii/> combat render lockout keeps the intent while aiming
+        if ( (!wireframe) && (!fRlvCanViewWireframe) )
             RlvUtil::notifyBlocked(RlvStringKeys::Blocked::Wireframe);
-        set_use_wireframe( (!gUseWireframe) && (fRlvCanViewWireframe) );
+        set_use_wireframe( (!wireframe) && (fRlvCanViewWireframe) );
         return true;
     }
 };
@@ -1441,10 +1443,12 @@ class LLAdvancedToggleWireframe : public view_listener_t
 // Called from rlvhandler.cpp
 void set_use_wireframe(bool useWireframe)
     {
-        if (gUseWireframe == useWireframe)
+        // <SK:Nexii> Through the combat render lockout
+        if (SKCombatLockout::getWireframe() == useWireframe)
             return;
 
-        gUseWireframe = useWireframe;
+        SKCombatLockout::setWireframe(useWireframe);
+        // </SK:Nexii>
 // [/RLVa:KB]
 //      gUseWireframe = !(gUseWireframe);
 
@@ -1456,7 +1460,7 @@ class LLAdvancedCheckWireframe : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        return gUseWireframe;
+        return SKCombatLockout::getWireframe(); // <SK:Nexii/> combat render lockout
     }
 };
 
@@ -9344,9 +9348,12 @@ class LLToolsShowHiddenSelection : public view_listener_t
     bool handleEvent(const LLSD& userdata)
     {
         // TomY TODO Merge these
-        LLSelectMgr::sRenderHiddenSelections = !LLSelectMgr::sRenderHiddenSelections;
+        // <SK:Nexii> Through the combat render lockout
+        const bool show = !SKCombatLockout::getHiddenSelections();
+        SKCombatLockout::setHiddenSelections(show);
 
-        gSavedSettings.setBOOL("RenderHiddenSelections", LLSelectMgr::sRenderHiddenSelections);
+        gSavedSettings.setBOOL("RenderHiddenSelections", show);
+        // </SK:Nexii>
         return true;
     }
 };
@@ -9900,9 +9907,9 @@ class LLViewHighlightTransparent : public view_listener_t
     {
 //      LLDrawPoolAlpha::sShowDebugAlpha = !LLDrawPoolAlpha::sShowDebugAlpha;
 // [RLVa:KB] - @edit and @viewtransparent
-        LLDrawPoolAlpha::sShowDebugAlpha = (!LLDrawPoolAlpha::sShowDebugAlpha) && (RlvActions::canHighlightTransparent());
+        // <SK:Nexii/> Through the combat render lockout, which also rebuilds the batches on a live flip
+        SKCombatLockout::setHighlightTransparent((!SKCombatLockout::getHighlightTransparent()) && (RlvActions::canHighlightTransparent()));
 // [/RLVa:KB]
-        gPipeline.rebuildDrawInfo();
         return true;
     }
 };
@@ -9922,7 +9929,7 @@ class LLViewCheckHighlightTransparent : public view_listener_t
 {
     bool handleEvent(const LLSD& userdata)
     {
-        bool new_value = LLDrawPoolAlpha::sShowDebugAlpha;
+        bool new_value = SKCombatLockout::getHighlightTransparent(); // <SK:Nexii/> combat render lockout
         return new_value;
     }
 };

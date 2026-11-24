@@ -161,15 +161,7 @@ bool LLToolGun::handleHover(S32 x, S32 y, MASK mask)
 
 void LLToolGun::draw()
 {
-    static const std::string unknown_agent = LLTrans::getString("UnknownAvatar");
-
     static LLCachedControl<bool> show_crosshairs(gSavedSettings, "ShowCrosshairs");
-    static LLCachedControl<bool> show_iff(gSavedSettings, "AlchemyMouselookIFF", true);
-    static LLCachedControl<bool> show_iff_markers(gSavedSettings, "AlchemyMouselookIFFMarkers", false);
-    static LLCachedControl<F32> iff_range(gSavedSettings, "AlchemyMouselookIFFRange", 380.f);
-    static LLCachedControl<F32> userPresetX(gSavedSettings, "AlchemyMouselookTextOffsetX", 0.f);
-    static LLCachedControl<F32> userPresetY(gSavedSettings, "AlchemyMouselookTextOffsetY", -25.f);
-    static LLCachedControl<U32> userPresetHAlign(gSavedSettings, "AlchemyMouselookTextHAlign", 2);
 
     const S32 windowWidth = gViewerWindow->getWorldViewRectScaled().getWidth();
     const S32 windowHeight = gViewerWindow->getWorldViewRectScaled().getHeight();
@@ -177,66 +169,7 @@ void LLToolGun::draw()
     LLColor4 crosshair_color = LLColor4::white;
     crosshair_color.mV[VALPHA] = 0.75f;
 
-    if (show_iff)
-    {
-        bool target_rendered = false;
-
-        LLVector3d myPosition = gAgentCamera.getCameraPositionGlobal();
-        LLQuaternion myRotation = LLViewerCamera::getInstance()->getQuaternion();
-        myRotation.set(-myRotation.mQ[VX], -myRotation.mQ[VY], -myRotation.mQ[VZ], myRotation.mQ[VW]);
-
-        LLWorld::pos_map_t positions;
-        LLWorld::getInstance()->getAvatars(&positions, gAgent.getPositionGlobal(), iff_range);
-        for (const auto& position : positions)
-        {
-            const auto& id = position.first;
-            const auto& targetPosition = position.second;
-            if (id == gAgentID || targetPosition.isNull())
-            {
-                continue;
-            }
-
-            LLColor4 marker_color = LLColor4::white;
-            if(show_iff_markers || !target_rendered)
-                marker_color = ALAvatarGroups::instance().getAvatarColor(id, LLColor4::white, ALAvatarGroups::COLOR_MINIMAP);
-            marker_color.mV[VALPHA] = 0.75f;
-
-            if (show_iff_markers)
-            {
-                LLTracker::instance()->drawMarker(targetPosition, marker_color, true);
-            }
-
-            if (!target_rendered && !gRlvHandler.hasBehaviour(RLV_BHVR_SHOWNAMES))
-            {
-                LLVector3d magicVector = (targetPosition - myPosition) * myRotation;
-                magicVector.setVec(-magicVector.mdV[VY], magicVector.mdV[VZ], magicVector.mdV[VX]);
-
-                if (magicVector.mdV[VX] > -0.75 && magicVector.mdV[VX] < 0.75 && magicVector.mdV[VZ] > 0.0 && magicVector.mdV[VY] > -1.5 && magicVector.mdV[VY] < 1.5) // Do not change with these, cheater. :(
-                {
-                    crosshair_color = marker_color;
-
-                    LLAvatarName avatarName;
-                    std::string targetName = unknown_agent;
-                    if (LLAvatarNameCache::get(id, &avatarName))
-                    {
-                        targetName = avatarName.getCompleteName();
-                    }
-
-                    LLFontGL::getFontSansSerifBold()->renderUTF8(
-                        llformat("%s : %.2fm", targetName.c_str(), (targetPosition - myPosition).magVec()),
-                        0, (windowWidth / 2.f) + userPresetX, (windowHeight / 2.f) + userPresetY, crosshair_color,
-                        (LLFontGL::HAlign)((S32)userPresetHAlign), LLFontGL::TOP, LLFontGL::BOLD, LLFontGL::DROP_SHADOW
-                    );
-
-                    if (!show_iff_markers)
-                    {
-                        break;
-                    }
-                    target_rendered = true;
-                }
-            }
-        }
-    }
+    // <SK:Nexii/> Mouselook IFF removed: it named and placed avatars through walls, which the combat render lockout forbids
     if (show_crosshairs)
     {
         mCrosshairp->draw(
