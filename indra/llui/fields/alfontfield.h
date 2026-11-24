@@ -53,19 +53,22 @@ public:
     // Which names the list offers. A file may write any declared name,
     // which is what a XUI author needs; a preference offers the families
     // fonts.xml marks for people to choose from, and some only the
-    // monospace ones, or only the proportional.
+    // monospace, proportional or emoji ones. These are flags: a field may
+    // ask for more than one, joined with commas in XUI.
     enum class Families : U8
     {
-        Declared,
-        Selectable,
-        Monospace,
-        Proportional
+        Declared     = 1 << 0,
+        Selectable   = 1 << 1,
+        Monospace    = 1 << 2,
+        Proportional = 1 << 3,
+        Emoji        = 1 << 4,
     };
 
     struct Params : public LLInitParam::Block<Params, LLUICtrl::Params>
     {
         Optional<S32>         sample_width;
-        // "declared", "selectable", "monospace" or "proportional".
+        // Comma-separated names from Families: "declared", "selectable",
+        // "monospace", "proportional", "emoji".
         Optional<std::string> families;
         // Whether the name may be typed, as a XUI author types one; a
         // preference shows the choice instead, drawn in the font, and

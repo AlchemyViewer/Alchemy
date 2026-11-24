@@ -29,6 +29,7 @@
 #include "llappviewer.h"
 
 #include "alcrashreporter.h"
+#include "alimportedfonts.h"
 
 // Viewer includes
 #include "llversioninfo.h"
@@ -3220,6 +3221,28 @@ bool LLAppViewer::initConfiguration()
     {
         LL_WARNS() << "Crashes will be handled by system, stack trace logs and crash logger are both disabled" << LL_ENDL;
         disableCrashlogger();
+    }
+
+    // Clear font overrides before fonts load when --resetfonts was passed.
+    if (gSavedSettings.getBOOL("AlchemyResetFontsOnStartup"))
+    {
+        LL_INFOS() << "--resetfonts: clearing AlchemyUIFontOverrides" << LL_ENDL;
+        gSavedSettings.setLLSD("AlchemyUIFontOverrides", LLSD::emptyMap());
+    }
+
+    // Regenerate the imported-fonts overlay on startup. An empty list still
+    // needs a rewrite when a stale overlay is present; with neither, skip it
+    // so a clean installation does not gain a user font directory.
+    const LLSD      imported = ALImportedFonts::getImported();
+    const std::string overlay = ALImportedFonts::getOverlayPath();
+    if (imported.size() > 0 || (!overlay.empty() && gDirUtilp->fileExists(overlay)))
+    {
+        if (ALImportedFonts::regenerateOverlay().empty())
+        {
+            LL_WARNS() << "Imported fonts: overlay regeneration failed; ignoring the "
+                          "stale overlay for this session and using built-in fonts" << LL_ENDL;
+            LLFontGL::setImportedFontsOverlayEnabled(false);
+        }
     }
 
     std::string CmdLineChannel(gSavedSettings.getString("CmdLineChannel"));

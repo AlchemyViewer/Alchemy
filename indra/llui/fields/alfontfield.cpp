@@ -47,7 +47,9 @@
 #include "lluictrlfactory.h"
 
 #include <algorithm>
+#include <cctype>
 #include <functional>
+#include <set>
 
 static LLDefaultChildRegistry::Register<ALFontField> r("font_field");
 
@@ -93,30 +95,87 @@ namespace
         return font ? font : LLFontGL::getFontSansSerif();
     }
 
+    constexpr U8 bitOf(ALFontField::Families family)
+    {
+        return static_cast<U8>(family);
+    }
+
+    // The XUI attribute is a comma-separated set of family flags. Unknown
+    // names are ignored; a field that asks for none gets declared names,
+    // which is the vocabulary a XUI author writes.
+    ALFontField::Families parseFamilies(const std::string& text)
+    {
+        U8 mask = 0;
+        size_t from = 0;
+        while (from <= text.size())
+        {
+            const size_t comma = text.find(',', from);
+            std::string name = text.substr(from, comma == std::string::npos ? std::string::npos : comma - from);
+            while (!name.empty() && std::isspace(static_cast<unsigned char>(name.back())))  name.pop_back();
+            while (!name.empty() && std::isspace(static_cast<unsigned char>(name.front()))) name.erase(name.begin());
+
+            if (name == "declared")     mask |= bitOf(ALFontField::Families::Declared);
+            else if (name == "selectable")   mask |= bitOf(ALFontField::Families::Selectable);
+            else if (name == "monospace")    mask |= bitOf(ALFontField::Families::Monospace);
+            else if (name == "proportional") mask |= bitOf(ALFontField::Families::Proportional);
+            else if (name == "emoji")        mask |= bitOf(ALFontField::Families::Emoji);
+
+            if (comma == std::string::npos) break;
+            from = comma + 1;
+        }
+        if (mask == 0) mask = bitOf(ALFontField::Families::Declared);
+        return static_cast<ALFontField::Families>(mask);
+    }
+
     // The families a field offers, by name and by the label fonts.xml gives
-    // each: every declared one, or those marked for choosing -- and the name
-    // the field has now, should it be one the list would not offer, so that
-    // it can be kept.
+    // each. Several flags may be asked for; each contributes its families
+    // and duplicates are taken once. A preference keeps the name it has
+    // even where no flag would offer it; a declared-only field offers just
+    // the vocabulary a file may write.
     std::vector<std::pair<std::string, std::string>> familiesFor(ALFontField::Families families, const std::string& current)
     {
+        using Filter = LLFontRegistry::FamilyFilter;
+        struct Choice { U8 bit; Filter filter; };
+        static const Choice choices[] = {
+            { bitOf(ALFontField::Families::Declared),     Filter::ANY },
+            { bitOf(ALFontField::Families::Selectable),   Filter::ANY },
+            { bitOf(ALFontField::Families::Monospace),    Filter::MONOSPACE },
+            { bitOf(ALFontField::Families::Proportional), Filter::PROPORTIONAL },
+            { bitOf(ALFontField::Families::Emoji),        Filter::EMOJI },
+        };
+
+        const U8 mask = bitOf(families);
+        std::set<std::string> seen;
         std::vector<std::pair<std::string, std::string>> named;
-        if (families == ALFontField::Families::Declared)
+        for (const Choice& choice : choices)
         {
-            for (const std::string& name : LLFontGL::getDeclaredFontNames())
+            if (!(mask & choice.bit))
+                continue;
+            if (choice.bit == bitOf(ALFontField::Families::Declared))
             {
-                named.emplace_back(name, name);
+                for (const std::string& name : LLFontGL::getDeclaredFontNames())
+                {
+                    if (seen.insert(name).second)
+                        named.emplace_back(name, name);
+                }
             }
-            return named;
+            else
+            {
+                for (const LLFontRegistry::FamilyInfo& family : LLFontGL::getAvailableFamilies(choice.filter))
+                {
+                    if (seen.insert(family.name).second)
+                        named.emplace_back(family.name, family.label.empty() ? family.name : family.label);
+                }
+            }
         }
-        using Filter              = LLFontRegistry::FamilyFilter;
-        const Filter       filter = families == ALFontField::Families::Monospace      ? Filter::MONOSPACE
-                                    : families == ALFontField::Families::Proportional ? Filter::PROPORTIONAL
-                                                                                      : Filter::ANY;
-        for (const LLFontRegistry::FamilyInfo& family : LLFontGL::getAvailableFamilies(filter))
+        std::sort(named.begin(), named.end(), [](const auto& a, const auto& b)
         {
-            named.emplace_back(family.name, family.label.empty() ? family.name : family.label);
-        }
-        if (!current.empty() && std::none_of(named.begin(), named.end(), [&current](const auto& one) { return one.first == current; }))
+            if (a.second != b.second) return a.second < b.second;
+            return a.first < b.first;
+        });
+        // A declared-only field offered the vocabulary, not a place for
+        // whatever the field happens to say; a preference keeps its value.
+        if (mask != bitOf(ALFontField::Families::Declared) && !current.empty() && !seen.count(current))
         {
             named.insert(named.begin(), { current, current });
         }
@@ -336,11 +395,7 @@ ALFontField::ALFontField(const Params& p)
 :   LLUICtrl(p),
     mSampleWidth(p.sample_width)
 {
-    const std::string& families = p.families();
-    mFamilies = families == "selectable"   ? Families::Selectable
-                : families == "monospace"    ? Families::Monospace
-                : families == "proportional" ? Families::Proportional
-                                             : Families::Declared;
+    mFamilies = parseFamilies(p.families());
     mEditable = p.editable;
     if (mEditable)
     {
