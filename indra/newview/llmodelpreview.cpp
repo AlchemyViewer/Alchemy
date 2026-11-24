@@ -405,6 +405,19 @@ void LLModelPreview::rebuildUploadData()
 
                     bool found = FindModel(mScene[i], name_to_match, lod_model, transform);
 
+                    // <SK:Nexii> Mesh uploader LODs by name: inherited physics follows Use LOD Above and per-part visual LOD fallbacks
+                    if (!found && i == LLModel::LOD_PHYSICS && mLODFile[LLModel::LOD_PHYSICS].empty() && !mLODFromHighFile[LLModel::LOD_PHYSICS]
+                        && mPhysicsSearchLOD >= LLModel::LOD_IMPOSTOR && mPhysicsSearchLOD <= LLModel::LOD_HIGH)
+                    {
+                        for (S32 searchLOD = mPhysicsSearchLOD; searchLOD <= LLModel::LOD_HIGH && !found; ++searchLOD)
+                        {
+                            const std::string candidate = instance.mLabel + getLodSuffix(searchLOD);
+                            found = FindModel(mScene[i], candidate, lod_model, transform)
+                                || FindModel(mScene[searchLOD], candidate, lod_model, transform);
+                        }
+                    }
+                    // </SK:Nexii>
+
                     if (!found && i != LLModel::LOD_PHYSICS)
                     {
                         if (mImporterDebug)
@@ -826,6 +839,13 @@ void LLModelPreview::loadModel(std::string filename, S32 lod, bool force_disable
     }
 
     mLODFile[lod] = filename;
+    // <SK:Nexii> Mesh uploader LODs by name: switch physics lookup only once a file is actually chosen, so cancelling Browse preserves current physics
+    if (lod == LLModel::LOD_PHYSICS)
+    {
+        mPhysicsSearchLOD = lod;
+        mWarnOfUnmatchedPhyicsMeshes = false;
+    }
+    // </SK:Nexii>
 
     std::map<std::string, std::string, std::less<>> joint_alias_map;
     getJointAliases(joint_alias_map);
@@ -959,6 +979,7 @@ void LLModelPreview::clearIncompatible(S32 lod)
                 mModel[i].clear();
                 mScene[i].clear();
                 mVertexBuffer[i].clear();
+                mLODFromHighFile[i] = false; // <SK:Nexii> Mesh uploader LODs by name
 
                 if (i == LLModel::LOD_HIGH)
                 {
@@ -1952,13 +1973,17 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
     };
 
     const bool legacy = gSavedSettings.getBOOL("ImporterLegacyMatching");
-    // Only a suffixed model whose base the file also has is a LOD; any other is a model of its own.
+    // Only a suffixed model whose base the High scene instantiates is a LOD; any other is a model of its own.
     std::set<std::string> bases;
-    for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
+    for (const auto& scene_pair : mScene[LLModel::LOD_HIGH])
     {
-        if (model && !model->mSubmodelID && suffix_lod(model->mLabel) < 0)
+        for (const LLModelInstance& instance : scene_pair.second)
         {
-            bases.insert(model->mLabel);
+            const LLModel* model = instance.mModel;
+            if (model && !model->mSubmodelID && suffix_lod(model->mLabel) < 0)
+            {
+                bases.insert(model->mLabel);
+            }
         }
     }
     auto lod_of = [&](const LLModel* model) -> S32
@@ -2016,35 +2041,6 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
         }
     };
 
-    // A suffixed model with no base is named as the loader always named it, without its suffix. Models
-    // are found first, so every instance of one shared model takes the new name, not only the first.
-    std::set<LLModel*> leftovers;
-    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
-    {
-        for (LLModelInstance& instance : scene_pair.second)
-        {
-            LLModel* model = instance.mModel;
-            if (model && suffix_lod(core_of(model)) >= 0 && lod_of(model) < 0)
-            {
-                leftovers.insert(model);
-            }
-        }
-    }
-    for (LLModel* model : leftovers)
-    {
-        model->mLabel = stripSuffix(core_of(model)) + letter_of(model);
-    }
-    for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
-    {
-        for (LLModelInstance& instance : scene_pair.second)
-        {
-            if (leftovers.count(instance.mModel))
-            {
-                instance.mLabel = instance.mModel->mLabel; // a submodel keeps its letter, so it isn't taken for its root
-            }
-        }
-    }
-
     // Each model's LOD is settled once, before any is renamed.
     std::map<const LLModel*, S32> moved;
     for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
@@ -2061,17 +2057,88 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
         return it != moved.end() ? it->second : -1;
     };
 
-    bool split[LLModel::NUM_LODS] = {};
+    // A suffixed model with no base is named as the loader always named it, without its suffix, unless
+    // stripping would collide with another retained High part or form a LOD label for an existing base.
+    std::set<std::string> taken_cores;
+    std::set<std::string> taken_labels;
+    std::vector<std::string> leftover_core_order;
+    std::map<std::string, std::vector<LLModel*>> leftovers_by_core;
     for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
     {
-        const S32 lod = moved_to(model);
-        if (lod >= 0 && !split[lod])
+        if (!model || moved_to(model) >= 0)
         {
-            split[lod] = true;
-            mModel[lod].clear();
-            mScene[lod].clear();
+            continue;
+        }
+        const std::string core = core_of(model);
+        if (suffix_lod(core) < 0)
+        {
+            taken_cores.insert(core);
+            taken_labels.insert(model->mLabel);
+        }
+        else
+        {
+            auto& group = leftovers_by_core[core];
+            if (group.empty())
+            {
+                leftover_core_order.push_back(core);
+            }
+            group.push_back(model.get());
         }
     }
+    std::set<const LLModel*> renamed_leftovers;
+    for (const std::string& core : leftover_core_order)
+    {
+        const auto& group = leftovers_by_core[core];
+        const std::string stripped = stripSuffix(core);
+        const bool forms_base_lod = suffix_lod(stripped) >= 0 && bases.count(stripSuffix(stripped)) > 0;
+        bool can_strip = !forms_base_lod && !taken_cores.count(stripped);
+        if (can_strip)
+        {
+            for (const LLModel* model : group)
+            {
+                if (taken_labels.count(stripped + letter_of(model)))
+                {
+                    can_strip = false;
+                    break;
+                }
+            }
+        }
+        if (can_strip)
+        {
+            taken_cores.insert(stripped);
+            for (LLModel* model : group)
+            {
+                model->mLabel = stripped + letter_of(model);
+                taken_labels.insert(model->mLabel);
+                renamed_leftovers.insert(model);
+            }
+        }
+        else
+        {
+            taken_cores.insert(core);
+            for (const LLModel* model : group)
+            {
+                taken_labels.insert(model->mLabel);
+            }
+        }
+    }
+    if (!renamed_leftovers.empty())
+    {
+        for (auto& scene_pair : mScene[LLModel::LOD_HIGH])
+        {
+            for (LLModelInstance& instance : scene_pair.second)
+            {
+                if (renamed_leftovers.count(instance.mModel))
+                {
+                    instance.mLabel = instance.mModel->mLabel; // a submodel keeps its letter, so it isn't taken for its root
+                }
+            }
+        }
+    }
+
+    bool split[LLModel::NUM_LODS] = {};
+    LLModelLoader::model_list split_models[LLModel::NUM_LODS];
+    LLModelLoader::scene split_scene[LLModel::NUM_LODS];
     LLModelLoader::model_list kept;
     for (const LLPointer<LLModel>& model : mModel[LLModel::LOD_HIGH])
     {
@@ -2082,9 +2149,10 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
         }
         else
         {
+            split[lod] = true;
             // Named as a separate LOD file would name it, so the matching finds a submodel too.
             model->mLabel = stripSuffix(core_of(model)) + letter_of(model) + getLodSuffix(lod);
-            mModel[lod].push_back(model);
+            split_models[lod].push_back(model);
         }
     }
     for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
@@ -2116,7 +2184,7 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
                 continue;
             }
             it->mLabel = it->mModel->mLabel;
-            mScene[lod][scene_it->first].push_back(*it);
+            split_scene[lod][scene_it->first].push_back(*it);
             it = list.erase(it);
         }
         scene_it = list.empty() ? mScene[LLModel::LOD_HIGH].erase(scene_it) : std::next(scene_it);
@@ -2147,42 +2215,49 @@ U32 LLModelPreview::splitSuffixedModels(const std::string& filename)
         }
     }
 
-    if (split[LLModel::LOD_PHYSICS])
-    {
-        // As an explicit physics file does: the parts with no _PHYS are logged, and may use a default shape.
-        mPhysicsSearchLOD = LLModel::LOD_PHYSICS;
-        mWarnOfUnmatchedPhyicsMeshes = true;
-    }
-
     for (S32 lod = 0; lod < LLModel::NUM_LODS; ++lod)
     {
         if (!split[lod])
         {
             continue;
         }
-        // A LOD needs every model and submodel, each by its own name: a partial set is dropped and the LOD generated.
+        // A LOD needs every model and submodel, each by its own name: a partial set is dropped without clobbering a separate LOD file.
         auto complete = [&]()
         {
-            if (mModel[lod].size() != kept.size())
+            if (split_models[lod].size() != kept.size())
             {
                 return false;
             }
             std::set<std::string> names;
-            for (const LLPointer<LLModel>& model : mModel[lod])
+            for (const LLPointer<LLModel>& model : split_models[lod])
             {
-                names.insert(model->mLabel);
+                if (model)
+                {
+                    names.insert(model->mLabel);
+                }
             }
             return std::all_of(kept.begin(), kept.end(), [&](const LLPointer<LLModel>& model)
-                               { return names.count(model->mLabel + getLodSuffix(lod)) > 0; });
+                               { return model && names.count(model->mLabel + getLodSuffix(lod)) > 0; });
         };
         if (lod != LLModel::LOD_PHYSICS && !complete())
         {
-            release(lod);
-            updateLodControls(lod);
+            if (was_from_file[lod])
+            {
+                release(lod);
+                updateLodControls(lod);
+            }
             std::ostringstream out;
-            out << "Only some models have a " << getLodSuffix(lod) << " model in the file; generating that LOD instead";
+            out << "Only some models have a " << getLodSuffix(lod) << " model in the file; ignoring that partial LOD";
             LLFloaterModelPreview::addStringToLog(out, true);
             continue;
+        }
+        mModel[lod] = std::move(split_models[lod]);
+        mScene[lod] = std::move(split_scene[lod]);
+        if (lod == LLModel::LOD_PHYSICS)
+        {
+            // As an explicit physics file does: the parts with no _PHYS are logged, and may use a default shape.
+            mPhysicsSearchLOD = LLModel::LOD_PHYSICS;
+            mWarnOfUnmatchedPhyicsMeshes = true;
         }
         mLODFromHighFile[lod] = true;
         mLODFile[lod] = filename;
