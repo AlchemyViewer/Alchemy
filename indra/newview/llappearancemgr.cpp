@@ -4104,8 +4104,11 @@ void LLAppearanceMgr::onIdle(void *)
 void LLAppearanceMgr::requestServerAppearanceUpdate()
 {
     // Workaround: we shouldn't request update from server prior to uploading all attachments, but it is
-    // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete
-    if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0)
+    // complicated to check for pending attachment uploads, so we are just waiting for uploads to complete.
+    // The request names the current outfit's version, so it waits too while that is unknown, as it is
+    // while the folder is fetched again.
+    if (!mOutstandingAppearanceBakeRequest && gAssetStorage->getNumPendingUploads() == 0
+        && getCOFVersion() != LLViewerInventoryCategory::VERSION_UNKNOWN)
     {
         mRerequestAppearanceBake = false;
         LLCoprocedureManager::CoProcedure_t proc = boost::bind(&LLAppearanceMgr::serverAppearanceUpdateCoro, this, _1);
@@ -4115,6 +4118,15 @@ void LLAppearanceMgr::requestServerAppearanceUpdate()
     {
         // Shedule update
         mRerequestAppearanceBake = true;
+        // A current outfit of unknown version is asked for, so that the update waits on nothing else.
+        // fetch() asks only once its last request has had its time, however often this is asked.
+        if (getCOFVersion() == LLViewerInventoryCategory::VERSION_UNKNOWN)
+        {
+            if (LLViewerInventoryCategory* cof = gInventory.getCategory(getCOF()))
+            {
+                cof->fetch();
+            }
+        }
     }
 }
 
@@ -4154,6 +4166,12 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
     }
     S32 retryCount(0);
     bool bRetry;
+    // What was last asked for before this request. A request that ends with every attempt failed puts it
+    // back, so that it holds back no later request for the same version: one that runs out of retries or
+    // is not retried, and one whose retry stops before asking again, the loop going round only after a
+    // failure.
+    const S32 requested_before = gAgentAvatarp->mLastUpdateRequestCOFVersion;
+    const auto give_back = [&requested_before] { gAgentAvatarp->mLastUpdateRequestCOFVersion = requested_before; };
     do
     {
         // If we have already received an update for this or higher cof version,
@@ -4169,6 +4187,12 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
         if (cofVersion == LLViewerInventoryCategory::VERSION_UNKNOWN)
         {
             LL_INFOS("AVatar") << "COF version is unknown... not requesting until COF version is known." << LL_ENDL;
+            // Asked for again once it is known.
+            mRerequestAppearanceBake = true;
+            if (retryCount > 0)
+            {
+                give_back();
+            }
             return;
         }
         else
@@ -4177,12 +4201,20 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
             {
                 LL_WARNS("Avatar") << "Have already received update for cof version " << lastRcv
                     << " but requesting for " << cofVersion << LL_ENDL;
+                if (retryCount > 0)
+                {
+                    give_back();
+                }
                 return;
             }
             if (lastReq >= cofVersion)
             {
                 LL_WARNS("Avatar") << "Request already in flight for cof version " << lastReq
                     << " but requesting for " << cofVersion << LL_ENDL;
+                if (retryCount > 0)
+                {
+                    give_back();
+                }
                 return;
             }
         }
@@ -4248,6 +4280,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
                 if (++retryCount > BAKE_RETRY_MAX_COUNT)
                 {
                     LL_WARNS("Avatar") << "Bake retry count exceeded!" << LL_ENDL;
+                    give_back();
                     break;
                 }
                 F32 timeout = pow(BAKE_RETRY_TIMEOUT, static_cast<float>(retryCount)) - 1.0f;
@@ -4265,6 +4298,7 @@ void LLAppearanceMgr::serverAppearanceUpdateCoro(LLCoreHttpUtil::HttpCoroutineAd
             else
             {
                 LL_WARNS("Avatar") << "No retry attempted." << LL_ENDL;
+                give_back();
                 break;
             }
         }

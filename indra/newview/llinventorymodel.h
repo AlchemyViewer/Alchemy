@@ -34,6 +34,7 @@
 
 #include <boost/unordered_map.hpp>
 
+#include "alinventorysync.h"
 #include "llassettype.h"
 #include "llfoldertype.h"
 #include "llframetimer.h"
@@ -219,6 +220,12 @@ private:
     typedef boost::unordered_map<LLUUID, item_array_t*> parent_item_map_t;
     parent_cat_map_t mParentChildCategoryTree;
     parent_item_map_t mParentChildItemTree;
+    // Each change to what a folder holds in the trees above, which a
+    // request notes as it goes.
+    ALInventorySync::ContentChanges mContentChanges;
+public:
+    const ALInventorySync::ContentChanges& getContentChanges() const { return mContentChanges; }
+private:
 
     // Track links to items and categories. We do not store item or
     // category pointers here, because broken links are also supported.
