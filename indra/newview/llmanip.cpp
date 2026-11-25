@@ -357,7 +357,7 @@ LLVector3 LLManip::getPivotPoint()
 {
     static LLCachedControl<bool> editRootAxis(gSavedSettings, "AlchemyEditRootAxis", false);
     LLViewerObject* object = mObjectSelection->getFirstRootObject(true);
-    if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis) && mObjectSelection->getSelectType() != SELECT_TYPE_HUD)
+    if (object && (mObjectSelection->getObjectCount() == 1 || editRootAxis))
     {
         return object->getPivotPositionAgent();
     }

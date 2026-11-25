@@ -1735,7 +1735,10 @@ namespace
         // A method is called with a colon, and after a dot is no use. The
         // grid's own declare theirs as fields taking self, which are called
         // with a colon all the same.
-        const std::string events = "local a = LLEvents.\nlocal b = LLEvents:\nlocal t = {}\nfunction t:greet(): number return 1 end\nlocal d = t:\n";
+        const std::string events = "local a = LLEvents.\nlocal b = LLEvents:\nlocal t = {}\n"
+                                   "function t:greet(): number return 1 end\n"
+                                   "function t:wave(name: string): number return 1 end\n"
+                                   "local d = t:\n";
         found                    = service.complete(events, 0, 19);
         {
             INFO("none of LLEvents' methods after a dot");
@@ -1750,8 +1753,33 @@ namespace
             REQUIRE(entry(found, "off"));
             REQUIRE(entry(found, "handlers"));
         }
-        UNSCOPED_INFO("a script's own method after a colon");
-        REQUIRE(entry(service.complete(events, 4, 12), "greet") != nullptr);
+        {
+            // The colon already binds the object: detail must not lead with
+            // self, or the editor would put it in the call's placeholders.
+            const ALScriptCompletion* on = entry(found, "on");
+            REQUIRE(on);
+            INFO("LLEvents:on without self: " + on->detail);
+            CHECK(on->detail.find("(self") == std::string::npos);
+        }
+        found                                 = service.complete(events, 5, 12);
+        const ALScriptCompletion* greet       = entry(found, "greet");
+        const ALScriptCompletion* wave        = entry(found, "wave");
+        {
+            INFO("a script's own method after a colon");
+            REQUIRE(greet);
+            REQUIRE(wave);
+        }
+        {
+            INFO("self-only method: empty brackets, caret after: " + greet->detail);
+            CHECK(greet->brackets == ALScriptCompletion::Brackets::After);
+            CHECK(greet->detail.find("(self") == std::string::npos);
+        }
+        {
+            INFO("method with args: self dropped, name kept: " + wave->detail);
+            CHECK(wave->brackets == ALScriptCompletion::Brackets::Inside);
+            CHECK(wave->detail.find("(self") == std::string::npos);
+            CHECK(wave->detail.find("name") != std::string::npos);
+        }
     }
 
     TEST_CASE_METHOD(alluauservice_data, "alluauservice: a function an argument wants is offered as a stub to fill in", "[alluauservice]")
