@@ -300,6 +300,7 @@ if(AL_BUILD_VIEWER)
     alpickitem.cpp
     alsceneexplorermodel.cpp
     alselectionoutline.cpp
+    alsettingcycle.cpp
     alstreaminfo.cpp
     altoolalign.cpp
     altoolscenepicker.cpp
@@ -1200,6 +1201,7 @@ if(AL_BUILD_VIEWER)
     alpickitem.h
     alsceneexplorermodel.h
     alselectionoutline.h
+    alsettingcycle.h
     alstreaminfo.h
     altoolalign.h
     altoolscenepicker.h
@@ -2637,6 +2639,7 @@ if(AL_BUILD_TESTS)
       tests/alscripttheme_test.cpp
       tests/alscripttypes_test.cpp
       tests/alscriptweightspane_test.cpp
+      tests/alsettingcycle_test.cpp
       tests/alteleportprogress_test.cpp
       tests/alterrainsurfacemaps_test.cpp
       tests/altextureboost_test.cpp
@@ -2724,6 +2727,7 @@ if(AL_BUILD_TESTS)
       alscripttheme.cpp
       alscripttypes.cpp
       alscriptweightspane.cpp
+      alsettingcycle.cpp
       alwhitebalancesolver.cpp
       llagentaccess.cpp
       llagentbenefits.cpp

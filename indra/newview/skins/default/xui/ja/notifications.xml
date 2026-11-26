@@ -5352,6 +5352,12 @@ UDP：3478, 3479, 5060, 5062, 6250, 12000-32000
 	<notification name="ChatCommandDiceRoll">
 		サイコロ：[RESULT]
 	</notification>
+	<notification name="ChatCommandToggleDebugSettingLLSD">
+		LLSD設定には対応していません。
+	</notification>
+	<notification name="ChatCommandToggleDebugSettingValues">
+		値が2つ以上必要です。
+	</notification>
 	<notification name="AutoAcceptedInventory">
 		[NAME]からの[ITEM]を自動的に受け取り、インベントリに入れました。
 	</notification>

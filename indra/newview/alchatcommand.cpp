@@ -30,6 +30,7 @@
 
 // viewer includes
 #include "alfarplane.h"
+#include "alsettingcycle.h"
 #include "aoengine.h"
 #include "llagent.h"
 #include "llagentcamera.h"
@@ -49,11 +50,13 @@
 #include "llviewerparcelmgr.h"
 #include "llviewerregion.h"
 #include "llvoavatarself.h"
+#include "llrender.h"
 #include "llvolume.h"
 #include "llvolumemessage.h"
-#include "llrender.h"
 
+#include <cmath>
 #include <iterator>
+#include <string_view>
 
 namespace
 {
@@ -74,6 +77,8 @@ constexpr char COMMAND_REZ_PLATFORM[] = "AlchemyChatCommandRezPlat";
 constexpr char COMMAND_SET_CHAT_CHANNEL[] = "AlchemyChatCommandSetChatChannel";
 constexpr char COMMAND_SET_HOME[] = "AlchemyChatCommandSetHome";
 constexpr char COMMAND_TELEPORT_TO_CAMERA[] = "AlchemyChatCommandTeleportToCam";
+constexpr char COMMAND_TOGGLE_DEBUG[] = "AlchemyChatCommandToggleDebugSetting";
+constexpr char POWERFUL_WIZARD[] = "AlchemyPowerfulWizard";
 constexpr char DICE_ROLL_TRIGGER[] = "/droll";
 constexpr char SEND_MENU_TRIGGER[] = "/sendmenu";
 
@@ -93,7 +98,7 @@ constexpr ConfiguredCommand CONFIGURED_COMMANDS[] = {
     { COMMAND_HEIGHT, "Teleport to height: meters", true },
     { COMMAND_HOME, "Teleport home", false },
     { COMMAND_HOVER_HEIGHT, "Set hover height: meters", true },
-    { COMMAND_MAP_TO, "Teleport to region: name", true },
+    { COMMAND_MAP_TO, "Teleport to region: name [x|y|z]", true },
     { COMMAND_POSITION, "Teleport to position: x y z", true },
     { COMMAND_REGION_MESSAGE, "Send region message: message", true },
     { COMMAND_RESYNC_ANIMATIONS, "Resync animations", false },
@@ -101,7 +106,47 @@ constexpr ConfiguredCommand CONFIGURED_COMMANDS[] = {
     { COMMAND_SET_CHAT_CHANNEL, "Set nearby chat channel: channel", true },
     { COMMAND_SET_HOME, "Set home location", false },
     { COMMAND_TELEPORT_TO_CAMERA, "Teleport to camera", false },
+    { COMMAND_TOGGLE_DEBUG, "Toggle a debug setting: name | name v1 v2 ...", true },
 };
+
+// True when the line was a toggle command, including one reported and refused.
+// False leaves the setting unchanged: no name, no such setting, or a value
+// that is not the setting's type.
+bool toggleDebugSetting(std::istream& input)
+{
+    std::string name;
+    if (!(input >> name))
+    {
+        return false;
+    }
+
+    LLControlVariablePtr control = gSavedSettings.getControl(name);
+    if (!control)
+    {
+        return false;
+    }
+
+    std::vector<std::string> values;
+    for (std::string value; input >> value; )
+    {
+        values.push_back(std::move(value));
+    }
+
+    switch (ALSettingCycle::apply(*control, values))
+    {
+    case ALSettingCycle::Result::Written:
+        return true;
+    case ALSettingCycle::Result::Unsupported:
+        LLNotificationsUtil::add("ChatCommandToggleDebugSettingLLSD");
+        return true;
+    case ALSettingCycle::Result::TooFewValues:
+        LLNotificationsUtil::add("ChatCommandToggleDebugSettingValues");
+        return true;
+    case ALSettingCycle::Result::BadValue:
+        break;
+    }
+    return false;
+}
 }
 
 std::vector<ALChatCommand::AutocompleteCommand> ALChatCommand::getAutocompleteCommands()
@@ -115,6 +160,11 @@ std::vector<ALChatCommand::AutocompleteCommand> ALChatCommand::getAutocompleteCo
     commands.reserve(std::size(CONFIGURED_COMMANDS) + 2);
     for (const ConfiguredCommand& command : CONFIGURED_COMMANDS)
     {
+        if (std::string_view(command.setting) == COMMAND_TOGGLE_DEBUG
+            && !gSavedSettings.getBOOL(POWERFUL_WIZARD))
+        {
+            continue;
+        }
         commands.push_back({
             gSavedSettings.getString(command.setting),
             command.description,
@@ -159,6 +209,7 @@ bool ALChatCommand::parseCommand(std::string data)
         static LLCachedControl<std::string> sTeleportToCam(gSavedSettings, COMMAND_TELEPORT_TO_CAMERA, "/tp2cam");
         static LLCachedControl<std::string> sHoverHeight(gSavedSettings, COMMAND_HOVER_HEIGHT, "/hover");
         static LLCachedControl<std::string> sAOCommand(gSavedSettings, COMMAND_AO, "/ao");
+        static LLCachedControl<std::string> sToggleDebug(gSavedSettings, COMMAND_TOGGLE_DEBUG, "/tgldbg");
 
         if (cmd == utf8str_tolower(sDrawDistanceCommand()))  // dd
         {
@@ -278,12 +329,31 @@ bool ALChatCommand::parseCommand(std::string data)
             const std::string::size_type length = cmd_bytes + 1;
             if (data.length() > length)
             {
+                const std::string tail = data.substr(length);
                 const LLVector3d& pos = gAgent.getPositionGlobal();
+                std::string region = tail;
+                F32 x = fmodf(static_cast<F32>(pos.mdV[VX]), REGION_WIDTH_METERS);
+                F32 y = fmodf(static_cast<F32>(pos.mdV[VY]), REGION_WIDTH_METERS);
+                F32 z = static_cast<F32>(pos.mdV[VZ]);
+                if (tail.find('|') != std::string::npos)
+                {
+                    bool has_z = false;
+                    if (!ALSettingCycle::parseMapToCoordinates(tail, region, x, y, has_z, z))
+                    {
+                        return false;
+                    }
+                    // teleportPosition fills a missing z with 0, so x|y still
+                    // sends the height the avatar is at now.
+                    if (!has_z)
+                    {
+                        z = static_cast<F32>(pos.mdV[VZ]);
+                    }
+                }
                 LLSD params;
-                params.append(data.substr(length));
-                params.append(fmodf(static_cast<F32>(pos.mdV[VX]), REGION_WIDTH_METERS));
-                params.append(fmodf(static_cast<F32>(pos.mdV[VY]), REGION_WIDTH_METERS));
-                params.append(static_cast<F32>(pos.mdV[VZ]));
+                params.append(region);
+                params.append(x);
+                params.append(y);
+                params.append(z);
                 LLCommandDispatcher::dispatch("teleport", params, LLSD(), LLGridManager::getInstance()->getGrid(), nullptr, "clicked", true);
                 return true;
             }
@@ -406,6 +476,14 @@ bool ALChatCommand::parseCommand(std::string data)
                     return true;
                 }
             }
+        }
+        else if (cmd == utf8str_tolower(sToggleDebug()))
+        {
+            if (!gSavedSettings.getBOOL(POWERFUL_WIZARD))
+            {
+                return false;
+            }
+            return toggleDebugSetting(input);
         }
         else if (cmd == SEND_MENU_TRIGGER)
         {
