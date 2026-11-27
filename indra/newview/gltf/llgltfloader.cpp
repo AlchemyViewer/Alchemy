@@ -431,7 +431,15 @@ void LLGLTFLoader::processNodeHierarchy(S32 node_idx, std::map<std::string, S32>
         // Potentially multiple nodes can reuse the same mesh and Collada used
         // node name instead of mesh name, so for consistency use node name if
         // avaliable, node index otherwise.
-        std::string base_name = getLodlessLabel(node);
+        // <SK:Nexii> Mesh uploader LODs by name: the high LOD's file keeps lower/physics suffixes for the preview to sort out,
+        // while stripping a trailing _LOD3 so High-suffixed meshes still match separate LOD files and embedded LODs
+        std::string base_name = mLod == LLModel::LOD_HIGH ? node.mName : getLodlessLabel(node);
+        if (mLod == LLModel::LOD_HIGH && base_name.size() > 5
+            && base_name.compare(base_name.size() - 5, 5, "_LOD3") == 0)
+        {
+            base_name.erase(base_name.size() - 5);
+        }
+        // </SK:Nexii>
         if (base_name.empty())
         {
             base_name = "node_" + std::to_string(node_idx);
@@ -1943,11 +1951,18 @@ void LLGLTFLoader::notifyUnsupportedExtension(bool unsupported)
 
 size_t LLGLTFLoader::getSuffixPosition(const std::string &label)
 {
-    if ((label.find("_LOD") != std::string::npos) || (label.find("_PHYS") != std::string::npos))
+    // <SK:Nexii> Mesh uploader LODs by name: match only recognized trailing suffixes so literal names like Wall_LODGE stay intact
+    static const std::string suffixes[] = { "_LOD0", "_LOD1", "_LOD2", "_LOD3", "_PHYS" };
+    for (const std::string& suffix : suffixes)
     {
-        return label.rfind('_');
+        if (label.size() > suffix.size()
+            && label.compare(label.size() - suffix.size(), suffix.size(), suffix) == 0)
+        {
+            return label.size() - suffix.size();
+        }
     }
     return std::string::npos;
+    // </SK:Nexii>
 }
 
 std::string LLGLTFLoader::getLodlessLabel(const LL::GLTF::Node& node)
