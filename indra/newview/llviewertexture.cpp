@@ -46,6 +46,8 @@
 #include "llnotificationsutil.h"
 
 // viewer includes
+#include "alcrashreporter.h"
+#include "altextureusers.h"
 #include "alvramusage.h"
 #include "llimagegl.h"
 #include "llviewerstats.h"
@@ -998,20 +1000,99 @@ void LLViewerTexture::setKnownDrawSize(S32 width, S32 height)
     //nothing here.
 }
 
+namespace
+{
+    const char* slot_name(ALTextureUsers::Removal::Slot slot)
+    {
+        switch (slot)
+        {
+            case ALTextureUsers::Removal::Slot::User:
+                return "itself";
+            case ALTextureUsers::Removal::Slot::Null:
+                return "null";
+            case ALTextureUsers::Removal::Slot::Other:
+                return "another";
+            case ALTextureUsers::Removal::Slot::Outside:
+                break;
+        }
+        return "outside";
+    }
+
+    const char* texture_type_name(S8 type)
+    {
+        switch (type)
+        {
+            case LLViewerTexture::LOCAL_TEXTURE:
+                return "local";
+            case LLViewerTexture::MEDIA_TEXTURE:
+                return "media";
+            case LLViewerTexture::DYNAMIC_TEXTURE:
+                return "dynamic";
+            case LLViewerTexture::FETCHED_TEXTURE:
+                return "fetched";
+            case LLViewerTexture::LOD_TEXTURE:
+                return "lod";
+            default:
+                return "other";
+        }
+    }
+
+    // A list of a texture's faces or volumes found not as ALTextureUsers leaves it, and put right, as one of them
+    // left. What wrote it is not known, and the viewer goes on, so each is logged, and the first of a run is also
+    // reported with the stack it was found from.
+    void report_repaired_users(const LLViewerTexture& texture, const char* list, U32 channel,
+                               const ALTextureUsers::Removal& removal, const LLViewerObject* object)
+    {
+        const std::string texture_id = texture.getID().asString();
+        const char* type = texture_type_name(texture.getType());
+        const char* held = slot_name(removal.slot);
+        const std::string object_id = object ? object->getID().asString() : std::string("none");
+        const char* local = object && object->isLocalOnly() ? "yes" : "no";
+        const char* dead = object && object->isDead() ? "yes" : "no";
+
+        LL_WARNS("Texture") << "Texture " << texture_id << " (" << type << "): its " << list << " list of channel "
+                            << channel << " was put right as a " << list << " left it. The " << list
+                            << " named slot " << removal.index << " of " << removal.count << " counted ("
+                            << removal.slots << " slots), which held " << held << "; " << removal.nulls
+                            << " null(s) dropped; the " << list << (removal.found ? " was in it" : " was not in it")
+                            << ". Its object " << object_id << ", local only " << local << ", dead " << dead
+                            << LL_ENDL;
+
+        static bool reported = false;
+        if (!reported)
+        {
+            const std::string channel_text = std::to_string(channel);
+            const std::string index_text = std::to_string(removal.index);
+            const std::string count_text = std::to_string(removal.count);
+            const std::string slots_text = std::to_string(removal.slots);
+            const std::string nulls_text = std::to_string(removal.nulls);
+            reported = ALCrashReporter::reportProblem("texture_users",
+                                                      "A texture's list of its users was put right as one left it",
+                                                      { { "texture", texture_id },
+                                                        { "texture_type", type },
+                                                        { "user_list", list },
+                                                        { "channel", channel_text },
+                                                        { "slot_held", held },
+                                                        { "slot", index_text },
+                                                        { "user_count", count_text },
+                                                        { "slots", slots_text },
+                                                        { "nulls", nulls_text },
+                                                        { "user_found", removal.found ? "yes" : "no" },
+                                                        { "object", object_id },
+                                                        { "object_local", local },
+                                                        { "object_dead", dead } });
+        }
+    }
+}
+
 //virtual
 void LLViewerTexture::addFace(U32 ch, LLFace* facep)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);
 
-    if(mNumFaces[ch] >= mFaceList[ch].size())
-    {
-        mFaceList[ch].resize(2 * mNumFaces[ch] + 1);
-    }
     const bool had_use = hasWorldUse();
-    mFaceList[ch][mNumFaces[ch]] = facep;
-    facep->setIndexInTex(ch, mNumFaces[ch]);
-    mNumFaces[ch]++;
+    ALTextureUsers::add(mFaceList[ch], mNumFaces[ch], ch, facep);
     mLastFaceListUpdateTimer.reset();
     if (!had_use)
     {
@@ -1026,18 +1107,10 @@ void LLViewerTexture::removeFace(U32 ch, LLFace* facep)
     llassert(ch < LLRender::NUM_TEXTURE_CHANNELS);
 
     const bool had_use = hasWorldUse();
-    if(mNumFaces[ch] > 1)
+    const ALTextureUsers::Removal removal = ALTextureUsers::remove(mFaceList[ch], mNumFaces[ch], ch, facep);
+    if (removal.repaired)
     {
-        S32 index = facep->getIndexInTex(ch);
-        llassert(index < (S32)mFaceList[ch].size());
-        llassert(index < (S32)mNumFaces[ch]);
-        mFaceList[ch][index] = mFaceList[ch][--mNumFaces[ch]];
-        mFaceList[ch][index]->setIndexInTex(ch, index);
-    }
-    else
-    {
-        mFaceList[ch].clear();
-        mNumFaces[ch] = 0;
+        report_repaired_users(*this, "face", ch, removal, facep->getViewerObject());
     }
     mLastFaceListUpdateTimer.reset();
     if (had_use && !hasWorldUse())
@@ -1069,14 +1142,8 @@ S32 LLViewerTexture::getNumFaces(U32 ch) const
 void LLViewerTexture::addVolume(U32 ch, LLVOVolume* volumep)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
-    if (mNumVolumes[ch] >= mVolumeList[ch].size())
-    {
-        mVolumeList[ch].resize(2 * mNumVolumes[ch] + 1);
-    }
     const bool had_use = hasWorldUse();
-    mVolumeList[ch][mNumVolumes[ch]] = volumep;
-    volumep->setIndexInTex(ch, mNumVolumes[ch]);
-    mNumVolumes[ch]++;
+    ALTextureUsers::add(mVolumeList[ch], mNumVolumes[ch], ch, volumep);
     mLastVolumeListUpdateTimer.reset();
     if (!had_use)
     {
@@ -1089,18 +1156,10 @@ void LLViewerTexture::removeVolume(U32 ch, LLVOVolume* volumep)
 {
     LL_PROFILE_ZONE_SCOPED_CATEGORY_TEXTURE;
     const bool had_use = hasWorldUse();
-    if (mNumVolumes[ch] > 1)
+    const ALTextureUsers::Removal removal = ALTextureUsers::remove(mVolumeList[ch], mNumVolumes[ch], ch, volumep);
+    if (removal.repaired)
     {
-        S32 index = volumep->getIndexInTex(ch);
-        llassert(index < (S32)mVolumeList[ch].size());
-        llassert(index < (S32)mNumVolumes[ch]);
-        mVolumeList[ch][index] = mVolumeList[ch][--mNumVolumes[ch]];
-        mVolumeList[ch][index]->setIndexInTex(ch, index);
-    }
-    else
-    {
-        mVolumeList[ch].clear();
-        mNumVolumes[ch] = 0;
+        report_repaired_users(*this, "volume", ch, removal, volumep);
     }
     mLastVolumeListUpdateTimer.reset();
     if (had_use && !hasWorldUse())

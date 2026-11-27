@@ -388,6 +388,29 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     return true;
 }
 
+bool ALCrashReporter::reportProblem(std::string_view kind, std::string_view message,
+                                    std::initializer_list<std::pair<std::string_view, std::string_view>> tags)
+{
+    if (!sEngaged)
+    {
+        return false;
+    }
+    SentryObjCEvent* event = [[SentryObjCEvent alloc] initWithLevel:SentryObjCLevelError];
+    event.message = [[SentryObjCMessage alloc] initWithFormatted:ns(std::string(message))];
+    event.logger = ns(std::string(kind));
+    NSMutableDictionary<NSString*, NSString*>* event_tags = [NSMutableDictionary dictionaryWithCapacity:tags.size() + 1];
+    event_tags[@"problem"] = ns(std::string(kind));
+    for (const auto& [key, value] : tags)
+    {
+        event_tags[ns(std::string(key))] = ns(std::string(value));
+    }
+    event.tags = event_tags;
+    // The SDK attaches the stack of the thread capturing a message event (attachStacktrace, on by default).
+    [SentryObjCSDK captureEvent:event];
+    LL_INFOS("CrashReporter") << "Reported " << kind << ": " << message << LL_ENDL;
+    return true;
+}
+
 bool ALCrashReporter::handleException(void*)
 {
     return false;

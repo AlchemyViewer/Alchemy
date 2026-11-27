@@ -206,7 +206,7 @@ namespace
 #endif
     }
 
-    void set_event_tag(sentry_value_t event, const char* key, std::string_view value)
+    void set_event_tag(sentry_value_t event, std::string_view key, std::string_view value)
     {
         sentry_value_t tags = sentry_value_get_by_key(event, "tags");
         if (sentry_value_is_null(tags))
@@ -214,10 +214,10 @@ namespace
             tags = sentry_value_new_object();
             sentry_value_set_by_key(event, "tags", tags);
         }
-        sentry_value_set_by_key(tags, key, sentry_value_new_string_n(value.data(), value.size()));
+        sentry_value_set_by_key_n(tags, key.data(), key.size(), sentry_value_new_string_n(value.data(), value.size()));
     }
 
-    void set_event_tag(sentry_value_t event, const char* key, U64 value)
+    void set_event_tag(sentry_value_t event, std::string_view key, U64 value)
     {
         char digits[24];
         const char* end = std::to_chars(digits, digits + sizeof(digits), value).ptr;
@@ -858,6 +858,37 @@ bool ALCrashReporter::reportFreeze(const std::string& description)
     record_freeze(sentry_capture_event(event));
     LL_INFOS("CrashReporter") << (with_stack ? "Freeze reported with the main thread's stack"
                                              : "Freeze reported as an event") << LL_ENDL;
+    return true;
+}
+
+bool ALCrashReporter::reportProblem(std::string_view kind, std::string_view message,
+                                    std::initializer_list<std::pair<std::string_view, std::string_view>> tags)
+{
+    if (!sEngaged)
+    {
+        return false;
+    }
+    sentry_value_t event =
+        sentry_value_new_message_event_n(SENTRY_LEVEL_ERROR, kind.data(), kind.size(), message.data(), message.size());
+    set_event_tag(event, "problem", kind);
+    for (const auto& [key, value] : tags)
+    {
+        set_event_tag(event, key, value);
+    }
+    // The stack is this thread's, walked here, as the thread the report is about.
+#if LL_WINDOWS
+    const U64 thread_id = GetCurrentThreadId();
+#elif LL_LINUX
+    const U64 thread_id = (U64)gettid();
+#else
+    const U64 thread_id = 0;
+#endif
+    sentry_value_t thread = sentry_value_new_thread(thread_id, nullptr);
+    sentry_value_set_by_key(thread, "current", sentry_value_new_bool(true));
+    sentry_value_set_stacktrace(thread, nullptr, 0);
+    sentry_event_add_thread(event, thread);
+    sentry_capture_event(event);
+    LL_INFOS("CrashReporter") << "Reported " << kind << ": " << message << LL_ENDL;
     return true;
 }
 

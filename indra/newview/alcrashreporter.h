@@ -237,6 +237,12 @@ namespace ALCrashReporter
                     std::initializer_list<std::pair<std::string_view, std::string_view>> values);
     void attach(const std::string& path);
     bool reportFreeze(const std::string& description);
+    // A fault the viewer found and went on from, filed as an error with the
+    // stack of the thread that found it: `kind` names it, as the event's
+    // logger and its "problem" tag, and `tags` are the event's own. How often
+    // a fault is filed is the caller's to limit. Whether the event was made.
+    bool reportProblem(std::string_view kind, std::string_view message,
+                       std::initializer_list<std::pair<std::string_view, std::string_view>> tags);
     bool handleException(void* exception_pointers);
 #else
     inline bool start(bool) { return false; }
@@ -253,6 +259,8 @@ namespace ALCrashReporter
                            std::initializer_list<std::pair<std::string_view, std::string_view>>) {}
     inline void attach(const std::string&) {}
     inline bool reportFreeze(const std::string&) { return false; }
+    inline bool reportProblem(std::string_view, std::string_view,
+                              std::initializer_list<std::pair<std::string_view, std::string_view>>) { return false; }
     inline bool handleException(void*) { return false; }
 #endif
 }

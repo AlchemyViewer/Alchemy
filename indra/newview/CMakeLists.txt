@@ -1147,6 +1147,7 @@ if(AL_BUILD_VIEWER)
     alwatersurface.h
     altextureboost.h
     altexturetable.h
+    altextureusers.h
     alfloaterscriptstudio.h
     alfloaterwebprofile.h
     alfloaterxuilibrary.h
@@ -2641,6 +2642,7 @@ if(AL_BUILD_TESTS)
       tests/alterrainsurfacemaps_test.cpp
       tests/altextureboost_test.cpp
       tests/altexturetable_test.cpp
+      tests/altextureusers_test.cpp
       tests/alwhitebalancesolver_test.cpp
       tests/cppfeatures_test.cpp
       tests/llagentaccess_test.cpp
