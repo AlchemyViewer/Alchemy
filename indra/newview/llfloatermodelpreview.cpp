@@ -499,12 +499,7 @@ void LLFloaterModelPreview::loadHighLodModel()
 void LLFloaterModelPreview::prepareToLoadModel(S32 lod)
 {
     mModelPreview->mLoading = true;
-    if (lod == LLModel::LOD_PHYSICS)
-    {
-        // loading physics from file
-        mModelPreview->mPhysicsSearchLOD = lod;
-        mModelPreview->mWarnOfUnmatchedPhyicsMeshes = false;
-    }
+    // <SK:Nexii> Mesh uploader LODs by name: physics search LOD is updated in loadModel() once a file is chosen, not before the picker opens
 }
 void LLFloaterModelPreview::loadModel(S32 lod)
 {

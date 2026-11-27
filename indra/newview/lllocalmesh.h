@@ -48,6 +48,7 @@
 #include <filesystem>
 #include <list>
 #include <map>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -85,10 +86,13 @@ struct LLLocalMeshPart
     std::string               mName;          // sub-mesh (model/instance) name, for build-floater display
     LLUUID                    mWorldID;       // unique mesh id objects/repository reference
     LLPointer<LLVolume>       mVolume;        // normalized geometry (<= 8 faces)
+    LLPointer<LLVolume>       mLODVolumes[LLModel::LOD_HIGH]; // the file's NAME_LOD0-2, null where it has none
+    std::shared_ptr<LLModel::Decomposition> mPhysics; // the file's NAME_PHYS as a physics mesh, null where it has none
     LLPointer<LLMeshSkinInfo> mSkinInfo;      // null if not rigged
     LLVector3                 mScale;         // object scale (decomposed instance scale; rigged: authored size)
     LLQuaternion              mRotation;      // object rotation (decomposed instance rotation; rigged: identity)
     LLVector3                 mOffset;        // scene-space position of the part (static); zero for rigged
+    LLVector3                 mPivotOffset;   // normalized-space pivot shift applied to geometry (for hot-swap compensation)
     S32                       mNumFaces = 0;
     std::vector<LLLocalMeshFaceMaterial> mFaceMaterials; // parallel to the volume's faces
 };
@@ -236,7 +240,9 @@ public:
 
     // Mesh repository injection: resolve a part's world id to its decoded data.
     bool                  isLocal(const LLUUID& world_id) const;
-    LLVolume*             getVolumeForWorldID(const LLUUID& world_id) const;
+    // The part's geometry for a LOD: the file's own model for it, else the High one.
+    LLVolume*             getVolumeForWorldID(const LLUUID& world_id, S32 lod = LLModel::LOD_HIGH) const;
+    LLModel::Decomposition* getDecompositionForWorldID(const LLUUID& world_id) const;
     const LLMeshSkinInfo* getSkinInfoForWorldID(const LLUUID& world_id) const;
 
     // Despawn in-world preview copies but KEEP the loaded unit so it can be re-spawned
@@ -365,7 +371,7 @@ private:
                         LLLocalMeshPreSwapSnapshot& out) const;
     // Re-rez every existing copy of a unit at its current transform/attachment, used
     // when a reload changes the prim count so hot-swap can't swap 1:1.
-    void respawnInstancesInPlace(const LLUUID& tracking_id);
+    void respawnInstancesInPlace(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot* pre_swap = nullptr);
     // Build one copy's linkset for (tracking_id, instance_id) rooted at `base` with
     // `root_rot`, optionally worn at attach_point. Returns the root.
     LLViewerObject* spawnLinkset(const LLUUID& tracking_id, const LLUUID& instance_id,

@@ -4757,7 +4757,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
     }
 
     // Local mesh: serve the decoded geometry directly from the registry instead
-    // of issuing an asset fetch. The same geometry is served for every LOD.
+    // of issuing an asset fetch. Each LOD gets the file's own model for it, or the High one. // <SK:Nexii> Local mesh LODs
     // Local mesh: decide locality by registry membership, not by whether a decoded
     // volume happens to exist right now. A local-only world id must never fall through
     // to the simulator-backed fetch below -- not even during the brief window of a
@@ -4765,7 +4765,7 @@ S32 LLMeshRepository::loadMesh(LLVOVolume* vobj, const LLVolumeParams& mesh_para
     if (LLLocalMeshMgr::instanceExists() &&
         LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
     {
-        LLVolume* local_volume = LLLocalMeshMgr::getInstance()->getVolumeForWorldID(mesh_params.getSculptID());
+        LLVolume* local_volume = LLLocalMeshMgr::getInstance()->getVolumeForWorldID(mesh_params.getSculptID(), new_lod); // <SK:Nexii> Local mesh LODs: the file's own model for this LOD
         if (local_volume)
         {
             LLVolume* sys_volume = LLPrimitive::getVolumeManager()->refVolume(mesh_params, new_lod);
@@ -5388,7 +5388,7 @@ void LLMeshRepository::notifyMeshUnavailable(const LLVolumeParams& mesh_params, 
 
 S32 LLMeshRepository::getActualMeshLOD(const LLVolumeParams& mesh_params, S32 lod)
 {
-    // Local mesh has no header/LOD list; the same geometry is valid for every LOD.
+    // Local mesh has no header/LOD list; each LOD resolves from the unit's per-LOD volumes (falling back to High). // <SK:Nexii>
     if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_params.getSculptID()))
     {
         return llclamp(lod, 0, LLVolumeLODGroup::NUM_LODS - 1);
@@ -5558,7 +5558,7 @@ LLModel::Decomposition* LLMeshRepository::getDecomposition(const LLUUID& mesh_id
     // forever, retrying).
     if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
     {
-        return ret;
+        return LLLocalMeshMgr::getInstance()->getDecompositionForWorldID(mesh_id); // <SK:Nexii> Local mesh LODs: the file's physics model
     }
 
     if (mesh_id.notNull())
@@ -5612,7 +5612,7 @@ bool LLMeshRepository::hasPhysicsShape(const LLUUID& mesh_id)
     // decomposition fetch below).
     if (LLLocalMeshMgr::instanceExists() && LLLocalMeshMgr::getInstance()->isLocal(mesh_id))
     {
-        return false;
+        return LLLocalMeshMgr::getInstance()->getDecompositionForWorldID(mesh_id) != nullptr; // <SK:Nexii> Local mesh LODs: the file's physics model
     }
 
     if (const LLMeshHeader* header = mHeaderCache.findValid(mesh_id))

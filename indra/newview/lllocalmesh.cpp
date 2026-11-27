@@ -27,6 +27,9 @@
 #include "lllocalmesh.h"
 
 #include <algorithm>     // std::sort (stable rez-order listing of spawned copies)
+#include <array>
+#include <set>
+#include <string_view>
 #include <unordered_map> // mSpawnedCopies: instance id -> copy (O(1) per-copy lookup/erase)
 #include <unordered_set> // dedup avatars when rebuilding overrides across copies
 
@@ -53,6 +56,7 @@
 #include "lllocalgltfmaterials.h" // import a glTF mesh's materials as mesh-owned local materials
 #include "llprimitive.h"     // LL_PCODE_VOLUME
 #include "object_flags.h"    // FLAGS_OBJECT_* for owner permissions
+#include "llmodelpreview.h"      // LLModelPreview::getFileOriginPivot, the uploader's origin rule
 #include "llnotificationsutil.h" // warn when a loaded mesh has no UVs
 #include "llscrolllistctrl.h"
 #include "llselectmgr.h"    // deselect before re-parenting onto the avatar
@@ -153,7 +157,8 @@ namespace
     // avatar deformation, vanishing parts). The per-vertex lookup goes through an
     // LLModel::JointWeightCache (O(1)) instead of getJointInfluences() (O(V)),
     // turning this pass from O(V^2) to O(V) -- see the cache's header doc.
-    void populateFaceWeights(LLVolumeFace& face, LLModel& mdl, const LLModel::JointWeightCache& locator)
+    void populateFaceWeights(LLVolumeFace& face, LLModel& mdl, const LLModel::JointWeightCache& locator,
+                             const std::vector<S32>* joint_remap = nullptr)
     {
         if (face.mNumVertices <= 0 || mdl.mSkinWeights.empty())
         {
@@ -175,13 +180,22 @@ namespace
             for (LLModel::weight_list::const_iterator it = weights.begin();
                  it != weights.end() && cur < 4; ++it)
             {
-                if (it->mJointIdx < 0 || it->mJointIdx >= 255)
+                S32 joint_idx = it->mJointIdx;
+                if (joint_remap)
+                {
+                    if (joint_idx < 0 || (size_t)joint_idx >= joint_remap->size())
+                    {
+                        continue;
+                    }
+                    joint_idx = (*joint_remap)[joint_idx];
+                }
+                if (joint_idx < 0 || joint_idx >= 255)
                 {
                     continue; // matches LLModel::writeModel()'s joint-index guard
                 }
                 const U16 influence = (U16)(it->mWeight * 65535.f);
                 const F32 w = llclamp((F32)influence / 65535.f, 0.001f, 0.999f);
-                packed[cur] = (F32)it->mJointIdx + w;
+                packed[cur] = (F32)joint_idx + w;
                 wsum += w;
                 ++cur;
             }
@@ -480,13 +494,63 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
     // matrix, so re-normalizing or baking the instance transform here would desync
     // the skinning once the preview is attached to an avatar. Static units bake
     // the instance transforms and normalize for in-world linkset placement.
+    // A model named NAME_LOD0-2 or NAME_PHYS beside a NAME is one of NAME's
+    // lower LODs or its physics shape, as the uploader reads the file, not a
+    // part of its own. A submodel's letter follows the suffix: NAME_LOD2b.
+    static const std::array<std::string_view, 4> lod_suffixes{ "_LOD0", "_LOD1", "_LOD2", "_PHYS" };
+    static constexpr std::string_view default_physics_label{ "default_physics_shape_PHYS" };
+    auto core_label = [](const LLModel* mdl) -> std::string_view
+    {
+        std::string_view label(mdl->mLabel);
+        return mdl->mSubmodelID > 0 && !label.empty() ? label.substr(0, label.size() - 1) : label;
+    };
+    auto base_of = [&](std::string_view label) -> std::string_view
+    {
+        for (std::string_view suffix : lod_suffixes)
+        {
+            if (label.size() > suffix.size() && label.substr(label.size() - suffix.size()) == suffix)
+            {
+                return label.substr(0, label.size() - suffix.size());
+            }
+        }
+        return {};
+    };
+    std::set<std::string, std::less<>> bases;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            const LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (mdl && mdl->getNumVolumeFaces() > 0 && !mdl->mSubmodelID && base_of(mdl->mLabel).empty())
+            {
+                bases.emplace(mdl->mLabel);
+            }
+        }
+    }
+    auto is_default_physics = [&](std::string_view core) -> bool
+    {
+        return !bases.empty() && core == default_physics_label;
+    };
+    auto is_auxiliary = [&](const LLModel* mdl) -> bool
+    {
+        const std::string_view core = core_label(mdl);
+        if (is_default_physics(core))
+        {
+            return true;
+        }
+        const std::string_view base = base_of(core);
+        return !base.empty() && bases.find(base) != bases.end();
+    };
+
+    // Determine unit rigging from retained High parts only, so a skin left on a
+    // hidden auxiliary _LOD/_PHYS model cannot put static parts on the rigged path.
     bool unit_rigged = false;
     for (auto iter = scene.begin(); iter != scene.end() && !unit_rigged; ++iter)
     {
         for (LLModelInstance& instance : iter->second)
         {
             LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
-            if (mdl && !mdl->mSkinInfo.mJointNames.empty())
+            if (mdl && mdl->getNumVolumeFaces() > 0 && !is_auxiliary(mdl) && !mdl->mSkinInfo.mJointNames.empty())
             {
                 unit_rigged = true;
                 break;
@@ -516,6 +580,157 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
         importGLTFMaterials(gltf_mat_by_name, new_owned_materials);
     }
 
+    // Each part's own LOD and physics models, keyed by (base label, submodel id) so a split
+    // root's submodel (e.g. Door_PHYSb) cannot collide with a separate part named Doorb:
+    // slots 0-2 are LOD0-2, slot 3 the physics shape.
+    std::map<std::pair<std::string, S32>, std::array<LLModel*, 4>> lods_of;
+    LLModel* default_physics_mdl = nullptr;
+    // How many distinct models (root and submodels) each part has at High, and at each of its own LOD slots:
+    // a LOD split differently from High would leave faces out, so it isn't served.
+    std::map<std::string, S32, std::less<>> high_count;
+    std::map<std::string, std::array<S32, 4>, std::less<>> lod_count;
+    std::unordered_set<const LLModel*> seen_models;
+    for (auto iter = scene.begin(); iter != scene.end(); ++iter)
+    {
+        for (const LLModelInstance& instance : iter->second)
+        {
+            LLModel* mdl = instance.mModel.notNull() ? instance.mModel.get() : instance.mLOD[LLModel::LOD_HIGH].get();
+            if (!mdl || mdl->getNumVolumeFaces() <= 0 || !seen_models.insert(mdl).second)
+            {
+                continue;
+            }
+            const std::string_view core = core_label(mdl);
+            if (is_default_physics(core))
+            {
+                if (!default_physics_mdl)
+                {
+                    default_physics_mdl = mdl;
+                }
+                continue;
+            }
+            const std::string_view base = base_of(core);
+            if (base.empty() || bases.find(base) == bases.end())
+            {
+                if (base.empty())
+                {
+                    ++high_count[std::string(core)];
+                }
+                continue;
+            }
+            const std::string_view suffix = core.substr(base.size());
+            const size_t slot = suffix == "_PHYS" ? 3 : (size_t)(suffix.back() - '0');
+            LLModel*& dst = lods_of[{ std::string(base), mdl->mSubmodelID }][slot];
+            if (!dst)
+            {
+                dst = mdl;
+                ++lod_count[std::string(base)][slot];
+            }
+        }
+    }
+    // A static part stands on the origin its file gives, as the uploader's From file pivot places it:
+    // its geometry moves by the offset that brings that origin to the prim's, and the part moves back.
+    auto shift_face = [](LLVolumeFace& face, const LLVector4a& offset)
+    {
+        for (S32 v = 0; v < face.mNumVertices; ++v)
+        {
+            face.mPositions[v].add(offset);
+        }
+        if (face.mExtents)
+        {
+            face.mExtents[0].add(offset);
+            face.mExtents[1].add(offset);
+        }
+        if (face.mCenter)
+        {
+            face.mCenter->add(offset);
+        }
+    };
+
+    // Map a lower LOD's joint indices onto High's joint table (which part.mSkinInfo exposes for all LODs).
+    // Returns false if any joint referenced by the LOD's skin weights is missing from High's table.
+    auto build_joint_remap = [](const LLModel* high_mdl, const LLModel* lod_mdl, std::vector<S32>& remap_out) -> bool
+    {
+        std::unordered_map<std::string_view, S32> high_joints;
+        high_joints.reserve(high_mdl->mSkinInfo.mJointNames.size());
+        for (size_t i = 0; i < high_mdl->mSkinInfo.mJointNames.size(); ++i)
+        {
+            high_joints.emplace(high_mdl->mSkinInfo.mJointNames[i], (S32)i);
+        }
+        const auto& lod_joints = lod_mdl->mSkinInfo.mJointNames;
+        remap_out.assign(lod_joints.size(), -1);
+        for (size_t j = 0; j < lod_joints.size(); ++j)
+        {
+            auto it = high_joints.find(lod_joints[j]);
+            if (it != high_joints.end())
+            {
+                remap_out[j] = it->second;
+            }
+        }
+        for (const auto& kv : lod_mdl->mSkinWeights)
+        {
+            for (const LLModel::JointWeight& w : kv.second)
+            {
+                if (w.mWeight <= 0.f)
+                {
+                    continue;
+                }
+                if (w.mJointIdx < 0 || (size_t)w.mJointIdx >= remap_out.size()
+                    || remap_out[w.mJointIdx] < 0 || remap_out[w.mJointIdx] >= 255)
+                {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
+    // A LOD or physics model's faces as a volume the repository can serve, built as the part's own is.
+    auto make_volume = [&](LLModel* mdl, const LLVector4a& offset, bool rigged, const std::vector<S32>* joint_remap) -> LLPointer<LLVolume>
+    {
+        std::vector<LLVolumeFace> lod_faces;
+        lod_faces.reserve(mdl->getNumVolumeFaces());
+        const LLModel::JointWeightCache lod_weights(*mdl);
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            LLVolumeFace face = mdl->getVolumeFace(fi);
+            if (rigged)
+            {
+                populateFaceWeights(face, *mdl, lod_weights, joint_remap);
+            }
+            shift_face(face, offset);
+            lod_faces.push_back(face);
+        }
+        LLVolumeParams lod_params;
+        lod_params.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
+        LLPointer<LLVolume> volume = new LLVolume(lod_params, 1.f);
+        volume->copyFacesFrom(lod_faces);
+        volume->cacheOptimize(true);
+        volume->setMeshAssetLoaded(true);
+        return volume;
+    };
+    // A physics model as the triangle list the physics display draws, as a downloaded physics mesh is.
+    auto make_physics = [](const LLModel* mdl, const LLVector3& offset) -> std::shared_ptr<LLModel::Decomposition>
+    {
+        auto decomp = std::make_shared<LLModel::Decomposition>();
+        std::vector<LLVector3>& pos = decomp->mPhysicsShapeMesh.mPositions;
+        std::vector<LLVector3>& norm = decomp->mPhysicsShapeMesh.mNormals;
+        for (S32 fi = 0; fi < mdl->getNumVolumeFaces(); ++fi)
+        {
+            const LLVolumeFace& face = mdl->getVolumeFace(fi);
+            for (S32 i = 0; i < face.mNumIndices; ++i)
+            {
+                const U16 idx = face.mIndices[i];
+                if (idx < face.mNumVertices)
+                {
+                    pos.emplace_back(LLVector3(face.mPositions[idx].getF32ptr()) + offset);
+                    // A Collada model without normals has none; the physics display draws positions alone.
+                    norm.emplace_back(face.mNormals ? LLVector3(face.mNormals[idx].getF32ptr()) : LLVector3::z_axis);
+                }
+            }
+        }
+        return decomp->mPhysicsShapeMesh.mPositions.empty() ? nullptr : decomp;
+    };
+
     for (auto iter = scene.begin(); iter != scene.end(); ++iter)
     {
         for (LLModelInstance& instance : iter->second)
@@ -525,6 +740,14 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
             {
                 continue;
             }
+            if (is_auxiliary(mdl))
+            {
+                continue;
+            }
+            // Rigged parts are placed by their skeleton, so only a static part takes its file's origin.
+            const LLVector3 pivot_offset = unit_rigged ? LLVector3::zero : LLModelPreview::getFileOriginPivot(mdl) * -0.5f;
+            LLVector4a pivot_offset4;
+            pivot_offset4.load3(pivot_offset.mV);
 
             std::vector<LLVolumeFace> faces;
             faces.reserve(mdl->getNumVolumeFaces());
@@ -545,6 +768,7 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                     // the avatar the same way a downloaded rigged mesh would.
                     populateFaceWeights(face, *mdl, weight_locator);
                 }
+                shift_face(face, pivot_offset4);
                 num_vertices += face.mNumVertices;
                 num_triangles += face.mNumIndices / 3;
                 if (!unit_has_uvs && face.mTexCoords)
@@ -640,8 +864,9 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 decomposeInstanceMatrix(instance.mTransform, pos, rot, scl);
                 part.mScale    = scl;
                 part.mRotation = rot;
-                part.mOffset   = pos; // scene-space; spawn uses per-part differences
+                part.mOffset   = (-pivot_offset) * instance.mTransform; // scene-space at the pivot; spawn uses per-part differences
             }
+            part.mPivotOffset = pivot_offset;
 
             LLVolumeParams vparams;
             vparams.setType(LL_PCODE_PROFILE_SQUARE, LL_PCODE_PATH_LINE);
@@ -655,6 +880,46 @@ bool LLLocalMesh::ingestScene(LLModelLoader::scene& scene)
                 LL_WARNS("LocalMesh") << "cacheOptimize failed for '" << mShortName << "'" << LL_ENDL;
             }
             part.mVolume->setMeshAssetLoaded(true);
+
+            auto own = lods_of.find({ std::string(core_label(mdl)), mdl->mSubmodelID });
+            const bool part_rigged = !mdl->mSkinInfo.mJointNames.empty();
+            if (own != lods_of.end())
+            {
+                const std::string_view own_base = core_label(mdl);
+                const auto high_it = high_count.find(own_base);
+                const auto lod_it = lod_count.find(own_base);
+                for (S32 lod = LLModel::LOD_IMPOSTOR; lod < LLModel::LOD_HIGH; ++lod)
+                {
+                    LLModel* lod_mdl = own->second[lod];
+                    // Served only where it can stand in for High: split the same way, with its
+                    // materials in the same order (faces take High's materials by index), and
+                    // skinned with joints mappable to High's skin table where High is rigged.
+                    if (!lod_mdl
+                        || high_it == high_count.end() || lod_it == lod_count.end() || lod_it->second[lod] != high_it->second
+                        || lod_mdl->mMaterialList != mdl->mMaterialList)
+                    {
+                        continue;
+                    }
+                    if (part_rigged)
+                    {
+                        std::vector<S32> joint_remap;
+                        if (lod_mdl->mSkinWeights.empty() || !build_joint_remap(mdl, lod_mdl, joint_remap))
+                        {
+                            continue;
+                        }
+                        part.mLODVolumes[lod] = make_volume(lod_mdl, pivot_offset4, true, &joint_remap);
+                    }
+                    else
+                    {
+                        part.mLODVolumes[lod] = make_volume(lod_mdl, pivot_offset4, false, nullptr);
+                    }
+                }
+            }
+            LLModel* physics_mdl = (own != lods_of.end() && own->second[3]) ? own->second[3] : default_physics_mdl;
+            if (physics_mdl)
+            {
+                part.mPhysics = make_physics(physics_mdl, pivot_offset);
+            }
 
             if (!mdl->mSkinInfo.mJointNames.empty())
             {
@@ -1115,10 +1380,24 @@ bool LLLocalMeshMgr::isLocal(const LLUUID& world_id) const
     return findPart(world_id) != nullptr;
 }
 
-LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id) const
+LLVolume* LLLocalMeshMgr::getVolumeForWorldID(const LLUUID& world_id, S32 lod) const
 {
     const LLLocalMeshPart* part = findPart(world_id);
-    return part ? part->mVolume.get() : nullptr;
+    if (!part)
+    {
+        return nullptr;
+    }
+    if (lod >= LLModel::LOD_IMPOSTOR && lod < LLModel::LOD_HIGH && part->mLODVolumes[lod].notNull())
+    {
+        return part->mLODVolumes[lod].get();
+    }
+    return part->mVolume.get();
+}
+
+LLModel::Decomposition* LLLocalMeshMgr::getDecompositionForWorldID(const LLUUID& world_id) const
+{
+    const LLLocalMeshPart* part = findPart(world_id);
+    return part ? part->mPhysics.get() : nullptr;
 }
 
 const LLMeshSkinInfo* LLLocalMeshMgr::getSkinInfoForWorldID(const LLUUID& world_id) const
@@ -1613,7 +1892,27 @@ LLViewerObject* LLLocalMeshMgr::spawnLinkset(const LLUUID& tracking_id, const LL
     return root;
 }
 
-void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
+// Hot-swap diff-restore state: each spawned prim's live face state, captured
+// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
+// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
+// after that would record the reset as if the user had applied it), plus the
+// OLD parts' imported materials to diff user edits against.
+struct LLLocalMeshPreSwapSnapshot
+{
+    struct Face
+    {
+        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
+        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
+    };
+    typedef std::vector<Face> PrimFaces;
+
+    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;        // per copy (instance id), per prim
+    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported;     // per part: the old file's materials
+    std::vector<LLVector3>                            mOldPivotOffsets; // per part: the old file's normalized pivot shift
+    std::string                                       mOldRootName;     // old root part's label, for respawn pivot compensation
+};
+
+void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id, const LLLocalMeshPreSwapSnapshot* pre_swap)
 {
     // Capture each existing copy's identity, transform and attachment, then re-rez
     // them in place. Used when a reload changes the prim count (hot-swap can't swap
@@ -1633,6 +1932,18 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
     const LLLocalMesh* unit = getUnit(tracking_id);
     const LLQuaternion intrinsic0 = (unit && !unit->getParts().empty())
         ? unit->getParts().front().mRotation : LLQuaternion();
+    LLVector3 root_pivot_delta = LLVector3::zero;
+    if (unit && !unit->getParts().empty() && pre_swap && !pre_swap->mOldPivotOffsets.empty()
+        && !pre_swap->mOldRootName.empty() && unit->getParts().front().mName == pre_swap->mOldRootName)
+    {
+        const LLLocalMeshPart& root_part = unit->getParts().front();
+        const LLVector3 delta = root_part.mPivotOffset - pre_swap->mOldPivotOffsets.front();
+        if (!delta.isExactlyZero())
+        {
+            root_pivot_delta = delta.scaledVec(root_part.mScale);
+        }
+    }
+    const bool compensate_root_pivot = !root_pivot_delta.isExactlyZero();
     std::vector<Saved> saved;
     for (const auto& entry : mSpawnedCopies)
     {
@@ -1648,9 +1959,13 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         }
         Saved s;
         s.mInstanceID = entry.first;
-        s.mBase       = r->getPositionAgent();
-        s.mRot        = ~intrinsic0 * r->getRotation(); // user delta, not full world rotation
         s.mAttached   = r->isAttachment();
+        s.mBase       = r->getPositionAgent();
+        if (compensate_root_pivot && !s.mAttached)
+        {
+            s.mBase -= root_pivot_delta * r->getRotationRegion();
+        }
+        s.mRot        = ~intrinsic0 * r->getRotation(); // user delta, not full world rotation
         s.mPoint      = s.mAttached ? ATTACHMENT_ID_FROM_STATE(r->getAttachmentState()) : 0;
         saved.push_back(s);
     }
@@ -1662,24 +1977,6 @@ void LLLocalMeshMgr::respawnInstancesInPlace(const LLUUID& tracking_id)
         spawnLinkset(tracking_id, s.mInstanceID, s.mBase, s.mRot, s.mAttached, s.mPoint);
     }
 }
-
-// Hot-swap diff-restore state: each spawned prim's live face state, captured
-// BEFORE the reload's ingestScene commits (ingest releases dropped imports,
-// whose teardown already swaps live faces to IMG_DEFAULT -- a capture taken
-// after that would record the reset as if the user had applied it), plus the
-// OLD parts' imported materials to diff user edits against.
-struct LLLocalMeshPreSwapSnapshot
-{
-    struct Face
-    {
-        LLTextureEntry mTE;          // diffuse id, color, glow, bump/shiny/fullbright, transforms, Blinn-Phong material, glTF override
-        LLUUID         mRenderMatID; // glTF render material id (kept in the param block, not the TE)
-    };
-    typedef std::vector<Face> PrimFaces;
-
-    std::map<LLUUID, std::vector<PrimFaces>>          mCaptured;    // per copy (instance id), per prim
-    std::vector<std::vector<LLLocalMeshFaceMaterial>> mOldImported; // per part: the old file's materials
-};
 
 namespace
 {
@@ -1773,9 +2070,14 @@ void restorePreservedFaces(LLVOVolume* vol,
 void LLLocalMeshMgr::capturePreSwap(const LLUUID& tracking_id, const LLLocalMesh& unit,
                                     LLLocalMeshPreSwapSnapshot& out) const
 {
+    if (!unit.getParts().empty())
+    {
+        out.mOldRootName = unit.getParts().front().mName;
+    }
     for (const LLLocalMeshPart& part : unit.getParts())
     {
         out.mOldImported.push_back(part.mFaceMaterials);
+        out.mOldPivotOffsets.push_back(part.mPivotOffset);
     }
     for (const auto& entry : mSpawnedCopies)
     {
@@ -1845,13 +2147,51 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMesh
     // id. The new id has an empty volume cache, so the repository copies the new
     // faces and the prim rebuilds in place; LLVOVolume also drops its cached skin
     // when the mesh id changes, so rigged skinning refreshes too. No despawn -> each
-    // copy's attachment, selection and transform are all preserved.
+    // copy's attachment, selection and transform are all preserved; when a part's
+    // file origin moved, shift its live position by the pivot delta so the mesh
+    // stays where the user placed it.
+    std::vector<LLVector3> pivot_deltas(parts.size(), LLVector3::zero);
+    bool any_pivot_change = false;
+    if (pre_swap.mOldPivotOffsets.size() == parts.size())
+    {
+        for (size_t i = 0; i < parts.size(); ++i)
+        {
+            const LLVector3 delta = parts[i].mPivotOffset - pre_swap.mOldPivotOffsets[i];
+            if (!delta.isExactlyZero())
+            {
+                pivot_deltas[i] = delta.scaledVec(parts[i].mScale);
+                any_pivot_change = true;
+            }
+        }
+    }
+
     for (auto& entry : mSpawnedCopies)
     {
         SpawnedCopy& copy = entry.second;
         if (copy.mTrackingID != tracking_id)
         {
             continue;
+        }
+        // Snapshot live transforms before updating geometry or moving the root, so
+        // root and child pivot compensations are computed in each prim's own frame.
+        const bool attached = !copy.mPrims.empty() && copy.mPrims[0].notNull()
+                              && !copy.mPrims[0]->isDead() && copy.mPrims[0]->isAttachment();
+        std::vector<LLVector3> old_pos;
+        std::vector<LLQuaternion> old_rot;
+        if (any_pivot_change)
+        {
+            old_pos.resize(parts.size());
+            old_rot.resize(parts.size());
+            for (size_t i = 0; i < parts.size(); ++i)
+            {
+                LLViewerObject* o = copy.mPrims[i].get();
+                if (!o || o->isDead())
+                {
+                    return false;
+                }
+                old_pos[i] = attached ? o->getPosition() : o->getPositionAgent();
+                old_rot[i] = attached ? o->getRotation() : o->getRotationRegion();
+            }
         }
         for (size_t i = 0; i < parts.size(); ++i)
         {
@@ -1872,6 +2212,34 @@ bool LLLocalMeshMgr::hotSwapInWorld(const LLUUID& tracking_id, const LLLocalMesh
                 const std::vector<LLLocalMeshFaceMaterial>* old_imported =
                     (i < pre_swap.mOldImported.size()) ? &pre_swap.mOldImported[i] : nullptr;
                 restorePreservedFaces(vol, cap_it->second[i], old_imported);
+            }
+        }
+        if (any_pivot_change)
+        {
+            const bool root_moved = !pivot_deltas[0].isExactlyZero();
+            for (size_t i = 0; i < parts.size(); ++i)
+            {
+                if (i == 0 && !root_moved)
+                {
+                    continue;
+                }
+                if (i > 0 && !root_moved && pivot_deltas[i].isExactlyZero())
+                {
+                    continue;
+                }
+                LLViewerObject* o = copy.mPrims[i].get();
+                if (attached)
+                {
+                    const LLVector3 pos = (i == 0)
+                        ? (old_pos[0] - pivot_deltas[0] * old_rot[0])
+                        : (old_pos[i] + pivot_deltas[0] - pivot_deltas[i] * old_rot[i]);
+                    o->setPosition(pos);
+                }
+                else
+                {
+                    o->setPositionAgent(old_pos[i] - pivot_deltas[i] * old_rot[i]);
+                }
+                o->markForUpdate();
             }
         }
     }
@@ -2145,7 +2513,7 @@ void LLLocalMeshMgr::onLoadResult(const LLUUID& tracking_id, LLModelLoader::scen
             {
                 if (!hotSwapInWorld(tracking_id, pre_swap))
                 {
-                    respawnInstancesInPlace(tracking_id); // prim count changed -> re-rez each copy
+                    respawnInstancesInPlace(tracking_id, &pre_swap); // prim count changed -> re-rez each copy
                 }
                 // The skin may have changed (a live edit, or a Joint Positions
                 // toggle), so recompute joint-position overrides on every affected
