@@ -4519,6 +4519,16 @@ public:
                 return;
             }
 
+            // addMessage has left the session if it turned the invitation away,
+            // as it does for a conference that AlchemyIgnoreAdHocSessions or
+            // VoiceCallsFriendsOnly rejects or for a muted group's, and it holds
+            // none if it couldn't open one. Accepting would put the agent back in
+            // a session the viewer doesn't hold.
+            if (!gIMMgr->hasSession(session_id))
+            {
+                return;
+            }
+
             //K now we want to accept the invitation
             std::string url = gAgent.getRegionCapability("ChatSessionRequest");
 
