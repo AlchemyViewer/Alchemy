@@ -13477,6 +13477,22 @@ are wearing now.
   </notification>
 
   <notification
+   icon="notifytip.tga"
+   name="ChatCommandToggleDebugSettingLLSD"
+   type="notifytip"
+   log_to_im="true">
+   LLSD settings are not supported.
+  </notification>
+
+  <notification
+   icon="notifytip.tga"
+   name="ChatCommandToggleDebugSettingValues"
+   type="notifytip"
+   log_to_im="true">
+   At least two values are required.
+  </notification>
+
+  <notification
    icon="notify.tga"
    name="DumpArchetypeSuccess"
    type="notify">
