@@ -1151,6 +1151,9 @@ public:
     LLRenderTarget          mExposureHistogram;
     LLRenderTarget          mExposureMap;
     LLRenderTarget          mLastExposure;
+    // The incident strength the last generateLuminance metered at: the setting in the main view where it could make the
+    // blended mask, and 0 otherwise. generateExposure takes the key of the grid's values from it.
+    F32                     mMeterIncident = 0.f;
 
     // lens flare sun state, 2x1, swapped each frame: [0] is this frame's, [1]
     // last frame's. Layout in lensFlareStateF.glsl.

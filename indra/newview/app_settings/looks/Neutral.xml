@@ -23,6 +23,17 @@
             <key>Value</key>
             <real>95.0</real>
         </map>
+        <key>AlchemyExposureIncidentStrength</key>
+        <map>
+            <key>Comment</key>
+            <string>How far automatic exposure meters the light falling on surfaces (incident metering) instead of the light they reflect (reflective metering). 0 is reflective, which exposes a white wall in dim light as middle grey; 1 is incident, so white stays white and a grey card stays grey. The incident light is estimated by dividing the reflected light by the G-buffer's albedo. 0 to 1.</string>
+            <key>Persist</key>
+            <integer>1</integer>
+            <key>Type</key>
+            <string>F32</string>
+            <key>Value</key>
+            <real>1.0</real>
+        </map>
         <key>AlchemyExposureLowPercent</key>
         <map>
             <key>Comment</key>

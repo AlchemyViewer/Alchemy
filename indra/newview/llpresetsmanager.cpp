@@ -603,6 +603,7 @@ void LLPresetsManager::getLooksControlNames(std::vector<std::string>& names)
         "AlchemyExposureSpeedDown",
         "AlchemyExposureMeteringMode",
         "AlchemyExposureSkyWeight",
+        "AlchemyExposureIncidentStrength",
         // Color LUT
         "RenderColorGrade",
         "RenderColorGradeLUT",
@@ -1090,6 +1091,11 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
     // always was, rather than reset. And the master switch is left alone: a
     // file that omits it was edited by hand, and its other keys are evidently
     // meant to be seen. resetToDefault fires only on a real change.
+    //
+    // The exception is the incident metering strength. A Look saved before it
+    // existed was graded under the reflective meter, so the strength it never
+    // carried is 0, which keeps it exposing as it did, and not the default's
+    // 1. The bundled Looks carry the key and apply their own value.
     const bool snapshot = applied * 2 >= static_cast<S32>(allowed.size());
     if (snapshot)
     {
@@ -1102,7 +1108,14 @@ bool LLPresetsManager::loadLooksPreset(std::string name)
             LLControlVariable* ctrl = gSavedSettings.getControl(ctrl_name).get();
             if (ctrl)
             {
-                ctrl->resetToDefault(true);
+                if (ctrl_name == "AlchemyExposureIncidentStrength")
+                {
+                    ctrl->set(LLSD(0.0));
+                }
+                else
+                {
+                    ctrl->resetToDefault(true);
+                }
             }
         }
     }
