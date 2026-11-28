@@ -58,13 +58,26 @@ namespace
         }
     }
 
+    // A member is a method where it takes self first, however it was
+    // declared: Luau's hasSelf, or a field whose first parameter is named
+    // self -- the grid's `LLEvents:on` and its kind.
+    bool isMethod(const Luau::FunctionType* function)
+    {
+        return function && (function->hasSelf ||
+                            (!function->argNames.empty() && function->argNames[0] && function->argNames[0]->name == "self"));
+    }
+
+    bool isMethod(const Luau::AutocompleteEntry& entry)
+    {
+        return entry.type && isMethod(ALLuauTypes::functionOf(*entry.type));
+    }
+
     // Whether a member is no use indexed as it is, `op` being the dot or
     // the colon before it. Luau's mark, but for an extern type's: there it
     // asks for a method to be called as it was declared, and the grid's
     // definitions declare `LLEvents:on` and its kind as fields whose first
     // parameter is self, which Luau then marks as wrong after a colon and
-    // right after a dot. A member is a method where it takes self first,
-    // however it was declared.
+    // right after a dot.
     bool wronglyIndexed(const Luau::AutocompleteEntry& entry, char op)
     {
         const Luau::FunctionType* function = entry.type ? ALLuauTypes::functionOf(*entry.type) : nullptr;
@@ -72,8 +85,66 @@ namespace
         {
             return entry.wrongIndexType;
         }
-        const bool method = function->hasSelf || (!function->argNames.empty() && function->argNames[0] && function->argNames[0]->name == "self");
-        return method != (op == ':');
+        return isMethod(function) != (op == ':');
+    }
+
+    // Whether a method's only parameter is the object the colon passes, so
+    // a call after `:` takes nothing more.
+    bool onlySelfBound(const Luau::FunctionType& function)
+    {
+        const auto [arg_types, tail] = Luau::flatten(function.argTypes);
+        if (arg_types.size() > 1)
+        {
+            return false;
+        }
+        const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
+        return !(tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden));
+    }
+
+    // The type printed for a completion the editor builds placeholders from:
+    // the first parameter dropped where the colon already passes it as self,
+    // as signature help drops it for a colon call. Built by hand rather than
+    // Luau's hideFunctionSelfArgument: that flag misses a script method's
+    // generic form (`<a>(self: a) -> ...`), which still prints self.
+    std::string callDetail(Luau::TypeId type, bool skipSelf)
+    {
+        if (!skipSelf)
+        {
+            return ALLuauTypes::typeText(type);
+        }
+        const Luau::FunctionType* function = ALLuauTypes::functionOf(type);
+        if (!function)
+        {
+            return ALLuauTypes::typeText(type);
+        }
+        const auto [arg_types, tail] = Luau::flatten(function->argTypes);
+        std::string detail           = "(";
+        for (size_t i = arg_types.empty() ? 0 : 1; i < arg_types.size(); ++i)
+        {
+            if (i > 1)
+            {
+                detail += ", ";
+            }
+            if (i < function->argNames.size() && function->argNames[i])
+            {
+                detail += function->argNames[i]->name + ": ";
+            }
+            detail += ALLuauTypes::typeText(arg_types[i]);
+        }
+        const Luau::VariadicTypePack* variadic = tail ? Luau::get<Luau::VariadicTypePack>(Luau::follow(*tail)) : nullptr;
+        const bool                    more     = tail && !Luau::isEmpty(*tail) && !(variadic && variadic->hidden);
+        if (more)
+        {
+            if (arg_types.size() > 1)
+            {
+                detail += ", ";
+            }
+            detail += "..." + Luau::toString(*tail);
+        }
+        detail += ") -> ";
+        Luau::ToStringOptions options = ALLuauTypes::glanceOptions();
+        detail += Luau::toString(function->retTypes, options);
+        return detail;
     }
 
     ALScriptCompletion::Brackets bracketsOf(Luau::ParenthesesRecommendation parens)
@@ -432,9 +503,20 @@ std::vector<ALScriptCompletion> ALLuauCompletion::answer(const Luau::Autocomplet
             completion.brackets = entry.typeCorrect == Luau::TypeCorrectKind::Correct ? ALScriptCompletion::Brackets::None
                                                                                        : bracketsOf(entry.parens);
         }
+        // After a colon the object is already bound as self: drop it from
+        // the detail the editor reads for placeholders, and put the caret
+        // after empty brackets where nothing else is taken.
+        const bool colonMethod = op == ':' && isMethod(entry);
         if (entry.type)
         {
-            completion.detail = ALLuauTypes::typeText(*entry.type);
+            completion.detail = callDetail(*entry.type, colonMethod);
+        }
+        if (colonMethod && completion.brackets != ALScriptCompletion::Brackets::None)
+        {
+            if (const Luau::FunctionType* function = ALLuauTypes::functionOf(*entry.type); function && onlySelfBound(*function))
+            {
+                completion.brackets = ALScriptCompletion::Brackets::After;
+            }
         }
         std::optional<std::string> symbol = entry.documentationSymbol;
         if (!symbol && entry.type)
